@@ -11,6 +11,7 @@ import { PeriodBar } from '@/components/admin/kit/period'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { REVIEW_ALIASES, REVIEW_FIELDS, REVIEW_SEARCH } from '@/lib/filters/fields/reviews'
 import { istToday, parsePeriod, runningAverage, type Period } from '@/lib/reviews/overview-period'
+import ReviewsOverviewSkeleton from './ReviewsOverviewSkeleton'
 
 interface Stats {
   reviews: number
@@ -308,11 +309,7 @@ export default function ReviewsOverview() {
     return (
       <div className="space-y-4">
         {header}
-        <KpiGrid>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
-          ))}
-        </KpiGrid>
+        <ReviewsOverviewSkeleton />
       </div>
     )
   }

@@ -5,6 +5,7 @@ import { Loader2, PlugZap, Trash2 } from 'lucide-react'
 import ConnectionsGear, { type ConnectionState } from '@/components/admin/ConnectionsGear'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { btnGhost, btnPrimary, inputCls } from '@/components/admin/kit/core'
+import { LoadingLines, Sk } from '@/components/admin/kit/skeleton'
 
 type Provider = 'ewaybill' | 'einvoice'
 interface ProviderStatus {
@@ -54,9 +55,15 @@ export default function TaxCredentialsGear() {
   return (
     <ConnectionsGear title="E-way bill and e-invoice API" scope="gst" state={state} open={open} onOpenChange={setOpen}>
       {!status ? (
-        <p className="text-sm text-foreground-muted flex items-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading...
-        </p>
+        <div className="space-y-4">
+          <LoadingLines lines={2} />
+          {(['ewaybill', 'einvoice'] as const).map(p => (
+            <div key={p} className="rounded-xl border border-border-default p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">{TITLE[p]}</h3>
+              <Sk className="h-3.5 w-2/3" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-foreground-secondary">

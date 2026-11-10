@@ -49,6 +49,8 @@ export interface UseDraftLockResult {
   handover: (toAdminId: string) => Promise<boolean>
   takeover: (reason: string) => Promise<boolean>
   requestAccess: (message?: string) => Promise<boolean>
+  /** Delete the draft through its type's own discard (DELETE on the lock API). */
+  discard: () => Promise<boolean>
   candidates: () => Promise<{ adminId: string; name: string }[]>
 }
 
@@ -172,12 +174,16 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
     })
   }, [resourceId, resourceType, refresh, toast])
 
+  // `null` payload = DELETE (discard the draft).
   const act = useCallback(
-    async (payload: Record<string, unknown>, ok?: string): Promise<boolean> => {
+    async (payload: Record<string, unknown> | null, ok?: string): Promise<boolean> => {
       if (!base) return false
       setBusy(true)
       try {
-        const r = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        const r = await fetch(
+          base,
+          payload ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) } : { method: 'DELETE' }
+        )
         const data = await r.json().catch(() => ({}))
         if (!r.ok) {
           toast.error(data.error || 'Could not update the draft lock')
@@ -248,6 +254,7 @@ export function useDraftLock({ resourceType, resourceId, initial, mode = 'edit',
       handover: (toAdminId: string) => act({ action: 'handover', toAdminId }, 'Draft handed over'),
       takeover: (reason: string) => act({ action: 'takeover', reason }, 'You now hold this draft'),
       requestAccess: (message?: string) => act({ action: 'request_access', message }, `Asked ${lock?.ownerName ?? 'the holder'} for this draft`),
+      discard: () => act(null, 'Draft deleted'),
       candidates: async () => {
         if (!base) return []
         const r = await fetch(`${base}?candidates=1`, { cache: 'no-store' })

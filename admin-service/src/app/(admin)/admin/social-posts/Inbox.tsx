@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Badge, Empty, Section, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
+import { CardsLoading } from './loading-parts'
 
 interface Item {
   id: string
@@ -94,7 +95,7 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !items ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <CardsLoading />
       ) : !items.length ? (
         <Empty msg={filter === 'open' ? 'Everything has a reply.' : 'No comments or reviews collected yet.'} />
       ) : (

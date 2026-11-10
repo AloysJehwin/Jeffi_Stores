@@ -24,7 +24,10 @@ import {
 } from '@/lib/google-ads/conversions/types'
 import { Section, Empty, Table } from './ReportViews'
 import { DataTable } from '@/components/admin/kit/data-table'
-import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { fetchJson } from '@/components/admin/kit/infinite'
+import { usePagedList } from '@/components/admin/kit/pager'
+import { LoadingLines, LoadingTable } from '@/components/admin/kit/skeleton'
+import { CONVERSION_ACTION_COLUMNS, UPLOAD_LOG_COLUMNS } from './skeletons'
 import { useListSort } from '@/components/admin/kit/list-sort'
 
 // Server-side purchase conversions: where they upload, Google's view of the account, and the queue.
@@ -310,7 +313,7 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
         {googleError ? (
           <p className="text-sm text-red-500">{googleError}</p>
         ) : !google ? (
-          <div className="h-24 rounded-lg bg-surface-secondary animate-pulse" />
+          <LoadingTable bare columns={CONVERSION_ACTION_COLUMNS} rows={3} />
         ) : (
           <ActionsTable
             actions={google.actions}
@@ -443,7 +446,7 @@ function ApiChoice({
 
 function RequestsTable({ requests, error }: { requests: DataManagerRequest[] | null; error: string | null }) {
   if (error) return <p className="text-sm text-red-500">{error}</p>
-  if (!requests) return <div className="h-16 rounded-lg bg-surface-secondary animate-pulse" />
+  if (!requests) return <LoadingTable bare columns={['Sent', 'Kind', 'Events', 'Google', 'Detail', 'Request id']} rows={3} />
   return (
     <div className="space-y-2">
       <p className="text-xs text-foreground-muted">
@@ -599,7 +602,7 @@ function ActionsTable({
 }
 
 function Diagnostics({ items, actionName }: { items: OfflineDiagnostics[] | null; actionName: string | null }) {
-  if (!items) return <div className="h-16 rounded-lg bg-surface-secondary animate-pulse" />
+  if (!items) return <LoadingLines lines={3} />
   const shown = items.filter(i => i.scope === 'account' || !actionName || i.actionName === actionName)
   if (!shown.length) return <Empty msg="Google has no upload diagnostics yet. They cover the last full day of imports." />
   return (
@@ -661,12 +664,10 @@ function UploadLogSection({
 }) {
   const [status, setStatus] = useState<UploadStatus | ''>('')
   const logSort = useListSort('uploads')
-  const list = useInfiniteList<UploadRow>({
+  const list = usePagedList<UploadRow>({
     key: `${status}|${reloadKey}|${logSort.sort ?? ''}|${logSort.dir}`,
-    pageSize: 25,
-    getKey: r => r.id,
     fetchPage: async (page, signal) => {
-      const qs = new URLSearchParams({ page: String(page) })
+      const qs = new URLSearchParams({ page: String(page), pageSize: '10' })
       if (status) qs.set('status', status)
       if (logSort.sort) {
         qs.set('sort', logSort.sort)
@@ -676,7 +677,6 @@ function UploadLogSection({
       return { rows: j.rows, total: j.total }
     },
   })
-  const error = list.rows.length ? null : list.error
 
   return (
     <Section
@@ -701,17 +701,17 @@ function UploadLogSection({
           </button>
         ))}
       </div>
-      {error ? (
-        <p className="text-sm text-red-500">{error}</p>
+      {list.error ? (
+        <p className="text-sm text-red-500">{list.error}</p>
       ) : list.loading ? (
-        <div className="h-24 rounded-lg bg-surface-secondary animate-pulse" />
+        <LoadingTable bare columns={UPLOAD_LOG_COLUMNS} rows={5} />
       ) : (
         <>
           <DataTable<UploadRow>
             bare
             sortNs="uploads"
             rows={list.rows}
-            infinite={list}
+            pager={list.pager}
             noun="uploads"
             rowKey={r => String(r.id)}
             empty="Nothing queued yet. Orders from Google Ads clicks appear here once paid (COD: once delivered)."

@@ -1,5 +1,5 @@
-import { AUTH_THEMES, AuthSplitSkeleton } from '@/components/auth/AuthSplitShell'
+import { BusinessAuthSkeleton } from '@/components/visitor/skeletons/auth'
 
 export default function Loading() {
-  return <AuthSplitSkeleton theme={AUTH_THEMES.business} />
+  return <BusinessAuthSkeleton kind="signin" />
 }

@@ -4,14 +4,13 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   actorOf,
-  closeIfLocked,
-  discardGuard,
   draftLockResponse,
   epochFrom,
   withDraftPublish,
   withDraftWrite,
   type DraftDb,
 } from '@/lib/admin/draft-locks'
+import { deleteReviewFormRow, discardReply } from '@/lib/admin/discard-rows'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -89,10 +88,5 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'review_forms:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const actor = actorOf(admin)
-  const denied = await discardGuard(actor, 'review_form', id)
-  if (denied) return denied
-  await queryOne('DELETE FROM review_forms WHERE id = $1', [id])
-  await closeIfLocked(actor, 'review_form', id)
-  return NextResponse.json({ success: true })
+  return discardReply(await deleteReviewFormRow(actorOf(admin), id))
 }

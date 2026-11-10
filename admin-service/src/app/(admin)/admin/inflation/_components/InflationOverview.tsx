@@ -4,6 +4,7 @@ import { Badge, Kpi, Section, Table, count, pct, when } from '@/components/admin
 import { delta } from '@/lib/overview/period'
 import type { AttentionItem } from '@/components/admin/overview/kit'
 import { OverviewTab } from '../../products/_components/catalog-overview'
+import InflationOverviewSkeleton from './InflationOverviewSkeleton'
 
 interface RunStats {
   runs: number
@@ -39,6 +40,7 @@ export default function InflationOverview() {
   return (
     <OverviewTab<InflationOverviewData>
       endpoint="/api/admin/inflation/overview"
+      skeleton={<InflationOverviewSkeleton />}
       kpis={d => (
         <>
           <Kpi
@@ -77,7 +79,6 @@ export default function InflationOverview() {
           <Table
             rows={d.recent}
             rowKey={r => r.id}
-            pageSize={8}
             empty="No bulk price changes yet"
             cols={[
               { key: 'cat', label: 'Category', render: r => r.categoryName },

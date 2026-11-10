@@ -6,7 +6,9 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Empty, TabAction, Tabs, api, btnGhost, btnPrimary, inputCls, pct } from '@/components/admin/kit/core'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { AI_CAPABILITY_LABEL } from '@/lib/ai/feature-labels'
-import Select from '@/components/ui/Select'
+import AdminSelect from '@/components/admin/AdminSelect'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { AI_PRICE_COLUMNS } from './columns'
 
 const ctl = `${inputCls} h-control py-0`
 
@@ -85,8 +87,7 @@ export default function AiPricingClient() {
       {adding && canWrite && (
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4 grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-end">
           <Field label="Capability">
-            <Select
-              aria-label="Capability"
+            <AdminSelect
               value={draft.capability}
               onChange={v => setDraft({ ...draft, capability: v })}
               options={CAPS.filter(c => c !== 'all').map(c => ({ value: c as string, label: AI_CAPABILITY_LABEL[c] }))}
@@ -99,8 +100,7 @@ export default function AiPricingClient() {
             <input className={ctl} value={draft.model} onChange={e => setDraft({ ...draft, model: e.target.value })} />
           </Field>
           <Field label="Unit">
-            <Select
-              aria-label="Unit"
+            <AdminSelect
               value={draft.unit_type}
               onChange={v => setDraft({ ...draft, unit_type: v })}
               options={UNITS.map(u => ({ value: u, label: UNIT_LABEL[u] }))}
@@ -124,7 +124,7 @@ export default function AiPricingClient() {
       )}
 
       {!rows ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingTable columns={AI_PRICE_COLUMNS} rows={6} />
       ) : shown.length === 0 ? (
         <Empty msg="No prices for this capability." />
       ) : (

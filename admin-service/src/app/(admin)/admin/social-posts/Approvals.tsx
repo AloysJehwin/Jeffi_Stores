@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { Empty, Section, api, btnGhost, btnPrimary } from '@/components/admin/channels/ui'
 import PostGroup from './PostGroup'
+import { CardsLoading } from './loading-parts'
 import { groupPosts, type Post } from './shared'
 
 export default function Approvals({ posts, canApprove: canApproveProp, onChange }: { posts: Post[] | null; canApprove: boolean; onChange: () => void }) {
@@ -27,7 +28,7 @@ export default function Approvals({ posts, canApprove: canApproveProp, onChange 
   return (
     <Section title={`Waiting for approval${waiting.length ? ` (${waiting.length})` : ''}`}>
       {!posts ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <CardsLoading />
       ) : !waiting.length ? (
         <Empty msg="Nothing is waiting for approval." />
       ) : (

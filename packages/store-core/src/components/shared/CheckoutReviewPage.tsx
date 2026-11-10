@@ -18,7 +18,9 @@ import { round2 } from '@/lib/catalog/gst'
 import { bp } from '@/lib/shared/business-path'
 import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
+import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, upiFlag, useUpiPayment, type PaymentChoice } from '@/components/payments'
 import { couponLookup, urlCoupon, urlCouponCode, withCoupon } from '@/components/visitor/coupons/terms'
+import { CheckoutReviewSkeleton } from '@/components/visitor/skeletons/commerce'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -49,6 +51,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
   const isCodSiteEnabled = useStoreConfig().flags.codEnabled
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const upiEnabled = upiFlag(useStoreConfig().flags)
   const updatesVia = updateChannelsLabel(useMessagingChannels())
   const storeName = useStoreConfig().identity.name
   const router = useRouter()
@@ -103,9 +106,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod' | 'manual'>(
-    isRazorpayEnabled ? 'razorpay' : isBusiness ? 'manual' : 'cod'
+  const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>(
+    upiEnabled ? 'upi' : isRazorpayEnabled ? 'razorpay' : isBusiness ? 'manual' : 'cod'
   )
+  // Once the customer picks a method the UPI default stops re-applying.
+  const payTouched = useRef(false)
+  const upi = useUpiPayment({
+    returnTo: ordersPath,
+    headers: portalHeader,
+    returnPath: id => (isBusiness ? bp(`/business/pay/upi/${id}/return`) : `/pay/upi/${id}/return`),
+  })
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -606,18 +616,34 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   // Business buyers can always fall back to manual (contact-for-payment), so B2B never
   // hits the no-payment state. Consumer storefront has no manual option.
   const manualAvailable = isBusiness && !hasDigital
-  const noPaymentMethod = !isRazorpayEnabled && !codAvailable && !manualAvailable
+  const noPaymentMethod = !isRazorpayEnabled && !codAvailable && !manualAvailable && !upiEnabled
+  const isOnlinePay = paymentMethod === 'razorpay' || paymentMethod === 'upi'
 
-  // Reset payment method if the selected option becomes unavailable.
+  // Reset payment method if the selected option becomes unavailable; UPI is the default while untouched.
   useEffect(() => {
-    if (paymentMethod === 'razorpay' && !isRazorpayEnabled) {
-      setPaymentMethod(codAvailable ? 'cod' : manualAvailable ? 'manual' : 'razorpay')
+    const fallback = upiEnabled ? 'upi' : isRazorpayEnabled ? 'razorpay' : codAvailable ? 'cod' : manualAvailable ? 'manual' : null
+    if (paymentMethod === 'upi' && !upiEnabled) {
+      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : codAvailable ? 'cod' : manualAvailable ? 'manual' : 'upi')
+    } else if (paymentMethod === 'razorpay' && !isRazorpayEnabled) {
+      setPaymentMethod(fallback ?? 'razorpay')
     } else if (paymentMethod === 'cod' && !codAvailable) {
-      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : manualAvailable ? 'manual' : 'cod')
+      setPaymentMethod(fallback ?? 'cod')
     } else if (paymentMethod === 'manual' && !manualAvailable) {
-      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : codAvailable ? 'cod' : 'manual')
+      setPaymentMethod(fallback ?? 'manual')
+    } else if (upiEnabled && paymentMethod !== 'upi' && !payTouched.current) {
+      setPaymentMethod('upi')
     }
-  }, [codAvailable, isRazorpayEnabled, manualAvailable])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codAvailable, isRazorpayEnabled, manualAvailable, upiEnabled])
+
+  // Start errors surface as toasts; the manual dialog shows its own confirm errors.
+  useEffect(() => {
+    if (upi.error && !upi.manual) {
+      showToast(upi.error, 'error')
+      upi.clearError()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upi.error, upi.manual])
 
   // Load Razorpay script when razorpay payment method is selected
   useEffect(() => {
@@ -714,6 +740,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           contact: selectedAddress?.phone || '',
         },
         theme: { color: '#f97316' },
+        // UPI has its own section on this page; keep it out of Checkout.
+        ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
         redirect: false,
         callback_url: `${window.location.origin}${callbackPath}`,
         modal: {
@@ -842,6 +870,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     }
     if (
       noPaymentMethod ||
+      (paymentMethod === 'upi' && !upiEnabled) ||
       (paymentMethod === 'razorpay' && !isRazorpayEnabled) ||
       (paymentMethod === 'cod' && !codAvailable) ||
       (paymentMethod === 'manual' && !manualAvailable)
@@ -853,7 +882,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     setIsSubmitting(true)
 
     try {
-      if (paymentMethod === 'razorpay') {
+      if (isOnlinePay) {
         const draftBody: any = {
           mode: isBuyNow ? 'buyNow' : 'cart',
           addressId: selectedAddress.id,
@@ -886,6 +915,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         }
         if (!draftRes.ok) throw new Error(draftData.error || 'Failed to start payment')
 
+        if (paymentMethod === 'upi') {
+          // PhonePe leaves the page; manual opens the UTR dialog (the draft commits on confirm).
+          const started = await upi.start({ purpose: 'order_draft', draftToken: draftData.draftToken })
+          if (!started || started.mode === 'manual') setIsSubmitting(false)
+          return
+        }
         await initiateRazorpayPayment({ draftToken: draftData.draftToken })
         return
       }
@@ -968,18 +1003,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     )
   }
 
-  if (authLoading || cartLoading || (intentToken && isBuyNow && !buyNowItem)) {
-    return (
-      <div className="min-h-screen bg-surface px-4 py-8">
-        <div className="max-w-2xl mx-auto animate-pulse space-y-4">
-          <div className="h-6 bg-surface-elevated rounded w-40" />
-          <div className="h-32 bg-surface-elevated rounded-lg" />
-          <div className="h-48 bg-surface-elevated rounded-lg" />
-          <div className="h-24 bg-surface-elevated rounded-lg" />
-        </div>
-      </div>
-    )
-  }
+  if (authLoading || cartLoading || (intentToken && isBuyNow && !buyNowItem)) return <CheckoutReviewSkeleton />
 
   if (!user) return null
   if (!intentToken && !isBuyNow && cartCount === 0) return null
@@ -1013,7 +1037,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               {isLoadingAddresses ? (
                 <div className="space-y-3">
                   {[1, 2].map(i => (
-                    <div key={i} className="h-20 bg-surface rounded-lg animate-pulse border border-border-default" />
+                    <div key={i} className="sk h-20 bg-surface rounded-lg border border-border-default" />
                   ))}
                 </div>
               ) : addresses.length === 0 ? (
@@ -1701,60 +1725,19 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               {/* Payment Method */}
               <div className="mb-4 space-y-2">
                 <p className="text-sm font-medium text-foreground-secondary">Payment Method</p>
-                {isRazorpayEnabled && (
-                  <label
-                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="razorpay"
-                      checked={paymentMethod === 'razorpay'}
-                      onChange={() => setPaymentMethod('razorpay')}
-                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
-                    />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Pay Online</p>
-                      <p className="text-xs text-foreground-secondary">UPI, Cards, Net Banking</p>
-                    </div>
-                  </label>
-                )}
-                {codAvailable && (
-                  <label
-                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="cod"
-                      checked={paymentMethod === 'cod'}
-                      onChange={() => setPaymentMethod('cod')}
-                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
-                    />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Cash on Delivery</p>
-                      <p className="text-xs text-foreground-secondary">Pay when your order arrives</p>
-                    </div>
-                  </label>
-                )}
-                {manualAvailable && (
-                  <label
-                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="manual"
-                      checked={paymentMethod === 'manual'}
-                      onChange={() => setPaymentMethod('manual')}
-                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
-                    />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Contact for Payment</p>
-                      <p className="text-xs text-foreground-secondary">Our team will reach out to arrange payment</p>
-                    </div>
-                  </label>
-                )}
+                <PaymentSections
+                  compact
+                  amountInr={finalTotal}
+                  upi={upiEnabled}
+                  razorpay={isRazorpayEnabled}
+                  cod={codAvailable}
+                  manual={manualAvailable}
+                  value={paymentMethod}
+                  onChange={v => {
+                    payTouched.current = true
+                    setPaymentMethod(v)
+                  }}
+                />
                 {paymentMethod === 'manual' && manualAvailable && (
                   <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
                     Your order will be placed as unpaid. Our team will contact you to confirm the payment arrangement
@@ -1813,6 +1796,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       isLoadingShipping ||
                       !serviceable ||
                       (paymentMethod === 'cod' && !codAvailable) ||
+                      (paymentMethod === 'upi' && !upiEnabled) ||
                       (shippingCharge === null && !shippingError) ||
                       isSubmitting ||
                       (paymentMethod === 'razorpay' && isRazorpayEnabled && !razorpayLoaded)
@@ -1822,14 +1806,14 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
-                        {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
+                        {isOnlinePay ? 'Processing...' : 'Placing Order...'}
                       </>
                     ) : isLoadingShipping ? (
                       <>
                         <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
                         Calculating delivery…
                       </>
-                    ) : paymentMethod === 'razorpay' && isRazorpayEnabled ? (
+                    ) : (paymentMethod === 'razorpay' && isRazorpayEnabled) || (paymentMethod === 'upi' && upiEnabled) ? (
                       <>
                         <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -1921,6 +1905,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           }}
           {...(isBusiness ? { portalHeader: 'business' } : {})}
         />
+        <UpiManualDialog
+          manual={upi.manual}
+          busy={upi.busy}
+          error={upi.error}
+          onConfirm={upi.confirmUtr}
+          onClose={() => {
+            upi.dismissManual()
+            setIsSubmitting(false)
+          }}
+        />
       </div>
     </div>
   )
@@ -1928,7 +1922,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
 export function CheckoutReviewPageVisitorWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<CheckoutReviewSkeleton />}>
       <CheckoutReviewPage isBusiness={false} />
     </Suspense>
   )
@@ -1936,7 +1930,7 @@ export function CheckoutReviewPageVisitorWrapper() {
 
 export function CheckoutReviewPageBusinessWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<CheckoutReviewSkeleton />}>
       <CheckoutReviewPage isBusiness={true} />
     </Suspense>
   )

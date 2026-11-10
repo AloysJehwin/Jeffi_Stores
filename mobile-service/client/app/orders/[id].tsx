@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import RazorpayCheckout from 'react-native-razorpay'
 import { PackageOpen } from 'lucide-react-native'
 import { api } from '../../src/api/client'
-import { createRazorpayOrder, verifyPayment } from '../../src/api/razorpay'
+import { createRazorpayOrder, razorpayDisplayConfig, verifyPayment } from '../../src/api/razorpay'
 import {
   cancelOrderWith,
   confirmOrderChange,
@@ -52,6 +52,7 @@ export default function OrderDetailScreen() {
   const config = useStoreConfig()
   const storeIdentity = config.identity
   const isRazorpayEnabled = config.flags.razorpayEnabled && RAZORPAY_ENABLED
+  const isUpiEnabled = !!config.flags.upiEnabled
   const orderAutoCancelMinutes = Number((config as { orderAutoCancelMinutes?: number }).orderAutoCancelMinutes ?? 10)
   const resetCart = useCartStore(s => s.reset)
 
@@ -113,7 +114,7 @@ export default function OrderDetailScreen() {
     // Only an online-payment checkout has a pay-by deadline; COD, manual and UPI QR orders wait.
     if (order.paymentMode === 'cod' || order.paymentMode === 'manual' || order.paymentMode === 'upi_qr') return
     if (order.status !== 'pending') return
-    if (!isRazorpayEnabled) return
+    if (!isRazorpayEnabled && !isUpiEnabled) return
     const deadline = new Date(order.createdAt).getTime() + orderAutoCancelMinutes * 60 * 1000
     const tick = () => {
       const remaining = Math.max(0, deadline - Date.now())
@@ -123,7 +124,7 @@ export default function OrderDetailScreen() {
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [order, handleAutoCancel, orderAutoCancelMinutes, isRazorpayEnabled])
+  }, [order, handleAutoCancel, orderAutoCancelMinutes, isRazorpayEnabled, isUpiEnabled])
 
   // A UPI QR order is paid by scanning; watch for the payment like the web does.
   useEffect(() => {
@@ -179,9 +180,14 @@ export default function OrderDetailScreen() {
 
   const prefill = () => ({ email: user?.email || '', contact: (order?.shippingAddress?.phone || '').replace(/\D/g, '').slice(-10), name: order?.shippingAddress?.full_name || '' })
 
-  // The app's Razorpay retry flow (create-order → native Checkout → verify), on the web's copy.
-  const handlePayNow = async () => {
+  // Pay now: UPI goes to the app's UPI screen (purpose 'order'); otherwise the Razorpay retry flow
+  // (create-order → native Checkout → verify), on the web's copy.
+  const handlePayNow = async (method: 'upi' | 'razorpay') => {
     if (!order || !user) return
+    if (method === 'upi') {
+      router.push({ pathname: '/checkout/upi', params: { orderId: order.id } })
+      return
+    }
     setIsPayingNow(true)
     try {
       const rzp = await createRazorpayOrder({ orderId: order.id })
@@ -194,6 +200,7 @@ export default function OrderDetailScreen() {
         name: storeIdentity.name || 'Jeffi Stores',
         prefill: prefill(),
         theme: { color: accent[500] },
+        ...razorpayDisplayConfig(isUpiEnabled),
       })
       await verifyPayment({
         razorpay_order_id: paymentData.razorpay_order_id ?? rzp.razorpayOrderId,
@@ -388,6 +395,7 @@ export default function OrderDetailScreen() {
               <PaymentNotices
                 order={order}
                 razorpay={isRazorpayEnabled}
+                upi={isUpiEnabled}
                 countdown={countdown}
                 autoCancelling={isAutoCancelling}
                 paying={isPayingNow}

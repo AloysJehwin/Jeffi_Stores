@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { useCanUseAi } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 
 interface AiSummary {
   summary: string | null
@@ -96,11 +97,7 @@ export default function CustomerAiSummary({
       </div>
 
       {loading ? (
-        <div className="space-y-2 animate-pulse">
-          <div className="h-3 bg-surface-secondary rounded w-full" />
-          <div className="h-3 bg-surface-secondary rounded w-5/6" />
-          <div className="h-3 bg-surface-secondary rounded w-2/3" />
-        </div>
+        <LoadingLines lines={3} />
       ) : data?.summary ? (
         <div className="flex gap-3">
           <Sparkles className="w-4 h-4 text-accent-500 shrink-0 mt-0.5" />

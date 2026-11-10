@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveAudience } from '@/lib/shared/email-campaigns'
+import { sesRate } from '@jeffi/mail-shell'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
     count: recipients.length,
     withEmail: recipients.filter(r => r.email).length,
     withPhone: recipients.filter(r => r.phone).length,
+    // Broadcast email goes out at the bulk share of the SES rate (lib/shared/ses-pace).
+    emailRate: Math.max(1, Math.floor(sesRate() * 0.75)),
     ...(pushReach ? { push: pushReach } : {}),
     recipients: page.map(r => ({ email: r.email, phone: r.phone, first_name: r.first_name })),
   })

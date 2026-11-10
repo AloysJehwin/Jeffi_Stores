@@ -64,6 +64,9 @@ const BUSINESS_TYPES = [
 const inp = fieldInput
 const lbl = fieldLabel
 
+// Same shape check as the bank endpoint (lib/payments/bank-verify.ts).
+const UPI_ID_RE = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/
+
 function slugify(s: string) {
   return s
     .toLowerCase()
@@ -152,7 +155,8 @@ export default function OnboardWizard({
   })
 
   // Step 5 — Bank
-  const [bank, setBank] = useState(init.bank ?? { accountNumber: '', ifsc: '', holderName: '' })
+  const [bank, setBank] = useState({ accountNumber: '', ifsc: '', holderName: '', upiId: '', ...(init.bank ?? {}) })
+  const upiIdOk = !bank.upiId || UPI_ID_RE.test(bank.upiId)
   const [ownRazorpay, setOwnRazorpay] = useState(init.ownRazorpay ?? false)
   // key_id is public and safe to round-trip the draft; the two secrets live only in local state and
   // are sent once to submit() — they must never enter the cleartext autosave `data` blob.
@@ -350,7 +354,7 @@ export default function OnboardWizard({
       const res = await fetch('/api/ecom/bank/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountNumber: bank.accountNumber, ifsc: bank.ifsc, holderName: bank.holderName }),
+        body: JSON.stringify({ accountNumber: bank.accountNumber, ifsc: bank.ifsc, holderName: bank.holderName, upiId: bank.upiId || undefined }),
       })
       const data = await res.json()
       if (res.ok && (data.status === 'verified' || data.status === 'unverified')) {
@@ -849,6 +853,7 @@ export default function OnboardWizard({
                       <div className="font-mono text-xs">
                         •••• {String(bank.accountNumber).slice(-4)} · {bank.ifsc}
                       </div>
+                      {bank.upiId && <div className="font-mono text-xs">UPI {bank.upiId}</div>}
                     </div>
                     <button
                       type="button"
@@ -857,7 +862,7 @@ export default function OnboardWizard({
                         setBankVerified(false)
                         setBankNameConfirmed(false)
                         setBankMsg(null)
-                        setBank({ accountNumber: '', ifsc: '', holderName: '' })
+                        setBank({ accountNumber: '', ifsc: '', holderName: '', upiId: '' })
                       }}
                       className="mt-3 min-h-11 sm:min-h-0 text-xs font-semibold text-foreground-secondary hover:text-foreground underline"
                     >
@@ -906,13 +911,35 @@ export default function OnboardWizard({
                       }}
                     />
                   </div>
+                  <div className="col-span-full sm:col-span-2">
+                    <label className={lbl}>
+                      UPI ID <span className="text-foreground-muted font-normal">(optional)</span>
+                    </label>
+                    <input
+                      className={inp}
+                      value={bank.upiId}
+                      disabled={bankVerified}
+                      placeholder="yourstore@okaxis"
+                      autoCapitalize="none"
+                      onChange={e => {
+                        setBank({ ...bank, upiId: e.target.value.trim() })
+                        setBankVerified(false)
+                        setBankNameConfirmed(false)
+                      }}
+                    />
+                    <p className={`mt-1 text-xs ${upiIdOk ? 'text-foreground-muted' : 'text-[#8a2e1f]'}`}>
+                      {upiIdOk
+                        ? 'Lets customers pay your store by UPI directly. A PhonePe Business account can be connected later from Integrations.'
+                        : 'A UPI ID looks like name@bank.'}
+                    </p>
+                  </div>
                 </div>
 
                 {!bankVerified ? (
                   <button
                     type="button"
                     onClick={verifyBank}
-                    disabled={busy || !bank.holderName || bank.accountNumber.length < 9 || bank.ifsc.length !== 11}
+                    disabled={busy || !bank.holderName || bank.accountNumber.length < 9 || bank.ifsc.length !== 11 || !upiIdOk}
                     className={`${primaryBtn} w-full sm:w-auto`}
                   >
                     {busy ? 'Saving…' : 'Save account'}
@@ -1119,6 +1146,7 @@ export default function OnboardWizard({
                   ['GSTIN', gstNumber],
                   ['GST cert', gstFilename || 'Not uploaded'],
                   ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not added'],
+                  ['UPI ID', bankVerified && bank.upiId ? bank.upiId : '—'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
                   ['Delhivery', ownDelhivery ? 'Own account' : 'Managed by Jeffi'],
                   ['Payments', ownRazorpay ? 'Own Razorpay' : 'Routed via Jeffi'],

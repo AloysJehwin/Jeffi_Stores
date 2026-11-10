@@ -26,3 +26,21 @@ export const CAMPAIGN_VARIABLES: ComposerVariable[] = [
   v('newPrice', 'New price', 'Current price', '799'),
   v('ctaUrl', 'CTA URL', 'Link target for the call-to-action', 'https://…'),
 ]
+
+const m = (key: string, label: string, description: string, sample: string): ComposerVariable => ({
+  key,
+  label,
+  description,
+  sample,
+  group: 'order',
+  builtIn: true,
+  section: 'Message',
+})
+
+// What a Messaging broadcast fills per recipient (the coupon ones only when a coupon is picked).
+export const MESSAGING_VARIABLES: ComposerVariable[] = [
+  m('firstName', 'First name', "Recipient's first name", 'Priya'),
+  m('couponCode', 'Coupon code', "The message's coupon code", 'DIWALI20'),
+  m('discountLabel', 'Discount', 'The coupon discount, e.g. 20% off', '20% off'),
+  m('discountPercent', 'Discount %', 'Percentage coupons only', '20'),
+]

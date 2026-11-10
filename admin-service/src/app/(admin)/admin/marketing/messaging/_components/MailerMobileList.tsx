@@ -44,7 +44,7 @@ const channelLabel = (
   c.template_key === 'library'
     ? Object.entries(c.channels ?? {})
         .map(([k, v]) =>
-          k === 'push' ? `App push: ${v.title || '—'}` : `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`
+          k === 'push' ? `App push: ${v.title || '—'}` : `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug || 'written here'}`
         )
         .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key

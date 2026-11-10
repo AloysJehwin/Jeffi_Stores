@@ -13,6 +13,8 @@ import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
 import { bp } from '@/lib/shared/business-path'
+import { OrderDetailSkeleton } from '@/components/visitor/skeletons/account'
+import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, upiFlag, useUpiPayment, type PaymentChoice } from '@/components/payments'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const PH = { 'X-Auth-Portal': 'business' }
@@ -222,9 +224,20 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
   const { user, isLoading: authLoading } = useAuth()
   const {
     flags: { razorpayEnabled: isRazorpayEnabled },
+    flags: storeFlags,
     orderAutoCancelMinutes,
     identity,
   } = useStoreConfig()
+  const upiEnabled = upiFlag(storeFlags)
+  const canPayOnline = isRazorpayEnabled || upiEnabled
+  // null = default (UPI when the store offers it).
+  const [payPick, setPayPick] = useState<PaymentChoice | null>(null)
+  const payChoice: PaymentChoice = payPick === 'razorpay' && isRazorpayEnabled ? 'razorpay' : upiEnabled ? 'upi' : 'razorpay'
+  const upi = useUpiPayment({
+    returnTo: bp(`/business/account/orders/${id}`),
+    headers: PH,
+    returnPath: intentId => bp(`/business/pay/upi/${intentId}/return`),
+  })
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
@@ -372,6 +385,11 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
     setIsPayingNow(true)
     setPaymentError('')
     try {
+      if (payChoice === 'upi') {
+        const started = await upi.start({ purpose: 'order', orderId: order.id })
+        if (!started || started.mode === 'manual') setIsPayingNow(false)
+        return
+      }
       await loadRazorpayScript()
       const rzpRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
@@ -416,6 +434,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
           contact: order.shippingAddress?.phone || '',
         },
         theme: { color: '#f97316' },
+        ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
         modal: { ondismiss: () => setIsPayingNow(false) },
       }
       const rzp = new (window as any).Razorpay(options)
@@ -430,68 +449,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
     }
   }
 
-  if (authLoading || loading) {
-    return (
-      <div className="bg-surface min-h-screen">
-        <div className="container mx-auto px-4">
-          <div className="py-4 sm:py-6 space-y-4 sm:space-y-6 animate-pulse">
-            {/* Order header skeleton */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="h-6 w-48 bg-surface-secondary rounded" />
-                  <div className="h-4 w-64 bg-surface-secondary rounded" />
-                </div>
-                <div className="flex gap-2">
-                  <div className="h-6 w-20 bg-surface-secondary rounded-full" />
-                  <div className="h-6 w-24 bg-surface-secondary rounded-full" />
-                </div>
-              </div>
-            </div>
-            {/* Order items skeleton */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-4">
-              <div className="h-5 w-36 bg-surface-secondary rounded" />
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex gap-4 pb-4 border-b border-border-default last:border-b-0"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  <div className="w-20 h-20 bg-surface-secondary rounded-lg shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-surface-secondary rounded w-3/4" />
-                    <div className="h-3 bg-surface-secondary rounded w-1/4" />
-                    <div className="h-3 bg-surface-secondary rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-              {/* Totals skeleton — business has an extra Business Discount row */}
-              <div className="pt-4 border-t-2 border-border-default space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex justify-between" style={{ animationDelay: `${i * 50}ms` }}>
-                    <div className="h-4 w-24 bg-surface-secondary rounded" />
-                    <div className="h-4 w-24 bg-surface-secondary rounded" />
-                  </div>
-                ))}
-                <div className="flex justify-between pt-2">
-                  <div className="h-6 w-12 bg-surface-secondary rounded" />
-                  <div className="h-7 w-28 bg-surface-secondary rounded" />
-                </div>
-              </div>
-            </div>
-            {/* Shipping address skeleton */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-3">
-              <div className="h-5 w-40 bg-surface-secondary rounded" />
-              <div className="h-4 w-32 bg-surface-secondary rounded" />
-              <div className="h-4 w-56 bg-surface-secondary rounded" />
-              <div className="h-4 w-44 bg-surface-secondary rounded" />
-              <div className="h-4 w-36 bg-surface-secondary rounded" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (authLoading || loading) return <OrderDetailSkeleton portal="business" />
 
   if (!user) return null
 
@@ -902,7 +860,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
           )}
 
           {order.paymentStatus === 'unpaid' &&
-            isRazorpayEnabled &&
+            canPayOnline &&
             order.status !== 'cancelled' &&
             order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -936,6 +894,11 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                           Time expired. Cancelling order...
                         </p>
                       )}
+                      {upiEnabled && !isAutoCancelling && (
+                        <div className="mt-3 max-w-md">
+                          <PaymentSections compact upi razorpay={isRazorpayEnabled} value={payChoice} onChange={setPayPick} />
+                        </div>
+                      )}
                     </div>
                   </div>
                   {!isAutoCancelling && (
@@ -960,7 +923,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
             )}
 
           {order.paymentStatus === 'unpaid' &&
-            !isRazorpayEnabled &&
+            !canPayOnline &&
             order.status !== 'cancelled' &&
             order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -986,7 +949,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
             )}
 
           {order.paymentStatus === 'failed' &&
-            isRazorpayEnabled &&
+            canPayOnline &&
             order.status !== 'cancelled' &&
             order.status !== 'cancel_requested' && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -1018,6 +981,11 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                       {isAutoCancelling && (
                         <p className="text-red-800 dark:text-red-300 text-sm mt-2">Time expired. Cancelling order...</p>
                       )}
+                      {upiEnabled && !isAutoCancelling && (
+                        <div className="mt-3 max-w-md">
+                          <PaymentSections compact upi razorpay={isRazorpayEnabled} value={payChoice} onChange={setPayPick} />
+                        </div>
+                      )}
                     </div>
                   </div>
                   {!isAutoCancelling && (
@@ -1041,11 +1009,21 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
 
-          {paymentError && (
+          {(paymentError || (upi.error && !upi.manual)) && (
             <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-red-800 dark:text-red-300 text-sm">{paymentError}</p>
+              <p className="text-red-800 dark:text-red-300 text-sm">{paymentError || upi.error}</p>
             </div>
           )}
+          <UpiManualDialog
+            manual={upi.manual}
+            busy={upi.busy}
+            error={upi.error}
+            onConfirm={upi.confirmUtr}
+            onClose={() => {
+              upi.dismissManual()
+              setIsPayingNow(false)
+            }}
+          />
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-4">

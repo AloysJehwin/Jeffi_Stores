@@ -24,6 +24,7 @@ export interface CustomerSubscriptionItem {
   nextChargeAt: string | null
   cancelAtCycleEnd: boolean
   accessExpiresAt: string | null
+  billingProvider: 'razorpay' | 'phonepe'
   address: { name: string; line1: string; city: string; state: string; pincode: string } | null
   orders: Array<{ id: string; orderNumber: string; status: string; total: number; createdAt: string; cycle: number | null }>
 }
@@ -79,6 +80,7 @@ export async function loadCustomerSubscriptions(userId: string, id?: string): Pr
       nextChargeAt: CHARGEABLE.has(r.status) && !r.cancel_at_cycle_end ? iso(r.current_end ?? r.next_renewal_at) : null,
       cancelAtCycleEnd: r.cancel_at_cycle_end === true,
       accessExpiresAt: iso(r.access_expires_at),
+      billingProvider: r.billing_provider === 'phonepe' ? 'phonepe' : 'razorpay',
       address: a
         ? {
             name: a.full_name ?? '',

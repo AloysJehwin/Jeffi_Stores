@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Archive, Check, Loader2, Plus, Save, Search, Send, X } from 'lucide-react'
-import { ActionButton } from '@/components/admin/kit'
+import { Archive, Check, Plus, Save, Search, Send, X } from 'lucide-react'
+import { ActionButton, Pager, usePagedRows } from '@/components/admin/kit'
+import { Sk } from '@/components/admin/kit/skeleton'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { useToast } from '@/contexts/ToastContext'
@@ -20,6 +21,55 @@ const LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: '
 const box = 'rounded-xl border border-border-default bg-surface-elevated min-w-0'
 const card = `${box} p-4 sm:p-5`
 const tabCls = (on: boolean) => `shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`
+
+const ACCESS = [
+  { label: 'Customer can create and edit templates', hint: 'Off: their console is read-only and API template writes are refused. You can still edit for them under Templates.' },
+  { label: 'Review customer changes before they are sent', hint: 'Their edits wait in Review; sends keep using the last approved version until you approve.' },
+]
+
+function SettingsLoading() {
+  return (
+    <div className="space-y-5 sm:space-y-6 min-w-0" aria-busy="true">
+      <div className={`${card} space-y-4`}>
+        <h3 className="font-semibold text-foreground">Customer access</h3>
+        {ACCESS.map(a => (
+          <div key={a.label} className="flex items-start gap-3">
+            <Sk className="mt-0.5 h-5 w-9 shrink-0 rounded-full" />
+            <span><span className="block text-sm font-medium text-foreground">{a.label}</span><span className="block text-xs text-foreground-muted">{a.hint}</span></span>
+          </div>
+        ))}
+      </div>
+      <div className={card}>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <h3 className="font-semibold text-foreground">Standard templates</h3>
+          <Sk className="h-9 w-44 rounded-lg" />
+        </div>
+        <Sk className="h-3.5 w-2/3" />
+      </div>
+      <div className="flex justify-end"><Sk className="h-control w-32 rounded-lg" /></div>
+    </div>
+  )
+}
+
+function ReviewLoading() {
+  return (
+    <div className={card} aria-busy="true">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Sk className="h-4 w-40" />
+        <Sk className="h-3 w-24" />
+        <Sk className="h-5 w-16 rounded-full" />
+      </div>
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row">
+        {['Live', 'Proposed'].map(t => (
+          <div key={t} className="min-w-0 flex-1">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-foreground-muted">{t}</div>
+            <Sk className="h-72 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
   return (
@@ -80,11 +130,11 @@ export default function MessagingTab({ tenantId, storeName }: { tenantId: string
         <button className={tabCls(section === 'templates')} onClick={() => setSection('templates')}>Templates</button>
       </div>
 
-      {section === 'settings' && (!settings || !catalog ? <div className={card}><Loader2 className="w-5 h-5 animate-spin text-foreground-muted" /></div> : (
+      {section === 'settings' && (!settings || !catalog ? <SettingsLoading /> : (
         <SettingsPanel settings={settings} setSettings={setSettings} catalog={catalog} dirty={saved !== JSON.stringify(settings)} busy={busy} onSave={saveSettings} />
       ))}
 
-      {section === 'review' && (reviews === null ? <div className={card}><Loader2 className="w-5 h-5 animate-spin text-foreground-muted" /></div> : reviews.length === 0 ? (
+      {section === 'review' && (reviews === null ? <ReviewLoading /> : reviews.length === 0 ? (
         <div className={card}><p className="text-sm text-foreground-muted">Nothing waiting for review. {settings?.review_required ? '' : 'Review is off for this customer — their changes go live as they save.'}</p></div>
       ) : (
         <div className="space-y-4">{reviews.map(r => <ReviewCard key={r.id} row={r} onDecide={decide} />)}</div>
@@ -115,10 +165,8 @@ function SettingsPanel({ settings, setSettings, catalog, dirty, busy, onSave }: 
     <div className="space-y-5 sm:space-y-6 min-w-0">
       <div className={`${card} space-y-4`}>
         <h3 className="font-semibold text-foreground">Customer access</h3>
-        <Toggle on={settings.editing_enabled} onChange={v => setSettings({ ...settings, editing_enabled: v })}
-          label="Customer can create and edit templates" hint="Off: their console is read-only and API template writes are refused. You can still edit for them under Templates." />
-        <Toggle on={settings.review_required} onChange={v => setSettings({ ...settings, review_required: v })}
-          label="Review customer changes before they are sent" hint="Their edits wait in Review; sends keep using the last approved version until you approve." />
+        <Toggle on={settings.editing_enabled} onChange={v => setSettings({ ...settings, editing_enabled: v })} {...ACCESS[0]} />
+        <Toggle on={settings.review_required} onChange={v => setSettings({ ...settings, review_required: v })} {...ACCESS[1]} />
       </div>
 
       <div className={card}>
@@ -248,6 +296,7 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
   }
 
   const shown = (items ?? []).filter(i => `${i.name} ${i.slug}`.toLowerCase().includes(q.toLowerCase()))
+  const paged = usePagedRows(shown, undefined, `${channel}|${q}`)
   return (
     <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className={box}>
@@ -256,8 +305,17 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
           <Search className="ml-1 w-4 h-4 shrink-0 text-foreground-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" aria-label="Filter templates" className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none" />
           <ActionButton action={{ label: 'New', icon: Plus, onClick: () => pick({ slug: '', channel, name: '', subject: '', body: '', blocks_format: channel === 'email' ? 'tiptap' : channel === 'sms' ? 'sms-text' : 'wa-content' }) }} />
         </div>
-        <div className="max-h-[50vh] overflow-y-auto lg:max-h-[560px]">
-          {items === null ? <p className="p-4 text-xs text-foreground-muted">Loading…</p> : shown.map(i => (
+        <div>
+          {items === null ? (
+            <div aria-busy="true">
+              {['w-3/4', 'w-1/2', 'w-2/3', 'w-3/5', 'w-1/2', 'w-2/3'].map((w, i) => (
+                <div key={i} className="flex items-center gap-2 border-b border-border-default px-3 py-2.5">
+                  <Sk className={`h-3.5 ${w}`} />
+                  <Sk className="ml-auto h-3.5 w-14 rounded-full" />
+                </div>
+              ))}
+            </div>
+          ) : paged.shown.map(i => (
             <button key={`${i.source}-${i.slug}`} onClick={() => open(i)} className="flex w-full min-w-0 items-center gap-2 border-b border-border-default px-3 py-2 text-left text-sm hover:bg-surface-secondary">
               <span className="min-w-0 truncate">{i.name || i.slug}</span>
               <span className={`ml-auto shrink-0 rounded-full px-1.5 text-[10px] font-semibold ${i.source === 'tenant' ? 'bg-sky-100 text-sky-700' : 'bg-surface-secondary text-foreground-muted'}`}>{i.source === 'tenant' ? 'Customer' : 'Standard'}</span>
@@ -265,6 +323,7 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
             </button>
           ))}
         </div>
+        <Pager control={paged.pager} noun="templates" className="px-3 pb-2" />
       </div>
       <div ref={editor} className={`${card} scroll-mt-4`}>
         {!selected ? <p className="py-16 text-center text-sm text-foreground-muted">Pick a template to view or edit it for the customer. Saving a standard template creates the customer&apos;s own copy.</p> : (

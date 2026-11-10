@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { SUBSCRIPTION_FIELDS, SUBSCRIPTION_SEARCH } from '@/lib/filters/fields/subscriptions'
-import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import SubscriptionsOverviewSkeleton from './SubscriptionsOverviewSkeleton'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, pct, when } from '@/components/admin/channels/ui'
 import { RankedBars, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta } from '@/lib/overview/period'
@@ -36,7 +37,7 @@ export default function SubscriptionsOverview() {
         tab="overview"
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
+      {!data ? loading && <SubscriptionsOverviewSkeleton /> : <Body d={data} />}
     </div>
   )
 }

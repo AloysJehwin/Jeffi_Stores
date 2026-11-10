@@ -1,25 +1,25 @@
-import Link from 'next/link'
-import { getTenantBilling } from '@/lib/tenant-registry'
+import { getTenantBilling, getTenantUpiId } from '@/lib/tenant-registry'
 import { getTenantWallet } from '@/lib/payments/wallet'
-import { hasOwnDelhiveryToken, storedRazorpayKeys } from '@/lib/integrations/resolve'
-import { DETAIL_PAGE_SIZE, loadTenantDetail, pageParam, withParam } from '@controller/lib/ecom/detail'
+import { hasOwnDelhiveryToken, storedPhonePeCreds, storedRazorpayKeys } from '@/lib/integrations/resolve'
+import { DETAIL_PAGE_SIZE, loadTenantDetail, pageParam } from '@controller/lib/ecom/detail'
 import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
 import { Field, FieldGrid, Section } from '@controller/components/admin/ecom/EcomUI'
 import { inr, inrHr } from '@controller/components/admin/ecom/cells'
 import { LedgerTable, TransactionsTable, WalletTable } from '@controller/components/admin/ecom/detail/BillingTables'
-import Pager from '@controller/components/admin/ecom/detail/Pager'
 import SettingRow from '@controller/components/admin/ecom/detail/SettingRow'
 import Copyable from '@controller/components/admin/ecom/detail/Copyable'
 import AccountModeToggle from '@controller/components/admin/ecom/detail/AccountModeToggle'
 import DeliveryModeToggle from '@controller/components/admin/ecom/detail/DeliveryModeToggle'
+import UpiModeToggle from '@controller/components/admin/ecom/detail/UpiModeToggle'
 import ReconcileButton from '@controller/components/admin/ecom/detail/ReconcileButton'
 import WalletCredit from '@controller/components/admin/ecom/detail/WalletCredit'
 
 export const dynamic = 'force-dynamic'
 
-type Search = { tp?: string; lp?: string; wl?: string }
+type Search = { tp?: string; lp?: string; wp?: string }
 
-const WALLET_STEP = 50
+// The wallet ledger has no count or offset, so a page reads every row up to it (capped like before at 1,000).
+const WALLET_PAGES = 100
 
 function Tile({ label, value, tone = 'text-foreground' }: { label: string; value: string; tone?: string }) {
   return (
@@ -39,22 +39,26 @@ export default async function TenantBillingPage({ params, searchParams }: { para
   const { t, cost, row } = d
   const tp = pageParam(sp.tp)
   const lp = pageParam(sp.lp)
-  const wl = Math.min(20, pageParam(sp.wl))
+  const wp = Math.min(WALLET_PAGES, pageParam(sp.wp))
 
-  const [billing, wallet, ownRazorpayCreds, ownDelhiveryCreds] = await Promise.all([
+  const [billing, wallet, ownRazorpayCreds, ownDelhiveryCreds, phonePeCreds, upiId] = await Promise.all([
     getTenantBilling(id, {
       transactions: { limit: DETAIL_PAGE_SIZE, offset: (tp - 1) * DETAIL_PAGE_SIZE },
       ledger: { limit: DETAIL_PAGE_SIZE, offset: (lp - 1) * DETAIL_PAGE_SIZE },
     }),
-    getTenantWallet(id, wl * WALLET_STEP).catch(() => null),
+    getTenantWallet(id, wp * DETAIL_PAGE_SIZE + 1).catch(() => null),
     storedRazorpayKeys(id)
       .then(k => !!k)
       .catch(() => false),
     hasOwnDelhiveryToken(id).catch(() => false),
+    storedPhonePeCreds(id)
+      .then(c => !!c)
+      .catch(() => false),
+    getTenantUpiId(id).catch(() => null),
   ])
   const { transactions, ledger, balance, totals } = billing
-  const path = `/admin/ecom/billing/${id}/view`
-  const href = (key: string) => (n: number) => withParam(path, sp, key, n)
+  const walletRows = wallet?.ledger.slice((wp - 1) * DETAIL_PAGE_SIZE, wp * DETAIL_PAGE_SIZE) ?? []
+  const walletNext = wp < WALLET_PAGES && (wallet?.ledger.length ?? 0) > wp * DETAIL_PAGE_SIZE
   const price = row?.price_inr_month ?? cost.priceMonth
 
   return (
@@ -74,6 +78,7 @@ export default async function TenantBillingPage({ params, searchParams }: { para
         <Section title="Accounts">
           <div className="divide-y divide-border-default">
             <AccountModeToggle tenantId={id} initial={t.own_razorpay === true} hasOwnCreds={ownRazorpayCreds} />
+            {d.isStore && <UpiModeToggle tenantId={id} initial={t.upi_mode ?? 'auto'} hasPhonePe={phonePeCreds} upiId={upiId} />}
             {d.isStore && <DeliveryModeToggle tenantId={id} initial={t.own_delhivery === true} hasOwnCreds={ownDelhiveryCreds} />}
             <SettingRow title="Settlements" value="Reconcile captured" hint="Settles captured rows whose transfer already processed at Razorpay.">
               <ReconcileButton tenantId={id} />
@@ -120,26 +125,17 @@ export default async function TenantBillingPage({ params, searchParams }: { para
               <Tile label="Ships on" value={t.own_delhivery ? 'Own Delhivery' : 'Platform'} />
             </div>
             <p className="text-xs text-foreground-muted">Prepaid. Shipments on the platform Delhivery account are debited here; so are messaging and AI usage.</p>
-            <WalletTable rows={wallet.ledger} />
-            {wallet.ledger.length >= wl * WALLET_STEP && wl < 20 && (
-              <div className="flex justify-center">
-                <Link href={href('wl')(wl + 1)} scroll={false} className="control-sm border border-border-default text-foreground hover:bg-surface-secondary">
-                  Show older movements
-                </Link>
-              </div>
-            )}
+            <WalletTable rows={walletRows} hasNext={walletNext} paging={{ page: wp, pageSize: DETAIL_PAGE_SIZE, param: 'wp' }} />
           </div>
         )}
       </Section>
 
       <Section title="Transactions & splits">
-        <TransactionsTable rows={transactions} total={billing.transactionCount} />
-        <Pager page={tp} pageSize={DETAIL_PAGE_SIZE} total={billing.transactionCount} href={href('tp')} />
+        <TransactionsTable rows={transactions} total={billing.transactionCount} paging={{ page: tp, pageSize: DETAIL_PAGE_SIZE, param: 'tp' }} />
       </Section>
 
       <Section title="Settlement ledger">
-        <LedgerTable rows={ledger} total={billing.ledgerCount} balance={balance} />
-        <Pager page={lp} pageSize={DETAIL_PAGE_SIZE} total={billing.ledgerCount} href={href('lp')} />
+        <LedgerTable rows={ledger} total={billing.ledgerCount} balance={balance} paging={{ page: lp, pageSize: DETAIL_PAGE_SIZE, param: 'lp' }} />
       </Section>
     </div>
   )

@@ -7,6 +7,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { ToolCardsSkeleton } from '../_components/AgentLoadingParts'
 
 interface ProposedTool {
   id: string
@@ -100,11 +101,7 @@ export default function ProposedToolsPage() {
         admin agent — every individual invocation will still go through the normal action approval queue.
       </p>
 
-      {loading && (
-        <div className="flex items-center gap-2 text-sm text-foreground-muted py-8 justify-center">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading
-        </div>
-      )}
+      {loading && <ToolCardsSkeleton />}
 
       {!loading && items.length === 0 && !list.error && (
         <div className="text-center py-12 text-sm text-foreground-muted">Nothing in the {statusFilter} queue.</div>

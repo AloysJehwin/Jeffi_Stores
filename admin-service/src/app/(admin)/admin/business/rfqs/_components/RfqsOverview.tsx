@@ -6,7 +6,6 @@ import {
   PeriodBar,
   useOverviewData,
   AttentionList,
-  OverviewSkeleton,
   type AttentionItem,
 } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct } from '@/components/admin/channels/ui'
@@ -15,6 +14,7 @@ import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { RFQ_FIELDS, RFQ_SEARCH } from '@/lib/filters/fields/business-rfqs'
+import RfqsOverviewSkeleton from './RfqsOverviewSkeleton'
 
 interface Totals {
   received: number
@@ -77,7 +77,7 @@ export default function RfqsOverview() {
       <ListFilters entity="business_rfqs" fields={RFQ_FIELDS} search={RFQ_SEARCH} period noun="RFQs" tab="overview" exportable />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
-        !error && <OverviewSkeleton />
+        !error && <RfqsOverviewSkeleton />
       ) : (
         <>
           <KpiGrid>

@@ -16,6 +16,7 @@ import * as tpl from './templates-v2.js'
 import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
 import * as twContent from './providers/twilio-content.js'
 import { priceUsd, twilioSignatureValid } from './providers/twilio.js'
+import { tenantSender } from './providers/senders.js'
 import { poolsForTenant } from './pools.js'
 import * as wa from './wa-approval.js'
 import { applyStatus, startDeliverySync } from './delivery.js'
@@ -460,9 +461,16 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   const id = req.query.m
   const status = req.body?.MessageStatus
   if (!id || !status) return reply.code(400).send({ ok: false })
-  // The body sets the wallet charge, so only Twilio may call this.
-  if (!twilioSignatureValid(String(req.headers['x-twilio-signature'] ?? ''), id, req.body ?? {})) return reply.code(403).send({ ok: false })
   const m = await one<MessageRow>(`SELECT * FROM messages WHERE id=$1`, [id])
+  // The body sets the wallet charge, so only Twilio may call this — signed with the platform's token, or with
+  // the store's own auth token when the message went out from its own account (metadata.sender.own).
+  const sig = String(req.headers['x-twilio-signature'] ?? '')
+  let valid = twilioSignatureValid(sig, id, req.body ?? {})
+  if (!valid && m && (m.metadata as any)?.sender?.own && m.channel !== 'email') {
+    const s = await tenantSender(m.tenant_id, m.channel).catch(() => null)
+    valid = !!s?.config.auth_token && twilioSignatureValid(sig, id, req.body ?? {}, s.config.auth_token)
+  }
+  if (!valid) return reply.code(403).send({ ok: false })
   if (!m) return { ok: true }
   await applyStatus(id, status, { code: req.body?.ErrorCode, message: req.body?.ErrorMessage, payload: req.body })
   const usd = priceUsd(req.body?.Price)

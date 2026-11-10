@@ -6,6 +6,7 @@ vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: vi.f
 import { RESOLVERS, detectAll, visibleSteps, platformStatus, type StatusContext } from '@/lib/setup-guide/status'
 import { mergeStatus } from '@/lib/setup-guide/progress'
 import { STEPS, PLATFORM_ITEMS } from '@/lib/setup-guide/registry'
+import { HOW_TO } from '@/lib/setup-guide/how-to'
 
 const T = '11111111-1111-1111-1111-111111111111'
 
@@ -23,6 +24,7 @@ function seededStore(over: Partial<StatusContext> = {}): StatusContext {
     shipping: async () => ({ ok: true, mode: 'platform' }),
     pickupLocations: async () => 0,
     codEnabled: async () => true,
+    messagingLocks: async () => ({}),
     wallet: async () => null,
     domains: async () => [],
     activeAdmins: async () => 1,
@@ -116,9 +118,11 @@ describe('setup guide: detected states', () => {
     expect(d.email.status).toBe('done')
   })
 
-  it('has a resolver for every step', () => {
+  it('has a resolver and a walkthrough for every step', () => {
     expect(STEPS.filter(s => !RESOLVERS[s.id]).map(s => s.id)).toEqual([])
     expect(new Set(STEPS.map(s => s.id)).size).toBe(STEPS.length)
+    expect(STEPS.filter(s => !HOW_TO[s.id]?.steps.length).map(s => s.id)).toEqual([])
+    expect(Object.keys(HOW_TO).filter(id => !STEPS.some(s => s.id === id))).toEqual([])
   })
 })
 

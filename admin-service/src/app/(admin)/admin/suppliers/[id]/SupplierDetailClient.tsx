@@ -9,7 +9,8 @@ import { Tabs } from '@/components/admin/kit/core'
 import { DetailHeader } from '@/components/admin/kit/actions'
 import { Card, Field, Fields, PageBody } from '@/components/admin/kit/layout'
 import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
-import { DetailSkeleton, ErrorState } from '@/components/admin/kit/states'
+import { ErrorState } from '@/components/admin/kit/states'
+import SupplierDetailLoading from './view/loading'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
@@ -98,11 +99,7 @@ export default function SupplierDetailClient({
   }
 
   if (loading || !data?.supplier) {
-    return (
-      <PageBody>
-        <DetailSkeleton kpis={3} />
-      </PageBody>
-    )
+    return <SupplierDetailLoading />
   }
 
   const s = data.supplier
@@ -264,13 +261,13 @@ export default function SupplierDetailClient({
 
         {tab === 'pos' && (
           <Card flush>
-            <DataTable sortNs="pos" rows={pos} cols={poCols} rowKey={r => String(r.id)} empty="No purchase orders found" bare />
+            <DataTable sortNs="pos" paged rows={pos} cols={poCols} rowKey={r => String(r.id)} empty="No purchase orders found" bare />
           </Card>
         )}
 
         {tab === 'expenses' && (
           <Card flush>
-            <DataTable sortNs="bills" rows={expenses} cols={expenseCols} rowKey={r => String(r.id)} empty="No bills/expenses found" bare />
+            <DataTable sortNs="bills" paged rows={expenses} cols={expenseCols} rowKey={r => String(r.id)} empty="No bills/expenses found" bare />
           </Card>
         )}
 
@@ -279,6 +276,7 @@ export default function SupplierDetailClient({
             <Card title="Linked (buy-price list)" flush>
               <DataTable
                 sortNs="linked"
+                paged
                 rows={linkedProducts}
                 cols={linkedCols}
                 rowKey={r => `${r.product_id}-${r.variant_id || ''}-${r.sub_variant_id || ''}-${linkedProducts.indexOf(r)}`}
@@ -289,6 +287,7 @@ export default function SupplierDetailClient({
             <Card title="Purchased (from POs)" flush>
               <DataTable
                 sortNs="bought"
+                paged
                 rows={purchasedProducts}
                 cols={purchasedCols}
                 rowKey={r => `${r.product_id}-${r.variant_id || ''}-${purchasedProducts.indexOf(r)}`}

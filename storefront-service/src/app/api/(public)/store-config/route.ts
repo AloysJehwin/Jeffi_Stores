@@ -26,6 +26,7 @@ export async function GET() {
       },
       flags: {
         razorpayEnabled: c.flags.razorpayEnabled,
+        upiEnabled: c.flags.upiEnabled,
         codEnabled: c.flags.codEnabled,
         gstEnabled: c.flags.gstEnabled,
         ondeviceSummaryEnabled: c.flags.ondeviceSummaryEnabled,

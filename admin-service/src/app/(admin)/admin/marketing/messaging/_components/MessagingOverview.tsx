@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -16,6 +15,7 @@ import type { MessagingState, MessagingTotals } from '@/lib/overviews/marketing-
 import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
+import { MessagingOverviewLoading } from './MessagingLoading'
 
 interface Data {
   bucket: Bucket
@@ -67,7 +67,7 @@ export default function MessagingOverview() {
       {filters && <p className="text-xs text-foreground-muted">Filtered: only the matching broadcasts count; automated WhatsApp and SMS are left out.</p>}
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
-        !error && <OverviewSkeleton />
+        !error && <MessagingOverviewLoading />
       ) : (
         <>
           <KpiGrid>

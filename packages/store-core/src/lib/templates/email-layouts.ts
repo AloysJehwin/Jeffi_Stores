@@ -13,6 +13,8 @@ export interface EmailLayoutContext {
   footerLines?: string[]
   /** Optional kicker above the title. */
   kicker?: string
+  /** Inbox preview line (hidden in the body). */
+  preheader?: string
 }
 
 export interface EmailLayout {
@@ -44,7 +46,18 @@ function layout(theme: MailTheme, extraCss?: string) {
       footerLines: ctx.footerLines ?? DEFAULT_FOOTER,
       theme,
       extraCss,
+      preheader: ctx.preheader,
     })
+}
+
+const PREHEADER_STYLE = 'display:none;font-size:1px;color:#ffffff;max-height:0;overflow:hidden;mso-hide:all;'
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** No layout: the body exactly as designed — a full document is kept as is, a fragment gets a bare document. */
+export function bareEmailDoc(body: string, preheader?: string): string {
+  const pre = preheader ? `<span style="${PREHEADER_STYLE}">${esc(preheader)}</span>` : ''
+  if (/^\s*(<!doctype|<html)/i.test(body)) return pre ? body.replace(/<body([^>]*)>/i, m => m + pre) : body
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;">${pre}${body}</body></html>`
 }
 
 // Per-layout character — small CSS layered on MAIL_BASE_CSS + the theme accent. Keeps the shared class
@@ -152,6 +165,14 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     render: layout({ accent: '#059669', pageBg: '#f0fdf4', containerBg: '#ffffff', frame: 'card', headerAlign: 'center' }, LAYOUT_CSS.fresh),
   },
   {
+    key: 'none',
+    label: 'No layout',
+    description: 'Sends the design exactly as written — no store header, footer or frame around it.',
+    supportsBlocks: true,
+    starterBody: '',
+    render: ctx => bareEmailDoc(ctx.bodyHtml, ctx.preheader),
+  },
+  {
     key: 'custom',
     label: 'Custom',
     description: 'Your own content. Set automatically once you edit a template.',
@@ -191,6 +212,7 @@ export const EMAIL_LAYOUT_OPTIONS = EMAIL_LAYOUTS.map(({ key, label, description
 }))
 
 export const CUSTOM_LAYOUT_KEY = 'custom'
+export const NO_LAYOUT_KEY = 'none'
 
 /** The starter body for a layout key, or '' for custom/unknown. */
 export function layoutStarterBody(key: string | null | undefined): string {

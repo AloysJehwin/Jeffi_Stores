@@ -14,7 +14,7 @@ const Schema = z.object({
   body: zNonEmpty,
   preheader: z.string().max(200).optional(),
   isHtml: z.boolean().optional(),
-  layout: z.enum(['template', 'message']).optional(),
+  layout: z.enum(['template', 'message', 'raw']).optional(),
   // The order-page scenario the template is for; one whose reply is read sends with a reply address.
   scenario: z.string().max(40).optional(),
   itemId: z.string().uuid().optional(),

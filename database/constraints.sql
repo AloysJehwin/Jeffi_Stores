@@ -3884,6 +3884,18 @@ ALTER TABLE ONLY public.subscription_cycle_orders
     ADD CONSTRAINT subscription_cycle_orders_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
 
 --
+-- subscription_redemptions (PhonePe Autopay renewals)
+--
+ALTER TABLE ONLY public.subscription_redemptions
+    ADD CONSTRAINT subscription_redemptions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.subscription_redemptions
+    ADD CONSTRAINT subscription_redemptions_merchant_order_id_key UNIQUE (merchant_order_id);
+ALTER TABLE ONLY public.subscription_redemptions
+    ADD CONSTRAINT subscription_redemptions_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.subscriptions(id) ON DELETE CASCADE;
+ALTER TABLE public.subscription_redemptions
+    ADD CONSTRAINT subscription_redemptions_status_check CHECK (status IN ('notifying','notified','executing','completed','failed','cancelled'));
+
+--
 -- subscription_plans_cache
 --
 ALTER TABLE ONLY public.subscription_plans_cache
@@ -3899,6 +3911,10 @@ ALTER TABLE public.subscriptions
         'active','created','authenticated','pending','halted','paused','cancelled','completed','expired'));
 ALTER TABLE ONLY public.subscriptions
     ADD CONSTRAINT subscriptions_razorpay_subscription_id_key UNIQUE (razorpay_subscription_id);
+ALTER TABLE public.subscriptions
+    ADD CONSTRAINT subscriptions_billing_provider_check CHECK (billing_provider IN ('razorpay','phonepe'));
+ALTER TABLE ONLY public.subscriptions
+    ADD CONSTRAINT subscriptions_phonepe_merchant_subscription_id_key UNIQUE (phonepe_merchant_subscription_id);
 ALTER TABLE ONLY public.subscriptions
     ADD CONSTRAINT subscriptions_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON DELETE SET NULL;
 
@@ -4212,6 +4228,16 @@ ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_initiated
 ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.payments(id) ON DELETE SET NULL;
 ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.payment_refunds ADD CONSTRAINT payment_refunds_retry_of_fkey FOREIGN KEY (retry_of) REFERENCES public.payment_refunds(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_merchant_order_id_key UNIQUE (merchant_order_id);
+ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_provider_check CHECK (provider IN ('phonepe','upg'));
+ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_purpose_check CHECK (purpose IN ('order_draft','order','order_adjustment','variant_change','wallet_topup','ecom_wallet_topup'));
+ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_status_check CHECK (status IN ('pending','queued','active','processing','awaiting_confirmation','completed','failed','expired','cancelled','rejected'));
+ALTER TABLE ONLY public.upi_bank_observations ADD CONSTRAINT upi_bank_observations_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.upi_bank_observations ADD CONSTRAINT upi_bank_observations_fingerprint_key UNIQUE (fingerprint);
+ALTER TABLE ONLY public.upi_bank_observations ADD CONSTRAINT upi_bank_observations_kind_check CHECK (kind IN ('credit','gmail_forwarding'));
+ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_amount_check CHECK (amount_paise > 0);
 
 ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_razorpay_dispute_id_key UNIQUE (razorpay_dispute_id);

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 import OrderAffirmation from '@/components/on-device/OrderAffirmation'
 import OrderCelebration from './OrderCelebration'
+import ConfirmationSkeleton from './ConfirmationSkeleton'
 import { trackPurchase } from '@/lib/client/analytics'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
@@ -54,7 +55,7 @@ interface OrderDetails {
 
 export default function OrderConfirmationPageWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<ConfirmationSkeleton />}>
       <OrderConfirmationPage />
     </Suspense>
   )
@@ -110,18 +111,7 @@ function OrderConfirmationPage() {
     fetchOrder()
   }, [orderId, router])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center px-4">
-        <div className="w-full max-w-md animate-pulse space-y-4">
-          <div className="h-16 bg-surface-elevated rounded-full w-16 mx-auto" />
-          <div className="h-6 bg-surface-elevated rounded w-48 mx-auto" />
-          <div className="h-4 bg-surface-elevated rounded w-64 mx-auto" />
-          <div className="h-32 bg-surface-elevated rounded-lg" />
-        </div>
-      </div>
-    )
-  }
+  if (isLoading) return <ConfirmationSkeleton />
 
   if (error || !order) {
     return (

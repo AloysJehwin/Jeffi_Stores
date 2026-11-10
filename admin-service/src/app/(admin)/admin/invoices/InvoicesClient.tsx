@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AlertTriangle, Check, Download, Plus, X } from 'lucide-react'
 import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, Field, Fields, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, Field, Fields, LockedFieldset, FormFooter, FormButton, fieldInputCls, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import RowActions from '@/components/admin/RowActions'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, {
@@ -31,6 +32,8 @@ import SerialEntryModal, {
 import DatePicker from '@/components/ui/DatePicker'
 import Toggle from '@/components/ui/Toggle'
 import InvoicesMobileList from './_components/InvoicesMobileList'
+import { LoadingForm, LoadingTable } from '@/components/admin/kit/skeleton'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
 
 const DRAFT_SORT_COLS: SortCol[] = [
   { key: 'order_number', label: 'Order No' },
@@ -122,6 +125,7 @@ export const SOURCE_COLORS: Record<string, string> = Object.fromEntries(Object.e
 // section 'drafts' (the Drafts tab) shows only the draft invoices awaiting finalization; 'list' the invoices.
 export default function InvoicesClient({ canWrite = false, section = 'list' }: { canWrite?: boolean; section?: 'list' | 'drafts' }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setViewState] = useState<View>(() => {
@@ -246,6 +250,15 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
   // A draft invoice belongs to the admin editing it; everyone else sees it read-only.
   const lock = useDraftLock({ resourceType: 'invoice', resourceId: view === 'edit' && editIsDraft ? editId : null })
 
+  // Delete the draft invoice: its holder, an unclaimed draft, or an owner role (audited).
+  async function discardDraftInvoice() {
+    const ok = await confirm({ title: 'Delete this draft?', message: 'This draft invoice will be deleted.', confirmLabel: 'Delete', cancelLabel: 'Keep', variant: 'danger' })
+    if (!ok || !(await lock.discard())) return
+    resetForm()
+    navigateView('list')
+    fetchDrafts()
+  }
+
   // Batch picker for perishable line items
   const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
   const [batchAssignments, setBatchAssignments] = useState<Record<string, { batch_id: string; qty: number }[]>>({}) // lineItemId → [{batch_id, qty}]
@@ -314,6 +327,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
       return (x < y ? -1 : x > y ? 1 : 0) * sign
     })
   })()
+  const pagedDrafts = usePagedRows(sortedDrafts, 10, `${draftSort.sort}|${draftSort.dir}`)
 
   useEffect(() => {
     if (section === 'drafts') fetchDrafts()
@@ -1660,6 +1674,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
 
             <FormFooter
               lock={isEdit && editIsDraft ? lock : null}
+              discard={isEdit && editIsDraft && lock.canDiscard ? discardDraftInvoice : undefined}
               onCancel={() => {
                 resetForm()
                 navigateView('list')
@@ -1719,7 +1734,16 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
   if (view === 'create') return renderForm(false)
   if (view === 'edit')
     return editLoading ? (
-      <div className="p-12 text-center text-foreground-muted text-sm">Loading invoice…</div>
+      <div className="space-y-5">
+        <PageHeader back={{ href: ap('/admin/invoices'), label: 'Invoices' }} title="Edit Offline Invoice" description="Update customer details, items and payment mode" />
+        <LoadingForm
+          sections={[
+            { title: 'Invoice Details', fields: ['Invoice Date', 'Payment Mode', 'Notes'], cols: 3 },
+            { title: 'Consignee (Ship to)', fields: ['Name', 'Phone & Email', 'Address Line 1', 'Address Line 2', 'City', 'State', 'Postal Code', 'GSTIN'] },
+            { title: 'Line Items', fields: ['Product', 'Quantity', 'Price'], cols: 3 },
+          ]}
+        />
+      </div>
     ) : (
       renderForm(true)
     )
@@ -1790,7 +1814,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
             </div>
 
             {draftsLoading ? (
-              <div className="p-6 text-center text-sm text-foreground-muted">Loading drafts…</div>
+              <LoadingTable bare rows={4} columns={[...DRAFT_SORT_COLS.map(c => c.label), 'Actions']} />
             ) : (
               <>
                 <div className="hidden overflow-x-auto md:block">
@@ -1804,7 +1828,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedDrafts.map(draft => (
+                      {pagedDrafts.shown.map(draft => (
                         <tr key={draft.id} className="border-b border-amber-500/20 last:border-0 hover:bg-amber-500/5">
                           <td className="px-4 py-3 font-mono text-xs font-medium">
                             <a href={ap(`/admin/orders/${draft.id}/view`)} className="text-foreground hover:text-accent-500 hover:underline">
@@ -1860,7 +1884,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
                 </div>
 
                 <div className="divide-y divide-amber-500/20 md:hidden">
-                  {sortedDrafts.map(draft => (
+                  {pagedDrafts.shown.map(draft => (
                     <div key={draft.id} className="space-y-2 p-4">
                       <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -1909,13 +1933,14 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
                     </div>
                   ))}
                 </div>
+                <Pager control={pagedDrafts.pager} noun="drafts" className="px-4 pb-3" />
               </>
             )}
           </section>
         )}
 
         {section === 'list' && (loading ? (
-          <TableSkeleton rows={8} cols={8} />
+          <LoadingTable columns={[...INVOICE_SORT_COLS.map(c => c.label), '']} />
         ) : invoices.length === 0 ? (
           <EmptyState title="No invoices found." body="Try a different search or clear the filters." />
         ) : (

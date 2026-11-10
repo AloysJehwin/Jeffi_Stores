@@ -6,6 +6,7 @@ import { isListUrl } from '@/lib/admin/filter-url'
 import { PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import { OverviewPanel, useTab } from '../../orders/_components/overview-shared'
 import PackingSlipsClient from '../PackingSlipsClient'
+import { PACKING_KPIS } from './overview-kpis'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -38,6 +39,7 @@ export default function PackingSlipsTabs() {
         endpoint="/api/admin/packing-slips/overview"
         fallback="7d"
         query={filters}
+        kpis={PACKING_KPIS}
         filters={
           <ListFilters entity="packing_slips" fields={PACKING_FIELDS} search={PACKING_SEARCH} period noun="Orders" tab="overview" exportable />
         }

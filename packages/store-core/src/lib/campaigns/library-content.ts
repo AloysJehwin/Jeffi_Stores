@@ -16,6 +16,8 @@ export async function withLibraryContent<C extends Campaign | null>(c: C): Promi
     body_template: t.body,
     template_mode: blocks ? 'blocks' : 'richtext',
     blocks: blocks ?? null,
+    // A template set to send without a layout keeps its own design; the campaign's theme is not wrapped around it.
+    ...(t.layout === 'none' ? { template_layout: 'none' } : {}),
     [RESOLVED]: true,
   })
 }

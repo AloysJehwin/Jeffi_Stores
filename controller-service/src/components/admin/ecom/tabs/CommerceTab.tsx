@@ -1,8 +1,7 @@
 import type { TenantDetail, BankAccount, TenantBilling } from '@/lib/tenant-registry'
 import { Field, FieldGrid, Mono, Section, StatusPill } from '../EcomUI'
 import { inr } from '../cells'
-import { LedgerTable, TransactionsTable } from '../detail/BillingTables'
-import Pager from '../detail/Pager'
+import { LedgerTable, TransactionsTable, type TablePage } from '../detail/BillingTables'
 
 function maskAccount(n: string | null): string {
   if (!n) return '—'
@@ -24,12 +23,6 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'go
   )
 }
 
-export interface PageInfo {
-  page: number
-  pageSize: number
-  href: (page: number) => string
-}
-
 export default function CommerceTab({
   tenant: t,
   billing,
@@ -40,8 +33,8 @@ export default function CommerceTab({
   tenant: TenantDetail
   billing: TenantBilling | null
   bank: BankAccount | null
-  txPage: PageInfo
-  ledgerPage: PageInfo
+  txPage: TablePage
+  ledgerPage: TablePage
 }) {
   const totals = billing?.totals
   const prepaidGross = (totals?.gross ?? 0) - (totals?.codGross ?? 0)
@@ -93,12 +86,10 @@ export default function CommerceTab({
       {billing && (
         <>
           <Section title="Transactions">
-            <TransactionsTable rows={billing.transactions} total={billing.transactionCount} />
-            <Pager {...txPage} total={billing.transactionCount} />
+            <TransactionsTable rows={billing.transactions} total={billing.transactionCount} paging={txPage} />
           </Section>
           <Section title="Settlement ledger">
-            <LedgerTable rows={billing.ledger} total={billing.ledgerCount} balance={billing.balance} />
-            <Pager {...ledgerPage} total={billing.ledgerCount} />
+            <LedgerTable rows={billing.ledger} total={billing.ledgerCount} balance={billing.balance} paging={ledgerPage} />
           </Section>
         </>
       )}

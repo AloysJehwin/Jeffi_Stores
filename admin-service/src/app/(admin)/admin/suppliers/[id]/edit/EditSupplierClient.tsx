@@ -20,6 +20,7 @@ import { useDraftLock } from '@/hooks/useDraftLock'
 import { assertDraftResponse, lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 import type { MergeConflict } from '@/lib/admin/draft-merge'
 import MergeDialog from '@/components/admin/drafts/MergeDialog'
+import EditLoading from './loading'
 
 
 const emptyForm = {
@@ -284,7 +285,7 @@ export default function EditSupplierClient({
     router.push(viewHref)
   }
 
-  if (loading) return null
+  if (loading) return <EditLoading />
 
   if (loadError)
     return (

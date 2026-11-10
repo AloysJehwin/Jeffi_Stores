@@ -4,6 +4,7 @@ import { debitMessageCost, refundMessageEstimate } from '@/lib/shared/messaging/
 import { usdToInr } from '@/lib/shared/messaging/pricing'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { getTenantSender } from '@/lib/messaging/tenant-senders'
 import { applyDeliveryStatus } from '@controller/lib/shared/messaging/delivery-status'
 
 export const dynamic = 'force-dynamic'
@@ -24,14 +25,17 @@ export async function POST(request: Request) {
   const base = process.env.PUBLIC_WEBHOOK_BASE_URL || process.env.APP_URL || 'https://jeffistores.in'
   const url = `${base.replace(/\/$/, '')}/api/webhooks/twilio/status?t=${encodeURIComponent(tenantId)}`
   const sig = request.headers.get('x-twilio-signature') || ''
+  const channel = (params.From || params.To || '').startsWith('whatsapp:') ? 'whatsapp' : 'sms'
+  // A send from the store's own Twilio account (tenant_messaging_senders) is signed with that account's token.
+  const ownToken = async () => (await getTenantSender(tenantId, channel).catch(() => null))?.config.auth_token
   if (!twilio.validateRequest(authToken, sig, url, params)) {
-    return NextResponse.json({ error: 'invalid signature' }, { status: 403 })
+    const t = tenantId ? await ownToken() : undefined
+    if (!t || !twilio.validateRequest(t, sig, url, params)) return NextResponse.json({ error: 'invalid signature' }, { status: 403 })
   }
 
   const sid = params.MessageSid || params.SmsSid
   const status = params.MessageStatus || params.SmsStatus || ''
   const price = params.Price ? Number(params.Price) : 0
-  const channel = (params.From || params.To || '').startsWith('whatsapp:') ? 'whatsapp' : 'sms'
   if (!sid || !tenantId) return new NextResponse(null, { status: 204 })
 
   const priceInr = price ? usdToInr(price) : 0

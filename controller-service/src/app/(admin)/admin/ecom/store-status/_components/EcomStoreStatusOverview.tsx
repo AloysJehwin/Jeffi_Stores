@@ -18,6 +18,7 @@ import {
 } from '@/components/admin/channels/ui'
 import type { EcomStoreStatusOverview as Data } from '@controller/lib/overviews/ecom-store-status'
 import { OverviewShell, Grid2, dateIn, label, useEcomOverview } from '../../_components/overview-shell'
+import { StoreStatusOverviewLoading } from '../../_components/skeletons'
 
 const HEALTH_TONE: Record<string, Tone> = {
   up: 'green',
@@ -106,7 +107,7 @@ export default function EcomStoreStatusOverview() {
   const [probe, setProbe] = useState(false)
   const o = useEcomOverview<Data>('/api/admin/ecom/store-status/overview', probe ? '&probe=1' : '')
   return (
-    <OverviewShell {...o}>
+    <OverviewShell {...o} skeleton={<StoreStatusOverviewLoading />}>
       {d => (
         <>
           <KpiGrid>

@@ -10,6 +10,7 @@ import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
 import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'
 import CopySku from '@/components/ui/CopySku'
 import { Tabs } from '@/components/admin/channels/ui'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim()
@@ -510,7 +511,16 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
 
               {/* Results list */}
               <div className="space-y-0.5 max-h-72 overflow-y-auto">
-                {searching && <div className="text-sm text-foreground-muted text-center py-6">Searching…</div>}
+                {searching &&
+                  [0, 1, 2, 3].map(i => (
+                    <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+                      <Sk className="h-4 w-4 shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <Sk className="h-3.5 w-2/3" />
+                        <Sk className="h-3 w-1/3" />
+                      </div>
+                    </div>
+                  ))}
                 {!searching && searchResults.length === 0 && (
                   <div className="text-sm text-foreground-muted text-center py-6">No products found</div>
                 )}

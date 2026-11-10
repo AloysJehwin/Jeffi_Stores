@@ -3,6 +3,10 @@ import { TENANT_HOST_PREFIXES } from './host-prefixes'
 import { clearTenantCache } from './host-resolution'
 import type { ComputeSpec } from '@/lib/compute/spec'
 
+/** The platform admin's UPI switch for a store: 'auto' = its own provider (PhonePe when saved, else UPG), 'off' = none. */
+export type UpiMode = 'auto' | 'off'
+export const UPI_MODES: UpiMode[] = ['auto', 'off']
+
 export interface TenantRow {
   id: string
   slug: string
@@ -15,6 +19,7 @@ export interface TenantRow {
   daily_payout: boolean
   own_delhivery: boolean
   own_razorpay: boolean
+  upi_mode: UpiMode
   service_types: string[] // store | messaging | documents
   store_request?: StoreRequest | null
   billing_interval: string
@@ -88,7 +93,7 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
     where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`)
   }
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
             t.instance_state, t.billing_interval, t.subscription_status,
             p.slug AS plan, p.monthly_price_inr, COALESCE(CASE WHEN COALESCE(tc.applied, tc.desired)->'db'->>'mode' = 'dedicated' THEN p.rds_margin END, p.infra_margin)::float8 AS infra_margin,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.s3_usage_bytes::float8 AS s3_usage_bytes,
@@ -278,7 +283,7 @@ export interface TenantDetail extends TenantRow {
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at, t.instance_state,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,

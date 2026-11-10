@@ -48,14 +48,14 @@ export default function ExtensionTokenCard() {
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-      <div className="px-6 py-4 border-b border-border-default">
-        <h2 className="text-lg font-semibold text-foreground">Chrome Extension Token</h2>
-        <p className="text-sm text-foreground-muted mt-1">
+    <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-default">
+      <div className="px-5 py-4 border-b border-border-default">
+        <h2 className="text-sm font-semibold text-foreground">Chrome Extension Token</h2>
+        <p className="text-xs text-foreground-muted mt-0.5">
           Generate a scoped upload token for the Jeffi Gallery Uploader extension.
         </p>
       </div>
-      <div className="p-4 sm:p-6 space-y-3">
+      <div className="p-5 space-y-3">
         <div className="flex items-center gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default font-mono text-sm text-foreground-secondary">
           {token ? (
             <input

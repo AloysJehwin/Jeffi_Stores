@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
-import { getSiteControls, SITE_CONTROLS_DEFAULTS, invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
+import { getSiteControls, SITE_CONTROLS_DEFAULTS, invalidateSiteControlsCache, MESSAGING_LOCK_HINT } from '@/lib/catalog/site-controls'
 import { getDeliverySettings } from '@/lib/shipping/delivery-settings'
 import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { hasPlanScope } from '@/lib/auth/plan-gate'
@@ -23,6 +23,7 @@ import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinition
 import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
 import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import GoogleTagCard from '@/components/admin/site-controls/GoogleTagCard'
+import UpiCollectionCard from '@/components/admin/UpiCollectionCard'
 import OpsEmailCard, { type OpsEmailAdmin } from '@/components/admin/site-controls/OpsEmailCard'
 import { loadOpsEmail } from '@/lib/shared/ops-email'
 import { OPS_ATTACHMENTS, OPS_SECTIONS, OPS_SECTION_IDS } from '@/lib/shared/ops-email-config'
@@ -366,6 +367,14 @@ export default async function SiteControlsPage() {
                       </FullSpan>
                       <FullSpan>
                         <ToggleControl
+                          settingKey="feature_upi_enabled"
+                          label="UPI payments"
+                          hint="Shows a UPI section at checkout and on order payments. Paid through PhonePe, or to your UPI ID with staff confirming the UTR, as set for your store."
+                          initial={c.flags.upiEnabled}
+                        />
+                      </FullSpan>
+                      <FullSpan>
+                        <ToggleControl
                           settingKey="feature_cod_enabled"
                           label="Cash on delivery (COD)"
                           hint="Site-level COD switch. COD is offered only when this is on AND the product itself allows COD. When off, COD is hidden everywhere."
@@ -396,6 +405,9 @@ export default async function SiteControlsPage() {
                         initial={c.values.codSurchargePct}
                       />
                     </SectionCard>
+                  </div>
+                  <div>
+                    <UpiCollectionCard />
                   </div>
                 </>
               ),
@@ -568,6 +580,8 @@ export default async function SiteControlsPage() {
                                 label="SMS notifications"
                                 hint="When off, SMS channel is hidden from signin/signup and no SMS messages are sent."
                                 initial={c.flags.smsEnabled}
+                                locked={!!c.locks.sms}
+                                lockedHint={c.locks.sms && MESSAGING_LOCK_HINT[c.locks.sms]}
                               />
                             </FullSpan>
                             <FullSpan>
@@ -576,6 +590,8 @@ export default async function SiteControlsPage() {
                                 label="WhatsApp notifications"
                                 hint="When off, WhatsApp channel is hidden from signin/signup and no WhatsApp messages are sent."
                                 initial={c.flags.whatsappEnabled}
+                                locked={!!c.locks.whatsapp}
+                                lockedHint={c.locks.whatsapp && MESSAGING_LOCK_HINT[c.locks.whatsapp]}
                               />
                             </FullSpan>
                             <FullSpan>

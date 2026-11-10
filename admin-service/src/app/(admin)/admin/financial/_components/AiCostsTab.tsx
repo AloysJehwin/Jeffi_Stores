@@ -1,7 +1,8 @@
 'use client'
 
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
-import { PeriodBar, OverviewSkeleton, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { AiCostsTabSkeleton } from './FinanceSkeletons'
 import { delta } from '@/lib/overview/period'
 import { AI_CAPABILITY_LABEL, aiFeatureLabel } from '@/lib/ai/feature-labels'
 import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
@@ -39,7 +40,7 @@ export function AiCostsTab() {
     <div className="space-y-5">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} />}
+      {loading && !data ? <AiCostsTabSkeleton /> : data && <Body d={data} />}
     </div>
   )
 }

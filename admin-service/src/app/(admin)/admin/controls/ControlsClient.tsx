@@ -17,7 +17,8 @@ import {
   computeVolumeFactor,
 } from '@/lib/catalog/units'
 import ProductsAdvancedFilters from '../products/_components/ProductsAdvancedFilters'
-import { EmptyState, InfiniteFooter, PageBody, PageHeader, fetchJson, fieldInputCls, useActionToast, useInfiniteList } from '@/components/admin/kit'
+import { EmptyState, Pager, PageBody, PageHeader, Sk, fetchJson, fieldInputCls, useActionToast, usePagedList } from '@/components/admin/kit'
+import { HistoryRowsSkeleton, ProductRowsSkeleton } from './_components/ControlsLoadingParts'
 import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
@@ -333,10 +334,9 @@ export default function ControlsClient({
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const LOGS_PER_PAGE = 10
 
-  const logList = useInfiniteList<ControlsLog>({
+  const logList = usePagedList<ControlsLog>({
     key: 'controls-logs',
     pageSize: LOGS_PER_PAGE,
-    getKey: l => l.id,
     fetchPage: async (p, signal) => {
       const data = await fetchJson(`/api/admin/controls/rollback?limit=${LOGS_PER_PAGE}&offset=${(p - 1) * LOGS_PER_PAGE}`, signal)
       return { rows: data.logs ?? [], hasMore: !!data.hasMore }
@@ -799,7 +799,7 @@ export default function ControlsClient({
               )}
             </h2>
             {loading ? (
-              <span className="text-sm text-foreground-muted">Loading…</span>
+              <Sk className="h-3.5 w-20" />
             ) : (
               products.length > 0 && (
                 <button
@@ -814,15 +814,7 @@ export default function ControlsClient({
           </div>
 
           {loading ? (
-            <div className="divide-y divide-border-default">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-2.5 animate-pulse">
-                  <div className="w-4 h-4 rounded bg-surface-secondary shrink-0" />
-                  <div className="h-3.5 bg-surface-secondary rounded flex-1" />
-                  <div className="h-3 bg-surface-secondary rounded w-24" />
-                </div>
-              ))}
-            </div>
+            <ProductRowsSkeleton />
           ) : (
             <div className="max-h-[28rem] overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-x-4 [&>label]:border-b [&>label]:border-border-default">
               {products.map(p => (
@@ -1462,8 +1454,10 @@ export default function ControlsClient({
             {logsLoading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
-        {logsLoading && logs.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-foreground-muted">Loading…</p>
+        {logsLoading ? (
+          <HistoryRowsSkeleton />
+        ) : logs.length === 0 && logList.error ? (
+          <p className="px-4 py-3 text-sm text-red-600 dark:text-red-400">{logList.error}</p>
         ) : logs.length === 0 ? (
           <p className="px-4 py-3 text-sm text-foreground-muted">No operations recorded yet.</p>
         ) : (
@@ -1581,7 +1575,7 @@ export default function ControlsClient({
                     )
                   })}
                 </div>
-                <InfiniteFooter className="px-4 pb-3" shown={logs.length} control={logList} noun="operations" />
+                <Pager className="px-4 pb-3" control={logList.pager} noun="operations" />
               </>
             )
           })()

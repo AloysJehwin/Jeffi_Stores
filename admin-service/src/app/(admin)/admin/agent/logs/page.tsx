@@ -8,6 +8,7 @@ import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters
 import { AGENT_LOG_FIELDS } from '@/lib/filters/fields/agent'
 import { LOG_COUNT_CAP } from '@/lib/filters/fields/audit'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { LogRowsSkeleton } from '../_components/AgentLoadingParts'
 
 interface ToolLogMessage {
   id: string
@@ -79,26 +80,7 @@ export default function AgentLogsPage() {
       )}
 
       {loading && toolLogs.length === 0 ? (
-        <div className="space-y-2 animate-pulse">
-          {[...Array(8)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated border border-border-default rounded-lg px-4 py-3 flex items-start gap-3"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <div className="w-8 h-8 rounded-full bg-surface-secondary shrink-0" />
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="h-3 w-20 bg-surface-secondary rounded" />
-                  <div className="h-3 w-12 bg-surface-secondary rounded" />
-                  <div className="h-3 w-16 bg-surface-secondary rounded" />
-                </div>
-                <div className="h-3 w-3/4 bg-surface-secondary rounded" />
-              </div>
-              <div className="h-3 w-4 bg-surface-secondary rounded shrink-0" />
-            </div>
-          ))}
-        </div>
+        <LogRowsSkeleton />
       ) : toolLogs.length === 0 ? (
         <p className="text-sm text-foreground-muted italic">
           {filters

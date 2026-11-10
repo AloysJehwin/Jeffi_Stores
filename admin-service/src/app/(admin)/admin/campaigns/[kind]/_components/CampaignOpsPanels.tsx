@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { InfiniteFooter, fetchJson, useReveal } from '@/components/admin/kit/infinite'
+import { useEffect, useRef, useState } from 'react'
+import { fetchJson } from '@/components/admin/kit/infinite'
+import { EMBEDDED_PAGE_SIZE, Pager, usePagedList, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
@@ -48,8 +50,6 @@ export interface WhatsAppLog {
   error: string | null
   sent_at: string
 }
-
-const WA_LIMIT = 10
 
 // Collapsible card — collapsed by default so a long list isn't a wall of rows; the admin expands the one they need.
 export function CollapsibleCard({
@@ -159,6 +159,9 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind])
 
+  const eligiblePage = usePagedRows(eligible ?? [], EMBEDDED_PAGE_SIZE, eligible)
+  const suppressedPage = usePagedRows(suppressed ?? [], EMBEDDED_PAGE_SIZE, suppressed)
+
   return (
     <div className="space-y-5">
       <CollapsibleCard
@@ -181,10 +184,8 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
         ) : note ? (
           <p className="p-8 text-sm text-foreground-muted text-center italic">{note}</p>
         ) : loading && !eligible ? (
-          <div className="p-4 space-y-2 animate-pulse" aria-busy="true">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-8 rounded bg-surface-secondary" />
-            ))}
+          <div className="p-4" aria-busy="true">
+            <LoadingLines lines={4} />
           </div>
         ) : eligible && eligible.length === 0 ? (
           <p className="p-8 text-sm text-foreground-muted text-center">
@@ -195,8 +196,9 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
             </span>
           </p>
         ) : eligible && eligible.length > 0 ? (
-          <div className="divide-y divide-border-default max-h-96 overflow-y-auto">
-            {eligible.map((r, i) => (
+          <>
+          <div className="divide-y divide-border-default">
+            {eligiblePage.shown.map((r, i) => (
               <div
                 key={r.reference_id || `row-${i}`}
                 className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50"
@@ -223,6 +225,8 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
               </div>
             ))}
           </div>
+          <Pager className="px-5 pb-3" control={eligiblePage.pager} noun="recipients" />
+          </>
         ) : null}
       </CollapsibleCard>
 
@@ -232,8 +236,8 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
           count={suppressedTotal}
           subtitle="Customers who would otherwise qualify but are blocked from receiving this campaign right now."
         >
-          <div className="divide-y divide-border-default max-h-96 overflow-y-auto">
-            {suppressed.map((r, i) => {
+          <div className="divide-y divide-border-default">
+            {suppressedPage.shown.map((r, i) => {
               const reasonColor =
                 r.reason === 'cooldown' || r.reason === 'recent_send'
                   ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
@@ -274,6 +278,7 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
               )
             })}
           </div>
+          <Pager className="px-5 pb-3" control={suppressedPage.pager} noun="customers" />
         </CollapsibleCard>
       )}
     </div>
@@ -281,8 +286,8 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
 }
 
 /**
- * Recent sends — initial batch comes in as props (from the campaign GET the view already made);
- * pagination refetches only the sends slice via `?offset=`.
+ * Recent sends, 10 a page — page 1 comes in as props (from the campaign GET the view already made);
+ * the arrows refetch only the sends slice via `?offset=`.
  */
 export function RecentSendsPanel({
   kind,
@@ -293,29 +298,29 @@ export function RecentSendsPanel({
   initialSends: RecentSend[]
   initialTotal: number
 }) {
-  const [recentSends, setRecentSends] = useState<RecentSend[]>(initialSends)
-  const [sendsTotal, setSendsTotal] = useState(initialTotal)
-  const [sendsLoading, setSendsLoading] = useState(false)
-  const [sendsError, setSendsError] = useState<string | null>(null)
-
-  const loadMoreSends = useCallback(async () => {
-    setSendsLoading(true)
-    setSendsError(null)
-    try {
-      const data = await fetchJson(`/api/admin/campaigns/${kind}?offset=${recentSends.length}`)
-      const seen = new Set(recentSends.map(r => r.id))
-      setRecentSends(prev => [...prev, ...((data.recentSends || []) as RecentSend[]).filter(r => !seen.has(r.id))])
-      setSendsTotal(data.total || 0)
-    } catch (e) {
-      setSendsError(e instanceof Error ? e.message : 'Failed to load')
-    } finally {
-      setSendsLoading(false)
-    }
-  }, [kind, recentSends])
+  const seeded = useRef(true)
+  const list = usePagedList<RecentSend>({
+    key: kind,
+    fetchPage: async page => {
+      if (page === 1 && seeded.current) {
+        seeded.current = false
+        return { rows: initialSends.slice(0, EMBEDDED_PAGE_SIZE), total: initialTotal }
+      }
+      seeded.current = false
+      const data = await fetchJson(`/api/admin/campaigns/${kind}?offset=${(page - 1) * EMBEDDED_PAGE_SIZE}`)
+      return { rows: ((data.recentSends || []) as RecentSend[]).slice(0, EMBEDDED_PAGE_SIZE), total: data.total || 0 }
+    },
+  })
+  const recentSends = list.rows
+  const sendsTotal = list.pager.total ?? initialTotal
 
   return (
     <CollapsibleCard title="Recent sends" count={sendsTotal}>
-      {recentSends.length === 0 ? (
+      {list.loading ? (
+        <div className="p-4" aria-busy="true">
+          <LoadingLines lines={4} />
+        </div>
+      ) : recentSends.length === 0 ? (
         <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
       ) : (
         <div>
@@ -352,12 +357,7 @@ export function RecentSendsPanel({
               )
             })}
           </div>
-          <InfiniteFooter
-            className="px-5 pb-3"
-            shown={recentSends.length}
-            noun="sends"
-            control={{ total: sendsTotal, hasMore: recentSends.length < sendsTotal, loadingMore: sendsLoading, error: sendsError, loadMore: loadMoreSends }}
-          />
+          <Pager className="px-5 pb-3" control={list.pager} noun="sends" />
         </div>
       )}
     </CollapsibleCard>
@@ -370,7 +370,7 @@ export function RecentSendsPanel({
  * can render it unconditionally).
  */
 export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppLog[] }) {
-  const wa = useReveal(logs, WA_LIMIT)
+  const wa = usePagedRows(logs, EMBEDDED_PAGE_SIZE, logs)
   const { whatsapp } = useMessagingChannels()
   if (!whatsapp || !campaignSupportsWhatsApp(kind)) return null
   return (
@@ -423,7 +423,7 @@ export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppL
               )
             })}
           </div>
-          <InfiniteFooter className="px-5 pb-3" shown={wa.shown.length} control={wa.control} noun="messages" />
+          <Pager className="px-5 pb-3" control={wa.pager} noun="messages" />
         </>
       )}
     </CollapsibleCard>

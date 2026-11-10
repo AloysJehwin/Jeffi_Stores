@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const scopes: string[] = session?.scopes || []
 
   const navLinks = [
-    { href: '/admin/setup', label: 'Setup guide', scope: 'setup_guide:read' },
+    { href: '/admin/setup', label: 'Setup guide', scope: 'setup_guide:read', bottom: true },
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard:read' },
     { href: '/admin/products', label: 'Products', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
@@ -70,6 +70,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/labels', label: 'Labels', scope: 'labels:read', group: 'Fulfilment' },
     { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan:read', group: 'Fulfilment', mobileOnly: true },
     { href: '/admin/financial', label: 'Financial', scope: 'financial:read', group: 'Finance' },
+    { href: '/admin/financial/upi', label: 'UPI Confirmations', scope: 'financial:read', group: 'Finance' },
     { href: '/admin/inventory', label: 'Inventory', scope: 'inventory:read', group: 'Finance' },
     { href: '/admin/suppliers', label: 'Suppliers', scope: 'inventory:read', group: 'Finance' },
     { href: '/admin/purchase-orders', label: 'Purchase Orders', scope: 'inventory:read', group: 'Finance' },

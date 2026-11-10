@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ExternalLink, ChevronDown } from 'lucide-react'
 import CollapsibleSection from '@/components/admin/CollapsibleSection'
+import DatePicker from '@/components/ui/DatePicker'
+import { PlatformAppsLoading } from './SetupLoading'
 import { PageBody, PageHeader, StatusBadge, Tabs, CopyValue, api, btnGhost, btnPrimary, inputCls, useActionToast, type StatusMap } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { ManualState } from '@/lib/setup-guide/progress'
-import type { ResolvedOwnCredentials, ResolvedPlatformItem, ResolvedRegister, ResolvedStep, SetupGuideResult, StatusCounts } from '@/lib/setup-guide/status'
+import type { ResolvedHowTo, ResolvedOwnCredentials, ResolvedPlatformItem, ResolvedRegister, ResolvedStep, SetupGuideResult, StatusCounts } from '@/lib/setup-guide/status'
 import type { StepStatus } from '@/lib/setup-guide/registry'
 
 export type GuidePayload = SetupGuideResult & { canWrite: boolean; platform: boolean }
@@ -193,6 +195,51 @@ function OwnCredentialsGuide({ g }: { g: ResolvedOwnCredentials }) {
   )
 }
 
+function HowToGuide({ h }: { h: ResolvedHowTo }) {
+  return (
+    <div className="space-y-4 rounded-lg border border-border-default bg-surface p-3 sm:p-4">
+      {h.before.length > 0 && (
+        <GuideBlock title="Have ready">
+          <List items={h.before} />
+        </GuideBlock>
+      )}
+      <GuideBlock title="Steps">
+        <List items={h.steps} ordered />
+      </GuideBlock>
+      {h.wait && (
+        <GuideBlock title="Typical wait">
+          <p className="text-sm text-foreground-secondary">{h.wait}</p>
+        </GuideBlock>
+      )}
+      {h.links.length > 0 && (
+        <GuideBlock title="Links">
+          <ul className="space-y-1 text-sm">
+            {h.links.map(l => (
+              <li key={l.url}>
+                <Ext href={l.url}>{l.label}</Ext>
+              </li>
+            ))}
+          </ul>
+        </GuideBlock>
+      )}
+      {h.notes.length > 0 && (
+        <GuideBlock title="Notes">
+          <List items={h.notes} />
+        </GuideBlock>
+      )}
+    </div>
+  )
+}
+
+function GuideToggle({ open, onClick, children }: { open: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" className={btnGhost} aria-expanded={open} onClick={onClick}>
+      {children}
+      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+    </button>
+  )
+}
+
 function ManualControls({ state, canWrite, busy, onSave }: { state: ManualState | null; canWrite: boolean; busy: boolean; onSave: (m: Manual) => void }) {
   const [applying, setApplying] = useState(false)
   const [date, setDate] = useState(today())
@@ -201,10 +248,10 @@ function ManualControls({ state, canWrite, busy, onSave }: { state: ManualState 
   if (applying)
     return (
       <div className="flex w-full flex-wrap items-end gap-2">
-        <label className="text-xs space-y-1">
+        <div className="text-xs space-y-1">
           <span className="text-foreground-muted">Applied on</span>
-          <input type="date" className={inputCls} value={date} max={today()} onChange={e => setDate(e.target.value)} />
-        </label>
+          <DatePicker value={date} max={today()} onChange={setDate} aria-label="Applied on" className="w-44" />
+        </div>
         <label className="text-xs space-y-1 min-w-0 flex-1 basis-40">
           <span className="text-foreground-muted">Note (optional)</span>
           <input className={inputCls} value={note} maxLength={500} onChange={e => setNote(e.target.value)} placeholder="Reference number, contact…" />
@@ -250,7 +297,8 @@ function manualText(m: { state: ManualState; applied_at: string | null; note: st
 }
 
 function StepRow({ step, canWrite, busy, onSave }: { step: ResolvedStep; canWrite: boolean; busy: boolean; onSave: (id: string, m: Manual) => void }) {
-  const [guide, setGuide] = useState(false)
+  const [guide, setGuide] = useState<'how' | 'own' | null>(null)
+  const toggle = (g: 'how' | 'own') => setGuide(cur => (cur === g ? null : g))
   const showConnect = !!step.connect && step.status !== 'done' && step.canOpen
   const manual = manualText(step.manual)
   return (
@@ -280,14 +328,19 @@ function StepRow({ step, canWrite, busy, onSave }: { step: ResolvedStep; canWrit
           <span className="text-xs text-foreground-muted">You do not have access to this page</span>
         )}
         <ManualControls state={step.manual?.state ?? null} canWrite={canWrite} busy={busy} onSave={m => onSave(step.id, m)} />
+        {step.howTo && (
+          <GuideToggle open={guide === 'how'} onClick={() => toggle('how')}>
+            How to do it
+          </GuideToggle>
+        )}
         {step.ownCredentials && (
-          <button type="button" className={btnGhost} aria-expanded={guide} onClick={() => setGuide(g => !g)}>
+          <GuideToggle open={guide === 'own'} onClick={() => toggle('own')}>
             Use your own credentials
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${guide ? 'rotate-180' : ''}`} />
-          </button>
+          </GuideToggle>
         )}
       </div>
-      {guide && step.ownCredentials && <OwnCredentialsGuide g={step.ownCredentials} />}
+      {guide === 'how' && step.howTo && <HowToGuide h={step.howTo} />}
+      {guide === 'own' && step.ownCredentials && <OwnCredentialsGuide g={step.ownCredentials} />}
     </li>
   )
 }
@@ -431,7 +484,7 @@ function PlatformApps() {
     [load, toast]
   )
   if (error) return <p className="text-sm text-red-600">{error}</p>
-  if (!data) return <p className="py-8 text-center text-sm text-foreground-muted">Loading…</p>
+  if (!data) return <PlatformAppsLoading />
   return (
     <div className="space-y-4">
       <ProgressHeader counts={data.counts} />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import CertsLoading from './CertsLoading'
 
 interface Cert {
   serial: string
@@ -76,7 +77,7 @@ export default function CertList() {
   }
 
   if (error && !certs) return <p className="mt-6 text-sm text-red-600 dark:text-red-400">{error}</p>
-  if (!certs) return <p className="mt-6 text-sm text-foreground-muted">Loading…</p>
+  if (!certs) return <CertsLoading />
   if (certs.length === 0) {
     return (
       <p className="mt-6 text-sm text-foreground-secondary">

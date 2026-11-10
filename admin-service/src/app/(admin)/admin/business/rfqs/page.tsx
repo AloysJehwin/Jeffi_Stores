@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 import { listKey } from '@/lib/admin/list-key'
 import { Suspense } from 'react'
 import { normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
-import { Kpi, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
+import { LoadingChart, LoadingTable, Sk } from '@/components/admin/kit/skeleton'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -114,7 +115,7 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
           <ListFilters entity="business_rfqs" fields={RFQ_FIELDS} search={RFQ_SEARCH} noun="RFQs" tab="list" exportable />
 
           {/* Table re-shimmers on filter/pagination change while the shell stays mounted */}
-          <Suspense key={listKey(resolvedSearchParams)} fallback={<TableSkeleton rows={8} cols={6} />}>
+          <Suspense key={listKey(resolvedSearchParams)} fallback={<LoadingTable columns={['RFQ #', 'Company', 'Contact', 'Items', 'Status', 'Submitted', '']} />}>
             <BusinessRFQsListContent q={q} page={resolvedSearchParams.page} sp={resolvedSearchParams} host={host} />
           </Suspense>
         </>
@@ -125,13 +126,16 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
 
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 animate-pulse xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:col-span-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+        {['Total', 'Pending', 'In Review', 'Offer Accepted', 'Converted', 'Rejected'].map(l => (
+          <div key={l} className="flex h-[84px] flex-col gap-1 rounded-xl border border-border-default bg-surface-elevated p-3 sm:p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">{l}</p>
+            <Sk className="mt-1 h-6 w-16" />
+          </div>
         ))}
       </div>
-      <div className="h-full min-h-[180px] rounded-xl border border-border-default bg-surface-elevated" />
+      <LoadingChart title="RFQs Received" height="h-32" />
     </div>
   )
 }

@@ -122,10 +122,7 @@ export default async function AccountPanel() {
               <MobileNumberCard />
             </div>
           </div>
-        </section>
 
-        {/* ── Extension Token ─────────────────────────────────────── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ExtensionTokenCard />
         </section>
 

@@ -10,6 +10,7 @@ import {
 import { Kpi } from '@/components/admin/channels/ui'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import TeamOverviewSkeleton from './TeamOverviewSkeleton'
 
 // Team overview: members, activity, sign-ins and MFA coverage.
 export default function TeamOverview() {
@@ -21,7 +22,7 @@ export default function TeamOverview() {
     <div className="space-y-3">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
+      {loading && <TeamOverviewSkeleton />}
       {data && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="grid grid-cols-2 gap-3">

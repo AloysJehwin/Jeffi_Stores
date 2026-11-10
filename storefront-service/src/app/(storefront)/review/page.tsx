@@ -5,16 +5,9 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
+import { REVIEW_TAGS } from './tags'
+import ReviewSkeleton from './ReviewSkeleton'
 
-const TAGS = [
-  'Great quality',
-  'Fast delivery',
-  'Worth the price',
-  'Exactly as described',
-  'Well packed',
-  'Will buy again',
-  'Highly recommend',
-]
 
 interface ProductInfo {
   productId: string
@@ -133,18 +126,7 @@ export default function ReviewPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-surface px-4 py-12">
-        <div className="max-w-lg mx-auto animate-pulse space-y-4">
-          <div className="h-6 bg-surface-elevated rounded w-48 mx-auto" />
-          <div className="h-4 bg-surface-elevated rounded w-64 mx-auto" />
-          <div className="h-40 bg-surface-elevated rounded-xl" />
-          <div className="h-24 bg-surface-elevated rounded-xl" />
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <ReviewSkeleton storeName={storeName} rating={rating} />
 
   if (tokenError) {
     return (
@@ -273,7 +255,7 @@ export default function ReviewPage() {
               What did you like? <span className="text-gray-400">(optional)</span>
             </p>
             <div className="flex flex-wrap gap-2">
-              {TAGS.map(tag => (
+              {REVIEW_TAGS.map(tag => (
                 <button
                   key={tag}
                   type="button"

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { EMBEDDED_PAGE_SIZE } from '@/components/admin/kit/pager'
+import DeliveryLogPager from './DeliveryLogPager'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AutoRefresh from '@/components/admin/AutoRefresh'
 import Tooltip from '@/components/ui/Tooltip'
@@ -29,7 +30,7 @@ const channelLabel = (
   c.template_key === 'library'
     ? Object.entries(c.channels ?? {})
         .map(([k, v]) =>
-          k === 'push' ? `App push: ${v.title || '—'}` : `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`
+          k === 'push' ? `App push: ${v.title || '—'}` : `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug || 'written here'}`
         )
         .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
@@ -98,9 +99,9 @@ export default async function CampaignDetailPage({
   const backUrl = back && back.startsWith('/admin/marketing/messaging') ? back : '/admin/marketing/messaging'
 
   const logPage = Math.max(1, parseInt(resolvedSearchParams.logPage || '1', 10))
-  const logPageSize = 50
+  const logPageSize = EMBEDDED_PAGE_SIZE
 
-  const [logs, logTotal, counts, push] = await Promise.all([
+  const [logs, logTotal, counts, push, latest] = await Promise.all([
     queryMany<LogRow>(
       'SELECT email, channel, to_address, status, error, sent_at, push_device_id, send_after FROM email_campaign_logs WHERE campaign_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3',
       [id, logPageSize, (logPage - 1) * logPageSize]
@@ -114,17 +115,23 @@ export default async function CampaignDetailPage({
       [id]
     ),
     campaignPushReport(id).catch(() => null),
+    // Page-independent: the latest failure and any SMS/WhatsApp still settling.
+    queryOne<{ error: string | null; recent: boolean }>(
+      `SELECT (SELECT error FROM email_campaign_logs WHERE campaign_id = $1 AND status = 'failed' AND error IS NOT NULL ORDER BY sent_at DESC LIMIT 1) AS error,
+              EXISTS (SELECT 1 FROM email_campaign_logs WHERE campaign_id = $1 AND status = 'sent' AND channel <> 'email' AND sent_at > now() - interval '10 minutes') AS recent`,
+      [id]
+    ),
   ])
 
   const sentCount = Number(counts?.sent ?? 0)
   const failedCount = Number(counts?.failed ?? 0)
   const skippedCount = Number(counts?.skipped ?? 0)
-  const campaignError = logs.find(l => l.status === 'failed' && l.error)?.error ?? null
+  const campaignError = latest?.error ?? null
   // SMS/WhatsApp outcomes land after the send — keep refreshing for 10 minutes; pushes while queued.
   const awaiting =
     campaign.status === 'sending' ||
     Number(counts?.pending ?? 0) > 0 ||
-    logs.some(l => l.status === 'sent' && l.channel !== 'email' && Date.now() - new Date(l.sent_at).getTime() < 600_000)
+    !!latest?.recent
   const when = (v: string) =>
     new Date(v).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
 
@@ -215,7 +222,7 @@ export default async function CampaignDetailPage({
         </Card>
       )}
 
-      {logs.length > 0 && (
+      {logTotal > 0 && (
         <div>
           <Card
             title="Delivery log"
@@ -239,15 +246,8 @@ export default async function CampaignDetailPage({
                     ))}
                   </tr>
                 </thead>
-                <ServerPagedItems
-                  wrap="tbody"
-                  param="logPage"
-                  page={logPage}
-                  total={logTotal}
-                  noun="deliveries"
-                  items={logs.map((l, i) => ({
-                    key: String((logPage - 1) * logPageSize + i),
-                    node: (
+                <tbody>
+                  {logs.map((l, i) => (
                     <tr
                       key={i}
                       className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
@@ -274,11 +274,11 @@ export default async function CampaignDetailPage({
                         )}
                       </td>
                     </tr>
-                    ),
-                  }))}
-                />
+                  ))}
+                </tbody>
               </table>
             </div>
+            <DeliveryLogPager page={logPage} total={logTotal} />
           </Card>
         </div>
       )}

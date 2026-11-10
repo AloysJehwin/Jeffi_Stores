@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Mail, Tag, Package, X, ChevronDown, Wand2, LayoutTemplate } from 'lucide-react'
+import { Mail, Tag, Package, X, Wand2, LayoutTemplate } from 'lucide-react'
+import AdminSelect from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import Link from 'next/link'
@@ -9,6 +10,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 
 interface Coupon {
   id: string
@@ -56,7 +58,7 @@ interface QuickTemplate {
   body: string
 }
 
-type StoreTemplate = { slug: string; name: string; subject: string; body: string }
+type StoreTemplate = { slug: string; name: string; subject: string; preheader: string; body: string; layout: 'store' | 'none' }
 
 // The layout adds its own headline, so a library template's first <h2> becomes the Headline field.
 function splitHeadline(html: string): { headline: string; body: string } {
@@ -372,12 +374,14 @@ export default function CustomerMailerPanel({
   const [subject, setSubject] = useState('')
   const [headline, setHeadline] = useState('')
   const [body, setBody] = useState('')
+  const [preheader, setPreheader] = useState('')
+  // Off: the body goes out exactly as written, without the store's header, headline and footer.
+  const [storeLayout, setStoreLayout] = useState(true)
   const [attachMode, setAttachMode] = useState<AttachMode>('none')
 
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [couponsLoading, setCouponsLoading] = useState(false)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
-  const [couponOpen, setCouponOpen] = useState(false)
 
   const [productQuery, setProductQuery] = useState('')
   const [products, setProducts] = useState<Product[]>([])
@@ -451,6 +455,22 @@ export default function CustomerMailerPanel({
   }, [productQuery, attachMode])
 
   const buildTemplateData = useCallback((): Record<string, string> => {
+    if (!storeLayout) {
+      // The send only adds the coupon line to the layout's body, so a raw body carries its own.
+      const extra: string[] = []
+      if (attachMode === 'product' && selectedProduct) {
+        const productUrl = selectedProduct.slug ? `${BASE_URL}/products/${selectedProduct.slug}` : null
+        extra.push(
+          `<p>Check out: <strong>${selectedProduct.name}</strong> — starting at ₹${Math.round(selectedProduct.base_price).toLocaleString('en-IN')}${productUrl ? `<br><a href="${productUrl}" style="color:#e07b3f;">View Product →</a>` : ''}</p>`
+        )
+      }
+      if (attachMode === 'coupon' && selectedCoupon) {
+        const valLabel =
+          selectedCoupon.discount_type === 'percentage' ? `${selectedCoupon.discount_value}% off` : `₹${selectedCoupon.discount_value} off`
+        extra.push(`<p>Use coupon code <strong>${selectedCoupon.code}</strong> for ${valLabel} on your next order.</p>`)
+      }
+      return { body: [body, ...extra].filter(Boolean).join('\n'), preheader }
+    }
     const data: Record<string, string> = { headline, body }
     if (attachMode === 'product' && selectedProduct) {
       const productUrl = selectedProduct.slug ? `${BASE_URL}/products/${selectedProduct.slug}` : null
@@ -462,7 +482,7 @@ export default function CustomerMailerPanel({
         .join('\n')
     }
     return data
-  }, [headline, body, attachMode, selectedProduct])
+  }, [headline, body, preheader, storeLayout, attachMode, selectedProduct, selectedCoupon])
 
   async function loadPreview() {
     setPreviewLoading(true)
@@ -470,7 +490,7 @@ export default function CustomerMailerPanel({
       const res = await fetch('/api/admin/mailer/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_key: templateKey, template_data: buildTemplateData(), subject }),
+        body: JSON.stringify({ template_key: templateKey, template_data: buildTemplateData(), subject, ...(storeLayout ? {} : { layout: 'raw' }) }),
       })
       const d = await res.json()
       setPreviewHtml(d.html || '')
@@ -488,6 +508,7 @@ export default function CustomerMailerPanel({
     template_key: templateKey,
     subject,
     template_data: buildTemplateData(),
+    ...(storeLayout ? {} : { layout: 'raw' }),
     audience_type: 'specific_user',
     audience_filter: {
       userId: customerId,
@@ -518,9 +539,24 @@ export default function CustomerMailerPanel({
     }
   }
 
+  function changeStoreLayout(on: boolean) {
+    setStoreLayout(on)
+    // The layout adds the headline, so it moves between its own field and the body's first <h2>.
+    if (on) {
+      const split = splitHeadline(body)
+      setHeadline(split.headline)
+      setBody(split.body)
+    } else if (headline.trim()) {
+      setBody(`<h2>${headline}</h2>\n${body}`)
+      setHeadline('')
+    }
+  }
+
+  const ready = !!subject.trim() && (storeLayout ? !!headline.trim() : !!body.trim())
+
   async function handleSend() {
-    if (!subject.trim() || !headline.trim()) {
-      setSendError('Subject and headline are required.')
+    if (!ready) {
+      setSendError(storeLayout ? 'Subject and headline are required.' : 'Subject and message are required.')
       return
     }
     setSendError(null)
@@ -614,6 +650,8 @@ export default function CustomerMailerPanel({
             setSubject('')
             setHeadline('')
             setBody('')
+            setPreheader('')
+            setStoreLayout(true)
             setAttachMode('none')
             setSelectedCoupon(null)
             setSelectedProduct(null)
@@ -658,8 +696,15 @@ export default function CustomerMailerPanel({
                     key={t.slug}
                     type="button"
                     onClick={() => {
-                      const { headline, body } = splitHeadline(t.body)
                       setSubject(t.subject)
+                      setPreheader(t.preheader)
+                      setStoreLayout(t.layout !== 'none')
+                      if (t.layout === 'none') {
+                        setHeadline('')
+                        setBody(t.body)
+                        return
+                      }
+                      const { headline, body } = splitHeadline(t.body)
                       setHeadline(headline)
                       setBody(body)
                     }}
@@ -686,6 +731,8 @@ export default function CustomerMailerPanel({
                     setSubject(tpl.subject)
                     setHeadline(tpl.headline)
                     setBody(tpl.body)
+                    setPreheader('')
+                    setStoreLayout(true)
                   }}
                   className="px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
                 >
@@ -695,23 +742,42 @@ export default function CustomerMailerPanel({
             </div>
           </div>
 
-          {/* Email template type */}
-          <div className="flex gap-2">
-            {EMAIL_TEMPLATES.map(t => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setTemplateKey(t.value as 'promotion' | 'announcement')}
-                className={`px-3 h-control-sm rounded-lg text-xs font-semibold border transition-colors ${
-                  templateKey === t.value
-                    ? 'bg-accent-500 border-accent-500 text-white'
-                    : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-foreground-secondary">
+              <input
+                type="checkbox"
+                checked={storeLayout}
+                onChange={e => changeStoreLayout(e.target.checked)}
+                className="h-4 w-4 accent-accent-500"
+              />
+              Store header &amp; footer
+            </label>
+            <p className="text-[11px] text-foreground-muted mt-1">
+              {storeLayout
+                ? "Your store's email layout frames the headline and message."
+                : 'Sent exactly as written, for a template that carries its own design.'}
+            </p>
           </div>
+
+          {/* Email template type */}
+          {storeLayout && (
+            <div className="flex gap-2">
+              {EMAIL_TEMPLATES.map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTemplateKey(t.value as 'promotion' | 'announcement')}
+                  className={`px-3 h-control-sm rounded-lg text-xs font-semibold border transition-colors ${
+                    templateKey === t.value
+                      ? 'bg-accent-500 border-accent-500 text-white'
+                      : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Subject */}
           <div>
@@ -736,31 +802,49 @@ export default function CustomerMailerPanel({
           </div>
 
           {/* Headline */}
-          <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Headline *
-            </label>
-            <AIEnrichButton
-              fieldLabel="Email Headline"
-              value={headline}
-              onChange={setHeadline}
-              scope="mailer:write"
-              context={aiContext}
-            >
+          {storeLayout && (
+            <div>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Headline *
+              </label>
+              <AIEnrichButton
+                fieldLabel="Email Headline"
+                value={headline}
+                onChange={setHeadline}
+                scope="mailer:write"
+                context={aiContext}
+              >
+                <input
+                  type="text"
+                  value={headline}
+                  onChange={e => setHeadline(e.target.value)}
+                  placeholder="e.g. We miss you! Here's something special"
+                  className={`${inputCls} pr-16`}
+                />
+              </AIEnrichButton>
+            </div>
+          )}
+
+          {!storeLayout && (
+            <div>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Preview text
+              </label>
               <input
                 type="text"
-                value={headline}
-                onChange={e => setHeadline(e.target.value)}
-                placeholder="e.g. We miss you! Here's something special"
-                className={`${inputCls} pr-16`}
+                value={preheader}
+                maxLength={200}
+                onChange={e => setPreheader(e.target.value)}
+                placeholder="Shown next to the subject in the inbox"
+                className={inputCls}
               />
-            </AIEnrichButton>
-          </div>
+            </div>
+          )}
 
           {/* Body */}
           <div>
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Message
+              Message{storeLayout ? '' : ' *'}
             </label>
             <div className="relative">
               <EmailComposer value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
@@ -818,47 +902,17 @@ export default function CustomerMailerPanel({
 
           {/* Coupon picker */}
           {attachMode === 'coupon' && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setCouponOpen(o => !o)}
-                className={`${inputCls} flex items-center justify-between`}
-              >
-                <span className={selectedCoupon ? 'text-foreground' : 'text-foreground-muted'}>
-                  {selectedCoupon
-                    ? `${selectedCoupon.code} — ${selectedCoupon.discount_type === 'percentage' ? `${selectedCoupon.discount_value}%` : `₹${selectedCoupon.discount_value}`} off`
-                    : 'Select a coupon…'}
-                </span>
-                <ChevronDown className="w-4 h-4 text-foreground-muted shrink-0" />
-              </button>
-              {couponOpen && (
-                <div className="absolute z-50 left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {couponsLoading ? (
-                    <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
-                  ) : coupons.length === 0 ? (
-                    <p className="text-xs text-foreground-muted px-3 py-2">No active coupons found.</p>
-                  ) : (
-                    coupons.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCoupon(c)
-                          setCouponOpen(false)
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-secondary transition-colors"
-                      >
-                        <span className="font-semibold text-foreground">{c.code}</span>
-                        <span className="ml-2 text-foreground-muted">
-                          {c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`} off
-                          {c.description && ` · ${c.description}`}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
+            <AdminSelect
+              value={selectedCoupon?.id ?? ''}
+              onChange={v => setSelectedCoupon(coupons.find(c => c.id === v) ?? null)}
+              disabled={couponsLoading || coupons.length === 0}
+              placeholder={couponsLoading ? 'Loading coupons…' : coupons.length ? 'Select a coupon…' : 'No active coupons found.'}
+              options={coupons.map(c => ({
+                value: c.id,
+                label: `${c.code} — ${c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`} off`,
+                hint: c.description || undefined,
+              }))}
+            />
           )}
 
           {/* Product picker */}
@@ -891,7 +945,9 @@ export default function CustomerMailerPanel({
               ) : (
                 <div className="mt-1 border border-border-default rounded-lg overflow-hidden bg-surface-elevated">
                   {productsLoading ? (
-                    <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
+                    <div className="px-3 py-2">
+                      <LoadingLines lines={3} />
+                    </div>
                   ) : products.length === 0 ? (
                     <p className="text-xs text-foreground-muted px-3 py-2">No products found.</p>
                   ) : (
@@ -932,10 +988,8 @@ export default function CustomerMailerPanel({
                 <span className="text-foreground-muted">Subject:</span>{' '}
                 <span className="font-semibold text-foreground">{subject || '(no subject)'}</span>
               </div>
-              <div
-                className="p-4 bg-white text-zinc-900 text-xs max-h-64 overflow-y-auto"
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
-              />
+              {/* An iframe, so a template's own styles neither leak into nor borrow from the admin page. */}
+              <iframe srcDoc={previewHtml} className="w-full border-0 bg-white" style={{ height: 420 }} sandbox="allow-same-origin" title="Email preview" />
             </>
           )}
         </div>
@@ -956,7 +1010,7 @@ export default function CustomerMailerPanel({
             <button
               type="button"
               onClick={handleSend}
-              disabled={sending || !subject.trim() || !headline.trim()}
+              disabled={sending || !ready}
               className="flex items-center gap-1.5 px-4 h-control-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
             >
               {sending ? (
@@ -967,7 +1021,7 @@ export default function CustomerMailerPanel({
               {sending ? 'Sending…' : `Send to ${customerName}`}
             </button>
           </RequireWrite>
-          <p className="text-[10px] text-foreground-muted">Subject and headline required.</p>
+          <p className="text-[10px] text-foreground-muted">{storeLayout ? 'Subject and headline required.' : 'Subject and message required.'}</p>
         </div>
         {sendError && <p className="text-xs text-red-500">{sendError}</p>}
       </div>

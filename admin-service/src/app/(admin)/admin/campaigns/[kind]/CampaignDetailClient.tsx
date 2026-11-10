@@ -5,7 +5,7 @@ import {
   renderPreviewTemplate as renderTemplate,
 } from '@/lib/templates/email-preview'
 import { useCallback, useEffect, useState } from 'react'
-import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
+import { CampaignEditLoading } from './CampaignLoading'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
@@ -358,7 +358,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   // Skeleton only on first load; refetches after save keep the page rendered.
   if (!campaign || !form)
-    return loading ? <CampaignDetailSkeleton /> : <p className="text-sm text-foreground-muted">Campaign not found.</p>
+    return loading ? <CampaignEditLoading /> : <p className="text-sm text-foreground-muted">Campaign not found.</p>
 
   const couponOptions: SelectOption[] = [
     { value: '', label: 'None — use discount % to auto-generate' },
@@ -432,7 +432,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   }
   // Full themed document for the preview iframe, so the selected layout (Fresh vs Promo…) renders
   // with its own shell + CSS. renderLayoutPreview also fills {store_name}/{store_web} via previewVars.
-  const previewDoc = renderTemplate(renderLayoutPreview(form.template_layout, previewBody), bridgedPreview)
+  // A linked template set to "No layout" sends its own design whatever the theme says (as the send does).
+  const linkedOwnDesign = linked?.layout === 'none'
+  const previewDoc = renderTemplate(renderLayoutPreview(linkedOwnDesign ? 'none' : form.template_layout, previewBody), bridgedPreview)
 
   const SINGLE_PRODUCT_KINDS = new Set(['restock', 'price_drop'])
   const MULTI_PRODUCT_KINDS = new Set([
@@ -593,13 +595,15 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                     Theme
                   </label>
                   <AdminSelect
-                    value={form.template_layout}
+                    value={linkedOwnDesign ? 'none' : form.template_layout}
                     onChange={key => setForm(f => (f ? { ...f, template_layout: key } : f))}
                     options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
+                    disabled={linkedOwnDesign}
                   />
                   <p className="text-[10px] text-foreground-muted mt-1">
-                    {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description} The theme wraps the
-                    template; the wording lives in the template.
+                    {linkedOwnDesign
+                      ? 'This template is set to send without a layout — it goes out exactly as designed. Change that in the template.'
+                      : `${EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description ?? ''} The theme wraps the template; the wording lives in the template.`}
                   </p>
                 </div>
               </>

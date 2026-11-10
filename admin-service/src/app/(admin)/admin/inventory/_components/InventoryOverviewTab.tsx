@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowRight, CircleAlert, Info, RefreshCw } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import InventoryOverviewSkeleton from './InventoryOverviewSkeleton'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { PRODUCT_SEARCH, VALUATION_ALIASES, VALUATION_FIELDS } from '@/lib/filters/fields/inventory'
 import {
@@ -616,8 +616,7 @@ export default function InventoryOverviewTab() {
       <div className="space-y-5">
         <PeriodPicker value={range} today={today} onChange={setRange} />
         {filterBar}
-        <AdminStatsSkeleton cards={6} gridClass="grid-cols-2 md:grid-cols-3 xl:grid-cols-6" />
-        <AdminStatsSkeleton cards={6} gridClass="grid-cols-2 md:grid-cols-3 xl:grid-cols-6" />
+        <InventoryOverviewSkeleton />
       </div>
     )
   }
@@ -748,7 +747,6 @@ export default function InventoryOverviewTab() {
             cols={reorderCols}
             rowKey={r => `${r.product_id}:${r.variant_id}:${r.sub_variant_id}`}
             empty="No SKU is selling faster than its stock can last. Nothing to reorder."
-            pageSize={10}
           />
         </Section>
       </div>
@@ -821,7 +819,6 @@ export default function InventoryOverviewTab() {
               cols={deadCols}
               rowKey={r => `${r.product_id}:${r.variant_id}:${r.sub_variant_id}`}
               empty="Every SKU in stock has sold in the last 90 days."
-              pageSize={8}
             />
           </Section>
         </div>
@@ -835,7 +832,6 @@ export default function InventoryOverviewTab() {
               cols={batchCols}
               rowKey={r => r.id}
               empty="No batch expires in the next 30 days."
-              pageSize={8}
             />
           </Section>
         </div>

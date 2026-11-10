@@ -17,6 +17,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { PACKING_DEFAULT_DAYS, PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import PackingSlipsMobileList from './_components/PackingSlipsMobileList'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import {
   DOC_META,
   DOC_ORDER,
@@ -190,9 +191,11 @@ export default function PackingSlipsClient({ header }: { header?: React.ReactNod
           </div>
         </div>
 
-        {orders.length === 0 ? (
+        {orders.length === 0 && list.loading ? (
+          <LoadingTable bare columns={['Order #', 'Customer', 'Date', 'Status', 'Total', 'Documents']} />
+        ) : orders.length === 0 ? (
           <div className="px-6 py-12 text-center text-foreground-muted text-sm">
-            {list.loading ? 'Loading…' : filters ? 'No orders match the current filters.' : 'No orders found for the selected date range.'}
+            {filters ? 'No orders match the current filters.' : 'No orders found for the selected date range.'}
           </div>
         ) : (
           <>

@@ -135,7 +135,6 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     // The send is now fire-and-forget: the route returns immediately after
     // marking the campaign 'sending' and kicking off a background dispatch.
     expect(body.queued).toBe(true)
-    expect(body.batch_size).toBe(50)
     expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("status = 'sending'"), ['campaign-1'])
   })
 
@@ -150,9 +149,8 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.queued).toBe(true)
-    expect(body.batch_size).toBe(50)
     // Background dispatch fires after the response; allow the microtask to run.
     await new Promise(r => setTimeout(r, 0))
-    expect(mockSendCampaign).toHaveBeenCalledWith('campaign-1', expect.objectContaining({ batchSize: 50 }))
+    expect(mockSendCampaign).toHaveBeenCalledWith('campaign-1')
   })
 })

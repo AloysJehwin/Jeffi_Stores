@@ -1,18 +1,46 @@
 'use client'
 
-import { DataTable, StatusBadge, humanize, type DataCol, type InfiniteControl } from '@/components/admin/kit'
+import { useTransition } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { DataTable, StatusBadge, humanize, type DataCol, type PagerControl } from '@/components/admin/kit'
 import type { LedgerEntry, TenantTransaction } from '@/lib/tenant-registry/tenants'
 import type { WalletLedgerEntry } from '@/lib/payments/wallet'
 import { MONEY_STATUS, inr as inrBase } from '../cells'
 
-// Transactions, settlement ledger and wallet ledger for the Billing page and the Commerce tab. One page of rows
-// each; the page renders a Pager under them, so the footer only counts.
+// Transactions, settlement ledger and wallet ledger for the Billing page and the Commerce tab. Each gets one
+// server page of rows; its ‹ › arrows change that table's page param (?tp, ?lp, ?wp) in the URL.
 
 const inr = (n: number | string) => inrBase(n, 2)
 const day = (v: string) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 const signTone = (v: number) => (v >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
 const signed = (v: number) => `${v >= 0 ? '+' : '−'}${inr(Math.abs(v))}`
-const counted = (total: number): InfiniteControl & { loading?: boolean } => ({ total, hasMore: false, loadingMore: false, loadMore: () => {} })
+/** Which page of a server-paged table this is, and the query param that holds it. */
+export interface TablePage {
+  page: number
+  pageSize: number
+  param: string
+}
+
+function useUrlPager({ page, pageSize, param }: TablePage, total: number | null, hasNext = total != null && page * pageSize < total): PagerControl {
+  const router = useRouter()
+  const pathname = usePathname()
+  const params = useSearchParams()
+  const [loading, start] = useTransition()
+  return {
+    page,
+    pageSize,
+    total,
+    hasNext,
+    loading,
+    setPage: n => {
+      const q = new URLSearchParams(params.toString())
+      if (n > 1) q.set(param, String(n))
+      else q.delete(param)
+      const qs = q.toString()
+      start(() => router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false }))
+    },
+  }
+}
 
 export const LEDGER_LABEL: Record<string, string> = {
   order_capture: 'Order capture (tenant share)',
@@ -38,6 +66,7 @@ const WALLET_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',
   email: 'Email',
   ad_free: 'Ad-free',
+  messaging_addon: 'SMS & WhatsApp add-on',
   infra: 'Servers',
 }
 export const walletLabel = (e: Pick<WalletLedgerEntry, 'category' | 'entry_type'>) => WALLET_LABEL[e.category ?? ''] ?? humanize(e.category || e.entry_type)
@@ -55,14 +84,15 @@ const TX_COLS: DataCol<TenantTransaction>[] = [
   { key: 'date', label: 'Date', sortType: 'date', sort: tx => new Date(tx.occurred_at).getTime(), render: tx => <span className="text-foreground-muted">{day(tx.occurred_at)}</span> },
 ]
 
-export function TransactionsTable({ rows, total }: { rows: TenantTransaction[]; total: number }) {
+export function TransactionsTable({ rows, total, paging }: { rows: TenantTransaction[]; total: number; paging: TablePage }) {
+  const pager = useUrlPager(paging, total)
   return (
     <DataTable
       sortNs="tx"
       rows={rows}
       cols={TX_COLS}
       rowKey={tx => tx.id}
-      infinite={counted(total)}
+      pager={pager}
       noun="transactions"
       empty="No transactions yet."
       bare
@@ -95,7 +125,8 @@ const LEDGER_COLS: DataCol<LedgerEntry>[] = [
   { key: 'date', label: 'Date', sortType: 'date', sort: e => new Date(e.occurred_at).getTime(), render: e => <span className="text-foreground-muted">{day(e.occurred_at)}</span> },
 ]
 
-export function LedgerTable({ rows, total, balance }: { rows: LedgerEntry[]; total: number; balance: number }) {
+export function LedgerTable({ rows, total, balance, paging }: { rows: LedgerEntry[]; total: number; balance: number; paging: TablePage }) {
+  const pager = useUrlPager(paging, total)
   return (
     <div className="space-y-3 min-w-0">
       <DataTable
@@ -103,7 +134,7 @@ export function LedgerTable({ rows, total, balance }: { rows: LedgerEntry[]; tot
         rows={rows}
         cols={LEDGER_COLS}
         rowKey={e => e.id}
-        infinite={counted(total)}
+        pager={pager}
         noun="entries"
         empty="No ledger entries yet."
         bare
@@ -136,8 +167,9 @@ const WALLET_COLS: DataCol<WalletRow>[] = [
   { key: 'date', label: 'Date', sortType: 'date', sort: e => new Date(e.occurred_at).getTime(), render: e => <span className="text-foreground-muted">{day(e.occurred_at)}</span> },
 ]
 
-/** The wallet's latest movements; there is no offset paging, so the page asks for more rows. */
-export function WalletTable({ rows }: { rows: WalletLedgerEntry[] }) {
+/** One page of the wallet's movements; its total is not counted, so `hasNext` comes from the page. */
+export function WalletTable({ rows, paging, hasNext }: { rows: WalletLedgerEntry[]; paging: TablePage; hasNext: boolean }) {
+  const pager = useUrlPager(paging, null, hasNext)
   const keyed = rows.map((r, i) => ({ ...r, k: `${r.occurred_at}-${r.awb ?? ''}-${i}` }))
   return (
     <DataTable
@@ -145,7 +177,7 @@ export function WalletTable({ rows }: { rows: WalletLedgerEntry[] }) {
       rows={keyed}
       cols={WALLET_COLS}
       rowKey={e => e.k}
-      pageSize={Math.max(25, rows.length)}
+      pager={pager}
       noun="movements"
       empty="No wallet movements yet."
       bare

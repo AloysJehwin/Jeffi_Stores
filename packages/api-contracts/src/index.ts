@@ -42,6 +42,8 @@ export const SendMessageRequest = z
     kicker: z.string().max(120).optional(),
     footer_contact: z.string().max(200).optional(),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), // email: the store's button/link colour
+    // email: 'none' sends the HTML as written; overrides the template's own layout setting
+    layout: z.enum(['store', 'none']).optional(),
     // WhatsApp templates with an image header / link button: pass full URLs, the service fills their {{n}}.
     media_url: z.string().url().optional(),
     button_url: z.string().url().optional(),

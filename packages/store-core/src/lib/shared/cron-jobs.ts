@@ -175,6 +175,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job, like ad_free_renew: one run walks every tenant on auto-renew.
+    id: 'messaging_addon_renew',
+    name: 'Renew SMS & WhatsApp add-on',
+    path: '/api/cron/messaging-addon-renew',
+    method: 'POST',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 250 * SEC,
+    lockTtlMs: HOUR,
+    tenantScope: null,
+  },
+  {
     id: 'publish_social_posts',
     name: 'Publish social posts',
     path: '/api/cron/publish-social-posts',
@@ -519,6 +531,29 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'orders:read',
   },
   {
+    id: 'upi_sweep',
+    name: 'UPI missed-payment sweep',
+    path: '/api/cron/upi-sweep',
+    method: 'GET',
+    intervalMs: 10 * MIN,
+    intervalLabel: 'every 10 min',
+    startDelayMs: 660 * SEC,
+    lockTtlMs: 10 * MIN - 30 * SEC,
+    tenantScope: 'orders:read',
+  },
+  {
+    // PhonePe Autopay: notify >= 24 h before each due date, debit on it, mint the cycle's order.
+    id: 'subscription_renewals',
+    name: 'UPI Autopay subscription renewals',
+    path: '/api/cron/subscription-renewals',
+    method: 'GET',
+    intervalMs: 30 * MIN,
+    intervalLabel: 'every 30 min',
+    startDelayMs: 690 * SEC,
+    lockTtlMs: 30 * MIN - 30 * SEC,
+    tenantScope: 'orders:read',
+  },
+  {
     id: 'myntra_sync',
     name: 'Myntra orders, listings, stock and alerts',
     path: '/api/cron/myntra-sync',
@@ -630,6 +665,7 @@ const DAILY_AT_IST: Record<string, string> = {
   google_ads_audiences: '0 6',
   // Early morning IST, so a lapsing month is charged before most store traffic.
   ad_free_renew: '0 5',
+  messaging_addon_renew: '10 5',
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
   s3_usage: '30 2',

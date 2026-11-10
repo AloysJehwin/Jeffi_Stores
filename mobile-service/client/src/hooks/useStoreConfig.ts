@@ -4,7 +4,7 @@ import { getStoreConfig, type StoreConfig } from '../api/storeConfig'
 const FALLBACK: StoreConfig = {
   slug: null,
   identity: { name: '', email: '', phone: '', web: '', logoUrl: null },
-  flags: { razorpayEnabled: true, codEnabled: false, gstEnabled: true, digitalProductsEnabled: false, subscriptionsEnabled: false },
+  flags: { razorpayEnabled: true, codEnabled: false, gstEnabled: true, digitalProductsEnabled: false, subscriptionsEnabled: false, upiEnabled: false },
 }
 
 export function useStoreConfig(): StoreConfig {

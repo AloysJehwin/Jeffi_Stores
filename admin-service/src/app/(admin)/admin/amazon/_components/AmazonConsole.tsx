@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import AmazonMerchantPanel from './AmazonMerchantPanel'
+import { AmazonTabLoading } from './skeletons'
 import { BuyboxView, FeesView, OrdersStockView, OverviewView, RepricerView, SalesView, SuppressedView } from './AmazonTabs'
 
 type Tab = 'overview' | 'sales' | 'orders' | 'listings' | 'suppressed' | 'buybox' | 'fees' | 'repricer' | 'alerts' | 'changes' | 'runs'
@@ -96,7 +97,7 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
       {error ? (
         <ErrorState body={error} />
       ) : DATA_TABS.has(tab) && !data ? (
-        <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+        <AmazonTabLoading tab={tab} />
       ) : (
         <Body tab={tab} data={data} onChanged={reload} />
       )}

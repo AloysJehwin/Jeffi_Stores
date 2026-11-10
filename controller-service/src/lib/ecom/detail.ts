@@ -137,16 +137,7 @@ export async function loadInfraDetail(d: TenantDetailData): Promise<InfraDetail>
   return { domains, migrations, currentSha: process.env.GIT_SHA || null, compute, spec, workload, breakdown, breakdownNote }
 }
 
-export const DETAIL_PAGE_SIZE = 50
+export const DETAIL_PAGE_SIZE = 10
 
 /** 1-based page from a ?param. */
 export const pageParam = (v: string | undefined) => Math.max(1, Math.floor(Number(v) || 1))
-
-/** The current URL with one query param changed (page 1 drops it). */
-export function withParam(path: string, sp: Record<string, string | undefined>, key: string, page: number): string {
-  const q = new URLSearchParams()
-  for (const [k, v] of Object.entries(sp)) if (typeof v === 'string' && v && k !== key) q.set(k, v)
-  if (page > 1) q.set(key, String(page))
-  const qs = q.toString()
-  return `${path}${qs ? `?${qs}` : ''}`
-}

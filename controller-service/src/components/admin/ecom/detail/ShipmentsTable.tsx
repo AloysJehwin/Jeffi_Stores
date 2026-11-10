@@ -41,6 +41,7 @@ export default function ShipmentsTable({ tenantId, ownDelhivery, shipments }: { 
         rowKey={s => s.id}
         rowActions={ownDelhivery ? undefined : actions}
         noun="shipments"
+        paged
         empty="No shipments with an AWB yet."
         mobileCard={s => (
           <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1.5 min-w-0">

@@ -9,6 +9,7 @@ import { AttentionList } from '@/components/admin/overview/kit'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, count, money, pct, when } from '@/components/admin/channels/ui'
 import { delta, ratio } from '@/lib/overview/period'
 import { Bars, OverviewFrame, withAp } from './catalog-overview'
+import ProductsOverviewLoading from './ProductsOverviewLoading'
 import type { AttentionItem } from '@/components/admin/overview/kit'
 
 type Issue = 'no_price' | 'no_image' | 'no_hsn' | 'no_gst' | 'no_cost' | 'no_description' | 'out_of_stock'
@@ -99,6 +100,7 @@ export default function ProductsOverview({ fields }: { fields: FilterField[] }) 
     <OverviewFrame<ProductsOverviewData>
       endpoint="/api/admin/products/overview"
       query={query}
+      skeleton={<ProductsOverviewLoading />}
       filters={
         <ListFilters entity="products" fields={fields} search={PRODUCT_SEARCH} period noun="Products" tab="overview" />
       }

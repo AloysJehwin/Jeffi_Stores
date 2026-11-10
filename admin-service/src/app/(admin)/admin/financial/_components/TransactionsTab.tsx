@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { TransactionsTabSkeleton } from './FinanceSkeletons'
 import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
 import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
@@ -81,7 +82,7 @@ export function TransactionsTab() {
     <div className="space-y-5">
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} />}
+      {loading && !data ? <TransactionsTabSkeleton /> : data && <Body d={data} />}
     </div>
   )
 }

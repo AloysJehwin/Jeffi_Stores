@@ -7,20 +7,29 @@ import { ChoiceChips, fieldCls } from '../../_ui'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import Pager from '../_components/Pager'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
+import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, useUpiPayment, type PaymentChoice } from '@/components/payments'
 
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
 const AMOUNTS = [500, 1000, 2500, 5000]
-const CATEGORY: Record<string, string> = { ad_free: 'ad-free' }
+const CATEGORY: Record<string, string> = { ad_free: 'ad-free', messaging_addon: 'SMS & WhatsApp add-on' }
 
-export default function WalletClient({ initial, keyId, tenantName }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string }) {
+export default function WalletClient({ initial, keyId, tenantName, upiEnabled = false }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string; upiEnabled?: boolean }) {
   const router = useRouter()
   const [amount, setAmount] = useState(1000)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [method, setMethod] = useState<PaymentChoice>(upiEnabled ? 'upi' : 'razorpay')
+  const upi = useUpiPayment({ returnTo: '/dashboard/wallet', apiBase: '/api/ecom/wallet/topup/upi' })
+  const viaUpi = upiEnabled && method === 'upi'
 
   async function topUp() {
+    if (viaUpi) {
+      setMsg(null)
+      await upi.start({ purpose: 'ecom_wallet_topup', amountInr: amount })
+      return
+    }
     setBusy(true); setMsg(null)
     try {
       const r = await fetch('/api/ecom/wallet/topup/create-order', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amountInr: amount }) })
@@ -30,6 +39,7 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
       await new Promise<void>((res, rej) => {
         const rz = new (window as any).Razorpay({
           key: o.keyId || keyId, amount: o.amount, currency: o.currency, order_id: o.orderId, name: 'Jeffi Commerce', description: `Wallet top-up · ${tenantName}`, theme: { color: '#c46a46' },
+          ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
           handler: async (p: any) => {
             const v = await fetch('/api/ecom/wallet/topup/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) })
             const d = await v.json(); if (!v.ok) return rej(new Error(d.error)); res()
@@ -55,14 +65,21 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
           <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
             options={AMOUNTS.map(a => ({ value: String(a), label: fmt(a) }))} />
           <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} aria-label="Custom amount" className={`w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm ${fieldCls}`} />
-          <button onClick={topUp} disabled={busy || amount < 100} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Opening…' : 'Pay with Razorpay'}</button>
+          <button onClick={topUp} disabled={busy || upi.busy || amount < 100} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy || upi.busy ? 'Opening…' : viaUpi ? 'Pay with UPI' : upiEnabled ? 'Pay' : 'Pay with Razorpay'}</button>
         </div>
+        {upiEnabled && (
+          <div className="mt-4 max-w-md">
+            <PaymentSections compact upi razorpay value={method} onChange={setMethod} />
+          </div>
+        )}
         {amount >= 100 && (
           <p className="mt-3 text-xs tabular-nums text-foreground-muted">
             {fmt(amount)} credit + {fmt(topupAmounts(amount).gst)} GST (18%) = you pay <strong className="text-foreground">{fmt(topupAmounts(amount).total)}</strong>. A tax invoice is emailed after payment.
           </p>
         )}
         {msg && <p className="mt-3 text-sm text-foreground-secondary">{msg}</p>}
+        {upi.error && !upi.manual && <p role="alert" className="mt-3 text-sm text-foreground-secondary">{upi.error}</p>}
+        <UpiManualDialog manual={upi.manual} busy={upi.busy} error={upi.error} onConfirm={upi.confirmUtr} onClose={upi.dismissManual} />
       </Card>
       <Card title="Ledger">
         <div className="-mx-6 -mb-6 overflow-x-auto"><table className="w-full text-sm min-w-[560px]"><thead className="org-sand text-foreground-secondary"><tr>{['When', 'Category', 'Amount', 'Note'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>

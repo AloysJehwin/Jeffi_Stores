@@ -10,9 +10,11 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { EmptyState, ErrorState, TableSkeleton, type EmptyStateProps } from './states'
 import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl } from './infinite'
+import { Pager, usePagedRows, EMBEDDED_PAGE_SIZE, type PagerControl } from './pager'
 import { SortArrow, useListSort, type SortType } from './list-sort'
 
-// List tables, infinite scroll (no page buttons). Client mode sorts in memory and reveals
+// List tables. A page's main list scrolls infinitely; a list inside a page (paged / pager) shows ‹ ›
+// arrows and a fixed page of rows. Client mode sorts in memory and reveals
 // pageSize rows at a time, or shows rows an `infinite` source (useInfiniteList) fetched so far.
 // Server mode reads and writes the page's existing query params (?page, ?sort&dir, filters,
 // search); rows of ?page=1..N accumulate client-side (see useServerPages). Both modes keep the
@@ -66,6 +68,10 @@ export interface DataTableProps<T> {
   pageHref?: (page: number) => string
   /** Client mode fed page by page from an API (useInfiniteList): rows are everything loaded so far. */
   infinite?: InfiniteControl & { loading?: boolean }
+  /** A list inside a page (more content below it): rows in memory, shown a page at a time with ‹ › arrows. */
+  paged?: boolean
+  /** A list inside a page fed one page at a time from an API (usePagedList): rows are that page. */
+  pager?: PagerControl
   /** Rows removed locally (deleted) that earlier accumulated pages may still hold. */
   hide?: (r: T) => boolean
   /** Footer wording: "Showing X of Y <noun>". */
@@ -218,7 +224,7 @@ function BulkButton<T>({ a, rows, done }: { a: BulkAction<T>; rows: T[]; done: (
 }
 
 export function DataTable<T>(props: DataTableProps<T>) {
-  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, noun, hide, sortNs } = props
+  const { rows, cols, rowKey, mode = 'client', pageSize = props.paged ? EMBEDDED_PAGE_SIZE : 25, search, filters, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, pager, noun, hide, sortNs } = props
   const server = mode === 'server'
   const listSort = useListSort(server ? undefined : sortNs)
   const sortKey = listSort.sort
@@ -247,7 +253,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const sv = useServerPages({ rows: server ? rows : [], page: server ? (props.page ?? 1) : 1, total: server ? (props.total ?? rows.length) : 0, rowKey, pageHref: props.pageHref })
   const reveal = useReveal(shownRows, pageSize, `${q}|${sortKey}|${desc}`)
-  const visibleAll = server ? sv.rows : infinite ? shownRows : reveal.shown
+  const paging = usePagedRows(shownRows, pageSize, `${q}|${sortKey}|${desc}`)
+  const pagerCtl = pager ?? (props.paged && !server ? paging.pager : null)
+  const visibleAll = server ? sv.rows : infinite || pager ? shownRows : props.paged ? paging.shown : reveal.shown
   const visible = hide ? visibleAll.filter(r => !hide(r)) : visibleAll
   const control: InfiniteControl = server ? sv.control : infinite ? { ...infinite, total: q.trim() ? null : infinite.total } : reveal.control
   const loading = props.loading || (server && sv.resetting) || !!infinite?.loading
@@ -416,7 +424,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
         </div>
       )}
       {body}
-      {!loading && !props.error && !firstPageError && (visible.length > 0 || control.hasMore || control.error) && <InfiniteFooter shown={visible.length} control={control} noun={noun} />}
+      {pagerCtl ? (
+        !loading && !props.error && <Pager control={pagerCtl} noun={noun} />
+      ) : (
+        !loading && !props.error && !firstPageError && (visible.length > 0 || control.hasMore || control.error) && <InfiniteFooter shown={visible.length} control={control} noun={noun} />
+      )}
     </div>
   )
 }

@@ -5,9 +5,10 @@ import Link from 'next/link'
 
 import { ap } from '@/lib/shared/admin-path'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
-import { Card, DataTable, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, PageBody, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { Card, DataTable, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, PageBody, StatusBadge, type DataCol } from '@/components/admin/kit'
 import { SETTLEMENT_STATUS, payoutBadge } from '../../_components/shared'
 import { ChangeLog } from '@/components/admin/change-log'
+import PayableDetailLoading from './view/loading'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
 
@@ -64,11 +65,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
   }
 
   if (loading || !data?.expense) {
-    return (
-      <PageBody>
-        <DetailSkeleton />
-      </PageBody>
-    )
+    return <PayableDetailLoading />
   }
 
   const e = data.expense
@@ -100,7 +97,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
           {payments.length === 0 ? (
             <EmptyState bare title="No payments recorded yet" />
           ) : (
-            <DataTable<any> bare rows={payments} cols={PAYMENT_COLS} rowKey={p => p.id} mobileCard={p => <PaymentCard p={p} />} />
+            <DataTable<any> bare paged rows={payments} cols={PAYMENT_COLS} rowKey={p => p.id} mobileCard={p => <PaymentCard p={p} />} />
           )}
         </Card>
         <ChangeLog kind="payable" id={id} version={`${e.updated_at}|${payments.length}`} />

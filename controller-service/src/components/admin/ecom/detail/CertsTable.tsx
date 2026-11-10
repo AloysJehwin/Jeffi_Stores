@@ -80,6 +80,7 @@ export default function CertsTable({ tenantId, certs }: { tenantId: string; cert
       rowKey={c => c.id}
       rowActions={actions}
       noun="certificates"
+      paged
       empty="No client certificates issued."
       bare
       mobileCard={c => (

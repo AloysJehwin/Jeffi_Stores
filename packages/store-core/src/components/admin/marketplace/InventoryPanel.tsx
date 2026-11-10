@@ -7,6 +7,7 @@ import { Badge, Banner, Kpi, KpiGrid, Section, Table, api, btnGhost, count, inpu
 import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { InventoryRow, InventoryView } from '@/lib/marketplace/stock'
+import { InventoryLoading } from './skeletons'
 
 type Channel = 'myntra' | 'ajio'
 const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
@@ -121,7 +122,7 @@ export default function InventoryPanel({ channel }: { channel: Channel }) {
   }
 
   if (error && !data) return <Banner ok={false}>{error}</Banner>
-  if (!data) return <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+  if (!data) return <InventoryLoading />
   const t = data.totals
   const run = data.lastRun
 

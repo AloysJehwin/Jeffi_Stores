@@ -5,6 +5,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import { actorOf, withDraftCreate } from '@/lib/admin/draft-locks'
+import { bareEmailDoc } from '@/lib/templates/email-layouts'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -36,7 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
-  const { title, template_key, subject, template_data, audience_type, audience_filter, channels } = body
+  const { title, subject, audience_type, audience_filter, channels } = body
+  let { template_key, template_data } = body
+  // Store layout off: 'custom' sends a full document as written.
+  if (body.layout === 'raw' && template_key && template_key !== 'library') {
+    template_key = 'custom'
+    template_data = { htmlBody: bareEmailDoc(String(template_data?.body ?? ''), template_data?.preheader) }
+  }
 
   if (!title || !template_key || !subject || !audience_type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })

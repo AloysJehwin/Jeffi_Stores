@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { RazorpaySettlementsTabSkeleton, SettlementLinesSkeleton } from './FinanceSkeletons'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
 import { badgeCls, useActionToast } from '@/components/admin/kit'
 import type { AwaitingRow, AwaitingSettlement, SettlementDetail, SettlementLine, SettlementOverview, SettlementRow } from '@/lib/payments/rzp-settlement-report'
 import { FinancePeriodBar, useFinancePeriod } from './finance'
@@ -74,7 +76,7 @@ function Settlements() {
       </div>
       {overview.error && <Banner ok={false}>{overview.error}</Banner>}
       {d?.sync.last_error && d.sync.last_status !== 'success' && <Banner ok={false}>Last sync: {d.sync.last_error}</Banner>}
-      {overview.loading && !d ? <OverviewSkeleton /> : d && <Body d={d} awaiting={awaiting.data} />}
+      {overview.loading && !d ? <RazorpaySettlementsTabSkeleton /> : d && <Body d={d} awaiting={awaiting.data} />}
     </div>
   )
 }
@@ -123,7 +125,9 @@ function Body({ d, awaiting }: { d: SettlementOverview; awaiting: AwaitingSettle
 
 function SettlementsTable({ rows }: { rows: SettlementRow[] }) {
   const [open, setOpen] = useState<string | null>(null)
+  const paged = usePagedRows(rows)
   return (
+    <>
     <div className={`${tableWrapCls} overflow-x-auto`}>
       <table className="w-full text-sm">
         <thead className={theadCls}>
@@ -138,7 +142,7 @@ function SettlementsTable({ rows }: { rows: SettlementRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
+          {paged.shown.map(r => (
             <Fragment key={r.id}>
               <tr className="border-b border-border-default hover:bg-surface-secondary/50 cursor-pointer" onClick={() => setOpen(open === r.id ? null : r.id)}>
                 <td className="px-4 py-2.5 w-8 text-foreground-muted">{open === r.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
@@ -164,12 +168,14 @@ function SettlementsTable({ rows }: { rows: SettlementRow[] }) {
         </tbody>
       </table>
     </div>
+    <Pager control={paged.pager} noun="settlements" />
+    </>
   )
 }
 
 function SettlementLines({ id }: { id: string }) {
   const { data, error, loading } = useOverviewData<SettlementDetail>(`/api/admin/financial/razorpay-settlements/${encodeURIComponent(id)}`)
-  if (loading) return <p className="text-xs text-foreground-muted">Loading lines…</p>
+  if (loading) return <SettlementLinesSkeleton />
   if (error || !data) return <p className="text-xs text-red-600">{error || 'Could not load the lines.'}</p>
   if (!data.groups.length) return <p className="text-xs text-foreground-muted">Razorpay sent no lines for this settlement yet. Sync again later.</p>
   const s = data.settlement
@@ -189,7 +195,7 @@ function SettlementLines({ id }: { id: string }) {
               {g.fees ? ` · fees ${money(g.fees)}` : ''}
             </span>
           </div>
-          <Table rows={g.lines} cols={LINE_COLS} rowKey={l => l.entity_id} pageSize={10} />
+          <Table rows={g.lines} cols={LINE_COLS} rowKey={l => l.entity_id} />
         </div>
       ))}
     </div>

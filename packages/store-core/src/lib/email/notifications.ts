@@ -14,6 +14,7 @@ import {
   storeBaseUrlAsync,
   escapeHtml,
 } from './shared'
+import { bareEmailDoc } from '@/lib/templates/email-layouts'
 
 export async function sendNewReviewNotification(review: any, user: any, product: any) {
   const adminEmail = await getAdminNotificationEmails()
@@ -275,11 +276,13 @@ export async function sendPaymentDowntimeEmail(d: { label: string; severity: str
 
 /**
  * A message from the store team to a customer. 'message' frames the text under the subject in a box;
- * 'template' sends a library template's body as written (it carries its own greeting and headline).
+ * 'template' sends a library template's body as written (it carries its own greeting and headline)
+ * inside the store's header and footer; 'raw' sends the body as written with neither.
  */
-export async function adminContactHtml(subject: string, message: string, opts: { isHtml?: boolean; layout?: 'template' | 'message'; preheader?: string } = {}) {
-  const [contactLine, brand, address] = await Promise.all([storeContactLine(), currentBrandNameAsync(), storeAddressLine()])
+export async function adminContactHtml(subject: string, message: string, opts: { isHtml?: boolean; layout?: 'template' | 'message' | 'raw'; preheader?: string } = {}) {
   const messageHtml = opts.isHtml ? message : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  if (opts.layout === 'raw') return bareEmailDoc(messageHtml, opts.preheader)
+  const [contactLine, brand, address] = await Promise.all([storeContactLine(), currentBrandNameAsync(), storeAddressLine()])
   const asTemplate = opts.layout === 'template'
   return mailShell({
     brand,
@@ -299,7 +302,7 @@ export async function sendAdminContactEmail(
   name: string,
   subject: string,
   message: string,
-  opts: { isHtml?: boolean; layout?: 'template' | 'message'; preheader?: string; entityType?: string; entityId?: string } = {}
+  opts: { isHtml?: boolean; layout?: 'template' | 'message' | 'raw'; preheader?: string; entityType?: string; entityId?: string } = {}
 ) {
   try {
     const info = await sendAuditedMail({

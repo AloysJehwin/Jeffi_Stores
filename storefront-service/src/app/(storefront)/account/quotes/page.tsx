@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import { useInfiniteList, fetchJson, InfiniteFooter } from '@/components/admin/kit/infinite'
+import { AccountQuotesSkeleton, QuoteRowsSkeleton } from '@/components/visitor/skeletons/account'
 
 interface RFQ {
   id: string
@@ -38,7 +39,7 @@ export default function MyQuotesPage() {
     },
   })
   const rfqs = list.rows
-  const loading = list.loading || list.loadingMore
+  const loading = list.loading
   const initialLoading = list.loading && rfqs.length === 0
 
   useEffect(() => {
@@ -47,28 +48,7 @@ export default function MyQuotesPage() {
     }
   }, [user, isLoading])
 
-  if (isLoading || initialLoading) {
-    return (
-      <div className="container mx-auto px-4 pt-4 pb-8">
-        <div className="space-y-3 animate-pulse">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default p-4"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-4 bg-surface-secondary rounded w-36" />
-                <div className="h-5 bg-surface-secondary rounded-full w-20" />
-              </div>
-              <div className="h-3 bg-surface-secondary rounded w-48 mb-1" />
-              <div className="h-3 bg-surface-secondary rounded w-24" />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  if (isLoading || initialLoading) return <AccountQuotesSkeleton />
 
   return (
     <div className="bg-surface min-h-screen py-6 lg:py-8">
@@ -110,24 +90,7 @@ export default function MyQuotesPage() {
                   </Link>
                 </div>
               ) : loading ? (
-                <div className="divide-y divide-border-default">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="p-5 flex items-start justify-between gap-4 animate-pulse"
-                      style={{ animationDelay: `${i * 50}ms` }}
-                    >
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-4 w-32 bg-surface-secondary rounded" />
-                          <div className="h-5 w-16 bg-surface-secondary rounded-full" />
-                        </div>
-                        <div className="h-3 w-20 bg-surface-secondary rounded" />
-                        <div className="h-3 w-28 bg-surface-secondary rounded" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <QuoteRowsSkeleton />
               ) : (
                 <div className="divide-y divide-border-default">
                   {rfqs.map(rfq => (

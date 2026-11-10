@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, btnGhost } from '@/components/admin/channels/ui'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { ErrorState } from '@/components/admin/kit/states'
-import { OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { TRAFFIC_TABS, parseTab, type TrafficTab, type TrafficTabData } from '@/lib/traffic/types'
 import OverviewTab from './_components/OverviewTab'
 import AcquisitionTab from './_components/AcquisitionTab'
@@ -15,6 +15,7 @@ import ProductsTab from './_components/ProductsTab'
 import SearchTab from './_components/SearchTab'
 import AudienceTab from './_components/AudienceTab'
 import RealtimeTab from './_components/RealtimeTab'
+import TrafficTabLoading from './_components/TrafficLoading'
 
 const LABELS: Record<TrafficTab, string> = {
   overview: 'Overview',
@@ -82,7 +83,7 @@ export default function TrafficClient() {
       {error ? (
         <ErrorState body={error} actionNode={<button type="button" onClick={reload} className={btnGhost}>Try again</button>} />
       ) : !ready ? (
-        <OverviewSkeleton />
+        <TrafficTabLoading tab={tab} />
       ) : (
         <TabBody key={key} tab={tab} data={ready} />
       )}

@@ -9,6 +9,7 @@ import { useDraftLock } from '@/hooks/useDraftLock'
 import { useAutosaveDraft } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { assertDraftResponse, lockHeaders } from '@/lib/client/draft-lock-client'
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
 import { FEED_TYPES, IMAGE_AD_TYPES, specProblems } from '@/lib/google-ads/campaign-spec'
@@ -332,9 +333,26 @@ export default function CampaignWizard({
       {loadError && <p className="text-sm text-red-500">{loadError}</p>}
       {draftId && <DraftLockBanner lock={lock} scope="google_ads_campaigns:write" />}
       {!loadError && (!b || !d) && (
-        <p className="text-sm text-foreground-muted flex items-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading your store data...
-        </p>
+        <div className="space-y-4" role="status" aria-busy="true" aria-label="Loading your store data">
+          <ol className="flex flex-wrap gap-1 text-xs">
+            {STEPS.map((s, i) => (
+              <li key={s} className={`rounded-full px-3 py-1 ${i === step ? 'bg-accent-500 text-white' : 'bg-surface-secondary text-foreground-muted'}`}>
+                {i + 1}. {s}
+              </li>
+            ))}
+          </ol>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {STEPS.slice(0, 3).map(s => (
+              <Sk key={s} className="h-20 rounded-lg" />
+            ))}
+          </div>
+          {['Campaign name', 'Daily budget (₹)', 'Bid strategy'].map(l => (
+            <div key={l} className="space-y-1">
+              <p className="text-xs font-medium text-foreground-secondary">{l}</p>
+              <Sk className="h-control rounded-lg" />
+            </div>
+          ))}
+        </div>
       )}
       {b && d && (
         <LockedFieldset readOnly={readOnly}>

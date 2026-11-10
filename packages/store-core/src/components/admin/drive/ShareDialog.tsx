@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Shield, Trash2, User, Users } from 'lucide-react'
+import { Shield, Trash2, User, Users } from 'lucide-react'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { Dialog, useActionToast } from '@/components/admin/kit'
 import AdminSelect from '@/components/admin/AdminSelect'
 import type { DriveLevel, DriveShare, DriveVisibility } from '@/lib/drive/types'
@@ -116,7 +117,7 @@ export default function ShareDialog({
         <div>
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground-muted">People with access</p>
           {!shares ? (
-            <Loader2 className="h-5 w-5 animate-spin text-foreground-muted" />
+            <LoadingLines lines={2} />
           ) : !shares.length ? (
             <p className="text-sm text-foreground-secondary">Not shared with anyone yet.</p>
           ) : (

@@ -14,10 +14,11 @@ import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import DatePicker from '@/components/ui/DatePicker'
 import { isValidDob } from '@/lib/shared/format'
+import { StoreAuthSkeleton } from '@/components/visitor/skeletons/auth'
 
 export default function SignupPageWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<StoreAuthSkeleton kind="signup" />}>
       <SignupPage />
     </Suspense>
   )

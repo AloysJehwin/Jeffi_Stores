@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { Kpi, KpiGrid, Section, Banner, Table, Badge, count, money, pct, when } from '@/components/admin/channels/ui'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -16,6 +15,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { REQUEST_SEARCH, RETURN_FIELDS } from '@/lib/filters/fields/returns'
 import { BreakdownBars, fmtDays, withAp } from '../../orders/_components/overview-shared'
+import ReturnsOverviewSkeleton from './ReturnsOverviewSkeleton'
 
 export interface ReturnsKpis {
   requests: number
@@ -88,7 +88,7 @@ export default function ReturnsOverview() {
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       <ListFilters entity="returns" fields={RETURN_FIELDS} search={REQUEST_SEARCH} period noun="Returns" tab="overview" exportable />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data ? <Body d={data} /> : null}
+      {loading && !data ? <ReturnsOverviewSkeleton /> : data ? <Body d={data} /> : null}
     </div>
   )
 }
@@ -226,7 +226,6 @@ export function OldestOpen({
         rows={rows}
         rowKey={r => r.id}
         empty="No open requests."
-        pageSize={6}
         cols={[
           {
             key: 'order',
