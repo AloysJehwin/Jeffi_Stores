@@ -4,6 +4,7 @@ import { Kpi, Section, count, pct } from '@/components/admin/channels/ui'
 import { delta, ratio } from '@/lib/overview/period'
 import type { AttentionItem } from '@/components/admin/overview/kit'
 import { OverviewTab } from '../products/_components/catalog-overview'
+import EnrichmentOverviewSkeleton from './EnrichmentOverviewSkeleton'
 
 interface Stats {
   proposed: number
@@ -44,6 +45,7 @@ export default function EnrichmentOverview() {
   return (
     <OverviewTab<EnrichmentOverviewData>
       endpoint="/api/admin/catalog-enrichment/overview"
+      skeleton={<EnrichmentOverviewSkeleton />}
       kpis={d => (
         <>
           <Kpi

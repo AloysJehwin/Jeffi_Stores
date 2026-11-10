@@ -2,7 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useActionToast } from '@/components/admin/kit/toast'
-import { InfiniteFooter, useReveal } from '@/components/admin/kit/infinite'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingTable, Sk } from '@/components/admin/kit/skeleton'
 import { SortTh, useListSort, type SortCol } from '@/components/admin/kit/list-sort'
 import { TONE_CLS } from '@/components/admin/kit/tones'
 import Link from 'next/link'
@@ -231,7 +232,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Pickup Warehouses</h2>
           <span className="text-sm text-foreground-secondary">
-            {loading ? 'Loading…' : `${warehouses.length} registered`}
+            {loading ? <Sk className="h-3.5 w-20" /> : `${warehouses.length} registered`}
           </span>
         </div>
         {canWrite && (
@@ -434,15 +435,14 @@ export default function DelhiveryPageClient({
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
-  const PAGE_SIZE = 25
   // The endpoint already caps these (100 eligible orders, 20 pickups); the pickup request spans the
-  // whole eligible set, so they arrive in one payload and are revealed 25 at a time.
+  // whole eligible set, so they arrive in one payload and are shown 10 at a time.
   const orderSort = useListSort('eligible')
   const pickupSort = useListSort('pickups')
   const sortedOrders = useMemo(() => sortRows(orders, orderSort.sort, orderSort.dir, ORDER_SORT), [orders, orderSort.sort, orderSort.dir])
   const sortedHistory = useMemo(() => sortRows(pickupHistory, pickupSort.sort, pickupSort.dir, PICKUP_SORT), [pickupHistory, pickupSort.sort, pickupSort.dir])
-  const { shown: pagedOrders, control: ordersMore } = useReveal(sortedOrders, PAGE_SIZE, `${orderSort.sort}|${orderSort.dir}`)
-  const { shown: pagedHistory, control: historyMore } = useReveal(sortedHistory, PAGE_SIZE, `${pickupSort.sort}|${pickupSort.dir}`)
+  const { shown: pagedOrders, pager: ordersPager } = usePagedRows(sortedOrders, 10, `${orderSort.sort}|${orderSort.dir}`)
+  const { shown: pagedHistory, pager: historyPager } = usePagedRows(sortedHistory, 10, `${pickupSort.sort}|${pickupSort.dir}`)
 
   const loadData = () => {
     setLoading(true)
@@ -639,7 +639,7 @@ export default function DelhiveryPageClient({
         <div className="px-6 py-4 border-b border-border-default flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Eligible Orders</h2>
-            <span className="text-sm text-foreground-secondary">{orders.length} found</span>
+            {loading ? <Sk className="h-3.5 w-16" /> : <span className="text-sm text-foreground-secondary">{orders.length} found</span>}
           </div>
           <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
             {pickupLocations.length > 0 && (
@@ -662,54 +662,7 @@ export default function DelhiveryPageClient({
         </div>
 
         {loading ? (
-          <div className="p-4 animate-pulse">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border-default bg-surface-secondary">
-                    <th className="px-4 py-3 w-8">
-                      <div className="h-4 w-4 bg-surface-elevated rounded" />
-                    </th>
-                    {['Order', 'AWB', 'Customer', 'Destination', 'Placed', 'Status'].map((_, i) => (
-                      <th key={i} className="px-4 py-3">
-                        <div
-                          className="h-3 bg-surface-elevated rounded w-16"
-                          style={{ animationDelay: `${i * 40}ms` }}
-                        />
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...Array(6)].map((_, i) => (
-                    <tr key={i} className="border-b border-border-default" style={{ animationDelay: `${i * 60}ms` }}>
-                      <td className="px-4 py-3">
-                        <div className="h-4 w-4 bg-surface-secondary rounded" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="h-4 w-20 bg-surface-secondary rounded" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="h-4 w-28 bg-surface-secondary rounded" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="h-4 w-32 bg-surface-secondary rounded" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="h-4 w-36 bg-surface-secondary rounded" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="h-4 w-24 bg-surface-secondary rounded" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="h-5 w-16 bg-surface-secondary rounded-full" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <LoadingTable bare rows={6} columns={['Order', 'AWB', 'Customer', 'Destination', 'Placed', 'Status']} />
         ) : orders.length === 0 ? (
           <div className="p-8 text-center text-foreground-muted">
             <svg className="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -791,7 +744,7 @@ export default function DelhiveryPageClient({
               </table>
             </div>
 
-            <InfiniteFooter shown={pagedOrders.length} control={ordersMore} noun="orders" className="px-6 pb-3" />
+            <Pager control={ordersPager} noun="orders" className="px-6 pb-3" />
 
             <div className="px-6 py-4 border-t border-border-default flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-foreground-secondary">
@@ -1066,7 +1019,7 @@ export default function DelhiveryPageClient({
               </tbody>
             </table>
           </div>
-          <InfiniteFooter shown={pagedHistory.length} control={historyMore} noun="pickups" className="px-6 pb-3" />
+          <Pager control={historyPager} noun="pickups" className="px-6 pb-3" />
         </div>
       )}
     </div>

@@ -14,6 +14,7 @@ import type { ListingsPayload, ListingUnitView } from '@/lib/marketplace/catalog
 import type { ColumnSource, TemplateMapping, TemplateSheet } from '@/lib/marketplace/catalog-export'
 import type { ListingTaskRow, SkuReportField, SkuReportMatch } from '@/lib/marketplace/listings'
 import { download, postForm } from './files'
+import { ListingsLoading } from './skeletons'
 
 type Channel = 'myntra' | 'ajio'
 const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
@@ -116,7 +117,7 @@ export default function ListingsMapper({ channel }: { channel: Channel }) {
   const keys = [...selected]
 
   if (error) return <Banner ok={false}>{error}</Banner>
-  if (!data) return <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+  if (!data) return <ListingsLoading />
 
   const counts = data.units.reduce<Record<string, number>>((m, u) => ((m[statusOf(u)] = (m[statusOf(u)] ?? 0) + 1), m), {})
 
@@ -203,7 +204,7 @@ export default function ListingsMapper({ channel }: { channel: Channel }) {
 
       {data.tasks.length > 0 && (
         <Section title="Submissions">
-          <Table rows={data.tasks} cols={TASK_COLS} rowKey={t => t.task_id} pageSize={10} />
+          <Table rows={data.tasks} cols={TASK_COLS} rowKey={t => t.task_id} />
         </Section>
       )}
 

@@ -13,7 +13,7 @@ import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
 import { PushPreview } from '@/components/admin/campaigns/PushEditor'
 import { campaignSupportsPush, scenarioPushCopy } from '@/lib/campaigns/push-kinds'
-import { CampaignDetailSkeleton, CampaignPageSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
+import { CampaignViewLoading } from '../CampaignLoading'
 import { ViewDraftLink } from '@/components/admin/kit/draft-lock'
 import {
   type CampaignRow,
@@ -129,12 +129,7 @@ export default function CampaignViewClient({
       .catch(() => {})
   }, [c?.sms_template_slug])
 
-  if (loading)
-    return (
-      <CampaignPageSkeleton>
-        <CampaignDetailSkeleton />
-      </CampaignPageSkeleton>
-    )
+  if (loading) return <CampaignViewLoading />
   if (error || !c) return <div className="p-6 text-sm text-red-600">{error || 'Not found'}</div>
 
   const vars = { ...sampleVariableMap(), ...SAMPLE_VARS }

@@ -13,12 +13,13 @@ import { getCouponsSummary, queryCoupons } from '@/lib/queries/coupons'
 import { COUPONS_ENTITY } from '@/lib/filters/entities/coupons'
 import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import CouponsTable, { type CouponRow } from './_components/CouponsTable'
-import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader } from '@/components/admin/kit'
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import OverviewTabs from './_components/OverviewTabs'
 import CouponsOverview from './_components/CouponsOverview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -63,7 +64,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
         </PageDrafts>
       ) : (
         <>
-          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+          <Suspense key={JSON.stringify(q)} fallback={<LoadingKpis labels={['Total', 'Active', 'Expired', 'From campaigns']} />}>
             <CouponsStats q={q} />
           </Suspense>
 
@@ -84,15 +85,6 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
   )
 }
 
-function KpiRowSkeleton() {
-  return (
-    <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] animate-pulse">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
-      ))}
-    </div>
-  )
-}
 
 async function AddCouponButton() {
   const host = await getHost()
@@ -236,7 +228,7 @@ async function CouponPendingDrafts() {
 function CouponsListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
+    <Suspense key={key} fallback={<LoadingTable columns={['Code', 'Type', 'Value', 'Min Purchase', 'Usage', 'Valid Until', 'Status']} />}>
       <CouponsListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )

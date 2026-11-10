@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { fetchJson } from '@/components/admin/kit/infinite'
+import { EMBEDDED_PAGE_SIZE, Pager, usePagedList } from '@/components/admin/kit/pager'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 
@@ -37,13 +39,10 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function ProductStockMovements({ productId }: { productId: string }) {
   const [open, setOpen] = useState(false)
-  const PAGE_SIZE = 20
-  const list = useInfiniteList<Transaction>({
+  const list = usePagedList<Transaction>({
     key: open ? productId : null,
-    pageSize: PAGE_SIZE,
-    getKey: t => t.id,
     fetchPage: async (page, signal) => {
-      const params = new URLSearchParams({ view: 'ledger', product_id: productId, page: String(page), limit: String(PAGE_SIZE) })
+      const params = new URLSearchParams({ view: 'ledger', product_id: productId, page: String(page), limit: String(EMBEDDED_PAGE_SIZE) })
       const d = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
       return { rows: d.transactions || [], total: d.total || 0 }
     },
@@ -64,10 +63,13 @@ export default function ProductStockMovements({ productId }: { productId: string
       {open && (
         <div className="overflow-x-auto">
           {loading ? (
-            <div className="px-4 py-6 text-center text-sm text-foreground-muted">Loading…</div>
+            <LoadingTable bare rows={5} columns={['Date', 'Type', 'Variant', 'Qty Change', 'Stock After', 'Reference', 'Batch / Serial', 'Notes']} />
           ) : rows.length === 0 && list.error ? (
-            <div className="px-4 pb-3">
-              <InfiniteFooter shown={0} control={list} />
+            <div className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-red-600 dark:text-red-400" role="alert">
+              {list.error}
+              <button type="button" onClick={list.reload} className="control-xs border border-red-500/40 hover:bg-red-500/10">
+                Retry
+              </button>
             </div>
           ) : rows.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-foreground-muted">No stock movements recorded.</div>
@@ -169,9 +171,11 @@ export default function ProductStockMovements({ productId }: { productId: string
                 </tbody>
               </table>
 
-              <div className="px-4 pb-3 border-t border-border-default bg-surface">
-                <InfiniteFooter shown={rows.length} control={list} noun="movements" />
-              </div>
+              {(list.pager.page > 1 || list.pager.hasNext) && (
+                <div className="px-4 pb-3 border-t border-border-default bg-surface">
+                  <Pager control={list.pager} noun="movements" />
+                </div>
+              )}
             </>
           )}
         </div>

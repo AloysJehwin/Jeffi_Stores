@@ -24,10 +24,16 @@ async function tenantClaims() {
   return { tenantId: tenant.tenantId, tenantSlug: tenant.slug }
 }
 
-/** Server-side GET from document-service as the given identity, following redirects (stored PDFs). */
-export async function docServiceFetch(path: string, claims: Record<string, unknown>): Promise<Response> {
+/** Server-side call to document-service as the given identity (GET by default, following redirects for stored PDFs). */
+export async function docServiceFetch(path: string, claims: Record<string, unknown>, init: { method?: string; body?: unknown } = {}): Promise<Response> {
+  const body = init.body === undefined ? undefined : JSON.stringify(init.body)
   return fetch(`${DOCUMENTS_URL}${path}`, {
-    headers: { authorization: `Bearer ${token({ ...(await tenantClaims()), ...claims })}` },
+    method: init.method ?? 'GET',
+    headers: {
+      authorization: `Bearer ${token({ ...(await tenantClaims()), ...claims })}`,
+      ...(body ? { 'content-type': 'application/json' } : {}),
+    },
+    body,
     cache: 'no-store',
   })
 }

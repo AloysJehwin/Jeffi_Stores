@@ -11,6 +11,8 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { NormalizedLine, PayoutTotals, SettlementField, SettlementListRow, SettlementMapping, ChannelSettlementsView, UnsettledOrder } from '@/lib/marketplace/settlements'
 import ColumnMapper from './ColumnMapper'
 import { postForm } from './files'
+import { Sk } from '@/components/admin/kit/skeleton'
+import { SettlementsLoading } from './skeletons'
 
 type Channel = 'myntra' | 'ajio'
 const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
@@ -101,7 +103,7 @@ export default function SettlementsPanel({ channel }: { channel: Channel }) {
   }, [load])
 
   if (error && !data) return <Banner ok={false}>{error}</Banner>
-  if (!data) return <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+  if (!data) return <SettlementsLoading />
   const t = data.totals
   const rec = data.receivable
 
@@ -288,7 +290,16 @@ function ImportDialog({ channel, file, onClose, onDone }: { channel: Channel; fi
     >
       {error && <Banner ok={false}>{error}</Banner>}
       {!p ? (
-        !error && <div className="h-40 animate-pulse rounded-lg bg-surface" />
+        !error && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Sk className="h-3 w-24" />
+                <Sk className="h-control rounded-lg" />
+              </div>
+            ))}
+          </div>
+        )
       ) : (
         <div className="space-y-5">
           <div>
@@ -346,7 +357,7 @@ function ImportDialog({ channel, file, onClose, onDone }: { channel: Channel; fi
                   </ul>
                 </div>
               )}
-              {p.preview.length > 0 && <Table rows={p.preview} cols={PREVIEW_COLS} rowKey={l => String(l.rowNumber)} pageSize={10} />}
+              {p.preview.length > 0 && <Table rows={p.preview} cols={PREVIEW_COLS} rowKey={l => String(l.rowNumber)} />}
               {p.errors.length > 0 && (
                 <p className="text-xs text-amber-600">
                   {p.errors.length} row(s) skipped: {p.errors.slice(0, 3).map(e => `row ${e.row}: ${e.message}`).join('; ')}

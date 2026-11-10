@@ -1,5 +1,5 @@
-import VisitorSkeleton from '@/components/visitor/VisitorSkeleton'
+import { LegalDocSkeleton } from '../LegalSkeletons'
 
 export default function Loading() {
-  return <VisitorSkeleton variant="page" />
+  return <LegalDocSkeleton />
 }

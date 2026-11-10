@@ -44,6 +44,7 @@ import { KIND_OPTIONS } from './DrivePicker'
 import FilePreview from './FilePreview'
 import MoveDialog from './MoveDialog'
 import ShareDialog from './ShareDialog'
+import { DriveItemsLoading } from './DriveLoading'
 
 interface UploadJob {
   key: string
@@ -502,9 +503,7 @@ export default function DriveBrowser({ initialFolder, initialTrash }: { initialF
 
         <div className="min-h-[50vh] p-4">
           {loading && !data ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="h-7 w-7 animate-spin text-accent-500" />
-            </div>
+            <DriveItemsLoading view={view} />
           ) : error ? (
             <ErrorState bare body={error} actionNode={<button type="button" onClick={refresh} className="control-md border border-border-default">Try again</button>} />
           ) : !folders.length && !files.length ? (

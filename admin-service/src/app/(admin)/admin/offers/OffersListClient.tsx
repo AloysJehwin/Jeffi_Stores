@@ -10,6 +10,7 @@ import AdminImage from '@/components/admin/AdminImage'
 import { Plus } from 'lucide-react'
 import { DataTable, DraftLockBadge, StatusBadge, useListSort, type DataCol } from '@/components/admin/kit'
 import type { DraftLockChip } from '@/lib/client/draft-lock-client'
+import { OffersListLoading } from './OffersLoading'
 
 interface OfferListRow {
   id: string
@@ -29,6 +30,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
   const canWrite = canWriteProp && hasWriteScope
   const [offers, setOffers] = useState<OfferListRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [creating, setCreating] = useState(false)
   const { sort, dir } = useListSort()
 
@@ -44,6 +46,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
       showToast('Could not load offers', 'error')
     } finally {
       setLoading(false)
+      setLoaded(true)
     }
   }, [showToast, sort, dir])
 
@@ -119,6 +122,9 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
         </p>
       </div>
 
+      {!loaded ? (
+        <OffersListLoading />
+      ) : (
       <DataTable<OfferListRow>
         rows={offers}
         cols={cols}
@@ -171,6 +177,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
           },
         ]}
       />
+      )}
     </div>
   )
 }

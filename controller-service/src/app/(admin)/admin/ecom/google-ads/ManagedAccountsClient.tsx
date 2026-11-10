@@ -6,6 +6,8 @@ import { AlertCircle, RefreshCw, Unlink } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { formatCid, money } from '@/lib/google-ads/format'
 import type { ManagedAccount } from '@controller/lib/google-ads/manager-view'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { GADS_COLUMNS } from './columns'
 
 // Client accounts under the Jeffi manager account: the store each belongs to, status, spend over
 // the last 30 days, and unlink.
@@ -69,6 +71,7 @@ export default function ManagedAccountsClient({ managerId, configured }: { manag
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
         </p>
       )}
+      {configured && !accounts && !error && <LoadingTable columns={GADS_COLUMNS} rows={5} />}
       {accounts && !accounts.length && (
         <div className="md:hidden rounded-xl border border-border-default bg-surface-elevated p-6 text-center text-sm text-foreground-muted">
           No client accounts under the manager yet.

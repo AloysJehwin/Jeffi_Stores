@@ -12,7 +12,7 @@ import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { queryMany } from '@/lib/shared/db'
 import type { ShipmentRow } from '@controller/lib/orders/tenant-shipments-shared'
 import { listTenantAdminCerts, getTenantCa } from '@/lib/tenancy/tenant-ca'
-import { DETAIL_PAGE_SIZE, loadInfraDetail, loadTenantDetail, pageParam, withParam } from '@controller/lib/ecom/detail'
+import { DETAIL_PAGE_SIZE, loadInfraDetail, loadTenantDetail, pageParam } from '@controller/lib/ecom/detail'
 import { TenantTabNav, isTenantTab, type TenantTab } from '@controller/components/admin/ecom/EcomUI'
 import TenantObjectHeader from '@controller/components/admin/ecom/TenantObjectHeader'
 import OverviewTab from '@controller/components/admin/ecom/tabs/OverviewTab'
@@ -24,6 +24,7 @@ import KycTab from '@controller/components/admin/ecom/tabs/KycTab'
 import AccessTab from '@controller/components/admin/ecom/tabs/AccessTab'
 import CertificatesTab from '@controller/components/admin/ecom/tabs/CertificatesTab'
 import MessagingTab from '@controller/components/admin/ecom/tabs/MessagingTab'
+import NumbersTab from '@controller/components/admin/ecom/tabs/NumbersTab'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ export default async function TenantObjectPage({ params, searchParams }: { param
 
   // API workspaces (Messaging/Documents only) have no store infrastructure to show or manage.
   const hiddenTabs: TenantTab[] = [
-    ...(d.isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access', 'certificates'] as TenantTab[])),
+    ...(d.isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access', 'certificates', 'numbers'] as TenantTab[])),
     ...(hasService(t, 'messaging') ? [] : (['messaging'] as TenantTab[])),
   ]
   if (hiddenTabs.includes(tab)) redirect(`/admin/ecom/customers/${id}/view?tab=overview`)
@@ -69,6 +70,7 @@ export default async function TenantObjectPage({ params, searchParams }: { param
         {tab === 'certificates' && <CertificatesTab tenant={t} {...await certificatesData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} />}
         {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} storeName={t.display_name} />}
+        {tab === 'numbers' && d.isStore && <NumbersTab tenantId={t.id} />}
       </div>
     </div>
   )
@@ -104,13 +106,11 @@ async function commerceData(id: string, sp: Search) {
     }).catch(() => null),
     getTenantBankAccount(id).catch(() => null),
   ])
-  const path = `/admin/ecom/customers/${id}/view`
-  const q = { ...sp, tab: 'commerce' }
   return {
     billing,
     bank,
-    txPage: { page: tx, pageSize: DETAIL_PAGE_SIZE, href: (n: number) => withParam(path, q, 'tp', n) },
-    ledgerPage: { page: lp, pageSize: DETAIL_PAGE_SIZE, href: (n: number) => withParam(path, q, 'lp', n) },
+    txPage: { page: tx, pageSize: DETAIL_PAGE_SIZE, param: 'tp' },
+    ledgerPage: { page: lp, pageSize: DETAIL_PAGE_SIZE, param: 'lp' },
   }
 }
 

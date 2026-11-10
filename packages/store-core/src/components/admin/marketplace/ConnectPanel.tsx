@@ -5,7 +5,8 @@ import { KeyRound, PackagePlus, RefreshCw, Unplug } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import IconButton from '@/components/ui/IconButton'
 import { CopyValue } from '@/components/admin/kit/actions'
-import { Badge, api, btnGhost, btnPrimary, inputCls, when, type Tone } from '@/components/admin/channels/ui'
+import { Badge, api, btnGhost, btnPrimary, when, type Tone } from '@/components/admin/channels/ui'
+import { fieldInputCls } from '@/components/admin/kit'
 import { useActionToast } from '@/components/admin/kit/toast'
 import type { MarketplaceConnectionStatus } from '@/lib/marketplace/connection-route'
 
@@ -94,10 +95,10 @@ export default function ConnectPanel({
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {status.fields.map(f => (
-            <label key={f.key} className="min-w-0 text-xs text-foreground-muted">
+            <label key={f.key} className="block min-w-0 text-xs text-foreground-muted">
               {f.label}
               <input
-                className={inputCls}
+                className={`${fieldInputCls} mt-1`}
                 type={f.secret ? 'password' : 'text'}
                 autoComplete="off"
                 disabled={!canWrite}
@@ -107,14 +108,17 @@ export default function ConnectPanel({
               />
             </label>
           ))}
-          <AdminSelect
-            label="Mode"
-            value={mode}
-            onChange={v => setMode(v as Mode)}
-            options={MODE_OPTIONS}
-            disabled={!canWrite}
-            hint={MODE_OPTIONS.find(o => o.value === mode)?.hint}
-          />
+          <div className="min-w-0 text-xs text-foreground-muted">
+            Mode
+            <AdminSelect
+              className="mt-1"
+              value={mode}
+              onChange={v => setMode(v as Mode)}
+              options={MODE_OPTIONS}
+              disabled={!canWrite}
+              hint={MODE_OPTIONS.find(o => o.value === mode)?.hint}
+            />
+          </div>
         </div>
         {canWrite && (
           <div className="flex flex-wrap gap-2">

@@ -52,4 +52,10 @@ export interface SubscriptionRow {
   locked_price_at: string | Date | null
   source: string | null
   updated_at: string | Date | null
+  billing_provider: 'razorpay' | 'phonepe' | string | null
+  phonepe_merchant_subscription_id: string | null
+  phonepe_subscription_id: string | null
+  phonepe_setup_order_id: string | null
+  phonepe_mandate_state: string | null
+  phonepe_mandate_expires_at: string | Date | null
 }

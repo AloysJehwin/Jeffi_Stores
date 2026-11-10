@@ -11,6 +11,8 @@ const Schema = z.object({
   accountNumber: z.string().min(9).max(18),
   ifsc: z.string().min(11).max(11),
   holderName: z.string().min(1).max(200),
+  // Optional: customers can pay this UPI ID directly (tenants.upi_mode 'manual'); blank clears it.
+  upiId: z.string().trim().max(120).regex(/^[\w.\-]{2,}@[a-zA-Z]{2,}$/, 'A UPI ID looks like name@bank').optional().or(z.literal('')),
 })
 
 // Owner submits bank details → format-checked and recorded 'unverified' against the owner for Route
@@ -27,11 +29,13 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const { accountNumber, ifsc, holderName } = parsed.data
+  const upiId = parsed.data.upiId || undefined
 
   const result = await recordBankAccount(owner.id, {
     accountNumber,
     ifsc: ifsc.toUpperCase(),
     holderName,
+    upiId,
   })
   if (result.status === 'failed') {
     return NextResponse.json(
@@ -60,6 +64,7 @@ export async function POST(request: NextRequest) {
       accountNumber,
       ifsc: ifsc.toUpperCase(),
       holderName,
+      upiId,
       status: settlement.ok ? 'verified' : 'failed',
       ref: settlement.ok ? 'route_settlement' : 'route_rejected',
       verifiedName: result.verifiedName ?? holderName,

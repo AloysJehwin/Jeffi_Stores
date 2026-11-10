@@ -2,6 +2,7 @@
 
 import { Tabs } from '@/components/admin/channels/ui'
 import { OverviewPanel, useTab } from '../../orders/_components/overview-shared'
+import { LABELS_KPIS } from './overview-kpis'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -18,7 +19,7 @@ export default function LabelsTabs({ generator }: { generator: React.ReactNode }
   return (
     <div className="space-y-5">
       <Tabs tabs={[...TABS]} value={view} onChange={setView} />
-      {view === 'overview' ? <OverviewPanel endpoint="/api/admin/labels/overview" /> : generator}
+      {view === 'overview' ? <OverviewPanel endpoint="/api/admin/labels/overview" kpis={LABELS_KPIS} /> : generator}
     </div>
   )
 }

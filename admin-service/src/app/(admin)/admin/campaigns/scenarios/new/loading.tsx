@@ -1,5 +1,9 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { NewScenarioLoading } from '../_components/ScenarioLoading'
 
 export default function Loading() {
-  return <AdminSkeleton variant="form" />
+  return (
+    <div className="p-4 sm:p-6">
+      <NewScenarioLoading />
+    </div>
+  )
 }

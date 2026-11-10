@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import type { Address } from '../../types'
 
-// Hand-off between the Order Review screen (choices) and the payment screen (Razorpay / COD placement).
+// Hand-off between the Order Review screen (choices) and the payment screens (Razorpay / UPI / COD placement).
 // 'manual' is the business portal's pay-later order (our team follows up); never COD for a business.
-export type PayMethod = 'razorpay' | 'cod' | 'manual'
+export type PayMethod = 'upi' | 'razorpay' | 'cod' | 'manual'
 
 export interface PlaceOrderRequest {
   mode: 'cart' | 'buyNow'

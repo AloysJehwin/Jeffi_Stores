@@ -1,5 +1,1 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
-
-export default function Loading() {
-  return <AdminSkeleton variant="detail" />
-}
+export { default } from './view/loading'

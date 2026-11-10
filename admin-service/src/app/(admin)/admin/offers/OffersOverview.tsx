@@ -6,6 +6,7 @@ import { Badge, Kpi, Section, Table, count, money, pct, type Tone } from '@/comp
 import { delta, ratio } from '@/lib/overview/period'
 import type { AttentionItem } from '@/components/admin/overview/kit'
 import { OverviewTab } from '../products/_components/catalog-overview'
+import { OffersOverviewLoading } from './OffersLoading'
 
 type Status = 'live' | 'scheduled' | 'ended' | 'hidden'
 
@@ -35,6 +36,7 @@ export default function OffersOverview() {
   return (
     <OverviewTab<OffersOverviewData>
       endpoint="/api/admin/offers/overview"
+      skeleton={<OffersOverviewLoading />}
       kpis={d => (
         <>
           <Kpi label="Live offers" value={count(d.counts.live)} sub={`${count(d.counts.scheduled)} scheduled`} />
@@ -59,7 +61,6 @@ export default function OffersOverview() {
           <Table
             rows={d.offers}
             rowKey={r => r.id}
-            pageSize={10}
             empty="No product offers yet"
             cols={[
               {

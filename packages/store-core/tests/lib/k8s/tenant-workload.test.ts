@@ -195,7 +195,7 @@ describe('tracing env', () => {
       expect(envOf(sf)).toMatchObject({ SERVICE_TENANT_SLUG: 'acme' })
       expect(sf.spec.template.spec.containers[0].image).toContain('jeffi-stores-storefront-service')
       expect(byKind(objs, 'IngressRoute', 'controller')).toEqual([])
-      expect(route(objs, 'razorpay-webhook').match).toBe('Host(`jeffistores.in`) && Path(`/api/webhooks/razorpay/acme`)')
+      expect(route(objs, 'razorpay-webhook').match).toBe('Host(`jeffistores.in`) && (Path(`/api/webhooks/razorpay/acme`) || Path(`/api/webhooks/upi/acme`))')
       // Admin restarts in place on a rollout; the storefront never drops below its copies.
       expect((byKind(objs, 'Deployment', 'acme-admin-service')[0] as any).spec.strategy.rollingUpdate).toEqual({ maxUnavailable: 1, maxSurge: 0 })
       expect(sf.spec.strategy.rollingUpdate).toEqual({ maxUnavailable: 0, maxSurge: 1 })

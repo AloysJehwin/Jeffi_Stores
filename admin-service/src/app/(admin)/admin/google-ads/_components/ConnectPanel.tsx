@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { inputCls, btnPrimary, btnGhost } from '@/components/admin/kit/core'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { AlertCircle, CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-react'
 import type { AdsConnectionStatus } from '@/lib/google-ads/connection'
 import { formatCid } from '@/lib/google-ads/format'
@@ -167,9 +168,14 @@ export default function ConnectPanel({
             <div className="space-y-2">
               <p className="text-sm text-foreground-secondary">Signed in. Choose the Google Ads account to report on:</p>
               {busy && !accounts && (
-                <p className="text-sm text-foreground-muted flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading accounts…
-                </p>
+                <div className="divide-y divide-border-default rounded-lg border border-border-default" aria-busy="true" aria-label="Loading accounts">
+                  {[0, 1].map(i => (
+                    <div key={i} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <Sk className="h-3.5 w-48" />
+                      <Sk className="h-control w-20 rounded-lg" />
+                    </div>
+                  ))}
+                </div>
               )}
               {accounts && accounts.length === 0 && (
                 <p className="text-sm text-foreground-muted">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@/components/admin/kit/layout'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { Badge, btnGhost, when } from '@/components/admin/kit/core'
 import { EmptyState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
@@ -85,7 +86,7 @@ export default function CliTokensPanel({ owner }: { owner: boolean }) {
         {error ? (
           <p className="px-5 pb-5 text-sm text-red-500">{error}</p>
         ) : !rows ? (
-          <p className="px-5 pb-5 text-sm text-foreground-muted">Loading…</p>
+          <LoadingTable bare rows={4} columns={['Token', 'Access', 'Last used', 'Expires', '']} />
         ) : rows.length === 0 ? (
           <EmptyState bare title="No tokens" body="Run jeffi login in a terminal, or copy an extension token from the Account tab." />
         ) : (

@@ -11,10 +11,11 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
+import { StoreAuthSkeleton } from '@/components/visitor/skeletons/auth'
 
 export default function LoginPageWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<StoreAuthSkeleton kind="login" />}>
       <LoginPage />
     </Suspense>
   )

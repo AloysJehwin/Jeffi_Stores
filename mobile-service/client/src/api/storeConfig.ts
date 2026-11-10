@@ -10,6 +10,8 @@ export interface StoreConfig {
     gstEnabled: boolean
     digitalProductsEnabled: boolean
     subscriptionsEnabled: boolean
+    /** UPI collection (PhonePe or the store's UPI ID) beside Razorpay; same flag as /api/feature-flags. */
+    upiEnabled?: boolean
   }
 }
 

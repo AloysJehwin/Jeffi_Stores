@@ -22,7 +22,7 @@ Services:
   `src`), `<project>/integration-tests` (`npm run test:integration`). A route test lives in the app that owns the
   route; lib, component, hook and middleware tests in store-core; an audit with the tree it scans. The root
   `vitest.config.ts` runs them all as projects (`npx vitest --project admin` runs one).
-- `messaging-service` (SMS/email/WhatsApp send + templates library)
+- `messaging-service` (SMS/email/WhatsApp send + templates library). It now needs `SOCIAL_TOKEN_ENC_KEY` (the same key as the app) to decrypt a store's own sender credentials in `tenant_messaging_senders`.
 - `document-service` (invoice/quotation/PO rendering + storage)
 - `public-api-service` (the public API gateway, `public.jeffistores.in`)
 - `mobile-service` (the mobile backend, `mobile.jeffistores.in`: the only host the Play Store app talks to; `/v1/app/*` is native, `/api/*` is forwarded to the storefront in-cluster until each route gets its own handler). The Expo app itself lives in `mobile-service/client` and is built by EAS, not in an image.

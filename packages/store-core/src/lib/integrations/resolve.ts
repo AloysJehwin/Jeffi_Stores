@@ -287,6 +287,33 @@ export async function storedRazorpayKeys(tenantId: string): Promise<Omit<Razorpa
   }
 }
 
+/** A store's PhonePe Business credentials (tenant_integration_credentials 'phonepe'); see docs/PAYMENTS_UPI.md. */
+export interface PhonePeCreds {
+  env: 'sandbox' | 'production'
+  client_id: string
+  client_secret: string
+  client_version: string
+  merchant_id?: string
+  webhook_username?: string
+  webhook_password?: string
+}
+
+/** The store's saved PhonePe creds whatever its UPI mode, or null when none decrypt to a usable blob.
+ * For the integrations card and the upi-mode guard; payments resolve through lib/payments/upi/creds. */
+export async function storedPhonePeCreds(tenantId: string): Promise<PhonePeCreds | null> {
+  const cfg = await tenantConfigFor(tenantId, 'phonepe')
+  if (!cfg?.client_id || !cfg?.client_secret || !cfg?.client_version) return null
+  return {
+    env: cfg.env === 'production' ? 'production' : 'sandbox',
+    client_id: String(cfg.client_id),
+    client_secret: String(cfg.client_secret),
+    client_version: String(cfg.client_version),
+    merchant_id: cfg.merchant_id ? String(cfg.merchant_id) : undefined,
+    webhook_username: cfg.webhook_username ? String(cfg.webhook_username) : undefined,
+    webhook_password: cfg.webhook_password ? String(cfg.webhook_password) : undefined,
+  }
+}
+
 const OWN_RZP_TTL_MS = 30_000
 const ownRzp = new Map<string, { own: boolean; at: number }>()
 

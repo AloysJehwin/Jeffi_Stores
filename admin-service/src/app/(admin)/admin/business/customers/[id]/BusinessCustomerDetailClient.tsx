@@ -5,9 +5,10 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import { Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { APPROVAL_STATUS, fmtDay } from '../../_status'
 import { ChangeLog } from '@/components/admin/change-log'
+import DetailLoading from './view/loading'
 
 interface Customer {
   id: string
@@ -138,13 +139,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
     setNewDiscountPct('')
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 sm:p-6">
-        <DetailSkeleton kpis={4} />
-      </div>
-    )
-  }
+  if (loading) return <DetailLoading />
 
   if (!customer) {
     return (

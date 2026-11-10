@@ -6,13 +6,13 @@ import {
   PeriodBar,
   useOverviewData,
   AttentionList,
-  OverviewSkeleton,
   type AttentionItem,
 } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct } from '@/components/admin/channels/ui'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import SuppliersOverviewSkeleton from './SuppliersOverviewSkeleton'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { SUPPLIER_FIELDS, SUPPLIER_SEARCH } from '@/lib/filters/fields/suppliers'
 
@@ -60,7 +60,7 @@ export default function SuppliersOverview() {
       <ListFilters entity="suppliers" fields={SUPPLIER_FIELDS} search={SUPPLIER_SEARCH} noun="Suppliers" tab="overview" period />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
-        !error && <OverviewSkeleton />
+        !error && <SuppliersOverviewSkeleton />
       ) : (
         <>
           <KpiGrid>

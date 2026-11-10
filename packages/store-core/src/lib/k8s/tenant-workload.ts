@@ -490,10 +490,10 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
           ...(businessHosts.length ? [{ classes: ['business' as const], match: hostMatch(businessHosts) }] : []),
         ])
       ),
-      // The store's own-key Razorpay webhook arrives on the platform host; its storefront takes it.
+      // The store's own-key Razorpay and PhonePe webhooks arrive on the platform host; its storefront takes them.
       ingress('razorpay-webhook', [
         {
-          match: `Host(\`${ROOT_DOMAIN}\`) && Path(\`/api/webhooks/razorpay/${slug}\`)`,
+          match: `Host(\`${ROOT_DOMAIN}\`) && (Path(\`/api/webhooks/razorpay/${slug}\`) || Path(\`/api/webhooks/upi/${slug}\`))`,
           kind: 'Rule',
           priority: PRIORITY_BAND.override,
           middlewares: [strip],

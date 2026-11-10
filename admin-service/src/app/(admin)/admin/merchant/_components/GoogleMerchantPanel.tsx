@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
-import { DataTable, fetchJson, useInfiniteList, useListSort, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, fetchJson, useInfiniteList, useListSort, Kpi, LoadingKpis, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -230,12 +230,16 @@ export default function GoogleMerchantPanel() {
         ) : null}
         {syncStatus?.status === 'error' && syncStatus.errors?.length ? <SyncErrors errors={syncStatus.errors} /> : null}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Kpi label="Total in feed" value={count(summary?.total ?? 0)} />
-          <Kpi label="Approved" value={count(summary?.approved ?? 0)} />
-          <Kpi label="Pending" value={count(summary?.pending ?? 0)} />
-          <Kpi label="Disapproved" value={count(summary?.disapproved ?? 0)} />
-        </div>
+        {list.loading && !summary ? (
+          <LoadingKpis labels={['Total in feed', 'Approved', 'Pending', 'Disapproved']} />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Kpi label="Total in feed" value={count(summary?.total ?? 0)} />
+            <Kpi label="Approved" value={count(summary?.approved ?? 0)} />
+            <Kpi label="Pending" value={count(summary?.pending ?? 0)} />
+            <Kpi label="Disapproved" value={count(summary?.disapproved ?? 0)} />
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">

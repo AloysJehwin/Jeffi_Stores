@@ -11,6 +11,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { ErrorState } from '@/components/admin/kit/states'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { useActionToast } from '@/components/admin/kit/toast'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
@@ -37,6 +38,7 @@ import {
 } from '@/components/admin/channels/ui'
 import type { MadsTab } from '@/lib/meta-ads/console'
 import { ChangeImageDialog, NewAdDialog } from './AdCreativeDialogs'
+import { MetaAdsBodyLoading, MetaAdsTabLoading } from './skeletons'
 
 const TABS: { id: MadsTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -162,15 +164,17 @@ export default function MetaAdsConsole() {
           <ConnectionsGear title="Meta Ads connection" scope="meta_ads" state={state} open={gearOpen} onOpenChange={setGearOpen}>
             {status ? (
               <ConnectPanel status={status} canWrite={canWrite} onChanged={onConnChanged} />
+            ) : error ? (
+              <p className="text-sm text-foreground-muted">{error}</p>
             ) : (
-              <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+              <LoadingLines lines={3} />
             )}
           </ConnectionsGear>
         }
       />
 
       {!status ? (
-        error ? <ErrorState body={error} /> : <p className="text-sm text-foreground-muted">Loading...</p>
+        error ? <ErrorState body={error} /> : <MetaAdsBodyLoading tab={tab} />
       ) : !status.connected ? (
         <NotConnectedState provider="Meta Ads" onOpen={() => setGearOpen(true)} />
       ) : (
@@ -215,7 +219,7 @@ export default function MetaAdsConsole() {
           {error ? (
             <ErrorState body={error} />
           ) : DATA_TABS.has(tab) && !data ? (
-            <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+            <MetaAdsTabLoading tab={tab} />
           ) : (
             <Body
               tab={tab}

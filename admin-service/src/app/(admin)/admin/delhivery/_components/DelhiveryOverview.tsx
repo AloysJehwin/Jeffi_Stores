@@ -15,7 +15,6 @@ import {
 } from '@/components/admin/channels/ui'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -24,6 +23,7 @@ import {
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta, type Bucket, type Period } from '@/lib/overview/period'
 import { fmtDays, withAp } from '../../orders/_components/overview-shared'
+import DelhiveryOverviewSkeleton from './DelhiveryOverviewSkeleton'
 
 interface Kpis {
   shipments: number
@@ -100,7 +100,7 @@ export default function DelhiveryOverview() {
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data ? <Body d={data} /> : null}
+      {loading && !data ? <DelhiveryOverviewSkeleton /> : data ? <Body d={data} /> : null}
     </div>
   )
 }
@@ -185,7 +185,6 @@ function Body({ d }: { d: Data }) {
             rows={d.pickups}
             rowKey={r => r.id}
             empty="Every pickup request has been collected."
-            pageSize={8}
             cols={[
               { key: 'date', label: 'Pickup date', render: r => r.pickupDate },
               { key: 'id', label: 'Request', render: r => r.pickupId ?? '-' },

@@ -30,7 +30,8 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { categoryFor, type ActivityCategory } from '@/lib/shared/activity-shared'
-import { InfiniteFooter } from '@/components/admin/kit/infinite'
+import { Pager, usePagedRows, type PagerControl } from '@/components/admin/kit/pager'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { ap } from '@/lib/shared/admin-path'
 
 interface ActivityEvent {
@@ -186,8 +187,24 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
   }, [events])
 
   const visibleEvents = filter === 'all' ? events : events.filter(e => categoryFor(e.kind) === filter)
+  // Ten at a time; the arrow past the last loaded page fetches the next batch from the API.
+  const paged = usePagedRows(visibleEvents, 10, filter)
+  const lastPage = Math.max(1, Math.ceil(visibleEvents.length / 10))
+  const pager: PagerControl = {
+    ...paged.pager,
+    total: hasMore ? null : visibleEvents.length,
+    hasNext: paged.pager.hasNext || hasMore,
+    loading: loadingMore,
+    setPage: p => {
+      if (p > lastPage && hasMore && !loadingMore) {
+        setLoadingMore(true)
+        loadMore()
+      }
+      paged.pager.setPage(p)
+    },
+  }
 
-  const grouped = visibleEvents.reduce<Record<string, ActivityEvent[]>>((acc, e) => {
+  const grouped = paged.shown.reduce<Record<string, ActivityEvent[]>>((acc, e) => {
     const g = dateGroup(e.created_at)
     if (!acc[g]) acc[g] = []
     acc[g].push(e)
@@ -228,11 +245,11 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex gap-3 animate-pulse">
-              <div className="w-8 h-8 rounded-full bg-surface-secondary" />
+            <div key={i} className="flex gap-3">
+              <Sk className="h-8 w-8 shrink-0 rounded-full" />
               <div className="flex-1 space-y-1.5">
-                <div className="h-3 bg-surface-secondary rounded w-3/4" />
-                <div className="h-2 bg-surface-secondary rounded w-1/3" />
+                <Sk className="h-3 w-3/4" />
+                <Sk className="h-2 w-1/3" />
               </div>
             </div>
           ))}
@@ -242,6 +259,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
       ) : visibleEvents.length === 0 ? (
         <p className="text-sm text-foreground-muted italic">No {filter} activity yet</p>
       ) : (
+        <>
         <div className="space-y-5 max-h-[600px] overflow-y-auto pr-1">
           {Object.entries(grouped).map(([group, items]) => (
             <div key={group}>
@@ -286,14 +304,9 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
               </div>
             </div>
           ))}
-
-          <InfiniteFooter
-            shown={events.length}
-            control={{ hasMore, loadingMore, loadMore }}
-            noun="events"
-            className="mt-2"
-          />
         </div>
+        <Pager control={pager} noun="events" />
+        </>
       )}
     </div>
   )

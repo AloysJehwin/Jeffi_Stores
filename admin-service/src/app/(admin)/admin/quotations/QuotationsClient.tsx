@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Check, Plus } from 'lucide-react'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol, Pager, usePagedList, EMBEDDED_PAGE_SIZE } from '@/components/admin/kit'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { useToast } from '@/contexts/ToastContext'
@@ -245,27 +246,34 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
   const isEditorMounted = useRef(false)
 
   // Ordered server-side across all quotations via ?sort&dir.
+  const listKey = view === 'list' ? `${section}|${filters}|${sort}|${dir}` : null
+  const fetchQuotes = async (p: number, signal: AbortSignal, size: number) => {
+    const params = new URLSearchParams(section === 'drafts' ? '' : filters)
+    if (section === 'drafts') params.set('status', 'draft')
+    if (sort) {
+      params.set('sort', sort)
+      params.set('dir', dir)
+    }
+    params.set('page', String(p))
+    params.set('pageSize', String(size))
+    const data = await fetchJson(`/api/admin/quotations?${params}`, signal)
+    return { rows: (data.quotations || []) as Quotation[], total: data.total || 0 }
+  }
   const list = useInfiniteList<Quotation>({
-    key: view === 'list' ? `${section}|${filters}|${sort}|${dir}` : null,
+    key: section === 'drafts' ? null : listKey,
     pageSize: PAGE_SIZE,
     getKey: q => q.id,
-    fetchPage: async (p, signal) => {
-      const params = new URLSearchParams(section === 'drafts' ? '' : filters)
-      if (section === 'drafts') params.set('status', 'draft')
-      if (sort) {
-        params.set('sort', sort)
-        params.set('dir', dir)
-      }
-      params.set('page', String(p))
-      params.set('pageSize', String(PAGE_SIZE))
-      const data = await fetchJson(`/api/admin/quotations?${params}`, signal)
-      return { rows: data.quotations || [], total: data.total || 0 }
-    },
+    fetchPage: (p, signal) => fetchQuotes(p, signal, PAGE_SIZE),
   })
-  const quotations = list.rows
+  // The Drafts tab's list sits above the draft-lock table: a page at a time with arrows.
+  const draftList = usePagedList<Quotation>({
+    key: section === 'drafts' ? listKey : null,
+    fetchPage: (p, signal) => fetchQuotes(p, signal, EMBEDDED_PAGE_SIZE),
+  })
+  const quotations = section === 'drafts' ? draftList.rows : list.rows
   const sortedQuotations = quotations
-  const loading = list.loading
-  const loadList = list.reload
+  const loading = section === 'drafts' ? draftList.loading : list.loading
+  const loadList = section === 'drafts' ? draftList.reload : list.reload
 
   function newQuotation() {
     setEditId(null)
@@ -738,6 +746,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
         throw new Error(d.error)
       }
       list.setRows(prev => prev.filter(q => q.id !== id))
+      draftList.setRows(prev => prev.filter(q => q.id !== id))
     } catch (e: any) {
       setError(e.message || 'Delete failed')
     }
@@ -852,7 +861,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
         )}
 
         {loading ? (
-          <TableSkeleton rows={8} cols={6} />
+          <LoadingTable columns={[...QUOTE_SORT_COLS.map(c => c.label), '']} />
         ) : quotations.length === 0 ? (
           section === 'drafts' ? (
             <EmptyState title="No draft quotations." />
@@ -981,7 +990,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
             </div>
           </>
         )}
-        <InfiniteFooter shown={quotations.length} control={list} noun="quotations" />
+        {section === 'drafts' ? <Pager control={draftList.pager} noun="drafts" /> : <InfiniteFooter shown={quotations.length} control={list} noun="quotations" />}
         <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />
         <Dialog
           open={showConvertModal}

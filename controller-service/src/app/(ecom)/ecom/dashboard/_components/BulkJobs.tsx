@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ArrowLeft, Ban, Download, Loader2, RotateCcw } from 'lucide-react'
 import { Card } from './Card'
-import { SkeletonRows } from './Skeleton'
+import { SandTableLoading } from './Skeleton'
 import Pager from './Pager'
 import { STATUS_PILL, fmt, fmtDate } from './finance'
 import { useToast } from '@/contexts/ToastContext'
@@ -20,6 +20,7 @@ const TONE: Record<string, string> = {
   running: 'org-sage org-sage-text', queued: 'org-sand', done: STATUS_PILL.settled, skipped: 'org-sand', pending: 'org-sand',
 }
 const LIVE = new Set(['queued', 'running'])
+const JOB_COLUMNS = ['Started', 'Reference', 'Status', 'Progress', 'Spent', '']
 export const Pill = ({ s }: { s: string }) => <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${TONE[s] ?? 'org-sand'}`}>{s}</span>
 
 function Progress({ j }: { j: BulkJob }) {
@@ -73,12 +74,12 @@ export default function BulkJobs({ base, form, columns, row, refreshKey = 0 }: {
       <div>
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Bulk jobs</h2>
       <Card>
-        {jobs === null ? <SkeletonRows rows={4} cols={5} /> : jobs.length === 0 ? (
+        {jobs === null ? <SandTableLoading columns={JOB_COLUMNS} rows={4} edge="-m-6" minWidth="min-w-[720px]" /> : jobs.length === 0 ? (
           <p className="text-sm text-foreground-secondary">No bulk jobs yet. Upload a CSV above or call the bulk API.</p>
         ) : (
           <div className="-m-6 overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-              <thead className="org-sand text-foreground-secondary"><tr>{['Started', 'Reference', 'Status', 'Progress', 'Spent', ''].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
+              <thead className="org-sand text-foreground-secondary"><tr>{JOB_COLUMNS.map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
               <tbody className="divide-y divide-border-default">
                 {jobs.map(j => (
                   <tr key={j.id} onClick={() => setOpen(j)} className="cursor-pointer hover:bg-surface-secondary/50">
@@ -155,7 +156,7 @@ function JobDetail({ base, job, columns, row, onBack, onAct }: {
       <Segmented ariaLabel="Filter by status" size="sm" value={status} onChange={filter}
         options={[['', 'All'], ['done', 'Done'], ['failed', 'Failed'], ['skipped', 'Skipped'], ['pending', 'Pending']].map(([k, l]) => ({ value: k, label: l }))} />
       <Card>
-        {data === null ? <SkeletonRows rows={6} cols={columns.length + 2} /> : data.items.length === 0 ? <p className="text-sm text-foreground-secondary">Nothing here.</p> : (
+        {data === null ? <SandTableLoading columns={['#', ...columns, 'Status']} rows={6} edge="-m-6" minWidth="min-w-[720px]" /> : data.items.length === 0 ? <p className="text-sm text-foreground-secondary">Nothing here.</p> : (
           <div className="-m-6 overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead className="org-sand text-foreground-secondary"><tr>{['#', ...columns, 'Status'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>

@@ -17,7 +17,8 @@ import {
   money,
   type Col,
 } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { ReceivablesTabSkeleton } from './FinanceSkeletons'
 import { KeyedTrendCard } from '@/components/admin/kit/charts'
 import { delta } from '@/lib/overview/period'
 import {
@@ -83,7 +84,7 @@ export function ReceivablesTab() {
     <div className="space-y-5">
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} onChanged={reload} />}
+      {loading && !data ? <ReceivablesTabSkeleton /> : data && <Body d={data} onChanged={reload} />}
     </div>
   )
 }

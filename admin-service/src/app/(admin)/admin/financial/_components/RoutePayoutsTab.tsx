@@ -1,7 +1,8 @@
 'use client'
 
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { RoutePayoutsTabSkeleton } from './FinanceSkeletons'
 import { badgeCls } from '@/components/admin/kit'
 import type { RouteOverview, RoutePayoutRow, RoutePendingRow } from '@/lib/payments/rzp-route-report'
 import RazorpayAccountCard from '@/components/admin/RazorpayAccountCard'
@@ -28,7 +29,7 @@ export function RoutePayoutsTab({ ownPending = false }: { ownPending?: boolean }
       )}
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} />}
+      {loading && !data ? <RoutePayoutsTabSkeleton /> : data && <Body d={data} />}
     </div>
   )
 }
@@ -59,7 +60,7 @@ function Body({ d }: { d: RouteOverview }) {
       </Section>
 
       <Section title={`Not paid out yet${d.pending.failed ? ` · ${count(d.pending.failed)} failed` : ''}`}>
-        <Table rows={d.pendingRows} cols={PENDING_COLS} rowKey={r => r.id} pageSize={10} empty="Every payment's share has been paid out." />
+        <Table rows={d.pendingRows} cols={PENDING_COLS} rowKey={r => r.id} empty="Every payment's share has been paid out." />
       </Section>
     </div>
   )

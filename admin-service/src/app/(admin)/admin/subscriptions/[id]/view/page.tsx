@@ -10,6 +10,7 @@ import RecordReplies from '@/components/admin/replies/RecordReplies'
 import { hasScope } from '@/lib/auth/scopes'
 import { SUBSCRIPTION_STATUS, fmtDate, inr } from '../../_status'
 import SubscriptionActions from '../SubscriptionActions'
+import SubscriptionCycles from '../SubscriptionCycles'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -57,7 +58,6 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
   if (sub.paused_at) fields.push(['Paused', fmtDate(str(sub.paused_at))])
   if (sub.cancelled_at) fields.push(['Cancelled', fmtDate(str(sub.cancelled_at))])
 
-  const th = 'px-5 py-2.5 text-left text-xs font-medium'
   return (
     <EntityPage
       header={
@@ -70,7 +70,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               {sub.cancel_at_cycle_end && status !== 'cancelled' ? <Badge tone="red">Cancels at cycle end</Badge> : null}
             </>
           }
-          actions={<SubscriptionActions id={id} status={status} cancelAtCycleEnd={!!sub.cancel_at_cycle_end} />}
+          actions={<SubscriptionActions id={id} status={status} cancelAtCycleEnd={!!sub.cancel_at_cycle_end} autopay={sub.billing_provider === 'phonepe'} />}
         />
       }
       main={
@@ -86,39 +86,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
             {cycles.length === 0 ? (
               <EmptyState bare title="No cycles charged yet" />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                      <th className={th}>Cycle</th>
-                      <th className={th}>Charged</th>
-                      <th className={`${th} text-right`}>Amount</th>
-                      <th className={th}>Payment</th>
-                      <th className={th}>Order</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cycles.map(c => (
-                      <tr key={c.id} className="border-b border-border-default/60 last:border-0">
-                        <td className="px-5 py-2.5">#{c.cycleNumber}</td>
-                        <td className="px-5 py-2.5">{fmtDate(c.createdAt)}</td>
-                        <td className="px-5 py-2.5 text-right tabular-nums">{inr(c.amount)}</td>
-                        <td className="px-5 py-2.5 font-mono text-xs">{c.razorpayPaymentId}</td>
-                        <td className="px-5 py-2.5">
-                          {c.order ? (
-                            <Link href={ap(`/admin/orders/${c.order.id}`, host)} className="text-accent-500 hover:underline">
-                              {c.order.orderNumber}
-                            </Link>
-                          ) : (
-                            <span className="text-foreground-muted">{c.status}</span>
-                          )}
-                          {c.order && <span className="ml-2 text-xs text-foreground-muted">{c.order.status}</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SubscriptionCycles cycles={cycles.map(c => ({ ...c, orderHref: c.order ? ap(`/admin/orders/${c.order.id}`, host) : null }))} />
             )}
           </Card>
         </>

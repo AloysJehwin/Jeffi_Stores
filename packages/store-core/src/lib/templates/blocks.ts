@@ -21,6 +21,18 @@ export type EmailBlock =
   // Token-driven product blocks: expanded by the send pipeline's registered vars.
   | { type: 'product_rows' } // -> {itemsHtml}
   | { type: 'product_card' } // -> {productCard}
+  // The message's coupon: {couponCode}/{discountLabel} fill per send; the block drops out without a coupon.
+  | { type: 'coupon'; heading?: string; note?: string }
+  // Hand-picked products, captured when picked so the email shows what the admin saw.
+  | { type: 'products'; items: EmailProduct[]; columns?: 1 | 2 }
+
+export interface EmailProduct {
+  name: string
+  url: string
+  image?: string | null
+  price?: string | null
+  mrp?: string | null
+}
 
 export const BLOCK_TYPES: EmailBlock['type'][] = [
   'heading',
@@ -32,6 +44,8 @@ export const BLOCK_TYPES: EmailBlock['type'][] = [
   'spacer',
   'product_rows',
   'product_card',
+  'coupon',
+  'products',
 ]
 
 function esc(s: unknown): string {
@@ -66,9 +80,36 @@ function renderBlock(b: EmailBlock): string {
       return '{itemsHtml}'
     case 'product_card':
       return '{productCard}'
+    case 'coupon':
+      return `{#if couponCode}<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:20px 0;"><tr><td align="center" style="border:2px dashed #e07b3f;border-radius:10px;padding:20px;background:#fff7ed;">
+${b.heading ? `<div style="font-size:16px;font-weight:600;color:#333;margin:0 0 8px;">${b.heading}</div>` : ''}<div style="font-size:26px;font-weight:800;letter-spacing:2px;color:#e07b3f;font-family:monospace;">{couponCode}</div>
+<div style="font-size:14px;color:#555;margin-top:6px;">{discountLabel}</div>${b.note ? `<div style="font-size:12px;color:#888;margin-top:8px;">${b.note}</div>` : ''}</td></tr></table>{/if}`
+    case 'products':
+      return productGrid(b.items ?? [], b.columns === 1 ? 1 : 2)
     default:
       return ''
   }
+}
+
+function productCell(p: EmailProduct, width: number): string {
+  const price = p.price
+    ? `<div style="margin-top:6px;">${p.mrp && p.mrp !== p.price ? `<span style="color:#999;text-decoration:line-through;font-size:13px;">₹${esc(p.mrp)}</span>&nbsp;` : ''}<strong style="color:#1a3a4a;font-size:16px;">₹${esc(p.price)}</strong></div>`
+    : ''
+  const img = p.image ? `<a href="${esc(p.url)}"><img src="${esc(p.image)}" alt="${esc(p.name)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border-radius:6px;background:#f5f5f5;margin:0 auto 10px;" /></a>` : ''
+  return `${img}<a href="${esc(p.url)}" style="color:#1a3a4a;font-weight:600;font-size:15px;text-decoration:none;">${esc(p.name)}</a>${price}
+<div style="margin-top:10px;"><a href="${esc(p.url)}" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:8px 18px;border-radius:6px;font-weight:600;font-size:13px;">Shop now</a></div>`
+}
+
+function productGrid(items: EmailProduct[], columns: 1 | 2): string {
+  if (!items.length) return ''
+  const width = columns === 1 ? 280 : 240
+  const rows: string[] = []
+  for (let i = 0; i < items.length; i += columns) {
+    const cells = items.slice(i, i + columns).map(p => `<td valign="top" align="center" width="${Math.floor(100 / columns)}%" style="padding:10px;">${productCell(p, width)}</td>`)
+    if (cells.length < columns) cells.push(`<td width="${Math.floor(100 / columns)}%"></td>`)
+    rows.push(`<tr>${cells.join('')}</tr>`)
+  }
+  return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:8px 0 16px;">${rows.join('')}</table>`
 }
 
 export function isEmailBlockArray(v: unknown): v is EmailBlock[] {

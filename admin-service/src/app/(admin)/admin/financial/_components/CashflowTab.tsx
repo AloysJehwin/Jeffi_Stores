@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Banner, Kpi, KpiGrid, Section, Table, money, type Col } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { CashflowTabSkeleton } from './FinanceSkeletons'
 import { delta } from '@/lib/overview/period'
 import { CashflowTrendCard, MixDonutCard, type TrendPoint } from './OverviewCharts'
 import { FinancePeriodBar, useFinancePeriod, type FinanceOverviewContract } from './finance'
@@ -57,7 +58,7 @@ export function CashflowTab({ initialData }: { initialData?: unknown }) {
     <div className="space-y-5">
       <FinancePeriodBar defaultPreset="fy" onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !d ? <OverviewSkeleton /> : d ? <Body d={d} /> : null}
+      {loading && !d ? <CashflowTabSkeleton /> : d ? <Body d={d} /> : null}
     </div>
   )
 }

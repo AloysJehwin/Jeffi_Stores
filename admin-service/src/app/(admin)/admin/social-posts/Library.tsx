@@ -9,6 +9,8 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Empty, Section, api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { PLATFORMS, PLATFORM_LABEL, type Platform, type Template } from './shared'
 
 const lbl = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -36,6 +38,7 @@ function Templates({ templates, reload }: { templates: Template[] | null; reload
   const { showToast } = useToast()
   const [editing, setEditing] = useState<Template | 'new' | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const { shown, pager } = usePagedRows(templates ?? [])
 
   async function remove(id: string) {
     setBusy(id)
@@ -60,27 +63,30 @@ function Templates({ templates, reload }: { templates: Template[] | null; reload
         />
       )}
       {!templates ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingLines lines={4} />
       ) : !templates.length ? (
         <Empty msg="No templates yet." />
       ) : (
-        <ul className="divide-y divide-border-default">
-          {templates.map(t => (
-            <li key={t.id} className="py-2 flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{t.name}</p>
-                <p className="text-xs text-foreground-muted line-clamp-2 whitespace-pre-line">{t.caption}</p>
-                {t.hashtags && <p className="text-xs text-blue-600 dark:text-blue-400 truncate">{t.hashtags}</p>}
-              </div>
-              {canWrite && (
-                <div className="flex gap-0.5">
-                  <IconButton icon={Pencil} size="sm" label="Edit" onClick={() => setEditing(t)} />
-                  <IconButton icon={Trash2} size="sm" variant="danger" label="Delete" busy={busy === t.id} onClick={() => remove(t.id)} />
+        <>
+          <ul className="divide-y divide-border-default">
+            {shown.map(t => (
+              <li key={t.id} className="py-2 flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{t.name}</p>
+                  <p className="text-xs text-foreground-muted line-clamp-2 whitespace-pre-line">{t.caption}</p>
+                  {t.hashtags && <p className="text-xs text-blue-600 dark:text-blue-400 truncate">{t.hashtags}</p>}
                 </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                {canWrite && (
+                  <div className="flex gap-0.5">
+                    <IconButton icon={Pencil} size="sm" label="Edit" onClick={() => setEditing(t)} />
+                    <IconButton icon={Trash2} size="sm" variant="danger" label="Delete" busy={busy === t.id} onClick={() => remove(t.id)} />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+          <Pager control={pager} noun="templates" />
+        </>
       )}
     </Section>
   )
@@ -208,7 +214,7 @@ function Rules({ templates }: { templates: Template[] }) {
         />
       )}
       {!rules ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingLines lines={3} />
       ) : !rules.length ? (
         <Empty msg="No rules yet." />
       ) : (

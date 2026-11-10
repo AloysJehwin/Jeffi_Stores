@@ -17,6 +17,7 @@ import PresenceBadge from '@/components/chat/PresenceBadge'
 import TypingIndicator from '@/components/chat/TypingIndicator'
 import { useSupportChat } from '@/components/chat/useSupportChat'
 import { languageLabel, type SupportChannel, type SupportMessage, type SupportSession } from '@/lib/support/types'
+import { ConversationLoading, MessagesLoading } from './SupportInboxLoading'
 
 const QUICK_REPLIES = [
   { category: 'Greeting', replies: ['Hello! Thank you for reaching out to {store} support. How can I help you today?', "Hi! I'm here to help. Let me look into this for you right away."] },
@@ -158,7 +159,7 @@ export default function SupportConversation({ sessionId, onSession, onClose, inC
   const orderHref = useCallback((id: string) => ap(`/admin/orders/${id}`), [])
 
   if (chat.error && !s) return <div className="h-full flex items-center justify-center text-sm text-foreground-muted p-6 text-center">{chat.error}</div>
-  if (!s) return <div className="h-full flex items-center justify-center text-sm text-foreground-muted">Loading…</div>
+  if (!s) return <ConversationLoading />
 
   const closed = s.status === 'closed'
   const mineToHandle = s.handler === 'human' && s.assignedAdminId === chat.me
@@ -298,7 +299,7 @@ export default function SupportConversation({ sessionId, onSession, onClose, inC
         showTicks={showTicks}
         onRetry={chat.retry}
         orderHref={orderHref}
-        empty={chat.loading ? <p className="text-center text-xs text-foreground-muted pt-8">Loading…</p> : <p className="text-center text-xs text-foreground-muted pt-8">No messages yet</p>}
+        empty={chat.loading ? <MessagesLoading /> : <p className="text-center text-xs text-foreground-muted pt-8">No messages yet</p>}
         footer={typingLabel ? <TypingIndicator label={typingLabel} /> : null}
       />
       {drive.node}

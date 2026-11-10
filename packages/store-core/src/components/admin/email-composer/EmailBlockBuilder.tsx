@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import ScenarioFillDialog from '@/components/admin/messaging-templates/ScenarioFillDialog'
@@ -14,12 +14,12 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Heading, MousePointerClick, Minus, Space, Package, LayoutGrid, Sparkles } from 'lucide-react'
+import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Heading, MousePointerClick, Minus, Space, Package, LayoutGrid, Sparkles, Ticket, ShoppingBag, Search, Loader2 } from 'lucide-react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
 import type { ComposerVariable } from '@/components/admin/email-composer/variables'
-import { renderBlocks, type EmailBlock } from '@/lib/templates/blocks'
+import { renderBlocks, type EmailBlock, type EmailProduct } from '@/lib/templates/blocks'
 import type { EditorFieldSnapshot, UndoHandle } from '@/lib/ai/scenario-fill-apply'
 import type {
   TemplateMode,
@@ -55,6 +55,8 @@ interface Props {
    *  Set `isNewTemplate` to false to suppress the opener on an existing template (per-block
    *  sparkles still work). */
   scenarioFill?: ScenarioFillConfig
+  /** Blocks this editor shouldn't offer (e.g. token-driven product blocks where nothing fills them). */
+  hideTypes?: EmailBlock['type'][]
 }
 
 const VarsCtx = createContext<ComposerVariable[]>(CAMPAIGN_VARIABLES)
@@ -69,12 +71,83 @@ const PALETTE: { type: BlockType; label: string; icon: React.ReactNode; make: ()
   { type: 'cta_button', label: 'Button', icon: <MousePointerClick className="w-4 h-4" />, make: () => ({ type: 'cta_button', text: 'Shop now', url: '{ctaUrl}' }) },
   { type: 'product_rows', label: 'Product rows', icon: <Package className="w-4 h-4" />, make: () => ({ type: 'product_rows' }) },
   { type: 'product_card', label: 'Product card', icon: <LayoutGrid className="w-4 h-4" />, make: () => ({ type: 'product_card' }) },
+  { type: 'products', label: 'Pick products', icon: <ShoppingBag className="w-4 h-4" />, make: () => ({ type: 'products', items: [], columns: 2 }) },
+  { type: 'coupon', label: 'Coupon', icon: <Ticket className="w-4 h-4" />, make: () => ({ type: 'coupon', heading: 'Your code', note: '' }) },
   { type: 'divider', label: 'Divider', icon: <Minus className="w-4 h-4" />, make: () => ({ type: 'divider' }) },
   { type: 'spacer', label: 'Spacer', icon: <Space className="w-4 h-4" />, make: () => ({ type: 'spacer', size: 'md' }) },
 ]
 
 const inputCls =
   'w-full field-normal border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500'
+
+// Search the catalogue and keep a snapshot of each pick (name, link, image, price) in the block.
+function ProductPicker({ items, onChange }: { items: EmailProduct[]; onChange: (items: EmailProduct[]) => void }) {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<EmailProduct[]>([])
+  const [loading, setLoading] = useState(false)
+  useEffect(() => {
+    if (q.trim().length < 2) return setResults([])
+    let live = true
+    setLoading(true)
+    const t = setTimeout(() => {
+      fetch(`/api/admin/mailer/products?q=${encodeURIComponent(q.trim())}`, { credentials: 'include' })
+        .then(r => (r.ok ? r.json() : { items: [] }))
+        .then(d => live && setResults(d.items ?? []))
+        .catch(() => live && setResults([]))
+        .finally(() => live && setLoading(false))
+    }, 300)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [q])
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+        <input className={`${inputCls} pl-8`} value={q} onChange={e => setQ(e.target.value)} placeholder="Search products by name or SKU" />
+        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted" />}
+      </div>
+      {results.length > 0 && (
+        <div className="max-h-52 overflow-y-auto rounded-lg border border-border-default divide-y divide-border-default">
+          {results.map(r => {
+            const picked = items.some(i => i.url === r.url)
+            return (
+              <button
+                key={r.url}
+                type="button"
+                disabled={picked}
+                onClick={() => onChange([...items, r])}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-secondary disabled:opacity-50"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {r.image ? <img src={r.image} alt="" className="w-9 h-9 rounded object-cover bg-surface-secondary" /> : <span className="w-9 h-9 rounded bg-surface-secondary" />}
+                <span className="flex-1 min-w-0 text-sm text-foreground truncate">{r.name}</span>
+                {r.price && <span className="text-xs text-foreground-muted">₹{r.price}</span>}
+                <span className="text-xs text-accent-500">{picked ? 'Added' : 'Add'}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {items.length > 0 && (
+        <ul className="space-y-1.5">
+          {items.map((it, i) => (
+            <li key={it.url} className="flex items-center gap-3 rounded-lg border border-border-default px-3 py-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {it.image ? <img src={it.image} alt="" className="w-8 h-8 rounded object-cover bg-surface-secondary" /> : <span className="w-8 h-8 rounded bg-surface-secondary" />}
+              <span className="flex-1 min-w-0 text-sm text-foreground truncate">{it.name}</span>
+              {it.price && <span className="text-xs text-foreground-muted">₹{it.price}</span>}
+              <button type="button" aria-label="Remove product" onClick={() => onChange(items.filter((_, x) => x !== i))} className="text-foreground-muted hover:text-red-500">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 function BlockRow({
   id,
@@ -225,6 +298,30 @@ function BlockRow({
         </div>
       )}
 
+      {block.type === 'coupon' && (
+        <div className="space-y-2">
+          <input className={inputCls} value={block.heading ?? ''} onChange={e => onPatch({ ...block, heading: e.target.value })} placeholder="Line above the code (e.g. Your Diwali code)" />
+          <input className={inputCls} value={block.note ?? ''} onChange={e => onPatch({ ...block, note: e.target.value })} placeholder="Small print (optional, e.g. Valid till 15 Nov)" />
+          <p className="text-[11px] text-foreground-muted">Shows the message&apos;s coupon code and discount; left out when no coupon is picked.</p>
+        </div>
+      )}
+
+      {block.type === 'products' && (
+        <div className="space-y-2">
+          <ProductPicker items={block.items ?? []} onChange={items => onPatch({ ...block, items })} />
+          <div className="w-40">
+            <AdminSelect
+              value={String(block.columns ?? 2)}
+              onChange={v => onPatch({ ...block, columns: v === '1' ? 1 : 2 })}
+              options={[
+                { value: '2', label: 'Two per row' },
+                { value: '1', label: 'One per row' },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+
       {block.type === 'divider' && <p className="text-xs text-foreground-muted">A horizontal rule.</p>}
       {block.type === 'product_rows' && (
         <p className="text-xs text-foreground-muted">
@@ -240,7 +337,7 @@ function BlockRow({
   )
 }
 
-export default function EmailBlockBuilder({ blocks, onChange, extraVariables, scenarioFill }: Props) {
+export default function EmailBlockBuilder({ blocks, onChange, extraVariables, scenarioFill, hideTypes }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   // Stable keys by index are fine here — blocks have no ids; we reorder the array directly.
   const ids = blocks.map((_, i) => `block-${i}`)
@@ -301,7 +398,7 @@ export default function EmailBlockBuilder({ blocks, onChange, extraVariables, sc
         </div>
       )}
       <div className="flex flex-wrap gap-1.5">
-        {PALETTE.map(p => (
+        {PALETTE.filter(p => !hideTypes?.includes(p.type)).map(p => (
           <button
             key={p.type}
             type="button"

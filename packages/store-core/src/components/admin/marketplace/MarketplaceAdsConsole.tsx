@@ -12,6 +12,8 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import { ChannelAlerts } from '@/components/admin/channels/ChannelPanels'
 import { Badge, Banner, Empty, Kpi, KpiGrid, RangePresets, Section, Table, Tabs, api, btnGhost, btnPrimary, change, count, lastDays, money, pct, when } from '@/components/admin/channels/ui'
 import ColumnMapper from './ColumnMapper'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { IMPORT_HISTORY_COLUMNS, MarketplaceAdsTabLoading } from './skeletons'
 import { ap } from '@/lib/shared/admin-path'
 import { AD_FIELDS, type AdsChannel } from '@/lib/marketplace-ads/columns'
 import type { MadsTab } from '@/lib/marketplace-ads/console'
@@ -88,7 +90,7 @@ export default function MarketplaceAdsConsole({ channel }: { channel: AdsChannel
       ) : error ? (
         <ErrorState body={error} />
       ) : !data ? (
-        <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+        <MarketplaceAdsTabLoading tab={tab} />
       ) : (
         <Body tab={tab} d={data} info={info} portalLink={portalLink} onImport={canWrite ? () => setTab('import') : undefined} />
       )}
@@ -420,7 +422,6 @@ function ImportTab({ channel, canWrite, onDone }: { channel: AdsChannel; canWrit
                         rows={pv.rows}
                         rowKey={(r: any) => String(r.line)}
                         empty="No rows to import."
-                        pageSize={20}
                         cols={[
                           { key: 'line', label: 'Row', num: true, render: (r: any) => r.line },
                           { key: 'date', label: 'Date', render: (r: any) => r.date },
@@ -475,7 +476,7 @@ function ImportTab({ channel, canWrite, onDone }: { channel: AdsChannel; canWrit
       )}
       <Section title="Import history">
         {!history ? (
-          <p className="text-sm text-foreground-muted">Loading...</p>
+          <LoadingTable bare columns={IMPORT_HISTORY_COLUMNS} rows={4} />
         ) : (
           <Table
             rows={history}

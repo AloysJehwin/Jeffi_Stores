@@ -4,7 +4,8 @@ import { useEffect, useState, Fragment } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
-import { EmptyState, ErrorState, InfiniteFooter, PageBody, PageHeader, TableSkeleton, badgeCls, fetchJson, useInfiniteList } from '@/components/admin/kit'
+import { EmptyState, ErrorState, InfiniteFooter, PageBody, PageHeader, badgeCls, fetchJson, useInfiniteList } from '@/components/admin/kit'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
@@ -31,6 +32,8 @@ interface Item {
   promoted_at: string | null
   error: string | null
 }
+
+const COLUMNS = ['Product', 'AI Description', 'Use Cases', 'Status', 'Proposed', 'Actions']
 
 const STATUS_BADGE: Record<string, string> = {
   proposed: badgeCls('amber'),
@@ -256,7 +259,7 @@ export default function CatalogEnrichmentPage() {
             />
           </div>
           {loading && (
-            <TableSkeleton rows={8} cols={6} />
+            <LoadingTable columns={statusFilter === 'proposed' ? ['', ...COLUMNS] : COLUMNS} />
           )}
 
           {!loading && items.length === 0 && list.error && (

@@ -12,6 +12,8 @@ import TemplateEditor, {
   type EditorTemplate,
 } from '@/components/admin/messaging-templates/TemplateEditor'
 import { PageHeader, fieldInputCls } from '@/components/admin/kit'
+import { EMBEDDED_PAGE_SIZE, Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { PAGES, pagesOf, scenarioOf } from '@/lib/messaging/placements'
 
@@ -53,7 +55,7 @@ export default function MessagingTemplatesClient() {
 
   const [items, setItems] = useState<ListItem[]>([])
   const [selected, setSelected] = useState<EditorTemplate | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState(q)
   const { showToast } = useToast()
@@ -161,15 +163,21 @@ export default function MessagingTemplatesClient() {
     )
   }, [items, query])
 
+  // Ten at a time, in category order so a category's templates sit on consecutive pages.
+  const ordered = useMemo(
+    () => [...filtered].sort((a, b) => (a.category || 'uncategorised').localeCompare(b.category || 'uncategorised')),
+    [filtered]
+  )
+  const paged = usePagedRows(ordered, EMBEDDED_PAGE_SIZE, `${channel}|${query}`)
   const grouped = useMemo(() => {
     const map = new Map<string, ListItem[]>()
-    for (const it of filtered) {
+    for (const it of paged.shown) {
       const key = it.category || 'uncategorised'
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(it)
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
-  }, [filtered])
+  }, [paged.shown])
 
   const INPUT = fieldInputCls
   const counts = useMemo(
@@ -243,16 +251,12 @@ export default function MessagingTemplatesClient() {
               }}
             />
           </div>
-          <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+          <div>
             {loading &&
-              Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="px-4 py-3 border-b border-border-default animate-pulse"
-                  style={{ animationDelay: `${i * 50}ms` }}
-                >
-                  <div className="h-3.5 w-2/3 bg-surface-secondary rounded mb-2" />
-                  <div className="h-3 w-1/3 bg-surface-secondary rounded opacity-60" />
+              Array.from({ length: EMBEDDED_PAGE_SIZE }).map((_, i) => (
+                <div key={i} className="space-y-2 border-b border-border-default px-4 py-3">
+                  <Sk className="h-3.5 w-2/3" />
+                  <Sk className="h-3 w-1/3" />
                 </div>
               ))}
             {!loading && filtered.length === 0 && (
@@ -323,6 +327,7 @@ export default function MessagingTemplatesClient() {
                 </div>
               ))}
           </div>
+          {!loading && <Pager className="px-3 pb-3" control={paged.pager} noun="templates" />}
         </aside>
 
         <section className="bg-surface-elevated rounded-lg border border-border-default p-6">

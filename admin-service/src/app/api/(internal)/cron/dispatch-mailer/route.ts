@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/shared/db'
+import { query, queryMany } from '@/lib/shared/db'
 import { sendCampaign } from '@/lib/shared/email-campaigns'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 import { drainCampaignPush } from '@/lib/push/broadcast'
@@ -20,14 +20,16 @@ export async function GET(req: NextRequest) {
      LIMIT 5`
   )
 
+  // Claimed here so an overlapping run can't pick the same one; a big audience takes minutes at the SES
+  // rate, so the sends run on after this response (a failed one goes back to draft, as from Send now).
   const dispatched: string[] = []
   for (const campaign of due) {
-    try {
-      await sendCampaign(campaign.id, { batchSize: 50, batchDelay: 1000 })
-      dispatched.push(campaign.id)
-    } catch {
-      // Logged inside sendCampaign — continue to next
-    }
+    const claimed = await query(`UPDATE email_campaigns SET status = 'sending' WHERE id = $1 AND status = 'scheduled'`, [campaign.id])
+    if (!claimed.rowCount) continue
+    dispatched.push(campaign.id)
+    void sendCampaign(campaign.id).catch(() =>
+      query(`UPDATE email_campaigns SET status = 'draft' WHERE id = $1 AND status = 'sending'`, [campaign.id]).catch(() => {})
+    )
   }
 
   // App pushes waiting out quiet hours (Mailer rows and scenario pushes), plus any a send left queued.

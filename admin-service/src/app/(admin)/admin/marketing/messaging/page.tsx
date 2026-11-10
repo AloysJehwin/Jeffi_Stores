@@ -3,12 +3,14 @@ import { normalizeQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
-import { ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { TONE_CLS } from '@/components/admin/kit/tones'
 import MessagingTable, { type Campaign } from './_components/MessagingTable'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import MessagingOverview from './_components/MessagingOverview'
+import { MessagingOverviewTabLoading } from './_components/MessagingLoading'
 import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { listCampaigns } from '@/lib/admin/messaging'
 import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
@@ -68,7 +70,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
       />
 
       {tab === 'overview' ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<MessagingOverviewTabLoading />}>
           <MessagingOverview />
         </Suspense>
       ) : tab === 'drafts' ? (
@@ -76,7 +78,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
       ) : (
         <>
           <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} noun="Messages" tab="list" exportable />
-          <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={6} />}>
+          <Suspense key={listKey(sp)} fallback={<LoadingTable columns={['Title', 'Template', 'Audience', 'Recipients', 'Status', 'Date', '']} />}>
             <MailerListContent resolvedSearchParams={sp} />
           </Suspense>
         </>

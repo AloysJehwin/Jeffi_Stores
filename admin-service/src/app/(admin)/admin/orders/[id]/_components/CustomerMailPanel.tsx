@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, Eye, EyeOff, Loader2, Mail, MessageSquareReply, Send, Sparkles, User } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { fieldInputCls } from '@/components/admin/kit/form'
+import { Sk } from '@/components/admin/kit/skeleton'
 import AdminSelect from '@/components/admin/AdminSelect'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
@@ -34,6 +35,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   const [preheader, setPreheader] = useState('')
   const [body, setBody] = useState('')
   const [itemId, setItemId] = useState('')
+  const [storeLayout, setStoreLayout] = useState(true)
   const [sending, setSending] = useState(false)
   const [missing, setMissing] = useState<string[]>([])
   const [checking, setChecking] = useState(false)
@@ -52,6 +54,8 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   const template = data?.templates.find(t => t.slug === selected) ?? null
   const scenario = template?.scenario ?? null
   const isCustom = selected === CUSTOM
+  // Off: the body goes out exactly as written, without the store's header and footer.
+  const layout = !storeLayout ? 'raw' : isCustom ? 'message' : 'template'
   const fitting = data?.templates.filter(t => t.fits) ?? []
   const others = data?.templates.filter(t => !t.fits) ?? []
 
@@ -63,10 +67,12 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
       setSubject('Message from {{store_name}}')
       setPreheader('')
       setBody('')
+      setStoreLayout(true)
       return
     }
     const t = list.find(x => x.slug === slug)
     if (!t) return
+    setStoreLayout(t.layout !== 'none')
     setSubject(t.subject)
     setPreheader(t.preheader)
     setBody(t.body)
@@ -100,7 +106,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
         const res = await fetch(`/api/admin/orders/${orderId}/send-customer-mail/preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subject, body, preheader, scenario: scenario?.id, itemId: itemId || undefined, layout: isCustom ? 'message' : 'template' }),
+          body: JSON.stringify({ subject, body, preheader, scenario: scenario?.id, itemId: itemId || undefined, layout }),
         })
         const d = await res.json()
         if (seq !== checkSeq.current) return
@@ -113,7 +119,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
       }
     }, 500)
     return () => clearTimeout(t)
-  }, [open, selected, subject, body, preheader, itemId, orderId, scenario?.id, isCustom])
+  }, [open, selected, subject, body, preheader, itemId, orderId, scenario?.id, layout])
 
   async function generateFromScenario() {
     if (scenarioPrompt.trim().length < 10 || scenarioLoading) return
@@ -152,7 +158,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
           body,
           preheader: preheader || undefined,
           isHtml: true,
-          layout: isCustom ? 'message' : 'template',
+          layout,
           scenario: scenario?.id,
           itemId: itemId || undefined,
         }),
@@ -215,8 +221,13 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
           </div>
 
           {!data && !loadError ? (
-            <div className="flex items-center gap-2 text-xs text-foreground-muted">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading templates…
+            <div className="space-y-2">
+              <Sk className="h-3 w-24" />
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2, 3].map(i => (
+                  <Sk key={i} className="h-7 w-28 rounded-full" />
+                ))}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -309,7 +320,24 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                 </AIEnrichButton>
               </div>
 
-              {!isCustom && (
+              <div>
+                <label className="flex items-center gap-2 text-xs font-medium text-foreground-secondary">
+                  <input
+                    type="checkbox"
+                    checked={storeLayout}
+                    onChange={e => setStoreLayout(e.target.checked)}
+                    className="h-4 w-4 accent-accent-500"
+                  />
+                  Store header &amp; footer
+                </label>
+                <p className="mt-1 text-[11px] text-foreground-muted">
+                  {storeLayout
+                    ? "The message is framed by your store's email header and footer."
+                    : 'Sent exactly as written, for a template that carries its own design.'}
+                </p>
+              </div>
+
+              {(!isCustom || !storeLayout) && (
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-foreground-muted">Preview text</label>
                   <input

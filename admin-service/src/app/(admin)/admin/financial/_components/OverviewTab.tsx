@@ -6,7 +6,8 @@
 import Link from 'next/link'
 import { Badge, Banner, Kpi, KpiGrid, Section, count, money, pct, type Tone } from '@/components/admin/channels/ui'
 import { MixDonutCard } from '@/components/admin/kit/charts'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { OverviewTabSkeleton } from './FinanceSkeletons'
 import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import { MARKETPLACE_LABELS, MARKETPLACE_SOURCES, type MarketplaceSource } from '@/lib/marketplace/sources'
@@ -103,7 +104,7 @@ export function OverviewTab() {
     <div className="space-y-5">
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} />}
+      {loading && !data ? <OverviewTabSkeleton /> : data && <Body d={data} />}
     </div>
   )
 }

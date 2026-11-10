@@ -16,9 +16,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const segment = searchParams.get('segment') || undefined
   const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
 
   const sort = parseSort(searchParams, CUSTOMERS_ENTITY.sorts)
 
-  const { customers } = await getCustomers({ segment, limit, sort: sort?.key ?? 'lifetime_value', dir: sort?.dir ?? 'desc' })
-  return NextResponse.json({ customers })
+  const { customers, total } = await getCustomers({ segment, page, limit, sort: sort?.key ?? 'lifetime_value', dir: sort?.dir ?? 'desc' })
+  return NextResponse.json({ customers, total })
 }

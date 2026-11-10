@@ -444,7 +444,17 @@ export interface CommitInput {
   couponId: string | null
   shippingAmount: number
   codFeeAmount: number
-  paymentRecord: { gatewayOrderId: string; paymentId: string; signature: string; amountPaise: number } | null
+  /** The captured payment; gateway/method default to Razorpay, gatewayResponse to the razorpay_* keys. */
+  paymentRecord: {
+    gatewayOrderId: string
+    paymentId: string
+    signature: string
+    amountPaise: number
+    gateway?: string
+    method?: string
+    vpa?: string | null
+    gatewayResponse?: Record<string, unknown>
+  } | null
   /** Buyer's click / UTM attribution (from the browser cookie; absent on webhook commits). */
   attribution?: Attribution | null
   /** Buyer's advertising-cookie choice (consent cookie); null when none was made. */
@@ -807,17 +817,22 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
 
     if (input.paymentRecord) {
       await client.query(
-        `INSERT INTO payments (order_id, payment_method, payment_gateway, transaction_id, amount, status, gateway_response)
-         VALUES ($1, 'razorpay', 'razorpay', $2, $3, 'completed', $4)`,
+        `INSERT INTO payments (order_id, payment_method, payment_gateway, transaction_id, amount, status, gateway_response, vpa)
+         VALUES ($1, $5, $6, $2, $3, 'completed', $4, $7)`,
         [
           created.id,
           input.paymentRecord.paymentId,
           (input.paymentRecord.amountPaise / 100).toFixed(2),
-          JSON.stringify({
-            razorpay_order_id: input.paymentRecord.gatewayOrderId,
-            razorpay_payment_id: input.paymentRecord.paymentId,
-            razorpay_signature: input.paymentRecord.signature,
-          }),
+          JSON.stringify(
+            input.paymentRecord.gatewayResponse ?? {
+              razorpay_order_id: input.paymentRecord.gatewayOrderId,
+              razorpay_payment_id: input.paymentRecord.paymentId,
+              razorpay_signature: input.paymentRecord.signature,
+            }
+          ),
+          input.paymentRecord.method ?? 'razorpay',
+          input.paymentRecord.gateway ?? 'razorpay',
+          input.paymentRecord.vpa ?? null,
         ]
       )
 

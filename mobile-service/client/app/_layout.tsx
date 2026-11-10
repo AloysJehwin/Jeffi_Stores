@@ -1,6 +1,6 @@
 import '../global.css'
 import { useEffect, useRef } from 'react'
-import { Stack, useSegments } from 'expo-router'
+import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -13,6 +13,7 @@ import { useThemeStore } from '../src/stores/themeStore'
 import { getStoredToken, loadAuthPortal } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
+import { loadPendingUpi } from '../src/components/checkout/upiPending'
 import Toast from '../src/ui/Toast'
 import UpdatePrompt from '../src/ui/UpdatePrompt'
 import { QuickAddSheetHost } from '../src/components/product/QuickAddSheet'
@@ -114,6 +115,23 @@ function ThemeRehydrator() {
   return null
 }
 
+// A UPI payment the app was killed in the middle of (browser or UPI app open) picks up where it left off.
+function UpiResume() {
+  const router = useRouter()
+  const navReady = !!useRootNavigationState()?.key
+  const user = useAuthStore(s => s.user)
+  const isLoading = useAuthStore(s => s.isLoading)
+  const checked = useRef(false)
+  useEffect(() => {
+    if (checked.current || !navReady || isLoading || !user) return
+    checked.current = true
+    loadPendingUpi().then(p => {
+      if (p) router.push({ pathname: '/checkout/upi', params: { intentId: p.intentId } })
+    })
+  }, [navReady, isLoading, user, router])
+  return null
+}
+
 export default function RootLayout() {
   const { colorScheme } = useColorScheme()
   const t = useTokens()
@@ -128,6 +146,7 @@ export default function RootLayout() {
           <ScreenTracker />
           <CartRehydrator />
           <ThemeRehydrator />
+          <UpiResume />
           <PushBootstrap />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           {/* The scene background matches the theme, so a push never flashes white in dark mode. */}
@@ -139,6 +158,7 @@ export default function RootLayout() {
             <Stack.Screen name="category/[slug]" />
             <Stack.Screen name="checkout/review" />
             <Stack.Screen name="checkout/payment" />
+            <Stack.Screen name="checkout/upi" />
             <Stack.Screen name="orders/index" />
             <Stack.Screen name="orders/[id]" />
             <Stack.Screen name="account/profile" />

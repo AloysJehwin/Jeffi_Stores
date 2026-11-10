@@ -3,6 +3,7 @@ import { getTenantWallet } from '@/lib/payments/wallet'
 import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/shared/db'
 import WalletClient, { type AiSpendRow } from './WalletClient'
+import { walletUpiAvailable } from '@/lib/payments/upi/creds'
 
 const AI_SPEND_DAYS = 30
 
@@ -26,11 +27,12 @@ export const revalidate = 0
 export default async function WalletPage() {
   const tenantId = await resolveTenantId().catch(() => null)
   if (!tenantId) redirect('/admin/dashboard')
-  const [wallet, ai] = await Promise.all([
+  const [wallet, ai, upiEnabled] = await Promise.all([
     // Balance only; the ledger pages in from the server with the list's filters.
     tenantId ? getTenantWallet(tenantId, 0).catch(() => null) : null,
     tenantId ? aiSpend() : [],
+    walletUpiAvailable().catch(() => false),
   ])
 
-  return <WalletClient initial={wallet} aiSpend={ai} aiSpendDays={AI_SPEND_DAYS} />
+  return <WalletClient initial={wallet} aiSpend={ai} aiSpendDays={AI_SPEND_DAYS} upiEnabled={upiEnabled} />
 }

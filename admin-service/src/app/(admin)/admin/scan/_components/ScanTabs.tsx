@@ -4,6 +4,7 @@ import { Tabs } from '@/components/admin/channels/ui'
 import { PageHeader } from '@/components/admin/kit'
 import { OverviewPanel, useTab } from '../../orders/_components/overview-shared'
 import ScanClient from '../ScanClient'
+import { SCAN_KPIS } from './overview-kpis'
 
 const TABS = [
   { id: 'scan', label: 'Scanner' },
@@ -24,7 +25,7 @@ export default function ScanTabs() {
         <ScanClient />
       ) : (
         <div className="p-4 sm:p-6">
-          <OverviewPanel endpoint="/api/admin/scan/overview" />
+          <OverviewPanel endpoint="/api/admin/scan/overview" kpis={SCAN_KPIS} />
         </div>
       )}
     </div>

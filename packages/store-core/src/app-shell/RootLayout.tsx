@@ -105,6 +105,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     },
     flags: {
       razorpayEnabled: c.flags.razorpayEnabled,
+      upiEnabled: c.flags.upiEnabled,
       codEnabled: c.flags.codEnabled,
       gstEnabled: c.flags.gstEnabled,
       ondeviceSummaryEnabled: c.flags.ondeviceSummaryEnabled,

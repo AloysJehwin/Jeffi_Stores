@@ -4,6 +4,7 @@ import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { poolsForTenant } from './pools.js'
 import { callbacksEnabled, fetchStatus } from './providers/twilio.js'
+import { tenantSender } from './providers/senders.js'
 
 const REASONS: Record<string, string> = {
   '63049': "Meta held back this marketing message — WhatsApp caps marketing messages to people who haven't chatted with the business recently",
@@ -59,14 +60,16 @@ export function startDeliverySync(log: (m: string) => void, scope: ServiceScope)
   if (callbacksEnabled()) return
   const sweep = async () => {
     const w = scopeSql(scope, 'tenant_id', 1)
-    const rows = await db.query<{ id: string; provider_ref: string }>(
-      `SELECT id, provider_ref FROM messages
+    const rows = await db.query<{ id: string; provider_ref: string; tenant_id: string; channel: 'sms' | 'whatsapp'; metadata: any }>(
+      `SELECT id, provider_ref, tenant_id, channel, metadata FROM messages
        WHERE provider='twilio' AND status='sent' AND provider_ref IS NOT NULL AND created_at > now() - interval '24 hours'
          AND updated_at < now() - greatest(interval '10 seconds', (now() - created_at) / 4) AND ${w.sql}
        ORDER BY created_at DESC LIMIT 50`, w.params)
     for (const r of rows.rows) {
       try {
-        const s = await fetchStatus(r.provider_ref)
+        // A send from the store's own Twilio account is polled with that account's client.
+        const ov = r.metadata?.sender?.own ? await tenantSender(r.tenant_id, r.channel) : null
+        const s = await fetchStatus(r.provider_ref, ov ?? undefined)
         await applyStatus(r.id, s.status, { code: s.code, message: s.message, payload: { polled: true, ...s } })
       } catch (e: any) {
         log(`delivery sync ${r.id}: ${e?.message}`)

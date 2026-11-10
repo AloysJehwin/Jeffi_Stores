@@ -14,6 +14,8 @@ import {
 import { Banner, KpiGrid, TabLinks as SharedTabLinks } from '@/components/admin/channels/ui'
 import type { Period } from '@/lib/overview/period'
 import { resolveListTab, type ListTab } from '@/lib/overviews/catalog'
+import { LoadingToolbar } from '@/components/admin/kit/skeleton'
+import { LoadingPeriodBar } from './loading-parts'
 
 // Client pieces shared by the catalogue overview tabs (products, categories, brands, offers,
 // catalogue enrichment, bulk price).
@@ -62,16 +64,31 @@ export function OverviewTab<T extends { attention?: AttentionItem[] }>({
   extra,
   query,
   filters,
+  skeleton,
 }: {
   endpoint: string
   kpis: (data: T) => React.ReactNode
   extra?: (data: T) => React.ReactNode
   query?: string
   filters?: React.ReactNode
+  /** The page's own body skeleton (real KPI labels and panel titles) while data loads. */
+  skeleton?: React.ReactNode
 }) {
   return (
-    <Suspense fallback={<OverviewSkeleton />}>
-      <OverviewFrame<T> endpoint={endpoint} query={query} filters={filters}>
+    <Suspense
+      fallback={
+        skeleton ? (
+          <div className="space-y-4">
+            <LoadingPeriodBar />
+            {filters && <LoadingToolbar filters={1} />}
+            {skeleton}
+          </div>
+        ) : (
+          <OverviewSkeleton />
+        )
+      }
+    >
+      <OverviewFrame<T> endpoint={endpoint} query={query} filters={filters} skeleton={skeleton}>
         {data => (
           <div className="space-y-4">
             <KpiGrid>{kpis(data)}</KpiGrid>

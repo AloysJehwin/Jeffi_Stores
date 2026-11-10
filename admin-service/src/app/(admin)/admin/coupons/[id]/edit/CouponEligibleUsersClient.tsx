@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import CouponUserPicker from './CouponUserPicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { InfiniteFooter, useServerPages } from '@/components/admin/kit/infinite'
+import { EMBEDDED_PAGE_SIZE, Pager } from '@/components/admin/kit/pager'
 
 interface EligibleUser {
   id: string
@@ -19,18 +20,28 @@ interface Props {
   canRemove: boolean
   canAdd: boolean
   allUsersMode: boolean
-  /** ?usersPage the server rendered and the full count; pages accumulate on scroll. */
+  /** ?usersPage the server rendered (10 a page) and the full count. */
   page: number
   total: number
 }
 
 export default function CouponEligibleUsersClient({ couponId, initialUsers, canRemove, canAdd, allUsersMode, page, total }: Props) {
   const canWrite = useCanWrite('coupons:write')
-  const pages = useServerPages({ rows: initialUsers, page, total, rowKey: u => u.id, param: 'usersPage' })
+  const router = useRouter()
+  const pathname = usePathname()
+  const sp = useSearchParams()
+  const [paging, startPaging] = useTransition()
+  // ?usersPage replaces the rows with that page; the server already returns 10 at a time.
+  const setPage = (p: number) => {
+    const q = new URLSearchParams(sp.toString())
+    if (p > 1) q.set('usersPage', String(p))
+    else q.delete('usersPage')
+    startPaging(() => router.replace(`${pathname}${q.size ? `?${q}` : ''}`, { scroll: false }))
+  }
   const [added, setAdded] = useState<EligibleUser[]>([])
   const [removed, setRemoved] = useState<Set<string>>(new Set())
   const addedIds = new Set(added.map(u => u.id))
-  const users = [...added, ...pages.rows.filter(u => !addedIds.has(u.id))].filter(u => !removed.has(u.id))
+  const users = [...added, ...initialUsers.filter(u => !addedIds.has(u.id))].filter(u => !removed.has(u.id))
   const [removing, setRemoving] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
   const existingIds = new Set(users.map(u => u.id))
@@ -213,7 +224,11 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
           </tbody>
         </table>
       </div>
-      {!pages.resetting && <InfiniteFooter shown={users.length} control={pages.control} noun="users" className="px-4 pb-3" />}
+      <Pager
+        className="px-4 pb-3"
+        noun="users"
+        control={{ page, pageSize: EMBEDDED_PAGE_SIZE, total, hasNext: page * EMBEDDED_PAGE_SIZE < total, loading: paging, setPage }}
+      />
     </div>
   )
 }

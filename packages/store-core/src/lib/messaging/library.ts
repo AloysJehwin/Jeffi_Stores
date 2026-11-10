@@ -29,6 +29,7 @@ export interface LibraryTemplate {
   channel: Channel
   category: string | null
   subject: string | null
+  preheader: string | null
   body: string
   blocks: any
   blocks_format: string | null
@@ -60,7 +61,7 @@ export async function getLibraryTemplate(channel: Channel, slug: string): Promis
       const v = a.current_version ?? {}
       t = {
         id: a.id, slug: a.slug, name: a.name, channel: a.channel, category: a.category ?? null,
-        subject: v.subject ?? null, body: v.body ?? '', blocks: v.blocks ?? null, blocks_format: v.blocks_format ?? null,
+        subject: v.subject ?? null, preheader: v.preheader ?? null, body: v.body ?? '', blocks: v.blocks ?? null, blocks_format: v.blocks_format ?? null,
         variables: v.variables ?? [], provider_ref: a.provider_ref ?? null, approval_status: a.approval_status ?? null,
         media_type: a.media_type ?? null, layout: v.layout === 'none' ? 'none' : 'store',
       }
@@ -83,6 +84,8 @@ export interface PageTemplate {
   preheader: string
   body: string
   tags: string[]
+  /** 'none': the template carries its own design, sent without the store's header and footer. */
+  layout: 'store' | 'none'
 }
 
 /** The email templates offered on an admin page (tag 'page:order'), the store's copies over the standard ones. */
@@ -97,7 +100,10 @@ export async function listPageTemplates(tag: string): Promise<PageTemplate[]> {
     const { items } = await r.json()
     return (items ?? [])
       .filter((i: any) => i.status !== 'archived' && i.body)
-      .map((i: any) => ({ slug: i.slug, name: i.name, subject: i.subject ?? '', preheader: i.preheader ?? '', body: i.body, tags: i.tags ?? [] }))
+      .map((i: any) => ({
+        slug: i.slug, name: i.name, subject: i.subject ?? '', preheader: i.preheader ?? '', body: i.body, tags: i.tags ?? [],
+        layout: i.layout === 'none' ? 'none' : 'store',
+      }))
   } catch {
     return []
   }

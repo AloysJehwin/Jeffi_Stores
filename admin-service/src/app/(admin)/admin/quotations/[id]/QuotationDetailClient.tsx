@@ -7,9 +7,10 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useAgentChanges } from '@/lib/client/agent-events'
 import { formatINR, formatDate } from '@/lib/shared/format'
-import { ActionButton, Card, DetailHeader, DetailSkeleton, EmptyState, EntityPage, Field, Fields, PageBody, QUOTATION_STATUS, StatusBadge, badgeCls, useActionToast, type KitAction } from '@/components/admin/kit'
+import { ActionButton, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, PageBody, QUOTATION_STATUS, StatusBadge, badgeCls, useActionToast, type KitAction } from '@/components/admin/kit'
 import { ChangeLog } from '@/components/admin/change-log'
 import RecordReplies from '@/components/admin/replies/RecordReplies'
+import QuotationDetailLoading from './view/loading'
 
 const th = 'px-4 py-2.5 text-xs font-medium text-foreground-muted whitespace-nowrap'
 
@@ -68,11 +69,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
   }
 
   if (loading || !data?.quotation) {
-    return (
-      <PageBody>
-        <DetailSkeleton kpis={3} />
-      </PageBody>
-    )
+    return <QuotationDetailLoading />
   }
 
   const q = data.quotation

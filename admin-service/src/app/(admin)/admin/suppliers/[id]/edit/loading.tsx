@@ -1,9 +1,5 @@
-import { FormSkeleton } from '@/components/admin/kit/states'
+import SupplierFormSkeleton from '../../_components/SupplierFormSkeleton'
 
 export default function Loading() {
-  return (
-    <div className="p-4 sm:p-6">
-      <FormSkeleton />
-    </div>
-  )
+  return <SupplierFormSkeleton description="Changes are saved to the draft only" />
 }

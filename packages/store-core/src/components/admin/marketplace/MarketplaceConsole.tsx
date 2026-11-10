@@ -8,6 +8,7 @@ import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channe
 import { Section, Tabs, api, btnGhost, when } from '@/components/admin/channels/ui'
 import { CopyValue } from '@/components/admin/kit/actions'
 import { PageHeader } from '@/components/admin/kit/layout'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { EmptyState, ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -20,6 +21,7 @@ import MarketplaceOverview from './MarketplaceOverview'
 import MarketplaceReturns from './MarketplaceReturns'
 import OrdersQueue from './OrdersQueue'
 import SettlementsPanel from './SettlementsPanel'
+import { MarketplaceBodyLoading } from './skeletons'
 
 type Channel = MarketplaceConnectionStatus['channel']
 type Tab = 'overview' | 'orders' | 'returns' | 'listings' | 'inventory' | 'settlements' | 'alerts' | 'changes' | 'runs'
@@ -105,13 +107,13 @@ export default function MarketplaceConsole({ channel }: { channel: Channel }) {
         badges={status?.connected ? modeBadge(status.mode) : null}
         actions={
           <ConnectionsGear title={`${info.title} connection`} scope={channel} state={state} open={gearOpen} onOpenChange={setGearOpen}>
-            {panel || <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>}
+            {panel || (error ? <p className="text-sm text-foreground-muted">{error}</p> : <LoadingLines lines={3} />)}
           </ConnectionsGear>
         }
       />
 
       {!status ? (
-        error ? <ErrorState body={error} /> : <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+        error ? <ErrorState body={error} /> : <MarketplaceBodyLoading tab={tab} />
       ) : (
         <>
           <Tabs tabs={TABS} value={tab} onChange={setTab} />

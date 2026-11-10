@@ -14,6 +14,7 @@ import { Banner, Kpi, KpiGrid, count, money, pct } from '@/components/admin/chan
 import { delta } from '@/lib/overview/period'
 import type { CustomerState, CustomerTotals } from '@/lib/overviews/customers'
 import { ap } from '@/lib/shared/admin-path'
+import CustomersOverviewSkeleton from './CustomersOverviewSkeleton'
 
 interface Data {
   current: CustomerTotals
@@ -47,7 +48,7 @@ export default function CustomersOverview() {
       />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
-        !error && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+        !error && <CustomersOverviewSkeleton />
       ) : (
         <>
           <KpiGrid>

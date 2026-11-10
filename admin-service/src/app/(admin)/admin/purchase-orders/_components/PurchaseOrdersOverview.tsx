@@ -10,7 +10,6 @@ import {
   PeriodBar,
   useOverviewData,
   AttentionList,
-  OverviewSkeleton,
   type AttentionItem,
 } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, money, count, btnGhost } from '@/components/admin/channels/ui'
@@ -19,6 +18,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import type { OpenPo, ReorderGroup } from '@/lib/overviews/purchase-orders'
 import { ap } from '@/lib/shared/admin-path'
+import PurchaseOrdersOverviewSkeleton from './PurchaseOrdersOverviewSkeleton'
 
 interface Data {
   kpis: OverviewKpi[]
@@ -83,7 +83,7 @@ export default function PurchaseOrdersOverview() {
       )}
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
-        !error && <OverviewSkeleton />
+        !error && <PurchaseOrdersOverviewSkeleton />
       ) : (
         <>
           <KpiGrid>
@@ -217,7 +217,6 @@ export default function PurchaseOrdersOverview() {
                     <Table
                       rows={g.lines}
                       rowKey={l => `${l.product_id}:${l.variant_id || ''}:${l.sub_variant_id || ''}`}
-                      pageSize={10}
                       cols={[
                         {
                           key: 'item',

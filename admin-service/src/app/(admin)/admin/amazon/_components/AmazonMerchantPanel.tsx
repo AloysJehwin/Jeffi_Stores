@@ -6,7 +6,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 import { groupAmazonSyncErrors } from '@/lib/amazon/sync-errors'
-import { DataTable, ListFilters, fetchJson, useFilterQuery, useInfiniteList, useListSort, Kpi, StatusBadge, btnGhost, btnPrimary, count, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, ListFilters, fetchJson, useFilterQuery, useInfiniteList, useListSort, Kpi, LoadingKpis, StatusBadge, btnGhost, btnPrimary, count, type DataCol, type StatusMap } from '@/components/admin/kit'
 import { AMAZON_LISTING_FIELDS, AMAZON_LISTING_SEARCH } from '@/lib/filters/fields/amazon-listings'
 
 interface Summary {
@@ -230,12 +230,16 @@ export default function AmazonMerchantPanel() {
         ) : null}
         {syncStatus?.status === 'error' && syncStatus.errors?.length ? <SyncErrors errors={syncStatus.errors} /> : null}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Kpi label="Total listings" value={count(summary?.total ?? 0)} />
-          <Kpi label="Approved" value={count(summary?.approved ?? 0)} />
-          <Kpi label="Pending" value={count(summary?.pending ?? 0)} />
-          <Kpi label="Blocked" value={count(summary?.disapproved ?? 0)} />
-        </div>
+        {list.loading && !summary ? (
+          <LoadingKpis labels={['Total listings', 'Approved', 'Pending', 'Blocked']} />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Kpi label="Total listings" value={count(summary?.total ?? 0)} />
+            <Kpi label="Approved" value={count(summary?.approved ?? 0)} />
+            <Kpi label="Pending" value={count(summary?.pending ?? 0)} />
+            <Kpi label="Blocked" value={count(summary?.disapproved ?? 0)} />
+          </div>
+        )}
 
         <ListFilters
           entity="amazon.listings"

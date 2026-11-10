@@ -14,6 +14,7 @@ import { Check, MessageSquare, ExternalLink, Trash2, AlertTriangle } from 'lucid
 import { tabHref } from '@/lib/admin/filter-url'
 import { REVIEW_ALIASES, REVIEW_FIELDS, REVIEW_LIST_PRESET, REVIEW_SEARCH } from '@/lib/filters/fields/reviews'
 import ReviewsOverview from './_components/ReviewsOverview'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 interface Review {
   id: string
@@ -227,12 +228,12 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4">
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-full bg-surface-secondary animate-pulse shrink-0" />
+                <Sk className="w-9 h-9 rounded-full shrink-0" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/3 bg-surface-secondary rounded animate-pulse" />
-                  <div className="h-3 w-1/4 bg-surface-secondary rounded animate-pulse" />
-                  <div className="h-3 w-full bg-surface-secondary rounded animate-pulse" />
-                  <div className="h-3 w-5/6 bg-surface-secondary rounded animate-pulse" />
+                  <Sk className="h-4 w-1/3" />
+                  <Sk className="h-3 w-1/4" />
+                  <Sk className="h-3 w-full" />
+                  <Sk className="h-3 w-5/6" />
                 </div>
               </div>
             </div>

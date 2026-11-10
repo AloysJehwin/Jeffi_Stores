@@ -6,7 +6,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import { Card, DetailHeader, DetailSkeleton, Dialog, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { Card, DetailHeader, Dialog, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { RFQ_STATUS, fmtDay } from '../../_status'
 import { round2 } from '@/lib/catalog/gst'
 import { fmtQty } from '@/lib/shared/number-display'
@@ -15,6 +15,7 @@ import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { assertDraftResponse } from '@/lib/client/draft-lock-client'
 import { ChangeLog } from '@/components/admin/change-log'
 import RecordReplies from '@/components/admin/replies/RecordReplies'
+import DetailLoading from './view/loading'
 
 interface RFQMessage {
   id: string
@@ -361,12 +362,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
   // For header stat: prefer selling total, fallback to MRP total
   const totalCatalog = totalSelling > 0 ? totalSelling : totalMrp
 
-  if (loading)
-    return (
-      <div className="p-4 sm:p-6">
-        <DetailSkeleton kpis={4} />
-      </div>
-    )
+  if (loading) return <DetailLoading />
 
   if (!rfq)
     return (

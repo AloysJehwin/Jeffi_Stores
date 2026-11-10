@@ -10,6 +10,7 @@ import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 import AccountAddressForm from '@/components/shared/AccountAddressForm'
+import { AddressesSkeleton } from '@/components/visitor/skeletons/account'
 
 interface Address {
   id: string
@@ -205,28 +206,7 @@ function AccountAddresses({ isBusiness }: { isBusiness: boolean }) {
     }
   }
 
-  if (isLoading || loading) {
-    return (
-      <div className="container mx-auto px-4 pt-4 pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-pulse">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default p-4"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              <div className="h-4 bg-surface-secondary rounded w-24 mb-3" />
-              <div className="space-y-2">
-                <div className="h-3 bg-surface-secondary rounded w-full" />
-                <div className="h-3 bg-surface-secondary rounded w-3/4" />
-                <div className="h-3 bg-surface-secondary rounded w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  if (isLoading || loading) return <AddressesSkeleton portal={isBusiness ? 'business' : 'store'} />
 
   if (!user) {
     return null

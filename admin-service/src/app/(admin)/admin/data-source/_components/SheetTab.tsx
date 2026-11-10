@@ -7,6 +7,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { Badge, Banner, Section, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/kit/core'
 import GoogleSheetDisconnect from './GoogleSheetDisconnect'
 import SheetOwnCredentials from './SheetOwnCredentials'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
 import JobDetail from './JobDetail'
 import { ACTIVE, JobBadge, duration, sheetUrl, type GsheetStatus } from './shared'
 
@@ -56,6 +57,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
   const syncing = !!last && ACTIVE.has(last.status)
   const pending = last?.status === 'done' ? (last.pendingDeletions ?? []) : []
   const chosen = selected ?? new Set(pending.map(p => p.productId))
+  const { shown: pendingPage, pager: pendingPager } = usePagedRows(pending, 10, last?.id ?? null)
   const sheetChanged = !!sheetInput.trim() && sheetInput.trim() !== gsheet.spreadsheetId && !sheetInput.includes(gsheet.spreadsheetId ?? '\u0000')
 
   const finish = async (ok: boolean, text: string) => {
@@ -160,7 +162,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
                 Started {when(last.createdAt)}
                 {duration(last.createdAt, last.finishedAt) ? `, took ${duration(last.createdAt, last.finishedAt)}` : ''}
               </p>
-              <JobDetail key={`${last.id}:${last.status}`} id={last.id} compact />
+              <JobDetail key={`${last.id}:${last.status}`} id={last.id} />
             </div>
           ) : (
             <p className="text-sm text-foreground-muted">{state === 'connected' ? 'No sync yet. Create or link a sheet, then Sync now.' : 'Connect Google to sync products from a sheet.'}</p>
@@ -173,8 +175,8 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
               These were synced from the sheet before and are missing from the latest sync. Remove deletes products without orders and deactivates the rest; Keep leaves them in the
               store as manually managed.
             </p>
-            <ul className="max-h-56 overflow-y-auto divide-y divide-border-default rounded-lg border border-border-default">
-              {pending.map(p => (
+            <ul className="divide-y divide-border-default rounded-lg border border-border-default">
+              {pendingPage.map(p => (
                 <li key={p.productId} className="flex items-center gap-2 px-3 py-2 text-sm">
                   {canWrite && <input type="checkbox" aria-label={`Select ${p.name}`} checked={chosen.has(p.productId)} onChange={() => toggle(p.productId)} />}
                   <span className="text-foreground truncate">{p.name}</span>
@@ -182,6 +184,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
                 </li>
               ))}
             </ul>
+            <Pager control={pendingPager} noun="products" />
             {canWrite && (
               <div className="flex flex-wrap gap-2 mt-3">
                 <button type="button" onClick={() => reconcile('approve')} disabled={!!busy || syncing || chosen.size === 0} className={`${btnPrimary} !bg-red-600 hover:!bg-red-700`}>

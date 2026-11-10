@@ -17,6 +17,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { Tabs } from '@/components/admin/channels/ui'
 import { ErrorState, badgeCls, fieldInputCls } from '@/components/admin/kit'
+import { LoadingLines, Sk } from '@/components/admin/kit/skeleton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'locations' | 'labels'
@@ -347,12 +348,8 @@ export default function ShelvingClient() {
               <div className="flex items-center gap-1.5 flex-wrap flex-1">
                 {loading ? (
                   <div className="flex gap-1.5">
-                    {[80, 96, 72].map(w => (
-                      <div
-                        key={w}
-                        className="h-7 rounded-full bg-surface-secondary animate-pulse"
-                        style={{ width: w }}
-                      />
+                    {['w-20', 'w-24', 'w-[72px]'].map(w => (
+                      <Sk key={w} className={`h-7 rounded-full ${w}`} />
                     ))}
                   </div>
                 ) : warehouses.length === 0 ? (
@@ -427,12 +424,8 @@ export default function ShelvingClient() {
                         <span className="text-xs text-foreground-muted italic">Select a warehouse first</span>
                       ) : locationsLoading ? (
                         <div className="flex gap-1.5">
-                          {[60, 60, 60].map((w, i) => (
-                            <div
-                              key={i}
-                              className="h-7 rounded-full bg-surface-secondary animate-pulse"
-                              style={{ width: w }}
-                            />
+                          {[0, 1, 2].map(i => (
+                            <Sk key={i} className="h-7 w-[60px] rounded-full" />
                           ))}
                         </div>
                       ) : (
@@ -754,8 +747,13 @@ export default function ShelvingClient() {
                   )}
 
                   {stockLoading && (
-                    <div className="flex items-center justify-center py-16">
-                      <div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="bg-surface-elevated rounded-xl border border-border-default">
+                      <div className="px-4 py-3 border-b border-border-default">
+                        <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Stock</span>
+                      </div>
+                      <div className="p-4">
+                        <LoadingLines lines={4} />
+                      </div>
                     </div>
                   )}
 

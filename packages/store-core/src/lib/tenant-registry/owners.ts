@@ -42,7 +42,7 @@ export async function getOwnerById(id: string): Promise<Owner | null> {
 export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.store_request, t.created_at,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
             pp.slug AS pending_plan, t.pending_billing_interval,
@@ -156,10 +156,11 @@ export async function getOwnerBankWithRoute(ownerId: string): Promise<{
   verificationRef: string | null
   linkedAccountId: string | null
   tenantSlug: string | null
+  upiId: string | null
 } | null> {
   const pool = controlPlanePool()
   const r = await pool.query(
-    `SELECT b.account_number, b.ifsc, b.holder_name, b.verified_name,
+    `SELECT b.account_number, b.ifsc, b.holder_name, b.verified_name, b.upi_id,
             b.verification_status, b.verification_ref,
             COALESCE(b.linked_account_id, t.razorpay_linked_account_id) AS linked_account_id,
             t.slug AS tenant_slug
@@ -181,7 +182,40 @@ export async function getOwnerBankWithRoute(ownerId: string): Promise<{
     verificationRef: row.verification_ref ?? null,
     linkedAccountId: row.linked_account_id ?? null,
     tenantSlug: row.tenant_slug ?? null,
+    upiId: row.upi_id ?? null,
   }
+}
+
+/** Change only the UPI ID on the owner's bank row (payouts page); null clears it. False when there is no row yet. */
+export async function setOwnerUpiId(ownerId: string, upiId: string | null): Promise<boolean> {
+  const r = await controlPlanePool().query(
+    `UPDATE tenant_bank_accounts SET upi_id=$2, updated_at=now() WHERE owner_id=$1`,
+    [ownerId, upiId]
+  )
+  return (r.rowCount ?? 0) > 0
+}
+
+/** Set the UPI ID on the bank row getTenantUpiId reads; null clears it. False when the store has no bank row yet. */
+export async function setTenantUpiId(tenantId: string, upiId: string | null): Promise<boolean> {
+  const r = await controlPlanePool().query(
+    `UPDATE tenant_bank_accounts SET upi_id = $2, updated_at = now()
+      WHERE id = (SELECT b.id FROM tenant_bank_accounts b
+                   WHERE b.tenant_id = $1 OR b.owner_id IN (SELECT owner_id FROM owner_tenants WHERE tenant_id = $1)
+                   ORDER BY (b.tenant_id = $1) DESC NULLS LAST, b.created_at DESC LIMIT 1)`,
+    [tenantId, upiId]
+  )
+  return (r.rowCount ?? 0) > 0
+}
+
+/** The UPI ID customers of a store pay (UPG): its own bank row, else its owner's. */
+export async function getTenantUpiId(tenantId: string): Promise<string | null> {
+  const r = await controlPlanePool().query(
+    `SELECT b.upi_id FROM tenant_bank_accounts b
+      WHERE b.tenant_id = $1 OR b.owner_id IN (SELECT owner_id FROM owner_tenants WHERE tenant_id = $1)
+      ORDER BY (b.tenant_id = $1) DESC NULLS LAST, b.created_at DESC LIMIT 1`,
+    [tenantId]
+  )
+  return r.rows[0]?.upi_id ?? null
 }
 
 export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount | null> {

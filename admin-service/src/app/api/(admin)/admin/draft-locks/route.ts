@@ -55,6 +55,8 @@ export async function GET(req: NextRequest) {
         canEdit: writer && (isMine || !held),
         canClaim: writer && !held,
         canTakeOver: writer && owner && held && !isMine,
+        // Same rule as getDraftLockState: holder, unclaimed / holder can no longer edit, or an owner role.
+        canDiscard: writer && (isMine || !held || owner),
       }
     }),
   })

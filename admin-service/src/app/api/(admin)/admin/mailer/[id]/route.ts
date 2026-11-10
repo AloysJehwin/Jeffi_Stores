@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, queryMany, queryCount, query } from '@/lib/shared/db'
-import { actorOf, closeIfLocked, discardGuard, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
+import { actorOf, draftLockResponse, epochFrom, withDraftWrite } from '@/lib/admin/draft-locks'
+import { deleteMailerMessage, discardReply } from '@/lib/admin/discard-rows'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -103,17 +104,5 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [id])
-  if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (campaign.status === 'sending') {
-    return NextResponse.json({ error: 'Cannot delete a campaign while it is sending' }, { status: 400 })
-  }
-
-  // Deleting a draft is a discard: its holder, or an owner role (audited).
-  const actor = campaign.status === 'draft' ? actorOf(admin) : null
-  const denied = await discardGuard(actor, 'mailer', id)
-  if (denied) return denied
-  await query('DELETE FROM email_campaigns WHERE id = $1', [id])
-  if (actor) await closeIfLocked(actor, 'mailer', id, 'discarded')
-  return NextResponse.json({ success: true })
+  return discardReply(await deleteMailerMessage(actorOf(admin), id))
 }

@@ -77,6 +77,8 @@ export interface CommitCycleInput {
   currentStart?: Date | null
   currentEnd?: Date | null
   tenant?: TenantRef | null
+  /** Set when the cycle was not paid through Razorpay (PhonePe Autopay): how the payment row is recorded. */
+  gateway?: { method: string; name: string; response: Record<string, unknown>; settlement?: string } | null
 }
 
 export interface CommitCycleResult {
@@ -259,18 +261,20 @@ export async function commitCycle(input: CommitCycleInput): Promise<CommitCycleR
 
     await client.query(
       `INSERT INTO payments (order_id, payment_method, payment_gateway, transaction_id, amount, status, gateway_response)
-       VALUES ($1, 'razorpay', 'razorpay', $2, $3, 'completed', $4)
+       VALUES ($1, $5, $6, $2, $3, 'completed', $4)
        ON CONFLICT (transaction_id) DO NOTHING`,
       [
         order.id,
         input.paymentId,
         (input.amountPaise / 100).toFixed(2),
-        JSON.stringify({
+        JSON.stringify(input.gateway?.response ?? {
           razorpay_order_id: input.gatewayOrderId ?? null,
           razorpay_payment_id: input.paymentId,
           razorpay_subscription_id: sub.razorpay_subscription_id,
           razorpay_invoice_id: input.invoiceId ?? null,
         }),
+        input.gateway?.method ?? 'razorpay',
+        input.gateway?.name ?? 'razorpay',
       ]
     )
 
@@ -325,6 +329,7 @@ export async function commitCycle(input: CommitCycleInput): Promise<CommitCycleR
           totalInr: input.amountPaise / 100,
           orderId: order.id,
           orderRef: order.order_number,
+          gateway: input.gateway?.settlement,
         }),
       activitySummary: `Subscription cycle ${out.cycle} — order #${order.order_number}`,
       activityMetadata: { subscriptionId: sub.id, cycle: out.cycle },
@@ -343,6 +348,7 @@ export async function fireCycleTransfer(opts: {
   totalInr: number
   orderId: string
   orderRef: string
+  gateway?: string
 }): Promise<void> {
   const t = opts.tenant
   if (!t?.tenantId || t.tenantId === NIL_TENANT_ID) return
@@ -360,6 +366,7 @@ export async function fireCycleTransfer(opts: {
     grossInr: opts.totalInr,
     collectedOn: own ? 'own' : 'platform',
     linkedAccountId: opts.sub.linked_account_id,
+    ...(opts.gateway ? { gateway: opts.gateway } : {}),
   })
 }
 

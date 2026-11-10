@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, btnPrimary, count, inputCls, money, pct, when } from '@/components/admin/channels/ui'
 import Select from '@/components/ui/Select'
+import { AmazonOrdersLoading } from './skeletons'
 
 const PRICE = '/api/admin/amazon/console/price'
 const useCanPrice = () => useCanWrite('amazon_pricing')
@@ -330,7 +331,7 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
     await load()
     onChanged()
   }
-  if (!d || !form) return notice ? <ErrorState body={notice} /> : <p className="text-sm text-foreground-muted">Loading...</p>
+  if (!d || !form) return notice ? <ErrorState body={notice} /> : <AmazonOrdersLoading />
   const s = d.orders.summary ?? {}
   return (
     <div className="space-y-5">

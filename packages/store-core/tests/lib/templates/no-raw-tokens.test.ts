@@ -218,7 +218,7 @@ describe('admin mailer (sendCampaign)', () => {
         : ([{ user_id: 'u1', email: 'asha@x.in', first_name: 'Asha', last_name: 'R' }] as any)
     )
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
-    const r = await sendCampaign('e1', { batchDelay: 0 })
+    const r = await sendCampaign('e1')
     expect(r.sent).toBe(1)
     const m = lastMail()
     expectClean(m.subject, m.html)

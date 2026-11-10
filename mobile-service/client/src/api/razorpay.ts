@@ -9,6 +9,11 @@ export interface RazorpayOrder {
   orderId?: string
 }
 
+/** Checkout options hiding UPI inside Razorpay whenever the app offers its own UPI section, so it isn't shown twice. */
+export function razorpayDisplayConfig(hideUpi: boolean): { config?: { display: { hide: { method: string }[] } } } {
+  return hideUpi ? { config: { display: { hide: [{ method: 'upi' }] } } } : {}
+}
+
 /** Pass the checkout draftToken (new order) or an existing unpaid orderId (retry). */
 export async function createRazorpayOrder(payload: { draftToken?: string; orderId?: string }): Promise<RazorpayOrder> {
   return api('/api/razorpay/create-order', {
