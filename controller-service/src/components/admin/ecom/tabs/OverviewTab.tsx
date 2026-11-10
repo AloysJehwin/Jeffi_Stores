@@ -5,6 +5,7 @@ import { Field, FieldGrid, Section, Mono, NOT_PROVISIONED } from '../EcomUI'
 import { JOB_STATUS, TenantStatus, dateIN, dateTimeIN, inr } from '../cells'
 import RunningNow from '../detail/RunningNow'
 import CostSummary from '../detail/CostSummary'
+import { ADDON_INFO, isAddonId } from '@/lib/billing/addons'
 
 function surfaces(slug: string, plan: string | null): string[] {
   const hosts = [`${slug}.jeffistores.in`, `admin-${slug}.jeffistores.in`, `invoice-${slug}.jeffistores.in`]
@@ -56,6 +57,9 @@ export default function OverviewTab({ d, owners }: { d: TenantDetailData; owners
             <Field label="Payout" value={t.daily_payout ? 'Daily (+5%)' : 'Weekly'} />
             <Field label="Subscription" value={<span className="capitalize">{t.subscription_status}</span>} />
             <Field label="Created" value={dateIN(t.created_at)} />
+            {!!t.requested_addons?.length && (
+              <Field wide label="Add-ons chosen at signup" value={`${t.requested_addons.map(id => (isAddonId(id) ? ADDON_INFO[id].name : id)).join(', ')} (from the wallet once live)`} />
+            )}
           </FieldGrid>
         </Section>
 

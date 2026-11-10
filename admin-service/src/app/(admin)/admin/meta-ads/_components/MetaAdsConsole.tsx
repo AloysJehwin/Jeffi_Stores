@@ -62,6 +62,7 @@ const SERIES: SeriesDef[] = [
 const ERRORS: Record<string, string> = {
   not_configured: 'Facebook sign-in is not set up. Add your own Meta app in the gear, or the platform sets META_APP_ID / META_APP_SECRET.',
   bad_state: 'The sign-in link expired. Try again.',
+  invalid_app_id: 'The platform Meta app ID (META_APP_ID) is not a valid app ID, so Facebook rejects it. Set it to the numeric App ID from developers.facebook.com, or add your own Meta app in the gear.',
 }
 
 export default function MetaAdsConsole() {

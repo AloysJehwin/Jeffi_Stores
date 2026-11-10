@@ -14,6 +14,8 @@ import { Badge, primaryBtn, secondaryBtn } from './ui'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { addonPrices, getRequestedAddons } from '@/lib/billing/requested-addons'
+import { ADDON_INFO, type AddonId } from '@/lib/billing/addons'
 
 export const dynamic = 'force-dynamic'
 
@@ -167,11 +169,13 @@ export default async function OnboardPage({
     }
 
     // pending_approval — under review
-    const [allPlans, priceRow] = await Promise.all([
+    const [allPlans, priceRow, requested, prices] = await Promise.all([
       listPlans('any'),
       controlPlanePool()
         .query<{ price: string | null }>(`SELECT price_inr_month AS price FROM tenant_compute WHERE tenant_id = $1`, [t.id])
         .catch(() => ({ rows: [] as { price: string | null }[] })),
+      getRequestedAddons(t.id).catch(() => [] as AddonId[]),
+      addonPrices().catch(() => []),
     ])
     const planName = allPlans.find(p => p.slug === t.plan)?.name ?? t.plan
     const priceMonth = priceRow.rows[0]?.price == null ? null : Number(priceRow.rows[0].price)
@@ -193,6 +197,17 @@ export default async function OnboardPage({
               {planName && priceMonth != null && (
                 <Row label="Price" value={`${yearly ? `${inr(priceMonth * 10)}/yr` : `${inr(priceMonth)}/mo`} incl. GST`} />
               )}
+              {requested.length > 0 && (
+                <Row
+                  label="Add-ons"
+                  value={`${requested
+                    .map(id => {
+                      const p = prices.find(x => x.id === id)
+                      return p ? `${ADDON_INFO[id].name} (${inr(p.priceInr)}/mo)` : ADDON_INFO[id].name
+                    })
+                    .join(', ')} — from your wallet once the store is live`}
+                />
+              )}
             </div>
           </Card>
           <Card title="What happens next">
@@ -208,7 +223,7 @@ export default async function OnboardPage({
     )
   }
 
-  const [plans, draft, query] = await Promise.all([listPlans(), getDraft(owner.id), searchParams])
+  const [plans, draft, query, addons] = await Promise.all([listPlans(), getDraft(owner.id), searchParams, addonPrices().catch(() => [])])
 
   // A submitted draft belongs to a store that already exists. Replaying it whole put the
   // PREVIOUS store's name, slug and plan into the form for a second store, with nothing to
@@ -257,6 +272,7 @@ export default async function OnboardPage({
     <OnboardEntry
       owner={who}
       plans={plans}
+      addons={addons}
       computeEnabled={computeSpecEnabled()}
       paymentsEnabled={paymentsEnabled()}
       initialDraft={initialDraft}
@@ -281,10 +297,11 @@ async function UpgradeWizard({
   const draft = await getDraft(ownerId)
   const reopened = draft?.status === 'submitted'
   if (reopened) await reopenDraft(ownerId)
-  const [allPlans, kyc, bank] = await Promise.all([
+  const [allPlans, kyc, bank, addons] = await Promise.all([
     listPlans(),
     getKyc(tenant.id),
     getOwnerBankAccount(ownerId).catch(() => null),
+    addonPrices().catch(() => []),
   ])
   const plans = allPlans.filter(p => p.slug !== 'services')
   const saved = draft?.data ?? {}
@@ -312,6 +329,7 @@ async function UpgradeWizard({
     <OnboardWizard
       owner={owner}
       plans={plans}
+      addons={addons}
       computeEnabled={computeSpecEnabled()}
       paymentsEnabled={paymentsEnabled()}
       initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data }}

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ComputeSpecSchema } from '@controller/lib/compute/schema'
+import { ADDON_IDS } from '@/lib/billing/addons'
 
 /**
  * Onboarding payload validation.
@@ -15,6 +16,8 @@ export const OnboardSchema = z
     // Server size, when owners choose it (COMPUTE_SPEC_ENABLED); otherwise the plan's default applies later.
     compute: ComputeSpecSchema.optional(),
     extraServices: z.array(z.enum(['messaging', 'documents'])).default([]),
+    // Add-ons to switch on from the wallet once the store is live (lib/billing/requested-addons.ts).
+    addons: z.array(z.enum(ADDON_IDS)).max(ADDON_IDS.length).default([]),
     // Step 1 — Store
     displayName: z.string().min(1).max(200),
     slug: z.string().min(3).max(63),

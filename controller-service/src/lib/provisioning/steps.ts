@@ -670,6 +670,9 @@ const HANDLERS: Record<Step, Handler> = {
         // Once per store; never throws.
         const { notifyStoreLive } = await import('./start-store')
         await notifyStoreLive(job.tenant_id)
+        // Add-ons picked at signup: bought from the wallet if it covers them, else left pending. Never throws.
+        const { activateRequestedAddons } = await import('@/lib/billing/requested-addons')
+        await activateRequestedAddons(job.tenant_id).catch(() => {})
         // The runner records the event and moves on (connect_crons on k8s) or marks the job done.
         return ok('tenant activated')
   },

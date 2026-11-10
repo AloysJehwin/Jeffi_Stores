@@ -31,7 +31,17 @@ auto-renew is switched on. A short wallet shows a "Top up wallet" link instead.
   05:10 IST) charges the next month a day before the end; a short wallet lets the month lapse and is
   retried daily for a week.
 
-API: `GET/POST /api/ecom/billing/messaging-addon` — `{ action: 'buy' }` or `{ action: 'renew_on' | 'renew_off' }`.
+API: `GET/POST /api/ecom/billing/messaging-addon` — `{ action: 'buy' }`, `{ action: 'renew_on' | 'renew_off' }` or
+`{ action: 'decline_request' }`.
+
+### Picked during signup
+
+The onboarding Plan step offers this add-on and Ad-free (`lib/billing/addons.ts`). The choice is saved on
+`tenants.requested_addons` at submit and nothing is charged. When the store goes live (provisioning `activate`
+step) and on every later wallet top-up, `activateRequestedAddons` (`lib/billing/requested-addons.ts`) buys each
+requested add-on with auto-renew on; a short wallet leaves it pending and never blocks go-live. A pending
+request shows on the Billing card ("You chose this during signup") with "Not now" to drop it; it is removed
+once bought or declined.
 
 ## What the flagship admin enters
 

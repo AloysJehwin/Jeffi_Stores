@@ -54,16 +54,33 @@ export interface MetaConfig extends OwnMetaApp {
 /** A store's own Meta app, in tenant_integration_credentials like the other own-app providers. */
 export const META_APP_PROVIDER = 'meta_app'
 
-/** The platform Meta app from env, or null. */
+/** A Meta app or login-configuration id: digits only. Trims whitespace and stray quotes from a pasted secret. */
+export function cleanMetaId(v?: string | null): string | null {
+  const s = String(v ?? '').trim().replace(/^["']+|["']+$/g, '').trim()
+  return /^\d{5,25}$/.test(s) ? s : null
+}
+
+/** META_APP_ID is set but isn't an app id (Facebook answers PLATFORM__INVALID_APP_ID for it). */
+export function platformMetaAppIdInvalid(): boolean {
+  return !!process.env.META_APP_ID?.trim() && !cleanMetaId(process.env.META_APP_ID)
+}
+
+let warnedInvalidAppId = false
+
+/** The platform Meta app from env, or null (also when META_APP_ID isn't a valid app id). */
 export function platformMetaConfig(): MetaConfig | null {
-  const appId = process.env.META_APP_ID
-  const appSecret = process.env.META_APP_SECRET
+  const appId = cleanMetaId(process.env.META_APP_ID)
+  const appSecret = process.env.META_APP_SECRET?.trim().replace(/^["']+|["']+$/g, '')
+  if (!appId && platformMetaAppIdInvalid() && !warnedInvalidAppId) {
+    warnedInvalidAppId = true
+    console.warn('[meta] META_APP_ID is not a numeric Meta app id; Facebook sign-in with the platform app is off')
+  }
   if (!appId || !appSecret) return null
   return {
     appId,
     appSecret,
-    loginConfigId: process.env.META_LOGIN_CONFIG_ID || null,
-    adsLoginConfigId: process.env.META_ADS_LOGIN_CONFIG_ID || null,
+    loginConfigId: cleanMetaId(process.env.META_LOGIN_CONFIG_ID),
+    adsLoginConfigId: cleanMetaId(process.env.META_ADS_LOGIN_CONFIG_ID),
     source: 'platform',
   }
 }
@@ -73,7 +90,9 @@ export async function readOwnMetaApp(tenantId: string): Promise<OwnMetaApp | nul
   if (!row || row.status !== 'connected') return null
   try {
     const j = JSON.parse(decryptToken(row.config_enc))
-    return j?.appId && j?.appSecret ? (j as OwnMetaApp) : null
+    const appId = cleanMetaId(j?.appId)
+    if (!appId || !j?.appSecret) return null
+    return { ...j, appId, loginConfigId: cleanMetaId(j.loginConfigId), adsLoginConfigId: cleanMetaId(j.adsLoginConfigId) } as OwnMetaApp
   } catch {
     return null
   }

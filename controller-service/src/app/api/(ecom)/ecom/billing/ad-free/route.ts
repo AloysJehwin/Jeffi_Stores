@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ownerApi } from '@controller/lib/ecom/owner-api'
-import { AD_FREE_PRICE_INR, buyAdFreeMonth, getAdFree, setAdFreeRenew } from '@/lib/billing/ad-free'
-import { getWalletBalance } from '@/lib/payments/wallet'
+import { buyAdFreeMonth, setAdFreeRenew } from '@/lib/billing/ad-free'
+import { adFreeState } from '@controller/lib/ecom/ad-free-state'
+import { clearRequestedAddon } from '@/lib/billing/requested-addons'
 
 export const dynamic = 'force-dynamic'
 
-const Schema = z.object({ action: z.enum(['buy', 'renew_on', 'renew_off']) })
-
-async function state(tenantId: string) {
-  const [status, balance] = await Promise.all([getAdFree(tenantId), getWalletBalance(tenantId)])
-  return { ...status, priceInr: AD_FREE_PRICE_INR, balanceInr: balance.balance }
-}
+const Schema = z.object({ action: z.enum(['buy', 'renew_on', 'renew_off', 'decline_request']) })
 
 export async function GET(request: NextRequest) {
   const ctx = await ownerApi(request)
   if (ctx instanceof NextResponse) return ctx
-  return NextResponse.json(await state(ctx.tenant.id))
+  return NextResponse.json(await adFreeState(ctx.tenant.id))
 }
 
 export async function POST(request: NextRequest) {
@@ -30,8 +26,12 @@ export async function POST(request: NextRequest) {
   if (parsed.data.action === 'buy') {
     const r = await buyAdFreeMonth(tenant.id, { renew: true, reason: 'purchase' })
     if (!r.ok) return NextResponse.json({ error: r.error, topUpUrl: '/dashboard/wallet' }, { status: 402 })
+    await clearRequestedAddon(tenant.id, 'ad_free')
+  } else if (parsed.data.action === 'decline_request') {
+    // "Not now" on an add-on picked during signup.
+    await clearRequestedAddon(tenant.id, 'ad_free')
   } else {
     await setAdFreeRenew(tenant.id, parsed.data.action === 'renew_on')
   }
-  return NextResponse.json(await state(tenant.id))
+  return NextResponse.json(await adFreeState(tenant.id))
 }

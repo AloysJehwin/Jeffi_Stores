@@ -22,6 +22,8 @@ export interface TenantRow {
   upi_mode: UpiMode
   service_types: string[] // store | messaging | documents
   store_request?: StoreRequest | null
+  /** Add-ons picked at signup, not yet bought or declined (getTenant only). */
+  requested_addons?: string[]
   billing_interval: string
   /** A downgrade waiting for the paid cycle to end (owner queries only). */
   pending_plan?: string | null
@@ -283,7 +285,7 @@ export interface TenantDetail extends TenantRow {
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at, t.instance_state,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.requested_addons, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
