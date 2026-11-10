@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "7baf2a30529069de8ae0d9d24058ea3c949b7aafe0cdc436dee967eacf9b49e4",
+ "manifestHash": "cdc5e873fa20c423118121aae586f93de780dc71bbea4f96a4b85e586db28ca8",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -7888,6 +7888,7 @@
     "dir",
     "limit",
     "order",
+    "page",
     "segment",
     "sort"
    ],
@@ -7909,6 +7910,13 @@
      "name": "order",
      "schema": {
       "type": "string"
+     }
+    },
+    {
+     "name": "page",
+     "schema": {
+      "type": "integer",
+      "default": 1
      }
     },
     {
@@ -10073,6 +10081,41 @@
    "command": "draft-locks post"
   },
   {
+   "id": "admin DELETE /api/admin/draft-locks/{resourceType}/{resourceId}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/draft-locks/{resourceType}/{resourceId}",
+   "gatewayPath": "/v1/admin/draft-locks/{resourceType}/{resourceId}",
+   "file": "admin-service/src/app/api/(admin)/admin/draft-locks/[resourceType]/[resourceId]/route.ts",
+   "pathParams": [
+    {
+     "name": "resourceType",
+     "catchAll": false,
+     "optional": false
+    },
+    {
+     "name": "resourceId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "string",
+    "format": "uuid"
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Delete the draft through its type's own discard (holder, an unclaimed draft, or an owner role).",
+   "command": "draft-locks delete"
+  },
+  {
    "id": "admin POST /api/admin/draft-locks/presence",
    "host": "admin",
    "method": "POST",
@@ -12181,6 +12224,233 @@
    "body": null,
    "summary": "The wallet page's ledger: ?page= plus its filters and ?sort&dir. Under the topup prefix so it is reachable on delhivery:read like the page itself.",
    "command": "financial-wallet-topup ledger"
+  },
+  {
+   "id": "admin GET /api/admin/financial/wallet/topup/upi/{intentId}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/wallet/topup/upi/{intentId}",
+   "gatewayPath": "/v1/admin/financial/wallet/topup/upi/{intentId}",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/wallet/topup/upi/[intentId]/route.ts",
+   "pathParams": [
+    {
+     "name": "intentId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "delhivery:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get an upi (financial / wallet / topup)",
+   "command": "financial-wallet-topup-upi get"
+  },
+  {
+   "id": "admin POST /api/admin/financial/wallet/topup/upi/{intentId}/cancel",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/financial/wallet/topup/upi/{intentId}/cancel",
+   "gatewayPath": "/v1/admin/financial/wallet/topup/upi/{intentId}/cancel",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/wallet/topup/upi/[intentId]/cancel/route.ts",
+   "pathParams": [
+    {
+     "name": "intentId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "delhivery:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "delhivery:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Cancel an upi",
+   "command": "financial-wallet-topup-upi cancel"
+  },
+  {
+   "id": "admin POST /api/admin/financial/wallet/topup/upi/{intentId}/check",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/financial/wallet/topup/upi/{intentId}/check",
+   "gatewayPath": "/v1/admin/financial/wallet/topup/upi/{intentId}/check",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/wallet/topup/upi/[intentId]/check/route.ts",
+   "pathParams": [
+    {
+     "name": "intentId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "delhivery:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "delhivery:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Check an upi",
+   "command": "financial-wallet-topup-upi check"
+  },
+  {
+   "id": "admin POST /api/admin/financial/wallet/topup/upi/{intentId}/confirm",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/financial/wallet/topup/upi/{intentId}/confirm",
+   "gatewayPath": "/v1/admin/financial/wallet/topup/upi/{intentId}/confirm",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/wallet/topup/upi/[intentId]/confirm/route.ts",
+   "pathParams": [
+    {
+     "name": "intentId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "delhivery:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "delhivery:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "utr": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "required": [
+     "utr"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Confirm an upi",
+   "command": "financial-wallet-topup-upi confirm"
+  },
+  {
+   "id": "admin POST /api/admin/financial/wallet/topup/upi/start",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/financial/wallet/topup/upi/start",
+   "gatewayPath": "/v1/admin/financial/wallet/topup/upi/start",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/wallet/topup/upi/start/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "delhivery:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "delhivery:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "purpose": {
+      "type": "string",
+      "enum": [
+       "order_draft",
+       "order",
+       "order_adjustment",
+       "variant_change",
+       "wallet_topup",
+       "ecom_wallet_topup"
+      ]
+     },
+     "draftToken": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "orderId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "adjustmentId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "requestId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "amountInr": {
+      "anyOf": [
+       {
+        "type": "number",
+        "exclusiveMinimum": 0
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "returnTo": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "purpose"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Wallet top-up by UPI: paid to the platform (its PhonePe, else its UPI ID), like the Razorpay top-up.",
+   "command": "financial-wallet-topup-upi start"
   },
   {
    "id": "admin POST /api/admin/financial/wallet/topup/verify",
@@ -18064,6 +18334,151 @@
    "command": "integrations meta-app-delete"
   },
   {
+   "id": "admin GET /api/admin/integrations/phonepe",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/integrations/phonepe",
+   "gatewayPath": "/v1/admin/integrations/phonepe",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/phonepe/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get phonepe (integrations)",
+   "command": "integrations phonepe"
+  },
+  {
+   "id": "admin POST /api/admin/integrations/phonepe",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/integrations/phonepe",
+   "gatewayPath": "/v1/admin/integrations/phonepe",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/phonepe/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "test"
+      ]
+     }
+    }
+   ],
+   "scope": "financial:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "`?action=test`: the saved creds (the platform's: saved, else env) against PhonePe.",
+   "command": "integrations phonepe-create"
+  },
+  {
+   "id": "admin PUT /api/admin/integrations/phonepe",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/integrations/phonepe",
+   "gatewayPath": "/v1/admin/integrations/phonepe",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/phonepe/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "financial:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:write"
+   ],
+   "guard": "auth",
+   "platform": "owner",
+   "body": {
+    "type": "object",
+    "properties": {
+     "env": {
+      "type": "string",
+      "enum": [
+       "sandbox",
+       "production"
+      ]
+     },
+     "client_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "client_secret": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "client_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+     },
+     "merchant_id": {
+      "type": "string",
+      "maxLength": 120
+     },
+     "webhook_username": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "webhook_password": {
+      "type": "string",
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "env",
+     "client_id",
+     "client_secret",
+     "client_version"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Save the credentials after PhonePe accepts them. Blank webhook fields keep the saved ones.",
+   "command": "integrations phonepe-update"
+  },
+  {
+   "id": "admin DELETE /api/admin/integrations/phonepe",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/integrations/phonepe",
+   "gatewayPath": "/v1/admin/integrations/phonepe",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/phonepe/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "financial:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:write"
+   ],
+   "guard": "auth",
+   "platform": "owner",
+   "body": null,
+   "noBody": true,
+   "summary": "Remove the saved creds: the merchant goes back to its UPI ID (the platform to its env creds, if set).",
+   "command": "integrations phonepe-delete"
+  },
+  {
    "id": "admin GET /api/admin/integrations/razorpay",
    "host": "admin",
    "method": "GET",
@@ -18220,6 +18635,58 @@
    "bodyContentType": "application/json",
    "summary": "One cheap read with the tenant's stored credentials. Always 200 with { ok, message } once the request is valid, so the popup can show the provider's reason.",
    "command": "integrations test"
+  },
+  {
+   "id": "admin GET /api/admin/integrations/upi",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/integrations/upi",
+   "gatewayPath": "/v1/admin/integrations/upi",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/upi/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "financial:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "owner",
+   "body": null,
+   "summary": "What Site Controls → UPI collection shows: provider, UPI ID, bank alerts, PhonePe.",
+   "command": "integrations upi"
+  },
+  {
+   "id": "admin PUT /api/admin/integrations/upi/vpa",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/integrations/upi/vpa",
+   "gatewayPath": "/v1/admin/integrations/upi/vpa",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/upi/vpa/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "financial:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "owner",
+   "body": {
+    "type": "object",
+    "properties": {
+     "vpa": {
+      "type": "string",
+      "maxLength": 120,
+      "pattern": "^[\\w.\\-]{2,}@[a-zA-Z][a-zA-Z0-9]{1,}$"
+     }
+    },
+    "required": [
+     "vpa"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The merchant's UPI ID (owner only); it decides where UPG payments go.",
+   "command": "integrations-upi vpa"
   },
   {
    "id": "admin DELETE /api/admin/inventory/batches/{id}",
@@ -22456,16 +22923,8 @@
       "type": "string",
       "description": "type assumed from the field name"
      },
-     "template_key": {
-      "type": "string",
-      "description": "type assumed from the field name"
-     },
      "subject": {
       "type": "string",
-      "description": "type assumed from the field name"
-     },
-     "template_data": {
-      "type": "object",
       "description": "type assumed from the field name"
      },
      "audience_type": {
@@ -22480,13 +22939,36 @@
       "type": "object",
       "additionalProperties": true,
       "description": "free-form JSON, stored as sent"
+     },
+     "template_key": {
+      "type": "string",
+      "examples": [
+       "library"
+      ]
+     },
+     "template_data": {
+      "type": "object",
+      "properties": {
+       "body": {
+        "type": "string"
+       },
+       "preheader": {
+        "type": "string"
+       }
+      }
+     },
+     "layout": {
+      "type": "string",
+      "examples": [
+       "raw"
+      ]
      }
     },
     "required": [
      "title",
-     "template_key",
      "subject",
-     "audience_type"
+     "audience_type",
+     "template_key"
     ]
    },
    "bodySource": "inferred",
@@ -22668,6 +23150,40 @@
    "bodyContentType": "application/json",
    "summary": "Send a mailer",
    "command": "mailer send"
+  },
+  {
+   "id": "admin POST /api/admin/mailer/attachments",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/mailer/attachments",
+   "gatewayPath": "/v1/admin/mailer/attachments",
+   "file": "admin-service/src/app/api/(admin)/admin/mailer/attachments/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "mailer:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary"
+     }
+    },
+    "required": [
+     "file"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "Create an attachment (mailer)",
+   "command": "mailer attachments"
   },
   {
    "id": "admin POST /api/admin/mailer/audience-preview",
@@ -22856,7 +23372,15 @@
       "type": "string"
      },
      "template_data": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+       "body": {
+        "type": "string"
+       },
+       "preheader": {
+        "type": "string"
+       }
+      }
      },
      "subject": {
       "type": "string"
@@ -22867,18 +23391,22 @@
        "email": {
         "type": "object",
         "properties": {
-         "slug": {
-          "type": "string"
-         },
          "vars": {
-          "type": "object"
-         },
-         "subject": {
-          "type": "string"
+          "description": "any JSON value (type not inferred)"
          }
         }
        }
       }
+     },
+     "layout": {
+      "type": "string",
+      "examples": [
+       "raw"
+      ]
+     },
+     "coupon_id": {
+      "type": "string",
+      "description": "type assumed from the field name"
      }
     },
     "required": [
@@ -22889,6 +23417,152 @@
    "bodyContentType": "application/json",
    "summary": "Preview (mailer)",
    "command": "mailer preview"
+  },
+  {
+   "id": "admin GET /api/admin/mailer/products",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/mailer/products",
+   "gatewayPath": "/v1/admin/mailer/products",
+   "file": "admin-service/src/app/api/(admin)/admin/mailer/products/route.ts",
+   "pathParams": [],
+   "query": [
+    "q"
+   ],
+   "queryParams": [
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "mailer:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Products for an email's product block: name, link, image and price as the email shows them.",
+   "command": "mailer products"
+  },
+  {
+   "id": "admin POST /api/admin/mailer/test",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/mailer/test",
+   "gatewayPath": "/v1/admin/mailer/test",
+   "file": "admin-service/src/app/api/(admin)/admin/mailer/test/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "mailer:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "channels": {
+      "type": "object",
+      "properties": {
+       "email": {
+        "type": "object",
+        "properties": {
+         "slug": {
+          "type": "string",
+          "description": "Library template (mode 'template')."
+         },
+         "mode": {
+          "type": "string",
+          "enum": [
+           "template",
+           "custom"
+          ]
+         },
+         "vars": {
+          "type": "object",
+          "additionalProperties": {
+           "type": "string"
+          }
+         },
+         "subject": {
+          "type": "string"
+         },
+         "preheader": {
+          "type": "string"
+         },
+         "layout": {
+          "type": "string",
+          "description": "Layout key (classic, bold, … or 'none'); empty follows the template's own setting."
+         },
+         "format": {
+          "type": "string",
+          "enum": [
+           "richtext",
+           "blocks"
+          ],
+          "description": "Written here (mode 'custom')."
+         },
+         "body": {
+          "type": "string"
+         },
+         "blocks": {
+          "type": "array",
+          "items": {}
+         },
+         "attachments": {
+          "type": "array",
+          "items": {
+           "type": "object",
+           "properties": {
+            "url": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            },
+            "size": {
+             "type": "number"
+            },
+            "mime": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "url",
+            "name",
+            "size",
+            "mime"
+           ]
+          }
+         },
+         "reply_to": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "slug"
+        ]
+       }
+      }
+     },
+     "coupon_id": {
+      "type": "string"
+     },
+     "subject": {
+      "type": "string",
+      "default": "Message"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "POST — the composer's email exactly as a customer gets it (layout, coupon, attachments), sent to the admin.",
+   "command": "mailer test"
   },
   {
    "id": "admin GET /api/admin/marketing/messaging/overview",
@@ -27443,7 +28117,8 @@
       "type": "string",
       "enum": [
        "template",
-       "message"
+       "message",
+       "raw"
       ]
      },
      "scenario": {
@@ -27513,8 +28188,10 @@
      },
      "layout": {
       "type": "string",
-      "examples": [
-       "template"
+      "enum": [
+       "template",
+       "message",
+       "raw"
       ]
      }
     }
@@ -28610,6 +29287,107 @@
    "body": null,
    "summary": "Get overview (packing slips)",
    "command": "packing-slips overview"
+  },
+  {
+   "id": "admin GET /api/admin/payments/upi",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/payments/upi",
+   "gatewayPath": "/v1/admin/payments/upi",
+   "file": "admin-service/src/app/api/(admin)/admin/payments/upi/route.ts",
+   "pathParams": [],
+   "query": [
+    "limit",
+    "offset",
+    "status"
+   ],
+   "queryParams": [
+    {
+     "name": "limit",
+     "schema": {
+      "type": "integer",
+      "default": 50
+     }
+    },
+    {
+     "name": "offset",
+     "schema": {
+      "type": "integer",
+      "default": 0
+     }
+    },
+    {
+     "name": "status",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "queued",
+       "active",
+       "processing",
+       "awaiting_confirmation",
+       "completed",
+       "failed",
+       "expired",
+       "cancelled",
+       "rejected"
+      ]
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "UPI intents for the confirmations page: ?status=awaiting_confirmation&limit=&offset=",
+   "command": "payments-upi list"
+  },
+  {
+   "id": "admin POST /api/admin/payments/upi/{intentId}/decide",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/payments/upi/{intentId}/decide",
+   "gatewayPath": "/v1/admin/payments/upi/{intentId}/decide",
+   "file": "admin-service/src/app/api/(admin)/admin/payments/upi/[intentId]/decide/route.ts",
+   "pathParams": [
+    {
+     "name": "intentId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "financial:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "approve",
+       "reject"
+      ]
+     }
+    },
+    "required": [
+     "action"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Approve or reject a manual UPI payment against the UTR the customer entered.",
+   "command": "payments-upi decide"
   },
   {
    "id": "admin GET /api/admin/product-offers",
@@ -41058,6 +41836,225 @@
    "command": "platform dns resync"
   },
   {
+   "id": "platform GET /api/admin/ecom/{tenantId}/messaging-senders/{channel}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/{tenantId}/messaging-senders/{channel}",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/messaging-senders/{channel}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/messaging-senders/[channel]/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    },
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get a messaging sender",
+   "command": "platform messaging-senders get"
+  },
+  {
+   "id": "platform PUT /api/admin/ecom/{tenantId}/messaging-senders/{channel}",
+   "host": "platform",
+   "method": "PUT",
+   "path": "/api/admin/ecom/{tenantId}/messaging-senders/{channel}",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/messaging-senders/{channel}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/messaging-senders/[channel]/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    },
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "twilio",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "account_sid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "auth_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "api_key_sid": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "api_key_secret": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "messaging_service_sid": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "account_sid",
+         "auth_token"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "region": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "access_key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "secret_access_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "whatsapp_phone_number_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "waba_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "sms_origination": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "region",
+         "access_key_id",
+         "secret_access_key"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     }
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update a messaging sender",
+   "command": "platform messaging-senders update"
+  },
+  {
+   "id": "platform DELETE /api/admin/ecom/{tenantId}/messaging-senders/{channel}",
+   "host": "platform",
+   "method": "DELETE",
+   "path": "/api/admin/ecom/{tenantId}/messaging-senders/{channel}",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/messaging-senders/{channel}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/messaging-senders/[channel]/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    },
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "string",
+    "enum": [
+     "sms",
+     "whatsapp"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Delete a messaging sender",
+   "command": "platform messaging-senders delete"
+  },
+  {
    "id": "platform POST /api/admin/ecom/{tenantId}/reconcile-settlements",
    "host": "platform",
    "method": "POST",
@@ -41132,6 +42129,51 @@
    "bodyContentType": "application/json",
    "summary": "Submit correct for a shipment",
    "command": "platform shipments correct"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/{tenantId}/upi-mode",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/{tenantId}/upi-mode",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/upi-mode",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/upi-mode/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "mode": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "off"
+      ]
+     },
+     "upi_mode": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "off"
+      ]
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update upi mode",
+   "command": "platform upi-mode update"
   },
   {
    "id": "platform GET /api/admin/ecom/{tenantId}/wallet",
@@ -42435,6 +43477,87 @@
    "bodyContentType": "application/json",
    "summary": "Reject a KYC",
    "command": "platform kyc reject"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/messaging-addon-pricing",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/messaging-addon-pricing",
+   "gatewayPath": "/v1/platform/ecom/messaging-addon-pricing",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/messaging-addon-pricing/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_billing:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:read"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get messaging addon pricing",
+   "command": "platform messaging-addon-pricing get"
+  },
+  {
+   "id": "platform PUT /api/admin/ecom/messaging-addon-pricing",
+   "host": "platform",
+   "method": "PUT",
+   "path": "/api/admin/ecom/messaging-addon-pricing",
+   "gatewayPath": "/v1/platform/ecom/messaging-addon-pricing",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/messaging-addon-pricing/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_billing:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "costLines": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "label": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 120
+        },
+        "inrMonth": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 100000
+        }
+       },
+       "required": [
+        "label",
+        "inrMonth"
+       ]
+      },
+      "minItems": 1,
+      "maxItems": 20
+     },
+     "marginPct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 500
+     }
+    },
+    "required": [
+     "costLines",
+     "marginPct"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update messaging addon pricing",
+   "command": "platform messaging-addon-pricing update"
   },
   {
    "id": "platform GET /api/admin/ecom/migrations/run",
