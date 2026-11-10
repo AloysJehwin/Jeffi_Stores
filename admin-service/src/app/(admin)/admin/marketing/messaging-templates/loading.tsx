@@ -1,5 +1,5 @@
 import { PageLoading, Sk } from '@/components/admin/kit/skeleton'
-import { EMBEDDED_PAGE_SIZE } from '@/components/admin/kit/pager'
+import { EMBEDDED_PAGE_SIZE } from '@/components/admin/kit/page-size'
 import { LoadingTabBar } from '../../products/_components/loading-parts'
 
 // The description and the SMS / WhatsApp tabs follow Site Controls, so only Email is drawn.
