@@ -498,12 +498,11 @@ export default function CheckoutUpiScreen() {
                 <Button key={a.id} label={`Pay with ${a.label}`} icon={Smartphone} variant="outline" size="md" onPress={() => openUpiApp(appUrl(upg.upiUri!, a.scheme), a.label)} />
               ))}
               <Button label="Other UPI app" icon={ExternalLink} variant="outline" size="md" onPress={() => openUpiApp(upg.upiUri!, 'A UPI app')} />
-              <Text className="text-xs text-foreground-muted">If your app says the payment can&apos;t be completed, pay with the QR or the UPI ID instead.</Text>
             </View>
           )}
           {upg.qrDataUrl && (
             <View className="items-center gap-2">
-              <Text className="text-center text-xs text-foreground-muted">Or screenshot this QR and pick it from your gallery in your UPI app's Scan, or scan it with another phone</Text>
+              <Text className="text-xs text-foreground-muted">Or scan with another phone</Text>
               <View className="rounded-xl bg-white p-2">
                 <Image source={{ uri: upg.qrDataUrl }} style={{ width: 200, height: 200 }} contentFit="contain" accessibilityLabel="UPI payment QR code" />
               </View>

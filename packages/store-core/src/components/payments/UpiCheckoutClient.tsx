@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check, Clock, Copy, Download, Loader2, Users, XCircle } from 'lucide-react'
+import { Check, Clock, Copy, Loader2, QrCode, Users, XCircle } from 'lucide-react'
 import { UpiMark } from './PaymentSections'
 import { isValidUtr } from './UpiManualDialog'
 import { clearPendingUpi, readPendingUpi, type UpiIntentStatus, type UpiIntentView, type UpiPurpose } from './useUpiPayment'
@@ -78,6 +78,7 @@ export default function UpiCheckoutClient({ intentId, orderHref, fallbackHref, r
   const [actionError, setActionError] = useState<string | null>(null)
   const [cancelArmed, setCancelArmed] = useState(false)
   const [phone, setPhone] = useState<{ mobile: boolean; ios: boolean }>({ mobile: false, ios: false })
+  const [showQr, setShowQr] = useState(false)
   const [copied, setCopied] = useState(false)
   const [utr, setUtr] = useState('')
   const [utrTouched, setUtrTouched] = useState(false)
@@ -285,6 +286,7 @@ export default function UpiCheckoutClient({ intentId, orderHref, fallbackHref, r
     const left = Number.isFinite(expires) ? expires - serverMs : null
     const low = left !== null && left <= 60_000
     const links = view.upiUri ? upiAppLinks(view.upiUri, phone.ios) : []
+    const qrVisible = !!view.qrDataUrl && (!phone.mobile || showQr || links.length === 0)
     const vpa = view.payee?.vpa
     return (
       <div className={`${frame} sm:max-w-lg`}>
@@ -329,38 +331,9 @@ export default function UpiCheckoutClient({ intentId, orderHref, fallbackHref, r
             )}
           </div>
 
-          {view.qrDataUrl && (
-            <div className="flex flex-col items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={view.qrDataUrl}
-                alt={`UPI QR code${amount ? ` for ${amount}` : ''}${vpa ? ` to ${vpa}` : ''}`}
-                width={256}
-                height={256}
-                className="h-52 w-52 rounded-lg border border-border-default bg-white p-2 sm:h-64 sm:w-64"
-              />
-              {phone.mobile ? (
-                <>
-                  <a
-                    href={view.qrDataUrl}
-                    download={`upi-${(amountPaise ?? 0) / 100}.png`}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border-default px-3 text-sm font-medium text-foreground hover:bg-surface-secondary"
-                  >
-                    <Download className="h-4 w-4" aria-hidden /> Save QR
-                  </a>
-                  <p className="text-center text-xs text-foreground-muted">
-                    Save the QR, then in your UPI app tap Scan and pick it from your gallery. Or pay to the UPI ID above. Don&apos;t change the amount.
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs text-foreground-muted">Scan with any UPI app. The amount is filled in — please don&apos;t change it.</p>
-              )}
-            </div>
-          )}
-
           {phone.mobile && links.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Or open your UPI app</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Pay with</p>
               <div className="grid grid-cols-2 gap-2">
                 {links.map(l => (
                   <a
@@ -373,7 +346,25 @@ export default function UpiCheckoutClient({ intentId, orderHref, fallbackHref, r
                   </a>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-foreground-muted">If your app says the payment can&apos;t be completed, pay with the QR or the UPI ID instead.</p>
+              {view.qrDataUrl && !showQr && (
+                <button type="button" onClick={() => setShowQr(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-accent-600 hover:underline dark:text-accent-400">
+                  <QrCode className="h-3.5 w-3.5" aria-hidden /> Show QR code to pay from another phone
+                </button>
+              )}
+            </div>
+          )}
+
+          {qrVisible && (
+            <div className="flex flex-col items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={view.qrDataUrl!}
+                alt={`UPI QR code${amount ? ` for ${amount}` : ''}${vpa ? ` to ${vpa}` : ''}`}
+                width={256}
+                height={256}
+                className="h-52 w-52 rounded-lg border border-border-default bg-white p-2 sm:h-64 sm:w-64"
+              />
+              <p className="text-xs text-foreground-muted">Scan with any UPI app. The amount is filled in — please don&apos;t change it.</p>
             </div>
           )}
 
