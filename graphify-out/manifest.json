@@ -10505,8 +10505,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/orders/orders.ts": {
-    "mtime": 1792943292.1548295,
-    "ast_hash": "4b8c3f7060b5456a87addb59196d3e9c",
+    "mtime": 1794305425.7848995,
+    "ast_hash": "839fbf68f053f0fedba31c05e2edba3f",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/orders/returns.ts": {
@@ -13950,8 +13950,8 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/orders/[id]/view/page.tsx": {
-    "mtime": 1794049640.8499062,
-    "ast_hash": "e2878aafec22c5809a05df13015d80d4",
+    "mtime": 1794305828.3796217,
+    "ast_hash": "88571378d5e0d9ff0921e96d9191c658",
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/orders/_components/OrderDetailModal.tsx": {
@@ -17675,8 +17675,8 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/api/(internal)/cron/cancel-stale-orders/route.ts": {
-    "mtime": 1794046811.7482517,
-    "ast_hash": "ab5a7cf3d746f2c097439d2f4f71473e",
+    "mtime": 1794305435.7348742,
+    "ast_hash": "5cd5b393e4afac6679ae5e26025cca3b",
     "semantic_hash": ""
   },
   "admin-service/src/app/api/(internal)/cron/compute-health/route.ts": {
@@ -18530,8 +18530,8 @@
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/orders/[id]/page.tsx": {
-    "mtime": 1794256916.939723,
-    "ast_hash": "9f25352e27c368ed2232b9262781294f",
+    "mtime": 1794305469.073072,
+    "ast_hash": "c1b3456ae5014bb05bec4f2b7032515c",
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/orders/confirmation/OrderCelebration.tsx": {
@@ -19175,8 +19175,8 @@
     "semantic_hash": ""
   },
   "storefront-service/src/app/api/(public)/orders/[id]/route.ts": {
-    "mtime": 1794049582.8926184,
-    "ast_hash": "ec0a19753cfbd1ab633560781f683d7f",
+    "mtime": 1794305447.151546,
+    "ast_hash": "2af7d37099e9167513a33de9cf1989fd",
     "semantic_hash": ""
   },
   "storefront-service/src/app/api/(public)/orders/[id]/track-rvp/route.ts": {
@@ -22870,8 +22870,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/inventory-orders.test.ts": {
-    "mtime": 1790931257.308422,
-    "ast_hash": "80df3aea2a49d668463827ca27dd4e74",
+    "mtime": 1794306039.5075076,
+    "ast_hash": "71d9e372c70f3a1e3e3d2a40f5287733",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/invoice-line-items.test.ts": {
@@ -27680,8 +27680,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/payments/upi/intents.ts": {
-    "mtime": 1794285828.1741245,
-    "ast_hash": "55a880c2a1f4848a2633e70bd7936f9e",
+    "mtime": 1794305412.9551005,
+    "ast_hash": "c3e31f65e0ec5460b21c98bd949d39d6",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/payments/upi/pay-uri.ts": {
@@ -27997,6 +27997,11 @@
   "packages/store-core/tests/lib/payments/upi/upg-logic.test.ts": {
     "mtime": 1794286501.0627062,
     "ast_hash": "651272007c3d88fa9c031c1ee35347fd",
+    "semantic_hash": ""
+  },
+  "admin-service/src/app/(admin)/admin/orders/[id]/_components/UpiConfirmationCard.tsx": {
+    "mtime": 1794305529.604846,
+    "ast_hash": "adc6ce289cba1999463a398e75f847d3",
     "semantic_hash": ""
   }
 }

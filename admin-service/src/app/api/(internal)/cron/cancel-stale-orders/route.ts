@@ -3,7 +3,7 @@ import { queryMany } from '@/lib/shared/db'
 import { cancelOrder } from '@/lib/orders/orders'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
-import { MARKETPLACE_SOURCES_SQL } from '@/lib/marketplace/sources'
+import { upiPaymentOpenSql } from '@/lib/payments/upi/intents'
 
 export async function GET(request: NextRequest) {
   if (!verifyCronRequest(request)) {
@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Integer-sanitised for safe SQL interval interpolation.
+    // Storefront orders only (invoices, quotations and admin-made orders wait for payment), and never one whose
+    // UPI payment is still in play. Integer-sanitised for safe SQL interval interpolation.
     const staleWindowMinutes = Math.max(1, Math.round((await getBusinessValues()).orderAutoCancelMinutes))
     const stale = await queryMany<{
       id: string
@@ -30,7 +31,8 @@ export async function GET(request: NextRequest) {
        WHERE status = 'pending'
          AND payment_status IN ('unpaid', 'failed')
          AND payment_mode IS DISTINCT FROM 'cod'
-         AND COALESCE(source, '') NOT IN ${MARKETPLACE_SOURCES_SQL}
+         AND source = 'online'
+         AND NOT ${upiPaymentOpenSql('orders.id')}
          AND created_at < NOW() - INTERVAL '${staleWindowMinutes} minutes'
        ORDER BY created_at
        LIMIT 100`
