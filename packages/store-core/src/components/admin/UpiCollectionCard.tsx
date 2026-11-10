@@ -236,6 +236,16 @@ export default function UpiCollectionCard() {
             </p>
           </div>
 
+          {!alerts?.address && data.provider === 'upg' && (
+            <div className="space-y-1">
+              <p className={subhead}>Bank alerts</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Automatic confirmation isn&apos;t switched on for this platform yet, so payments can&apos;t be confirmed from your bank&apos;s alerts.
+                Until it is, customers enter their UTR after paying and you approve it under Financial → UPI confirmations.
+              </p>
+            </div>
+          )}
+
           {alerts?.address && data.provider !== 'phonepe' && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">

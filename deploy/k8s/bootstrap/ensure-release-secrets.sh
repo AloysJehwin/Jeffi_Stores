@@ -1,6 +1,7 @@
 #!/bin/bash
-# Makes sure jeffi/production holds ADMIN_GATEWAY_SECRET and CRON_SECRET: a missing one is generated, an existing
-# one is never replaced. Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production (the release does not),
+# Makes sure jeffi/production holds ADMIN_GATEWAY_SECRET, CRON_SECRET and UPG_ALERT_SECRET (signs each store's UPI
+# bank-alert forwarding address): a missing one is generated, an existing one is never replaced (that would change
+# every forwarding address). Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production (the release does not),
 # and checks the copies the store apps and CronJobs read. Warns (only) when the Meta app keys are missing.
 # Prints no values; rollback commands go to $OUT_DIR/ensure-secrets-rollback.sh.
 # Usage: bash deploy/k8s/bootstrap/ensure-release-secrets.sh [--dry-run] [--yes] [--sync-store] [--cluster]
@@ -38,7 +39,7 @@ get jeffi/production > "$TMP/prod.json"
 if run python3 -I - "$TMP/prod.json" "$TMP/prod.new" <<'PY'
 import json, secrets, sys
 cur = json.load(open(sys.argv[1])); new, n = dict(cur), 0
-for k in ('ADMIN_GATEWAY_SECRET', 'CRON_SECRET'):
+for k in ('ADMIN_GATEWAY_SECRET', 'CRON_SECRET', 'UPG_ALERT_SECRET'):
     v = cur.get(k)
     if isinstance(v, str) and v.strip(): print(f'  {k}: present ({len(v)} characters), kept'); continue
     new[k] = secrets.token_hex(32); n += 1
