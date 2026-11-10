@@ -187,6 +187,38 @@ export async function listUpiIntents(opts: { status?: UpiIntentStatus | null; li
   return { items: rows.map((r: any) => normIntent(r)!), total: Number(count?.n ?? 0) }
 }
 
+/**
+ * SQL condition: the order's own UPI payment is still in play (a session open, a UTR awaiting staff, or one that
+ * failed/expired within 15 minutes, which a late bank alert can still complete). Such an order is never auto-cancelled.
+ */
+export const upiPaymentOpenSql = (orderIdExpr: string) =>
+  `EXISTS (SELECT 1 FROM upi_payment_intents u WHERE u.refs->>'orderId' = (${orderIdExpr})::text AND u.purpose IN ('order_draft', 'order')
+     AND (u.status IN ('pending', 'queued', 'active', 'processing', 'awaiting_confirmation')
+       OR (u.status IN ('failed', 'expired') AND u.updated_at > NOW() - INTERVAL '15 minutes')))`
+
+export async function upiPaymentOpen(orderId: string, db: UpiDb = storeDb): Promise<boolean> {
+  return !!(await one(db, `SELECT ${upiPaymentOpenSql('$1')} AS open`, [orderId]))?.open
+}
+
+export interface PendingUpiConfirmation {
+  intentId: string
+  utr: string | null
+  submittedAt: string | null
+  amountPaise: number
+}
+
+/** The UTR a customer submitted for this order, while staff haven't approved or rejected it. */
+export async function pendingUpiConfirmation(orderId: string, db: UpiDb = storeDb): Promise<PendingUpiConfirmation | null> {
+  const r = await one(
+    db,
+    `SELECT id, utr, confirmed_at, amount_paise::bigint AS amount_paise FROM upi_payment_intents
+      WHERE refs->>'orderId' = $1 AND purpose IN ('order_draft', 'order') AND status = 'awaiting_confirmation'
+      ORDER BY confirmed_at DESC NULLS LAST LIMIT 1`,
+    [orderId]
+  )
+  return r ? { intentId: r.id, utr: r.utr, submittedAt: r.confirmed_at ? new Date(r.confirmed_at).toISOString() : null, amountPaise: Number(r.amount_paise) } : null
+}
+
 /** Pending PhonePe intents old enough for the browser to have given up on, young enough to still matter. */
 export async function pendingPhonePeIntents(opts: { minAgeSec: number; maxAgeSec: number; limit?: number }): Promise<UpiIntent[]> {
   const rows = await many(storeDb,

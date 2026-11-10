@@ -70,6 +70,9 @@ interface OrderDetails {
   status: string
   paymentStatus: string
   paymentMode?: string | null
+  source?: string | null
+  /** A UTR the customer submitted, waiting for the store to approve it. */
+  upiConfirmation?: { utr: string | null; submittedAt: string | null } | null
   createdAt: string
   updatedAt: string
   deliveredAt: string | null
@@ -376,6 +379,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (order.status === 'cancelled' || order.status === 'cancel_requested') return
     if (order.paymentStatus !== 'failed' && order.paymentStatus !== 'unpaid') return
     if (order.paymentMode === 'cod') return // COD is paid on delivery — never a pay-now countdown
+    if (order.source && order.source !== 'online') return // invoices and admin-made orders wait for payment
+    if (order.upiConfirmation) return
     if (!isRazorpayEnabled) return
 
     const orderCreatedAt = new Date(order.createdAt).getTime()
@@ -874,7 +879,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <span
                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}
                   >
-                    Payment: {order.paymentStatus}
+                    Payment: {order.upiConfirmation ? 'confirming' : order.paymentStatus}
                   </span>
                   {((CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital) ||
                     (canReturn && !showReturnForm) ||
@@ -883,7 +888,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     (order.invoiceNumber && !order.originalOrderId)) && (
                     <span className="hidden sm:inline-block w-px h-5 bg-border-default mx-1" aria-hidden />
                   )}
-                  {CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital && (
+                  {CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital && !order.upiConfirmation && (
                     <button
                       type="button"
                       onClick={() => setShowCancelConfirm(true)}
@@ -1917,7 +1922,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
+            {order.upiConfirmation && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+              <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-sm text-amber-900 dark:text-amber-200">
+                    <p className="font-semibold">UPI payment submitted</p>
+                    <p className="mt-1">
+                      {order.upiConfirmation.utr ? (
+                        <>
+                          UTR <span className="font-mono font-medium">{order.upiConfirmation.utr}</span>
+                          {order.upiConfirmation.submittedAt &&
+                            `, sent ${new Date(order.upiConfirmation.submittedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                          .{' '}
+                        </>
+                      ) : null}
+                      The store is matching it with its bank statement. Your order is confirmed once it&apos;s approved; there&apos;s no need to pay again.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {order.paymentStatus === 'unpaid' &&
+              !order.upiConfirmation &&
               order.paymentMode !== 'cod' &&
               canPayOnline &&
               order.status !== 'cancelled' &&
@@ -1982,6 +2012,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
             {order.paymentStatus === 'unpaid' &&
+              !order.upiConfirmation &&
               !canPayOnline &&
               order.status !== 'cancelled' &&
               order.status !== 'cancel_requested' && (

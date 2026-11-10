@@ -2,6 +2,7 @@ import { queryOne, queryMany, query } from '@/lib/shared/db'
 import { sendOrderAutoCancelledEmail, sendOrderAutoCancelledAdminNotification, sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { logActivity } from '@/lib/shared/activity'
+import { upiPaymentOpen } from '@/lib/payments/upi/intents'
 
 export const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 
@@ -20,7 +21,7 @@ interface CancelOptions {
 export async function cancelOrder(orderId: string, opts: CancelOptions): Promise<CancelResult> {
   const order = await queryOne<any>(
     `
-    SELECT o.id, o.order_number, o.status, o.payment_status, o.user_id, o.order_type,
+    SELECT o.id, o.order_number, o.status, o.payment_status, o.user_id, o.order_type, o.source,
       o.customer_name, o.customer_email, o.total_amount,
       json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
     FROM orders o
@@ -48,6 +49,19 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
 
   const isUnpaidPending =
     order.status === 'pending' && (order.payment_status === 'unpaid' || order.payment_status === 'failed')
+
+  // Only storefront orders time out unpaid; invoices, quotations and admin-made orders wait for payment.
+  if (opts.reason === 'auto_cancel_unpaid' && order.source !== 'online') {
+    return { success: false, error: 'Only storefront orders are cancelled automatically', status: 409 }
+  }
+  // Cancelling while a UPI payment is in flight (or its UTR is with staff) would leave money on a cancelled order.
+  if (isUnpaidPending && (await upiPaymentOpen(orderId).catch(() => false))) {
+    return {
+      success: false,
+      error: 'A UPI payment for this order is still being confirmed. Please wait a few minutes, or contact the store to cancel.',
+      status: 409,
+    }
+  }
 
   if (isUnpaidPending) {
     const restoreToCart = opts.restoreToCart === true && order.order_type !== 'direct'
