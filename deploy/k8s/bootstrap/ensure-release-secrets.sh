@@ -13,7 +13,7 @@ for a in "$@"; do case $a in
   *) echo "Unknown option $a" >&2; exit 2 ;;
 esac; done
 umask 077
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+TMP=$(mktemp -d); on_exit 'rm -rf "$TMP"'
 get() { aws secretsmanager get-secret-value --secret-id "$1" --query SecretString --output text; }
 ver() { aws secretsmanager get-secret-value --secret-id "$1" --query VersionId --output text; }
 
