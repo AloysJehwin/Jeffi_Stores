@@ -271,6 +271,7 @@ export const RESOLVERS: Record<string, (ctx: StatusContext) => Promise<Detected>
     return attention(t.approved ? `${t.approved} of ${t.total} key templates approved by Meta` : 'Templates not approved by Meta yet; messages go out as plain text')
   },
   async push(ctx) {
+    if ((await ctx.messagingLocks()).push) return todo(MESSAGING_LOCK_HINT.app)
     return on((await ctx.settings()).feature_push_enabled) ? done() : todo()
   },
 

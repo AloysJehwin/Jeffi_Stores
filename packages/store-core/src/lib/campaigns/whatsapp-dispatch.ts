@@ -160,15 +160,19 @@ export async function sendCampaignWhatsApp(
       return (await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: ref, channel }).catch(() => null)) ?? ''
     }
 
+    // A channel off or locked in Site Controls is skipped before it claims a dedup marker.
+    const waOn = params.whatsappEnabled === true && (await whatsappOn())
+    const smsOn = params.smsEnabled === true && (await smsChannelOn())
+
     let ok = false
     let attempted = false
     let deduped = false
-    if (params.whatsappEnabled === true) {
+    if (waOn) {
       const waSentId = await claim('whatsapp')
       if (waSentId === null) deduped = true
       else { attempted = true; ok = await sendWhatsAppPart(kind, user.phone, row, clean, render, missing, waSentId) }
     }
-    const smsClaim = params.smsEnabled === true ? await claim('sms') : undefined
+    const smsClaim = smsOn ? await claim('sms') : undefined
     if (smsClaim === null) deduped = true
     if (smsClaim != null) {
       attempted = true
@@ -199,6 +203,15 @@ async function whatsappOn(): Promise<boolean> {
     return (await getFeatureFlags()).whatsappEnabled
   } catch {
     return process.env.WHATSAPP_DISABLED !== 'true'
+  }
+}
+
+async function smsChannelOn(): Promise<boolean> {
+  try {
+    const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
+    return (await getFeatureFlags()).smsEnabled
+  } catch {
+    return process.env.SMS_DISABLED !== 'true'
   }
 }
 

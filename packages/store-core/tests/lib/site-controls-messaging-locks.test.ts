@@ -26,7 +26,7 @@ describe('site-controls SMS & WhatsApp add-on locks', () => {
     const c = await getSiteControls()
     expect(c.flags.smsEnabled).toBe(false)
     expect(c.flags.whatsappEnabled).toBe(false)
-    expect(c.locks).toEqual({ sms: 'addon', whatsapp: 'number' })
+    expect(c.locks).toEqual({ sms: 'addon', whatsapp: 'number', push: 'app' })
   })
 
   it('leaves an entitled channel on the stored switch', async () => {
@@ -34,7 +34,7 @@ describe('site-controls SMS & WhatsApp add-on locks', () => {
     const c = await getSiteControls()
     expect(c.flags.smsEnabled).toBe(true)
     expect(c.flags.whatsappEnabled).toBe(false)
-    expect(c.locks).toEqual({ whatsapp: 'addon' })
+    expect(c.locks).toEqual({ whatsapp: 'addon', push: 'app' })
   })
 
   it('never locks the flagship', async () => {

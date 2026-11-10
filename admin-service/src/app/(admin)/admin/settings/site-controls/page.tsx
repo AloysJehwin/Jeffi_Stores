@@ -603,11 +603,23 @@ export default async function SiteControlsPage() {
                               />
                             </FullSpan>
                             <FullSpan>
+                              <TextControl
+                                settingKey="mobile_app_build_id"
+                                label="Store app build ID"
+                                hint="EAS project ID of your store's mobile app. App notifications in campaigns and messaging show only once it's set."
+                                initial={c.mobileApp.buildId ?? ''}
+                                placeholder="e.g. 821b6f4c-8f52-4bbe-88f6-fcf69366efaa"
+                                refreshOnSave
+                              />
+                            </FullSpan>
+                            <FullSpan>
                               <ToggleControl
                                 settingKey="feature_push_enabled"
                                 label="App push notifications"
                                 hint="Order updates pushed to the mobile app. When off, nothing is pushed; customers still see every update in the app's inbox."
                                 initial={c.flags.pushEnabled}
+                                locked={!!c.locks.push}
+                                lockedHint={c.locks.push && MESSAGING_LOCK_HINT[c.locks.push]}
                               />
                             </FullSpan>
                             <FullSpan>
@@ -616,6 +628,8 @@ export default async function SiteControlsPage() {
                                 label="Marketing push notifications"
                                 hint="Offers and price alerts pushed to the app. Needs app push on; each customer's own notification settings still apply."
                                 initial={c.flags.marketingPushEnabled}
+                                locked={!!c.locks.push}
+                                lockedHint={c.locks.push && MESSAGING_LOCK_HINT[c.locks.push]}
                               />
                             </FullSpan>
                             <FullSpan>

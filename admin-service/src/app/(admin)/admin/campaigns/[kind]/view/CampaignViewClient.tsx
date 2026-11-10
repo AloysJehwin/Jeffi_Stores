@@ -144,7 +144,7 @@ export default function CampaignViewClient({
   const waEnabled =
     msg.whatsapp && campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_slug
   const pushKind = campaignSupportsPush(kind) ? kind : (c.scenario_kind ?? '')
-  const pushEnabled = campaignSupportsPush(pushKind) && c.parameters?.pushEnabled === true
+  const pushEnabled = msg.push && campaignSupportsPush(pushKind) && c.parameters?.pushEnabled === true
   const pushCopy = scenarioPushCopy(pushKind, c.parameters)
   const pushHistory = ['push_sent', 'push_waiting', 'push_skipped', 'push_failed'].some(k => Number((c as any)[k] ?? 0) > 0)
 

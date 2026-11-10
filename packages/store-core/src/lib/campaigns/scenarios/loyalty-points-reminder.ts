@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { tierName } from '@/lib/loyalty/tiers'
 import { cooldownMinutes } from '../duration'
@@ -10,6 +11,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -28,6 +30,7 @@ export const loyaltyPointsReminder: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 100,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     maxRecipientsPerSweep: {
@@ -46,6 +49,11 @@ export const loyaltyPointsReminder: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -155,17 +163,14 @@ export const loyaltyPointsReminder: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(
-        campaign.kind,
-        row.user_id,
-        {
-          headline: `You have ${row.points} points to spend`,
-          code: couponCode || '',
-          discount: discountPercent ? String(discountPercent) : '',
-        },
-        cooldownMinutes(params)
-      ).catch(() => {})
+    if (params.whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
+      const msgVars = {
+        headline: `You have ${row.points} points to spend`,
+        code: couponCode || '',
+        discount: discountPercent ? String(discountPercent) : '',
+      }
+      if (params.whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

@@ -418,7 +418,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       ? renderBlocks(form.blocks)
       : form.body_template
   const previewBody = renderTemplate(previewBodySource, bridgedPreview)
-  const pushOn = campaignSupportsPush(varsKind) && !!form.parameters?.pushEnabled
+  const pushOn = msg.push && campaignSupportsPush(varsKind) && !!form.parameters?.pushEnabled
   const pushDefault = defaultPushCopy(varsKind)
   const pushParam = (k: string) => (typeof form.parameters?.[k] === 'string' ? String(form.parameters[k]) : undefined)
   const pushSent = scenarioPushCopy(varsKind, form.parameters)

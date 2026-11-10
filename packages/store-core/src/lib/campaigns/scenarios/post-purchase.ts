@@ -2,6 +2,7 @@ import { queryMany } from '@/lib/shared/db'
 import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
@@ -10,6 +11,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -29,6 +31,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
@@ -55,6 +58,11 @@ export const postPurchase: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -131,11 +139,13 @@ export const postPurchase: ScenarioModule<Params, Row> = {
         ctaUrl,
       },
     })
-    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
+      const msgVars = {
         orderNumber: row.order_number,
         url: ctaUrl,
-      }, cooldownMinutes(params)).catch(() => {})
+      }
+      if ((params as any).whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

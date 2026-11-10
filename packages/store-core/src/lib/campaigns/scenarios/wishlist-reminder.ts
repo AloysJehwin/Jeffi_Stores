@@ -3,6 +3,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } fr
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import { SAVED_ITEMS_SQL } from './_wishlist-base'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
@@ -12,6 +13,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -30,6 +32,7 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 100,
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     idleFor: {
@@ -63,6 +66,11 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -218,8 +226,10 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: `${user.baseUrl}/${items.some(i => i.source === 'wishlist') ? 'wishlist' : 'cart'}` }, cooldownMinutes(params)).catch(() => {})
+    if (params.whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
+      const msgVars = { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: `${user.baseUrl}/${items.some(i => i.source === 'wishlist') ? 'wishlist' : 'cart'}` }
+      if (params.whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

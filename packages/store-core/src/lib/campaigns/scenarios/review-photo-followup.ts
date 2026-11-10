@@ -7,6 +7,7 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
@@ -14,6 +15,7 @@ interface Params extends Record<string, unknown> {
   sinceReview: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -34,6 +36,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
     sinceReview: days(3),
     whatsappEnabled: false,
     smsEnabled: false,
+    pushEnabled: false,
   },
   paramSchema: {
     sinceReview: {
@@ -53,6 +56,11 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -178,10 +186,10 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(
-        () => {}
-      )
+    if (params.whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
+      const msgVars = { product: row.product_name }
+      if (params.whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

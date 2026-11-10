@@ -29,7 +29,7 @@ export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all')
   const [channelFilter, setChannelFilter] = useState<'all' | 'email' | 'whatsapp'>('all')
-  const { whatsapp: waOn } = useMessagingChannels()
+  const { whatsapp: waOn, push: pushOn } = useMessagingChannels()
 
   const list = useInfiniteList<CampaignRow>({
     key: 'campaigns',
@@ -50,7 +50,7 @@ export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly
       if (statusFilter === 'active' && !c.enabled) return false
       if (statusFilter === 'paused' && c.enabled) return false
       if (channelFilter !== 'all') {
-        if (!getChannels(c.kind, c.parameters, c.scenario_kind, { whatsapp: waOn }).includes(channelFilter as 'email' | 'whatsapp')) return false
+        if (!getChannels(c.kind, c.parameters, c.scenario_kind, { whatsapp: waOn, push: pushOn }).includes(channelFilter as 'email' | 'whatsapp')) return false
       }
       if (search.trim()) {
         const q = search.toLowerCase()
@@ -63,7 +63,7 @@ export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly
       }
       return true
     })
-  }, [campaigns, search, statusFilter, channelFilter, waOn])
+  }, [campaigns, search, statusFilter, channelFilter, waOn, pushOn])
 
   async function discardDraft(c: CampaignRow) {
     const ok = await confirm({
@@ -314,7 +314,7 @@ export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly
                     >
                       {c.enabled ? 'Active' : 'Paused'}
                     </span>
-                    {getChannels(c.kind, c.parameters, c.scenario_kind, { whatsapp: waOn }).map(ch => (
+                    {getChannels(c.kind, c.parameters, c.scenario_kind, { whatsapp: waOn, push: pushOn }).map(ch => (
                       <ChannelChip key={ch} channel={ch} />
                     ))}
                     {c.draft_fields != null && (
