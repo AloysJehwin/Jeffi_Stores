@@ -104,7 +104,7 @@ trap 'rc=$?; if [ $rc -ne 0 ] && $PRE; then
   echo "Stopped before the window: nothing in production changed. Fix it and re-run (pushed images are reused)." >&2
 elif [ $rc -ne 0 ] && [ $CUR -gt 0 ]; then
   echo "Step $CUR (${TITLES[$CUR]}) failed. ${HINTS[$CUR]}" >&2
-  echo "Fix it, then resume: OUT_DIR=$OUT_DIR bash deploy/k8s/go-live.sh --from $CUR" >&2; fi' EXIT
+  echo "Fix it, then resume: OUT_DIR=$OUT_DIR bash deploy/k8s/go-live.sh --from $CUR" >&2; fi; run_exit_hooks' EXIT
 
 say "Preflight"
 preflight

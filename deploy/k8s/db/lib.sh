@@ -33,6 +33,12 @@ confirm() {
   [ "$a" = yes ] || { echo "Stopped."; exit 1; }
 }
 
+# EXIT cleanup that scripts add to instead of setting their own trap (a later `trap … EXIT` would replace this one).
+EXIT_HOOKS=()
+on_exit() { EXIT_HOOKS+=("$1"); }
+run_exit_hooks() { local h; for h in ${EXIT_HOOKS[@]+"${EXIT_HOOKS[@]}"}; do eval "$h" || true; done; }
+trap run_exit_hooks EXIT
+
 listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 CORE_IP=${CORE#*@}
 # The core's security group allows SSH from listed IPs only; a home IP changes now and then.
@@ -57,8 +63,7 @@ ssh_forward() { # <local port> <target>; replaces one of ours that holds the por
   pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true; sleep 1
   [ "${TUNNEL:-auto}" = ssm ] ||
     { ssh -i "$SSH_KEY" -f -N -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE" && return 0; }
-  ssm_forward "$1" "$2" && return 0
-  ssm_forward "$1" "$2" && return 0 # a session that didn't come up is usually fine the second time
+  for _ in 1 2 3; do ssm_forward "$1" "$2" && return 0; done # a session that didn't come up is usually fine the next time
   [ "${TUNNEL:-auto}" = ssm ] || ssh_allowed || true
   return 1
 }
@@ -72,9 +77,23 @@ ssm_forward() {
   local doc=AWS-StartPortForwardingSessionToRemoteHost params="host=${2%:*},portNumber=${2##*:},localPortNumber=$1"
   [ "${2%:*}" = 127.0.0.1 ] && { doc=AWS-StartPortForwardingSession; params="portNumber=${2##*:},localPortNumber=$1"; }
   pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true
-  nohup aws ssm start-session --target "$id" --document-name "$doc" --parameters "$params" >/dev/null 2>&1 &
-  for _ in $(seq 1 40); do listening "$1" && return 0; sleep 1; done
-  echo "SSM forward on :$1 didn't open within 40 s" >&2
+  local log sid=
+  log=$(mktemp "${TMPDIR:-/tmp}/ssm-forward-$1.XXXXXX")
+  nohup aws ssm start-session --target "$id" --document-name "$doc" --parameters "$params" >"$log" 2>&1 &
+  for _ in $(seq 1 60); do
+    if listening "$1"; then
+      sid=$(grep -o 'SessionId: [^ ]*' "$log" | head -1 | cut -d' ' -f2)
+      # A CI runner is torn down without closing its sessions; left open on the core they pile up until
+      # the agent stops opening new ones, so close ours when the job's script exits.
+      [ -n "${GITHUB_ACTIONS:-}" ] && [ -n "$sid" ] && on_exit "aws ssm terminate-session --session-id $sid >/dev/null 2>&1"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "SSM forward on :$1 didn't open within 60 s:" >&2
+  sed 's/^/  /' "$log" >&2
+  sid=$(grep -o 'SessionId: [^ ]*' "$log" | head -1 | cut -d' ' -f2)
+  [ -n "$sid" ] && aws ssm terminate-session --session-id "$sid" >/dev/null 2>&1 || true
   return 1
 }
 pg_up() { pg_isready -h 127.0.0.1 -p "$PORT" -t 10 -q 2>/dev/null; }
