@@ -1,5 +1,5 @@
-import VisitorSkeleton from '@/components/visitor/VisitorSkeleton'
+import ConfirmationSkeleton from './ConfirmationSkeleton'
 
 export default function Loading() {
-  return <VisitorSkeleton variant="list" />
+  return <ConfirmationSkeleton />
 }

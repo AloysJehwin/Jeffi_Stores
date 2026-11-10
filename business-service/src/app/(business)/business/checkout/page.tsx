@@ -5,6 +5,7 @@ import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, upiFlag, useUpiPayment, type PaymentChoice } from '@/components/payments'
 import Link from 'next/link'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -13,6 +14,9 @@ import CopySku from '@/components/ui/CopySku'
 import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
+import { CheckoutSkeleton } from '@/components/visitor/skeletons/commerce'
+
+const UPI_HEADERS = { 'X-Auth-Portal': 'business' }
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -42,6 +46,7 @@ function CheckoutPage() {
   const storeIdentity = useStoreConfig().identity
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const upiEnabled = upiFlag(useStoreConfig().flags)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -84,7 +89,14 @@ function CheckoutPage() {
   const [address, setAddress] = useState<any>(null)
   const [isLoadingAddress, setIsLoadingAddress] = useState(true)
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual'>(isRazorpayEnabled ? 'razorpay' : 'manual')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>(upiEnabled ? 'upi' : isRazorpayEnabled ? 'razorpay' : 'manual')
+  // Once the buyer picks a method the UPI default stops re-applying.
+  const payTouched = useRef(false)
+  const upi = useUpiPayment({
+    returnTo: bp('/business/account/orders'),
+    headers: UPI_HEADERS,
+    returnPath: id => bp(`/business/pay/upi/${id}/return`),
+  })
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -344,9 +356,21 @@ function CheckoutPage() {
     : cartItems.length > 0 && cartItems.every((i: any) => isDigitalLine(i))
 
   useEffect(() => {
-    if (!isRazorpayEnabled && paymentMethod === 'razorpay') setPaymentMethod('manual')
-    else if (hasDigital && isRazorpayEnabled && paymentMethod === 'manual') setPaymentMethod('razorpay')
-  }, [isRazorpayEnabled, paymentMethod, hasDigital])
+    const online = upiEnabled ? 'upi' : isRazorpayEnabled ? 'razorpay' : null
+    if (paymentMethod === 'upi' && !upiEnabled) setPaymentMethod(isRazorpayEnabled ? 'razorpay' : 'manual')
+    else if (!isRazorpayEnabled && paymentMethod === 'razorpay') setPaymentMethod(online ?? 'manual')
+    else if (hasDigital && online && paymentMethod === 'manual') setPaymentMethod(online)
+    // UPI is the default; adopt it when the flag arrives after first render, unless the buyer already chose.
+    else if (upiEnabled && paymentMethod !== 'upi' && !payTouched.current) setPaymentMethod('upi')
+  }, [isRazorpayEnabled, paymentMethod, hasDigital, upiEnabled])
+
+  useEffect(() => {
+    if (upi.error && !upi.manual) {
+      setError(upi.error)
+      upi.clearError()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upi.error, upi.manual])
 
   const fetchShipping = (postalCode: string) => {
     if (isBuyNow && !buyNowItem) return
@@ -513,6 +537,8 @@ function CheckoutPage() {
           contact: address?.phone || '',
         },
         theme: { color: '#f97316' },
+        // UPI has its own section on this page; keep it out of Checkout.
+        ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
         redirect: false,
         callback_url: `${window.location.origin}/business/checkout/payment-callback`,
         modal: {
@@ -638,7 +664,7 @@ function CheckoutPage() {
     }
 
     try {
-      if (paymentMethod === 'razorpay') {
+      if (paymentMethod === 'razorpay' || paymentMethod === 'upi') {
         const draftBody: any = {
           mode: isBuyNow ? 'buyNow' : 'cart',
           addressId: searchParams.get('addressId'),
@@ -675,6 +701,12 @@ function CheckoutPage() {
         }
         if (!draftRes.ok) throw new Error(draftData.error || 'Failed to start payment')
 
+        if (paymentMethod === 'upi') {
+          // PhonePe leaves the page; manual opens the UTR dialog (the draft commits on confirm).
+          const started = await upi.start({ purpose: 'order_draft', draftToken: draftData.draftToken })
+          if (!started || started.mode === 'manual') setIsSubmitting(false)
+          return
+        }
         await initiateRazorpayPayment({ draftToken: draftData.draftToken })
         return
       }
@@ -773,31 +805,9 @@ function CheckoutPage() {
     )
   }
 
-  if (authLoading || cartLoading || isLoadingAddress) {
-    return (
-      <div className="min-h-screen bg-surface px-4 py-8">
-        <div className="max-w-2xl mx-auto animate-pulse space-y-4">
-          <div className="h-6 bg-surface-elevated rounded w-40" />
-          <div className="h-32 bg-surface-elevated rounded-lg" />
-          <div className="h-48 bg-surface-elevated rounded-lg" />
-          <div className="h-24 bg-surface-elevated rounded-lg" />
-        </div>
-      </div>
-    )
-  }
+  if (authLoading || cartLoading || isLoadingAddress) return <CheckoutSkeleton />
 
-  if (!user || (!isBuyNow && cartCount === 0) || !address) {
-    return (
-      <div className="min-h-screen bg-surface px-4 py-8">
-        <div className="max-w-2xl mx-auto animate-pulse space-y-4">
-          <div className="h-6 bg-surface-elevated rounded w-40" />
-          <div className="h-32 bg-surface-elevated rounded-lg" />
-          <div className="h-48 bg-surface-elevated rounded-lg" />
-          <div className="h-24 bg-surface-elevated rounded-lg" />
-        </div>
-      </div>
-    )
-  }
+  if (!user || (!isBuyNow && cartCount === 0) || !address) return <CheckoutSkeleton />
 
   const effectiveBusinessDiscount = isBuyNow ? buyNowBusinessDiscount : businessDiscountAmount
   const subtotal = isBuyNow ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0) : getCartTotal()
@@ -1181,70 +1191,17 @@ function CheckoutPage() {
                         This pincode is not serviceable for delivery. Please use a different address.
                       </div>
                     )}
-                    <div className="space-y-3">
-                      {isRazorpayEnabled && (
-                        <label
-                          className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
-                        >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="razorpay"
-                            checked={paymentMethod === 'razorpay'}
-                            onChange={() => setPaymentMethod('razorpay')}
-                            className="w-4 h-4 text-accent-600 focus:ring-accent-500"
-                          />
-                          <div className="flex-1">
-                            <p className="font-semibold text-foreground">Pay Online</p>
-                            <p className="text-sm text-foreground-secondary">UPI, Cards, Net Banking, Wallets</p>
-                          </div>
-                          <svg
-                            className="w-8 h-8 text-accent-500"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                            />
-                          </svg>
-                        </label>
-                      )}
-                      <label
-                        className={`${hasDigital ? 'hidden' : 'flex'} items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="manual"
-                          checked={paymentMethod === 'manual'}
-                          onChange={() => setPaymentMethod('manual')}
-                          className="w-4 h-4 text-accent-600 focus:ring-accent-500"
-                        />
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">Request Manual Payment</p>
-                          <p className="text-sm text-foreground-secondary">
-                            Our team will contact you for payment details
-                          </p>
-                        </div>
-                        <svg
-                          className="w-8 h-8 text-foreground-muted"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                          />
-                        </svg>
-                      </label>
-                    </div>
+                    <PaymentSections
+                      amountInr={finalTotal}
+                      upi={upiEnabled}
+                      razorpay={isRazorpayEnabled}
+                      manual={hasDigital ? false : { title: 'Request Manual Payment', description: 'Our team will contact you for payment details' }}
+                      value={paymentMethod}
+                      onChange={v => {
+                        payTouched.current = true
+                        setPaymentMethod(v)
+                      }}
+                    />
                   </div>
 
                   {paymentMethod === 'manual' && (
@@ -1463,6 +1420,7 @@ function CheckoutPage() {
                     isSubmitting ||
                     !serviceable ||
                     (paymentMethod === 'manual' && hasDigital) ||
+                    (paymentMethod === 'upi' && !upiEnabled) ||
                     (paymentMethod === 'razorpay' && (!isRazorpayEnabled || !razorpayLoaded))
                   }
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
@@ -1470,9 +1428,9 @@ function CheckoutPage() {
                   {isSubmitting ? (
                     <>
                       <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                      {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
+                      {paymentMethod === 'manual' ? 'Placing Order...' : 'Processing...'}
                     </>
-                  ) : paymentMethod === 'razorpay' ? (
+                  ) : paymentMethod !== 'manual' ? (
                     <>
                       <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -1504,6 +1462,16 @@ function CheckoutPage() {
             </div>
           </div>
         </form>
+        <UpiManualDialog
+          manual={upi.manual}
+          busy={upi.busy}
+          error={upi.error}
+          onConfirm={upi.confirmUtr}
+          onClose={() => {
+            upi.dismissManual()
+            setIsSubmitting(false)
+          }}
+        />
       </div>
       <div className="container mx-auto px-4 pb-8">
         <FeaturedForYou variant="business" compact limit={4} />

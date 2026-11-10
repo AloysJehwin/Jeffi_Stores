@@ -121,6 +121,92 @@ const CLEAR_CART = 'DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved
 
 export type CaptureOutcome = 'paid' | 'already_paid' | 'committed' | 'adjustment' | 'variant_change' | 'needs_action' | 'unmatched'
 
+/** Books a store's share of a payment; routeCapturedPayment (Razorpay Route) unless a gateway overrides it. */
+export type BookPayment = (p: { store: Store; paymentId: string; totalAmountInr: number; orderId: string; orderRef: string }) => Promise<void>
+
+/** How a captured payment is written and booked. Every field defaults to Razorpay. */
+export interface CaptureGateway {
+  /** payments.payment_gateway of the row that was waiting for it. */
+  gateway?: string
+  /** payments.payment_method on a new row. */
+  method?: string
+  vpa?: string | null
+  /** Replaces the razorpay_* gateway_response shape. */
+  gatewayResponse?: Record<string, unknown>
+  book?: BookPayment
+  /** Who took the money, for the manual-action task text. */
+  label?: string
+}
+
+const bookOf = (gw?: CaptureGateway): BookPayment => gw?.book ?? routeCapturedPayment
+
+export interface PaidOrderRecord {
+  order_id: string
+  user_id: string | null
+  total_amount: string
+  order_number: string
+  gclid?: string | null
+  gbraid?: string | null
+  wbraid?: string | null
+}
+
+/**
+ * Flips an existing order to paid and completes its pending payment row (inserting one when the store
+ * never made it). Only the call whose UPDATE flipped the order books the store's share.
+ */
+export async function markOrderPaid(opts: {
+  record: PaidOrderRecord
+  paymentId: string
+  gatewayResponse: Record<string, unknown>
+  store: Store
+  gw?: CaptureGateway
+  /** Insert a completed row when no pending one exists (the Razorpay webhook never needs this). */
+  insertIfMissing?: boolean
+}): Promise<'paid'> {
+  const { record, paymentId } = opts
+  const gateway = opts.gw?.gateway ?? 'razorpay'
+  const orderId = record.order_id
+  let flipped = false
+  await withTransaction(async client => {
+    const upd = await client.query(
+      `UPDATE orders SET payment_status = 'paid',
+        status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+        updated_at = NOW()
+       WHERE id = $1 AND payment_status != 'paid'`,
+      [orderId]
+    )
+    flipped = (upd.rowCount ?? 0) > 0
+    const pu = await client.query(
+      `UPDATE payments
+       SET transaction_id = $1, status = 'completed',
+           gateway_response = $2, vpa = COALESCE($5, vpa), updated_at = NOW()
+       WHERE order_id = $3 AND payment_gateway = $4 AND status = 'pending'`,
+      [paymentId, JSON.stringify(opts.gatewayResponse), orderId, gateway, opts.gw?.vpa ?? null]
+    )
+    if (opts.insertIfMissing && !pu.rowCount) {
+      await client.query(
+        `INSERT INTO payments (order_id, payment_method, payment_gateway, transaction_id, amount, status, gateway_response, vpa)
+         VALUES ($1, $2, $3, $4, $5, 'completed', $6, $7) ON CONFLICT (transaction_id) DO NOTHING`,
+        [orderId, opts.gw?.method ?? gateway, gateway, paymentId, record.total_amount, JSON.stringify(opts.gatewayResponse), opts.gw?.vpa ?? null]
+      )
+    }
+    if (record.user_id) await client.query(CLEAR_CART, [record.user_id])
+  })
+  await queueAdsConversion(orderId, record)
+  await notifyOrderPaid(record.user_id, orderId)
+
+  if (flipped) {
+    bookOf(opts.gw)({
+      store: opts.store,
+      paymentId,
+      totalAmountInr: parseFloat(record.total_amount),
+      orderId,
+      orderRef: record.order_number,
+    }).catch(() => {})
+  }
+  return 'paid'
+}
+
 /** Applies a captured payment to the store this runs in. 'unmatched': nothing here was waiting for it. */
 export async function applyCapturedPayment(payment: any, store: Store): Promise<CaptureOutcome> {
   const rzpOrderId = payment.order_id
@@ -162,39 +248,12 @@ export async function applyCapturedPayment(payment: any, store: Store): Promise<
   }
   if (record.payment_status === 'paid') return 'already_paid'
 
-  const orderId = record.order_id
-  let flipped = false
-  await withTransaction(async client => {
-    const upd = await client.query(
-      `UPDATE orders SET payment_status = 'paid',
-        status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
-        updated_at = NOW()
-       WHERE id = $1 AND payment_status != 'paid'`,
-      [orderId]
-    )
-    flipped = (upd.rowCount ?? 0) > 0
-    await client.query(
-      `UPDATE payments
-       SET transaction_id = $1, status = 'completed',
-           gateway_response = $2, updated_at = NOW()
-       WHERE order_id = $3 AND payment_gateway = 'razorpay' AND status = 'pending'`,
-      [paymentId, JSON.stringify({ razorpay_order_id: rzpOrderId, razorpay_payment_id: paymentId, ...payment }), orderId]
-    )
-    if (record.user_id) await client.query(CLEAR_CART, [record.user_id])
+  return markOrderPaid({
+    record,
+    paymentId,
+    gatewayResponse: { razorpay_order_id: rzpOrderId, razorpay_payment_id: paymentId, ...payment },
+    store,
   })
-  await queueAdsConversion(orderId, record)
-  await notifyOrderPaid(record.user_id, orderId)
-
-  if (flipped) {
-    routeCapturedPayment({
-      store,
-      paymentId,
-      totalAmountInr: parseFloat(record.total_amount),
-      orderId,
-      orderRef: record.order_number,
-    }).catch(() => {})
-  }
-  return 'paid'
 }
 
 /** A payment-link payment: the order the link was made for is paid. */
@@ -294,14 +353,18 @@ export type DraftCommit =
 /**
  * Creates the order for a checkout whose browser never came back to verify. The atomic intent claim
  * elects one winner between this and verify, so the order and its transfer happen once.
+ * `gw` names another gateway (UPI); `paid: false` commits the order unpaid (a manual UPI transfer
+ * awaiting approval), so no money-captured task or booking is made.
  */
 export async function commitDraftFromCapture(
   rzpOrderId: string,
   payment: any,
   store: Store,
-  opts: { via?: string } = {}
+  opts: { via?: string; gw?: CaptureGateway; paid?: boolean } = {}
 ): Promise<DraftCommit> {
   const paymentId = payment.id
+  const paid = opts.paid !== false
+  const label = opts.gw?.label ?? 'Razorpay'
   const intent = await queryOne<{ id: string; draft_token: string; user_id: string; amount_paise: number }>(
     `UPDATE pending_payment_intents SET committed = true
      WHERE razorpay_order_id = $1 AND committed = false
@@ -312,6 +375,7 @@ export async function commitDraftFromCapture(
 
   // The payment is captured but no order can be made from it: someone has to create it or refund.
   const manual = (title: string, description: string): DraftCommit => {
+    if (!paid) return { status: 'needs_action', reason: title }
     createAutoTask({
       userId: intent.user_id,
       sourceKind: 'contact_failed_payment',
@@ -325,7 +389,7 @@ export async function commitDraftFromCapture(
   }
 
   const draft = await verifyDraftToken(intent.draft_token)
-  if (!draft) return manual('Payment captured but draft expired', `Razorpay captured ₹${(intent.amount_paise / 100).toFixed(2)} but the checkout session expired.`)
+  if (!draft) return manual('Payment captured but draft expired', `${label} captured ₹${(intent.amount_paise / 100).toFixed(2)} but the checkout session expired.`)
 
   const capturedPaise = payment.amount
   if (Math.abs(capturedPaise - intent.amount_paise) > 1) {
@@ -375,7 +439,18 @@ export async function commitDraftFromCapture(
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const paymentRecord = { gatewayOrderId: rzpOrderId, paymentId, signature: '', amountPaise: capturedPaise }
+  const paymentRecord = paid
+    ? {
+        gatewayOrderId: rzpOrderId,
+        paymentId,
+        signature: '',
+        amountPaise: capturedPaise,
+        ...(opts.gw?.gateway ? { gateway: opts.gw.gateway } : {}),
+        ...(opts.gw?.method ? { method: opts.gw.method } : {}),
+        ...(opts.gw?.vpa ? { vpa: opts.gw.vpa } : {}),
+        ...(opts.gw?.gatewayResponse ? { gatewayResponse: opts.gw.gatewayResponse } : {}),
+      }
+    : null
   const common = {
     userId: intent.user_id,
     user,
@@ -415,7 +490,11 @@ export async function commitDraftFromCapture(
     notifyAccessGranted(intent.user_id, created.order_number).catch(() => {})
   }
   const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
-  sendPaidNotifications(user, fullOrder || created, orderItems || [])
+  if (paid) sendPaidNotifications(user, fullOrder || created, orderItems || [])
+  else {
+    sendOrderConfirmationEmail(user.email, fullOrder || created, orderItems || []).catch(() => {})
+    sendNewOrderNotification(fullOrder || created, orderItems || [], user).catch(() => {})
+  }
   logActivity({
     userId: intent.user_id,
     kind: 'order_placed',
@@ -431,13 +510,15 @@ export async function commitDraftFromCapture(
   ).catch(() => {})
   attributeConversion(intent.user_id, created.id).catch(() => {})
 
-  routeCapturedPayment({
-    store,
-    paymentId,
-    totalAmountInr: parseFloat(created.total_amount),
-    orderId: created.id,
-    orderRef: created.order_number,
-  }).catch(() => {})
+  if (paid) {
+    bookOf(opts.gw)({
+      store,
+      paymentId,
+      totalAmountInr: parseFloat(created.total_amount),
+      orderId: created.id,
+      orderRef: created.order_number,
+    }).catch(() => {})
+  }
 
   return { status: 'committed', order: created }
 }

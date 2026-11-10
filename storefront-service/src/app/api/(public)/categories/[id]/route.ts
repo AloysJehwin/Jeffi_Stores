@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryCount } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { actorOf, closeIfLocked, discardGuard } from '@/lib/admin/draft-locks'
+import { actorOf } from '@/lib/admin/draft-locks'
+import { deleteCategoryRow, discardReply } from '@/lib/admin/discard-rows'
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -9,35 +9,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const admin = await requireAdminScope(request, 'categories:write')
     if (admin instanceof NextResponse) return admin
 
-    const categoryId = id
-
-    const productCount = await queryCount('SELECT COUNT(*) FROM products WHERE category_id = $1', [categoryId])
-
-    if (productCount > 0) {
-      return NextResponse.json(
-        { error: `Cannot delete category. It has ${productCount} product(s) assigned to it.` },
-        { status: 400 }
-      )
-    }
-
-    const subCategoryCount = await queryCount('SELECT COUNT(*) FROM categories WHERE parent_category_id = $1', [
-      categoryId,
-    ])
-
-    if (subCategoryCount > 0) {
-      return NextResponse.json(
-        { error: `Cannot delete category. It has ${subCategoryCount} subcategory(ies).` },
-        { status: 400 }
-      )
-    }
-
-    const actor = actorOf(admin)
-    const denied = await discardGuard(actor, 'category', categoryId)
-    if (denied) return denied
-    await query('DELETE FROM categories WHERE id = $1', [categoryId])
-    await closeIfLocked(actor, 'category', categoryId)
-
-    return NextResponse.json({ success: true })
+    return discardReply(await deleteCategoryRow(actorOf(admin), id))
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to delete category' }, { status: 500 })
   }

@@ -1,5 +1,5 @@
-import VisitorSkeleton from '@/components/visitor/VisitorSkeleton'
+import { SupportSkeleton } from '@/components/visitor/skeletons/marketing'
 
 export default function Loading() {
-  return <VisitorSkeleton variant="page" />
+  return <SupportSkeleton portal="business" />
 }

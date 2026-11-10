@@ -36,6 +36,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/ecom/PurgeCustomerButton.tsx',
   'controller-service/src/components/admin/ecom/detail/AccountModeToggle.tsx',
   'controller-service/src/components/admin/ecom/detail/DeliveryModeToggle.tsx',
+  'controller-service/src/components/admin/ecom/detail/UpiModeToggle.tsx',
+  'controller-service/src/components/admin/ecom/detail/MessagingSenders.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
   'controller-service/src/components/admin/ecom/detail/DnsResyncButton.tsx',
   'controller-service/src/components/admin/ecom/detail/ReconcileButton.tsx',

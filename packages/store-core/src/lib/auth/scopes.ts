@@ -244,7 +244,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'delhivery:read',
     label: 'Pickup Requests (Read)',
     description: 'View Delhivery pickup requests and scheduling',
-    routes: ['/admin/delhivery', '/admin/wallet'],
+    routes: ['/admin/delhivery', '/admin/wallet', '/admin/pay'],
     group: 'Fulfilment',
   },
   {
@@ -890,6 +890,8 @@ export function getScopeForPath(pathname: string): string | null {
   // plans without financial:* (basic/growth). Keep this above the generic financial match.
   if (pathname.startsWith('/api/admin/financial/wallet/topup')) return 'delhivery:read'
   if (pathname.startsWith('/api/admin/financial')) return 'financial:read'
+  if (pathname.startsWith('/api/admin/payments/upi')) return 'financial:read'
+  if (pathname.startsWith('/api/admin/integrations/upi') || pathname.startsWith('/api/admin/integrations/phonepe')) return 'financial:read'
   // Batch allocation for an order line / invoice create — an orders-flow helper that
   // lives under /inventory but is gated on orders:read (see the route handler), so it
   // must be reachable on plans without inventory:*. Keep this above the generic match.
@@ -964,6 +966,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/ecom/billing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/ai-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/compute-pricing')) return 'ecom_billing:read'
+  if (pathname.startsWith('/api/admin/ecom/messaging-addon-pricing')) return 'ecom_billing:read'
   if (/^\/api\/admin\/ecom\/[^/]+\/compute/.test(pathname)) return 'ecom_instances:read'
   if (/^\/api\/admin\/ecom\/[^/]+\/certs/.test(pathname)) return 'ecom_customers:read'
   if (pathname.startsWith('/api/admin/ecom/store-status')) return 'ecom_customers:read'

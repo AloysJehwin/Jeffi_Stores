@@ -7,6 +7,7 @@ import IconButton from '@/components/ui/IconButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { AlertConfig, AlertRow, NotifySettings } from '@/lib/google-ads/alerts'
 import { inputCls, btnGhost, btnPrimary } from './wizard/fields'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 
 // Overview > Alerts: what the rules after each sync found, with the per-store thresholds.
 
@@ -105,7 +106,7 @@ export default function AlertsPanel() {
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !d ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingLines lines={2} />
       ) : open.length === 0 ? (
         <p className="text-sm text-foreground-muted">
           No open alerts. Rules run after every sync{dismissed ? `; ${dismissed} dismissed alert(s) stay quiet until they clear` : ''}.

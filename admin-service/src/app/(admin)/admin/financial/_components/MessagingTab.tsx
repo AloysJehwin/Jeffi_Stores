@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, pct, type Col } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { MessagingTabSkeleton } from './FinanceSkeletons'
 import { ap } from '@/lib/shared/admin-path'
 import { delta } from '@/lib/overview/period'
 import { KeyedTrendCard, MixDonutCard } from '@/components/admin/kit/charts'
@@ -74,7 +75,7 @@ export function MessagingTab() {
     <div className="space-y-5">
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} />}
+      {loading && !data ? <MessagingTabSkeleton /> : data && <Body d={data} />}
     </div>
   )
 }

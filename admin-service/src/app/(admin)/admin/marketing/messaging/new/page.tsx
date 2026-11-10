@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Bell, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil } from 'lucide-react'
+import { Bell, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Paperclip, Send, X, Save } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { fetchJson } from '@/components/admin/kit/infinite'
+import { EMBEDDED_PAGE_SIZE, Pager, usePagedList } from '@/components/admin/kit/pager'
+import { Sk } from '@/components/admin/kit/skeleton'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import LibraryTemplatePicker from '@/components/admin/messaging-templates/LibraryTemplatePicker'
 import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
@@ -13,6 +15,12 @@ import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { WhatsAppPreview, waSlots } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
 import WaParamsForm, { waParams, VarInput, usageContext } from '@/components/admin/campaigns/WaParamsForm'
 import { PushFields, PushPreview } from '@/components/admin/campaigns/PushEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
+import { MESSAGING_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
+import { EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email-layouts'
+import { renderBlocks, type EmailBlock } from '@/lib/templates/blocks'
+import { MAX_ATTACHMENT_BYTES, hasEmailContent, type EmailAttachment, type MessagingEmail } from '@/lib/messaging/broadcast-shared'
 import { pushCopyProblem, type PushChannel } from '@/lib/push/copy'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
@@ -36,9 +44,14 @@ type Channels = Partial<
     { slug: string; vars?: Record<string, string>; subject?: string; media_url?: string; button_url?: string }
   >
 >
-type Payload = Channels & { push?: PushChannel }
+type Payload = Omit<Channels, 'email'> & { email?: MessagingEmail; push?: PushChannel }
 const TEMPLATE_CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
-type Loaded = { slug: string; subject: string | null; body: string; approval_status: string | null; blocks?: any }
+type Loaded = { slug: string; subject: string | null; body: string; approval_status: string | null; blocks?: any; layout?: 'store' | 'none' }
+type EmailMode = 'template' | 'custom'
+type CouponOption = { id: string; code: string; discount_type: string; discount_value: string | number; is_active?: boolean }
+// The store layout's themes plus No layout; Custom is the Classic look, so it isn't offered separately.
+const LAYOUT_CHOICES = EMAIL_LAYOUT_OPTIONS.filter(l => l.key !== 'custom')
+const fmtBytes = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 const CHANNELS: Array<{ key: Tab; label: string; icon: typeof Mail; note: string }> = [
   { key: 'email', label: 'Email', icon: Mail, note: 'Customers with an email address' },
@@ -128,6 +141,21 @@ export default function NewMessagePage() {
   const [previewTab, setPreviewTab] = useState<Tab>('email')
   const [subject, setSubject] = useState('')
   const [title, setTitle] = useState('')
+  // Email: a library template, or one written here (rich text or blocks) with its own layout, coupon and files.
+  const [emailMode, setEmailMode] = useState<EmailMode>('template')
+  const [emailFormat, setEmailFormat] = useState<'richtext' | 'blocks'>('blocks')
+  const [emailBody, setEmailBody] = useState('')
+  const [emailBlocks, setEmailBlocks] = useState<EmailBlock[]>([])
+  const [emailLayout, setEmailLayout] = useState('')
+  const [preheader, setPreheader] = useState('')
+  const [replyTo, setReplyTo] = useState('')
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [couponId, setCouponId] = useState('')
+  const [coupons, setCoupons] = useState<CouponOption[] | null>(null)
+  const [testSending, setTestSending] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [sendRate, setSendRate] = useState(14)
   const [audienceType, setAudienceType] = useState('all')
   const [daysSinceOrder, setDaysSinceOrder] = useState('30')
   const [segment, setSegment] = useState('vip')
@@ -177,14 +205,24 @@ export default function NewMessagePage() {
   const active: Tab[] = [...tplActive, ...(push ? (['push'] as const) : [])]
   const isOn = (k: Tab) => (k === 'push' ? !!push : !!channels[k])
   const pushProblem = push ? pushCopyProblem(push) : null
-  const ready = active.length > 0 && tplActive.every(k => channels[k]!.slug) && !pushProblem
-  // Email can be left empty in step 1 — step 2's AI Assist writes it.
-  const step1Ready = active.length > 0 && tplActive.every(k => k === 'email' || channels[k]!.slug)
+  const customEmail = emailMode === 'custom'
+  const chosen = (k: Channel) => (k === 'email' ? customEmail || !!channels.email?.slug : !!channels[k]?.slug)
+  const step1Ready = active.length > 0 && tplActive.every(chosen)
 
   // What the send stores: shared named vars for email/SMS, numbered slots for WhatsApp, push copy.
   const payloadChannels = useMemo<Payload>(() => {
     const out: Payload = {}
-    if (channels.email?.slug) out.email = { slug: channels.email.slug, vars, ...(subject ? { subject } : {}) }
+    if (channels.email && (customEmail || channels.email.slug))
+      out.email = {
+        ...(customEmail
+          ? { mode: 'custom' as const, format: emailFormat, ...(emailFormat === 'blocks' ? { blocks: emailBlocks } : { body: emailBody }) }
+          : { slug: channels.email.slug, vars }),
+        ...(subject ? { subject } : {}),
+        ...(preheader ? { preheader } : {}),
+        ...(emailLayout ? { layout: emailLayout } : {}),
+        ...(attachments.length ? { attachments } : {}),
+        ...(replyTo.trim() ? { reply_to: replyTo.trim() } : {}),
+      }
     if (channels.sms?.slug) out.sms = { slug: channels.sms.slug, vars }
     if (channels.whatsapp?.slug)
       out.whatsapp = {
@@ -195,13 +233,19 @@ export default function NewMessagePage() {
       }
     if (push) out.push = push
     return out
-  }, [channels, vars, waVars, waMedia, waLink, subject, push])
+  }, [channels, vars, waVars, waMedia, waLink, subject, push, customEmail, emailFormat, emailBlocks, emailBody, preheader, emailLayout, attachments, replyTo])
+  const emailReady = !channels.email || hasEmailContent(payloadChannels.email)
+  const ready = active.length > 0 && tplActive.every(chosen) && emailReady && !pushProblem
 
   useEffect(() => {
     fetch('/api/admin/review-forms?page=1')
       .then(r => r.json())
       .then(d => setReviewForms(d.forms || []))
       .catch(() => {})
+    fetch('/api/admin/coupons?is_active=true', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setCoupons(d?.coupons ?? []))
+      .catch(() => setCoupons([]))
     fetch('/api/admin/customer-tag-definitions', { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then(d => setTagDefs((d?.definitions || []).map((x: { tag: string }) => x.tag)))
@@ -220,13 +264,15 @@ export default function NewMessagePage() {
     draftIdRef.current = draftId
   }, [draftId])
 
+  // The coupon rides in the audience filter, where the send reads it (and makes each recipient eligible).
   const buildAudienceFilter = useCallback((): Record<string, unknown> => {
-    if (audienceType === 'order_history') return { daysSinceOrder: parseInt(daysSinceOrder, 10) || 30 }
-    if (audienceType === 'segment') return { segment }
-    if (audienceType === 'tag') return { tags: selectedTags }
-    if (audienceType === 'specific_user') return { userId: specificUser?.id }
-    return {}
-  }, [audienceType, daysSinceOrder, segment, selectedTags, specificUser])
+    const c = couponId ? { couponId } : {}
+    if (audienceType === 'order_history') return { ...c, daysSinceOrder: parseInt(daysSinceOrder, 10) || 30 }
+    if (audienceType === 'segment') return { ...c, segment }
+    if (audienceType === 'tag') return { ...c, tags: selectedTags }
+    if (audienceType === 'specific_user') return { ...c, userId: specificUser?.id }
+    return c
+  }, [audienceType, daysSinceOrder, segment, selectedTags, specificUser, couponId])
 
   // Picked templates' current content (drives the variable inputs and previews).
   const slugKey = tplActive.map(k => `${k}:${channels[k]?.slug ?? ''}`).join('|')
@@ -248,6 +294,7 @@ export default function NewMessagePage() {
               body: v.body ?? '',
               approval_status: a.approval_status ?? null,
               blocks: v.blocks ?? null,
+              layout: v.layout === 'none' ? 'none' : 'store',
             },
           }))
         })
@@ -262,11 +309,11 @@ export default function NewMessagePage() {
   const fields = useMemo(
     () =>
       namedVars(
-        channels.email ? loaded.email?.subject : '',
-        channels.email ? loaded.email?.body : '',
+        channels.email && !customEmail ? loaded.email?.subject : '',
+        channels.email && !customEmail ? loaded.email?.body : '',
         channels.sms ? loaded.sms?.body : ''
-      ),
-    [channels.email, channels.sms, loaded]
+      ).filter(f => !(couponId && /^(couponCode|discountPercent|discountLabel)$/.test(f))),
+    [channels.email, channels.sms, loaded, customEmail, couponId]
   )
   const slots = channels.whatsapp && loaded.whatsapp ? waSlots(loaded.whatsapp.body) : []
   const waP = useMemo(
@@ -350,7 +397,19 @@ export default function NewMessagePage() {
         setChannels({ email: { slug: LEGACY_SLUG[campaign.template_key] } })
         setVars(campaign.template_data || {})
       } else {
-        setChannels(ch)
+        const em = ch.email
+        setChannels({ ...ch, ...(em ? { email: { slug: em.slug ?? '' } } : {}) } as Channels)
+        if (em) {
+          setEmailMode(em.mode === 'custom' ? 'custom' : 'template')
+          if (em.format) setEmailFormat(em.format)
+          setEmailBody(em.body ?? '')
+          setEmailBlocks(Array.isArray(em.blocks) ? (em.blocks as EmailBlock[]) : [])
+          setEmailLayout(em.layout ?? '')
+          setPreheader(em.preheader ?? '')
+          setReplyTo(em.reply_to ?? '')
+          setAttachments(em.attachments ?? [])
+        }
+        setCouponId(typeof campaign.audience_filter?.couponId === 'string' ? campaign.audience_filter.couponId : '')
         setPush(savedPush ?? null)
         setVars(ch.email?.vars ?? ch.sms?.vars ?? {})
         setWaVars(ch.whatsapp?.vars ?? {})
@@ -408,13 +467,13 @@ export default function NewMessagePage() {
       const res = await fetch('/api/admin/mailer/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_key: 'library', channels: payloadChannels, subject }),
+        body: JSON.stringify({ template_key: 'library', channels: payloadChannels, subject, coupon_id: couponId || undefined }),
       })
       setPreviewHtml((await res.json()).html || '')
     } finally {
       setPreviewLoading(false)
     }
-  }, [payloadChannels, subject])
+  }, [payloadChannels, subject, couponId])
 
   useEffect(() => {
     if (step !== 2) return
@@ -429,12 +488,11 @@ export default function NewMessagePage() {
     () => JSON.stringify({ audience_type: audienceType, audience_filter: buildAudienceFilter(), push: !!push }),
     [audienceType, buildAudienceFilter, push]
   )
-  // Recipients load 25 at a time; count/withPhone come with the first page.
-  const audience = useInfiniteList<Recipient>({
+  // Recipients, one page of 10 at a time; count/withPhone come with the first page.
+  const audience = usePagedList<Recipient>({
     key: step === 3 ? audienceKey : null,
-    pageSize: 25,
     fetchPage: async (p, signal) => {
-      const body = { ...JSON.parse(audienceKey || '{}'), offset: (p - 1) * 25, limit: 25 }
+      const body = { ...JSON.parse(audienceKey || '{}'), offset: (p - 1) * EMBEDDED_PAGE_SIZE, limit: EMBEDDED_PAGE_SIZE }
       const data = await fetchJson('/api/admin/mailer/audience-preview', signal, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -444,6 +502,7 @@ export default function NewMessagePage() {
         setAudienceCount(data.count ?? 0)
         setWithPhone(data.withPhone ?? 0)
         setWithEmail(data.withEmail ?? data.count ?? 0)
+        if (data.emailRate) setSendRate(data.emailRate)
         setPushReach(data.push ?? null)
       }
       return { rows: data.recipients || [], total: data.count ?? 0 }
@@ -494,11 +553,14 @@ export default function NewMessagePage() {
       setWaMedia('')
       setWaLink('')
     }
-    if (k === 'email') setSubject('')
+    if (k === 'email') {
+      setSubject('')
+      setEmailLayout('')
+    }
     setEditing(null)
   }
 
-  // AI writes an email, which is saved as a new template in this store's library and picked.
+  // AI writes the email straight into the composer; "Save as template" keeps it in the library if wanted.
   async function generateFromScenario() {
     if (scenarioPrompt.trim().length < 10 || scenarioLoading) return
     setScenarioLoading(true)
@@ -507,7 +569,7 @@ export default function NewMessagePage() {
       const res = await fetch('/api/admin/ai-generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: scenarioPrompt, subject, variables: fields, campaign: true }),
+        body: JSON.stringify({ scenario: scenarioPrompt, subject, variables: ['firstName', ...(couponId ? ['couponCode', 'discountLabel'] : [])], campaign: true }),
       })
       const data = (await res.json()) as { html?: string; error?: string }
       if (!res.ok || !data.html) return setScenarioError(data.error || 'Generation failed')
@@ -515,33 +577,94 @@ export default function NewMessagePage() {
         .match(/<h2[^>]*>(.*?)<\/h2>/i)?.[1]
         ?.replace(/<[^>]+>/g, '')
         .trim()
-      const name = subject || h2 || scenarioPrompt.slice(0, 60)
-      const slug = `messaging/ai-${Date.now().toString(36)}`
-      const created = await fetch('/api/admin/messaging-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          channel: 'email',
-          name,
-          category: 'messaging',
-          subject: subject || h2 || name,
-          body: data.html,
-          blocks_format: 'tiptap-html',
-          publish: true,
-        }),
-      })
-      if (!created.ok) return setScenarioError('Generated, but saving it as a template failed')
-      setChannels(p => ({ ...p, email: { slug } }))
-      setLoaded(p => ({
-        ...p,
-        email: { slug, subject: subject || h2 || name, body: data.html!, approval_status: null },
-      }))
-      showToast('Saved as a new email template in your library.', 'success')
+      setEmailMode('custom')
+      setEmailFormat('richtext')
+      setEmailBody(data.html)
+      if (!subject && h2) setSubject(h2)
+      showToast('Written into the email below — edit it as you like.', 'success')
     } catch {
       setScenarioError('Network error')
     } finally {
       setScenarioLoading(false)
+    }
+  }
+
+  // Keeps an email written here in the library, so it can be reused.
+  async function saveAsTemplate() {
+    const email = payloadChannels.email
+    if (!email || !hasEmailContent(email) || savingTemplate) return
+    setSavingTemplate(true)
+    try {
+      const name = subject || title || 'Message email'
+      const res = await fetch('/api/admin/messaging-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: `messaging/${Date.now().toString(36)}`,
+          channel: 'email',
+          name,
+          category: 'messaging',
+          subject: subject || name,
+          ...(preheader ? { preheader } : {}),
+          ...(emailFormat === 'blocks'
+            ? { body: renderBlocks(emailBlocks), blocks: { blocks: emailBlocks }, blocks_format: 'email-blocks' }
+            : { body: emailBody, blocks_format: 'tiptap-html' }),
+          ...(emailLayout === 'none' ? { layout: 'none' } : {}),
+          publish: true,
+        }),
+      })
+      if (!res.ok) return setError((await res.json().catch(() => ({}))).error || 'Saving the template failed')
+      showToast('Saved to your email templates.', 'success')
+    } catch {
+      setError('Network error')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  async function addAttachments(files: FileList | null) {
+    if (!files?.length) return
+    setUploading(true)
+    try {
+      let total = attachments.reduce((n, a) => n + a.size, 0)
+      const added: EmailAttachment[] = []
+      for (const file of Array.from(files)) {
+        if (total + file.size > MAX_ATTACHMENT_BYTES) {
+          setError(`${file.name} would take the attachments over 5 MB`)
+          continue
+        }
+        const form = new FormData()
+        form.append('file', file)
+        const res = await fetch('/api/admin/mailer/attachments', { method: 'POST', body: form, credentials: 'include' })
+        const d = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(d.error || `Could not attach ${file.name}`)
+          continue
+        }
+        total += d.size
+        added.push({ url: d.url, name: file.name, size: d.size, mime: d.mime })
+      }
+      if (added.length) setAttachments(p => [...p, ...added])
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function sendTest() {
+    if (testSending || !payloadChannels.email) return
+    setTestSending(true)
+    try {
+      const res = await fetch('/api/admin/mailer/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ channels: { email: payloadChannels.email }, subject: subject || title, coupon_id: couponId || undefined }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) return setError(d.error || 'Test send failed')
+      showToast(`Test sent to ${d.to}`, 'success')
+    } finally {
+      setTestSending(false)
     }
   }
 
@@ -551,7 +674,7 @@ export default function NewMessagePage() {
     setError('')
     try {
       const audienceFilter = buildAudienceFilter()
-      const emailSubject = subject || loaded.email?.subject || title || 'Message'
+      const emailSubject = subject || (customEmail ? '' : loaded.email?.subject) || title || 'Message'
       const fields = {
         title: title || emailSubject,
         template_key: 'library',
@@ -625,7 +748,7 @@ export default function NewMessagePage() {
         <DraftLockBanner lock={lock} scope="mailer:write" className="mb-4" />
 
         {/* Read-only viewers step through the draft here; the step buttons are disabled for them. */}
-        <div className="flex gap-1 mb-6 max-w-3xl">
+        <div className="flex gap-1 mb-6">
           {[1, 2, 3].map(s => (
             <button
               key={s}
@@ -640,13 +763,13 @@ export default function NewMessagePage() {
 
         {/* ── Step 1: channels + a library template per channel ── */}
         {step === 1 && (
-          <LockedFieldset readOnly={lock.readOnly} className="max-w-3xl space-y-4">
+          <LockedFieldset readOnly={lock.readOnly} className="space-y-4">
             <p className="text-sm text-foreground-secondary">
               Pick one or more channels and a template for each from your{' '}
               <Link href={ap('/admin/marketing/messaging-templates')} className="text-accent-500 hover:underline">
                 Templates
               </Link>{' '}
-              library.
+              library — or write the email right here.
             </p>
             {CHANNELS.filter(c => shown(c.key)).map(c => {
               const on = isOn(c.key)
@@ -672,7 +795,29 @@ export default function NewMessagePage() {
                   {on && c.key === 'push' && (
                     <p className="mt-2 pl-7 text-[11px] text-foreground-muted">Write the title, text and link in the next step.</p>
                   )}
-                  {on && c.key !== 'push' && (
+                  {on && c.key === 'email' && (
+                    <div className="mt-3 pl-7 flex flex-wrap gap-2" role="radiogroup" aria-label="Email content">
+                      {(
+                        [
+                          ['template', 'Use a template', 'One from your library, with its own layout setting'],
+                          ['custom', 'Write it here', 'Design this email now — text or blocks, products, coupon, files'],
+                        ] as const
+                      ).map(([m, label, hint]) => (
+                        <button
+                          key={m}
+                          type="button"
+                          role="radio"
+                          aria-checked={emailMode === m}
+                          onClick={() => setEmailMode(m)}
+                          className={`flex-1 min-w-[220px] rounded-lg border px-3 py-2 text-left transition-colors ${emailMode === m ? 'border-accent-500 bg-surface-elevated' : 'border-border-default hover:bg-surface-secondary'}`}
+                        >
+                          <span className="block text-sm font-medium text-foreground">{label}</span>
+                          <span className="block text-[11px] text-foreground-muted">{hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {on && c.key !== 'push' && !(c.key === 'email' && customEmail) && (
                     <div className="mt-3 pl-7">
                       <LibraryTemplatePicker
                         channel={c.key}
@@ -681,12 +826,12 @@ export default function NewMessagePage() {
                         onChange={slug => pickTemplate(c.key as Channel, slug)}
                         allowNone={false}
                       />
-                      {c.key === 'email' && canUseAi && !channels.email?.slug && (
-                        <p className="mt-1.5 text-[11px] text-foreground-muted">
-                          Or leave it empty and write one with AI in the next step.
-                        </p>
-                      )}
                     </div>
+                  )}
+                  {on && c.key === 'email' && customEmail && (
+                    <p className="mt-2 pl-7 text-[11px] text-foreground-muted">
+                      You&apos;ll write it in the next step{canUseAi ? ' — or have AI draft it for you' : ''}.
+                    </p>
                   )}
                 </div>
               )
@@ -699,12 +844,12 @@ export default function NewMessagePage() {
         {step === 2 && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
             <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
-              {canUseAi && channels.email && (
+              {canUseAi && channels.email && customEmail && (
                 <div className="bg-violet-500/5 border border-violet-500/40 rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
                     <p className="text-sm font-semibold text-violet-700 dark:text-violet-400">
-                      Write a new email with AI
+                      Draft this email with AI
                     </p>
                   </div>
                   <textarea
@@ -712,7 +857,7 @@ export default function NewMessagePage() {
                     onChange={e => setScenarioPrompt(e.target.value)}
                     rows={2}
                     className={`${inputClass} resize-none`}
-                    placeholder="e.g. 'Diwali sale 20% off power tools, CTA to /products' — saved as a new email template and used for this message"
+                    placeholder="e.g. 'Diwali sale 20% off power tools, CTA to /products' — written into the email below for you to edit"
                   />
                   <div className="flex items-center gap-2">
                     <RequireWrite scope="mailer:write">
@@ -727,7 +872,7 @@ export default function NewMessagePage() {
                         ) : (
                           <Sparkles className="w-3.5 h-3.5" />
                         )}
-                        {scenarioLoading ? 'Generating…' : 'Generate email'}
+                        {scenarioLoading ? 'Writing…' : 'Write email'}
                       </button>
                     </RequireWrite>
                   </div>
@@ -777,10 +922,135 @@ export default function NewMessagePage() {
                       onChange={e => setSubject(e.target.value)}
                       className={inputClass}
                       placeholder={
-                        loaded.email?.subject ? `Template: ${loaded.email.subject}` : 'Subject line customers will see'
+                        !customEmail && loaded.email?.subject ? `Template: ${loaded.email.subject}` : 'Subject line customers will see'
                       }
                     />
                   </AIEnrichButton>
+                </div>
+              )}
+
+              {channels.email && (
+                <div>
+                  <label className={labelClass}>Preview text (optional)</label>
+                  <input
+                    value={preheader}
+                    onChange={e => setPreheader(e.target.value)}
+                    maxLength={200}
+                    className={inputClass}
+                    placeholder="The line inboxes show after the subject"
+                  />
+                </div>
+              )}
+
+              {channels.email && customEmail && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className={labelClass + ' !mb-0'}>Email</label>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
+                        {(['blocks', 'richtext'] as const).map(f => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => {
+                              // Text keeps the blocks' content when switching; blocks start from the text.
+                              if (f === 'richtext' && emailFormat === 'blocks' && !emailBody && emailBlocks.length) setEmailBody(renderBlocks(emailBlocks))
+                              if (f === 'blocks' && emailFormat === 'richtext' && !emailBlocks.length && emailBody) setEmailBlocks([{ type: 'text', html: emailBody }])
+                              setEmailFormat(f)
+                            }}
+                            className={`px-3 h-control-sm rounded-md text-xs font-semibold transition-colors ${emailFormat === f ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+                          >
+                            {f === 'blocks' ? 'Blocks' : 'Rich text'}
+                          </button>
+                        ))}
+                      </div>
+                      <RequireWrite scope="templates:write">
+                        <button
+                          type="button"
+                          onClick={saveAsTemplate}
+                          disabled={savingTemplate || !hasEmailContent(payloadChannels.email)}
+                          className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-secondary text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                        >
+                          {savingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save as template
+                        </button>
+                      </RequireWrite>
+                    </div>
+                  </div>
+                  {emailFormat === 'blocks' ? (
+                    <EmailBlockBuilder
+                      blocks={emailBlocks}
+                      onChange={setEmailBlocks}
+                      extraVariables={MESSAGING_VARIABLES}
+                      hideTypes={['product_rows', 'product_card']}
+                    />
+                  ) : (
+                    <div className="relative">
+                      <EmailComposer value={emailBody} onChange={setEmailBody} extraVariables={MESSAGING_VARIABLES} minHeight={280} />
+                      <AIEnrichButton
+                        placement="in-field"
+                        anchorClassName="absolute right-3 bottom-3 z-10"
+                        fieldLabel="Email body (HTML)"
+                        value={emailBody}
+                        onChange={setEmailBody}
+                        scope="mailer:write"
+                        format="html"
+                        variables={MESSAGING_VARIABLES.map(v => v.key)}
+                        write
+                        broadcast
+                        context={`A broadcast email to customers.${subject ? ` Subject: "${subject}".` : ''}${couponId ? ' Mention the coupon {couponCode} ({discountLabel}).' : ''}`}
+                      />
+                    </div>
+                  )}
+                  <p className="text-[11px] text-foreground-muted">
+                    Use {'{firstName}'} for the customer&apos;s name{couponId ? ', {couponCode} and {discountLabel} for the coupon' : ''}. Store details fill in automatically.
+                  </p>
+                </div>
+              )}
+
+              {channels.email && (
+                <div>
+                  <AdminSelect
+                    label="Email layout"
+                    value={emailLayout}
+                    onChange={setEmailLayout}
+                    options={[
+                      ...(!customEmail
+                        ? [{ value: '', label: `Template's own setting (${loaded.email?.layout === 'none' ? 'no layout' : 'store layout'})` }]
+                        : []),
+                      ...LAYOUT_CHOICES.map(l => ({ value: l.key, label: l.key === 'none' ? 'No layout — just the design' : `Store layout · ${l.label}` })),
+                    ]}
+                  />
+                  <p className="mt-1 text-[11px] text-foreground-muted">
+                    {(() => {
+                      const key = emailLayout || (!customEmail && loaded.email?.layout === 'none' ? 'none' : 'classic')
+                      return key === 'none'
+                        ? 'Sent exactly as designed — pick this when the email already has its own header and footer.'
+                        : 'Your logo header and footer are added around the email.'
+                    })()}
+                  </p>
+                </div>
+              )}
+
+              {coupons && coupons.length > 0 && (
+                <div>
+                  <AdminSelect
+                    label="Coupon (optional)"
+                    value={couponId}
+                    onChange={setCouponId}
+                    options={[
+                      { value: '', label: 'No coupon' },
+                      ...coupons.map(c => ({
+                        value: c.id,
+                        label: `${c.code} · ${c.discount_type === 'percentage' ? `${Number(c.discount_value)}% off` : `₹${Number(c.discount_value)} off`}`,
+                      })),
+                    ]}
+                  />
+                  {couponId && (
+                    <p className="mt-1 text-[11px] text-foreground-muted">
+                      Every recipient can use it. Place it with {'{couponCode}'} / {'{discountLabel}'}
+                      {customEmail && emailFormat === 'blocks' ? ' or the Coupon block' : ''} — in SMS too.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -869,9 +1139,68 @@ export default function NewMessagePage() {
               )}
               {pushProblem && <p className="text-xs text-amber-700 dark:text-amber-400">{pushProblem}</p>}
 
+              {channels.email && (
+                <div className="space-y-3 rounded-lg border border-border-default p-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className={labelClass + ' !mb-0'}>Attachments</label>
+                      <label className={`inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-secondary text-xs font-medium text-foreground-secondary hover:bg-surface-secondary cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />} Attach files
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.csv,.txt,.doc,.docx,.xls,.xlsx,.pptx"
+                          onChange={e => {
+                            void addAttachments(e.target.files)
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {attachments.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {attachments.map((a, i) => (
+                          <li key={a.url} className="flex items-center gap-2 text-xs text-foreground">
+                            <Paperclip className="w-3 h-3 text-foreground-muted" />
+                            <span className="flex-1 min-w-0 truncate">{a.name}</span>
+                            <span className="text-foreground-muted">{fmtBytes(a.size)}</span>
+                            <button type="button" aria-label={`Remove ${a.name}`} onClick={() => setAttachments(p => p.filter((_, x) => x !== i))} className="text-foreground-muted hover:text-red-500">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-foreground-muted">PDF, image or office files, 5 MB in total. Large files slow delivery — a link is often better.</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelClass}>Reply-to address (optional)</label>
+                    <input
+                      type="email"
+                      value={replyTo}
+                      onChange={e => setReplyTo(e.target.value)}
+                      className={inputClass}
+                      placeholder="Where customers' replies go, e.g. sales@yourstore.com"
+                    />
+                  </div>
+                  <RequireWrite scope="mailer:write">
+                    <button
+                      type="button"
+                      onClick={sendTest}
+                      disabled={testSending || !hasEmailContent(payloadChannels.email)}
+                      className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-secondary text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                    >
+                      {testSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />} Send a test to me
+                    </button>
+                  </RequireWrite>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
                 {tplActive
-                  .filter(k => k !== 'whatsapp')
+                  .filter(k => k !== 'whatsapp' && !(k === 'email' && customEmail))
                   .map(k => (
                     <button
                       key={k}
@@ -883,7 +1212,7 @@ export default function NewMessagePage() {
                     </button>
                   ))}
               </div>
-              {editing && channels[editing]?.slug && (
+              {editing && channels[editing]?.slug && !(editing === 'email' && customEmail) && (
                 <LinkedTemplateEditor
                   variableNames={fields}
                   channel={editing}
@@ -934,7 +1263,7 @@ export default function NewMessagePage() {
                     />
                   ) : (
                     <div className="flex items-center justify-center h-[520px] text-foreground-muted text-sm">
-                      Pick an email template to preview
+                      {customEmail ? 'Write the email to preview it' : 'Pick an email template to preview'}
                     </div>
                   )}
                 </div>
@@ -1079,6 +1408,12 @@ export default function NewMessagePage() {
                   end, and nobody gets more than 2 offer pushes a day across messages and campaigns.
                 </p>
               )}
+              {channels.email && withEmail > 0 && (
+                <p className="text-xs text-foreground-muted">
+                  Email goes out at about {sendRate} a second to stay inside your Amazon SES limit — {withEmail.toLocaleString()} emails
+                  take about {withEmail / sendRate < 60 ? `${Math.max(1, Math.ceil(withEmail / sendRate))} seconds` : `${Math.ceil(withEmail / sendRate / 60)} minutes`}.
+                </p>
+              )}
               {scheduledAt && (
                 <p className="text-xs text-foreground-muted">
                   Sending at{' '}
@@ -1109,8 +1444,16 @@ export default function NewMessagePage() {
                 style={{ minHeight: '400px' }}
               >
                 {audienceLoading && (
-                  <div className="flex items-center justify-center h-[400px] text-foreground-muted text-sm gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                  <div className="divide-y divide-border-default" aria-busy="true">
+                    {Array.from({ length: EMBEDDED_PAGE_SIZE }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                        <Sk className="h-7 w-7 shrink-0 rounded-full" />
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <Sk className="h-3.5 w-1/3" />
+                          <Sk className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {!audienceLoading && audienceRecipients.length === 0 && audienceCount !== null && (
@@ -1119,7 +1462,7 @@ export default function NewMessagePage() {
                   </div>
                 )}
                 {!audienceLoading && audienceRecipients.length > 0 && (
-                  <div className="overflow-y-auto divide-y divide-border-default" style={{ maxHeight: '520px' }}>
+                  <div className="divide-y divide-border-default">
                     {audienceRecipients.map((r, i) => (
                       <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                         <div className="w-7 h-7 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
@@ -1142,13 +1485,16 @@ export default function NewMessagePage() {
                         )}
                       </div>
                     ))}
-                    <InfiniteFooter shown={audienceRecipients.length} control={audience} noun="recipients" className="pb-3" />
+                    <Pager className="px-4 pb-3" control={audience.pager} noun="recipients" />
                   </div>
                 )}
                 {!audienceLoading && !audienceRecipients.length && audience.error && (
-                  <div className="p-4">
-                    <InfiniteFooter shown={0} control={audience} />
-                  </div>
+                  <p role="alert" className="flex items-center gap-2 p-4 text-sm text-red-600 dark:text-red-400">
+                    {audience.error}
+                    <button type="button" onClick={audience.reload} className="control-xs border border-red-500/40 hover:bg-red-500/10">
+                      Retry
+                    </button>
+                  </p>
                 )}
               </div>
             </div>

@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { api, btnPrimary, inputCls } from '@/components/admin/kit/core'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { PRESETS, presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 import { monthlyTotal, quoteSpec } from '@controller/lib/compute/pricing'
 import type { Catalog, ComputeSpec, PresetKey, PriceRow, PricingSettings } from '@/lib/compute/spec'
+import { PricingLoading, SETTINGS } from './PricingLoading'
 
 type PlanRow = {
   slug: string
@@ -31,22 +31,6 @@ type View = {
 const ctl = `${inputCls} h-control py-0`
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
 
-const SETTINGS: { key: keyof PricingSettings; label: string; step: string }[] = [
-  { key: 'usdInr', label: 'USD → INR', step: '0.01' },
-  { key: 'gstRate', label: 'GST rate', step: '0.01' },
-  { key: 'platformShareUsd', label: 'Platform share per store (USD/month)', step: '0.5' },
-  { key: 'rootVolumeGb', label: 'Server disk (GB)', step: '1' },
-  { key: 'poolCapacity', label: 'Starter stores per shared server', step: '1' },
-  { key: 'sharedDbCapacity', label: 'Starter stores per shared database', step: '1' },
-  { key: 'sharedDbStorageGb', label: 'Starter database storage (GB)', step: '1' },
-  { key: 'sharedDbMaxConnections', label: 'Shared database connections', step: '10' },
-  { key: 'minPrepayDays', label: 'Days of servers paid upfront', step: '1' },
-  { key: 'graceDays', label: 'Grace days on a negative wallet', step: '1' },
-  { key: 'ipv4UsdHour', label: 'IPv4 (USD/hour)', step: '0.0001' },
-  { key: 'ebsGp3UsdGbMonth', label: 'EBS gp3 (USD/GB-month)', step: '0.001' },
-  { key: 'snapshotUsdGbMonth', label: 'Snapshots (USD/GB-month)', step: '0.001' },
-  { key: 's3UsdGbMonth', label: 'S3 (USD/GB-month)', step: '0.001' },
-]
 
 export default function ComputePricingClient() {
   const canWrite = useCanWrite('ecom_billing:write')
@@ -70,7 +54,7 @@ export default function ComputePricingClient() {
     toast.result({ ok: true, text: 'Saved' })
   }
 
-  if (!view) return <PricingSkeleton />
+  if (!view) return <PricingLoading />
 
   return (
     <div className="space-y-6">
@@ -399,29 +383,5 @@ function MarginField(props: {
       </span>
       <span className="mt-1 block break-words text-xs text-foreground-secondary">{props.example}</span>
     </label>
-  )
-}
-
-const bar = 'bg-surface-secondary rounded'
-
-// Margins card, then the size and price tables, while the pricing loads.
-function PricingSkeleton() {
-  return (
-    <div className="space-y-6 animate-fade-in" aria-busy="true" aria-label="Loading server pricing">
-      <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 animate-pulse">
-        <div className={`h-4 w-24 mb-2 ${bar}`} />
-        <div className={`h-3 w-3/4 mb-6 ${bar} opacity-60`} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ animationDelay: `${i * 50}ms` }}>
-              <div className={`h-3 w-28 mb-2 ${bar}`} />
-              <div className={`h-control w-full ${bar}`} />
-            </div>
-          ))}
-        </div>
-      </div>
-      <AdminTableSkeleton rows={6} cols={6} />
-      <AdminTableSkeleton rows={4} cols={3} />
-    </div>
   )
 }

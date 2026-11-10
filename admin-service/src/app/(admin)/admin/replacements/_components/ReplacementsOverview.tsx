@@ -7,6 +7,7 @@ import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { REPLACEMENT_FIELDS, REQUEST_SEARCH } from '@/lib/filters/fields/returns'
 import { BreakdownBars, fmtDays, withAp } from '../../orders/_components/overview-shared'
 import type { ReturnsData } from '../../returns/_components/ReturnsOverview'
+import ReplacementsOverviewSkeleton from './ReplacementsOverviewSkeleton'
 
 export default function ReplacementsOverview() {
   const [period, setPeriod] = usePeriod()
@@ -31,7 +32,7 @@ export default function ReplacementsOverview() {
       />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (
-        <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+        <ReplacementsOverviewSkeleton />
       ) : data && c && p ? (
         <>
           <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5">

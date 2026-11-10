@@ -11,7 +11,6 @@ import {
   InfiniteFooter,
   ListFilters,
   TextArea,
-  TableSkeleton,
   badgeCls,
   fetchJson,
   useFilterQuery,
@@ -23,6 +22,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { fmtQty } from '@/lib/shared/number-display'
 import { RETURN_FIELDS, REQUEST_SEARCH } from '@/lib/filters/fields/returns'
+import RequestCardsLoading from './_components/RequestCardsLoading'
 
 interface ReturnRow {
   id: string
@@ -413,7 +413,7 @@ export default function AdminReturnsClient() {
       <ListFilters entity="returns" fields={RETURN_FIELDS} search={REQUEST_SEARCH} noun="Returns" tab="list" exportable />
 
       {list.loading ? (
-        <TableSkeleton rows={3} cols={4} />
+        <RequestCardsLoading />
       ) : list.error && !returns.length ? (
         <ErrorState body={list.error} />
       ) : returns.length === 0 ? (

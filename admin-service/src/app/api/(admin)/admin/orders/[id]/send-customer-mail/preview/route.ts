@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const finalSubject = renderTemplate(subject.trim(), ctx.vars)
   const html = await adminContactHtml(finalSubject, renderTemplate(body.trim(), ctx.vars, { escape: true }), {
     isHtml: true,
-    layout: b.layout === 'template' ? 'template' : 'message',
+    layout: b.layout === 'template' || b.layout === 'raw' ? b.layout : 'message',
     preheader: renderTemplate(preheader, ctx.vars),
   })
   return NextResponse.json({

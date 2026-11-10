@@ -6,6 +6,8 @@ import { aiFeatureLabel, aiLedgerNote } from '@/lib/ai/feature-labels'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Card, DataTable, FormButton, FormField, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useActionToast, useFilterQuery, useInfiniteList, useListSort, type DataCol } from '@/components/admin/kit'
 import { WALLET_FIELDS, WALLET_SEARCH } from '@/lib/filters/fields/wallet'
+import { ap } from '@/lib/shared/admin-path'
+import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, useUpiPayment, type PaymentChoice } from '@/components/payments'
 
 type LedgerEntry = {
   id: string
@@ -36,6 +38,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   email: 'Email',
   media: 'Media',
   ad_free: 'Ad-free',
+  messaging_addon: 'SMS & WhatsApp add-on',
   infra: 'Servers',
   adjustment: 'Adjustment',
 }
@@ -60,10 +63,13 @@ export default function WalletClient({
   initial,
   aiSpend = [],
   aiSpendDays = 30,
+  upiEnabled = false,
 }: {
   initial: Wallet | null
   aiSpend?: AiSpendRow[]
   aiSpendDays?: number
+  /** The platform takes UPI for top-ups (walletUpiAvailable). */
+  upiEnabled?: boolean
 }) {
   const canWrite = useCanWrite('delhivery:write')
   const [wallet, setWallet] = useState<Wallet | null>(initial)
@@ -72,6 +78,8 @@ export default function WalletClient({
   const toast = useActionToast()
   // Top-up responses are toasts; same call sites, no banner.
   const setToast = (t: { ok: boolean; text: string } | null) => t && toast.result(t)
+  const [method, setMethod] = useState<PaymentChoice>(upiEnabled ? 'upi' : 'razorpay')
+  const upi = useUpiPayment({ returnTo: ap('/admin/wallet'), returnPath: id => ap(`/admin/pay/upi/${id}/return`), apiBase: '/api/admin/financial/wallet/topup/upi' })
 
   // The ledger's filters live in the URL and are applied on the server, 50 entries a page; the
   // credit / debit cards total every matching entry.
@@ -109,6 +117,11 @@ export default function WalletClient({
   async function topUp() {
     const amountInr = Number(amount)
     if (!(amountInr > 0)) return setToast({ ok: false, text: 'Enter an amount greater than zero.' })
+    if (upiEnabled && method === 'upi') {
+      const started = await upi.start({ purpose: 'wallet_topup', amountInr })
+      if (!started) setToast({ ok: false, text: 'Could not start the UPI payment. Try again or use another method.' })
+      return
+    }
     setBusy(true)
     setToast(null)
     try {
@@ -127,6 +140,7 @@ export default function WalletClient({
         name: 'Wallet top-up',
         description: 'Delhivery shipping wallet',
         order_id: data.razorpayOrderId,
+        ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
         handler: async (response: any) => {
           const vres = await fetch('/api/admin/financial/wallet/topup/verify', {
             method: 'POST',
@@ -215,7 +229,7 @@ export default function WalletClient({
                 <input id="wallet-topup" type="number" min="1" step="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="2000" className={fieldInputCls} />
               </FormField>
             </div>
-            <FormButton type="button" onClick={topUp} pending={busy} pendingLabel="Processing…">
+            <FormButton type="button" onClick={topUp} pending={busy || upi.busy} pendingLabel="Processing…">
               Top up
             </FormButton>
             {Number(amount) > 0 && (
@@ -224,6 +238,12 @@ export default function WalletClient({
               </span>
             )}
           </div>
+          {upiEnabled && (
+            <div className="mt-4 max-w-md">
+              <PaymentSections compact upi razorpay value={method} onChange={setMethod} />
+            </div>
+          )}
+          <UpiManualDialog manual={upi.manual} busy={upi.busy} error={upi.error} onConfirm={upi.confirmUtr} onClose={upi.dismissManual} />
         </Card>
       )}
 
@@ -258,7 +278,7 @@ function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
         </p>
       }
     >
-      <DataTable<AiSpendRow> bare sortNs="ai" rows={rows} cols={cols} rowKey={r => r.feature} />
+      <DataTable<AiSpendRow> bare paged sortNs="ai" rows={rows} cols={cols} rowKey={r => r.feature} />
     </Card>
   )
 }

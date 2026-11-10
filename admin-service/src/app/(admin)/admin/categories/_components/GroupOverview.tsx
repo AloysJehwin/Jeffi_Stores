@@ -9,6 +9,7 @@ import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { BRAND_ALIASES, BRAND_FIELDS, BRAND_SEARCH } from '@/lib/filters/fields/brands'
 import { CATEGORY_ALIASES, CATEGORY_FIELDS, CATEGORY_SEARCH } from '@/lib/filters/fields/categories'
 import { OverviewTab } from '../../products/_components/catalog-overview'
+import { LoadingOverviewBody, LoadingTableCard } from '../../products/_components/loading-parts'
 
 const LISTS = {
   category: { entity: 'categories', fields: CATEGORY_FIELDS, aliases: CATEGORY_ALIASES, search: CATEGORY_SEARCH },
@@ -54,6 +55,17 @@ export default function GroupOverview({ dim }: { dim: 'category' | 'brand' }) {
     <OverviewTab<GroupOverviewData>
       endpoint={`/api${base}/overview`}
       query={query}
+      skeleton={
+        <LoadingOverviewBody
+          kpis={[`Active ${plural.toLowerCase()}`, 'Active products', 'Stock value', 'Sales', 'Empty', 'Unused']}
+          panel={
+            <LoadingTableCard
+              title={`Top ${plural.toLowerCase()} by sales`}
+              columns={[dim === 'category' ? 'Category' : 'Brand', 'Products', 'Stock', 'Sales', 'vs prev', 'Margin']}
+            />
+          }
+        />
+      }
       filters={
         <ListFilters
           entity={list.entity}
@@ -93,7 +105,6 @@ export default function GroupOverview({ dim }: { dim: 'category' | 'brand' }) {
           <Table
             rows={d.top}
             rowKey={r => r.id}
-            pageSize={10}
             empty="No sales or stock yet"
             cols={[
               {

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ScenarioDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { ScenarioDetailLoading } from '../_components/ScenarioLoading'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -60,6 +61,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
   const [savingKey, setSavingKey] = useState<string | null>(null)
   // Site Controls' switches hide an off channel's "Also send via" params (saved values untouched).
   const msg = useMessagingChannels()
+  const paged = usePagedRows(campaigns)
 
   useEffect(() => {
     load()
@@ -119,7 +121,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
     }
   }
 
-  if (!scenario && loading) return <ScenarioDetailSkeleton />
+  if (!scenario && loading) return <ScenarioDetailLoading />
   if (!scenario) return <p className="text-sm text-foreground-muted">Scenario not found.</p>
 
   return (
@@ -197,7 +199,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
           </div>
         ) : (
           <div className="space-y-4">
-            {campaigns.map(c => {
+            {paged.shown.map(c => {
               const ov = overrides[c.kind] || {}
               return (
                 <div key={c.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -362,6 +364,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                 </div>
               )
             })}
+            <Pager control={paged.pager} noun="campaigns" />
           </div>
         )}
       </div>

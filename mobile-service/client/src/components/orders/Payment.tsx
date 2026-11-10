@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import { View } from 'react-native'
 import { Image } from 'expo-image'
 import { CircleAlert, CircleCheck, Info, QrCode } from 'lucide-react-native'
 import { Button, Notice, Text } from '../../ui'
+import { PaymentSections } from '../checkout/PaymentSections'
+import type { PayMethod } from '../checkout/checkoutStore'
 import type { Order } from './shared'
 
 /** Paid, waiting for payment (with the pay-by countdown) or failed, with the pay / retry button. */
 export function PaymentNotices({
   order,
   razorpay,
+  upi,
   countdown,
   autoCancelling,
   paying,
@@ -16,12 +20,18 @@ export function PaymentNotices({
 }: {
   order: Order
   razorpay: boolean
+  /** The store collects UPI itself: a UPI section above Razorpay's other methods. */
+  upi: boolean
   countdown: string | null
   autoCancelling: boolean
   paying: boolean
-  onPay: () => void
+  onPay: (method: 'upi' | 'razorpay') => void
   store: { phone?: string | null; email?: string | null }
 }) {
+  const [method, setMethod] = useState<PayMethod>(upi ? 'upi' : 'razorpay')
+  const chosen = upi && method === 'upi' ? 'upi' : 'razorpay'
+  const online = razorpay || upi
+  const sections = upi ? <PaymentSections compact className="mt-3" value={method} onChange={setMethod} upi={upi} razorpay={razorpay} /> : null
   const notCancelled = order.status !== 'cancelled' && order.status !== 'cancel_requested'
   if (order.paymentStatus === 'paid') {
     return (
@@ -44,7 +54,7 @@ export function PaymentNotices({
       </Notice>
     )
   }
-  if (order.paymentStatus === 'unpaid' && order.paymentMode !== 'cod' && razorpay) {
+  if (order.paymentStatus === 'unpaid' && order.paymentMode !== 'cod' && online) {
     // A business order placed for manual payment: the team follows up, or it can be paid online now.
     const manual = order.paymentMode === 'manual'
     return (
@@ -58,14 +68,17 @@ export function PaymentNotices({
         {autoCancelling ? (
           <Text className="mt-2 text-sm text-accent-800 dark:text-accent-200">{expired}</Text>
         ) : (
-          <View className="mt-3">
-            <Button label={`Pay ₹${order.totalAmount.toLocaleString('en-IN')}`} loadingLabel="Processing..." loading={paying} size="md" block={false} onPress={onPay} />
-          </View>
+          <>
+            {sections}
+            <View className="mt-3">
+              <Button label={`Pay ₹${order.totalAmount.toLocaleString('en-IN')}`} loadingLabel="Processing..." loading={paying} size="md" block={false} onPress={() => onPay(chosen)} />
+            </View>
+          </>
         )}
       </Notice>
     )
   }
-  if (order.paymentStatus === 'unpaid' && !razorpay) {
+  if (order.paymentStatus === 'unpaid' && !online) {
     const { phone, email } = store
     return (
       <Notice icon={Info}>
@@ -75,7 +88,7 @@ export function PaymentNotices({
       </Notice>
     )
   }
-  if (order.paymentStatus === 'failed' && razorpay) {
+  if (order.paymentStatus === 'failed' && online) {
     return (
       <Notice tone="danger" icon={CircleAlert}>
         <Text className="text-sm leading-5 text-red-700 dark:text-red-300">Payment failed for this order. Please retry to complete your purchase.</Text>
@@ -83,9 +96,12 @@ export function PaymentNotices({
         {autoCancelling ? (
           <Text className="mt-2 text-sm text-red-700 dark:text-red-300">{expired}</Text>
         ) : (
-          <View className="mt-3">
-            <Button label="Retry Payment" loadingLabel="Processing..." loading={paying} variant="destructive" size="md" block={false} onPress={onPay} />
-          </View>
+          <>
+            {sections}
+            <View className="mt-3">
+              <Button label="Retry Payment" loadingLabel="Processing..." loading={paying} variant="destructive" size="md" block={false} onPress={() => onPay(chosen)} />
+            </View>
+          </>
         )}
       </Notice>
     )

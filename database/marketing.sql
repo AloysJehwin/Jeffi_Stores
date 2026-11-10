@@ -432,5 +432,12 @@ CREATE TABLE public.subscriptions (
     cancelled_at timestamp with time zone,
     locked_price_at timestamp with time zone,
     source character varying(12) DEFAULT 'legacy'::character varying NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    -- Which gateway bills the renewals. 'phonepe' = PhonePe Autopay (UPI mandate; we notify + execute each cycle).
+    billing_provider character varying(12) DEFAULT 'razorpay'::character varying NOT NULL,
+    phonepe_merchant_subscription_id character varying(63),
+    phonepe_subscription_id character varying(64),
+    phonepe_setup_order_id character varying(63),
+    phonepe_mandate_state character varying(24),
+    phonepe_mandate_expires_at timestamp with time zone
 );

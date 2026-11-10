@@ -207,6 +207,67 @@ function isAutosaveStatus(v: unknown): v is AutosaveStatus {
   return v === 'idle' || v === 'saving' || v === 'saved' || v === 'error' || v === 'locked'
 }
 
+// The box a sticky bar sticks to; null inside a fixed layer (dialogs, drawers).
+function scrollBox(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const s = getComputedStyle(p)
+    if (s.position === 'fixed') return null
+    if (/auto|scroll|hidden|overlay/.test(s.overflowY)) return p
+  }
+  return document.scrollingElement as HTMLElement | null
+}
+
+// Visible in-flow content after the bar inside its scroll box.
+function followed(el: HTMLElement, box: HTMLElement): boolean {
+  for (let n: HTMLElement | null = el; n && n !== box; n = n.parentElement) {
+    for (let s = n.nextElementSibling; s; s = s.nextElementSibling) {
+      if (s instanceof HTMLElement && s.offsetHeight > 0 && !/fixed|absolute/.test(getComputedStyle(s).position)) return true
+    }
+  }
+  return false
+}
+
+// Free space between the end of the box's content and its bottom edge; negative once it scrolls.
+function spareBelow(el: HTMLElement, box: HTMLElement): number {
+  let top = el
+  while (top.parentElement && top.parentElement !== box) top = top.parentElement
+  const r = box.getBoundingClientRect()
+  const origin = box === document.documentElement ? r.top : r.top + box.clientTop - box.scrollTop
+  const end = top.getBoundingClientRect().bottom + parseFloat(getComputedStyle(top).marginBottom) + parseFloat(getComputedStyle(box).paddingBottom) - origin
+  return box.clientHeight - end
+}
+
+// On a page shorter than its scroll box, push the sticky bar down to the box's bottom.
+function usePinToBottom(ref: React.RefObject<HTMLDivElement>, on: boolean, key: unknown) {
+  useEffect(() => {
+    const el = ref.current
+    const box = on && el && typeof ResizeObserver !== 'undefined' ? scrollBox(el) : null
+    if (!el || !box) return
+    let extra = 0
+    let raf = 0
+    const measure = () => {
+      raf = 0
+      const next = el.offsetParent && !followed(el, box) ? Math.max(0, Math.floor(extra + spareBelow(el, box))) : 0
+      if (next === extra) return
+      extra = next
+      if (next) el.style.setProperty('margin-top', `calc(0.75rem + ${next}px)`, 'important')
+      else el.style.removeProperty('margin-top')
+    }
+    const ro = new ResizeObserver(() => {
+      if (!raf) raf = requestAnimationFrame(measure)
+    })
+    ro.observe(box)
+    for (const c of Array.from(box.children)) ro.observe(c)
+    if (el.parentElement) ro.observe(el.parentElement)
+    measure()
+    return () => {
+      ro.disconnect()
+      cancelAnimationFrame(raf)
+      el.style.removeProperty('margin-top')
+    }
+  }, [ref, on, key])
+}
+
 /** Cancel and submit row. Render it inside the <form> so its buttons submit that form. */
 export function FormFooter({
   submitLabel,
@@ -230,6 +291,8 @@ export function FormFooter({
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const readOnly = !!lock?.readOnly
   const autosaveNode = isAutosaveStatus(autosave) ? <AutosaveStatusPill status={autosave} /> : autosave
+  const barRef = useRef<HTMLDivElement>(null)
+  usePinToBottom(barRef, sticky, readOnly)
 
   const handleCancel = async () => {
     if (!cancel) return
@@ -243,11 +306,12 @@ export function FormFooter({
   }
 
   // A sticky bar keeps its buttons clear of the assistant's floating button (--dock-offset).
-  const shell = `${sticky ? 'sticky bottom-0 z-10 !mt-3 pr-[calc(1rem+var(--dock-offset,0px))]' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`
+  // col-span-full: in a grid parent it takes its own full-width row, never a column beside content.
+  const shell = `${sticky ? 'sticky bottom-0 z-10 !mt-3 pr-[calc(1rem+var(--dock-offset,0px))]' : ''} col-span-full flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`
 
   if (readOnly && lock) {
     return (
-      <div className={shell}>
+      <div ref={barRef} className={shell}>
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-foreground-muted">
           <AutosaveStatusPill status="locked" />
           <span>{lockSummary(lock.lock) || 'Someone else is editing this draft'}</span>
@@ -269,7 +333,7 @@ export function FormFooter({
   }
 
   return (
-    <div className={shell}>
+    <div ref={barRef} className={shell}>
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-foreground-muted">
         {autosaveNode}
         {draftBadge}

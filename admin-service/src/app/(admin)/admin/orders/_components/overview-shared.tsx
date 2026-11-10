@@ -13,6 +13,7 @@ import {
 import { delta, parsePeriod, type PeriodPreset } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import type { StripKpi } from '@/lib/overviews/orders'
+import { LoadingKpis, LoadingSection } from '@/components/admin/kit/skeleton'
 
 // Shared by the orders and fulfilment overviews (Orders, Delhivery, Returns, Replacements,
 // Packing slips, Labels, Scan).
@@ -77,6 +78,7 @@ export function OverviewPanel<T extends StripData>({
   fallback = '30d',
   query,
   filters,
+  kpis = [],
 }: {
   endpoint: string
   extra?: (d: T) => React.ReactNode
@@ -86,6 +88,8 @@ export function OverviewPanel<T extends StripData>({
   query?: string
   /** The list's filter bar, under the PeriodBar. */
   filters?: React.ReactNode
+  /** The strip's KPI labels, shown while it loads. */
+  kpis?: string[]
 }) {
   const [urlPeriod, setUrlPeriod] = usePeriod(fallback)
   const [localPeriod, setLocalPeriod] = useState(() => parsePeriod(null, null, undefined, fallback))
@@ -99,11 +103,10 @@ export function OverviewPanel<T extends StripData>({
       {filters}
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (
-        <div className="grid grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5 gap-3 animate-pulse">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-surface-elevated border border-border-default" />
-          ))}
-        </div>
+        <>
+          <LoadingKpis labels={kpis} />
+          <LoadingSection title="Needs attention" lines={3} />
+        </>
       ) : data ? (
         <>
           <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-5">

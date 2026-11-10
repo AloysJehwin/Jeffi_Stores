@@ -21,7 +21,7 @@ import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from './ProductsTableClient'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader } from '@/components/admin/kit'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
@@ -32,6 +32,7 @@ import { resolveListTab } from '@/lib/overviews/catalog'
 import ProductsOverview from './_components/ProductsOverview'
 import { TabLinks, TabMemory } from './_components/catalog-overview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -322,7 +323,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </PageDrafts>
       ) : (
         <>
-          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+          <Suspense key={JSON.stringify(q)} fallback={<LoadingKpis labels={['Inventory stock value', 'Total products', 'Active', 'Featured', 'Categories', 'Inactive']} />}>
             <ProductsStats q={q} />
           </Suspense>
 
@@ -342,15 +343,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   )
 }
 
-function KpiRowSkeleton() {
-  return (
-    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 animate-pulse">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
-      ))}
-    </div>
-  )
-}
 
 // Resolves searchParams (no DB — near-instant) then keys the table Suspense
 // on the query string so filter/pagination changes re-trigger the shimmer
@@ -367,7 +359,7 @@ async function ProductsListSection({
   const resolvedSearchParams = await searchParams
   const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
+    <Suspense key={key} fallback={<LoadingTable columns={['Product', 'SKU', 'Category', 'Brand', 'Price', 'Stock', 'Status']} />}>
       <ProductsListContent
         resolvedSearchParams={resolvedSearchParams}
         isSuperAdmin={isSuperAdmin}

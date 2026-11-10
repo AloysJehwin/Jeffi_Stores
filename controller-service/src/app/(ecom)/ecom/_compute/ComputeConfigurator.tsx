@@ -7,6 +7,7 @@ import { BASIC_DB_CLASSES, DEDICATED_PRESETS, PRESETS, PRESET_DB_CLASS, TRAFFIC_
 import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
 import { LIMITS, PRESET_RANK, fitOf, fittingServers, nodeTier, planCompatibilityError, serverFitErrors, validateSpec, type Fit, type Validation } from '@/lib/compute/validate'
 import { activeServices, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
+import { ConfiguratorLoading } from './ConfiguratorLoading'
 
 export interface ComputePlan {
   slug: string
@@ -222,7 +223,7 @@ export function ComputeConfigurator({
   }, [spec, validation?.ok, planSlug])
 
   if (loadError) return <p className="text-sm text-red-600">{loadError}</p>
-  if (!catalog || !plan || !spec) return <p className="text-sm text-foreground-muted">Loading server prices…</p>
+  if (!catalog || !plan || !spec) return <ConfiguratorLoading />
 
   const set = (next: ComputeSpec) => {
     const c = evaluate(next, planSlug)

@@ -1,6 +1,6 @@
 'use client'
 
-import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { DonutSplit, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta } from '@/lib/overview/period'
@@ -8,6 +8,7 @@ import { ap } from '@/lib/shared/admin-path'
 import type { CashSaleOverview as Data } from '@/lib/overviews/cash-sale'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { CASH_SALE_ALIASES, CASH_SALE_FIELDS, CASH_SALE_SEARCH } from '@/lib/filters/fields/cash-sale'
+import CashSaleOverviewSkeleton from './CashSaleOverviewSkeleton'
 
 const SERIES: SeriesDef[] = [
   { key: 'sales', label: 'Sales', color: 'rgb(16 185 129)', kind: 'area', axis: 'money' },
@@ -37,7 +38,7 @@ export default function CashSaleOverview() {
         exportable
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
+      {!data ? loading && <CashSaleOverviewSkeleton /> : <Body d={data} />}
     </div>
   )
 }

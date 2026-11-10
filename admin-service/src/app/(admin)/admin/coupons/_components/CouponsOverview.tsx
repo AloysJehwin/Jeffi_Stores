@@ -5,7 +5,6 @@ import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -16,6 +15,7 @@ import { TrendChart, RankedBars, type SeriesDef } from '@/components/admin/dashb
 import { delta, type Bucket } from '@/lib/overview/period'
 import type { CouponState, CouponTotals } from '@/lib/overviews/coupons'
 import { ap } from '@/lib/shared/admin-path'
+import CouponsOverviewLoading from './CouponsOverviewLoading'
 
 interface TopCoupon {
   id: string
@@ -70,7 +70,7 @@ export default function CouponsOverview() {
       />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
-        !error && <OverviewSkeleton />
+        !error && <CouponsOverviewLoading />
       ) : (
         <>
           <KpiGrid>

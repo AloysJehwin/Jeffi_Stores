@@ -7,6 +7,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { DRIVE_ACCEPT, GALLERY_FOLDER_ID, formatBytes, type DriveFile, type DriveKind } from '@/lib/drive/types'
 import { driveApi, uploadDriveFile, type DriveListing } from './api'
 import { DriveGrid } from './DriveItems'
+import { DriveItemsLoading } from './DriveLoading'
 
 export interface DrivePickOptions {
   title?: string
@@ -187,9 +188,7 @@ export default function DrivePicker({
 
         <div className="flex-1 px-5 py-4">
           {loading && !data ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-7 w-7 animate-spin text-accent-500" />
-            </div>
+            <DriveItemsLoading />
           ) : error ? (
             <p className="py-16 text-center text-sm text-red-600">{error}</p>
           ) : !folders.length && !files.length ? (

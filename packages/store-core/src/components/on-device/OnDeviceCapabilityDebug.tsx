@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { detectOnDeviceCapability, type CapabilityVerdict } from '@/lib/on-device/capability'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 /**
  * Debug readout for the on-device model capability gate. Drop this on any page
@@ -25,9 +26,7 @@ export default function OnDeviceCapabilityDebug() {
     }
   }, [])
 
-  if (!verdict) {
-    return <div className="text-xs text-foreground-muted p-3">Checking device capability…</div>
-  }
+  if (!verdict) return <OnDeviceCapabilitySkeleton />
 
   const d = verdict.details
   const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
@@ -67,6 +66,33 @@ export default function OnDeviceCapabilityDebug() {
       />
       <Row k="storage quota" v={d.storageQuotaMB != null ? `${d.storageQuotaMB} MB` : '—'} />
       <Row k="model cached" v={d.modelCached ? 'yes' : 'no'} />
+    </div>
+  )
+}
+
+const ROWS = [
+  'this device', 'summary flag', 'summary · desktop', 'summary · mobile', 'fine-tune flag', 'fine-tune · desktop',
+  'fine-tune · mobile', 'WebGPU', 'GPU adapter', 'GPU vendor', 'device memory', 'max buffer', 'max storage binding',
+  'storage quota', 'model cached',
+]
+
+/** The readout's labels while the device check runs. */
+export function OnDeviceCapabilitySkeleton() {
+  const row = (k: string) => (
+    <div key={k} className="flex justify-between gap-4 py-0.5">
+      <span className="text-foreground-muted">{k}</span>
+      <Sk className="h-3.5 w-16" />
+    </div>
+  )
+  return (
+    <div className="max-w-sm w-full rounded-lg border border-border-default bg-surface-elevated p-4 text-xs" aria-busy="true">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold text-foreground">On-device model</span>
+        <Sk className="h-4 w-20 rounded-full" />
+      </div>
+      {row('reason')}
+      <div className="border-t border-border-default my-2" />
+      {ROWS.map(row)}
     </div>
   )
 }

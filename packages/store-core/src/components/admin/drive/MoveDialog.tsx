@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ChevronRight, CornerLeftUp, HardDrive, Loader2 } from 'lucide-react'
+import { ChevronRight, CornerLeftUp, HardDrive } from 'lucide-react'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { Dialog } from '@/components/admin/kit'
 import { GALLERY_FOLDER_ID, type DriveFolder } from '@/lib/drive/types'
 import { driveApi, type DriveCrumb } from './api'
@@ -81,8 +82,8 @@ export default function MoveDialog({ title, exclude = [], allowRoot, onMove, onC
           </button>
         )}
         {!folders ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-foreground-muted" />
+          <div className="px-3 py-3">
+            <LoadingLines lines={4} />
           </div>
         ) : !folders.length ? (
           <p className="px-3 py-6 text-center text-sm text-foreground-muted">No folders inside</p>

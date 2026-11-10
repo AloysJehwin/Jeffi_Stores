@@ -16,6 +16,7 @@ import {
   requestDraftAccess,
   takeoverDraftLock,
 } from '@/lib/admin/draft-locks'
+import { discardDraft } from '@/lib/admin/draft-discard'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,4 +131,26 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
   const state = await getDraftLockState(admin, t.type, t.id)
   return NextResponse.json({ ...state, me: admin.adminId, viewers: await listViewers(db, t.type, t.id) })
+}
+
+/** Delete the draft through its type's own discard (holder, an unclaimed draft, or an owner role). */
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const t = await target(params)
+  if (!t) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+  if (!hasScope(admin.role, admin.scopes, WRITE_SCOPE[t.type]))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+  try {
+    const r = await discardDraft({ adminId: admin.adminId, role: admin.role, scopes: admin.scopes }, t.type, t.id)
+    if (!r.ok) return NextResponse.json(r.body, { status: r.status })
+  } catch (err) {
+    const locked = draftLockResponse(err)
+    if (locked) return locked
+    console.error('[draft-locks] delete', t.type, t.id, err)
+    return NextResponse.json({ error: 'Could not delete the draft' }, { status: 500 })
+  }
+  const state = await getDraftLockState(admin, t.type, t.id)
+  return NextResponse.json({ success: true, ...state, me: admin.adminId })
 }

@@ -1,5 +1,10 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { PageLoading } from '@/components/admin/kit/skeleton'
+import ProductFormLoading from '../_components/ProductFormLoading'
 
 export default function Loading() {
-  return <AdminSkeleton variant="form" />
+  return (
+    <PageLoading back="Products" title="Add New Product" description="Create a new product in your inventory">
+      <ProductFormLoading />
+    </PageLoading>
+  )
 }

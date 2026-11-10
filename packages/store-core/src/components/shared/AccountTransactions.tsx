@@ -8,6 +8,7 @@ import { bp } from '@/lib/shared/business-path'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import { useInfiniteList, InfiniteFooter } from '@/components/admin/kit/infinite'
+import { TransactionsSkeleton } from '@/components/visitor/skeletons/account'
 
 interface Transaction {
   id: string
@@ -114,30 +115,7 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
     }
   }, [user, authLoading, router, isBusiness])
 
-  if (authLoading || initialLoading) {
-    return (
-      <div className="container mx-auto px-4 pt-4 pb-8">
-        <div className="space-y-3 animate-pulse">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default p-4"
-              style={{ animationDelay: `${i * 70}ms` }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-3 bg-surface-secondary rounded w-32" />
-                <div className="h-5 bg-surface-secondary rounded-full w-16" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="h-4 bg-surface-secondary rounded w-24" />
-                <div className="h-4 bg-surface-secondary rounded w-20" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  if (authLoading || initialLoading) return <TransactionsSkeleton portal={isBusiness ? 'business' : 'store'} />
 
   if (!user) return null
 

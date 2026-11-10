@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { CampaignCardListSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
+import CampaignsListLoading from './_components/CampaignsListLoading'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -126,7 +127,7 @@ export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly
     }
   }
 
-  if (loading) return <CampaignCardListSkeleton />
+  if (loading) return draftsOnly ? <CampaignCardListSkeleton /> : <CampaignsListLoading />
 
   // Unpublished edits, for the Drafts tab.
   const pendingBlock = (() => {

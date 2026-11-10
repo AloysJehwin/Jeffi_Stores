@@ -5,9 +5,10 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Download, Loader2 } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
-import { Card, DataTable, EmptyState, Field, Fields, FormField, Kpi, KpiGrid, PageBody, PageHeader, StatusBadge, Tabs, TableSkeleton, badgeCls, useActionToast, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { Card, DataTable, EmptyState, Field, Fields, FormField, Kpi, KpiGrid, PageBody, PageHeader, StatusBadge, Tabs, badgeCls, useActionToast, type DataCol, type StatusMap } from '@/components/admin/kit'
 import { fmtQty } from '@/lib/shared/number-display'
 import TaxCredentialsGear from './_components/TaxCredentialsGear'
+import { GstKpisSkeleton, GstTabSkeleton } from './_components/GstSkeleton'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
@@ -213,7 +214,7 @@ export default function GSTPage() {
   const initial = getPresetRange('this_month')
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const toast = useActionToast()
 
   const [gstr1Summary, setGstr1Summary] = useState<GSTSummary | null>(null)
@@ -328,13 +329,7 @@ export default function GSTPage() {
         </button>
       </div>
 
-      {loading && (
-        <div className="grid animate-pulse grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
-          ))}
-        </div>
-      )}
+      {loading && <GstKpisSkeleton />}
 
       {gstr1Summary && !loading && (
         <KpiGrid>
@@ -349,7 +344,7 @@ export default function GSTPage() {
 
       <Tabs tabs={tabs} value={tab} onChange={handleTabChange} />
 
-      {loading && <TableSkeleton rows={8} cols={6} />}
+      {loading && <GstTabSkeleton tab={tab} />}
 
       {!loading && tab === 'gstr1' && (
         <div className="space-y-4">
@@ -358,13 +353,13 @@ export default function GSTPage() {
           ) : (
             <>
               <Card title={`B2B Invoices (${gstr1B2B.length})`} flush action={<CsvButton onClick={() => downloadCSV('gstr1')} />}>
-                <DataTable bare sortNs="b2b" rows={keyed(gstr1B2B)} cols={invoiceCols(true)} rowKey={kk} empty="No B2B invoices in this period." />
+                <DataTable bare paged sortNs="b2b" rows={keyed(gstr1B2B)} cols={invoiceCols(true)} rowKey={kk} empty="No B2B invoices in this period." />
               </Card>
               <Card title={`B2C Invoices (${gstr1B2C.length})`} flush>
-                <DataTable bare sortNs="b2c" rows={keyed(gstr1B2C)} cols={invoiceCols(false)} rowKey={kk} empty="No B2C invoices in this period." />
+                <DataTable bare paged sortNs="b2c" rows={keyed(gstr1B2C)} cols={invoiceCols(false)} rowKey={kk} empty="No B2C invoices in this period." />
               </Card>
               <Card title="HSN Summary" flush>
-                <DataTable bare sortNs="hsn" rows={keyed(hsnSummary)} cols={hsnCols} rowKey={kk} empty="No HSN lines in this period." />
+                <DataTable bare paged sortNs="hsn" rows={keyed(hsnSummary)} cols={hsnCols} rowKey={kk} empty="No HSN lines in this period." />
               </Card>
             </>
           )}
@@ -390,7 +385,7 @@ export default function GSTPage() {
                 </KpiGrid>
               </Card>
               <Card title="Tax Breakup by GST Rate" flush>
-                <DataTable bare sortNs="rate" rows={keyed(gstr3b.summary.byGstRate)} cols={rateCols} rowKey={kk} empty="No tax lines in this period." />
+                <DataTable bare paged sortNs="rate" rows={keyed(gstr3b.summary.byGstRate)} cols={rateCols} rowKey={kk} empty="No tax lines in this period." />
               </Card>
               <Card title="6. Payment of Tax">
                 <KpiGrid>
@@ -452,11 +447,12 @@ export default function GSTPage() {
                 </KpiGrid>
               </Card>
               <Card title="By Supplier" flush>
-                <DataTable bare sortNs="itcsup" rows={keyed(itcData.supplierSummary)} cols={supplierCols} rowKey={kk} empty="No suppliers in this period." />
+                <DataTable bare paged sortNs="itcsup" rows={keyed(itcData.supplierSummary)} cols={supplierCols} rowKey={kk} empty="No suppliers in this period." />
               </Card>
               <Card title="Line-level Detail" flush>
                 <DataTable
                   bare
+                  paged
                   sortNs="itc"
                   rows={keyed(itcData.rows)}
                   cols={itcCols}

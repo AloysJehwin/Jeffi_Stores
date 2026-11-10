@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { SkeletonRows } from '../_components/Skeleton'
+import { SandTableLoading } from '../_components/Skeleton'
 import { Card } from '../_components/Card'
 import { ChoiceChips, fieldCls } from '../../_ui'
+
+const KEY_COLUMNS = ['Name', 'Key', 'Scopes', '30-day use', 'Last used', '']
 
 interface Key { id: string; name: string; key_prefix: string; scopes: string[]; status: string; last_used_at: string | null; created_at: string; requests_30d: number; spend_paise_30d: string }
 const SCOPES: [string, string, 'messaging' | 'documents' | null][] = [
@@ -98,8 +100,8 @@ export default function ApiKeysClient({ services, docsUrl }: { services: { messa
       )}
 
       <Card title="Keys">
-        {keys === null ? <SkeletonRows rows={3} cols={5} /> : keys.length === 0 ? <p className="text-sm text-foreground-secondary">No keys yet.</p> : (
-          <div className="-mx-6 -mb-6 overflow-x-auto"><table className="w-full text-sm min-w-[640px]"><thead className="org-sand text-foreground-secondary"><tr>{['Name', 'Key', 'Scopes', '30-day use', 'Last used', ''].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
+        {keys === null ? <SandTableLoading columns={KEY_COLUMNS} rows={3} /> : keys.length === 0 ? <p className="text-sm text-foreground-secondary">No keys yet.</p> : (
+          <div className="-mx-6 -mb-6 overflow-x-auto"><table className="w-full text-sm min-w-[640px]"><thead className="org-sand text-foreground-secondary"><tr>{KEY_COLUMNS.map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-border-default">{keys.map(k => <tr key={k.id} className={k.status === 'revoked' ? 'opacity-50' : ''}><td className="px-6 py-2.5 font-medium">{k.name}</td><td className="px-6 py-2.5 font-mono text-xs">{k.key_prefix}…</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{k.scopes.length} scopes</td><td className="px-6 py-2.5 text-xs">{k.requests_30d} req · ₹{(Number(k.spend_paise_30d) / 100).toFixed(2)}</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{k.last_used_at ? new Date(k.last_used_at).toLocaleString('en-IN') : '—'}</td><td className="px-6 py-2.5 text-right">{k.status === 'active' ? <button onClick={() => revoke(k.id)} className="text-xs text-[#8a2e1f] hover:underline">Revoke</button> : <span className="text-xs">Revoked</span>}</td></tr>)}</tbody></table></div>
         )}
       </Card>

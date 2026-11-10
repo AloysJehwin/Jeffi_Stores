@@ -6,6 +6,8 @@ import { Star } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { PageBody, PageHeader } from '@/components/admin/kit'
+import { Sk } from '@/components/admin/kit/skeleton'
+import { SubmissionCardsLoading } from './SubmissionsLoading'
 
 interface CustomField {
   id: string
@@ -104,7 +106,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       <PageHeader
         back={{ href: ap('/admin/review-forms'), label: 'Review Forms' }}
         title={formMeta?.title ? `${formMeta.title} — Submissions` : 'Submissions'}
-        description={`${total} total`}
+        description={loading && !formMeta ? <Sk className="mt-1 h-3.5 w-16" /> : `${total} total`}
       />
 
       <div className="flex h-control w-fit max-w-full gap-1 overflow-x-auto rounded-lg border border-border-default bg-surface-elevated p-0.5">
@@ -120,25 +122,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-pulse">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <div className="aspect-video bg-surface-secondary" />
-              <div className="p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="h-4 w-32 bg-surface-secondary rounded" />
-                  <div className="h-5 w-16 bg-surface-secondary rounded-full" />
-                </div>
-                <div className="h-3 w-24 bg-surface-secondary rounded" />
-                <div className="h-3 w-28 bg-surface-secondary rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <SubmissionCardsLoading />
       ) : submissions.length === 0 ? (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-foreground-muted">
           No submissions yet

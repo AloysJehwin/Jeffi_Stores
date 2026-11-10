@@ -5,6 +5,8 @@ import { confirmSnsSubscription, verifySns, type SnsEnvelope } from '@controller
 import { lookupTenantContextBySlug } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { parseReplyAddress } from '@/lib/replies/context'
+import { parseAlertAddress, PLATFORM_ALERT_SLUG } from '@/lib/payments/upi/alert-parse'
+import { handleUpgAlertEmail } from '@/lib/payments/upi/alerts'
 import { topReply } from '@controller/lib/replies/email-text'
 import { handleInboundEmail } from '@controller/lib/support/email-inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
@@ -14,7 +16,8 @@ export const runtime = 'nodejs'
 
 // SES receiving for reply.<domain>: the rule stores each mail in S3 and announces it over SNS. The
 // reply+<store>.<token> address picks the store and the question; the mail joins the customer's
-// support chat and the reply engine reads it.
+// support chat and the reply engine reads it. upi+<store>.<token> is a merchant's forwarded bank
+// credit alert (docs/PAYMENTS_UPI.md), handled in that store's context.
 
 interface SesReceived {
   notificationType?: string
@@ -58,7 +61,11 @@ export async function POST(request: NextRequest) {
   }
   if (r.spamVerdict?.status === 'FAIL' || r.virusVerdict?.status === 'FAIL') return new NextResponse(null, { status: 204 })
 
-  const addr = (r.recipients ?? n.mail.destination ?? []).map(parseReplyAddress).find(Boolean)
+  const recipients = r.recipients ?? n.mail.destination ?? []
+  const upi = recipients.map(a => parseAlertAddress(a)).find(Boolean)
+  if (upi) return upgAlert(n, upi.slug)
+
+  const addr = recipients.map(parseReplyAddress).find(Boolean)
   if (!addr) return new NextResponse(null, { status: 204 })
   const ctx = addr.slug ? await lookupTenantContextBySlug(addr.slug).catch(() => null) : null
   if (addr.slug && !ctx) return new NextResponse(null, { status: 204 })
@@ -70,6 +77,25 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[ses-inbound] mail failed', err instanceof Error ? err.message : err)
     // SNS retries on 5xx; the mail is handled once per SES message id.
+    return NextResponse.json({ error: 'retry' }, { status: 503 })
+  }
+}
+
+async function upgAlert(n: SesReceived, slug: string): Promise<NextResponse> {
+  try {
+    const platform = slug === PLATFORM_ALERT_SLUG
+    const ctx = platform ? null : await lookupTenantContextBySlug(slug)
+    if (!platform && !ctx) return new NextResponse(null, { status: 204 })
+    const run = async () => {
+      const action = n.receipt!.action!
+      const obj = await client().send(new GetObjectCommand({ Bucket: action.bucketName, Key: action.objectKey }))
+      await handleUpgAlertEmail({ raw: Buffer.from(await obj.Body!.transformToByteArray()), sesMessageId: n.mail!.messageId! })
+    }
+    await (ctx ? runWithTenantContext(ctx, run) : run())
+    return new NextResponse(null, { status: 204 })
+  } catch (err) {
+    console.error('[ses-inbound] bank alert failed', err instanceof Error ? err.message : err)
+    // Redelivery is safe: an observation is written once per credit.
     return NextResponse.json({ error: 'retry' }, { status: 503 })
   }
 }

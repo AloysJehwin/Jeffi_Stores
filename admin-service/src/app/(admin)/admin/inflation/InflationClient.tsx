@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
-import { EmptyState, InfiniteFooter, PageBody, SortTh, fetchJson, useInfiniteList, useListSort, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast, type SortCol } from '@/components/admin/kit'
+import { EmptyState, ErrorState, Pager, PageBody, SortTh, fetchJson, usePagedList, useListSort, PageHeader, LoadingTable, Sk, badgeCls, fieldInputCls, useActionToast, type SortCol } from '@/components/admin/kit'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import InflationHistoryMobileList from './_components/InflationHistoryMobileList'
@@ -129,12 +129,12 @@ export default function InflationClient({ categories, brands }: { categories: Ca
     if (rollbackError) toast.error(rollbackError)
   }, [rollbackError, toast])
 
-  const PAGE_SIZE = 25
+  // The history sits under the apply form: 10 runs a page with arrows.
+  const PAGE_SIZE = 10
   const logSort = useListSort('log')
-  const logList = useInfiniteList<InflationLog>({
+  const logList = usePagedList<InflationLog>({
     key: `logs|${logSort.sort ?? ''}|${logSort.dir}`,
     pageSize: PAGE_SIZE,
-    getKey: l => l.id,
     fetchPage: async (p, signal) => {
       const sortQs = logSort.sort ? `&sort=${encodeURIComponent(logSort.sort)}&dir=${logSort.dir}` : ''
       const data = await fetchJson(`/api/admin/inflation/logs?limit=${PAGE_SIZE}&offset=${(p - 1) * PAGE_SIZE}${sortQs}`, signal)
@@ -422,14 +422,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 {productListLoading ? (
                   <div className="max-h-72 overflow-y-auto divide-y divide-border-default">
                     {Array.from({ length: 6 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 px-4 py-2.5 animate-pulse"
-                        style={{ animationDelay: `${i * 50}ms` }}
-                      >
-                        <div className="w-4 h-4 rounded bg-surface-secondary shrink-0" />
-                        <div className="h-3.5 bg-surface-secondary rounded flex-1" />
-                        <div className="h-3 bg-surface-secondary rounded w-16" />
+                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                        <Sk className="w-4 h-4 rounded shrink-0" />
+                        <Sk className="h-3.5 flex-1" />
+                        <Sk className="h-3 w-16" />
                       </div>
                     ))}
                   </div>
@@ -561,11 +557,17 @@ export default function InflationClient({ categories, brands }: { categories: Ca
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Inflation History</h2>
             </div>
             {logsLoading ? (
-              <div className="p-4"><TableSkeleton rows={4} cols={5} /></div>
+              <LoadingTable columns={[...LOG_COLS.map(c => c.label), '']} rows={4} bare />
             ) : logs.length === 0 && logList.error ? (
-              <div className="p-4">
-                <InfiniteFooter shown={0} control={logList} />
-              </div>
+              <ErrorState
+                bare
+                body={logList.error}
+                actionNode={
+                  <button type="button" onClick={logList.reload} className="control-sm border border-border-default text-foreground hover:bg-surface-secondary">
+                    Retry
+                  </button>
+                }
+              />
             ) : logs.length === 0 ? (
               <EmptyState bare title="No inflation applied yet." />
             ) : (
@@ -730,7 +732,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                     </tbody>
                   </table>
                 </div>
-                <InfiniteFooter shown={logs.length} control={logList} noun="runs" className="px-4 pb-3" />
+                <Pager control={logList.pager} noun="runs" className="px-4 pb-3" />
               </div>
             )}
           </div>

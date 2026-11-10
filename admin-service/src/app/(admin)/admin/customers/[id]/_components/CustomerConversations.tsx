@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MessageSquare,
   Mail,
@@ -15,7 +15,8 @@ import {
   Send,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { InfiniteFooter } from '@/components/admin/kit/infinite'
+import { Pager, usePagedList } from '@/components/admin/kit/pager'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import NoteAttachments from '@/components/admin/NoteAttachments'
 import type { NoteAttachment } from '@/lib/shared/customer-notes-shared'
@@ -53,7 +54,7 @@ const DIRECTION_BADGE: Record<ConversationItem['direction'], { label: string; cl
   internal: { label: 'Internal', className: 'bg-surface-secondary text-foreground-muted' },
 }
 
-const PAGE_LIMIT = 40
+const PAGE_LIMIT = 10
 
 function relTime(iso: string): string {
   const sec = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
@@ -262,15 +263,11 @@ export default function CustomerConversations({
   isBusiness?: boolean
 }) {
   const [summary, setSummary] = useState<ConversationSummary | null>(null)
-  const [items, setItems] = useState<ConversationItem[]>([])
-  const [nextBefore, setNextBefore] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | ConversationChannel>('all')
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
-  const reqRef = useRef(0)
+  // The API pages by cursor: page N+1 starts before the last item of page N.
+  const cursors = useRef<Record<number, string | null>>({ 1: null })
   const { sms: smsOn, whatsapp: waOn } = useMessagingChannels()
   // The WhatsApp reply action needs a phone and Site Controls' WhatsApp switch on.
   const waPhone = waOn ? phone : null
@@ -293,46 +290,27 @@ export default function CustomerConversations({
     }
   }, [customerId])
 
-  const load = useCallback(
-    async (before: string | null) => {
-      const token = ++reqRef.current
-      if (before) setLoadingMore(true)
-      else {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const sp = new URLSearchParams({ limit: String(PAGE_LIMIT) })
-        if (filter !== 'all') sp.set('channels', filter)
-        if (debounced) sp.set('q', debounced)
-        if (before) sp.set('before', before)
-        const res = await fetch(`/api/admin/customers/${customerId}/conversations?${sp.toString()}`, {
-          credentials: 'include',
-        })
-        if (token !== reqRef.current) return
-        if (!res.ok) {
-          setError('Could not load conversations')
-          return
-        }
-        const data = await res.json()
-        const newItems: ConversationItem[] = data.items || []
-        setItems(prev => (before ? [...prev, ...newItems] : newItems))
-        setNextBefore(data.nextBefore ?? null)
-      } catch {
-        if (token === reqRef.current) setError('Could not load conversations')
-      } finally {
-        if (token === reqRef.current) {
-          setLoading(false)
-          setLoadingMore(false)
-        }
-      }
+  const list = usePagedList<ConversationItem>({
+    key: `${customerId}|${filter}|${debounced}`,
+    pageSize: PAGE_LIMIT,
+    fetchPage: async (page, signal) => {
+      if (page === 1) cursors.current = { 1: null }
+      const sp = new URLSearchParams({ limit: String(PAGE_LIMIT) })
+      if (filter !== 'all') sp.set('channels', filter)
+      if (debounced) sp.set('q', debounced)
+      const before = cursors.current[page]
+      if (before) sp.set('before', before)
+      const res = await fetch(`/api/admin/customers/${customerId}/conversations?${sp.toString()}`, {
+        credentials: 'include',
+        signal,
+      })
+      if (!res.ok) throw new Error('Could not load conversations')
+      const data = await res.json()
+      cursors.current[page + 1] = data.nextBefore ?? null
+      return { rows: data.items || [], hasMore: !!data.nextBefore }
     },
-    [customerId, filter, debounced]
-  )
-
-  useEffect(() => {
-    load(null)
-  }, [load])
+  })
+  const items = list.rows
 
   const groups = useMemo(() => {
     const byDay = new Map<string, ConversationItem[]>()
@@ -380,23 +358,24 @@ export default function CustomerConversations({
         className="w-full mb-4 rounded-lg border border-border-default bg-surface px-3 h-control text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
       />
 
-      {loading ? (
+      {list.loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex gap-3 animate-pulse">
-              <div className="w-8 h-8 rounded-full bg-surface-secondary" />
+            <div key={i} className="flex gap-3">
+              <Sk className="h-8 w-8 shrink-0 rounded-full" />
               <div className="flex-1 space-y-1.5">
-                <div className="h-3 bg-surface-secondary rounded w-3/4" />
-                <div className="h-2 bg-surface-secondary rounded w-1/3" />
+                <Sk className="h-3 w-3/4" />
+                <Sk className="h-2 w-1/3" />
               </div>
             </div>
           ))}
         </div>
-      ) : error ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      ) : list.error ? (
+        <p className="text-sm text-red-600 dark:text-red-400">{list.error}</p>
       ) : items.length === 0 ? (
         <p className="text-sm text-foreground-muted">No messages found.</p>
       ) : (
+        <>
         <div className="space-y-5 max-h-[700px] overflow-y-auto pr-1">
           {groups.map(([group, groupItems]) => (
             <div key={group}>
@@ -423,14 +402,9 @@ export default function CustomerConversations({
               </div>
             </div>
           ))}
-
-          <InfiniteFooter
-            shown={items.length}
-            control={{ hasMore: !!nextBefore, loadingMore, loadMore: () => nextBefore && load(nextBefore) }}
-            noun="messages"
-            className="mt-2"
-          />
         </div>
+        <Pager control={list.pager} noun="messages" />
+        </>
       )}
     </div>
   )

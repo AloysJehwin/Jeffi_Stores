@@ -11,6 +11,7 @@ import { Section } from './ReportViews'
 import { Modal, btnGhost, btnPrimary, inputCls } from './wizard/fields'
 import Select from '@/components/ui/Select'
 import { useActionToast } from '@/components/admin/kit/toast'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 // Audiences tab: Customer Match lists built from the store's own customers.
 
@@ -300,7 +301,7 @@ function AttachDialog({ a, campaigns, onClose }: { a: AudienceView; campaigns: A
             <label className="text-sm block space-y-1">
               <span className="text-foreground-muted text-xs">Asset group</span>
               {groups == null ? (
-                <p className="text-xs text-foreground-muted">Loading...</p>
+                <Sk className="h-control rounded-lg" />
               ) : (
                 <Select
                   className="w-full"

@@ -21,6 +21,7 @@ import ConnectPanel, { NotConfigured } from './_components/ConnectPanel'
 import ConversionsView from './_components/ConversionsView'
 import ExperimentsView from './_components/ExperimentsView'
 import AudiencesView from './_components/AudiencesView'
+import { GoogleAdsTabLoading } from './_components/skeletons'
 import {
   OverviewView,
   CampaignsView,
@@ -93,7 +94,7 @@ export default function GoogleAdsClient({
   const [status, setStatus] = useState(initialStatus)
   const [range, setRange] = useState(() => lastDays(30))
   const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(initialStatus.connected)
   const [loadError, setLoadError] = useState<string | null>(null)
   const toast = useActionToast()
   // Action responses are toasts; null (the old "clear the banner") is a no-op.
@@ -357,7 +358,7 @@ export default function GoogleAdsClient({
             {loadError ? (
               <p className="text-sm text-red-500">{loadError}</p>
             ) : loading && !data ? (
-              <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+              <GoogleAdsTabLoading tab={tab} />
             ) : data ? (
               <AdsManageProvider currency={currency} onChanged={reload}>
                 <TabBody tab={tab} data={data} currency={currency} />

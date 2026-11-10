@@ -12,6 +12,7 @@ import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { TASK_FIELDS, TASK_SEARCH } from '@/lib/filters/fields/tasks'
+import { TasksOverviewSkeleton } from './TasksLoadingParts'
 
 // The list's filters bar, without its My tasks / Open presets (the overview covers the whole team).
 const OVERVIEW_FIELDS = TASK_FIELDS.filter(f => f.key !== 'scope' && f.key !== 'status')
@@ -41,7 +42,7 @@ export default function TasksOverview() {
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       <ListFilters entity="tasks" fields={OVERVIEW_FIELDS} search={TASK_SEARCH} noun="Tasks" tab="overview" period />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
+      {loading && <TasksOverviewSkeleton />}
       {data && (
         <>
           <KpiGrid>
@@ -63,7 +64,6 @@ export default function TasksOverview() {
                 rows={data.by_assignee}
                 rowKey={r => r.admin_id ?? 'none'}
                 empty="No tasks"
-                pageSize={6}
                 cols={[
                   { key: 'name', label: 'Assignee', render: r => r.name },
                   { key: 'open', label: 'Open', num: true, render: r => count(r.open), sort: r => r.open },

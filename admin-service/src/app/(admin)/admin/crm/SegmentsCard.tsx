@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
-import { Dialog } from '@/components/admin/kit'
+import { Dialog, Pager, usePagedList, LoadingLines } from '@/components/admin/kit'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
 import { ap } from '@/lib/shared/admin-path'
@@ -72,24 +72,15 @@ interface ModalProps {
 
 function SegmentModal({ segment, onClose }: ModalProps) {
   const canMail = useHasScope('mailer:write')
-  const [customers, setCustomers] = useState<Customer[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
-
-  if (!loaded && !loading) {
-    setLoading(true)
-    fetch(`/api/admin/customers?segment=${segment.key}&limit=50`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        setCustomers(d.customers || [])
-        setLoaded(true)
-      })
-      .catch(() => {
-        setCustomers([])
-        setLoaded(true)
-      })
-      .finally(() => setLoading(false))
-  }
+  const list = usePagedList<Customer>({
+    key: segment.key,
+    fetchPage: async (page, signal) => {
+      const r = await fetch(`/api/admin/customers?segment=${segment.key}&limit=10&page=${page}`, { credentials: 'include', signal })
+      if (!r.ok) throw new Error('Failed to load customers')
+      const d = await r.json()
+      return { rows: d.customers || [], total: d.total }
+    },
+  })
 
   return (
     <Dialog
@@ -107,17 +98,20 @@ function SegmentModal({ segment, onClose }: ModalProps) {
               <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Customers</h3>
             </div>
             <div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
-              {loading && (
-                <div className="flex items-center justify-center py-8">
-                  <span className="w-5 h-5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+              {list.loading ? (
+                <div className="py-2">
+                  <LoadingLines lines={8} />
                 </div>
-              )}
-              {loaded && customers?.length === 0 && (
+              ) : list.error ? (
+                <p className="text-sm text-red-600 dark:text-red-400 py-4">{list.error}</p>
+              ) : list.rows.length === 0 ? (
                 <p className="text-sm text-foreground-muted py-4">No customers found.</p>
+              ) : (
+                list.rows.map(c => <CustomerRow key={c.id} c={c} large />)
               )}
-              {customers?.map(c => (
-                <CustomerRow key={c.id} c={c} large />
-              ))}
+            </div>
+            <div className="px-6 pb-3 shrink-0">
+              <Pager control={list.pager} noun="customers" />
             </div>
           </div>
 

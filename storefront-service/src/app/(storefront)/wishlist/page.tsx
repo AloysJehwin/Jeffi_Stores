@@ -15,6 +15,7 @@ import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { wishlistBadges } from '@/components/visitor/account/wishlist-badges'
 import { startBuyNow } from '@/lib/client/buy-now'
+import { WishlistSkeleton } from '@/components/visitor/skeletons/account'
 
 interface WishlistItem {
   id: string
@@ -151,27 +152,7 @@ function WishlistInner() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 animate-pulse">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden"
-              style={{ animationDelay: `${i * 70}ms` }}
-            >
-              <div className="aspect-square bg-surface-secondary" />
-              <div className="p-3 space-y-2">
-                <div className="h-3 bg-surface-secondary rounded w-3/4" />
-                <div className="h-4 bg-surface-secondary rounded w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  if (isLoading) return <WishlistSkeleton />
 
   if (wishlistItems.length === 0) {
     return (

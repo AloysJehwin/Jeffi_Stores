@@ -157,3 +157,4 @@ export function applyMailTheme(html: string, t: StoreMailTheme): string {
   if (t.replyHint && !out.includes(REPLY_HINT)) out = out.replace('<!--/mail-footer-->', `<p>${REPLY_HINT}</p><!--/mail-footer-->`)
   return out
 }
+export * from './ses-pace'

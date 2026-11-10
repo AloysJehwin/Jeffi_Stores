@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
+import { Mail, Tag, Package, X, Wand2 } from 'lucide-react'
+import AdminSelect from '@/components/admin/AdminSelect'
+import { LoadingLines, Sk } from '@/components/admin/kit/skeleton'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import Link from 'next/link'
@@ -182,7 +184,6 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [couponsLoading, setCouponsLoading] = useState(false)
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
-  const [couponOpen, setCouponOpen] = useState(false)
 
   const [productQuery, setProductQuery] = useState('')
   const [products, setProducts] = useState<Product[]>([])
@@ -569,47 +570,16 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
 
           {/* Coupon picker */}
           {attachMode === 'coupon' && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setCouponOpen(o => !o)}
-                className={`${inputCls} flex items-center justify-between`}
-              >
-                <span className={selectedCoupon ? 'text-foreground' : 'text-foreground-muted'}>
-                  {selectedCoupon
-                    ? `${selectedCoupon.code} — ${selectedCoupon.discount_type === 'percentage' ? `${selectedCoupon.discount_value}%` : `₹${selectedCoupon.discount_value}`} off`
-                    : 'Select a coupon…'}
-                </span>
-                <ChevronDown className="w-4 h-4 text-foreground-muted shrink-0" />
-              </button>
-              {couponOpen && (
-                <div className="absolute z-50 left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {couponsLoading ? (
-                    <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
-                  ) : coupons.length === 0 ? (
-                    <p className="text-xs text-foreground-muted px-3 py-2">No active coupons found.</p>
-                  ) : (
-                    coupons.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCoupon(c)
-                          setCouponOpen(false)
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-secondary transition-colors"
-                      >
-                        <span className="font-semibold text-foreground">{c.code}</span>
-                        <span className="ml-2 text-foreground-muted">
-                          {c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`} off
-                          {c.description && ` · ${c.description}`}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
+            <AdminSelect
+              value={selectedCoupon?.id ?? ''}
+              onChange={v => setSelectedCoupon(coupons.find(c => c.id === v) ?? null)}
+              disabled={couponsLoading || coupons.length === 0}
+              placeholder={couponsLoading ? 'Loading coupons…' : coupons.length === 0 ? 'No active coupons found.' : 'Select a coupon…'}
+              options={coupons.map(c => ({
+                value: c.id,
+                label: `${c.code} — ${c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`} off${c.description ? ` · ${c.description}` : ''}`,
+              }))}
+            />
           )}
 
           {/* Product picker */}
@@ -670,8 +640,9 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
       {tab === 'preview' && (
         <div className="border border-border-default rounded-lg overflow-hidden">
           {previewLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <span className="w-5 h-5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+            <div className="space-y-4 p-4">
+              <Sk className="h-4 w-1/2" />
+              <LoadingLines lines={6} />
             </div>
           ) : (
             <>

@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Section, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
 import type { NetworkInfo } from './shared'
+import { LoadingSection, LoadingLines } from '@/components/admin/kit/skeleton'
 
 const STATUS_TONE: Record<string, 'green' | 'amber' | 'red' | 'muted'> = {
   connected: 'green',
@@ -58,7 +59,7 @@ export default function Accounts({
     onChange()
   }
 
-  if (!networks) return <p className="text-sm text-foreground-muted">Loading...</p>
+  if (!networks) return <LoadingSection title="Connected accounts" lines={7} />
 
   return (
     <Section title="Connected accounts">
@@ -352,7 +353,7 @@ function TargetPicker({
           {error.hint && <p className="text-sm text-amber-600">{error.hint}</p>}
         </div>
       ) : !targets ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingLines lines={2} />
       ) : !targets.length ? (
         <p className="text-sm text-foreground-muted">
           This sign-in has nothing to post to. Sign in with another account.

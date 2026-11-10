@@ -13,6 +13,7 @@ import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Dialog } from '@/components/admin/kit/dialog'
 import { PageHeader } from '@/components/admin/kit/layout'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { Badge } from '@/components/admin/kit/core'
 import { FormButton, FormField, FormFooter, FormGrid, FormSection, TextInput, fieldInputCls } from '@/components/admin/kit/form'
 import { useActionToast } from '@/components/admin/kit/toast'
@@ -1371,7 +1372,9 @@ export default function NewPOPage() {
                 </div>
                 <div className="overflow-y-auto flex-1">
                   {pickerLoading ? (
-                    <div className="p-8 text-center text-foreground-muted text-sm">Loading…</div>
+                    <div className="p-4">
+                      <LoadingLines lines={6} />
+                    </div>
                   ) : pickerResults.length === 0 ? (
                     <div className="p-8 text-center text-foreground-muted text-sm">
                       No products found in this category.

@@ -10,6 +10,7 @@ import { bp } from '@/lib/shared/business-path'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import { formatInr } from './SubscribeOption'
+import { SubscriptionCardSkeleton } from '@/components/visitor/skeletons/account'
 
 export interface SubscriptionItem {
   id: string
@@ -31,6 +32,7 @@ export interface SubscriptionItem {
   nextChargeAt: string | null
   cancelAtCycleEnd: boolean
   accessExpiresAt: string | null
+  billingProvider?: 'razorpay' | 'phonepe'
   address: { name: string; line1: string; city: string; state: string; pincode: string } | null
   orders: Array<{ id: string; orderNumber: string; status: string; total: number; createdAt: string; cycle: number }>
 }
@@ -143,7 +145,10 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
       {isBusiness ? <BusinessAccountMobileHeader /> : <AccountMobileHeader />}
       <div className="container mx-auto px-4 pt-4 pb-8 space-y-4">
         {loading ? (
-          <div className="h-32 bg-surface-elevated rounded-lg border border-border-default animate-pulse" />
+          <>
+            <SubscriptionCardSkeleton />
+            <SubscriptionCardSkeleton />
+          </>
         ) : subs.length === 0 ? (
           <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center">
             <p className="text-foreground-secondary mb-3">You have no subscriptions yet.</p>
@@ -156,7 +161,9 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
             const ended = ENDED.has(s.status)
             const canCancel = !ended && !s.cancelAtCycleEnd && s.status !== 'created'
             const canPause = s.status === 'active' && !s.cancelAtCycleEnd
-            const canResume = s.status === 'paused'
+            // PhonePe Autopay: a failed renewal is retried by resuming.
+            const retry = s.status === 'halted' && s.billingProvider === 'phonepe'
+            const canResume = s.status === 'paused' || retry
             const canAddress = !s.isDigital && !ended
             const paid = s.currentCycle ?? 0
             const locked = !!s.minCycles && paid < s.minCycles
@@ -212,7 +219,7 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
                     )}
                     {canResume && (
                       <button className={btn} disabled={busy === s.id} onClick={() => ask(s, 'resume')}>
-                        Resume
+                        {retry ? 'Retry payment' : 'Resume'}
                       </button>
                     )}
                     {canAddress && (

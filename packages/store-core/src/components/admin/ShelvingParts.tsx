@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import AdminSelect from '@/components/admin/AdminSelect'
 import CopySku from '@/components/ui/CopySku'
 import { ADMIN_INPUT_CLASS } from '@/lib/shared/format'
@@ -991,7 +992,7 @@ export function AssignStockForm({
       {selected && (
         <div className="rounded-lg border border-border-default bg-surface p-3 space-y-2">
           {loadingAvail ? (
-            <p className="text-xs text-foreground-muted">Loading inventory…</p>
+            <LoadingLines lines={2} />
           ) : unallocatedBase !== null ? (
             <>
               <div className="flex items-center justify-between text-xs">

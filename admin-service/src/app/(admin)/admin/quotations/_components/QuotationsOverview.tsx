@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
-import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { MAX_SPAN_DAYS, delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import type { QuotationOverview } from '@/lib/overviews/quotations'
+import QuotationsOverviewSkeleton from './QuotationsOverviewSkeleton'
 
 const SERIES: SeriesDef[] = [
   { key: 'sentValue', label: 'Quoted value', color: 'rgb(59 130 246)', kind: 'area', axis: 'money' },
@@ -48,7 +49,7 @@ export default function QuotationsOverview() {
         </p>
       )}
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
+      {!data ? loading && <QuotationsOverviewSkeleton /> : <Body d={data} />}
     </div>
   )
 }

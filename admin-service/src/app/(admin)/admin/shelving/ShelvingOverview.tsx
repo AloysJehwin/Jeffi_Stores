@@ -10,6 +10,7 @@ import {
 import { Kpi, KpiGrid } from '@/components/admin/channels/ui'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import ShelvingOverviewSkeleton from './ShelvingOverviewSkeleton'
 
 // Shelving overview: locations, utilisation and unshelved stock.
 export default function ShelvingOverview() {
@@ -21,7 +22,7 @@ export default function ShelvingOverview() {
     <div className="space-y-3">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
+      {loading && !data && <ShelvingOverviewSkeleton />}
       {data && (
         <>
           <KpiGrid>

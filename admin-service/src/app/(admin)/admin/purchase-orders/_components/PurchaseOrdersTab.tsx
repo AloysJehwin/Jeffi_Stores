@@ -22,6 +22,7 @@ import { documentUrlForLocation } from '@/lib/tenancy/forms-host'
 import { ChevronLeft } from 'lucide-react'
 import { Kpi, KpiGrid } from '@/components/admin/kit/core'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { DetailHeader } from '@/components/admin/kit/actions'
 import { Card, Field, Fields } from '@/components/admin/kit/layout'
@@ -1100,7 +1101,10 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
           cancel={cancelReceive}
           discard={
             draftRestored
-              ? () => {
+              ? async () => {
+                  // The server draft too, or reopening restores it again.
+                  const r = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive/draft`, { method: 'DELETE', credentials: 'include' })
+                  if (!r.ok) return showToast((await r.json().catch(() => ({}))).error || 'Could not discard the draft', 'error')
                   try {
                     localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`)
                   } catch {}
@@ -1412,12 +1416,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       />
 
       {loading ? (
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
-          <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
-          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-        </div>
+        <LoadingTable columns={[...PO_SORT_COLS.map(c => c.label), 'Actions']} />
       ) : (
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="md:hidden p-4 space-y-3">

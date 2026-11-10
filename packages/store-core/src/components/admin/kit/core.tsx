@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 import { badgeCls, type Tone } from './tones'
-import { InfiniteFooter, useReveal } from './infinite'
+import { Pager, usePagedRows, EMBEDDED_PAGE_SIZE } from './pager'
 import { SortArrow, naturalDir, type SortType } from './list-sort'
 
 // Core admin kit: cards, KPIs, badges, tabs, the client table, fetch and number helpers.
@@ -293,9 +293,8 @@ export interface Col<T> {
   num?: boolean
 }
 
-const PAGE = 25
-
-export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows: T[]; cols: Col<T>[]; rowKey: (r: T) => string; empty?: string; pageSize?: number }) {
+// A table inside a section: a fixed page of rows with ‹ › arrows, never an endless list.
+export function Table<T>({ rows, cols, rowKey, empty, pageSize = EMBEDDED_PAGE_SIZE, noun }: { rows: T[]; cols: Col<T>[]; rowKey: (r: T) => string; empty?: string; pageSize?: number; noun?: string }) {
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [desc, setDesc] = useState(true)
   const sorted = useMemo(() => {
@@ -308,7 +307,7 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
     })
     return desc ? s.reverse() : s
   }, [rows, cols, sortKey, desc])
-  const { shown, control } = useReveal(sorted, pageSize, `${sortKey}|${desc}`)
+  const { shown, pager } = usePagedRows(sorted, pageSize, `${sortKey}|${desc}`)
   if (!rows.length) return <Empty msg={empty} />
   return (
     <div className="min-w-0">
@@ -352,7 +351,7 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
           </tbody>
         </table>
       </div>
-      <InfiniteFooter shown={shown.length} control={control} />
+      <Pager control={pager} noun={noun} />
     </div>
   )
 }

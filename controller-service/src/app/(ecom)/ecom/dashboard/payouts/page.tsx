@@ -23,6 +23,7 @@ export default async function PayoutsPage() {
           verificationStatus: bank.verificationStatus,
           verificationRef: bank.verificationRef,
           hasRouteAccount: !!bank.linkedAccountId,
+          upiId: bank.upiId,
         }
       : null
 

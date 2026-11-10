@@ -280,11 +280,14 @@ export async function recordCapturedPayment(opts: {
   isCod?: boolean
   /** Snapshot taken at subscription creation; otherwise resolved from the control plane. */
   linkedAccountId?: string | null
+  /** tenant_transactions.gateway label; defaults per collectedOn (razorpay_own / razorpay_route); UPI passes upi_phonepe / upi_upg / upi_manual. */
+  gateway?: string
 }): Promise<RecordOutcome> {
   try {
     if (!opts.tenantId || opts.tenantId === NIL_TENANT_ID || !opts.orderRef || !opts.paymentId) return 'skipped'
     const pool = await cpPool()
     const own = opts.collectedOn === 'own'
+    const gateway = opts.gateway ?? (own ? 'razorpay_own' : 'razorpay_route')
     const ins = await pool.query(
       `INSERT INTO tenant_transactions
          (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, is_cod,
@@ -292,7 +295,7 @@ export async function recordCapturedPayment(opts: {
        VALUES ($1, $2, $3, $3, 0, 0, $4, $5, $6, $6, 'captured', now())
        ON CONFLICT DO NOTHING
        RETURNING ${TXN_COLS}`,
-      [opts.tenantId, opts.orderRef, opts.grossInr, own ? 'razorpay_own' : 'razorpay_route', !!opts.isCod, opts.paymentId]
+      [opts.tenantId, opts.orderRef, opts.grossInr, gateway, !!opts.isCod, opts.paymentId]
     )
     const row = ins.rows?.[0] as TxnRow | undefined
     if (!row) return 'duplicate'

@@ -19,6 +19,7 @@ import YourCoupons from '@/components/visitor/cart/YourCoupons'
 import { couponLookup, urlCoupon, urlCouponCode } from '@/components/visitor/coupons/terms'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 import MobileCheckoutBar from '@/components/visitor/cart/MobileCheckoutBar'
+import { CartSkeleton } from '@/components/visitor/skeletons/commerce'
 
 const SUMMARY_CTA_ID = 'cart-summary-cta'
 
@@ -217,28 +218,7 @@ export default function CartPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="animate-pulse space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default p-4 flex gap-4"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              <div className="w-20 h-20 bg-surface-secondary rounded-lg flex-shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-surface-secondary rounded w-3/4" />
-                <div className="h-3 bg-surface-secondary rounded w-1/2" />
-                <div className="h-4 bg-surface-secondary rounded w-24" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  if (isLoading) return <CartSkeleton />
 
   if (cartCount === 0 && savedItems.length === 0) {
     return (

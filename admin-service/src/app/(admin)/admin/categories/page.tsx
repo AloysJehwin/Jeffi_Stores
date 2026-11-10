@@ -17,11 +17,12 @@ import CategoriesClient from './CategoriesClient'
 import BrochureButton from '@/components/admin/BrochureButton'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import GroupOverview from './_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 
 type SP = { [key: string]: string | undefined }
 
@@ -230,7 +231,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
         </PageDrafts>
       ) : (
         <>
-          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+          <Suspense key={JSON.stringify(q)} fallback={<LoadingKpis labels={['Total categories', 'Main categories', 'Subcategories']} />}>
             <CategoriesStats q={q} />
           </Suspense>
 
@@ -251,15 +252,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   )
 }
 
-function KpiRowSkeleton() {
-  return (
-    <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
-      ))}
-    </div>
-  )
-}
 
 async function AddCategoryButton() {
   const host = await getHost()
@@ -275,7 +267,7 @@ async function AddCategoryButton() {
 function CategoriesListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={4} />}>
+    <Suspense key={key} fallback={<LoadingTable columns={['Category', 'Slug', 'Order', 'Status', 'Actions']} />}>
       <CategoriesListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )

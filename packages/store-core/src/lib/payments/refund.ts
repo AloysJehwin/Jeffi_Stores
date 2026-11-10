@@ -42,8 +42,10 @@ export function refundCapacity(p: { amount: number | string; gateway_response: u
 }
 
 /**
- * Partially refund `amount` across the order's completed Razorpay payments (the original charge and any
- * top-ups), on the tenant's own keys when connected else the platform's, with the Route clawback per refund.
+ * Partially refund `amount` across the order's completed gateway payments (the original charge and any
+ * top-ups). Razorpay: on the tenant's own keys when connected else the platform's, with the Route clawback
+ * per refund. PhonePe (UPI): its refund API on the account that collected. A manual UPI transfer has no
+ * gateway to refund through: it is left for an external refund and the error says so.
  * Payments stay 'completed'; each refund is appended to gateway_response.partial_refunds.
  */
 export async function refundAcrossPayments(opts: {
@@ -56,21 +58,31 @@ export async function refundAcrossPayments(opts: {
   const { queryMany, query } = await import('@/lib/shared/db')
   const { getRazorpayInstanceFor } = await import('@/lib/payments/razorpay')
   const { applyRouteRefund } = await import('@/lib/payments/route-settlement')
-  const payments = await queryMany<{ id: string; transaction_id: string | null; amount: string; gateway_response: unknown }>(
-    `SELECT id, transaction_id, amount, gateway_response FROM payments
-      WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' AND transaction_id IS NOT NULL
+  const payments = await queryMany<{ id: string; transaction_id: string | null; amount: string; gateway_response: unknown; payment_gateway?: string | null }>(
+    `SELECT id, transaction_id, amount, gateway_response, payment_gateway FROM payments
+      WHERE order_id = $1 AND payment_gateway IN ('razorpay', 'phonepe', 'upi_upg', 'upi_manual') AND status = 'completed' AND transaction_id IS NOT NULL
       ORDER BY created_at`,
     [opts.orderId]
   )
-  const { instance } = await getRazorpayInstanceFor(opts.tenantId ?? undefined)
+  const isRzp = (p: { payment_gateway?: string | null }) => !p.payment_gateway || p.payment_gateway === 'razorpay'
+  // A UPI-only store may have no Razorpay keys at all.
+  const instance = payments.some(isRzp) ? (await getRazorpayInstanceFor(opts.tenantId ?? undefined)).instance : null
   const refunds: Array<{ id: string; amount: number; paymentId: string }> = []
   let remaining = Math.round(opts.amount * 100) / 100
+  let manualLeft = 0
   for (const p of payments) {
     if (remaining <= 0) break
+    // Paid straight to the UPI ID: there is no gateway to refund through.
+    if (p.payment_gateway === 'upi_manual' || p.payment_gateway === 'upi_upg') {
+      manualLeft += refundCapacity(p)
+      continue
+    }
     const take = Math.min(refundCapacity(p), remaining)
     if (!(take > 0)) continue
     const paise = Math.round(take * 100)
-    const refund = await instance.payments.refund(p.transaction_id!, { amount: paise, notes: { purpose: opts.purpose } })
+    const refund = isRzp(p)
+      ? await instance!.payments.refund(p.transaction_id!, { amount: paise, notes: { purpose: opts.purpose } })
+      : await refundPhonePePayment(p, paise, opts.purpose)
     await import('@/lib/payments/refund-records')
       .then(m => m.recordRefund({ refund, paymentRowId: p.id, orderId: opts.orderId, purpose: opts.purpose }))
       .catch(() => {})
@@ -87,8 +99,33 @@ export async function refundAcrossPayments(opts: {
   // The order's total already reflects the change; keep the Google Ads conversion value in step.
   const { queueAdsConversion } = await import('@/lib/google-ads/conversions/queue')
   await queueAdsConversion(opts.orderId)
+  if (remaining > 0.01 && manualLeft > 0) {
+    throw Object.assign(
+      new Error(`₹${Math.min(remaining, manualLeft).toFixed(2)} was paid by UPI transfer to the store's UPI ID — send it back from your UPI app and record it as an external refund`),
+      { refunds, manualUpi: true }
+    )
+  }
   if (remaining > 0.01) throw Object.assign(new Error(`Only ₹${(opts.amount - remaining).toFixed(2)} of ₹${opts.amount.toFixed(2)} could be refunded — no payment has enough left`), { refunds })
   return { refunded: Math.round((opts.amount - remaining) * 100) / 100, refunds }
+}
+
+/** A PhonePe refund, shaped like a Razorpay refund entity so the same records and ledger apply. */
+async function refundPhonePePayment(p: { transaction_id: string | null; gateway_response: unknown }, paise: number, purpose: string) {
+  const gw = parseGw(p.gateway_response)
+  const moid = String(gw.merchant_order_id ?? '')
+  if (!moid) throw new Error('This UPI payment has no PhonePe order to refund against')
+  const { refund: phonePeRefund } = await import('@/lib/payments/upi/phonepe')
+  const { credsForMerchantOrder } = await import('@/lib/payments/upi/settle')
+  const merchantRefundId = `RF${randomUUID().replace(/-/g, '')}`
+  const r = await phonePeRefund(await credsForMerchantOrder(moid), { merchantRefundId, originalMerchantOrderId: moid, amountPaise: paise })
+  return {
+    id: merchantRefundId,
+    payment_id: p.transaction_id!,
+    amount: paise,
+    status: r.state === 'COMPLETED' ? 'processed' : r.state === 'FAILED' ? 'failed' : 'pending',
+    acquirer_data: { phonepe_refund_id: r.refundId },
+    notes: { purpose },
+  }
 }
 
 /**

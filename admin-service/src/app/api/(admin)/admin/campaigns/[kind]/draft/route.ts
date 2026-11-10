@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
+import { queryOne } from '@/lib/shared/db'
 import {
   actorOf,
   campaignLockId,
-  closeAfter,
-  discardGuard,
   draftLockResponse,
   epochFrom,
   withDraftWrite,
 } from '@/lib/admin/draft-locks'
+import { discardCampaignDraft, discardReply } from '@/lib/admin/discard-rows'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -69,14 +68,5 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const actor = actorOf(admin)
-  const lockId = actor ? await campaignLockId(kind) : null
-  if (lockId) {
-    const denied = await discardGuard(actor, 'campaign', lockId)
-    if (denied) return denied
-  }
-  // Discard = clear the draft (keep the row so campaign_id stays stable for sessions).
-  await query(`UPDATE campaign_drafts SET fields = '{}'::jsonb, updated_at = now() WHERE kind = $1`, [kind])
-  if (lockId) await closeAfter(actor, 'campaign', lockId, 'discarded')
-  return NextResponse.json({ success: true })
+  return discardReply(await discardCampaignDraft(actorOf(admin), kind))
 }

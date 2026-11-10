@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { FileClock } from 'lucide-react'
+import { FileClock, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { useDraftCounts, useDraftsList, type DraftListItem, type DraftsScope } from '@/hooks/useDraftsList'
 import { timeAgo } from '@/lib/client/draft-lock-client'
 import { DataTable, DraftLockBadge, HandoverDialog, TakeoverDialog, Tabs, useActionToast, useListSort, type DataCol } from '@/components/admin/kit'
 
-// A list page's Drafts tab (one draft type, or a comma list with a Type column), with claim / hand over / take over / request.
+// A list page's Drafts tab (one draft type, or a comma list with a Type column), with claim / hand over / take over / request / delete.
 
 const SORT_NS = 'drafts'
 
@@ -18,6 +19,33 @@ const ghost =
   'control-sm inline-flex items-center border border-border-secondary bg-surface text-xs text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50'
 const accent =
   'control-sm inline-flex items-center border border-accent-500/40 bg-accent-500/10 text-xs font-semibold text-accent-500 hover:bg-accent-500/20 disabled:opacity-50'
+const danger =
+  'control-sm inline-flex items-center gap-1 border border-red-500/40 text-xs text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-50'
+
+// Types where the whole entity is the draft: deleting removes it, not an edit of something live.
+const WHOLE: Record<string, string> = {
+  mailer: 'This draft message will be deleted.',
+  invoice: 'This draft invoice will be deleted.',
+  quotation: 'This draft quotation will be deleted.',
+  purchase_order: 'This draft purchase order will be cancelled.',
+  po_new: 'This new purchase order will be deleted.',
+  po_receive: 'This receipt draft will be deleted; nothing has been received from it.',
+  cash_sale: 'This held bill will be deleted.',
+  scenario: 'This new scenario will be deleted.',
+  google_ads_campaign: 'This new campaign will be deleted.',
+  rfq_reply: 'This unsent reply will be deleted.',
+}
+// Catalog types: a never-published entity is its own draft (its edit link has no ?draft=).
+const CATALOG = new Set(['product', 'brand', 'category', 'coupon', 'review_form'])
+
+function deleteMessage(r: DraftListItem, holder: string | null): string {
+  const what =
+    WHOLE[r.resourceType] ??
+    (CATALOG.has(r.resourceType) && !r.editHref.includes('draft=')
+      ? `This new ${r.typeLabel.toLowerCase()} was never published; it will be deleted.`
+      : "Changes in it are lost; the published version isn't affected.")
+  return holder ? `${holder} is editing this draft — they'll be notified.\n\n${what}` : what
+}
 
 const rowKey = (r: DraftListItem) => `${r.resourceType}:${r.resourceId}:${r.lock?.epoch ?? 0}:${r.lock?.ownerId ?? ''}`
 
@@ -28,16 +56,17 @@ function Owner({ r }: { r: DraftListItem }) {
   return <DraftLockBadge lock={l} mine={r.isMine} />
 }
 
-/** Claim / release / hand over / take over for one row. Its own lock state; no presence. */
+/** Claim / release / hand over / take over / delete for one row. Its own lock state; no presence. */
 function RowLockActions({ r, onChanged }: { r: DraftListItem; onChanged: () => void }) {
   const canWrite = useCanWrite(r.writeScope)
   const toast = useActionToast()
+  const confirm = useConfirm()
   const [dialog, setDialog] = useState<'handover' | 'takeover' | null>(null)
   const lock = useDraftLock({
     resourceType: r.resourceType,
     resourceId: r.resourceId,
     presence: false,
-    initial: { lock: r.lock, draftExists: true, isMine: r.isMine, canEdit: r.canEdit, canTakeOver: r.canTakeOver, canDiscard: false },
+    initial: { lock: r.lock, draftExists: true, isMine: r.isMine, canEdit: r.canEdit, canTakeOver: r.canTakeOver, canDiscard: r.canDiscard },
   })
   if (!canWrite) return null
   const done = (ok: boolean) => {
@@ -87,6 +116,32 @@ function RowLockActions({ r, onChanged }: { r: DraftListItem; onChanged: () => v
           Request access
         </button>
       )
+  }
+  if (lock.canDiscard && !lock.closed) {
+    const l = lock.lock
+    const holder = l?.ownerId && l.ownerCanEdit && !lock.isMine ? (l.ownerName ?? 'Another admin') : null
+    buttons.push(
+      <button
+        key="delete"
+        type="button"
+        className={danger}
+        disabled={lock.busy}
+        onClick={async () => {
+          const cancel = r.resourceType === 'purchase_order'
+          const ok = await confirm({
+            title: cancel ? 'Cancel this purchase order?' : 'Delete this draft?',
+            message: deleteMessage(r, holder),
+            confirmLabel: cancel ? 'Cancel PO' : 'Delete',
+            cancelLabel: 'Keep',
+            variant: 'danger',
+          })
+          if (ok) done(await lock.discard())
+        }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Delete
+      </button>
+    )
   }
   if (!buttons.length) return null
   return (

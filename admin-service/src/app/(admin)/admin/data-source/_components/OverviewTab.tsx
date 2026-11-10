@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { AttentionList, OverviewSkeleton, useOverviewData, type AttentionItem } from '@/components/admin/overview/kit'
+import { AttentionList, useOverviewData, type AttentionItem } from '@/components/admin/overview/kit'
 import { Banner, Kpi, KpiGrid, when } from '@/components/admin/kit/core'
 import { STALE_JOB_MESSAGE } from './shared-constants'
 import { duration, jobState, sheetUrl, sourceLabel, type GsheetStatus, type ImportJob } from './shared'
+import DataSourceOverviewSkeleton from './DataSourceOverviewSkeleton'
 
 interface OverviewData {
   stats: {
@@ -48,7 +49,7 @@ export default function OverviewTab({ refreshKey, onGoto }: { refreshKey: number
       </div>
     )
   }
-  if (loading || !data) return <OverviewSkeleton />
+  if (loading || !data) return <DataSourceOverviewSkeleton />
   const { stats, gsheet, catalog } = data
 
   const lastImportTone = stats.lastImport ? jobState(stats.lastImport.status, stats.lastImport.error_count).label : 'None yet'

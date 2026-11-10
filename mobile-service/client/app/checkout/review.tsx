@@ -11,6 +11,7 @@ import AiInsight from '../../src/components/cart/AiInsight'
 import { AddAddressSheet } from '../../src/components/account/AddressSheet'
 import CouponHintBanner from '../../src/components/checkout/CouponHintBanner'
 import { BuyNowReviewRow, CartReviewRow } from '../../src/components/checkout/CheckoutItemRow'
+import { PaymentSections } from '../../src/components/checkout/PaymentSections'
 import { useCheckoutStore, type PayMethod } from '../../src/components/checkout/checkoutStore'
 import { cartTax, cartTotal, digitalLinesSubtotal, isDigitalLine, money } from '../../src/components/cart/lines'
 import {
@@ -123,7 +124,7 @@ export default function CheckoutReviewScreen() {
   const couponFromParams = params.couponCode || null
   const user = useAuthStore(s => s.user)
   const authLoading = useAuthStore(s => s.isLoading)
-  const { razorpayEnabled, codEnabled, gstEnabled } = useStoreConfig().flags
+  const { razorpayEnabled, codEnabled, gstEnabled, upiEnabled = false } = useStoreConfig().flags
   const submitError = useCheckoutStore(s => s.submitError)
   const existingOrder = useCheckoutStore(s => s.existingOrder)
 
@@ -197,7 +198,16 @@ export default function CheckoutReviewScreen() {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
   const [notes, setNotes] = useState('')
   const business = useBusiness()
-  const [paymentMethod, setPaymentMethod] = useState<PayMethod>(razorpayEnabled ? 'razorpay' : business.isBusiness ? 'manual' : 'cod')
+  const [paymentMethod, setPaymentMethod] = useState<PayMethod>(upiEnabled ? 'upi' : razorpayEnabled ? 'razorpay' : business.isBusiness ? 'manual' : 'cod')
+  const methodChosen = useRef(false)
+  const chooseMethod = (m: PayMethod) => {
+    methodChosen.current = true
+    setPaymentMethod(m)
+  }
+  // UPI is the default once the flags arrive (the fallback config has it off), unless the user already picked.
+  useEffect(() => {
+    if (upiEnabled && !methodChosen.current && paymentMethod === 'razorpay') setPaymentMethod('upi')
+  }, [upiEnabled, paymentMethod])
   const [cancellingPrevious, setCancellingPrevious] = useState(false)
 
   // Fresh visit: no stale error from an earlier attempt.
@@ -319,8 +329,9 @@ export default function CheckoutReviewScreen() {
     codEnabled &&
     (isBuyNow ? true : cartItems.length > 0 && cartItems.every(i => i.products?.is_cod_allowed !== false))
   const manualAvailable = business.isBusiness && !hasDigital
-  const noPaymentMethod = !razorpayEnabled && !codAvailable && !manualAvailable
+  const noPaymentMethod = !upiEnabled && !razorpayEnabled && !codAvailable && !manualAvailable
   const methodUnavailable =
+    (paymentMethod === 'upi' && !upiEnabled) ||
     (paymentMethod === 'razorpay' && !razorpayEnabled) ||
     (paymentMethod === 'cod' && !codAvailable) ||
     (paymentMethod === 'manual' && !manualAvailable)
@@ -328,9 +339,9 @@ export default function CheckoutReviewScreen() {
   // Keep the chosen method valid as flags / the cart change.
   useEffect(() => {
     if (!methodUnavailable) return
-    const next: PayMethod | null = razorpayEnabled ? 'razorpay' : manualAvailable ? 'manual' : codAvailable ? 'cod' : null
+    const next: PayMethod | null = upiEnabled ? 'upi' : razorpayEnabled ? 'razorpay' : manualAvailable ? 'manual' : codAvailable ? 'cod' : null
     if (next && next !== paymentMethod) setPaymentMethod(next)
-  }, [paymentMethod, methodUnavailable, razorpayEnabled, codAvailable, manualAvailable])
+  }, [paymentMethod, methodUnavailable, upiEnabled, razorpayEnabled, codAvailable, manualAvailable])
 
   // ── coupon ──
   const runApply = async (code: string) => {
@@ -401,7 +412,7 @@ export default function CheckoutReviewScreen() {
       notes,
       total: finalTotal,
     })
-    router.push('/checkout/payment')
+    router.push(paymentMethod === 'upi' ? '/checkout/upi' : '/checkout/payment')
   }
 
   // ── render ──
@@ -709,36 +720,16 @@ export default function CheckoutReviewScreen() {
             containerClassName="mb-4"
           />
 
-          {/* Payment Method */}
+          {/* Payment Method: the app's UPI flow above Razorpay (without UPI), COD and the business manual payment. */}
           <View className="mb-4 gap-2">
-            <Label>Payment Method</Label>
-            {razorpayEnabled && (
-              <Radio
-                card
-                selected={paymentMethod === 'razorpay'}
-                onSelect={() => setPaymentMethod('razorpay')}
-                label="Pay Online"
-                description="UPI, Cards, Net Banking"
-              />
-            )}
-            {codAvailable && (
-              <Radio
-                card
-                selected={paymentMethod === 'cod'}
-                onSelect={() => setPaymentMethod('cod')}
-                label="Cash on Delivery"
-                description="Pay when your order arrives"
-              />
-            )}
-            {manualAvailable && (
-              <Radio
-                card
-                selected={paymentMethod === 'manual'}
-                onSelect={() => setPaymentMethod('manual')}
-                label="Manual payment"
-                description="Bank transfer or invoice — our team will contact you"
-              />
-            )}
+            <PaymentSections
+              value={paymentMethod}
+              onChange={chooseMethod}
+              upi={upiEnabled}
+              razorpay={razorpayEnabled}
+              cod={codAvailable}
+              manual={manualAvailable}
+            />
             {paymentMethod === 'manual' && manualAvailable && (
               <Notice tone="info">
                 Your order is placed unpaid. Our team will contact you with payment details; you can also pay it online later from
@@ -784,7 +775,7 @@ export default function CheckoutReviewScreen() {
             </Notice>
           ) : (
             <Button
-              {...(paymentMethod === 'razorpay' && razorpayEnabled
+              {...((paymentMethod === 'razorpay' && razorpayEnabled) || (paymentMethod === 'upi' && upiEnabled)
                 ? { label: `Pay ${money(finalTotal)}`, icon: ShieldCheck }
                 : paymentMethod === 'cod'
                   ? { label: 'Place Order — Pay on Delivery', trailing: <Banknote size={20} color={status.white} strokeWidth={2.2} /> }

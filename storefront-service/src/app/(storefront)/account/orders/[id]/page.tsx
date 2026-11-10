@@ -15,6 +15,8 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewModal from './ReviewModal'
 import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
 import { fmtQty } from '@/lib/shared/number-display'
+import { OrderDetailSkeleton } from '@/components/visitor/skeletons/account'
+import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, upiFlag, useUpiPayment, type PaymentChoice, type UpiStartBody } from '@/components/payments'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
@@ -226,9 +228,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { user, isLoading: authLoading } = useAuth()
   const {
     flags: { razorpayEnabled: isRazorpayEnabled },
+    flags: storeFlags,
     orderAutoCancelMinutes,
     identity: storeIdentity,
   } = useStoreConfig()
+  const upiEnabled = upiFlag(storeFlags)
+  const canPayOnline = isRazorpayEnabled || upiEnabled
+  // null = default (UPI when the store offers it).
+  const [payPick, setPayPick] = useState<PaymentChoice | null>(null)
+  const payChoice: PaymentChoice = payPick === 'razorpay' && isRazorpayEnabled ? 'razorpay' : upiEnabled ? 'upi' : 'razorpay'
+  const upi = useUpiPayment({ returnTo: `/account/orders/${id}` })
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
@@ -513,11 +522,25 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     })
   }
 
+  // UPI start errors surface as toasts; the manual dialog shows its own confirm errors.
+  useEffect(() => {
+    if (upi.error && !upi.manual) {
+      showToast(upi.error, 'error')
+      upi.clearError()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upi.error, upi.manual])
+
   const handlePayNow = async () => {
     if (!order) return
     setIsPayingNow(true)
 
     try {
+      if (payChoice === 'upi') {
+        const started = await upi.start({ purpose: 'order', orderId: order.id })
+        if (!started || started.mode === 'manual') setIsPayingNow(false)
+        return
+      }
       await loadRazorpayScript()
 
       const rzpResponse = await fetch('/api/razorpay/create-order', {
@@ -569,6 +592,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           contact: order.shippingAddress?.phone || '',
         },
         theme: { color: '#f97316' },
+        ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
         modal: {
           ondismiss: function () {
             setIsPayingNow(false)
@@ -588,8 +612,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  const handleConfirmVariantChange = () => confirmChange(`/api/orders/${order?.id}/variant-change/confirm`, 'Variant change')
-  const handleConfirmAdjustment = (adjId: string) => confirmChange(`/api/orders/${order?.id}/adjustments/${adjId}/confirm`, 'Order changes')
+  const handleConfirmVariantChange = () =>
+    confirmChange(`/api/orders/${order?.id}/variant-change/confirm`, 'Variant change', { purpose: 'variant_change', requestId: order?.pendingVariantChange?.id })
+  const handleConfirmAdjustment = (adjId: string) =>
+    confirmChange(`/api/orders/${order?.id}/adjustments/${adjId}/confirm`, 'Order changes', { purpose: 'order_adjustment', adjustmentId: adjId })
   const handleRejectAdjustment = async (adjId: string) => {
     if (!order) return
     setVcrBusy(true)
@@ -606,7 +632,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   // Confirm a proposed change; when extra is due, pay it in Checkout (on the store's own keys) and verify.
-  async function confirmChange(confirmUrl: string, label: string) {
+  async function confirmChange(confirmUrl: string, label: string, upiBody: UpiStartBody) {
     if (!order) return
     setVcrBusy(true)
     try {
@@ -618,6 +644,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to confirm change')
+
+      // Collect path over UPI: same request, settled by the intent (the swap applies when it completes).
+      if (data.settlement === 'collect' && payChoice === 'upi') {
+        const started = await upi.start({ ...upiBody, requestId: upiBody.requestId ?? data.requestId })
+        if (!started || started.mode === 'manual') setVcrBusy(false)
+        return
+      }
 
       // Collect path: pay the extra via Razorpay Checkout; the swap applies on verify.
       if (data.settlement === 'collect' && data.razorpayOrderId) {
@@ -659,6 +692,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             contact: order.shippingAddress?.phone || '',
           },
           theme: { color: '#f97316' },
+          ...(upiEnabled && { config: razorpayDisplayConfig({ hideUpi: true }) }),
           modal: {
             ondismiss: function () {
               setVcrBusy(false)
@@ -703,68 +737,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  if (authLoading || loading) {
-    return (
-      <div className="bg-surface min-h-screen">
-        <div className="container mx-auto px-4">
-          <div className="py-4 sm:py-6 space-y-4 sm:space-y-6 animate-pulse">
-            {/* Order header skeleton */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="h-6 w-48 bg-surface-secondary rounded" />
-                  <div className="h-4 w-64 bg-surface-secondary rounded" />
-                </div>
-                <div className="flex gap-2">
-                  <div className="h-6 w-20 bg-surface-secondary rounded-full" />
-                  <div className="h-6 w-24 bg-surface-secondary rounded-full" />
-                </div>
-              </div>
-            </div>
-            {/* Order items skeleton */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-4">
-              <div className="h-5 w-36 bg-surface-secondary rounded" />
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex gap-4 pb-4 border-b border-border-default last:border-b-0"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  <div className="w-20 h-20 bg-surface-secondary rounded-lg shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-surface-secondary rounded w-3/4" />
-                    <div className="h-3 bg-surface-secondary rounded w-1/4" />
-                    <div className="h-3 bg-surface-secondary rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-              {/* Totals skeleton */}
-              <div className="pt-4 border-t-2 border-border-default space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex justify-between" style={{ animationDelay: `${i * 50}ms` }}>
-                    <div className="h-4 w-20 bg-surface-secondary rounded" />
-                    <div className="h-4 w-24 bg-surface-secondary rounded" />
-                  </div>
-                ))}
-                <div className="flex justify-between pt-2">
-                  <div className="h-6 w-12 bg-surface-secondary rounded" />
-                  <div className="h-7 w-28 bg-surface-secondary rounded" />
-                </div>
-              </div>
-            </div>
-            {/* Shipping address skeleton */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-3">
-              <div className="h-5 w-40 bg-surface-secondary rounded" />
-              <div className="h-4 w-32 bg-surface-secondary rounded" />
-              <div className="h-4 w-56 bg-surface-secondary rounded" />
-              <div className="h-4 w-44 bg-surface-secondary rounded" />
-              <div className="h-4 w-36 bg-surface-secondary rounded" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (authLoading || loading) return <OrderDetailSkeleton />
 
   if (!user) return null
 
@@ -1122,6 +1095,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       : a.settlement_type === 'cod_adjust' ? <>Your new total is <strong>₹{Number(a.new_total).toFixed(2)}</strong>, payable on delivery.</>
                       : <>No change to what you pay.</>}
                   </p>
+                  {a.settlement_type === 'collect' && upiEnabled && (
+                    <div className="mt-3 max-w-md">
+                      <PaymentSections compact upi razorpay={isRazorpayEnabled} value={payChoice} onChange={setPayPick} />
+                    </div>
+                  )}
                   <div className="flex gap-2 mt-3">
                     <button onClick={() => handleConfirmAdjustment(a.id)} disabled={vcrBusy}
                       className="px-4 py-2 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50">
@@ -1177,6 +1155,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         <>No change to your total.</>
                       )}
                     </p>
+                    {order.pendingVariantChange.settlementType === 'collect' && upiEnabled && (
+                      <div className="mt-3 max-w-md">
+                        <PaymentSections compact upi razorpay={isRazorpayEnabled} value={payChoice} onChange={setPayPick} />
+                      </div>
+                    )}
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={handleConfirmVariantChange}
@@ -1936,7 +1919,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
             {order.paymentStatus === 'unpaid' &&
               order.paymentMode !== 'cod' &&
-              isRazorpayEnabled &&
+              canPayOnline &&
               order.status !== 'cancelled' &&
               order.status !== 'cancel_requested' && (
                 <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -1970,6 +1953,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             Time expired. Cancelling order and restoring items to your cart...
                           </p>
                         )}
+                        {upiEnabled && !isAutoCancelling && (
+                          <div className="mt-3 max-w-md">
+                            <PaymentSections compact upi razorpay={isRazorpayEnabled} value={payChoice} onChange={setPayPick} />
+                          </div>
+                        )}
                       </div>
                     </div>
                     {!isAutoCancelling && (
@@ -1994,7 +1982,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
             {order.paymentStatus === 'unpaid' &&
-              !isRazorpayEnabled &&
+              !canPayOnline &&
               order.status !== 'cancelled' &&
               order.status !== 'cancel_requested' && (
                 <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -2025,7 +2013,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
             {order.paymentStatus === 'failed' &&
-              isRazorpayEnabled &&
+              canPayOnline &&
               order.status !== 'cancelled' &&
               order.status !== 'cancel_requested' && (
                 <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -2058,6 +2046,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           <p className="text-red-800 dark:text-red-300 text-sm mt-2">
                             Time expired. Cancelling order and restoring items to your cart...
                           </p>
+                        )}
+                        {upiEnabled && !isAutoCancelling && (
+                          <div className="mt-3 max-w-md">
+                            <PaymentSections compact upi razorpay={isRazorpayEnabled} value={payChoice} onChange={setPayPick} />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -2100,6 +2093,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
+      <UpiManualDialog
+        manual={upi.manual}
+        busy={upi.busy}
+        error={upi.error}
+        onConfirm={upi.confirmUtr}
+        onClose={() => {
+          upi.dismissManual()
+          setIsPayingNow(false)
+          setVcrBusy(false)
+        }}
+      />
       {showReviewModal && (
         <ReviewModal
           items={order.items.map(item => ({

@@ -301,17 +301,20 @@ export async function settleVariantChangePayment(params: {
   razorpayOrderId: string
   razorpayPaymentId: string
   amountPaise: number
+  /** Another gateway (UPI): the payment row's gateway/method and who books the store's share. */
+  gw?: { gateway: string; method: string; book?: (p: { paymentId: string; grossInr: number; orderRef: string; orderId: string }) => Promise<void> }
 }): Promise<{ applied: boolean; reason?: string }> {
-  const vcr = await queryOne<VariantChangeRow>(`SELECT * FROM variant_change_requests WHERE razorpay_order_id = $1`, [
-    params.razorpayOrderId,
-  ])
+  const vcr = await queryOne<VariantChangeRow & { order_number?: string }>(
+    `SELECT vcr.*, o.order_number FROM variant_change_requests vcr JOIN orders o ON o.id = vcr.order_id WHERE vcr.razorpay_order_id = $1`,
+    [params.razorpayOrderId]
+  )
   if (!vcr) return { applied: false, reason: 'no_request' }
   if (vcr.status === 'applied') return { applied: false, reason: 'already_applied' }
 
   // Record the top-up payment against the order.
-  await queryOne(
+  const inserted = await queryOne(
     `INSERT INTO payments (order_id, payment_method, payment_gateway, transaction_id, amount, status, gateway_response)
-     VALUES ($1, 'razorpay', 'razorpay', $2, $3, 'completed', $4)
+     VALUES ($1, $5, $6, $2, $3, 'completed', $4)
      ON CONFLICT (transaction_id) DO NOTHING
      RETURNING id`,
     [
@@ -324,8 +327,14 @@ export async function settleVariantChangePayment(params: {
         razorpay_order_id: params.razorpayOrderId,
         razorpay_payment_id: params.razorpayPaymentId,
       }),
+      params.gw?.method ?? 'razorpay',
+      params.gw?.gateway ?? 'razorpay',
     ]
   )
+  if (inserted && params.gw?.book) {
+    await params.gw.book({ paymentId: params.razorpayPaymentId, grossInr: params.amountPaise / 100, orderRef: `${vcr.order_number ?? vcr.order_id}#vc-${String(vcr.id).slice(0, 8)}`, orderId: vcr.order_id })
+      .catch(e => console.error('[variant-change] ledger record failed', e))
+  }
   await queryOne(
     `UPDATE variant_change_requests SET razorpay_payment_id = $1, updated_at = NOW() WHERE id = $2 RETURNING id`,
     [params.razorpayPaymentId, vcr.id]

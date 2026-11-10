@@ -10,6 +10,8 @@ import type { ChangeRow } from '@/lib/channels/change-log'
 import type { SyncLogRow } from '@/lib/channels/sync-run'
 import type { Channel } from '@/lib/channels/types'
 import { Badge, Section, Table, api, btnGhost, btnPrimary, inputCls, when } from './ui'
+import { LoadingLines, LoadingTable } from '@/components/admin/kit/skeleton'
+import { CHANGE_COLUMNS, RUN_COLUMNS } from './skeletons'
 
 // Alerts, Change history and Job runs tabs, the same for every channel console.
 
@@ -54,7 +56,7 @@ export function ChannelAlerts({ channel, params }: { channel: Channel; params?: 
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !d ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingLines lines={3} />
       ) : open.length === 0 ? (
         <p className="text-sm text-foreground-muted flex items-center gap-2">
           <BellRing className="w-4 h-4" /> No open alerts{dismissed ? `; ${dismissed} dismissed alert(s) stay quiet until they clear` : ''}.
@@ -173,7 +175,7 @@ export function ChangeHistory({ channel }: { channel: Channel }) {
   return (
     <Section title="Change history">
       {!rows ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingTable bare columns={CHANGE_COLUMNS} rows={5} />
       ) : (
         <Table
           rows={rows}
@@ -207,7 +209,7 @@ export function JobRuns({ channel, labels = {} }: { channel: Channel; labels?: R
   return (
     <Section title="Job runs">
       {!rows ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingTable bare columns={RUN_COLUMNS} rows={5} />
       ) : (
         <Table
           rows={rows}

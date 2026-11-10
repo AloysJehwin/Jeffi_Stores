@@ -8,7 +8,7 @@ import { queryMany, queryCount } from '@/lib/shared/db'
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import ReviewFormsTable, { type FormRow } from './_components/ReviewFormsTable'
-import { ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
@@ -16,6 +16,7 @@ import { REVIEW_FORMS_ENTITY } from '@/lib/filters/entities/review-forms'
 import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -191,7 +192,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
 // Keys the table Suspense on the query string so filter changes re-trigger the shimmer.
 function ReviewFormsListSection({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   return (
-    <Suspense key={listKey(resolvedSearchParams)} fallback={<TableSkeleton rows={8} cols={6} />}>
+    <Suspense key={listKey(resolvedSearchParams)} fallback={<LoadingTable columns={['Title', 'Template', 'Shareable Link', 'Coupon', 'Submissions', 'Status']} />}>
       <ReviewFormsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
     </Suspense>
   )

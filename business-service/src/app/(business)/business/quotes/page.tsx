@@ -9,6 +9,7 @@ import BusinessAccountMobileHeader from '@/components/business/AccountMobileHead
 import { bp } from '@/lib/shared/business-path'
 import { humanizeLabel } from '@/lib/shared/format'
 import { documentHostForHost, type DocumentApp } from '@/lib/tenancy/forms-host'
+import { QuotesListSkeleton, QuoteCardsSkeleton } from './QuotesSkeletons'
 
 // Quote/invoice pages live on this store's own document host (quotation-{slug}. on a tenant).
 // Only rendered after the client has loaded the data, so reading the host here is hydration-safe.
@@ -87,28 +88,7 @@ export default function MyQuotesPage() {
       })
   }, [user, page])
 
-  if (isLoading || initialLoading) {
-    return (
-      <div className="container mx-auto px-4 pt-4 pb-8">
-        <div className="space-y-3 animate-pulse">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default p-4"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-4 bg-surface-secondary rounded w-36" />
-                <div className="h-5 bg-surface-secondary rounded-full w-20" />
-              </div>
-              <div className="h-3 bg-surface-secondary rounded w-48 mb-1" />
-              <div className="h-3 bg-surface-secondary rounded w-24" />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  if (isLoading || initialLoading) return <QuotesListSkeleton />
 
   return (
     <div className="bg-surface min-h-screen">
@@ -162,29 +142,7 @@ export default function MyQuotesPage() {
               </Link>
             </div>
           ) : loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5 animate-pulse"
-                  style={{ animationDelay: `${i * 50}ms` }}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <div className="h-4 w-36 bg-surface-secondary rounded" />
-                      <div className="flex gap-2">
-                        <div className="h-5 w-16 bg-surface-secondary rounded-full" />
-                      </div>
-                    </div>
-                    <div className="h-8 w-20 bg-surface-secondary rounded flex-shrink-0" />
-                  </div>
-                  <div className="h-3 w-40 bg-surface-secondary rounded mb-3" />
-                  <div className="flex gap-2">
-                    <div className="h-8 w-24 bg-surface-secondary rounded-lg" />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <QuoteCardsSkeleton />
           ) : (
             <div className="space-y-3">
               {filterStatus !== 'all' && filteredRfqs.length === 0 && (

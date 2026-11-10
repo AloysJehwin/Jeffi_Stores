@@ -15,6 +15,8 @@ import {
   type StepStatus,
 } from './registry'
 import { listPlatformProgress, listStoreProgress, mergeStatus, type ManualProgress } from './progress'
+import { HOW_TO, type HowTo } from './how-to'
+import { MESSAGING_LOCK_HINT, type MessagingLocks } from '@/lib/billing/messaging-locks'
 
 // Step status from real state. Each resolver reads the facts it needs from a memoised context, so the
 // resolvers run in parallel and share queries. Detected states are cached ~30 s per store; manual
@@ -41,6 +43,7 @@ export interface StatusContext {
   shipping(): Promise<{ ok: boolean; mode?: string; error?: string }>
   pickupLocations(): Promise<number>
   codEnabled(): Promise<boolean>
+  messagingLocks(): Promise<MessagingLocks>
   wallet(): Promise<{ balance: number; minBalance: number } | null>
   domains(): Promise<{ domain: string; status: string }[]>
   activeAdmins(): Promise<number>
@@ -255,9 +258,13 @@ export const RESOLVERS: Record<string, (ctx: StatusContext) => Promise<Detected>
     return done('Sent from your store address')
   },
   async sms(ctx) {
+    const lock = (await ctx.messagingLocks()).sms
+    if (lock) return lock === 'number' ? attention(MESSAGING_LOCK_HINT.number) : todo(MESSAGING_LOCK_HINT.addon)
     return on((await ctx.settings()).feature_sms_enabled) ? done() : todo()
   },
   async whatsapp(ctx) {
+    const lock = (await ctx.messagingLocks()).whatsapp
+    if (lock) return lock === 'number' ? attention(MESSAGING_LOCK_HINT.number) : todo(MESSAGING_LOCK_HINT.addon)
     if (!on((await ctx.settings()).feature_whatsapp_enabled)) return todo()
     const t = await ctx.whatsappTemplates()
     if (t.approved >= t.total) return done()
@@ -410,6 +417,10 @@ export async function buildContext(tenantId: string | null): Promise<StatusConte
       const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
       return (await getFeatureFlags()).codEnabled
     }),
+    messagingLocks: memo(async () => {
+      const { getSiteControls } = await import('@/lib/catalog/site-controls')
+      return (await getSiteControls()).locks ?? {}
+    }),
     wallet: memo(async () => {
       if (!tenantId) return null
       const r = await reg.controlPlanePool().query(`SELECT balance, min_balance FROM tenant_wallets WHERE tenant_id = $1`, [tenantId])
@@ -545,6 +556,14 @@ export interface ResolvedStep {
   detail: string | null
   manual: ManualProgress | null
   ownCredentials: ResolvedOwnCredentials | null
+  howTo: ResolvedHowTo | null
+}
+export interface ResolvedHowTo {
+  before: string[]
+  steps: string[]
+  links: GuideLink[]
+  wait: string | null
+  notes: string[]
 }
 export interface StatusCounts {
   total: number
@@ -639,6 +658,9 @@ function resolveOwn(o: OwnCredentials | undefined, u: Urls): ResolvedOwnCredenti
   }
 }
 
+const resolveHowTo = (h: HowTo | undefined): ResolvedHowTo | null =>
+  h ? { before: h.before ?? [], steps: h.steps, links: h.links ?? [], wait: h.wait ?? null, notes: h.notes ?? [] } : null
+
 export function countStatuses(statuses: StepStatus[]): StatusCounts {
   const c: StatusCounts = { total: statuses.length, done: 0, todo: 0, in_progress: 0, needs_attention: 0, skipped: 0 }
   for (const s of statuses) c[s]++
@@ -696,6 +718,7 @@ export async function getSetupGuide(admin: { role: string; scopes: string[] }, t
       detail: d.detail ?? null,
       manual: m,
       ownCredentials: resolveOwn(s.ownCredentials, urls),
+      howTo: resolveHowTo(HOW_TO[s.id]),
     }
   })
   return {

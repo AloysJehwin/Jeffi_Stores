@@ -6,6 +6,7 @@ import PresenceBadge from '@/components/chat/PresenceBadge'
 import { ago, previewOf } from '@/components/chat/format'
 import type { SupportChannel, SupportEvent, SupportSession } from '@/lib/support/types'
 import SupportConversation, { CHANNEL_ICON, CHANNEL_LABEL } from './SupportConversation'
+import { SessionRowsLoading } from './SupportInboxLoading'
 
 type Filter = 'needs_human' | 'approval' | 'mine' | 'ai' | 'open' | 'closed'
 const TABS: Array<{ key: Filter; label: string }> = [
@@ -205,7 +206,7 @@ export default function SupportInbox({ initialId, initialFilter, me }: { initial
           </div>
         </div>
         <ul className="min-h-0 flex-1 overflow-y-auto divide-y divide-border-default">
-          {loading && <li className="p-6 text-center text-xs text-foreground-muted">Loading…</li>}
+          {loading && <SessionRowsLoading />}
           {!loading && visible.length === 0 && (
             <li className="p-8 text-center text-xs text-foreground-muted">
               <MessagesSquare className="w-6 h-6 mx-auto mb-2 opacity-50" />

@@ -10,6 +10,9 @@ import { humanize } from '@/lib/google-ads/format'
 import { useAdsManage, type AdsManage } from './ManageContext'
 import ExtensionsEditor, { SuggestionsLoading, toExtensions, useAssetSuggestions } from './wizard/ExtensionsEditor'
 import { Modal, btnGhost, btnPrimary } from './wizard/fields'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { CHANGE_LOG_COLUMNS } from './skeletons'
 
 // Row actions for the console tables. Rendered only for admins with google_ads_campaigns:write;
 // destructive ones confirm first, and every change is validated with Google before it is made.
@@ -334,14 +337,16 @@ export function ChangeLogPanel() {
       .then(d => setRows(d.changes ?? []))
       .catch(() => setRows([]))
   }, [])
+  const { shown, pager } = usePagedRows(rows ?? [])
   return (
     <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
       <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide mb-4">Changes made here</h2>
       {rows === null ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <LoadingTable bare columns={CHANGE_LOG_COLUMNS} rows={4} />
       ) : rows.length === 0 ? (
         <p className="text-sm text-foreground-muted text-center py-6">No changes made from this console yet.</p>
       ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -353,7 +358,7 @@ export function ChangeLogPanel() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
+              {shown.map(r => (
                 <tr key={r.id} className="border-b border-border-default/60 last:border-0 align-top">
                   <td className="py-2 px-2 whitespace-nowrap">{new Date(r.created_at).toLocaleString('en-IN')}</td>
                   <td className="py-2 px-2">
@@ -369,6 +374,8 @@ export function ChangeLogPanel() {
             </tbody>
           </table>
         </div>
+        <Pager control={pager} noun="changes" />
+        </>
       )}
     </div>
   )

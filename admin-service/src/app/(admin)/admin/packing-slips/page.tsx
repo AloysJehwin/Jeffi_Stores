@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import PackingSlipsTabs from './_components/PackingSlipsTabs'
+import Loading from './loading'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ export async function generateMetadata() {
 // The slips list fetches page by page from /api/admin/packing-slips/list.
 export default async function PackingSlipsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Loading />}>
       <PackingSlipsTabs />
     </Suspense>
   )

@@ -7,6 +7,8 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useAgentChanges } from '@/lib/client/agent-events'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 
 interface Task {
   id: string
@@ -55,6 +57,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
   const router = useRouter()
   const confirm = useConfirm()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [admins, setAdmins] = useState<AdminOption[]>([])
   const [showCompleted, setShowCompleted] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -75,6 +78,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
       const data = await res.json()
       setTasks(data.tasks || [])
     }
+    setLoaded(true)
   }
 
   useEffect(() => {
@@ -84,6 +88,8 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
       .then(d => setAdmins(d.admins || []))
       .catch(() => {})
   }, [showCompleted])
+
+  const paged = usePagedRows(tasks, 10, showCompleted)
 
   async function add() {
     const t = title.trim()
@@ -263,11 +269,14 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
         </div>
       )}
 
-      {tasks.length === 0 ? (
+      {!loaded ? (
+        <LoadingLines lines={3} />
+      ) : tasks.length === 0 ? (
         <p className="text-xs text-foreground-muted italic">{showCompleted ? 'No completed tasks' : 'No open tasks'}</p>
       ) : (
-        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-          {tasks.map(t => {
+        <>
+        <div className="space-y-2">
+          {paged.shown.map(t => {
             const due = dueLabel(t.due_date)
             const completed = t.status === 'completed'
             return (
@@ -370,6 +379,8 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
             )
           })}
         </div>
+        <Pager control={paged.pager} noun="tasks" />
+        </>
       )}
     </div>
   )

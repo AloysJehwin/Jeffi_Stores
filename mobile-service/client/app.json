@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jeffistores.app"
+      "bundleIdentifier": "com.jeffistores.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["tez", "gpay", "phonepe", "paytmmp", "upi"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -105,7 +108,9 @@
           "microphonePermission": false
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      "expo-web-browser",
+      "./plugins/withUpiQueries"
     ],
     "experiments": {
       "typedRoutes": true

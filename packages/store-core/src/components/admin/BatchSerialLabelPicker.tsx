@@ -7,8 +7,25 @@ import { LABEL_SIZES, type LabelSize, type LabelSpec } from '@/lib/documents/lab
 import { BatchSerialPreview } from '@/components/admin/label-preview'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import CopySku from '@/components/ui/CopySku'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 type Mode = 'batch' | 'serial'
+
+function RowsLoading() {
+  return (
+    <div className="space-y-1.5">
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border-default">
+          <Sk className="h-4 w-4 shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <Sk className="h-3.5 w-2/3" />
+            <Sk className="h-3 w-1/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 interface BatchRow {
   id: string
@@ -413,7 +430,7 @@ export default function BatchSerialLabelPicker({
               </div>
             )}
             {loading ? (
-              <p className="text-sm text-foreground-muted py-4 text-center">Loading…</p>
+              <RowsLoading />
             ) : batches.length === 0 ? (
               <p className="text-sm text-foreground-muted py-4 text-center">No batches found.</p>
             ) : (
@@ -528,7 +545,7 @@ export default function BatchSerialLabelPicker({
                   />
                 </div>
                 {serialProductsLoading ? (
-                  <p className="text-sm text-foreground-muted py-4 text-center">Loading…</p>
+                  <RowsLoading />
                 ) : serialProducts.length === 0 ? (
                   <p className="text-sm text-foreground-muted py-4 text-center">
                     No serialized products with in-stock serials.

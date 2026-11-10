@@ -6,6 +6,8 @@ import { EmptyState, badgeCls, fieldInputCls } from '@/components/admin/kit'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import { Sk } from '@/components/admin/kit/skeleton'
+import { BankOffersLoading } from './OffersLoading'
 
 interface AdminOffer {
   id: string
@@ -96,14 +98,18 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
           This page controls which of your account&apos;s offers appear on product pages, how they read, and in what
           order.
         </p>
-        <p className="text-xs text-foreground-muted mt-2">
-          {loading
-            ? 'Loading…'
-            : problem
+        {loading && !offers.length ? (
+          <Sk className="mt-2 h-3 w-64" />
+        ) : (
+          <p className="text-xs text-foreground-muted mt-2">
+            {problem
               ? 'Could not read offers from Razorpay — see below.'
               : `${offers.length} active on the account · ${visibleCount} shown on the storefront`}
-        </p>
+          </p>
+        )}
       </div>
+
+      {loading && !offers.length && <BankOffersLoading />}
 
       {!loading && problem && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">

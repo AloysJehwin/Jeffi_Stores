@@ -9,6 +9,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { EmptyState } from '@/components/admin/kit'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 interface HeldBill {
   id: string
@@ -29,6 +31,7 @@ export default function HeldBills() {
   const canWrite = useCanWrite('invoices')
   const [bills, setBills] = useState<HeldBill[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const paged = usePagedRows(bills ?? [])
 
   const load = useCallback(() => {
     fetch('/api/admin/invoices/cash-sale/drafts', { credentials: 'include' })
@@ -59,12 +62,27 @@ export default function HeldBills() {
     }
   }
 
-  if (!bills) return null
+  if (!bills)
+    return (
+      <section className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated">
+        <ul className="divide-y divide-border-default">
+          {[0, 1, 2].map(i => (
+            <li key={i} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="flex-1 space-y-1.5">
+                <Sk className="h-3.5 w-40" />
+                <Sk className="h-3 w-64 max-w-full" />
+              </div>
+              <Sk className="h-control-sm w-20 rounded-lg" />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
   if (!bills.length) return <EmptyState title="No held bills" body="Use Hold Bill on a sale to park it and serve the next customer." />
   return (
     <section className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated">
       <ul className="divide-y divide-border-default">
-        {bills.map(b => (
+        {paged.shown.map(b => (
           <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <ReceiptText className="h-4 w-4 shrink-0 text-foreground-muted" />
@@ -97,6 +115,7 @@ export default function HeldBills() {
           </li>
         ))}
       </ul>
+      <Pager control={paged.pager} noun="held bills" className="px-4 pb-3" />
     </section>
   )
 }

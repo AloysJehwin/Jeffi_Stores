@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
+import type { DraftLockError } from '@jeffi/draft-locks'
 import {
   actorOf,
+  announceDraftClosed,
   canDiscard,
   closeDraftLockTx,
   draftLockChips,
@@ -11,6 +13,7 @@ import {
   epochFrom,
   withDraftCreate,
   withDraftWrite,
+  type DraftActor,
   type DraftResourceType,
 } from '@/lib/admin/draft-locks'
 
@@ -137,17 +140,25 @@ export function jsonDraftItem(c: JsonDraftConfig) {
     const admin = await requireAdminScope(request, c.writeScope)
     if (admin instanceof NextResponse) return admin
     if (!isUuid(id)) return NextResponse.json({ ok: true })
-    const actor = actorOf(admin)
-    const allowed = await canDiscard(actor, c.type, id)
-    if (!allowed.ok) return NextResponse.json(allowed.error.body(), { status: 423 })
-    await withTransaction(async client => {
-      const r = await client.query(`DELETE FROM ${c.table} WHERE id = $1`, [id])
-      if (r.rowCount) await closeDraftLockTx(client, actor, c.type, id, 'discarded')
-    })
+    const refused = await discardJsonDraft(c, actorOf(admin), id)
+    if (refused) return NextResponse.json(refused.body(), { status: 423 })
     return NextResponse.json({ ok: true })
   }
 
   return { GET, PATCH, DELETE }
+}
+
+/** Discard (holder, an unclaimed draft, or an owner role, audited); returns the refusal, or null once gone. */
+export async function discardJsonDraft(c: JsonDraftConfig, actor: DraftActor, id: string): Promise<DraftLockError | null> {
+  const allowed = await canDiscard(actor, c.type, id)
+  if (!allowed.ok) return allowed.error
+  let closed: Awaited<ReturnType<typeof closeDraftLockTx>> = null
+  await withTransaction(async client => {
+    const r = await client.query(`DELETE FROM ${c.table} WHERE id = $1`, [id])
+    if (r.rowCount) closed = await closeDraftLockTx(client, actor, c.type, id, 'discarded')
+  })
+  await announceDraftClosed(actor, c.type, id, closed, 'discarded')
+  return null
 }
 
 /** Inside the finishing write's transaction: drop the draft and close its lock. */

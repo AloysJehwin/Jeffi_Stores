@@ -435,3 +435,25 @@ body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-botto
 @container (max-height: 5.5rem) {
   .shape-box .shape-tiny-hide { display: none; }
 }
+
+/* Admin loading placeholders: a muted block with a soft light sweep (kit/skeleton.tsx). */
+.sk {
+  position: relative;
+  overflow: hidden;
+}
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  animation: img-shimmer 1.4s ease-in-out infinite;
+}
+.dark .sk::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
+  }
+}

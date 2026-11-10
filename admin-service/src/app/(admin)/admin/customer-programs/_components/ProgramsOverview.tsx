@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -15,6 +14,7 @@ import { delta, type Bucket } from '@/lib/overview/period'
 import type { LoyaltyTotals, ReferralTotals } from '@/lib/overviews/customer-programs'
 import { TIER_KEYS, tierName } from '@/lib/loyalty/tiers'
 import { ap } from '@/lib/shared/admin-path'
+import { ProgramsOverviewLoading } from './ProgramsLoading'
 
 interface Person {
   id: string
@@ -72,7 +72,7 @@ export default function ProgramsOverview() {
     <div className="space-y-4">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading || !data ? !error && <OverviewSkeleton /> : <Body data={data} />}
+      {loading || !data ? !error && <ProgramsOverviewLoading /> : <Body data={data} />}
     </div>
   )
 }

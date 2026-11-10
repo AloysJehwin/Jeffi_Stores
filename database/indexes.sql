@@ -2509,6 +2509,12 @@ CREATE INDEX idx_subscription_cycle_orders_sub ON public.subscription_cycle_orde
 CREATE INDEX idx_subscriptions_rzp ON public.subscriptions USING btree (razorpay_subscription_id);
 CREATE INDEX idx_subscriptions_legacy_renewal ON public.subscriptions USING btree (status, next_renewal_at) WHERE razorpay_subscription_id IS NULL;
 
+-- PhonePe Autopay: the renewal cron's scan, and at most one open redemption per subscription.
+CREATE INDEX idx_subscriptions_phonepe_due ON public.subscriptions USING btree (status, current_end) WHERE ((billing_provider)::text = 'phonepe'::text);
+CREATE INDEX idx_subscription_redemptions_sub ON public.subscription_redemptions USING btree (subscription_id, cycle_number);
+CREATE UNIQUE INDEX uq_subscription_redemptions_open ON public.subscription_redemptions USING btree (subscription_id) WHERE ((status)::text = ANY (ARRAY['notifying'::text, 'notified'::text, 'executing'::text]));
+CREATE INDEX idx_subscription_redemptions_status ON public.subscription_redemptions USING btree (status, execute_after);
+
 CREATE INDEX idx_orders_subscription ON public.orders USING btree (subscription_id) WHERE subscription_id IS NOT NULL;
 
 CREATE INDEX idx_vault_tickets_expires ON public.vault_tickets USING btree (expires_at);
@@ -2646,6 +2652,14 @@ CREATE INDEX IF NOT EXISTS idx_payments_razorpay_order_id ON public.payments USI
 CREATE INDEX IF NOT EXISTS idx_payment_refunds_order ON public.payment_refunds USING btree (order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_refunds_payment ON public.payment_refunds USING btree (razorpay_payment_id);
 CREATE INDEX IF NOT EXISTS idx_payment_refunds_pending ON public.payment_refunds USING btree (created_at) WHERE (status = 'pending'::text);
+-- UPI intents: the sweep and the admin confirmations page read by status; an order's payments by its ref.
+CREATE INDEX IF NOT EXISTS idx_upi_payment_intents_status_created ON public.upi_payment_intents USING btree (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_upi_payment_intents_order ON public.upi_payment_intents USING btree (((refs ->> 'orderId'::text)));
+-- UPG: one payer per UPI ID at a time; the queue behind it is read FIFO.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_upi_payment_intents_vpa_slot ON public.upi_payment_intents USING btree (receiving_vpa) WHERE ((status)::text = ANY (ARRAY['active'::text, 'processing'::text]));
+CREATE INDEX IF NOT EXISTS idx_upi_payment_intents_vpa_queue ON public.upi_payment_intents USING btree (receiving_vpa, status, created_at) WHERE (receiving_vpa IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_upi_bank_observations_utr ON public.upi_bank_observations USING btree (utr) WHERE (utr IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_upi_bank_observations_vpa_observed ON public.upi_bank_observations USING btree (receiving_vpa, observed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payment_disputes_order ON public.payment_disputes USING btree (order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_disputes_open ON public.payment_disputes USING btree (respond_by) WHERE (status = ANY (ARRAY['open'::text, 'under_review'::text]));
 CREATE INDEX IF NOT EXISTS idx_razorpay_settlements_settled_at ON public.razorpay_settlements USING btree (settled_at DESC);

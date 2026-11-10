@@ -7,7 +7,6 @@ import { ORDER_ALIASES, ORDER_FIELDS, ORDER_SEARCH } from '@/lib/filters/fields/
 import { Kpi, KpiGrid, Section, Banner, Table, count, money, pct } from '@/components/admin/channels/ui'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -17,6 +16,7 @@ import { DonutSplit, TrendChart, type SeriesDef } from '@/components/admin/dashb
 import { MAX_SPAN_DAYS, delta, type Bucket, type Period } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import { BreakdownBars, fmtDays, fmtHours, withAp } from './overview-shared'
+import OrdersOverviewSkeleton from './OrdersOverviewSkeleton'
 
 interface Kpis {
   placed: number
@@ -88,7 +88,7 @@ export default function OrdersOverview() {
         </p>
       )}
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data ? <Body d={data} filters={filters} /> : null}
+      {loading && !data ? <OrdersOverviewSkeleton /> : data ? <Body d={data} filters={filters} /> : null}
     </div>
   )
 }

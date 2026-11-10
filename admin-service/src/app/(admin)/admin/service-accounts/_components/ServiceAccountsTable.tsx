@@ -78,7 +78,7 @@ export default function ServiceAccountsTable({ accounts, scopeLabels, canWrite }
       rows={accounts}
       cols={cols}
       rowKey={sa => String(sa.id)}
-      pageSize={Math.max(25, accounts.length)}
+      paged
       mobile={rows => (
         <div className="p-4">
           <ServiceAccountsMobileList accounts={rows as any} scopeLabels={scopeLabels} canWrite={canWrite} />

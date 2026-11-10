@@ -7,6 +7,7 @@ import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import Loading from './loading'
 
 type Step = 'identity' | 'verify' | 'enroll'
 
@@ -292,7 +293,7 @@ export default function AdminLogin() {
     }
   }
 
-  if (checkingSession) return null
+  if (checkingSession) return <Loading />
 
   const googleBusy = googleLoading || (leaving && via.current === 'google')
   const formBusy = loading || (leaving && via.current === 'form')

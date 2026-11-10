@@ -1,6 +1,6 @@
 import { controlPlanePool } from './shared'
 import { clearTenantCache } from './host-resolution'
-import { getTenant } from './tenants'
+import { getTenant, type UpiMode } from './tenants'
 import { getDraft, reopenDraft } from './kyc'
 import { PLATFORM_TENANT_ID, purgeBlocker } from './purge-rule'
 
@@ -46,6 +46,14 @@ export async function saveLinkedAccountId(tenantId: string, linkedAccountId: str
 export async function setOwnRazorpay(tenantId: string, value: boolean): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(`UPDATE tenants SET own_razorpay=$1, updated_at=now() WHERE id=$2`, [value, tenantId])
+}
+
+/**
+ * The platform admin's UPI switch for a store ('auto' | 'off'); the provider itself follows what the store saved.
+ */
+export async function setUpiMode(tenantId: string, mode: UpiMode): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`UPDATE tenants SET upi_mode=$1, updated_at=now() WHERE id=$2`, [mode, tenantId])
 }
 
 /**

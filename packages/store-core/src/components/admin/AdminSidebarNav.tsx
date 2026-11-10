@@ -11,6 +11,8 @@ interface NavLink {
   group?: string
   exactMatch?: boolean
   matchPaths?: string[]
+  /** Pinned to the foot of the sidebar instead of the scrolling list. */
+  bottom?: boolean
 }
 
 export const NAV_ICONS: Record<string, JSX.Element> = {
@@ -306,6 +308,11 @@ export const NAV_ICONS: Record<string, JSX.Element> = {
   Shelving: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+    </svg>
+  ),
+  'UPI Confirmations': (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
     </svg>
   ),
   'GST Compliance': (
@@ -629,12 +636,15 @@ interface Props {
   collapsed: boolean
 }
 
-function isNavActive(link: NavLink, currentPath: string | null, host: string): boolean {
+function isNavActive(link: NavLink, currentPath: string | null, host: string, siblings: NavLink[] = []): boolean {
   if (!currentPath) return false
   const href = ap(link.href, host)
+  const under = (p: string) => currentPath === p || currentPath.startsWith(p + '/')
   if (currentPath === href) return true
-  if (link.matchPaths?.some(m => currentPath === ap(m, host) || currentPath.startsWith(ap(m, host) + '/'))) return true
+  if (link.matchPaths?.some(m => under(ap(m, host)))) return true
   if (link.exactMatch || link.href === '/admin/dashboard') return false
+  // A deeper sibling (Financial → UPI Confirmations) takes the highlight from its parent.
+  if (siblings.some(o => o.href.startsWith(link.href + '/') && under(ap(o.href, host)))) return false
   return currentPath.startsWith(href + '/')
 }
 
@@ -642,7 +652,8 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
   const host = useAdminHost()
   const pathname = usePathname()
 
-  const ungrouped = navLinks.filter(l => !l.group)
+  const pinned = navLinks.filter(l => l.bottom)
+  const ungrouped = navLinks.filter(l => !l.group && !l.bottom)
   const groups = navLinks.reduce<Record<string, NavLink[]>>((acc, l) => {
     if (l.group) {
       acc[l.group] = acc[l.group] || []
@@ -658,7 +669,7 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
       >
         <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
-            const isActive = isNavActive(link, pathname, host)
+            const isActive = isNavActive(link, pathname, host, navLinks)
             return (
               <a
                 key={link.href}
@@ -679,7 +690,7 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
                 {groupName.slice(0, 3)}
               </span>
               {links.map(link => {
-                const isActive = isNavActive(link, pathname, host)
+                const isActive = isNavActive(link, pathname, host, navLinks)
                 return (
                   <a
                     key={link.href}
@@ -696,6 +707,22 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
             </div>
           ))}
         </nav>
+        {pinned.length > 0 && (
+          <div className="flex flex-col items-center gap-0 border-t border-white/10 p-1.5">
+            {pinned.map(link => (
+              <a
+                key={link.href}
+                href={ap(link.href, host)}
+                title={link.label}
+                className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
+                  isNavActive(link, pathname, host, navLinks) ? 'bg-white/20 text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <NavIcon label={link.label} />
+              </a>
+            ))}
+          </div>
+        )}
       </aside>
     )
   }
@@ -708,7 +735,7 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
             key={link.href}
             href={ap(link.href, host)}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isNavActive(link, pathname, host)
+              isNavActive(link, pathname, host, navLinks)
                 ? 'bg-white/20 text-white'
                 : 'text-gray-300 hover:bg-white/10 hover:text-white'
             }`}
@@ -723,6 +750,24 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
           <SidebarGroup key={groupName} groupName={groupName} links={links} pathname={pathname} />
         ))}
       </nav>
+      {pinned.length > 0 && (
+        <div className="flex flex-col gap-0.5 border-t border-white/10 p-3">
+          {pinned.map(link => (
+            <a
+              key={link.href}
+              href={ap(link.href, host)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isNavActive(link, pathname, host, navLinks) ? 'bg-white/20 text-white' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <span className="shrink-0">
+                <NavIcon label={link.label} />
+              </span>
+              {link.label}
+            </a>
+          ))}
+        </div>
+      )}
     </aside>
   )
 }
@@ -737,7 +782,7 @@ function SidebarGroup({
   pathname: string | null
 }) {
   const host = useAdminHost()
-  const isAnyActive = links.some(l => isNavActive(l, pathname, host))
+  const isAnyActive = links.some(l => isNavActive(l, pathname, host, links))
   const [isOpen, setIsOpen] = useState(isAnyActive)
   const lastActiveRef = useRef(isAnyActive)
 
@@ -773,7 +818,7 @@ function SidebarGroup({
               key={link.href}
               href={ap(link.href, host)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isNavActive(link, pathname, host)
+                isNavActive(link, pathname, host, links)
                   ? 'bg-white/20 text-white'
                   : 'text-gray-400 hover:bg-white/10 hover:text-white'
               }`}

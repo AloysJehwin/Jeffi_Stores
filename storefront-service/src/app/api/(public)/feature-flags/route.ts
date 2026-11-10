@@ -12,6 +12,7 @@ export async function GET() {
   return NextResponse.json({
     smsEnabled: flags.smsEnabled,
     whatsappEnabled: flags.whatsappEnabled,
+    upiEnabled: flags.upiEnabled,
     loyaltyEnabled: loyalty.enabled,
     birthdayEnabled: flags.birthdayEnabled,
     // Rewards are loyalty points, so referrals only show while loyalty is on too.

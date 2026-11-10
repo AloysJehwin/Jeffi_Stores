@@ -2,9 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useReveal } from '@/components/admin/kit/infinite'
-
-const PAGE_SIZE = 5
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
 
 interface Task {
   id: string
@@ -17,7 +15,7 @@ interface Task {
 
 export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]; viewAllHref: string }) {
   const [open, setOpen] = useState(false)
-  const { shown: paginated, control } = useReveal(tasks, PAGE_SIZE)
+  const { shown: paginated, pager } = usePagedRows(tasks)
   const overdueCount = tasks.filter(t => t.overdue).length
 
   return (
@@ -110,17 +108,11 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
                   </li>
                 ))}
               </ul>
-              {/* A dashboard card: no auto-load on scroll, it would always be on screen. */}
-              {control.hasMore && (
-                <div className="flex items-center justify-between px-5 py-2.5 border-t border-border-default/50 text-[11px] text-foreground-muted">
-                  <span className="tabular-nums">
-                    Showing {paginated.length} of {tasks.length}
-                  </span>
-                  <button type="button" onClick={control.loadMore} className="control-xs border border-border-default hover:bg-surface-secondary transition-colors">
-                    Show more
-                  </button>
+              {pager.hasNext || pager.page > 1 ? (
+                <div className="px-4 pb-2.5 border-t border-border-default/50">
+                  <Pager control={pager} noun="tasks" />
                 </div>
-              )}
+              ) : null}
             </>
           ) : (
             <div className="flex items-center gap-2.5 px-5 py-3 text-foreground-muted">

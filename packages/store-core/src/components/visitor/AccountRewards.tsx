@@ -9,6 +9,7 @@ import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import AccountCoupons from '@/components/visitor/account/AccountCoupons'
 import { useAccountCoupons } from '@/components/visitor/coupons/useAccountCoupons'
 import { useInfiniteList, InfiniteFooter, fetchJson, type InfiniteList } from '@/components/admin/kit/infinite'
+import { RewardsBodySkeleton } from '@/components/visitor/skeletons/account'
 
 interface Tier {
   key: string
@@ -353,14 +354,7 @@ export default function AccountRewards() {
       <AccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-10">
         {loading ? (
-          <div className="grid gap-4 lg:grid-cols-3 lg:items-start animate-pulse">
-            <div className="space-y-4 lg:col-span-2">
-              <div className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
-              <div className="h-28 rounded-xl bg-surface-elevated border border-border-default" />
-              <div className="h-56 rounded-xl bg-surface-elevated border border-border-default" />
-            </div>
-            <div className="hidden lg:block h-72 rounded-xl bg-surface-elevated border border-border-default" />
-          </div>
+          <RewardsBodySkeleton />
         ) : unavailable || !data ? (
           <div className="space-y-4">
             {(failed || coupons?.length === 0) && (

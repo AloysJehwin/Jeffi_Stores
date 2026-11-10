@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { ChevronDown, Loader2, Mail } from 'lucide-react'
 import { Badge } from '@/components/admin/kit/core'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 
 interface MailLog {
   id: string
@@ -44,6 +46,7 @@ export default function MailLogsPanel({ orderId }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [bodyHtml, setBodyHtml] = useState<Record<string, string>>({})
   const [bodyLoading, setBodyLoading] = useState<string | null>(null)
+  const paged = usePagedRows(logs ?? [])
 
   async function load() {
     setLoading(true)
@@ -99,9 +102,12 @@ export default function MailLogsPanel({ orderId }: Props) {
       {open && (
         <div className="border-t border-border-default px-5 pb-5 pt-4">
           {loading && (
-            <div className="flex items-center gap-2 py-4 text-sm text-foreground-muted">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading...
+            <div className="space-y-3">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="rounded-lg border border-border-default px-4 py-3">
+                  <LoadingLines lines={3} />
+                </div>
+              ))}
             </div>
           )}
 
@@ -113,7 +119,7 @@ export default function MailLogsPanel({ orderId }: Props) {
 
           {!loading && !error && logs !== null && logs.length > 0 && (
             <div className="space-y-3">
-              {logs.map(log => (
+              {paged.shown.map(log => (
                 <div key={log.id} className="border border-border-default rounded-lg overflow-hidden">
                   <div className="px-4 py-3 flex items-start gap-3 bg-surface">
                     <div className="flex-1 min-w-0">
@@ -167,6 +173,7 @@ export default function MailLogsPanel({ orderId }: Props) {
                       )}
                 </div>
               ))}
+              <Pager control={paged.pager} noun="emails" />
             </div>
           )}
         </div>

@@ -19,7 +19,8 @@ import {
   useActionToast,
   type Col,
 } from '@/components/admin/kit'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/kit/period'
+import { useOverviewData } from '@/components/admin/kit/period'
+import { PayablesTabSkeleton } from './FinanceSkeletons'
 import { KeyedTrendCard, type TrendPoint } from '@/components/admin/kit/charts'
 import { delta } from '@/lib/overview/period'
 import {
@@ -124,7 +125,7 @@ export function PayablesTab({ initialData: _initialData }: { initialData?: unkno
       </div>
 
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && <Body d={data} canWrite={canWrite} onPay={setPayBill} />}
+      {loading && !data ? <PayablesTabSkeleton /> : data && <Body d={data} canWrite={canWrite} onPay={setPayBill} />}
 
       {showAdd && (
         <AddBillDialog

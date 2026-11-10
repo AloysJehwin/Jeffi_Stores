@@ -295,6 +295,10 @@ async function handle(request: NextRequest) {
     // SaaS control plane (ecom.jeffistores.in). Public: marketing (/), /signin, /signup.
     // Protected (owner session required): /onboard, /dashboard. API under /api/ecom.
     if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
+    // A /ecom-prefixed link (the UPI return URL) would otherwise be rewritten to /ecom/ecom/… and 404.
+    if (pathname === '/ecom' || pathname.startsWith('/ecom/')) {
+      return NextResponse.redirect(buildRedirectUrl(request, (pathname.replace(/^\/ecom/, '') || '/') + request.nextUrl.search), 308)
+    }
     // Shared platform legal pages (/legal/*) render as-is on the ecom host too — the
     // onboarding legals-consent links here — so don't rewrite them into /ecom/legal (404).
     if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(passThrough())

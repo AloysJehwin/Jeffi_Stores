@@ -402,20 +402,6 @@ export default function NewCampaignClient() {
               <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
             </p>
           </div>
-
-          <FormFooter cancelHref={ap('/admin/campaigns')}>
-            <RequireWrite scope="campaigns:write">
-              <FormButton
-                type="button"
-                onClick={create}
-                disabled={!form.name.trim() || !form.kind.trim()}
-                pending={creating}
-                pendingLabel="Creating…"
-              >
-                Save as Draft
-              </FormButton>
-            </RequireWrite>
-          </FormFooter>
         </div>
 
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -429,6 +415,20 @@ export default function NewCampaignClient() {
           </div>
         </div>
       </div>
+
+      <FormFooter cancelHref={ap('/admin/campaigns')}>
+        <RequireWrite scope="campaigns:write">
+          <FormButton
+            type="button"
+            onClick={create}
+            disabled={!form.name.trim() || !form.kind.trim()}
+            pending={creating}
+            pendingLabel="Creating…"
+          >
+            Save as Draft
+          </FormButton>
+        </RequireWrite>
+      </FormFooter>
     </div>
   )
 }

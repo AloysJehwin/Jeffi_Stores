@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { Badge, Empty, Section, api, btnGhost } from '@/components/admin/channels/ui'
 import PostGroup from './PostGroup'
+import { CalendarGridLoading } from './loading-parts'
 import { STATUS_TONE, groupPosts, label, type Post } from './shared'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -87,7 +88,7 @@ export default function Calendar({ reloadKey }: { reloadKey: number }) {
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !posts ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <CalendarGridLoading />
       ) : view === 'list' ? (
         groups.length ? (
           <div className="space-y-3">

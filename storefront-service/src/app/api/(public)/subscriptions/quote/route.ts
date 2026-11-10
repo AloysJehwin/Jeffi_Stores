@@ -4,6 +4,7 @@ import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { deriveSubscriptionOffer } from '@/lib/subscriptions/offer'
 import { SubscriptionError } from '@/lib/subscriptions/types'
+import { autopayAvailable } from '@/lib/subscriptions/autopay'
 
 const QuoteSchema = z.object({
   productId: zUuid,
@@ -47,6 +48,8 @@ export async function POST(request: NextRequest) {
       isDigital: offer.isDigital,
       collectingAccount: offer.collectingAccount,
       merchantLabel: offer.merchantLabel,
+      // UPI section of the checkout: PhonePe Autopay, only when PhonePe is the store's UPI provider.
+      upiAutopay: await autopayAvailable(offer.tenantId),
     })
   } catch (err) {
     if (err instanceof SubscriptionError) return NextResponse.json({ error: err.message }, { status: err.status })

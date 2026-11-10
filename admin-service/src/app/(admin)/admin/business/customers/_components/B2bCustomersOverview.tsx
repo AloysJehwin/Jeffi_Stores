@@ -6,7 +6,6 @@ import {
   PeriodBar,
   useOverviewData,
   AttentionList,
-  OverviewSkeleton,
   type AttentionItem,
 } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, money, count, when } from '@/components/admin/channels/ui'
@@ -15,6 +14,7 @@ import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { B2B_ALIASES, B2B_FIELDS, B2B_SEARCH } from '@/lib/filters/fields/business-customers'
+import B2bCustomersOverviewSkeleton from './B2bCustomersOverviewSkeleton'
 
 interface Data {
   kpis: OverviewKpi[]
@@ -61,7 +61,7 @@ export default function B2bCustomersOverview() {
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
-        !error && <OverviewSkeleton />
+        !error && <B2bCustomersOverviewSkeleton />
       ) : (
         <>
           <KpiGrid>

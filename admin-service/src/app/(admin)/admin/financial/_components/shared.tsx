@@ -1,7 +1,7 @@
 'use client'
 
 import { formatINR as formatINRBase, formatDate as formatDateBase } from '@/lib/shared/format'
-import { Kpi, TableSkeleton, badgeCls, fieldInputCls, type StatusMap, type Tone } from '@/components/admin/kit'
+import { Kpi, badgeCls, fieldInputCls, type StatusMap, type Tone } from '@/components/admin/kit'
 
 export type Tab =
   | 'overview'
@@ -61,10 +61,6 @@ export const codTone = (s?: string): Tone => (s === 'cod_pending' ? 'amber' : s 
 
 export function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return <Kpi label={label} value={value} sub={sub} />
-}
-
-export function Skeleton({ rows = 5 }: { rows?: number }) {
-  return <TableSkeleton rows={rows} cols={5} />
 }
 
 export const thCls = 'px-4 py-2.5 text-left text-xs font-medium text-foreground-muted whitespace-nowrap'

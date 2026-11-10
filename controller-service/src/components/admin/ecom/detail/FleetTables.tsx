@@ -39,6 +39,7 @@ export function ServersTable({ servers }: { servers: TenantServer[] }) {
       cols={SERVER_COLS}
       rowKey={s => s.id}
       noun="servers"
+      paged
       empty="No servers of its own."
       bare
       mobileCard={s => (
@@ -79,6 +80,7 @@ export function PodsTable({ pods }: { pods: Pod[] }) {
       cols={POD_COLS}
       rowKey={p => p.name}
       noun="pods"
+      paged
       empty="No pods."
       bare
       mobileCard={p => (

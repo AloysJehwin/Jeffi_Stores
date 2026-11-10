@@ -1,11 +1,19 @@
 import 'server-only'
 import { queryOne } from '@/lib/shared/db'
 import { getRazorpayInstance, getRazorpayInstanceFor } from '@/lib/payments/razorpay'
-import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { loadAddress } from '@/lib/orders/order-commit'
 import { applySubscriptionState } from './cycle'
 import { assertIndianAddress, snapshotAddress } from './offer'
 import { SubscriptionError, type SubscriptionRow } from './types'
+import {
+  cancelAutopaySubscription,
+  isAutopay,
+  pauseAutopaySubscription,
+  resumeAutopaySubscription,
+  syncAutopaySubscription,
+  type Store,
+} from './autopay'
 
 export { SubscriptionError }
 export type { SubscriptionRow }
@@ -15,7 +23,7 @@ const TERMINAL = new Set(['cancelled', 'completed', 'expired'])
 async function loadSub(localId: string): Promise<SubscriptionRow> {
   const row = await queryOne<SubscriptionRow>(`SELECT * FROM subscriptions WHERE id = $1`, [localId])
   if (!row) throw new SubscriptionError('Subscription not found', 404)
-  if (!row.razorpay_subscription_id || row.source === 'legacy') {
+  if ((!row.razorpay_subscription_id && !isAutopay(row)) || row.source === 'legacy') {
     throw new SubscriptionError('This subscription cannot be managed here')
   }
   return row
@@ -32,6 +40,12 @@ export async function razorpayForSubscription(
     return { instance, keySecret: creds.key_secret }
   }
   return { instance: getRazorpayInstance(), keySecret: process.env.RAZORPAY_KEY_SECRET || '' }
+}
+
+/** The store a PhonePe-billed subscription belongs to (null = the flagship). */
+async function autopayStore(): Promise<Store> {
+  const t = await resolveTenant()
+  return t ? { tenantId: t.tenantId, slug: t.slug } : null
 }
 
 async function rzpFor(sub: SubscriptionRow): Promise<any> {
@@ -65,6 +79,10 @@ export async function cancelSubscription(
   const sub = await loadSub(localId)
   if (TERMINAL.has(sub.status)) throw new SubscriptionError('Subscription is already ended')
   assertCommitmentMet(sub, opts.actor)
+  if (isAutopay(sub)) {
+    await cancelAutopaySubscription(sub, opts.atCycleEnd, await autopayStore())
+    return reload(localId)
+  }
   const rzp = await rzpFor(sub)
   // Razorpay only supports cycle-end cancellation on an active sub; anything else ends now.
   const atEnd = opts.atCycleEnd && sub.status === 'active'
@@ -86,12 +104,18 @@ export async function pauseSubscription(
   const sub = await loadSub(localId)
   if (sub.status !== 'active') throw new SubscriptionError('Only an active subscription can be paused')
   assertCommitmentMet(sub, actor)
+  if (isAutopay(sub)) return pauseAutopaySubscription(sub)
   const entity = await (await rzpFor(sub)).subscriptions.pause(sub.razorpay_subscription_id, { pause_at: 'now' })
   return (await applySubscriptionState(localId, 'paused', entity)).row
 }
 
 export async function resumeSubscription(localId: string): Promise<SubscriptionRow> {
   const sub = await loadSub(localId)
+  if (isAutopay(sub)) {
+    // 'halted' = the renewal debit failed; resuming retries it.
+    if (sub.status !== 'paused' && sub.status !== 'halted') throw new SubscriptionError('Only a paused subscription can be resumed')
+    return resumeAutopaySubscription(sub, await autopayStore())
+  }
   if (sub.status !== 'paused') throw new SubscriptionError('Only a paused subscription can be resumed')
   const entity = await (await rzpFor(sub)).subscriptions.resume(sub.razorpay_subscription_id, { resume_at: 'now' })
   return (await applySubscriptionState(localId, 'active', entity)).row
@@ -119,6 +143,7 @@ export async function changeSubscriptionAddress(
 
 export async function syncSubscription(localId: string): Promise<SubscriptionRow> {
   const sub = await loadSub(localId)
+  if (isAutopay(sub)) return syncAutopaySubscription(localId, await autopayStore())
   const entity = await (await rzpFor(sub)).subscriptions.fetch(sub.razorpay_subscription_id)
   return (await applySubscriptionState(localId, entity?.status ?? null, entity)).row
 }

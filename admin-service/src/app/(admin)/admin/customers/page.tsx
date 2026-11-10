@@ -8,7 +8,8 @@ import { CUSTOMER_FIELDS, CUSTOMER_SEARCH } from '@/lib/filters/fields/customers
 import CustomersTable from './_components/CustomersTable'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader } from '@/components/admin/kit'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import CustomerEngagementChart from '@/components/admin/CustomerEngagementChart'
 import CustomersOverview from './_components/CustomersOverview'
 import OverviewTabs from '../coupons/_components/OverviewTabs'
@@ -87,13 +88,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 }
 
 function KpiRowSkeleton() {
-  return (
-    <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] animate-pulse">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
-      ))}
-    </div>
-  )
+  return <LoadingKpis labels={['Total customers', 'Active', 'Inactive', 'Flagged']} />
 }
 
 // Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
@@ -101,7 +96,7 @@ function KpiRowSkeleton() {
 function CustomersListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
+    <Suspense key={key} fallback={<LoadingTable columns={['Name', 'Email', 'Phone', 'Joined', 'Orders', 'Health', 'Status']} />}>
       <CustomersListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )
