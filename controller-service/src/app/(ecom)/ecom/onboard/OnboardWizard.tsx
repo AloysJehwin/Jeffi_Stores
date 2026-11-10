@@ -14,6 +14,7 @@ import { Card, Row } from '../dashboard/_components/Card'
 import OnboardShell from './OnboardShell'
 import { WIZARD_STEPS } from './steps'
 import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
+import { ADDON_INFO, cleanAddonIds, type AddonId, type AddonPrice } from '@/lib/billing/addons'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -80,6 +81,7 @@ function slugify(s: string) {
 export default function OnboardWizard({
   owner,
   plans,
+  addons = [],
   initialDraft,
   reusingPreviousDetails,
   ownerName,
@@ -91,6 +93,8 @@ export default function OnboardWizard({
   /** Shown in the rail with the sign-out button. */
   owner: { email: string; name: string | null }
   plans: Plan[]
+  /** Add-ons offered on the Plan step, with their live monthly prices. */
+  addons?: AddonPrice[]
   /** ECOM_PAYMENTS_ENABLED: approval leads to checkout. Off: approval starts the build directly. */
   paymentsEnabled?: boolean
   /** Owners pick their server size here (COMPUTE_SPEC_ENABLED). */
@@ -120,6 +124,9 @@ export default function OnboardWizard({
   )
   const [interval, setInterval] = useState<Interval>(init.interval ?? 'monthly')
   const [compute, setCompute] = useState<ComputeChoice | null>(null)
+  // Add-ons: nothing is charged here; they are bought from the store wallet once the store is live.
+  const [addonIds, setAddonIds] = useState<AddonId[]>(() => cleanAddonIds(init.addons).filter(id => addons.some(a => a.id === id)))
+  const addonsMonth = addons.filter(a => addonIds.includes(a.id)).reduce((sum, a) => sum + a.priceInr, 0)
 
   // Step 1 — Store
   const [displayName, setDisplayName] = useState(init.displayName ?? '')
@@ -222,6 +229,7 @@ export default function OnboardWizard({
         interval,
         computeSpec: chosenSpec,
         priceInrMonth: totalMonth,
+        addons: addonIds,
         displayName,
         slug: effectiveSlug,
         productCats,
@@ -260,6 +268,7 @@ export default function OnboardWizard({
       interval,
       chosenSpec,
       totalMonth,
+      addonIds,
       displayName,
       effectiveSlug,
       productCats,
@@ -390,6 +399,7 @@ export default function OnboardWizard({
           billingInterval: interval,
           ...(computeEnabled && chosenSpec ? { compute: chosenSpec } : {}),
           extraServices,
+          addons: addonIds,
           displayName,
           slug: effectiveSlug,
           productCategories: productCats.join(', '),
@@ -562,8 +572,37 @@ export default function OnboardWizard({
                   10 months&apos; price for 12.
                 </p>
               )}
+              {addonIds.length > 0 && (
+                <p className="text-sm text-foreground-secondary">
+                  <span className="font-semibold text-foreground">+ {inr(addonsMonth)}/mo add-ons</span>, from wallet — not part of
+                  your subscription.
+                </p>
+              )}
               </div>
               </Card>
+              {addons.length > 0 && (
+                <Card title="Add-ons" className="mt-4">
+                  <ChoiceCards<AddonId> multiple ariaLabel="Add-ons" columns="grid-cols-1 sm:grid-cols-2" value={addonIds} onChange={setAddonIds}
+                    options={addons.map(a => ({
+                      value: a.id,
+                      label: ADDON_INFO[a.id].name,
+                      content: (
+                        <>
+                          <div className="pr-6 text-sm font-semibold text-foreground">{ADDON_INFO[a.id].name}</div>
+                          <div className="mt-1 text-xs text-foreground-secondary">{ADDON_INFO[a.id].benefit}</div>
+                          <div className="mt-3 text-sm font-semibold text-foreground">
+                            {inr(a.priceInr)}<span className="font-normal text-foreground-muted">/mo</span>
+                          </div>
+                        </>
+                      ),
+                    }))} />
+                  <p className="mt-4 text-xs text-foreground-muted">
+                    Optional. Add-ons are billed monthly from your store wallet once your store is live — nothing is charged now — and you
+                    can turn them off anytime in Billing.
+                    {addonIds.includes('messaging') && ' Messages you send are charged separately.'}
+                  </p>
+                </Card>
+              )}
             </div>
           )}
 
@@ -1139,6 +1178,14 @@ export default function OnboardWizard({
                     'Subscription',
                     [selectedPlan?.name, interval, priceLabel].filter(Boolean).join(' · '),
                   ],
+                  ...(addonIds.length
+                    ? [
+                        [
+                          'Add-ons',
+                          `${addonIds.map(id => ADDON_INFO[id].name).join(', ')} · ${inr(addonsMonth)}/mo from wallet once live`,
+                        ] as [string, string],
+                      ]
+                    : []),
                   ['Store', `${displayName} (${effectiveSlug}.jeffistores.in)`],
                   ['Products', productCats.join(', ') || '—'],
                   ['Business', `${bizName} · ${bizType}`],

@@ -55,8 +55,11 @@ import json, sys
 cur = json.load(open(sys.argv[1]))
 for k in ('META_APP_ID', 'META_APP_SECRET'):
     v = cur.get(k)
-    if isinstance(v, str) and v.strip(): print(f'  {k}: present')
-    else: print(f'  {k}: WARNING, missing. Facebook sign-in for Social Posts and Meta Ads stays off for stores without their own Meta app.')
+    if not (isinstance(v, str) and v.strip()):
+        print(f'  {k}: WARNING, missing. Facebook sign-in for Social Posts and Meta Ads stays off for stores without their own Meta app.')
+    elif k == 'META_APP_ID' and not v.strip().strip('"\'').isdigit():
+        print(f'  {k}: WARNING, not a numeric app id ({len(v)} characters). Facebook rejects it (PLATFORM__INVALID_APP_ID); use the App ID from developers.facebook.com.')
+    else: print(f'  {k}: present')
 PY
 
 say "jeffi/public-api/production (the gateway signs with it)"

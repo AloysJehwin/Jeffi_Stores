@@ -2519,6 +2519,8 @@ CREATE INDEX idx_orders_subscription ON public.orders USING btree (subscription_
 
 CREATE INDEX idx_vault_tickets_expires ON public.vault_tickets USING btree (expires_at);
 
+CREATE INDEX idx_user_oauth_identities_user ON public.user_oauth_identities USING btree (user_id);
+
 CREATE INDEX idx_vault_access_log_user ON public.vault_access_log USING btree (user_id, created_at);
 CREATE INDEX idx_upload_sessions_product ON public.upload_sessions USING btree (product_id, status);
 

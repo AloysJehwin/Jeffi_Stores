@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "cdc5e873fa20c423118121aae586f93de780dc71bbea4f96a4b85e586db28ca8",
+ "manifestHash": "be74471fe8301775e1d3906bfe03813f861f35ab2b40a72784e1f3883c2efe46",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -37953,6 +37953,106 @@
    "noBody": true,
    "summary": "Delete a warehouse (shelving)",
    "command": "shelving-warehouses delete"
+  },
+  {
+   "id": "admin GET /api/admin/sign-in-methods",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/sign-in-methods",
+   "gatewayPath": "/v1/admin/sign-in-methods",
+   "file": "admin-service/src/app/api/(admin)/admin/sign-in-methods/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Customer sign-in methods for this store (Site Controls > Sign-in methods). Secrets are never returned.",
+   "command": "sign-in-methods list"
+  },
+  {
+   "id": "admin PUT /api/admin/sign-in-methods/{provider}",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/sign-in-methods/{provider}",
+   "gatewayPath": "/v1/admin/sign-in-methods/{provider}",
+   "file": "admin-service/src/app/api/(admin)/admin/sign-in-methods/[provider]/route.ts",
+   "pathParams": [
+    {
+     "name": "provider",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "enabled": {
+      "type": "boolean"
+     },
+     "clientId": {
+      "type": "string"
+     },
+     "clientSecret": {
+      "type": "string"
+     },
+     "teamId": {
+      "type": "string"
+     },
+     "keyId": {
+      "type": "string"
+     },
+     "privateKey": {
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Switch a method on or off and/or save the store's own app. Blank secret fields keep the stored secret.",
+   "command": "sign-in-methods update"
+  },
+  {
+   "id": "admin DELETE /api/admin/sign-in-methods/{provider}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/sign-in-methods/{provider}",
+   "gatewayPath": "/v1/admin/sign-in-methods/{provider}",
+   "file": "admin-service/src/app/api/(admin)/admin/sign-in-methods/[provider]/route.ts",
+   "pathParams": [
+    {
+     "name": "provider",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Remove the store's own app for this method.",
+   "command": "sign-in-methods delete"
   },
   {
    "id": "admin POST /api/admin/site-controls/logo",

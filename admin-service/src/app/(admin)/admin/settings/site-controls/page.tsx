@@ -23,6 +23,10 @@ import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinition
 import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
 import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import GoogleTagCard from '@/components/admin/site-controls/GoogleTagCard'
+import SignInMethodsCard from '@/components/admin/site-controls/SignInMethodsCard'
+import { listSignInMethodsAdmin } from '@/lib/auth/social/config'
+import { signInHosts, signInRedirectUris } from '@/lib/auth/social/hosts'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import UpiCollectionCard from '@/components/admin/UpiCollectionCard'
 import OpsEmailCard, { type OpsEmailAdmin } from '@/components/admin/site-controls/OpsEmailCard'
 import { loadOpsEmail } from '@/lib/shared/ops-email'
@@ -152,6 +156,10 @@ export default async function SiteControlsPage() {
   ])
   const inv = await loadInvoiceKeys()
   const opsEmail = await loadOpsEmailCard()
+  const [signInMethods, signInUris] = await Promise.all([
+    listSignInMethodsAdmin(await credentialOwnerId()).catch(() => []),
+    signInHosts().then(signInRedirectUris),
+  ])
   const delivery = await getDeliverySettings()
   const isTenant = (await resolveTenant().catch(() => null)) != null
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
@@ -733,6 +741,11 @@ export default async function SiteControlsPage() {
                   </div>
                 </>
               ),
+            },
+            {
+              id: 'sign-in',
+              label: 'Sign-in methods',
+              content: <SignInMethodsCard methods={signInMethods} redirectUris={signInUris} />,
             },
             {
               id: 'daily-email',

@@ -62,7 +62,7 @@ async function landing(res: Response): Promise<URL> {
 beforeEach(() => {
   vi.clearAllMocks()
   creds.clear()
-  Object.assign(process.env, { CRON_SECRET: 'test-cron-secret-at-least-32-bytes!!!!', META_APP_ID: 'platform-app', META_APP_SECRET: 'platform-secret' })
+  Object.assign(process.env, { CRON_SECRET: 'test-cron-secret-at-least-32-bytes!!!!', META_APP_ID: '1000000002', META_APP_SECRET: 'platform-secret' })
   delete process.env.META_GRAPH_VERSION
   creds.set('t-acme:meta_app', { config_enc: `enc:${JSON.stringify(OWN)}`, status: 'connected', meta: { app_id: OWN.appId }, expires_at: null })
 })
@@ -118,7 +118,7 @@ describe("Social sign-in with the store's own Meta app", () => {
     const { signAdminState } = await import('@/lib/shared/oauth-state')
     const state = signAdminState({ tenantId: 't-acme', provider: 'facebook', nonce: 'n', metaApp: 'platform' })
     await socialCallback(new NextRequest(`https://admin.jeffistores.in/api/admin/social/callback?state=${state}&code=c1`))
-    expect(tokenCalls()[0].searchParams.get('client_id')).toBe('platform-app')
+    expect(tokenCalls()[0].searchParams.get('client_id')).toBe('1000000002')
   })
 })
 

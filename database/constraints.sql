@@ -3937,6 +3937,18 @@ ALTER TABLE public.vault_tickets
     ADD CONSTRAINT vault_tickets_principal_type_check CHECK (principal_type IN ('customer','business','vault'));
 
 --
+-- user_oauth_identities
+--
+ALTER TABLE ONLY public.user_oauth_identities
+    ADD CONSTRAINT user_oauth_identities_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.user_oauth_identities
+    ADD CONSTRAINT user_oauth_identities_provider_subject_user_key UNIQUE (provider, subject, user_id);
+ALTER TABLE ONLY public.user_oauth_identities
+    ADD CONSTRAINT user_oauth_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE public.user_oauth_identities
+    ADD CONSTRAINT user_oauth_identities_provider_check CHECK (provider IN ('google','facebook','apple','github'));
+
+--
 -- vault_access_log (bigint sequence PK)
 --
 ALTER TABLE ONLY public.vault_access_log

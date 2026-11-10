@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { credentialOwnerId } from '@/lib/integrations/owner'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
-import { buildOAuthUrl, findMetaConfig } from '@/lib/catalog/meta'
+import { buildOAuthUrl, findMetaConfig, platformMetaAppIdInvalid } from '@/lib/catalog/meta'
 import { signAdminState } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri } from '@/lib/integrations/oauth'
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const cfg = await findMetaConfig(tenantId)
   if (!cfg || !process.env.CRON_SECRET) {
     const back = `${await currentAdminBaseUrlAsync()}/admin/social-posts`
-    return NextResponse.redirect(`${back}?connected=0&provider=meta&error=not_configured`)
+    return NextResponse.redirect(`${back}?connected=0&provider=meta&error=${!cfg && platformMetaAppIdInvalid() ? 'invalid_app_id' : 'not_configured'}`)
   }
 
   const state = signAdminState({ tenantId, provider, nonce: crypto.randomBytes(8).toString('hex'), metaApp: cfg.source })

@@ -3,14 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
-
-export interface AdFreeState {
-  active: boolean
-  until: string | null
-  renew: boolean
-  priceInr: number
-  balanceInr: number
-}
+import type { AdFreeState } from '@controller/lib/ecom/ad-free-state'
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -24,7 +17,7 @@ export default function AdFreeCard({ initial, tenantSlug }: { initial: AdFreeSta
   const [busy, setBusy] = useState(false)
   const short = s.balanceInr < s.priceInr
 
-  async function act(action: 'buy' | 'renew_on' | 'renew_off') {
+  async function act(action: 'buy' | 'renew_on' | 'renew_off' | 'decline_request') {
     setBusy(true)
     try {
       const res = await fetch(`/api/ecom/billing/ad-free?tenant=${encodeURIComponent(tenantSlug)}`, {
@@ -73,6 +66,16 @@ export default function AdFreeCard({ initial, tenantSlug }: { initial: AdFreeSta
         </div>
       ) : (
         <div className="space-y-4">
+          {s.requested && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-secondary px-4 py-3">
+              <p className="min-w-0 flex-1 text-sm text-foreground">
+                You chose this during signup — {short ? 'top up your wallet to switch it on.' : 'confirm below to switch it on.'}
+              </p>
+              <button onClick={() => act('decline_request')} disabled={busy} className="text-sm font-medium text-foreground-muted hover:text-foreground disabled:opacity-50">
+                Not now
+              </button>
+            </div>
+          )}
           <p className="text-sm text-foreground-secondary">
             Your store shows Google ads. Remove them for{' '}
             <span className="font-semibold text-foreground">{inr(s.priceInr)} a month</span>, paid from your wallet
