@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
-import { EMBEDDED_PAGE_SIZE } from '@/components/admin/kit/pager'
+import { EMBEDDED_PAGE_SIZE } from '@/components/admin/kit/page-size'
 import DeliveryLogPager from './DeliveryLogPager'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AutoRefresh from '@/components/admin/AutoRefresh'
