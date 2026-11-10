@@ -17,7 +17,7 @@ const OPTIONS: { id: ServiceChoice; title: string; copy: string; icon: typeof St
 export default function ServicePicker({ initial = [], onContinue }: { initial?: ServiceChoice[]; onContinue: (choice: ServiceChoice[]) => void }) {
   const [picked, setPicked] = useState<ServiceChoice[]>(initial)
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <PageHeader eyebrow="Get started" title="What do you need?" description="Pick one or more. You can add the others any time from your dashboard — they all share one wallet." />
       <ChoiceCards multiple ariaLabel="Services" className="gap-4" columns="grid-cols-1 md:grid-cols-3" cardClassName="rounded-2xl p-5 sm:p-6 bg-surface-elevated" value={picked} onChange={setPicked}
         options={OPTIONS.map(o => {
