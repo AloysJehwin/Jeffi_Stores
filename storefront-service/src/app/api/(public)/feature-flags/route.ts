@@ -12,6 +12,8 @@ export async function GET() {
   return NextResponse.json({
     smsEnabled: flags.smsEnabled,
     whatsappEnabled: flags.whatsappEnabled,
+    // Both are forced off while the store has no app build ID.
+    appPushEnabled: flags.pushEnabled && flags.marketingPushEnabled,
     upiEnabled: flags.upiEnabled,
     loyaltyEnabled: loyalty.enabled,
     birthdayEnabled: flags.birthdayEnabled,

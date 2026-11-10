@@ -89,3 +89,20 @@ CREATE TABLE public.vault_tickets (
     used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: user_oauth_identities; Type: TABLE; Schema: public; Owner: -
+--
+-- Social sign-in links (Google, Facebook, Apple, GitHub) for customer and business users. One row per
+-- provider account and user: the same provider account can back a customer and a business user.
+
+CREATE TABLE public.user_oauth_identities (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    provider character varying(20) NOT NULL,
+    subject text NOT NULL,
+    email character varying(255),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_login_at timestamp with time zone
+);

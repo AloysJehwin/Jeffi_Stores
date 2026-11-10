@@ -14,6 +14,7 @@ import { Card, Row } from '../dashboard/_components/Card'
 import OnboardShell from './OnboardShell'
 import { WIZARD_STEPS } from './steps'
 import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
+import { ADDON_INFO, cleanAddonIds, type AddonId, type AddonPrice } from '@/lib/billing/addons'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -80,6 +81,7 @@ function slugify(s: string) {
 export default function OnboardWizard({
   owner,
   plans,
+  addons = [],
   initialDraft,
   reusingPreviousDetails,
   ownerName,
@@ -91,6 +93,8 @@ export default function OnboardWizard({
   /** Shown in the rail with the sign-out button. */
   owner: { email: string; name: string | null }
   plans: Plan[]
+  /** Add-ons offered on the Plan step, with their live monthly prices. */
+  addons?: AddonPrice[]
   /** ECOM_PAYMENTS_ENABLED: approval leads to checkout. Off: approval starts the build directly. */
   paymentsEnabled?: boolean
   /** Owners pick their server size here (COMPUTE_SPEC_ENABLED). */
@@ -120,6 +124,9 @@ export default function OnboardWizard({
   )
   const [interval, setInterval] = useState<Interval>(init.interval ?? 'monthly')
   const [compute, setCompute] = useState<ComputeChoice | null>(null)
+  // Add-ons: nothing is charged here; they are bought from the store wallet once the store is live.
+  const [addonIds, setAddonIds] = useState<AddonId[]>(() => cleanAddonIds(init.addons).filter(id => addons.some(a => a.id === id)))
+  const addonsMonth = addons.filter(a => addonIds.includes(a.id)).reduce((sum, a) => sum + a.priceInr, 0)
 
   // Step 1 — Store
   const [displayName, setDisplayName] = useState(init.displayName ?? '')
@@ -222,6 +229,7 @@ export default function OnboardWizard({
         interval,
         computeSpec: chosenSpec,
         priceInrMonth: totalMonth,
+        addons: addonIds,
         displayName,
         slug: effectiveSlug,
         productCats,
@@ -260,6 +268,7 @@ export default function OnboardWizard({
       interval,
       chosenSpec,
       totalMonth,
+      addonIds,
       displayName,
       effectiveSlug,
       productCats,
@@ -390,6 +399,7 @@ export default function OnboardWizard({
           billingInterval: interval,
           ...(computeEnabled && chosenSpec ? { compute: chosenSpec } : {}),
           extraServices,
+          addons: addonIds,
           displayName,
           slug: effectiveSlug,
           productCategories: productCats.join(', '),
@@ -509,7 +519,7 @@ export default function OnboardWizard({
       onSelect={i => goTo(i as StepIdx)}
       saving={saving}
     >
-      <div className={step === 0 ? 'max-w-5xl' : 'max-w-2xl'}>
+      <div className="w-full">
         <PageHeader eyebrow={`Step ${step + 1} of ${STEPS.length}`} title={HEAD[step].title} description={HEAD[step].description} />
 
           {/* ── Restore banner (returning owner with a prior backup) ── */}
@@ -562,8 +572,37 @@ export default function OnboardWizard({
                   10 months&apos; price for 12.
                 </p>
               )}
+              {addonIds.length > 0 && (
+                <p className="text-sm text-foreground-secondary">
+                  <span className="font-semibold text-foreground">+ {inr(addonsMonth)}/mo add-ons</span>, from wallet — not part of
+                  your subscription.
+                </p>
+              )}
               </div>
               </Card>
+              {addons.length > 0 && (
+                <Card title="Add-ons" className="mt-4">
+                  <ChoiceCards<AddonId> multiple ariaLabel="Add-ons" columns="grid-cols-1 sm:grid-cols-2" value={addonIds} onChange={setAddonIds}
+                    options={addons.map(a => ({
+                      value: a.id,
+                      label: ADDON_INFO[a.id].name,
+                      content: (
+                        <>
+                          <div className="pr-6 text-sm font-semibold text-foreground">{ADDON_INFO[a.id].name}</div>
+                          <div className="mt-1 text-xs text-foreground-secondary">{ADDON_INFO[a.id].benefit}</div>
+                          <div className="mt-3 text-sm font-semibold text-foreground">
+                            {inr(a.priceInr)}<span className="font-normal text-foreground-muted">/mo</span>
+                          </div>
+                        </>
+                      ),
+                    }))} />
+                  <p className="mt-4 text-xs text-foreground-muted">
+                    Optional. Add-ons are billed monthly from your store wallet once your store is live — nothing is charged now — and you
+                    can turn them off anytime in Billing.
+                    {addonIds.includes('messaging') && ' Messages you send are charged separately.'}
+                  </p>
+                </Card>
+              )}
             </div>
           )}
 
@@ -571,6 +610,7 @@ export default function OnboardWizard({
           {step === 1 && (
             <Card>
               <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className={lbl}>Store name</label>
                   <input
@@ -596,6 +636,7 @@ export default function OnboardWizard({
                   {upgrade && (
                     <p className="text-xs text-foreground-muted mt-1">Your workspace&apos;s subdomain — already reserved for your store.</p>
                   )}
+                </div>
                 </div>
                 <div>
                   <label className={lbl}>
@@ -630,6 +671,7 @@ export default function OnboardWizard({
           {step === 2 && (
             <Card>
               <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className={lbl}>Legal business name</label>
                   <input
@@ -639,11 +681,6 @@ export default function OnboardWizard({
                   />
                 </div>
                 <div>
-                  <label className={lbl}>Business type</label>
-                  <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
-                    options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
-                </div>
-                <div>
                   <label className={lbl}>PAN number</label>
                   <input
                     className={inp}
@@ -651,6 +688,12 @@ export default function OnboardWizard({
                     onChange={e => setPan(e.target.value.toUpperCase())}
                     maxLength={10}
                   />
+                </div>
+                </div>
+                <div>
+                  <label className={lbl}>Business type</label>
+                  <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
+                    options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
                 </div>
                 <div>
                   <label className={lbl}>Business address</label>
@@ -668,6 +711,7 @@ export default function OnboardWizard({
           {step === 3 && (
             <Card>
               <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className={lbl}>
                     GSTIN <span className="text-foreground-muted font-normal">(optional)</span>
@@ -726,6 +770,7 @@ export default function OnboardWizard({
                   )}
                   {gstErr && <p className="text-xs text-[#8a2e1f] mt-1">{gstErr}</p>}
                 </div>
+                </div>
                 <div className={`${noteCls} org-peach`}>
                   Your GST certificate will be reviewed by the Jeffi Commerce team before your store goes live. This
                   usually takes 1–2 business days.
@@ -738,7 +783,7 @@ export default function OnboardWizard({
           {step === 4 && (
             <Card>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                   <div>
                     <label className={lbl}>Origin pincode</label>
                     <input
@@ -777,7 +822,7 @@ export default function OnboardWizard({
                       onChange={e => setWh({ ...wh, sellerName: e.target.value })}
                     />
                   </div>
-                  <div>
+                  <div className="xl:col-span-2">
                     <label className={lbl}>Seller phone</label>
                     <PhoneInput countries={['IN']} value={wh.sellerPhone} onChange={v => setWh({ ...wh, sellerPhone: v })} inputClassName={`${inp} min-w-0 flex-1`} />
                   </div>
@@ -871,7 +916,7 @@ export default function OnboardWizard({
                   </div>
                 ) : (
                 <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   <div className="col-span-full sm:col-span-2">
                     <label className={lbl}>Account holder name</label>
                     <input
@@ -1032,6 +1077,7 @@ export default function OnboardWizard({
           {step === 6 && (
             <Card>
 
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
               <div className="mb-6">
                 <label className={lbl}>Your full name</label>
                 <input
@@ -1050,6 +1096,7 @@ export default function OnboardWizard({
                 <label className={lbl}>Mobile number</label>
                 <PhoneInput countries={['IN']} value={mobile} onChange={setMobile} inputClassName={`${inp} min-w-0 flex-1`} />
                 <p className="text-xs text-foreground-muted mt-1">Used for account + payout notifications.</p>
+              </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1132,6 +1179,7 @@ export default function OnboardWizard({
 
           {step === 7 && (
             <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:items-start gap-4">
               <Card title="Your application">
               <div className="space-y-2.5">
                 {[
@@ -1139,6 +1187,14 @@ export default function OnboardWizard({
                     'Subscription',
                     [selectedPlan?.name, interval, priceLabel].filter(Boolean).join(' · '),
                   ],
+                  ...(addonIds.length
+                    ? [
+                        [
+                          'Add-ons',
+                          `${addonIds.map(id => ADDON_INFO[id].name).join(', ')} · ${inr(addonsMonth)}/mo from wallet once live`,
+                        ] as [string, string],
+                      ]
+                    : []),
                   ['Store', `${displayName} (${effectiveSlug}.jeffistores.in)`],
                   ['Products', productCats.join(', ') || '—'],
                   ['Business', `${bizName} · ${bizType}`],
@@ -1212,6 +1268,7 @@ export default function OnboardWizard({
                   ))}
                 </div>
               </Card>
+              </div>
               <div className={`${noteCls} org-peach`}>
                 After submitting, our team will review your GST certificate (1–2 business days).{' '}
                 {paymentsEnabled

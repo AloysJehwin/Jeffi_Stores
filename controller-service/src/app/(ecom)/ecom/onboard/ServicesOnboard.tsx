@@ -67,7 +67,7 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <button onClick={onBack} className="org-square min-h-11 sm:min-h-0 text-sm org-brown hover:underline mb-4">← Change services</button>
       <PageHeader
         eyebrow={services.map(s => (s === 'messaging' ? 'Messaging API' : 'Documents API')).join(' + ')}

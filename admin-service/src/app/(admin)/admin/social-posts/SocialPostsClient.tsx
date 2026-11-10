@@ -19,6 +19,7 @@ type Tab = 'calendar' | 'compose' | 'approvals' | 'inbox' | 'insights' | 'accoun
 const TAB_IDS: Tab[] = ['calendar', 'compose', 'approvals', 'inbox', 'insights', 'accounts', 'library', 'alerts']
 const ERRORS: Record<string, string> = {
   not_configured: 'Sign-in for this network is not set up on this platform.',
+  invalid_app_id: 'The platform Meta app ID (META_APP_ID) is not a valid app ID, so Facebook rejects it. Set it to the numeric App ID, or add your own Meta app.',
   bad_state: 'The sign-in link expired. Try again.',
 }
 

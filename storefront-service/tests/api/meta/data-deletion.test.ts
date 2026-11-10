@@ -36,7 +36,7 @@ const deletes = () => query.mock.calls.filter(c => String(c[0]).startsWith('DELE
 
 beforeEach(() => {
   vi.clearAllMocks()
-  Object.assign(process.env, { META_APP_ID: 'platform-app', META_APP_SECRET: 'platform-secret', CRON_SECRET: 'test-cron-secret-at-least-32-bytes!!!!' })
+  Object.assign(process.env, { META_APP_ID: '1000000002', META_APP_SECRET: 'platform-secret', CRON_SECRET: 'test-cron-secret-at-least-32-bytes!!!!' })
   query.mockImplementation(async (sql: string) => (String(sql).startsWith('SELECT') ? { rows: [OWN_ROW] } : { rowCount: 1 }))
 })
 

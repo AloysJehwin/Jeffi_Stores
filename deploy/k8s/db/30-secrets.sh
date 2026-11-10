@@ -8,7 +8,7 @@ source "$(dirname "$0")/lib.sh"
 mkdir -p "$OUT_DIR"
 BUCKET=${DOCUMENTS_BUCKET:-jeffi-stores-documents}
 DB_URL="postgresql://app_user@$RDS_HOST:5432/jeffi_stores"
-TMP=$(mktemp -d); chmod 700 "$TMP"; trap 'rm -rf "$TMP"' EXIT
+TMP=$(mktemp -d); chmod 700 "$TMP"; on_exit 'rm -rf "$TMP"'
 sm() { aws secretsmanager get-secret-value --secret-id "$1" --query "$2" --output text; }
 
 # <secret id> <KEY=value ...>; =@prod copies the value from jeffi/production.

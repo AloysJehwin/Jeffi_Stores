@@ -61,7 +61,7 @@ const ENV = {
   AMAZON_LWA_APP_CLIENT_SECRET: 'lwa-secret',
   GOOGLE_OAUTH_CLIENT_ID: 'gcid',
   GOOGLE_OAUTH_CLIENT_SECRET: 'gsecret',
-  META_APP_ID: 'meta-app',
+  META_APP_ID: '1000000003',
   META_APP_SECRET: 'meta-secret',
 }
 

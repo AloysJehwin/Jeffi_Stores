@@ -230,7 +230,21 @@ export default function UpiCollectionCard() {
                 ? 'Customers pay this ID when PhonePe is not connected. Use the UPI ID of the bank account whose credit alerts you forward below.'
                 : 'Only the owner can change the UPI ID.'}
             </p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+              Use a business UPI ID (PhonePe Business, Google Pay for Business, Paytm Business or BharatPe). Google Pay and PhonePe refuse payments
+              opened from your checkout to a personal UPI ID as risky; customers can then only pay by scanning the QR.
+            </p>
           </div>
+
+          {!alerts?.address && data.provider === 'upg' && (
+            <div className="space-y-1">
+              <p className={subhead}>Bank alerts</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Automatic confirmation isn&apos;t switched on for this platform yet, so payments can&apos;t be confirmed from your bank&apos;s alerts.
+                Until it is, customers enter their UTR after paying and you approve it under Financial → UPI confirmations.
+              </p>
+            </div>
+          )}
 
           {alerts?.address && data.provider !== 'phonepe' && (
             <div className="space-y-2">

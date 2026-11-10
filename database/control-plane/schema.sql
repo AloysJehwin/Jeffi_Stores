@@ -1262,6 +1262,14 @@ ALTER TABLE ONLY public.tenants ADD CONSTRAINT tenants_messaging_addon_check
     CHECK (messaging_addon IN ('none','sms','whatsapp','both'));
 
 --
+-- Add-ons the owner picked in the onboarding plan step (lib/billing/requested-addons.ts): 'messaging' |
+-- 'ad_free'. Bought from the wallet once the store is live; an entry is removed when bought or declined.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS requested_addons text[] NOT NULL DEFAULT '{}'::text[];
+ALTER TABLE ONLY public.tenants ADD CONSTRAINT tenants_requested_addons_check
+    CHECK (requested_addons <@ ARRAY['messaging','ad_free']::text[]);
+
+--
 -- tenant_messaging_senders: the sender Jeffi assigned a tenant for a channel — a DLT-registered SMS header
 -- or a WhatsApp number — plus the provider credentials that send through it (lib/messaging/tenant-senders.ts).
 -- config_enc is AES-256-GCM of the JSON credential blob (lib/crypto/token-cipher); meta holds masked,

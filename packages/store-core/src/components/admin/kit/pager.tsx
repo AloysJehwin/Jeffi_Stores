@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { useAgentChanges } from '@/lib/client/agent-events'
 import type { PageResult } from './infinite'
+import { EMBEDDED_PAGE_SIZE } from './page-size'
 
 // Lists inside a page (a section, card or tab with more content below it) show a fixed number of
 // rows with ‹ › arrows instead of scrolling on forever. The page's own main list keeps infinite scroll.
 
-export const EMBEDDED_PAGE_SIZE = 10
+export { EMBEDDED_PAGE_SIZE }
 
 export interface PagerControl {
   /** 1-based. */

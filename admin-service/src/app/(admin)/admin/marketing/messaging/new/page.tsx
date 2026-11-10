@@ -83,6 +83,9 @@ const AUDIENCE_OPTIONS = [
   { value: 'app_installs', label: 'All app installs, including signed out' },
 ]
 
+// Offered only when the store has an app with push on.
+const APP_AUDIENCES = new Set(['app_users', 'app_installs'])
+
 const SEGMENT_OPTIONS = [
   { value: 'vip', label: 'VIP (₹50k+ lifetime)' },
   { value: 'loyal', label: 'Loyal (5+ paid, ₹25k+)' },
@@ -130,7 +133,7 @@ export default function NewMessagePage() {
   const { showToast, showConfirm } = useToast()
   const [step, setStep] = useState(1)
   const [picked, setChannels] = useState<Channels>({})
-  const [push, setPush] = useState<PushChannel | null>(null)
+  const [pickedPush, setPush] = useState<PushChannel | null>(null)
   const [vars, setVars] = useState<Record<string, string>>({})
   const [waVars, setWaVars] = useState<Record<string, string>>({})
   // _action WhatsApp templates: the header image and the button's destination for this send.
@@ -193,9 +196,10 @@ export default function NewMessagePage() {
   const [showRestoreBanner, setShowRestoreBanner] = useState(false)
   const draftIdRef = useRef<string | null>(null)
 
-  // Site Controls' SMS/WhatsApp switches: an off channel is hidden and left out of what's saved/sent.
-  const { sms: smsOn, whatsapp: waOn } = useMessagingChannels()
-  const shown = (k: Tab) => (k === 'sms' ? smsOn : k === 'whatsapp' ? waOn : true)
+  // Site Controls' SMS/WhatsApp/app push switches: an off channel is hidden and left out of what's saved/sent.
+  const { sms: smsOn, whatsapp: waOn, push: pushOn } = useMessagingChannels()
+  const shown = (k: Tab) => (k === 'sms' ? smsOn : k === 'whatsapp' ? waOn : k === 'push' ? pushOn : true)
+  const push = pushOn ? pickedPush : null
   const channels = useMemo<Channels>(() => {
     const { sms, whatsapp, ...rest } = picked
     return { ...rest, ...(smsOn && sms ? { sms } : {}), ...(waOn && whatsapp ? { whatsapp } : {}) }
@@ -1291,7 +1295,7 @@ export default function NewMessagePage() {
             <LockedFieldset readOnly={lock.readOnly} className="space-y-5">
               <AdminSelect
                 label="Audience"
-                options={AUDIENCE_OPTIONS}
+                options={AUDIENCE_OPTIONS.filter(o => pushOn || !APP_AUDIENCES.has(o.value) || o.value === audienceType)}
                 value={audienceType}
                 onChange={setAudienceType}
               />

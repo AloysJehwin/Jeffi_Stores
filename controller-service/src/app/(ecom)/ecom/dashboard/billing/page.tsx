@@ -6,8 +6,7 @@ import BillingClient from './BillingClient'
 import AdFreeCard from './AdFreeCard'
 import MessagingAddonCard from './MessagingAddonCard'
 import { messagingAddonState } from '@controller/lib/ecom/messaging-addon-state'
-import { AD_FREE_PRICE_INR, getAdFree } from '@/lib/billing/ad-free'
-import { getWalletBalance } from '@/lib/payments/wallet'
+import { adFreeState } from '@controller/lib/ecom/ad-free-state'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,12 +29,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     }
   }
 
-  const adFree =
-    tenant.status === 'active'
-      ? await Promise.all([getAdFree(tenant.id), getWalletBalance(tenant.id)])
-          .then(([status, wallet]) => ({ ...status, priceInr: AD_FREE_PRICE_INR, balanceInr: wallet.balance }))
-          .catch(() => null)
-      : null
+  const adFree = tenant.status === 'active' ? await adFreeState(tenant.id).catch(() => null) : null
   const messaging = tenant.status === 'active' ? await messagingAddonState(tenant.id).catch(() => null) : null
 
   return (
