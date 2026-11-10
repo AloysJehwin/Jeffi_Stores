@@ -16,7 +16,11 @@ function walk(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {
     const full = join(dir, name)
     if (name === 'node_modules' || name === '.next') return []
-    return statSync(full).isDirectory() ? walk(full) : /\.(ts|tsx|js|mjs)$/.test(name) ? [full] : []
+    try {
+      return statSync(full).isDirectory() ? walk(full) : /\.(ts|tsx|js|mjs)$/.test(name) ? [full] : []
+    } catch {
+      return [] // a build/test artifact removed mid-walk under a loaded shard; skip it
+    }
   })
 }
 
@@ -30,7 +34,13 @@ describe('app import boundaries', () => {
     it(`${owner} imports no other app`, () => {
       const offenders: string[] = []
       for (const file of dirs.flatMap(d => walk(join(ROOT, d)))) {
-        for (const m of readFileSync(file, 'utf8').matchAll(SPEC_RE)) {
+        let src: string
+        try {
+          src = readFileSync(file, 'utf8')
+        } catch {
+          continue // removed mid-run; nothing to check
+        }
+        for (const m of src.matchAll(SPEC_RE)) {
           if (m[2] !== owner) offenders.push(`${relative(ROOT, file)}: ${m[0]}`)
         }
       }
