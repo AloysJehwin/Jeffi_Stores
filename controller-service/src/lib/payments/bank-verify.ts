@@ -48,11 +48,11 @@ export async function recordBankAccount(ownerId: string, details: BankDetails): 
 
 /** Catches typos, not a wrong-but-well-formed account. */
 export function validateBankFormat(d: BankDetails): BankVerifyResult {
-  if (d.upiId) {
-    return /^[\w.\-]{2,}@[a-z]{2,}$/i.test(d.upiId)
-      ? { status: 'unverified', verifiedName: d.holderName, ref: 'format_ok' }
-      : { status: 'failed', reason: 'That UPI ID does not look valid' }
+  if (d.upiId && !/^[\w.\-]{2,}@[a-z]{2,}$/i.test(d.upiId)) {
+    return { status: 'failed', reason: 'That UPI ID does not look valid' }
   }
+  // A UPI ID alone is a complete payout detail; with bank fields given, those are checked too.
+  if (d.upiId && !d.accountNumber && !d.ifsc) return { status: 'unverified', verifiedName: d.holderName, ref: 'format_ok' }
   if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test((d.ifsc || '').toUpperCase())) {
     return { status: 'failed', reason: 'That IFSC code does not look valid' }
   }

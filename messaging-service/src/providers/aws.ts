@@ -9,22 +9,40 @@ import {
 import type { PinpointSMSVoiceV2Client, SendTextMessageRequest } from '@aws-sdk/client-pinpoint-sms-voice-v2'
 import { cloudTemplate, cloudText, isAwsTemplateRef, parseAwsTemplateRef } from '@jeffi/api-contracts'
 import { normalizePhone } from './twilio.js'
+import type { SenderOverride } from './senders.js'
 
 // AWS End User Messaging, ported from the app's lib/shared/messaging/aws-provider.ts: WhatsApp through
 // Social Messaging (the Cloud API JSON is passed through to Meta), SMS through SMS-Voice v2. Same call
-// shapes as twilio.ts. Env is read per call; a missing id means not configured.
+// shapes as twilio.ts. Env is read per call; a missing id means not configured. A store's own AWS account
+// (tenant_messaging_senders) comes in as `ov` and replaces every env value, including the credentials.
 
-const env = () => ({
-  region: process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
-  waPhoneId: process.env.AWS_WHATSAPP_PHONE_NUMBER_ID || '',
-  wabaId: process.env.AWS_WHATSAPP_WABA_ID || '',
-  metaApiVersion: process.env.AWS_WHATSAPP_META_API_VERSION || 'v20.0',
-  smsOrigination: process.env.AWS_SMS_ORIGINATION || '',
-})
-const credentials = () =>
-  process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
-    ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
-    : undefined
+const env = (ov?: SenderOverride) => ov
+  ? {
+      region: ov.config.region || process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
+      waPhoneId: ov.config.whatsapp_phone_number_id || '',
+      wabaId: ov.config.waba_id || '',
+      metaApiVersion: process.env.AWS_WHATSAPP_META_API_VERSION || 'v20.0',
+      smsOrigination: ov.config.sms_origination || ov.sender,
+      configurationSet: ov.config.configuration_set || '',
+      dltEntityId: ov.config.dlt_entity_id || '',
+    }
+  : {
+      region: process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
+      waPhoneId: process.env.AWS_WHATSAPP_PHONE_NUMBER_ID || '',
+      wabaId: process.env.AWS_WHATSAPP_WABA_ID || '',
+      metaApiVersion: process.env.AWS_WHATSAPP_META_API_VERSION || 'v20.0',
+      smsOrigination: process.env.AWS_SMS_ORIGINATION || '',
+      configurationSet: process.env.AWS_SMS_CONFIGURATION_SET || '',
+      dltEntityId: process.env.AWS_SMS_DLT_ENTITY_ID || '',
+    }
+const credentials = (ov?: SenderOverride) =>
+  ov
+    ? { accessKeyId: ov.config.access_key_id, secretAccessKey: ov.config.secret_access_key }
+    : process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+      ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
+      : undefined
+// Per-store clients are kept by account + region so a tenant's sends reuse one connection pool.
+const ovKey = (ov: SenderOverride) => `${env(ov).region}:${ov.config.access_key_id}`
 
 export const awsSmsConfigured = () => !!env().smsOrigination
 export const awsWhatsAppConfigured = () => !!env().waPhoneId
@@ -34,19 +52,33 @@ export const awsTemplatesConfigured = () => !!env().wabaId
 const notConfigured = (v: string) => new Error(`AWS messaging is not configured (${v})`)
 
 let social: SocialMessagingClient | null = null
-const socialClient = () => (social ??= new SocialMessagingClient({ region: env().region, credentials: credentials() }))
+const socials = new Map<string, SocialMessagingClient>()
+function socialClient(ov?: SenderOverride) {
+  if (!ov) return (social ??= new SocialMessagingClient({ region: env().region, credentials: credentials() }))
+  const k = ovKey(ov)
+  let c = socials.get(k)
+  if (!c) socials.set(k, (c = new SocialMessagingClient({ region: env(ov).region, credentials: credentials(ov) })))
+  return c
+}
 // Loaded on first use so a missing SMS SDK can only fail AWS SMS sends, never the service.
 let sms: PinpointSMSVoiceV2Client | null = null
-async function sendText(input: SendTextMessageRequest) {
+const smss = new Map<string, PinpointSMSVoiceV2Client>()
+async function sendText(input: SendTextMessageRequest, ov?: SenderOverride) {
   const m = await import('@aws-sdk/client-pinpoint-sms-voice-v2')
-  sms ??= new m.PinpointSMSVoiceV2Client({ region: env().region, credentials: credentials() })
-  return sms.send(new m.SendTextMessageCommand(input))
+  let c: PinpointSMSVoiceV2Client
+  if (!ov) c = sms ??= new m.PinpointSMSVoiceV2Client({ region: env().region, credentials: credentials() })
+  else {
+    const k = ovKey(ov)
+    c = smss.get(k) ?? new m.PinpointSMSVoiceV2Client({ region: env(ov).region, credentials: credentials(ov) })
+    smss.set(k, c)
+  }
+  return c.send(new m.SendTextMessageCommand(input))
 }
 
-async function sendCloud(message: object): Promise<string> {
-  const { waPhoneId, metaApiVersion } = env()
+async function sendCloud(message: object, ov?: SenderOverride): Promise<string> {
+  const { waPhoneId, metaApiVersion } = env(ov)
   if (!waPhoneId) throw notConfigured('AWS_WHATSAPP_PHONE_NUMBER_ID')
-  const r = await socialClient().send(
+  const r = await socialClient(ov).send(
     new SendWhatsAppMessageCommand({
       originationPhoneNumberId: waPhoneId,
       metaApiVersion,
@@ -57,17 +89,17 @@ async function sendCloud(message: object): Promise<string> {
   return r.messageId
 }
 
-export async function sendSms(o: { to: string; body: string; messageId: string }): Promise<string> {
-  const { smsOrigination } = env()
+export async function sendSms(o: { to: string; body: string; messageId: string }, ov?: SenderOverride): Promise<string> {
+  const { smsOrigination, configurationSet, dltEntityId } = env(ov)
   if (!smsOrigination) throw notConfigured('AWS_SMS_ORIGINATION')
   const r = await sendText({
     DestinationPhoneNumber: normalizePhone(o.to),
     OriginationIdentity: smsOrigination,
     MessageBody: o.body,
     MessageType: 'TRANSACTIONAL',
-    ...(process.env.AWS_SMS_CONFIGURATION_SET ? { ConfigurationSetName: process.env.AWS_SMS_CONFIGURATION_SET } : {}),
-    ...(process.env.AWS_SMS_DLT_ENTITY_ID ? { DestinationCountryParameters: { IN_ENTITY_ID: process.env.AWS_SMS_DLT_ENTITY_ID } } : {}),
-  })
+    ...(configurationSet ? { ConfigurationSetName: configurationSet } : {}),
+    ...(dltEntityId ? { DestinationCountryParameters: { IN_ENTITY_ID: dltEntityId } } : {}),
+  }, ov)
   if (!r.MessageId) throw new Error('AWS SMS returned no message id')
   return r.MessageId
 }
@@ -82,10 +114,10 @@ export async function sendWhatsApp(o: {
   variables?: Record<string, string>
   messageId: string
   headerUrl?: string
-}): Promise<string> {
-  if (!env().waPhoneId) throw notConfigured('AWS_WHATSAPP_PHONE_NUMBER_ID')
+}, ov?: SenderOverride): Promise<string> {
+  if (!env(ov).waPhoneId) throw notConfigured('AWS_WHATSAPP_PHONE_NUMBER_ID')
   const to = normalizePhone(o.to)
-  if (!o.contentSid) return sendCloud(cloudText(to, o.body ?? ''))
+  if (!o.contentSid) return sendCloud(cloudText(to, o.body ?? ''), ov)
   if (!isAwsTemplateRef(o.contentSid)) throw new Error(`This WhatsApp template is not approved on AWS yet (${o.contentSid})`)
   const ref = parseAwsTemplateRef(o.contentSid)
   const vars = { ...(o.variables ?? {}) }
@@ -94,7 +126,7 @@ export async function sendWhatsApp(o: {
     const v = vars[ref.header.slot]
     vars[ref.header.slot] = v && /^https?:\/\//.test(v) ? v : o.headerUrl.replace(PH, v ?? '')
   }
-  return sendCloud(cloudTemplate(to, ref, vars))
+  return sendCloud(cloudTemplate(to, ref, vars), ov)
 }
 
 function wabaId() {

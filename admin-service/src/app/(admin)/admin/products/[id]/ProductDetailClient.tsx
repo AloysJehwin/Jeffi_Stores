@@ -14,7 +14,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAgentChanges } from '@/lib/client/agent-events'
-import { Dialog, DetailHeader, DetailSkeleton, ErrorState, ViewDraftLink, badgeCls, useActionToast } from '@/components/admin/kit'
+import { Dialog, DetailHeader, ErrorState, ViewDraftLink, badgeCls, useActionToast } from '@/components/admin/kit'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import {
   deriveSellableItems,
@@ -23,6 +23,8 @@ import {
   subscriptionSavingsPct,
 } from '@/lib/subscriptions/sellable'
 import { SUBSCRIPTION_INTERVALS, SUBSCRIPTION_INTERVAL_LABELS, isSubscriptionInterval } from '@/lib/subscriptions/intervals'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
+import ProductViewLoading from './ProductViewLoading'
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (
@@ -132,8 +134,8 @@ function AiPanel({
       }
     >
           {item === undefined && (
-            <div className="flex items-center gap-2 text-sm text-foreground-muted py-12 justify-center">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading
+            <div className="py-6">
+              <LoadingLines lines={6} />
             </div>
           )}
 
@@ -406,7 +408,11 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
       </button>
       {open && (
         <div className="px-4 pb-4 pt-1">
-          {loading && <p className="text-xs text-foreground-muted py-2">Loading…</p>}
+          {loading && (
+            <div className="py-2">
+              <LoadingLines lines={4} />
+            </div>
+          )}
           {!loading && data && (
             <div className="space-y-4">
               {/* Primary Supplier */}
@@ -859,13 +865,7 @@ export default function ProductDetailClient({
     )
   }
 
-  if (loading || !product) {
-    return (
-      <div className="p-4 sm:p-6">
-        <DetailSkeleton />
-      </div>
-    )
-  }
+  if (loading || !product) return <ProductViewLoading />
 
   const p = product
   const images: any[] = p.product_images || []

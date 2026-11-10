@@ -21,6 +21,7 @@ export interface DraftListItem {
   canEdit: boolean
   canClaim: boolean
   canTakeOver: boolean
+  canDiscard: boolean
 }
 
 export interface DraftTypeOption {

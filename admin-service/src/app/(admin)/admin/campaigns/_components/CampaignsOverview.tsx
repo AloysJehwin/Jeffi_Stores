@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -14,6 +13,7 @@ import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta, type Bucket } from '@/lib/overview/period'
 import type { CampaignRowStats, CampaignStats, CampaignTotals } from '@/lib/overviews/campaigns'
 import { ap } from '@/lib/shared/admin-path'
+import CampaignsOverviewLoading from './CampaignsOverviewLoading'
 
 interface Data {
   bucket: Bucket
@@ -50,7 +50,7 @@ export default function CampaignsOverview() {
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
-        !error && <OverviewSkeleton />
+        !error && <CampaignsOverviewLoading />
       ) : (
         <>
           <KpiGrid>

@@ -149,7 +149,7 @@ describe('ecom-emails', () => {
 
   describe('SMTP failures must never break the caller', () => {
     it('swallows a send failure rather than failing the KYC flow', async () => {
-      sendMail.mockRejectedValue(new Error('SES throttled'))
+      sendMail.mockRejectedValue(new Error('554 Message rejected'))
       const { sendKycApprovedEmail } = await import('@/lib/shared/ecom-emails')
       await expect(
         sendKycApprovedEmail(OWNER, { display_name: 'Acme', slug: 'acme' }, 'https://x')

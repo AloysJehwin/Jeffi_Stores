@@ -1,5 +1,5 @@
-import VisitorSkeleton from '@/components/visitor/VisitorSkeleton'
+import { StoreAuthSkeleton } from '@/components/visitor/skeletons/auth'
 
 export default function Loading() {
-  return <VisitorSkeleton variant="form" />
+  return <StoreAuthSkeleton kind="signup" />
 }

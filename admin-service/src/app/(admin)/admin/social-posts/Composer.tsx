@@ -13,6 +13,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { productUrl } from '@/lib/social/product-url'
 import { useActionToast } from '@/components/admin/kit'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { Banner, Section, api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
 import {
   PLATFORMS,
@@ -250,7 +251,11 @@ export default function Composer({
 
       <Section title="Networks">
         {!networks ? (
-          <p className="text-sm text-foreground-muted">Loading...</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {PLATFORMS.map(p => (
+              <Sk key={p} className="h-10 rounded-lg" />
+            ))}
+          </div>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {PLATFORMS.map(p => {
@@ -311,7 +316,13 @@ export default function Composer({
           {productId && (productLoading || product) && (
             <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border-default bg-surface-secondary">
               {productLoading || !product ? (
-                <p className="text-xs text-foreground-muted">Loading product...</p>
+                <>
+                  <Sk className="h-10 w-10 shrink-0 rounded-md" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Sk className="h-3.5 w-1/2" />
+                    <Sk className="h-3 w-1/3" />
+                  </div>
+                </>
               ) : (
                 <>
                   {(() => {

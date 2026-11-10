@@ -10,10 +10,11 @@ import { bp, businessReturnPath } from '@/lib/shared/business-path'
 import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/AuthSplitShell'
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { BusinessAuthSkeleton } from '@/components/visitor/skeletons/auth'
 
 export default function BusinessSignInWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<BusinessAuthSkeleton kind="signin" />}>
       <BusinessSignInPage />
     </Suspense>
   )

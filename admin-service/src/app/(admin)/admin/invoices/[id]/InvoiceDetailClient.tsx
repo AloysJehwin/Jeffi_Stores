@@ -16,7 +16,6 @@ import {
   Badge,
   Card,
   DetailHeader,
-  DetailSkeleton,
   Dialog,
   EmptyState,
   EntityPage,
@@ -31,6 +30,7 @@ import {
 } from '@/components/admin/kit'
 import { ChangeLog } from '@/components/admin/change-log'
 import RecordReplies from '@/components/admin/replies/RecordReplies'
+import InvoiceDetailLoading from './view/loading'
 
 const th = 'px-4 py-2.5 text-xs font-medium text-foreground-muted whitespace-nowrap'
 
@@ -176,11 +176,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   }
 
   if (loading || !data?.order) {
-    return (
-      <PageBody>
-        <DetailSkeleton kpis={3} />
-      </PageBody>
-    )
+    return <InvoiceDetailLoading />
   }
 
   const o = data.order

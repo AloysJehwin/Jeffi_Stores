@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import { filterScope, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { isListUrl } from '@/lib/admin/filter-url'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader } from '@/components/admin/kit'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import { getAdminSubscriptionStats, queryAdminSubscriptions } from '@/lib/queries/subscriptions'
 import { SUBSCRIPTIONS_ENTITY } from '@/lib/filters/entities/subscriptions'
 import { SUBSCRIPTION_FIELDS, SUBSCRIPTION_SEARCH } from '@/lib/filters/fields/subscriptions'
@@ -11,6 +11,7 @@ import { inr } from './_status'
 import SubscriptionsTable from './_components/SubscriptionsTable'
 import SubscriptionsTabBar from './_components/SubscriptionsTabBar'
 import SubscriptionsOverview from './_components/SubscriptionsOverview'
+import SubscriptionsOverviewSkeleton from './_components/SubscriptionsOverviewSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -29,14 +30,14 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
       <SubscriptionsTabBar value={tab} />
 
       {tab === 'overview' ? (
-        <Suspense fallback={<AdminStatsSkeleton cards={5} gridClass="grid-cols-2 sm:grid-cols-5" />}>
+        <Suspense fallback={<SubscriptionsOverviewSkeleton />}>
           <SubscriptionsOverview />
         </Suspense>
       ) : (
         <>
           <Suspense
             key={JSON.stringify(q)}
-            fallback={<AdminStatsSkeleton cards={5} gridClass="grid-cols-2 sm:grid-cols-5" />}
+            fallback={<LoadingKpis labels={['Active', 'Paused', 'Payment failed', 'Cancelled', 'MRR']} />}
           >
             <SubscriptionStats q={q} />
           </Suspense>
@@ -75,7 +76,7 @@ async function SubscriptionStats({ q }: { q: FilterQuery }) {
 
 function SubscriptionsListSection({ sp }: { sp: SP }) {
   return (
-    <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={7} />}>
+    <Suspense key={listKey(sp)} fallback={<LoadingTable columns={['Customer', 'Product', 'Plan', 'Per cycle', 'Cycle', 'Next charge', 'Status']} />}>
       <SubscriptionsListContent sp={sp} />
     </Suspense>
   )

@@ -10,6 +10,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { ErrorState } from '@/components/admin/kit/states'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { useActionToast } from '@/components/admin/kit/toast'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
@@ -33,6 +34,7 @@ import {
   pct,
 } from '@/components/admin/channels/ui'
 import type { AadsTab } from '@/lib/amazon-ads/console'
+import { AmazonAdsBodyLoading, AmazonAdsTabLoading } from './skeletons'
 
 const TABS: { id: AadsTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -162,15 +164,17 @@ export default function AmazonAdsConsole() {
           <ConnectionsGear title="Amazon Ads connection" scope="amazon_ads" state={state} open={gearOpen} onOpenChange={setGearOpen}>
             {status ? (
               <ConnectPanel status={status} canWrite={canWrite} onChanged={onChanged} />
+            ) : error ? (
+              <p className="text-sm text-foreground-muted">{error}</p>
             ) : (
-              <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+              <LoadingLines lines={3} />
             )}
           </ConnectionsGear>
         }
       />
 
       {!status ? (
-        error ? <ErrorState body={error} /> : <p className="text-sm text-foreground-muted">Loading...</p>
+        error ? <ErrorState body={error} /> : <AmazonAdsBodyLoading tab={tab} />
       ) : !status.connected ? (
         <NotConnectedState provider="Amazon Ads" onOpen={() => setGearOpen(true)} />
       ) : (
@@ -191,7 +195,7 @@ export default function AmazonAdsConsole() {
           {error ? (
             <ErrorState body={error} />
           ) : DATA_TABS.has(tab) && !data ? (
-            <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+            <AmazonAdsTabLoading tab={tab} />
           ) : (
             <Body tab={tab} d={data} onChanged={reload} />
           )}

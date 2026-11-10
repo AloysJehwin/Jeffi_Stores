@@ -1,5 +1,6 @@
 import { queryMany } from '@/lib/shared/db'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
+import type { MessagingLocks } from '@/lib/billing/messaging-locks'
 
 // Centralized reader for all admin-controlled store settings, backed by the
 // site_settings key/value table. Mirrors the cache pattern in delivery-settings.ts:
@@ -21,6 +22,8 @@ export interface StoreIdentity {
 
 export interface FeatureFlags {
   razorpayEnabled: boolean
+  // UPI section at checkout (PhonePe or the store's UPI ID); which one is tenants.upi_mode.
+  upiEnabled: boolean
   // Site-level Cash-on-Delivery gate. COD is offered only when this is on AND every cart
   // product's own is_cod_allowed is true (two-place validation).
   codEnabled: boolean
@@ -144,7 +147,12 @@ export interface SiteControls {
   // Whether the current tenant ships on its own Delhivery account. Platform store / no tenant in
   // scope is treated as true. Drives the COD gate and the admin COD-toggle lock.
   ownDelhivery: boolean
+  // Why SMS / WhatsApp is locked on a tenant store: 'addon' = not bought (ecom portal, Billing),
+  // 'number' = bought, waiting for Jeffi to assign the sender. {} when nothing is locked.
+  locks: MessagingLocks
 }
+
+export { MESSAGING_LOCK_HINT, type MessagingLock, type MessagingLocks } from '@/lib/billing/messaging-locks'
 
 // Defaults equal the pre-existing hardcoded / env-var values.
 const envBool = (v: string | undefined) => v === 'true'
@@ -166,6 +174,7 @@ const DEFAULTS: SiteControls = {
   flags: {
     // Preserve current env-driven behavior when the DB key is unset.
     razorpayEnabled: envBool(process.env.ENABLE_RAZORPAY),
+    upiEnabled: envBool(process.env.ENABLE_UPI),
     codEnabled: true,
     gstEnabled: envBool(process.env.ENABLE_GST),
     inventoryValidationEnabled: true,
@@ -261,6 +270,7 @@ const DEFAULTS: SiteControls = {
   },
   marketing: { googleTagId: '', googleAdsConversionId: '', googleAdsConversionLabel: '' },
   ownDelhivery: true,
+  locks: {},
 }
 
 const KEYS = [
@@ -273,6 +283,7 @@ const KEYS = [
   'business_email_accent',
   'business_hours',
   'feature_razorpay_enabled',
+  'feature_upi_enabled',
   'feature_cod_enabled',
   'feature_gst_enabled',
   'feature_inventory_validation_enabled',
@@ -467,6 +478,7 @@ export async function getSiteControls(): Promise<SiteControls> {
       },
       flags: {
         razorpayEnabled: bool('feature_razorpay_enabled', d.flags.razorpayEnabled),
+        upiEnabled: bool('feature_upi_enabled', d.flags.upiEnabled),
         codEnabled: bool('feature_cod_enabled', d.flags.codEnabled),
         gstEnabled: bool('feature_gst_enabled', d.flags.gstEnabled),
         inventoryValidationEnabled: bool('feature_inventory_validation_enabled', d.flags.inventoryValidationEnabled),
@@ -555,6 +567,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         googleAdsConversionLabel: str('google_ads_conversion_label', ''),
       },
       ownDelhivery: d.ownDelhivery,
+      locks: {},
     }
 
     // COD is offered only to tenants shipping on their own Delhivery account (own_delhivery). A
@@ -601,11 +614,35 @@ export async function getSiteControls(): Promise<SiteControls> {
       }
     }
 
+    // SMS & WhatsApp add-on: a tenant store sends on a channel only once it has bought the add-on and
+    // Jeffi has assigned its sender. Forced off here so every consumer (flags API, login channels,
+    // composer, campaigns, sms.ts / whatsapp.ts / sendByTemplate) hides and refuses a locked channel.
+    // The flagship (no tenant in scope) is exempt.
+    try {
+      const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+      const tenantId = await resolveTenantId()
+      if (tenantId) {
+        const { messagingEntitlement } = await import('@/lib/billing/messaging-addon')
+        // Fresher than its own 60 s cache, so with this 30 s cache a purchase shows within a minute.
+        const e = await messagingEntitlement(tenantId, { maxAgeMs: TTL_MS })
+        if (e.sms !== 'ok') {
+          result.locks.sms = e.sms
+          result.flags.smsEnabled = false
+        }
+        if (e.whatsapp !== 'ok') {
+          result.locks.whatsapp = e.whatsapp
+          result.flags.whatsappEnabled = false
+        }
+      }
+    } catch {
+      // Control-plane hiccup: leave the stored flags; messaging-service enforces the lock on send.
+    }
+
     cache.set(key, { value: result, expiresAt: Date.now() + TTL_MS })
     return result
   } catch {
     // Even the failure path must not hand a tenant the platform's identity.
-    return { ...DEFAULTS, identity: await identityDefaults() }
+    return { ...DEFAULTS, identity: await identityDefaults(), locks: {} }
   }
 }
 

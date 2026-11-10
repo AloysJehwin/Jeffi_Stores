@@ -6,6 +6,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useActionToast } from '@/components/admin/kit'
 import { Kpi, KpiGrid, Section, Table, api, btnGhost, count, money, when } from '@/components/admin/channels/ui'
 import { label } from './shared'
+import { InsightsLoading } from './loading-parts'
 
 interface Totals {
   posts: number
@@ -106,7 +107,7 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !d ? (
-        <p className="text-sm text-foreground-muted">Loading...</p>
+        <InsightsLoading />
       ) : (
         <>
           <KpiGrid>

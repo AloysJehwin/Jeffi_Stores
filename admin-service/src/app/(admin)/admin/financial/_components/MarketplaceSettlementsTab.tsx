@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Badge, Banner, Kpi, KpiGrid, Section, Table, count, money, type Col, type Tone } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { MarketplaceSettlementsTabSkeleton } from './FinanceSkeletons'
 import { ap } from '@/lib/shared/admin-path'
 import type { ChannelSummary, MarketplaceSettlementsOverview, RecentSettlement, SettlementChannel } from '@/lib/marketplace/settlements'
 import { FinancePeriodBar, useFinancePeriod } from './finance'
@@ -69,7 +70,7 @@ export function MarketplaceSettlementsTab() {
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !d ? (
-        <OverviewSkeleton />
+        <MarketplaceSettlementsTabSkeleton />
       ) : (
         d && (
           <>

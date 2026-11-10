@@ -9,6 +9,9 @@ import AddressFormModal from '@/components/visitor/AddressFormModal'
 import { bp } from '@/lib/shared/business-path'
 import { MAX_CYCLE_AMOUNT_INR } from '@/lib/subscriptions/intervals'
 import { SavingsNote, TermNote, formatInr } from './SubscribeOption'
+import { SubscribeAddressesSkeleton, SubscribeQuoteSkeleton, SubscribeSkeleton } from '@/components/visitor/skeletons/commerce'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { PaymentSections, otherDisplayConfig, upiFlag, type PaymentChoice } from '@/components/payments'
 
 const CHECKOUT_JS = 'https://checkout.razorpay.com/v1/checkout.js'
 
@@ -39,6 +42,8 @@ interface Quote {
   isDigital: boolean
   collectingAccount: 'platform' | 'own'
   merchantLabel: string
+  /** The store's UPI provider is PhonePe: the UPI section sets up a PhonePe Autopay mandate. */
+  upiAutopay?: boolean
 }
 
 export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
@@ -68,6 +73,11 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
+  const upiEnabled = upiFlag(useStoreConfig().flags)
+  // null = default (UPI Autopay when the store's UPI provider is PhonePe).
+  const [payPick, setPayPick] = useState<PaymentChoice | null>(null)
+  const upiAutopay = upiEnabled && quote?.upiAutopay === true
+  const payChoice: PaymentChoice = upiAutopay ? (payPick ?? 'upi') : 'razorpay'
   const authWasLoading = useRef(false)
   const addressesFetched = useRef(false)
 
@@ -179,6 +189,24 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
     }
     setError(null)
     setSubmitting(true)
+    if (upiAutopay && payChoice === 'upi') {
+      try {
+        const r = await fetch('/api/subscriptions', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...portalHeader },
+          body: JSON.stringify({ productId, variantId, subVariantId, interval, quantity, addressId: selected.id, consent: true, method: 'upi_autopay' }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || !data.redirectUrl) throw new Error(data.error || 'Could not start UPI Autopay')
+        // PhonePe's mandate page; it returns to /subscribe/return.
+        window.location.href = data.redirectUrl
+      } catch (e: any) {
+        setError(e?.message || 'Could not start UPI Autopay')
+        setSubmitting(false)
+      }
+      return
+    }
     try {
       const r = await fetch('/api/subscriptions', {
         method: 'POST',
@@ -203,6 +231,8 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
         description: data.description,
         prefill: data.prefill,
         theme: { color: '#f97316' },
+        // With PhonePe Autopay in the UPI section, Razorpay offers everything but UPI.
+        ...(upiAutopay && { config: otherDisplayConfig() }),
         handler: verify,
         modal: {
           ondismiss: () => {
@@ -222,7 +252,8 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
     }
   }
 
-  if (authLoading || !user) return null
+  if (authLoading) return <SubscribeSkeleton />
+  if (!user) return null
 
   if (!productId || !interval) {
     return (
@@ -236,7 +267,7 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
   }
 
   const merchant = quote?.merchantLabel || 'the store'
-  const canPay = !!quote && !!selected && consent && razorpayLoaded && !submitting
+  const canPay = !!quote && !!selected && consent && (razorpayLoaded || (upiAutopay && payChoice === 'upi')) && !submitting
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -256,7 +287,7 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
             </button>
           </div>
           {loadingAddresses ? (
-            <div className="h-20 bg-surface rounded-lg animate-pulse" />
+            <SubscribeAddressesSkeleton />
           ) : addresses.length === 0 ? (
             <p className="text-sm text-foreground-secondary">No saved addresses. Add one to continue.</p>
           ) : (
@@ -293,7 +324,7 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
           {quoteError ? (
             <p className="text-sm text-red-600 dark:text-red-400">{quoteError}</p>
           ) : !quote ? (
-            <div className="h-24 bg-surface rounded-lg animate-pulse" />
+            <SubscribeQuoteSkeleton />
           ) : (
             <dl className="text-sm space-y-1" data-testid="subscribe-summary">
               <div className="flex justify-between">
@@ -323,6 +354,8 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
               <TermNote totalCycles={quote.totalCycles} minCycles={quote.minCycles} digital={quote.isDigital} />
             </dl>
           )}
+
+          {upiAutopay && <PaymentSections compact mode="autopay" amountInr={quote?.amount ?? null} upi razorpay value={payChoice} onChange={setPayPick} />}
 
           <label className="flex gap-2 items-start text-xs text-foreground-secondary">
             <input
@@ -373,7 +406,7 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
 
 export function SubscribeCheckoutVisitor() {
   return (
-    <Suspense>
+    <Suspense fallback={<SubscribeSkeleton />}>
       <SubscribeCheckout isBusiness={false} />
     </Suspense>
   )
@@ -381,7 +414,7 @@ export function SubscribeCheckoutVisitor() {
 
 export function SubscribeCheckoutBusiness() {
   return (
-    <Suspense>
+    <Suspense fallback={<SubscribeSkeleton />}>
       <SubscribeCheckout isBusiness={true} />
     </Suspense>
   )

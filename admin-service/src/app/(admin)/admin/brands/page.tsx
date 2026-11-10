@@ -9,7 +9,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { queryMany, queryCount, queryOne } from '@/lib/shared/db'
 import { BRANDS_ENTITY } from '@/lib/filters/entities/brands'
 import { BRAND_ALIASES, BRAND_FIELDS, BRAND_SEARCH } from '@/lib/filters/fields/brands'
-import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
 import BrochureButton from '@/components/admin/BrochureButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import { draftLockChips } from '@/lib/admin/draft-locks'
@@ -17,6 +17,7 @@ import BrandsTable from './_components/BrandsTable'
 import GroupOverview from '../categories/_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -224,7 +225,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
         </PageDrafts>
       ) : (
         <>
-          <Suspense key={JSON.stringify(q)} fallback={<KpiRowSkeleton />}>
+          <Suspense key={JSON.stringify(q)} fallback={<LoadingKpis labels={['Total brands', 'Active', 'Inactive']} />}>
             <BrandsStats q={q} />
           </Suspense>
 
@@ -245,22 +246,13 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
   )
 }
 
-function KpiRowSkeleton() {
-  return (
-    <div className="grid gap-3 grid-cols-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
-      ))}
-    </div>
-  )
-}
 
 // Keys the table Suspense on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
 function BrandsListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={5} />}>
+    <Suspense key={key} fallback={<LoadingTable columns={['Brand', 'Slug', 'Website', 'Status', '']} />}>
       <BrandsListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )

@@ -5,9 +5,6 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { actorOf, draftLockResponse, epochFrom, lockNewDraft, withDraftPublish } from '@/lib/admin/draft-locks'
 
-const BATCH_SIZE = 50 // emails per batch
-const BATCH_DELAY = 1000 // ms between batches — stays under SES rate limits
-
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -65,17 +62,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Fire-and-forget background send (does NOT block the response). On failure the campaign is a
   // draft again and goes back to the admin who sent it.
-  sendInBackground(id, BATCH_SIZE, BATCH_DELAY).catch(() => {
+  sendInBackground(id).catch(() => {
     query(`UPDATE email_campaigns SET status = 'draft' WHERE id = $1`, [id])
       .then(() => lockNewDraft(actor, 'mailer', id))
       .catch(() => {})
   })
 
-  return NextResponse.json({ queued: true, batch_size: BATCH_SIZE })
+  return NextResponse.json({ queued: true })
 }
 
-// Background send — runs after the HTTP response is already returned
-async function sendInBackground(campaignId: string, batchSize: number, batchDelay: number) {
+// Background send — runs after the HTTP response is already returned; email is paced to the SES rate.
+async function sendInBackground(campaignId: string) {
   const { sendCampaign } = await import('@/lib/shared/email-campaigns')
-  await sendCampaign(campaignId, { batchSize, batchDelay })
+  await sendCampaign(campaignId)
 }

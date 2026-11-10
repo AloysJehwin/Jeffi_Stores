@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { Download } from 'lucide-react'
 import { Dialog } from '@/components/admin/kit'
 import Toggle from '@/components/ui/Toggle'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 
 interface LabelEntry {
   id: string
@@ -839,7 +840,9 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               </div>
 
               {loading ? (
-                <div className="text-xs text-foreground-muted py-4 text-center">Loading…</div>
+                <div className="py-2">
+                  <LoadingLines lines={4} />
+                </div>
               ) : entries.length === 0 ? (
                 <div className="text-xs text-foreground-muted py-4 text-center">No label data found</div>
               ) : (

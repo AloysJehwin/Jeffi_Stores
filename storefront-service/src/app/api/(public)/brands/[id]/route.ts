@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne, queryCount } from '@/lib/shared/db'
+import { queryOne } from '@/lib/shared/db'
 import { authenticateAdmin, requireAdminScope } from '@/lib/auth/jwt'
-import { actorOf, closeIfLocked, discardGuard } from '@/lib/admin/draft-locks'
+import { actorOf } from '@/lib/admin/draft-locks'
+import { deleteBrandRow, discardReply } from '@/lib/admin/discard-rows'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -60,24 +61,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const admin = await requireAdminScope(request, 'brands:write')
     if (admin instanceof NextResponse) return admin
 
-    const brandId = id
-
-    const productCount = await queryCount('SELECT COUNT(*) FROM products WHERE brand_id = $1', [brandId])
-
-    if (productCount > 0) {
-      return NextResponse.json(
-        { error: `Cannot delete brand. It has ${productCount} product(s) assigned to it.` },
-        { status: 400 }
-      )
-    }
-
-    const actor = actorOf(admin)
-    const denied = await discardGuard(actor, 'brand', brandId)
-    if (denied) return denied
-    await query('DELETE FROM brands WHERE id = $1', [brandId])
-    await closeIfLocked(actor, 'brand', brandId)
-
-    return NextResponse.json({ success: true })
+    return discardReply(await deleteBrandRow(actorOf(admin), id))
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to delete brand' }, { status: 500 })
   }

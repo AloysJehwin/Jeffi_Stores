@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { FileText, ExternalLink, Plus, X } from 'lucide-react'
-import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, SortTh, TableSkeleton, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
+import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, ListFilters, SortTh, badgeCls, fetchJson, useActionToast, useFilterQuery, useInfiniteList, useListSort, type SortCol, type StatusMap } from '@/components/admin/kit'
 import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import LineItemsSection, { newLineItem, fetchSeedLineItem, isBlankLine, validateDraftLines, type LineItem } from '@/components/admin/LineItemsSection'
 import { useDraftLock } from '@/hooks/useDraftLock'
@@ -27,6 +27,7 @@ import SerialEntryModal, {
 } from '@/components/admin/SerialEntryModal'
 import CashSaleMobileList from './_components/CashSaleMobileList'
 import { CASH_SALE_ALIASES, CASH_SALE_FIELDS, CASH_SALE_SEARCH } from '@/lib/filters/fields/cash-sale'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 
 const SORT_COLS: SortCol[] = [
   { key: 'invoice_number', label: 'Receipt No' },
@@ -1043,7 +1044,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
 
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
-          <TableSkeleton rows={8} cols={6} />
+          <LoadingTable bare columns={[...SORT_COLS.map(c => c.label), 'Actions']} />
         ) : sales.length === 0 ? (
           <EmptyState bare title={filters ? 'No cash sales match these filters.' : 'No cash sales found.'} />
         ) : (

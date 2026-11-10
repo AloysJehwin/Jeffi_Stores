@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Mail, MessageSquare, MessageCircle, Play, Plus, Search } from 'lucide-react'
 import { Card } from '../_components/Card'
-import { SkeletonRows } from '../_components/Skeleton'
+import { SandTableLoading, SkeletonRows, Sk } from '../_components/Skeleton'
+import { MESSAGE_COLUMNS } from './columns'
 import Pager, { useCursorPages } from '../_components/Pager'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
@@ -153,8 +154,8 @@ export default function MessagingClient({ storeName, ...props }: { prices: Recor
       {tab === 'log' && (
         <div>
         <Card>
-          {msgs === null ? <SkeletonRows rows={6} cols={5} /> : msgs.length === 0 ? <p className="text-sm text-foreground-secondary">No messages yet.</p> : (
-            <div className="-m-6 overflow-x-auto"><table className="w-full text-sm min-w-[720px]"><thead className="org-sand text-foreground-secondary"><tr>{['When', 'Channel', 'To', 'Template', 'Status', 'Charged'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
+          {msgs === null ? <SandTableLoading columns={MESSAGE_COLUMNS} rows={6} edge="-m-6" minWidth="min-w-[720px]" /> : msgs.length === 0 ? <p className="text-sm text-foreground-secondary">No messages yet.</p> : (
+            <div className="-m-6 overflow-x-auto"><table className="w-full text-sm min-w-[720px]"><thead className="org-sand text-foreground-secondary"><tr>{MESSAGE_COLUMNS.map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
               <tbody className="divide-y divide-border-default">{msgs.map(m => <tr key={m.id}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(m.created_at)}</td><td className="px-6 py-2.5 capitalize">{m.channel}</td><td className="px-6 py-2.5 font-mono text-xs">{m.to}</td><td className="px-6 py-2.5 text-xs">{m.template ?? '—'}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TONE[m.status] ?? 'org-sand'}`} title={m.error ?? ''}>{m.status}</span></td><td className="px-6 py-2.5 tabular-nums">{fmt(m.charged_inr)}</td></tr>)}</tbody></table></div>
           )}
         </Card>
@@ -176,9 +177,9 @@ export default function MessagingClient({ storeName, ...props }: { prices: Recor
               </div>
               <div className="max-h-[calc(100vh-320px)] overflow-y-auto overscroll-contain">
                 {items === null && Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="px-4 py-3 border-b border-border-default animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
-                    <div className="h-3.5 w-2/3 bg-surface-secondary rounded mb-2" />
-                    <div className="h-3 w-1/3 bg-surface-secondary rounded opacity-60" />
+                  <div key={i} className="px-4 py-3 border-b border-border-default">
+                    <Sk className="h-3.5 w-2/3 mb-2" />
+                    <Sk className="h-3 w-1/3" />
                   </div>
                 ))}
                 {items !== null && grouped.length === 0 && (

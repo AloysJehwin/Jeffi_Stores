@@ -6,6 +6,7 @@ import { Badge, DetailHeader, DraftLockBanner, FormFooter, LockedFieldset, PageB
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
@@ -62,6 +63,7 @@ export default function OfferDetailClient({
 }) {
   const router = useRouter()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const canWrite = useCanWrite('coupons:write')
   const [title, setTitle] = useState(offer.title)
   const [savedTitle, setSavedTitle] = useState(offer.title)
@@ -157,6 +159,17 @@ export default function OfferDetailClient({
     } finally {
       setPublishing(false)
     }
+  }
+
+  async function discardDraft() {
+    const ok = await confirm({
+      title: 'Discard this draft?',
+      message: "Changes in it are lost; the published offer isn't affected.",
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (ok && (await lock.discard())) router.push(ap(`/admin/offers/${offer.id}/view`))
   }
 
   const autosaveStatus = saving ? 'saving' : 'saved'
@@ -305,6 +318,7 @@ export default function OfferDetailClient({
             await edit.cancel()
           }}
           cancelLabel="Cancel"
+          discard={lock.canDiscard ? discardDraft : undefined}
         >
           <button
             type="button"

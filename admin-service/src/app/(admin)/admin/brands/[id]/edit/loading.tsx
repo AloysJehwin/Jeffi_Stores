@@ -1,9 +1,14 @@
-import { FormSkeleton } from '@/components/admin/kit'
+import { LoadingForm, PageLoading } from '@/components/admin/kit/skeleton'
 
 export default function Loading() {
   return (
-    <div className="p-4 sm:p-6">
-      <FormSkeleton sections={2} />
-    </div>
+    <PageLoading back="Brands" description="Changes are saved to the draft only">
+      <LoadingForm
+        sections={[
+          { title: 'Brand', description: 'Name, slug, website, logo and description.', fields: ['Brand Name', 'Slug', 'Website', 'Logo', 'Description'] },
+          { title: 'Return & Replacement Policy', description: 'Brand policy takes priority over category policy on the product page.', fields: ['Return window (days)', 'Replacement window (days)'] },
+        ]}
+      />
+    </PageLoading>
   )
 }

@@ -286,7 +286,7 @@ export async function getAssignedCouponCode(
   )
 }
 
-export function buildUnsubscribeUrl(token: string, campaignKind: CampaignKind, baseUrl: string = APP_URL): string {
+export function buildUnsubscribeUrl(token: string, campaignKind: CampaignKind | 'messaging', baseUrl: string = APP_URL): string {
   return `${baseUrl}/api/unsubscribe?token=${token}&campaign=${campaignKind}`
 }
 
@@ -320,13 +320,16 @@ export function wrapWithTracking(
 ): string {
   const rewritten = rewriteLinksForTracking(html, sentId, baseUrl)
   const pixel = `<img src="${buildTrackingPixelUrl(sentId, baseUrl)}" width="1" height="1" alt="" style="display:none;"/>`
-  const footer = `
+  return rewritten + pixel + unsubscribeFooter(unsubscribeUrl, storeName)
+}
+
+export function unsubscribeFooter(unsubscribeUrl: string, storeName?: string): string {
+  return `
     <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
       <p>You're receiving this email because you signed up at ${storeName || currentBrandName()}.<br/>
       <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from marketing emails.</p>
     </div>
   `
-  return rewritten + pixel + footer
 }
 
 export async function attributeConversion(userId: string, orderId: string): Promise<void> {

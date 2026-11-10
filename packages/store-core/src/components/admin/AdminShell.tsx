@@ -22,6 +22,7 @@ interface NavLink {
   group?: string
   exactMatch?: boolean
   matchPaths?: string[]
+  bottom?: boolean
 }
 
 interface Props {

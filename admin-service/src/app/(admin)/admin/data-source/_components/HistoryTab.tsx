@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Badge, Section, when } from '@/components/admin/kit/core'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 import JobDetail from './JobDetail'
 import { JobBadge, duration, sheetUrl, sourceLabel, type ImportJob } from './shared'
 
@@ -56,7 +57,7 @@ export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
       {error ? (
         <p className="text-sm text-red-500 py-6 text-center">{error}</p>
       ) : loading ? (
-        <p className="text-sm text-foreground-muted py-6 text-center">Loading...</p>
+        <LoadingTable bare rows={6} columns={['When', 'Source', 'Status', 'Rows', 'New', 'Upd', 'Skip', 'Duration']} />
       ) : jobs.length === 0 ? (
         <p className="text-sm text-foreground-muted py-6 text-center">No imports match these filters.</p>
       ) : (
@@ -127,7 +128,7 @@ export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
                     {expanded && (
                       <tr className="bg-surface-secondary/40 border-b border-border-default/60">
                         <td colSpan={9} className="px-3 py-3">
-                          <JobDetail id={j.id} compact />
+                          <JobDetail id={j.id} />
                         </td>
                       </tr>
                     )}

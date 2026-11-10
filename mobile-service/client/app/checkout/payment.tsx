@@ -5,8 +5,9 @@ import { Stack, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import RazorpayCheckout from 'react-native-razorpay'
 import { useCheckoutStore, type PlaceOrderRequest } from '../../src/components/checkout/checkoutStore'
-import { createOrderDraft, placeUnpaidOrder } from '../../src/api/orders'
-import { checkPendingPayment, createRazorpayOrder, verifyPayment } from '../../src/api/razorpay'
+import { createDraftForRequest } from '../../src/components/checkout/draft'
+import { placeUnpaidOrder } from '../../src/api/orders'
+import { checkPendingPayment, createRazorpayOrder, razorpayDisplayConfig, verifyPayment } from '../../src/api/razorpay'
 import { useAuthStore } from '../../src/stores/authStore'
 import { useCartStore } from '../../src/stores/cartStore'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
@@ -52,7 +53,7 @@ export default function CheckoutPaymentScreen() {
   const router = useRouter()
   const qc = useQueryClient()
   const user = useAuthStore(s => s.user)
-  const identity = useStoreConfig().identity
+  const { identity, flags } = useStoreConfig()
   const resetCart = useCartStore(s => s.reset)
   const [request] = useState<PlaceOrderRequest | null>(() => useCheckoutStore.getState().request)
   const [phase, setPhase] = useState<Phase>('processing')
@@ -133,21 +134,9 @@ export default function CheckoutPaymentScreen() {
     if (!NativeModules.RNRazorpayCheckout) {
       return abort('Online payment is not available in this build of the app. Please update the app or choose another method.')
     }
-    const draft = await createOrderDraft({
-      mode: r.mode,
-      addressId: r.address.id,
-      notes: r.notes,
-      couponId: r.couponId,
-      ...(r.intent ? { intent: r.intent } : {}),
-    })
-    if (draft.status === 409 && draft.data.existingOrderId) {
-      return abort(draft.data.error || 'You have an unpaid order.', {
-        id: draft.data.existingOrderId,
-        orderNumber: draft.data.existingOrderNumber || '',
-      })
-    }
-    if (!draft.ok || !draft.data.draftToken) return abort(draft.data.error || 'Failed to start payment')
-    const draftToken = draft.data.draftToken
+    const draft = await createDraftForRequest(r)
+    if (!draft.ok) return abort(draft.error, draft.existing)
+    const draftToken = draft.draftToken
 
     let rzp
     try {
@@ -172,6 +161,8 @@ export default function CheckoutPaymentScreen() {
           contact: (r.address.phone || '').replace(/\D/g, '').slice(-10),
         },
         theme: { color: accent[500] },
+        // UPI has its own section on Order Review when the store collects it; don't offer it twice.
+        ...razorpayDisplayConfig(!!flags.upiEnabled),
       })
     } catch (err: any) {
       if (isCancelled(err)) {
@@ -226,6 +217,11 @@ export default function CheckoutPaymentScreen() {
     started.current = true
     if (!request) {
       router.replace('/checkout/review')
+      return
+    }
+    // UPI has its own screen; Order Review routes there, this is a safety net.
+    if (request.method === 'upi') {
+      router.replace('/checkout/upi')
       return
     }
     // Let the push transition settle before the native sheet opens.

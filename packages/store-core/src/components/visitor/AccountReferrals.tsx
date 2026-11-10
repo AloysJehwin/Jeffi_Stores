@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import { useInfiniteList, InfiniteFooter, fetchJson } from '@/components/admin/kit/infinite'
+import { ReferralsBodySkeleton } from '@/components/visitor/skeletons/account'
 
 type Status = 'joined' | 'rewarded' | 'reversed' | 'capped' | 'rejected'
 
@@ -308,14 +309,7 @@ export default function AccountReferrals() {
       <AccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-10">
         {authLoading || loading ? (
-          <div className="grid gap-4 lg:grid-cols-3 lg:items-start animate-pulse">
-            <div className="space-y-4 lg:col-span-2">
-              <div className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
-              <div className="h-20 rounded-xl bg-surface-elevated border border-border-default" />
-              <div className="h-56 rounded-xl bg-surface-elevated border border-border-default" />
-            </div>
-            <div className="hidden lg:block h-72 rounded-xl bg-surface-elevated border border-border-default" />
-          </div>
+          <ReferralsBodySkeleton />
         ) : unavailable || !data ? (
           <div className={`${CARD} text-center py-12`}>
             <p className="text-foreground font-medium">

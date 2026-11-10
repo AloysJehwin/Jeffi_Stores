@@ -6,6 +6,7 @@ import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, type Col } from
 import { TrendChart, DonutSplit, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import type { EcomCustomersOverview as Data } from '@controller/lib/overviews/ecom-customers'
 import { OverviewShell, Grid2, label, useEcomOverview } from '../../_components/overview-shell'
+import { CustomersOverviewLoading } from '../../_components/skeletons'
 
 const SERIES: SeriesDef[] = [
   { key: 'signups', label: 'Signups', color: 'rgb(59 130 246)', kind: 'bar', axis: 'count', on: true },
@@ -47,7 +48,7 @@ const TOP_COLS: Col<Top>[] = [
 export default function EcomCustomersOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/customers/overview')
   return (
-    <OverviewShell {...o}>
+    <OverviewShell {...o} skeleton={<CustomersOverviewLoading />}>
       {d => (
         <>
           <KpiGrid>

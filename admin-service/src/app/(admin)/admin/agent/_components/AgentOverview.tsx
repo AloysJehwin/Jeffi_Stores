@@ -10,6 +10,10 @@ import {
 import { Kpi, KpiGrid, Section, Table, count } from '@/components/admin/channels/ui'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
+import { LoadingKpis, LoadingSection, LoadingTable } from '@/components/admin/kit/skeleton'
+import { LoadingAttention } from '../../products/_components/loading-parts'
+
+const KPIS = ['Conversations', 'Questions asked', 'Tool calls', 'Actions taken', 'Awaiting approval', 'AI search spend']
 
 interface Data {
   kpis: OverviewKpi[]
@@ -27,7 +31,17 @@ export default function AgentOverview() {
     <div className="space-y-3">
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
+      {loading && (
+        <>
+          <LoadingKpis labels={KPIS} />
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <LoadingAttention />
+            <LoadingSection title="Tools used">
+              <LoadingTable columns={['Tool', 'Calls', 'Errors']} rows={5} bare />
+            </LoadingSection>
+          </div>
+        </>
+      )}
       {data && (
         <>
           <KpiGrid>
@@ -49,7 +63,6 @@ export default function AgentOverview() {
                 rows={data.top_tools}
                 rowKey={r => r.tool}
                 empty="No tool calls in this period"
-                pageSize={8}
                 cols={[
                   { key: 'tool', label: 'Tool', render: r => <span className="font-mono text-xs">{r.tool}</span> },
                   { key: 'calls', label: 'Calls', num: true, render: r => count(r.calls), sort: r => r.calls },

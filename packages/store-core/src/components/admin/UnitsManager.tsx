@@ -6,6 +6,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import UnitRulesPanel, { ProductUnitRule } from '@/components/admin/UnitRulesPanel'
 import BaseUnitForm, { BaseUnitRow } from '@/components/admin/BaseUnitForm'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { type ProductUnit } from '@/components/admin/BaseUnitForm'
 import { Dimension, DIMENSION_LABEL, UNITS, computeAreaFactor, computeVolumeFactor } from '@/lib/catalog/units'
 
@@ -521,7 +522,12 @@ export default function UnitsManager({
     }
   }
 
-  if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
+  if (loading)
+    return (
+      <div className="py-3">
+        <LoadingLines lines={3} />
+      </div>
+    )
 
   if (readOnly || !canWrite) {
     const baseUnit = allUnits.find(u => u.is_base) ?? (isVariantScope || isSubVariantScope ? null : allUnits[0] ?? null)

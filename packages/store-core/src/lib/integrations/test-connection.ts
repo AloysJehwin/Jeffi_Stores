@@ -96,6 +96,51 @@ export async function verifyRazorpayKeys(keyId: string, keySecret: string): Prom
   }
 }
 
+/** PhonePe PG v2 OAuth host per environment (docs/plans/UPI_AND_MESSAGING_ADDON.md §1.1). */
+import { PHONEPE_AUTH_BASE } from '@/lib/payments/upi/phonepe'
+export { PHONEPE_AUTH_BASE }
+
+/** Live check of PhonePe client credentials: one token request. Nothing is cached or stored. */
+export async function verifyPhonePeCreds(c: { env: 'sandbox' | 'production'; client_id: string; client_secret: string; client_version: string }): Promise<ConnectionTestResult> {
+  const body = new URLSearchParams({ client_id: c.client_id, client_version: c.client_version, client_secret: c.client_secret, grant_type: 'client_credentials' })
+  try {
+    const res = await fetch(`${PHONEPE_AUTH_BASE[c.env]}/v1/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    })
+    const json: any = await res.json().catch(() => ({}))
+    if (res.ok && json?.access_token) return { ok: true, message: `Reached PhonePe (${c.env}) and got a token.` }
+    if (res.status === 400 || res.status === 401) return { ok: false, message: `PhonePe rejected these credentials${json?.message ? `: ${json.message}` : ''}. Check the client id, secret and version.` }
+    return { ok: false, message: `PhonePe answered ${res.status}${json?.message ? `: ${json.message}` : ''}.` }
+  } catch (e) {
+    return failure(e)
+  }
+}
+
+/** A store's saved PhonePe creds against PhonePe, or the platform's (saved, else env) for the flagship. */
+export async function testPhonePe(tenantId?: string): Promise<ConnectionTestResult> {
+  try {
+    const { storedPhonePeCreds } = await import('./resolve')
+    const { PLATFORM_TENANT_ID } = await import('@/lib/import/jobs')
+    const creds = tenantId
+      ? await storedPhonePeCreds(tenantId)
+      : (await storedPhonePeCreds(PLATFORM_TENANT_ID).catch(() => null)) ?? (process.env.PHONEPE_CLIENT_ID && process.env.PHONEPE_CLIENT_SECRET
+        ? {
+            env: process.env.PHONEPE_ENV === 'production' ? ('production' as const) : ('sandbox' as const),
+            client_id: process.env.PHONEPE_CLIENT_ID,
+            client_secret: process.env.PHONEPE_CLIENT_SECRET,
+            client_version: process.env.PHONEPE_CLIENT_VERSION || '1',
+          }
+        : null)
+    if (!creds) return { ok: false, message: 'No PhonePe credentials are set.' }
+    return verifyPhonePeCreds(creds)
+  } catch (e) {
+    return failure(e)
+  }
+}
+
 /** A store's saved Razorpay keys against Razorpay (whatever its mode), or the platform's for the flagship. */
 export async function testRazorpay(tenantId?: string): Promise<ConnectionTestResult> {
   try {

@@ -148,6 +148,7 @@ export const TENANT_TABS = [
   { key: 'certificates', label: 'Certificates' },
   { key: 'kyc', label: 'KYC' },
   { key: 'messaging', label: 'Messaging' },
+  { key: 'numbers', label: 'SMS & WhatsApp numbers' },
 ] as const
 
 export type TenantTab = (typeof TENANT_TABS)[number]['key']

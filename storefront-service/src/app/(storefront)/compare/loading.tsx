@@ -1,52 +1,74 @@
+import { Sk } from '@/components/admin/kit/skeleton'
+
+const LABEL = 'p-4 text-xs font-semibold text-foreground-muted uppercase tracking-wide bg-surface-secondary align-top whitespace-nowrap'
+const COLS = [0, 1, 2]
+
+// Which spec rows appear depends on the products; Brand and Category always do.
 export default function Loading() {
   return (
-    <div className="bg-surface min-h-screen animate-fade-in">
+    <div className="bg-surface min-h-screen" role="status" aria-busy="true" aria-label="Loading comparison">
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-10 bg-surface-secondary rounded animate-pulse" />
-            <div className="h-3 w-3 bg-surface-secondary rounded animate-pulse" />
-            <div className="h-3 w-16 bg-surface-secondary rounded animate-pulse" />
-            <div className="h-3 w-3 bg-surface-secondary rounded animate-pulse" />
-            <div className="h-3 w-14 bg-surface-secondary rounded animate-pulse" />
-          </div>
+          <nav className="flex items-center gap-2 text-sm">
+            <span className="text-foreground-muted">Home</span>
+            <span className="text-foreground-muted">/</span>
+            <span className="text-foreground-muted">Products</span>
+            <span className="text-foreground-muted">/</span>
+            <span className="text-foreground font-medium">Compare</span>
+          </nav>
         </div>
       </div>
+
       <div className="container mx-auto px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
-          <div className="h-8 w-48 bg-surface-secondary rounded animate-pulse" />
-          <div className="h-8 w-28 bg-surface-secondary rounded-lg animate-pulse" />
+          <h1 className="text-2xl font-bold text-foreground">Product Comparison</h1>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default bg-surface text-sm font-medium text-foreground-muted">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add product
+          </span>
         </div>
-        <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-hidden">
-          <div className="grid grid-cols-4 border-b border-border-default p-4 gap-4">
-            <div className="w-36" />
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="space-y-3" style={{ animationDelay: `${i * 80}ms` }}>
-                <div className="aspect-square max-w-[120px] mx-auto bg-surface-secondary rounded-lg animate-pulse" />
-                <div className="h-4 bg-surface-secondary rounded animate-pulse" />
-                <div className="h-4 w-3/4 bg-surface-secondary rounded animate-pulse" />
-                <div className="h-5 w-16 bg-surface-secondary rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className={`grid grid-cols-4 gap-4 px-4 py-3 border-b border-border-default last:border-0 ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
-            >
-              <div
-                className="h-3 w-20 bg-surface-secondary rounded animate-pulse"
-                style={{ animationDelay: `${i * 40}ms` }}
-              />
-              {Array.from({ length: 3 }).map((_, j) => (
-                <div
-                  key={j}
-                  className="h-3 bg-surface-secondary rounded animate-pulse"
-                  style={{ width: `${60 + Math.random() * 30}%`, animationDelay: `${(i * 3 + j) * 30}ms` }}
-                />
+
+        <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead>
+              <tr className="border-b border-border-default">
+                <th className="w-36 sm:w-44 p-4 bg-surface-secondary" />
+                {COLS.map(i => (
+                  <th key={i} className="p-4 text-left align-top">
+                    <div className="space-y-2">
+                      <Sk className="w-full aspect-square max-w-[120px] mx-auto rounded-lg" />
+                      <Sk className="h-4 w-full" />
+                      <Sk className="h-4 w-3/4" />
+                      <Sk className="h-5 w-24" />
+                      <Sk className="h-5 w-20 rounded-full" />
+                      <span className="block text-xs text-accent-500 font-medium">Change</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {['Brand', 'Category', '', '', '', '', ''].map((label, row) => (
+                <tr
+                  key={row}
+                  className={`border-b border-border-default last:border-0 ${row % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
+                >
+                  <td className={LABEL}>{label || <Sk className="h-3 w-20" />}</td>
+                  {COLS.map(i => (
+                    <td key={i} className="p-4 align-top">
+                      <Sk className="h-4 w-3/4" />
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </div>
-          ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-6 text-center">
+          <span className="text-sm text-accent-500">← Back to Products</span>
         </div>
       </div>
     </div>

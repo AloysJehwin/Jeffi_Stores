@@ -133,7 +133,7 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
           lastJob && (
             <Section title="Last file import" action={<JobBadge status={lastJob.status} errors={lastJob.error_count} />}>
               <p className="text-xs text-foreground-muted mb-3">Started {when(lastJob.created_at)}</p>
-              <JobDetail id={lastJob.id} compact />
+              <JobDetail id={lastJob.id} />
             </Section>
           )
         )}

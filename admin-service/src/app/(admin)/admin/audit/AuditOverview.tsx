@@ -13,6 +13,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { AUDIT_FIELDS, AUDIT_SEARCH } from '@/lib/filters/fields/audit'
+import { AuditOverviewSkeleton } from './AuditLoadingParts'
 
 interface Data {
   kpis: OverviewKpi[]
@@ -48,7 +49,7 @@ export default function AuditOverview() {
         <p className="text-xs text-foreground-muted">Filtered to the matching events; failed sign-ins are not.</p>
       )}
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {loading && <div className="h-24 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />}
+      {loading && <AuditOverviewSkeleton />}
       {data && (
         <>
           <KpiGrid>

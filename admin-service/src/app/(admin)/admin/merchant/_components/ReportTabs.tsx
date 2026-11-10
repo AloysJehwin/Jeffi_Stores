@@ -7,6 +7,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import Select from '@/components/ui/Select'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, change, count, money, pct, when } from '@/components/admin/channels/ui'
+import { Sk } from '@/components/admin/kit/skeleton'
 
 const SERIES: SeriesDef[] = [
   { key: 'organic', label: 'Free listing clicks', color: 'rgb(16 185 129)', kind: 'bar', axis: 'count', on: true },
@@ -109,7 +110,7 @@ function IssueDetail({ offerId }: { offerId: string }) {
       </button>
     )
   if (state.error) return <span className="text-xs text-red-500">{state.error}</span>
-  if (!state.issues) return <span className="text-xs text-foreground-muted">Loading...</span>
+  if (!state.issues) return <Sk className="h-3.5 w-48" />
   if (!state.issues.length) return <span className="text-xs text-foreground-muted">{offerId}: no issues now</span>
   return (
     <div className="rounded border border-border-default p-2 space-y-2 text-xs">

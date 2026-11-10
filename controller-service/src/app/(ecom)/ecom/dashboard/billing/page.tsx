@@ -4,6 +4,8 @@ import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions
 import PageHeader from '../_components/PageHeader'
 import BillingClient from './BillingClient'
 import AdFreeCard from './AdFreeCard'
+import MessagingAddonCard from './MessagingAddonCard'
+import { messagingAddonState } from '@controller/lib/ecom/messaging-addon-state'
 import { AD_FREE_PRICE_INR, getAdFree } from '@/lib/billing/ad-free'
 import { getWalletBalance } from '@/lib/payments/wallet'
 
@@ -34,12 +36,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           .then(([status, wallet]) => ({ ...status, priceInr: AD_FREE_PRICE_INR, balanceInr: wallet.balance }))
           .catch(() => null)
       : null
+  const messaging = tenant.status === 'active' ? await messagingAddonState(tenant.id).catch(() => null) : null
 
   return (
     <>
       <PageHeader eyebrow="Account" title="Billing" description="Your plan, renewal, add-ons and subscription controls." />
       <div className="space-y-8">
         {adFree && <AdFreeCard initial={adFree} tenantSlug={tenant.slug} />}
+        {messaging && <MessagingAddonCard initial={messaging} tenantSlug={tenant.slug} />}
         <BillingClient
           tenant={tenant}
           plans={plans}

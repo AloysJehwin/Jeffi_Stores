@@ -2,6 +2,10 @@ import 'server-only'
 import sharp from 'sharp'
 import { query, resolveRequestTenant } from '@/lib/shared/db'
 import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
+import QRCode from 'qrcode'
+import { resolveUpiProvider } from '@/lib/payments/upi/creds'
+import { isFlagship } from '@/lib/payments/webhook-tenant'
+import { upiPayUri } from '@/lib/payments/upi/pay-uri'
 
 // Razorpay's QR poster is 674×1644; the QR square sits at these proportional bounds.
 const RZP_QR_LEFT_RATIO = 136 / 674
@@ -38,6 +42,19 @@ export async function createOrderUpiQr(opts: {
   description: string
 }): Promise<{ qrId: string; qrImageUrl: string }> {
   const tenant = await resolveRequestTenant()
+  // A store collecting to its own UPI ID (UPG) has no gateway QR: a static one of its UPI ID, amount and order number.
+  const upi = tenant?.tenantId && !isFlagship(tenant) ? await resolveUpiProvider(tenant.tenantId).catch(() => null) : null
+  if (upi?.provider === 'upg') {
+    const vpa = upi.vpa
+    const upiUri = upiPayUri({ vpa, payeeName: opts.name, amountPaise: opts.amountPaise, reference: opts.order.order_number })
+    const qrImageUrl = await QRCode.toDataURL(upiUri, { margin: 1, width: 300, errorCorrectionLevel: 'M' })
+    const qrId = `upi_static_${opts.order.id}`
+    await query(
+      `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, payment_mode = 'upi_qr', updated_at = NOW() WHERE id = $3`,
+      [qrId, qrImageUrl, opts.order.id]
+    )
+    return { qrId, qrImageUrl }
+  }
   const { instance } = await getRazorpayInstanceFor(tenant?.tenantId)
   const qr = await (instance as any).qrCode.create({
     type: 'upi_qr',

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingTable } from '@/components/admin/kit/skeleton'
 
 interface CategoryRow {
   categoryId: string
@@ -25,6 +27,7 @@ export default function ReorderIntervalsPanel() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const paged = usePagedRows(rows ?? [])
 
   const load = (categories: CategoryRow[]) => {
     setRows(categories)
@@ -108,17 +111,14 @@ export default function ReorderIntervalsPanel() {
       {error ? (
         <p className="p-6 text-sm text-red-600">{error}</p>
       ) : !rows ? (
-        <div className="p-4 space-y-2 animate-pulse">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-8 rounded bg-surface-secondary" />
-          ))}
-        </div>
+        <LoadingTable bare rows={5} columns={['Category', 'Products', 'Reorder every (days)']} />
       ) : rows.length === 0 ? (
         <p className="p-6 text-sm text-foreground-muted">No categories yet.</p>
       ) : (
-        <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
+        <>
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-surface-elevated">
+            <thead className="bg-surface-elevated">
               <tr className="text-left text-xs uppercase tracking-wide text-foreground-muted">
                 <th className="px-4 py-2 font-medium">Category</th>
                 <th className="px-4 py-2 font-medium text-right">Products</th>
@@ -126,7 +126,7 @@ export default function ReorderIntervalsPanel() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(row => {
+              {paged.shown.map(row => {
                 const inherited = row.parentId ? parentDays.get(row.parentId) : ''
                 return (
                   <tr key={row.categoryId} className="border-t border-border-default">
@@ -155,6 +155,8 @@ export default function ReorderIntervalsPanel() {
             </tbody>
           </table>
         </div>
+        <Pager className="px-4 pb-3" control={paged.pager} noun="categories" />
+        </>
       )}
 
       {rows && rows.length > 0 && (

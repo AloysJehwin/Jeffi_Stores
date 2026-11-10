@@ -12,6 +12,7 @@ interface NavLink {
   group?: string
   exactMatch?: boolean
   matchPaths?: string[]
+  bottom?: boolean
 }
 
 function isMobileNavActive(link: NavLink, currentPath: string | null, host: string): boolean {
@@ -59,7 +60,8 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
 
   const scanLink = navLinks.find(l => l.href === '/admin/scan')
   const nonScanLinks = navLinks.filter(l => l.href !== '/admin/scan')
-  const ungrouped = nonScanLinks.filter(l => !l.group)
+  const pinned = nonScanLinks.filter(l => l.bottom)
+  const ungrouped = nonScanLinks.filter(l => !l.group && !l.bottom)
   const groups = nonScanLinks.reduce<Record<string, NavLink[]>>((acc, l) => {
     if (l.group) {
       acc[l.group] = acc[l.group] || []
@@ -149,6 +151,17 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
             ))}
             {Object.entries(groups).map(([groupName, links]) => (
               <MobileNavGroup key={groupName} groupName={groupName} links={links} pathname={pathname} />
+            ))}
+            {pinned.map(link => (
+              <a
+                key={link.href}
+                href={ap(link.href, host)}
+                className={`mt-2 border-t border-white/10 px-4 pt-4 pb-3 font-medium transition-colors ${
+                  isMobileNavActive(link, pathname, host) ? 'text-primary-400' : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                {link.label}
+              </a>
             ))}
           </nav>
         </div>

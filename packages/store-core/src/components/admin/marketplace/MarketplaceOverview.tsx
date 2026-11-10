@@ -5,6 +5,7 @@ import { Badge, Kpi, KpiGrid, Section, Table, api, count, money, when, type Col 
 import { ErrorState } from '@/components/admin/kit/states'
 import type { MarketplaceEventRow, MarketplaceOverview as Overview } from '@/lib/marketplace/console'
 import { CHANNEL_NAME, type Channel } from './queue-shared'
+import { MarketplaceOverviewLoading } from './skeletons'
 
 // Overview tab: today's and the week's orders, what needs action (accept, SLA, dispatch, returns),
 // and the last pushes from the marketplace.
@@ -28,7 +29,7 @@ export default function MarketplaceOverview({ channel }: { channel: Channel }) {
   }, [load])
 
   if (error) return <ErrorState body={error} />
-  if (!data) return <div className="h-40 rounded-xl border border-border-default bg-surface-elevated animate-pulse" />
+  if (!data) return <MarketplaceOverviewLoading />
   const k = data.kpis
 
   const cols: Col<MarketplaceEventRow>[] = [

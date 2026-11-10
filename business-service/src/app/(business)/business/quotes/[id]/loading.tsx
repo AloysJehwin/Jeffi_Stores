@@ -1,5 +1,5 @@
-import VisitorSkeleton from '@/components/visitor/VisitorSkeleton'
+import { QuoteDetailSkeleton } from '../QuotesSkeletons'
 
 export default function Loading() {
-  return <VisitorSkeleton variant="page" />
+  return <QuoteDetailSkeleton />
 }

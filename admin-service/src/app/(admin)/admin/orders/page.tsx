@@ -9,7 +9,8 @@ import { ORDER_ALIASES, ORDER_FIELDS, ORDER_SEARCH } from '@/lib/filters/fields/
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
-import { Kpi, ListFilters, ListSkeleton, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
+import { LoadingChart, LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import OrdersTable from './_components/OrdersTable'
 import OrdersOverview from './_components/OrdersOverview'
 
@@ -112,7 +113,17 @@ function OrdersList({ resolved }: { resolved: SP }) {
   const q = normalizeQuery(ORDERS_ENTITY, resolved)
   return (
     <>
-      <Suspense key={JSON.stringify(q)} fallback={<ListSkeleton header={false} kpis={3} rows={0} />}>
+      <Suspense
+        key={JSON.stringify(q)}
+        fallback={
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <LoadingKpis labels={['Total revenue', 'Total', 'Pending', 'Processing', 'Completed']} />
+            <div className="xl:col-span-2">
+              <LoadingChart title="Revenue Trend" />
+            </div>
+          </div>
+        }
+      >
         <OrdersStats q={q} />
       </Suspense>
 
@@ -128,7 +139,7 @@ function OrdersList({ resolved }: { resolved: SP }) {
 function OrdersListSection({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
+    <Suspense key={key} fallback={<LoadingTable columns={['Order ID', 'Source', 'Customer', 'Date', 'EDD', 'Total', 'Payment', 'Status']} />}>
       <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )

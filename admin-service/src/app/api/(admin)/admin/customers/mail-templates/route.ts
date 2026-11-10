@@ -12,5 +12,5 @@ export async function GET(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const templates = await listPageTemplates(pageTag('customer')).catch(() => [])
-  return NextResponse.json({ templates: templates.map(({ slug, name, subject, preheader, body }) => ({ slug, name, subject, preheader, body })) })
+  return NextResponse.json({ templates: templates.map(({ slug, name, subject, preheader, body, layout }) => ({ slug, name, subject, preheader, body, layout })) })
 }

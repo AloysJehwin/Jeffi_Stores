@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { FilePen } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { timeAgo } from '@/lib/client/draft-lock-client'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
 
 interface PoDraft {
   id: string
@@ -16,6 +17,7 @@ interface PoDraft {
 /** New purchase orders this admin started and hasn't created yet, for the Drafts tab. */
 export default function PurchaseOrderDrafts() {
   const [drafts, setDrafts] = useState<PoDraft[] | null>(null)
+  const paged = usePagedRows(drafts ?? [])
 
   useEffect(() => {
     fetch('/api/admin/inventory/po/draft', { credentials: 'include' })
@@ -35,7 +37,7 @@ export default function PurchaseOrderDrafts() {
         <p className="text-xs text-foreground-muted">Resume where you left off</p>
       </div>
       <ul className="divide-y divide-amber-500/20">
-        {drafts.map(d => (
+        {paged.shown.map(d => (
           <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-foreground">{d.supplier_name || 'No supplier yet'}</p>
@@ -52,6 +54,7 @@ export default function PurchaseOrderDrafts() {
           </li>
         ))}
       </ul>
+      <Pager control={paged.pager} noun="drafts" className="px-4 pb-3" />
     </section>
   )
 }

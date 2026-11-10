@@ -6,6 +6,7 @@ import { Kpi, KpiGrid, Section, Table, Badge, count, pct, when, type Col } from 
 import { RankedBars } from '@/components/admin/dashboard/Charts'
 import type { EcomInstancesOverview as Data } from '@controller/lib/overviews/ecom-instances'
 import { OverviewShell, Grid2, bytes, label, useEcomOverview } from '../../_components/overview-shell'
+import { InstancesOverviewLoading } from '../../_components/skeletons'
 
 type Job = Data['open_jobs'][number]
 const JOB_COLS: Col<Job>[] = [
@@ -63,7 +64,7 @@ const STORAGE_COLS: Col<Use>[] = [
 export default function EcomInstancesOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/instances/overview')
   return (
-    <OverviewShell {...o}>
+    <OverviewShell {...o} skeleton={<InstancesOverviewLoading />}>
       {d => (
         <>
           <KpiGrid>

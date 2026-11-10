@@ -7,11 +7,12 @@ import { canonicalQuery } from '@jeffi/list-filters/client'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
-import { EmptyState, ListSkeleton } from '@/components/admin/kit/states'
+import { EmptyState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ListFilters } from '@/components/admin/kit/list-filters'
 import { TASK_FIELDS, TASK_SEARCH } from '@/lib/filters/fields/tasks'
+import { TaskRowsSkeleton } from './TasksLoadingParts'
 
 interface AdminOption {
   id: string
@@ -266,7 +267,7 @@ export default function AdminTasksClient() {
       )}
 
       {loading ? (
-        <ListSkeleton header={false} kpis={0} rows={6} cols={3} />
+        <TaskRowsSkeleton />
       ) : tasks.length === 0 ? (
         <EmptyState
           title={

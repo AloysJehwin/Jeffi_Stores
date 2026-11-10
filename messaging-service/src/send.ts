@@ -12,6 +12,7 @@ import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
 import * as aws from './providers/aws.js'
 import { messagingProvider } from './providers/policy.js'
+import { tenantSender, SenderError } from './providers/senders.js'
 import { wrapEmail } from './mail-shell.js'
 import { hostUrl, MediaError } from './media.js'
 
@@ -200,7 +201,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let subject = req.subject ?? null
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
-  let layout: 'store' | 'none' = 'store'
+  let layout: 'store' | 'none' = req.layout ?? 'store'
   let preheader: string | null = null
   let mediaHosted = false
   let waVars: Record<string, string> | null = null
@@ -214,7 +215,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     body = t.body
     preheader = t.preheader
     providerRef = providerRef ?? t.provider_ref ?? undefined
-    layout = (t as any).layout === 'none' ? 'none' : 'store'
+    layout = req.layout ?? ((t as any).layout === 'none' ? 'none' : 'store')
     if (req.channel === 'whatsapp') {
       // Slots follow the approved body: its own {{n}}, then {{brand_name}}, then header and button.
       const blocks = (t as any).blocks
@@ -253,20 +254,63 @@ async function channelsOff(tenantId: string): Promise<Set<string>> {
   return off
 }
 
+// The SMS & WhatsApp add-on (docs/plans/UPI_AND_MESSAGING_ADDON.md §2.3): a store's channel stays locked until
+// its add-on tier covers the channel ('addon') and the platform has assigned it a sender row ('number'). One
+// control-plane query, cached 30 s; columns/table not there yet, or no tenant row, means not locked. The
+// platform tenant is exempt; API customers ('api') answer to their API settings instead.
+export type ChannelLock = 'addon' | 'number'
+type Locks = Partial<Record<'sms' | 'whatsapp', ChannelLock>>
+const lockCache = new Map<string, { at: number; locks: Locks }>()
+export async function channelLocks(tenantId: string): Promise<Locks> {
+  if (tenantId === tpl.PLATFORM_TENANT_ID) return {}
+  const hit = lockCache.get(tenantId)
+  if (hit && Date.now() - hit.at < 30_000) return hit.locks
+  const locks: Locks = {}
+  try {
+    const row = (await db.query<{ messaging_addon: string | null; messaging_addon_until: string | Date | null; senders: string[] | null }>(
+      `SELECT t.messaging_addon, t.messaging_addon_until, array_remove(array_agg(s.channel), NULL) AS senders
+         FROM tenants t
+         LEFT JOIN tenant_messaging_senders s ON s.tenant_id = t.id AND s.status = 'active'
+        WHERE t.id = $1::uuid
+        GROUP BY t.id, t.messaging_addon, t.messaging_addon_until`,
+      [tenantId])).rows[0]
+    if (row) {
+      const tier = row.messaging_addon ?? 'none'
+      const active = tier !== 'none' && (!row.messaging_addon_until || new Date(row.messaging_addon_until).getTime() > Date.now())
+      const senders = new Set(row.senders ?? [])
+      for (const ch of ['sms', 'whatsapp'] as const) {
+        if (!active || (tier !== 'both' && tier !== ch)) locks[ch] = 'addon'
+        else if (!senders.has(ch)) locks[ch] = 'number'
+      }
+    }
+  } catch {
+    // Not locked when the add-on columns/table aren't there yet or the control plane is down.
+  }
+  lockCache.set(tenantId, { at: Date.now(), locks })
+  return locks
+}
+
 export async function assertChannelOn(tenantId: string, channel: string, space: tpl.Space = 'store') {
-  if (channel !== 'email' && space !== 'api' && (await channelsOff(tenantId)).has(channel))
-    throw new SendError(409, 'channel_disabled', `${channel === 'sms' ? 'SMS' : 'WhatsApp'} is turned off in Site Controls`)
+  if (channel === 'email' || space === 'api') return
+  const label = channel === 'sms' ? 'SMS' : 'WhatsApp'
+  const lock = (await channelLocks(tenantId))[channel as 'sms' | 'whatsapp']
+  if (lock) throw new SendError(409, 'channel_locked', `${label} is not enabled for this store — ${lock === 'addon' ? 'add the SMS & WhatsApp add-on in the ecom portal' : 'waiting for your number to be assigned'}`)
+  if ((await channelsOff(tenantId)).has(channel)) throw new SendError(409, 'channel_disabled', `${label} is turned off in Site Controls`)
 }
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
   const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
+  // The store's own sender (number + credentials) when the platform assigned it one; the platform env otherwise.
+  const sender = req.channel === 'email'
+    ? null
+    : await tenantSender(ctx.tenantId, req.channel).catch(e => { throw e instanceof SenderError ? new SendError(500, 'sender_unavailable', e.message) : e })
 
   const id = randomUUID()
   const priceInr = messagePriceInr(req.channel, ctx.internal)
   const from =
-    req.from ?? (req.channel === 'email' ? `${ctx.tenantSlug ?? 'noreply'}@${PLATFORM_DOMAIN}` : null)
+    req.from ?? (req.channel === 'email' ? `${ctx.tenantSlug ?? 'noreply'}@${PLATFORM_DOMAIN}` : sender?.sender ?? null)
 
   await db.query(
     `INSERT INTO messages (id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, reference, metadata)
@@ -297,22 +341,24 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
       provider = 'ses'
       // layout 'none': the template's HTML exactly as written, no store header/footer.
       const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact, accent: req.accent, replyHint: !!req.reply_to, preheader })
-      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to, inReplyTo: req.in_reply_to })
+      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html, replyTo: req.reply_to, inReplyTo: req.in_reply_to, bulk: !!ctx.batchId || ['campaign', 'automation'].includes(String(req.metadata?.kind)) })
     } else if (req.channel === 'sms') {
-      // The tenant's provider policy decides; a tenant on AWS never falls back to Twilio.
-      provider = await messagingProvider(ctx.tenantId, 'sms')
-      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id }) : await sendSms({ to: req.to, body, messageId: id })
+      // The store's own sender names its provider; else the tenant's provider policy decides, and a tenant on
+      // AWS never falls back to Twilio.
+      provider = sender?.provider ?? await messagingProvider(ctx.tenantId, 'sms')
+      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id }, sender ?? undefined) : await sendSms({ to: req.to, body, messageId: id }, sender ?? undefined)
     } else {
       // A raw content SID (no template) gets the caller's numbered variables as given.
       const variables = waVars ?? Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
-      provider = await messagingProvider(ctx.tenantId, 'whatsapp')
+      provider = sender?.provider ?? await messagingProvider(ctx.tenantId, 'whatsapp')
       ref = provider === 'aws'
-        ? await aws.sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id, headerUrl: waHeader })
-        : await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id })
+        ? await aws.sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id, headerUrl: waHeader }, sender ?? undefined)
+        : await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id }, sender ?? undefined)
     }
+    // metadata.sender.own marks a send from the store's own account (its token signs the status callback).
     await db.query(
-      `UPDATE messages SET status='sent', provider=$2, provider_ref=$3, charged_inr=$4, updated_at=now() WHERE id=$1`,
-      [id, provider, ref, debit.charged ? priceInr : 0]
+      `UPDATE messages SET status='sent', provider=$2, provider_ref=$3, charged_inr=$4, metadata=COALESCE(metadata,'{}'::jsonb) || $5::jsonb, updated_at=now() WHERE id=$1`,
+      [id, provider, ref, debit.charged ? priceInr : 0, JSON.stringify(sender ? { sender: { own: true, provider: sender.provider } } : {})]
     )
     await db.query(`INSERT INTO message_events (message_id, event) VALUES ($1,'sent')`, [id])
   } catch (e: any) {

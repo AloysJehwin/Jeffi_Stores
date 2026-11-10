@@ -5,6 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { ActionButton, StatusBadge } from '@/components/admin/kit'
 import type { PipelineView as PipelineData } from '@controller/lib/provisioning/pipeline-view'
 import { JobCard } from './JobCard'
+import { PipelineLoading } from './PipelineLoading'
 import { PipelineSummary } from './PipelineSummary'
 import { ResourcesPanel } from './ResourcesPanel'
 import { StepRow } from './StepRow'
@@ -92,6 +93,8 @@ export function PipelineView({ tenantId }: { tenantId: string }) {
           <p className="text-sm text-red-700 dark:text-red-400">{err}</p>
         </div>
       )}
+
+      {!data && !err && <PipelineLoading />}
 
       {!job && !err && data && (
         <div className="rounded-xl border border-border-default p-4 sm:p-6 bg-surface-elevated">

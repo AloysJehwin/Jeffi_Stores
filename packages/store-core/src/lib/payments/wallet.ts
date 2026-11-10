@@ -45,6 +45,7 @@ export type WalletCategory =
   | 'email'
   | 'media'
   | 'ad_free'
+  | 'messaging_addon'
   | 'infra'
   | 'adjustment'
 

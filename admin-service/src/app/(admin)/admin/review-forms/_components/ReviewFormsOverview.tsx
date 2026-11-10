@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import {
   AttentionList,
-  OverviewSkeleton,
   PeriodBar,
   useOverviewData,
   usePeriod,
@@ -15,6 +14,7 @@ import type { ReviewFormState, ReviewFormTotals } from '@/lib/overviews/review-f
 import { ap } from '@/lib/shared/admin-path'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/review-forms'
+import ReviewFormsOverviewLoading from './ReviewFormsOverviewLoading'
 
 interface Form {
   id: string
@@ -57,7 +57,7 @@ export default function ReviewFormsOverview() {
       />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
-        !error && <OverviewSkeleton />
+        !error && <ReviewFormsOverviewLoading />
       ) : (
         <>
           <KpiGrid>

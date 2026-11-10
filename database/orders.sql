@@ -298,6 +298,33 @@ CREATE TABLE public.subscription_cycle_orders (
 
 
 --
+-- Name: subscription_redemptions; Type: TABLE; Schema: public; Owner: -
+--
+-- One PhonePe Autopay renewal attempt: notified >= 24 h before the due date, executed on it. The paid
+-- cycle's order is still minted through subscription_cycle_orders (keyed by the PhonePe transaction id).
+
+CREATE TABLE public.subscription_redemptions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    subscription_id uuid NOT NULL,
+    cycle_number integer NOT NULL,
+    merchant_order_id character varying(63) NOT NULL,
+    provider_order_id text,
+    provider_txn_id text,
+    utr text,
+    amount_paise bigint NOT NULL,
+    due_at timestamp with time zone NOT NULL,
+    status character varying(16) DEFAULT 'notifying'::character varying NOT NULL,
+    notified_at timestamp with time zone,
+    execute_after timestamp with time zone,
+    executed_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    error_code text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: return_requests; Type: TABLE; Schema: public; Owner: -
 --
 

@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { PeriodBar, OverviewSkeleton, usePeriod, useOverviewData } from '@/components/admin/overview/kit'
+import { PeriodBar, usePeriod, useOverviewData } from '@/components/admin/overview/kit'
 import type { Period } from '@/lib/overview/period'
 
 /** Period bar + loader shared by the platform overviews; renders children only with fresh data. */
@@ -19,6 +19,7 @@ export function OverviewShell<T>({
   error,
   loading,
   reload,
+  skeleton,
   children,
 }: {
   period: Period
@@ -27,6 +28,8 @@ export function OverviewShell<T>({
   error: string | null
   loading: boolean
   reload: () => void
+  /** The overview's own body shape while its first data loads. */
+  skeleton: ReactNode
   children: (d: T) => ReactNode
 }) {
   return (
@@ -37,7 +40,7 @@ export function OverviewShell<T>({
           {error}
         </p>
       ) : !data ? (
-        <OverviewSkeleton />
+        skeleton
       ) : (
         children(data)
       )}

@@ -44,6 +44,8 @@ import { EmptyState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { Sk } from '@/components/admin/kit/skeleton'
+import { LogRowsSkeleton } from './AuditLoadingParts'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import {
   AUDIT_FIELDS,
@@ -682,11 +684,7 @@ export default function AdminAuditClient() {
           <LogWindowNote meta={mailMeta} noun="emails" />
 
           {mailLoading && mailRows.length === 0 ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />
-              ))}
-            </div>
+            <LogRowsSkeleton />
           ) : mailRows.length === 0 ? (
             <EmptyState title={emptyText(mailFilters, mailMeta, 'emails', 'No emails found.')} />
           ) : (
@@ -801,9 +799,7 @@ export default function AdminAuditClient() {
                                 Body redacted — OTP emails are not stored for security.
                               </p>
                             ) : body?.loading ? (
-                              <div className="flex items-center justify-center py-10">
-                                <RefreshCw className="w-4 h-4 animate-spin text-foreground-muted" />
-                              </div>
+                              <Sk className="h-40 w-full rounded-lg" />
                             ) : body?.html ? (
                               <iframe
                                 title={`mail-${row.id}`}
@@ -851,11 +847,7 @@ export default function AdminAuditClient() {
           <LogWindowNote meta={smsMeta} noun="messages" />
 
           {smsLoading && smsRows.length === 0 ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />
-              ))}
-            </div>
+            <LogRowsSkeleton />
           ) : smsRows.length === 0 ? (
             <EmptyState title={emptyText(messageFilters, smsMeta, 'SMS messages', 'No SMS messages found.')} />
           ) : (
@@ -992,11 +984,7 @@ export default function AdminAuditClient() {
           <LogWindowNote meta={waMeta} noun="messages" />
 
           {waLoading && waRows.length === 0 ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />
-              ))}
-            </div>
+            <LogRowsSkeleton />
           ) : waRows.length === 0 ? (
             <EmptyState title={emptyText(messageFilters, waMeta, 'WhatsApp messages', 'No WhatsApp messages found.')} />
           ) : (
@@ -1123,11 +1111,7 @@ export default function AdminAuditClient() {
             </p>
           </div>
           {cronLoading && cronJobs.length === 0 ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-16 rounded-lg bg-surface-secondary animate-pulse" />
-              ))}
-            </div>
+            <LogRowsSkeleton icon={false} />
           ) : (
             <div className="space-y-3">
               {cronJobs.map(job => {
@@ -1263,17 +1247,7 @@ export default function AdminAuditClient() {
           <LogWindowNote meta={auditMeta} noun="events" />
 
           {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="flex gap-3 animate-pulse">
-                  <div className="w-8 h-8 rounded-full bg-surface-secondary" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 bg-surface-secondary rounded w-3/4" />
-                    <div className="h-2 bg-surface-secondary rounded w-1/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <LogRowsSkeleton />
           ) : events.length === 0 ? (
             <p className="text-sm text-foreground-muted italic">
               {emptyText(auditFilters, auditMeta, 'audit events', 'No audit events yet.')}

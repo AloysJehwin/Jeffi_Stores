@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import DatePicker from '@/components/ui/DatePicker'
 import { isValidDob } from '@/lib/shared/format'
+import { BirthdayFormSkeleton } from './BirthdaySkeleton'
 
 type Stage = 'loading' | 'form' | 'saved' | 'already' | 'error'
 
@@ -64,11 +65,7 @@ export default function BirthdayPage() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center p-4">
       {stage === 'loading' ? (
-        <div className={`${CARD} animate-pulse`}>
-          <div className="h-10 w-10 mx-auto rounded-full bg-surface-secondary" />
-          <div className="mt-4 h-5 rounded bg-surface-secondary" />
-          <div className="mt-2 h-4 rounded bg-surface-secondary" />
-        </div>
+        <BirthdayFormSkeleton className={CARD} />
       ) : stage === 'error' ? (
         <div className={CARD}>
           <p className="text-4xl">🎂</p>

@@ -400,6 +400,8 @@ export async function settleAdjustmentPayment(params: {
   razorpayPaymentId: string
   amountPaise: number
   tenant?: { tenantId?: string | null; slug?: string | null } | null
+  /** Another gateway (UPI): the payment row's gateway/method and who books the store's share. */
+  gw?: { gateway: string; method: string; book?: (p: { paymentId: string; grossInr: number; orderRef: string; orderId: string }) => Promise<void> }
 }): Promise<{ applied: boolean; reason?: string }> {
   const adj = await queryOne<any>(
     `SELECT a.*, o.order_number FROM order_adjustments a JOIN orders o ON o.id = a.order_id WHERE a.razorpay_order_id = $1`,
@@ -410,13 +412,17 @@ export async function settleAdjustmentPayment(params: {
   const amount = params.amountPaise > 0 ? params.amountPaise / 100 : Math.abs(Number(adj.net_diff))
   const inserted = await queryOne(
     `INSERT INTO payments (order_id, payment_method, payment_gateway, transaction_id, amount, status, gateway_response)
-     VALUES ($1, 'razorpay', 'razorpay', $2, $3, 'completed', $4)
+     VALUES ($1, $5, $6, $2, $3, 'completed', $4)
      ON CONFLICT (transaction_id) DO NOTHING RETURNING id`,
     [adj.order_id, params.razorpayPaymentId, amount.toFixed(2),
-      JSON.stringify({ purpose: 'order_adjustment', adjustmentId: adj.id, razorpay_order_id: params.razorpayOrderId, razorpay_payment_id: params.razorpayPaymentId })]
+      JSON.stringify({ purpose: 'order_adjustment', adjustmentId: adj.id, razorpay_order_id: params.razorpayOrderId, razorpay_payment_id: params.razorpayPaymentId }),
+      params.gw?.method ?? 'razorpay', params.gw?.gateway ?? 'razorpay']
   )
   await queryOne(`UPDATE order_adjustments SET razorpay_payment_id = $1, updated_at = NOW() WHERE id = $2 RETURNING id`, [params.razorpayPaymentId, adj.id])
-  if (inserted && params.tenant?.tenantId) {
+  if (inserted && params.gw) {
+    await params.gw.book?.({ paymentId: params.razorpayPaymentId, grossInr: amount, orderRef: `${adj.order_number}#adj-${String(adj.id).slice(0, 8)}`, orderId: adj.order_id })
+      .catch(e => console.error('[order-adjustment] ledger record failed', e))
+  } else if (inserted && params.tenant?.tenantId) {
     const { recordCapturedPayment } = await import('@/lib/payments/route-settlement')
     const { resolveRazorpayCreds } = await import('@/lib/integrations/resolve')
     const { isOwn } = await resolveRazorpayCreds(params.tenant.tenantId).catch(() => ({ isOwn: false }))

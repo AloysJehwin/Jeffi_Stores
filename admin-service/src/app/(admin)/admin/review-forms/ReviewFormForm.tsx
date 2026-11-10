@@ -613,52 +613,49 @@ export default function ReviewFormForm({
       </LockedFieldset>
 
       {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
-      <div className="lg:col-span-2 sticky bottom-0 z-10">
-        <FormFooter
-          sticky={false}
-          lock={lock}
-          autosave={isDraft && autoSaveStatus !== 'idle' ? <AutosaveStatusPill status={autoSaveStatus} /> : null}
-          draftBadge={isDraft || isCreateDraft ? <Badge tone="amber">Draft pending</Badge> : null}
-          discard={isDraft && discardAction ? handleDiscard : undefined}
-          cancel={edit.sessionId ? handleCancel : undefined}
-          cancelHref={
-            edit.sessionId
-              ? undefined
-              : ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
-          }
-        >
-          <RequireWrite scope="review_forms:write">
-            {isDraft || isCreateDraft ? (
-              <>
-                <button
-                  type="submit"
-                  value="draft"
-                  disabled={submitting}
-                  className="control-md border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50"
-                >
-                  {submitting ? 'Saving…' : 'Save as Draft'}
-                </button>
-                <button
-                  type="submit"
-                  value="publish"
-                  disabled={submitting}
-                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
-                >
-                  {submitting ? 'Publishing…' : 'Update & Publish'}
-                </button>
-              </>
-            ) : (
+      <FormFooter
+        lock={lock}
+        autosave={isDraft && autoSaveStatus !== 'idle' ? <AutosaveStatusPill status={autoSaveStatus} /> : null}
+        draftBadge={isDraft || isCreateDraft ? <Badge tone="amber">Draft pending</Badge> : null}
+        discard={isDraft && discardAction ? handleDiscard : undefined}
+        cancel={edit.sessionId ? handleCancel : undefined}
+        cancelHref={
+          edit.sessionId
+            ? undefined
+            : ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
+        }
+      >
+        <RequireWrite scope="review_forms:write">
+          {isDraft || isCreateDraft ? (
+            <>
               <button
                 type="submit"
+                value="draft"
+                disabled={submitting}
+                className="control-md border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : 'Save as Draft'}
+              </button>
+              <button
+                type="submit"
+                value="publish"
                 disabled={submitting}
                 className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
               >
-                {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
+                {submitting ? 'Publishing…' : 'Update & Publish'}
               </button>
-            )}
-          </RequireWrite>
-        </FormFooter>
-      </div>
+            </>
+          ) : (
+            <button
+              type="submit"
+              disabled={submitting}
+              className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+            >
+              {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
+            </button>
+          )}
+        </RequireWrite>
+      </FormFooter>
     </form>
     {conflicts && (
       <MergeDialog

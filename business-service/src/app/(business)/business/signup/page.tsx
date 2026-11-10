@@ -12,10 +12,11 @@ import AuthSplitShell, { AUTH_POINTS, AUTH_THEMES } from '@/components/auth/Auth
 import { useLeaveTo } from '@/components/auth/useLeaveTo'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 import { isValidDob } from '@/lib/shared/format'
+import { BusinessAuthSkeleton } from '@/components/visitor/skeletons/auth'
 
 export default function BusinessSignUpWrapper() {
   return (
-    <Suspense>
+    <Suspense fallback={<BusinessAuthSkeleton kind="signup" />}>
       <BusinessSignUpPage />
     </Suspense>
   )

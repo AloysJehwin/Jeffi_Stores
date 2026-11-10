@@ -1,5 +1,9 @@
-import DashboardSkeleton from '../_components/Skeleton'
+import { CardLoading, ConsoleLoading } from '../_components/Skeleton'
 
 export default function Loading() {
-  return <DashboardSkeleton variant="form" />
+  return (
+    <ConsoleLoading eyebrow="Store">
+      <CardLoading />
+    </ConsoleLoading>
+  )
 }

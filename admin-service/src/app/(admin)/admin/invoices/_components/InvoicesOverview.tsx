@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
-import { AttentionList, OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { DonutSplit, RankedBars, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { MAX_SPAN_DAYS, delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import type { InvoiceOverview } from '@/lib/overviews/invoices'
+import InvoicesOverviewSkeleton from './InvoicesOverviewSkeleton'
 
 const SERIES: SeriesDef[] = [
   { key: 'value', label: 'Invoiced', color: 'rgb(16 185 129)', kind: 'area', axis: 'money' },
@@ -53,7 +54,7 @@ export default function InvoicesOverview() {
         </p>
       )}
       {error && <p className="text-sm text-red-500">{error}</p>}
-      {!data ? loading && <OverviewSkeleton /> : <Body d={data} />}
+      {!data ? loading && <InvoicesOverviewSkeleton /> : <Body d={data} />}
     </div>
   )
 }

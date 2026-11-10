@@ -11,7 +11,6 @@ import {
   InfiniteFooter,
   ListFilters,
   TextArea,
-  TableSkeleton,
   badgeCls,
   fetchJson,
   useFilterQuery,
@@ -23,6 +22,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { fmtQty } from '@/lib/shared/number-display'
 import { REPLACEMENT_FIELDS, REQUEST_SEARCH } from '@/lib/filters/fields/returns'
+import RequestCardsLoading from '../returns/_components/RequestCardsLoading'
 
 interface ReplacementRow {
   id: string
@@ -443,7 +443,7 @@ export default function AdminReplacementsClient() {
       <ListFilters entity="replacements" fields={REPLACEMENT_FIELDS} search={REQUEST_SEARCH} noun="Replacements" tab="list" exportable />
 
       {list.loading ? (
-        <TableSkeleton rows={3} cols={4} />
+        <RequestCardsLoading />
       ) : list.error && !replacements.length ? (
         <ErrorState body={list.error} />
       ) : replacements.length === 0 ? (

@@ -1321,7 +1321,7 @@ export default function TemplateEditor({
             )
           })()}
 
-        {embedded ? (
+        {embedded && (
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -1335,20 +1335,6 @@ export default function TemplateEditor({
               Saved to the Templates library — the same template everywhere it&apos;s used.
             </span>
           </div>
-        ) : (
-          <FormFooter sticky={false} onCancel={onCancel}>
-            {value.channel === 'email' && (
-              <FormButton type="button" variant="secondary" onClick={runPreview} disabled={previewing}>
-                Preview
-              </FormButton>
-            )}
-            <FormButton type="button" variant="secondary" onClick={() => onSave(false)} disabled={saving}>
-              Save as Draft
-            </FormButton>
-            <FormButton type="button" onClick={() => onSave(true)} disabled={saving}>
-              Publish
-            </FormButton>
-          </FormFooter>
         )}
       </div>
 
@@ -1428,6 +1414,25 @@ export default function TemplateEditor({
               <ApiCurlHint value={value} note={apiNote} />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Own row below editor and preview, not beside the preview. */}
+      {!embedded && (
+        <div className="hidden md:block lg:col-span-2">
+          <FormFooter sticky={false} onCancel={onCancel}>
+            {value.channel === 'email' && (
+              <FormButton type="button" variant="secondary" onClick={runPreview} disabled={previewing}>
+                Preview
+              </FormButton>
+            )}
+            <FormButton type="button" variant="secondary" onClick={() => onSave(false)} disabled={saving}>
+              Save as Draft
+            </FormButton>
+            <FormButton type="button" onClick={() => onSave(true)} disabled={saving}>
+              Publish
+            </FormButton>
+          </FormFooter>
         </div>
       )}
     </div>

@@ -5,7 +5,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
-import { invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
+import { getSiteControls, invalidateSiteControlsCache, MESSAGING_LOCK_HINT } from '@/lib/catalog/site-controls'
 import { isGoogleTagSettingKey, validateGoogleTagSetting } from '@/lib/analytics/google-tag'
 import { OPS_EMAIL_KEY, parseOpsEmailInput } from '@/lib/shared/ops-email-config'
 
@@ -45,6 +45,7 @@ const EDITABLE_KEYS = [
   'invoice_prefix',
   // Feature flags
   'feature_razorpay_enabled',
+  'feature_upi_enabled',
   'feature_cod_enabled',
   'feature_gst_enabled',
   'feature_inventory_validation_enabled',
@@ -147,6 +148,17 @@ function enablesLockedProgram(updates: Array<{ key: string; value: unknown }>, h
   return updates.some(u => CUSTOMER_PROGRAM_KEYS.has(u.key) && String(u.value) === 'true')
 }
 
+// SMS / WhatsApp can't be switched on while the add-on or the assigned number is missing (tenant stores).
+async function lockedChannelHint(updates: Array<{ key: string; value: unknown }>): Promise<string | null> {
+  const want = (k: string) => updates.some(u => u.key === k && String(u.value) === 'true')
+  const sms = want('feature_sms_enabled')
+  const wa = want('feature_whatsapp_enabled')
+  if (!sms && !wa) return null
+  const { locks } = await getSiteControls()
+  const lock = (sms && locks?.sms) || (wa && locks?.whatsapp)
+  return lock ? MESSAGING_LOCK_HINT[lock] : null
+}
+
 // The first time loyalty is switched on, past delivered orders are counted without emailing anyone,
 // then the tier-upgrade email is switched on so members hear about the upgrades that follow. The
 // silent pass stamps no upgrades, so this can't email anyone about tiers they already had.
@@ -206,6 +218,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
       if (await referralNeedsLoyalty(updates))
         return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+      const batchLock = await lockedChannelHint(updates)
+      if (batchLock) return NextResponse.json({ error: batchLock }, { status: 409 })
       const tagError = normaliseTagSettings(updates) ?? normaliseJsonSettings(updates, admin.adminId)
       if (tagError) return NextResponse.json({ error: tagError }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
@@ -226,6 +240,8 @@ export async function PATCH(request: NextRequest) {
     if (await referralNeedsLoyalty([{ key, value }])) {
       return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
     }
+    const lockHint = await lockedChannelHint([{ key, value }])
+    if (lockHint) return NextResponse.json({ error: lockHint }, { status: 409 })
     if (isGoogleTagSettingKey(key)) {
       const r = validateGoogleTagSetting(key, value)
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })

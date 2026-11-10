@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { fieldInputCls } from '@/components/admin/kit'
+import { Sk } from '@/components/admin/kit/skeleton'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 
@@ -187,10 +188,14 @@ export default function OfferProductPicker({
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">Products in this offer</h2>
-        <span className="text-xs text-foreground-muted">
-          {loading ? 'Loading…' : `${members.length} assigned`}
-          {saving || bulkBusy ? ' · saving…' : ''}
-        </span>
+        {loading && !members.length ? (
+          <Sk className="h-3 w-20" />
+        ) : (
+          <span className="text-xs text-foreground-muted">
+            {members.length} assigned
+            {saving || bulkBusy ? ' · saving…' : ''}
+          </span>
+        )}
       </div>
 
       <RequireWrite scope="coupons:write">
@@ -269,6 +274,9 @@ export default function OfferProductPicker({
           />
         )}
         <div className="flex flex-wrap gap-2 max-h-[32rem] overflow-y-auto">
+          {loading &&
+            !members.length &&
+            ['w-28', 'w-36', 'w-24', 'w-32', 'w-40', 'w-28', 'w-20', 'w-36'].map((w, i) => <Sk key={i} className={`h-6 rounded-full ${w}`} />)}
           {!loading && members.length === 0 && (
             <p className="text-xs text-foreground-muted">No products assigned yet.</p>
           )}

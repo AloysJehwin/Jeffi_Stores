@@ -13,6 +13,7 @@ import { statusSteps, REVIEW_STEP, FINAL_STEP } from './steps'
 import { Badge, primaryBtn, secondaryBtn } from './ui'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,6 +100,7 @@ export default async function OnboardPage({
             planName={t.plan ?? 'Basic'}
             plan={{ slug: t.plan ?? 'basic', monthlyPrice: t.monthly_price_inr, interval: t.billing_interval }}
             razorpayKeyId={process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? ''}
+            upiAutopay={await getFeatureFlags().then(f => (f as { upiEnabled?: boolean }).upiEnabled === true, () => false)}
           />
         </StatusLayout>
       )
@@ -301,7 +303,7 @@ async function UpgradeWizard({
     ownerName: saved.ownerName || ownerName || '',
     ...(bank && bankOk
       ? {
-          bank: { accountNumber: bank.account_number ?? '', ifsc: bank.ifsc ?? '', holderName: bank.holder_name ?? '' },
+          bank: { accountNumber: bank.account_number ?? '', ifsc: bank.ifsc ?? '', holderName: bank.holder_name ?? '', upiId: bank.upi_id ?? '' },
           bankVerified: true,
         }
       : {}),

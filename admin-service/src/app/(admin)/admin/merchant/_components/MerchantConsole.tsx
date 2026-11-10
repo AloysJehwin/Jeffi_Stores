@@ -12,6 +12,7 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import type { MerchantTab } from '@/lib/merchant/console-data'
 import GoogleMerchantPanel from './GoogleMerchantPanel'
+import { MerchantTabLoading } from './skeletons'
 import { BestSellersView, CompetitivenessView, InsightsView, IssuesView, OverviewView, PerformanceView } from './ReportTabs'
 import { AccountView, PromotionsView, ShippingView } from './SettingsTabs'
 
@@ -109,7 +110,7 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
       {error ? (
         <ErrorState body={error} />
       ) : DATA_TABS.has(tab) && !data ? (
-        <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
+        <MerchantTabLoading tab={tab} />
       ) : (
         <Body tab={tab} data={data} onChanged={reload} />
       )}

@@ -11,6 +11,7 @@ export async function remoteSend(req: {
   body?: string
   subject?: string
   from?: string
+  layout?: 'store' | 'none'
   provider_ref?: string
   variables?: Record<string, string>
   reference?: string

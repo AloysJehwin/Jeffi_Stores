@@ -5,7 +5,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { normalizeParams } from '@jeffi/list-filters/client'
 import { normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
-import { Kpi, ListFilters, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
+import { LoadingTable, Sk } from '@/components/admin/kit/skeleton'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -133,7 +134,7 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
           />
 
           {/* Table re-shimmers on filter/pagination change while the shell stays mounted */}
-          <Suspense key={listKey(resolvedSearchParams)} fallback={<TableSkeleton rows={8} cols={6} />}>
+          <Suspense key={listKey(resolvedSearchParams)} fallback={<LoadingTable columns={['Company', 'Contact', 'GST', 'Industry', 'Status', 'Joined', '']} />}>
             <BusinessCustomersListContent q={q} page={resolvedSearchParams.page} sp={resolvedSearchParams} host={host} />
           </Suspense>
         </>
@@ -144,9 +145,12 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
 
 function KpiRowSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 animate-pulse sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {CARDS.map(s => (
-        <div key={s} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+        <div key={s} className="flex h-[84px] flex-col gap-1 rounded-xl border border-border-default bg-surface-elevated p-3 sm:p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">{s}</p>
+          <Sk className="mt-1 h-6 w-16" />
+        </div>
       ))}
     </div>
   )

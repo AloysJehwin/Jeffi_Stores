@@ -13,7 +13,7 @@ import { formatDate } from '@/lib/shared/format'
 import CopySku from '@/components/ui/CopySku'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/kit/core'
-import { TableSkeleton } from '@/components/admin/kit/states'
+import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import {
@@ -848,7 +848,7 @@ function StockTab({ view }: { view: StockView }) {
           )}
 
           {loading ? (
-            <TableSkeleton rows={6} cols={6} />
+            <LoadingTable columns={LEDGER_SORT_COLS.map(c => c.label)} />
           ) : (
             <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
               <div className="overflow-x-auto">
@@ -1413,7 +1413,10 @@ function StockTab({ view }: { view: StockView }) {
           />
 
           {loading ? (
-            <TableSkeleton rows={6} cols={6} />
+            <>
+              <LoadingKpis labels={['Stock Value (ex-GST)', 'Stock Value (incl. GST)', 'Total SKUs', 'In Stock']} />
+              <LoadingTable columns={VAL_SORT_COLS.map(c => c.label)} />
+            </>
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

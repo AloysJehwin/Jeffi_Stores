@@ -1,12 +1,12 @@
 import { Suspense } from 'react'
 import MessagingTemplatesClient from './MessagingTemplatesClient'
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import Loading from './loading'
 
 export const dynamic = 'force-dynamic'
 
 export default function Page() {
   return (
-    <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
+    <Suspense fallback={<Loading />}>
       <MessagingTemplatesClient />
     </Suspense>
   )

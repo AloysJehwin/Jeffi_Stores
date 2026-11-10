@@ -70,6 +70,7 @@ export interface OrderMailTemplate {
   subject: string
   preheader: string
   body: string
+  layout: 'store' | 'none'
   scenario: Pick<PlacementScenario, 'id' | 'label' | 'reply' | 'pickItem'> | null
   /** The order is in a state the scenario suits (always true without a scenario). */
   fits: boolean
@@ -89,6 +90,7 @@ export async function orderMailTemplates(orderId: string) {
         subject: t.subject,
         preheader: t.preheader,
         body: t.body,
+        layout: t.layout,
         scenario: s ? { id: s.id, label: s.label, reply: s.reply, pickItem: s.pickItem } : null,
         fits: scenarioFits(s, o),
         rank: rank(s),

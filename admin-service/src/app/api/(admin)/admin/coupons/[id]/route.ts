@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
 import {
   actorOf,
-  closeIfLocked,
-  discardGuard,
   draftLockResponse,
   epochFrom,
   withDraftPublish,
   withDraftWrite,
   type DraftDb,
 } from '@/lib/admin/draft-locks'
+import { deleteCouponRow, discardReply } from '@/lib/admin/discard-rows'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -78,19 +77,5 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'coupons:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const inUse = await queryOne('SELECT id FROM review_forms WHERE coupon_id = $1 LIMIT 1', [id])
-  if (inUse)
-    return NextResponse.json(
-      { error: 'Coupon is used by a review form — remove it from the form first' },
-      { status: 409 }
-    )
-
-  const actor = actorOf(admin)
-  const denied = await discardGuard(actor, 'coupon', id)
-  if (denied) return denied
-  // Unlink from campaigns before deleting to avoid FK violation
-  await query('UPDATE campaigns SET coupon_id = NULL WHERE coupon_id = $1', [id])
-  await queryOne('DELETE FROM coupons WHERE id = $1', [id])
-  await closeIfLocked(actor, 'coupon', id)
-  return NextResponse.json({ success: true })
+  return discardReply(await deleteCouponRow(actorOf(admin), id))
 }

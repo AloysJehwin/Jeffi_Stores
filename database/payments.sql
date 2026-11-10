@@ -213,6 +213,74 @@ CREATE TABLE public.pending_payment_intents (
 
 
 --
+-- Name: upi_payment_intents; Type: TABLE; Schema: public; Owner: -
+--
+-- One UPI payment attempt (PhonePe PG, or UPG: pay the merchant's UPI ID, seen in its bank alerts) and
+-- what it pays for. merchant_order_id = 'JS' + id without dashes (docs/PAYMENTS_UPI.md).
+-- UPG: one intent per receiving_vpa is active/processing at a time; the rest queue FIFO.
+
+CREATE TABLE public.upi_payment_intents (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id uuid,
+    provider character varying(16) NOT NULL,
+    purpose character varying(32) NOT NULL,
+    amount_paise bigint NOT NULL,
+    currency character(3) DEFAULT 'INR'::bpchar NOT NULL,
+    merchant_order_id character varying(63) NOT NULL,
+    provider_order_id text,
+    provider_txn_id text,
+    utr text,
+    payer_vpa text,
+    status character varying(24) DEFAULT 'pending'::character varying NOT NULL,
+    redirect_url text,
+    return_to text,
+    refs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result jsonb,
+    error_code text,
+    expires_at timestamp with time zone,
+    confirmed_at timestamp with time zone,
+    decided_by uuid,
+    decided_at timestamp with time zone,
+    receiving_vpa text,
+    active_at timestamp with time zone,
+    pay_expires_at timestamp with time zone,
+    processing_at timestamp with time zone,
+    verify_expires_at timestamp with time zone,
+    observation_id uuid,
+    cancelled_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: upi_bank_observations; Type: TABLE; Schema: public; Owner: -
+--
+-- A credit seen in the merchant's bank-alert email (lib/payments/upi/alerts.ts). Only trusted rows
+-- (bank domain + DKIM, or Gmail's ARC seal attesting it) complete an intent; the rest are shown to staff.
+-- kind 'gmail_forwarding' keeps Gmail's forwarding-confirmation code and link for the owner.
+
+CREATE TABLE public.upi_bank_observations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    kind character varying(24) DEFAULT 'credit'::character varying NOT NULL,
+    receiving_vpa text,
+    amount_paise bigint,
+    utr text,
+    sender_vpa text,
+    bank_domain text,
+    ses_message_id text,
+    message_id text,
+    fingerprint text NOT NULL,
+    trusted boolean DEFAULT false NOT NULL,
+    subject text,
+    details jsonb,
+    observed_at timestamp with time zone DEFAULT now() NOT NULL,
+    matched_intent_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: subscription_plans_cache; Type: TABLE; Schema: public; Owner: -
 --
 -- Razorpay Plan ids we have already created, cached so repeated subscribes reuse one plan.

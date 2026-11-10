@@ -6,7 +6,7 @@ import { hasScope } from '../../lib/scopes'
 import { queryOne, queryMany, withTransaction } from '@jeffi/tenancy'
 import { sendPurchaseOrderEmail } from '../../lib/mail'
 import { parseBody } from '../../lib/validate'
-import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
+import { announceLock, assertHolder, canDiscard, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 
 const PatchSchema = z
   .object({
@@ -127,6 +127,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const was = prev.rows[0]?.status
       const next = status !== undefined ? status : was
       if (was !== 'draft' && next !== 'draft') return null
+      // Cancelling a draft PO is its discard: the holder, an unclaimed draft, or an owner role (audited).
+      if (was === 'draft' && next === 'cancelled') {
+        const denied = await canDiscard(admin, 'purchase_order', id, client)
+        if (denied) throw denied
+        await closeLock(client, admin, 'purchase_order', id, 'discarded')
+        return null
+      }
       const res = await assertHolder(client, admin, 'purchase_order', id, { epoch: epochFrom(request) })
       if (was === 'draft' && next !== 'draft')
         await closeLock(client, admin, 'purchase_order', id, next === 'sent' ? 'sent' : next === 'cancelled' ? 'discarded' : 'published')

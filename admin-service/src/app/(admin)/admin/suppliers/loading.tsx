@@ -1,9 +1,13 @@
-import { ListSkeleton } from '@/components/admin/kit/states'
+import { LoadingTabs, LoadingToolbar, PageLoading, Sk } from '@/components/admin/kit/skeleton'
+import SuppliersOverviewSkeleton from './_components/SuppliersOverviewSkeleton'
 
 export default function Loading() {
   return (
-    <div className="p-4 sm:p-6">
-      <ListSkeleton kpis={3} />
-    </div>
+    <PageLoading title="Suppliers" description="Purchasing, deliveries and what you owe suppliers">
+      <LoadingTabs tabs={['Overview', 'Suppliers', 'Drafts']} />
+      <Sk className="h-control w-full max-w-2xl rounded-lg" />
+      <LoadingToolbar filters={2} />
+      <SuppliersOverviewSkeleton />
+    </PageLoading>
   )
 }

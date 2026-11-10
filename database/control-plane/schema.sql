@@ -1027,6 +1027,14 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pending_plan_id uuid;
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pending_billing_interval character varying(16);
 
 --
+-- UPI collection (lib/payments/upi/creds.ts): the platform admin's switch. auto = the store's own provider
+-- (its PhonePe creds when saved, else UPG on its UPI ID); off = no UPI at checkout.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS upi_mode character varying(12) NOT NULL DEFAULT 'auto';
+ALTER TABLE ONLY public.tenants ADD CONSTRAINT tenants_upi_mode_check
+    CHECK (upi_mode IN ('auto','off'));
+
+--
 -- linked_account_settlements: a Route store's payout from its linked account to its bank, read from
 -- Razorpay (settlement.processed on the linked account, or the transfers it settled).
 --
@@ -1240,3 +1248,44 @@ ALTER TABLE ONLY public.platform_setup_progress ADD CONSTRAINT platform_setup_pr
 ALTER TABLE ONLY public.platform_setup_progress ADD CONSTRAINT platform_setup_progress_state_check
     CHECK (state IN ('applied','approved','skipped'));
 CREATE INDEX IF NOT EXISTS idx_platform_setup_progress_state ON public.platform_setup_progress USING btree (state);
+
+--
+-- SMS & WhatsApp add-on (lib/billing/messaging-addon.ts). A tenant store sends SMS / WhatsApp only while
+-- messaging_addon covers the channel (sms | whatsapp | both; Rs 500 / 500 / 1,000 a month from the wallet)
+-- AND Jeffi has assigned it a sender (tenant_messaging_senders). messaging_addon_renew: the daily
+-- messaging_addon_renew cron charges the next month before the current one ends. The flagship is exempt.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon character varying(8) NOT NULL DEFAULT 'none';
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon_until timestamp with time zone;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon_renew boolean NOT NULL DEFAULT false;
+ALTER TABLE ONLY public.tenants ADD CONSTRAINT tenants_messaging_addon_check
+    CHECK (messaging_addon IN ('none','sms','whatsapp','both'));
+
+--
+-- tenant_messaging_senders: the sender Jeffi assigned a tenant for a channel — a DLT-registered SMS header
+-- or a WhatsApp number — plus the provider credentials that send through it (lib/messaging/tenant-senders.ts).
+-- config_enc is AES-256-GCM of the JSON credential blob (lib/crypto/token-cipher); meta holds masked,
+-- non-secret hints for the admin UI. One row per (tenant, channel); the platform tenant never has one.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_messaging_senders (
+    id           uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id    uuid NOT NULL,
+    channel      character varying(10) NOT NULL,            -- sms | whatsapp
+    provider     character varying(16) NOT NULL,            -- twilio | aws
+    sender       character varying(120) NOT NULL,           -- DLT header or WhatsApp number
+    config_enc   text NOT NULL,                             -- encrypted JSON credential blob
+    meta         jsonb NOT NULL DEFAULT '{}'::jsonb,        -- masked display fields
+    status       character varying(16) NOT NULL DEFAULT 'active', -- active | disabled
+    created_by   character varying(255),
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at   timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_tenant_channel_key UNIQUE (tenant_id, channel);
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_channel_check
+    CHECK (channel IN ('sms','whatsapp'));
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_provider_check
+    CHECK (provider IN ('twilio','aws'));
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_status_check
+    CHECK (status IN ('active','disabled'));
+CREATE INDEX IF NOT EXISTS idx_tenant_messaging_senders_tenant ON public.tenant_messaging_senders USING btree (tenant_id);

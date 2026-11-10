@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { Badge, Banner, type Tone } from '@/components/admin/kit/core'
+import { Pager, usePagedRows } from '@/components/admin/kit/pager'
+import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { ACTIVE, Progress, downloadText, problemsCsv, rowRef, useJob, type ImportJob, type RowResult } from './shared'
 
 const GROUPS: { outcome: RowResult['outcome']; label: string; tone: Tone }[] = [
@@ -14,14 +16,19 @@ const GROUPS: { outcome: RowResult['outcome']; label: string; tone: Tone }[] = [
 ]
 
 /** One import's live progress and its rows grouped by outcome, with a CSV of the problem rows. */
-export default function JobDetail({ id, compact }: { id: string; compact?: boolean }) {
+export default function JobDetail({ id }: { id: string }) {
   const { job, error, loading } = useJob(id)
-  if (loading) return <p className="text-sm text-foreground-muted py-2">Loading import details...</p>
+  if (loading)
+    return (
+      <div className="py-2">
+        <LoadingLines lines={3} />
+      </div>
+    )
   if (error || !job) return <p className="text-sm text-red-500 py-2">{error || 'Import not found.'}</p>
-  return <JobBody job={job} compact={compact} />
+  return <JobBody job={job} />
 }
 
-function JobBody({ job, compact }: { job: ImportJob; compact?: boolean }) {
+function JobBody({ job }: { job: ImportJob }) {
   const rows = useMemo(() => job.row_results ?? [], [job.row_results])
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -41,6 +48,7 @@ function JobBody({ job, compact }: { job: ImportJob; compact?: boolean }) {
         .filter(r => r.outcome === open)
         .filter(r => !q || `${r.sku ?? ''} ${r.message ?? ''}`.toLowerCase().includes(q.toLowerCase()))
     : []
+  const { shown: page, pager } = usePagedRows(shown, 10, `${open}|${q}`)
 
   return (
     <div className="space-y-3">
@@ -103,9 +111,9 @@ function JobBody({ job, compact }: { job: ImportJob; compact?: boolean }) {
                   className="w-full sm:w-72 rounded-lg border border-border-default bg-surface px-3 py-1.5 text-sm text-foreground"
                 />
               )}
-              <div className={`overflow-auto rounded-lg border border-border-default ${compact ? 'max-h-60' : 'max-h-80'}`}>
+              <div className="overflow-x-auto rounded-lg border border-border-default">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-surface-secondary text-left text-foreground-muted">
+                  <thead className="bg-surface-secondary text-left text-foreground-muted">
                     <tr>
                       <th className="px-2 py-1.5 font-medium whitespace-nowrap">Where</th>
                       <th className="px-2 py-1.5 font-medium">SKU</th>
@@ -113,7 +121,7 @@ function JobBody({ job, compact }: { job: ImportJob; compact?: boolean }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {shown.map((r, i) => (
+                    {page.map((r, i) => (
                       <tr key={i} className="border-t border-border-default/60 align-top">
                         <td className="px-2 py-1.5 whitespace-nowrap text-foreground-muted">{rowRef(r)}</td>
                         <td className="px-2 py-1.5 font-mono text-foreground">{r.sku ?? '-'}</td>
@@ -130,6 +138,7 @@ function JobBody({ job, compact }: { job: ImportJob; compact?: boolean }) {
                   </tbody>
                 </table>
               </div>
+              <Pager control={pager} noun="rows" className="pt-1" />
             </div>
           )}
         </>

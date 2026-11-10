@@ -1,5 +1,6 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { LoadingLines, LoadingToolbar, PageLoading, Sk } from '@/components/admin/kit/skeleton'
 
+// Fallback for routes without their own loading.tsx: a generic list-shaped shimmer.
 export default function AdminLoading() {
   return (
     <div className="fixed inset-0 flex flex-row bg-surface-secondary z-50">
@@ -21,7 +22,17 @@ export default function AdminLoading() {
 
         {/* Content area */}
         <main className="flex-1 bg-surface-secondary overflow-y-auto">
-          <AdminSkeleton variant="list" />
+          <PageLoading actions={1}>
+            <LoadingToolbar filters={2} />
+            <div className="overflow-hidden rounded-xl border border-border-default bg-surface-elevated">
+              <div className="border-b border-border-default bg-surface-secondary/50 px-3 py-3">
+                <Sk className="h-3 w-1/3" />
+              </div>
+              <div className="p-4">
+                <LoadingLines lines={8} />
+              </div>
+            </div>
+          </PageLoading>
         </main>
       </div>
     </div>

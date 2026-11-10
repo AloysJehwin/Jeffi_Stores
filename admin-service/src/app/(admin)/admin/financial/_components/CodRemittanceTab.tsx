@@ -4,7 +4,8 @@ import { useState, type Dispatch, type SetStateAction } from 'react'
 import Link from 'next/link'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col, type Tone } from '@/components/admin/channels/ui'
-import { OverviewSkeleton, useOverviewData } from '@/components/admin/overview/kit'
+import { useOverviewData } from '@/components/admin/overview/kit'
+import { CodRemittanceTabSkeleton } from './FinanceSkeletons'
 import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
 import { badgeCls, useActionToast } from '@/components/admin/kit'
 import { delta } from '@/lib/overview/period'
@@ -88,7 +89,7 @@ export function CodRemittanceTab() {
       <FinancePeriodBar onRefresh={reload} busy={loading} />
       <StatusPills value={status} onChange={v => { setStatus(v); setSelected(new Set()) }} />
       {error && <Banner ok={false}>{error}</Banner>}
-      {loading && !data ? <OverviewSkeleton /> : data && (
+      {loading && !data ? <CodRemittanceTabSkeleton /> : data && (
         <Body
           d={data}
           canWrite={canWrite}

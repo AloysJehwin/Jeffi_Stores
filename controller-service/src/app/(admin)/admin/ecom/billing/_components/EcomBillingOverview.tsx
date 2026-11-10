@@ -6,6 +6,7 @@ import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, type Col } from
 import { TrendChart, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import type { EcomBillingOverview as Data } from '@controller/lib/overviews/ecom-billing'
 import { OverviewShell, Grid2, dateIn, useEcomOverview } from '../../_components/overview-shell'
+import { BillingOverviewLoading } from '../../_components/skeletons'
 
 const SERIES: SeriesDef[] = [
   { key: 'gmv', label: 'Store GMV', color: 'rgb(16 185 129)', kind: 'area', axis: 'money', on: true },
@@ -50,7 +51,7 @@ const PLAN_COLS: Col<Plan>[] = [
 export default function EcomBillingOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/billing/overview')
   return (
-    <OverviewShell {...o}>
+    <OverviewShell {...o} skeleton={<BillingOverviewLoading />}>
       {d => {
         const w = d.current.wallet
         return (
