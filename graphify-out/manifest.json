@@ -18545,8 +18545,8 @@
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/orders/confirmation/page.tsx": {
-    "mtime": 1794253187.5099823,
-    "ast_hash": "41bca08dcecdedccd57379c2cce162b7",
+    "mtime": 1794304622.968402,
+    "ast_hash": "9f01572f2c328ae66cd65f022e2c3d86",
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/orders/loading.tsx": {
@@ -27365,8 +27365,8 @@
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/orders/confirmation/ConfirmationSkeleton.tsx": {
-    "mtime": 1794253187.4366343,
-    "ast_hash": "eed5254c256b284ba385821334110e5d",
+    "mtime": 1794304622.971099,
+    "ast_hash": "0c192686d675e62fbbd187f7ae0bc43d",
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/referrals/loading.tsx": {
@@ -27910,8 +27910,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/admin/UpiCollectionCard.tsx": {
-    "mtime": 1794301289.2179124,
-    "ast_hash": "2af678c2fe2b2cc74e2361cbf7aab020",
+    "mtime": 1794304395.8604453,
+    "ast_hash": "59e232f06cb6fb884bba4c35df6259bd",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/subscriptions/SubscribeReturn.tsx": {
