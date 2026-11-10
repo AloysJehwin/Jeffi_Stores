@@ -70,7 +70,7 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
               {sub.cancel_at_cycle_end && status !== 'cancelled' ? <Badge tone="red">Cancels at cycle end</Badge> : null}
             </>
           }
-          actions={<SubscriptionActions id={id} status={status} cancelAtCycleEnd={!!sub.cancel_at_cycle_end} />}
+          actions={<SubscriptionActions id={id} status={status} cancelAtCycleEnd={!!sub.cancel_at_cycle_end} autopay={sub.billing_provider === 'phonepe'} />}
         />
       }
       main={
