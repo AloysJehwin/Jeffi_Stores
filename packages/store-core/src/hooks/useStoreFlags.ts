@@ -11,9 +11,11 @@ export interface StoreFlags {
   birthdayEnabled: boolean
   smsEnabled: boolean
   whatsappEnabled: boolean
+  // App push for marketing: needs a store app build ID and both push switches.
+  appPushEnabled: boolean
 }
 
-const OFF: StoreFlags = { loyaltyEnabled: false, referralEnabled: false, birthdayEnabled: false, smsEnabled: false, whatsappEnabled: false }
+const OFF: StoreFlags = { loyaltyEnabled: false, referralEnabled: false, birthdayEnabled: false, smsEnabled: false, whatsappEnabled: false, appPushEnabled: false }
 
 let cached: StoreFlags | null = null
 let pending: Promise<StoreFlags> | null = null
@@ -30,6 +32,7 @@ function loadStoreFlags(): Promise<StoreFlags> {
           birthdayEnabled: data?.birthdayEnabled === true,
           smsEnabled: data?.smsEnabled === true,
           whatsappEnabled: data?.whatsappEnabled === true,
+          appPushEnabled: data?.appPushEnabled === true,
         }
         return cached
       })
@@ -57,9 +60,9 @@ export function useStoreFlag(key: keyof StoreFlags): boolean {
   return enabled
 }
 
-/** Site Controls' SMS and WhatsApp switches: hide every option for a channel that's off. */
-export function useMessagingChannels(): { sms: boolean; whatsapp: boolean } {
-  return { sms: useStoreFlag('smsEnabled'), whatsapp: useStoreFlag('whatsappEnabled') }
+/** Site Controls' SMS, WhatsApp and app push switches: hide every option for a channel that's off. */
+export function useMessagingChannels(): { sms: boolean; whatsapp: boolean; push: boolean } {
+  return { sms: useStoreFlag('smsEnabled'), whatsapp: useStoreFlag('whatsappEnabled'), push: useStoreFlag('appPushEnabled') }
 }
 
 /** "WhatsApp, SMS & email": the update channels a customer actually gets, for copy. */

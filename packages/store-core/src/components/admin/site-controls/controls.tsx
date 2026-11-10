@@ -60,6 +60,7 @@ export function TextControl({
   initial,
   placeholder,
   type = 'text',
+  refreshOnSave,
 }: {
   settingKey: string
   label: string
@@ -67,7 +68,10 @@ export function TextControl({
   initial: string
   placeholder?: string
   type?: string
+  /** Re-render the page after a save, for fields that lock or unlock others. */
+  refreshOnSave?: boolean
 }) {
+  const router = useRouter()
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState(initial)
@@ -81,6 +85,7 @@ export function TextControl({
     setSaving(false)
     setDirty(false)
     showToast(ok ? 'Saved' : 'Failed to save', ok ? 'success' : 'error')
+    if (ok && refreshOnSave) router.refresh()
   }
 
   return (

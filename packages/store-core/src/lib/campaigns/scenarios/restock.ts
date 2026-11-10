@@ -9,6 +9,7 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import {
   NOT_RECENTLY_EMAILED_SQL,
   SAVED_ITEMS_SQL,
@@ -21,6 +22,7 @@ interface Params extends Record<string, unknown> {
   maxWatchesPerSweep: number
   whatsappEnabled: boolean
   smsEnabled: boolean
+  pushEnabled?: boolean
 }
 
 interface Row {
@@ -37,7 +39,7 @@ export const restock: ScenarioModule<Params, Row> = {
   description: 'Wishlisted product back in stock',
   trigger:
     "Fires when a product on a customer's wishlist goes from Out of Stock back to in stock (by stock status, not inventory quantity). One send per product per restock event; the wishlist snapshot is refreshed once the email is sent so the next out-to-in transition notifies again.",
-  defaultParams: { maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false },
+  defaultParams: { maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false, pushEnabled: false },
   paramSchema: {
     maxWatchesPerSweep: {
       type: 'integer',
@@ -55,6 +57,11 @@ export const restock: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via SMS',
       description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
+    pushEnabled: {
+      type: 'boolean',
+      label: 'Also send as an app push',
+      description: 'Additionally notify the customer in the store app (quiet hours and the 2-a-day push limit apply)',
     },
   },
 
@@ -110,8 +117,10 @@ export const restock: ScenarioModule<Params, Row> = {
 
     await settleWishlistEvent(result, row.user_id, row.product_id)
 
-    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(() => {})
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled || params.pushEnabled) {
+      const msgVars = { product: row.product_name }
+      if ((params as any).whatsappEnabled || (params as any).smsEnabled) sendCampaignWhatsApp(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
+      if (params.pushEnabled) sendCampaignPush(campaign.kind, row.user_id, msgVars, cooldownMinutes(params)).catch(() => {})
     }
 
     return result
