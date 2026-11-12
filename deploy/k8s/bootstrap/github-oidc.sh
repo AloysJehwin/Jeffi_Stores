@@ -41,6 +41,8 @@ BUILD_POLICY=$(cat <<JSON
 JSON
 )
 DEPLOY_TRUST=$(trust "environment:production" "environment:production-release")
+# OwnSessions: SSM names a session <role session name>-<id>, and CI assumes this role as GitHubActions
+# (.github/actions/release-setup), so the role may close its own tunnels and no one else's.
 DEPLOY_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  $SECRET,
@@ -50,7 +52,7 @@ DEPLOY_POLICY=$(cat <<JSON
  {"Sid":"TunnelToCore","Effect":"Allow","Action":"ssm:StartSession",
   "Resource":["arn:aws:ec2:$AWS_REGION:$ACCOUNT:instance/$CORE_ID","arn:aws:ssm:$AWS_REGION::document/AWS-StartPortForwardingSession",
    "arn:aws:ssm:$AWS_REGION::document/AWS-StartPortForwardingSessionToRemoteHost"]},
- {"Sid":"OwnSessions","Effect":"Allow","Action":["ssm:TerminateSession","ssm:ResumeSession"],"Resource":"arn:aws:ssm:*:*:session/\${aws:userid}-*"},
+ {"Sid":"OwnSessions","Effect":"Allow","Action":["ssm:TerminateSession","ssm:ResumeSession"],"Resource":"arn:aws:ssm:$AWS_REGION:$ACCOUNT:session/GitHubActions-*"},
  {"Sid":"RazerRelease","Effect":"Allow","Action":"ssm:SendCommand",
   "Resource":["arn:aws:ec2:$AWS_REGION:$ACCOUNT:instance/$CORE_ID","arn:aws:ssm:$AWS_REGION::document/AWS-RunShellScript"]},
  {"Sid":"RazerReleaseOutput","Effect":"Allow","Action":"ssm:GetCommandInvocation","Resource":"*"},
