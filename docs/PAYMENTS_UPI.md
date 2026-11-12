@@ -88,8 +88,8 @@ The handler never trusts the body's state: it re-fetches the order status from P
 - `lib/payments/upi/`: `creds.ts` (provider, kill switches), `service.ts` (start), `upg.ts` + `upg-logic.ts`
   (sessions, queue, matching), `alerts.ts` + `alert-parse.ts` (bank alerts), `settle.ts` (completion, UTR
   fallback, sweep), `handlers.ts` (HTTP), `settings.ts` (Site Controls API), `webhook.ts` (PhonePe).
-- Schema: `upi_payment_intents`, `upi_bank_observations` (`database/payments.sql`), `tenants.upi_mode`
-  (`database/control-plane/schema.sql`).
+- Schema: `upi_payment_intents`, `upi_bank_observations` (`admin-service/database/tables/payments.sql`), `tenants.upi_mode`
+  (`controller-service/database/control-plane/`).
 - Flagship admin: `UpiModeToggle` on the Billing view page. Store admin: `UpiCollectionCard`.
 - Owner portal: onboarding bank step and the Payouts page set the UPI ID (`PATCH /api/ecom/bank/upi`).
 

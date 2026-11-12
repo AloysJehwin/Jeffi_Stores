@@ -12,7 +12,7 @@ import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct } from '@/compon
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
-import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { ListFilters, useFilterQuery, SplitRow } from '@/components/admin/kit'
 import { RFQ_FIELDS, RFQ_SEARCH } from '@/lib/filters/fields/business-rfqs'
 import RfqsOverviewSkeleton from './RfqsOverviewSkeleton'
 
@@ -93,8 +93,9 @@ export default function RfqsOverview() {
             ))}
           </KpiGrid>
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <SplitRow
+            scroll="narrow"
+            wide={
               <Section title="RFQs received and converted">
                 <TrendChart
                   points={data.series}
@@ -103,27 +104,29 @@ export default function RfqsOverview() {
                   ariaLabel="RFQs received and converted"
                 />
               </Section>
-            </div>
-            <Section title="All RFQs by status">
-              {data.by_status.length === 0 ? (
-                <p className="text-sm text-foreground-muted">No RFQs yet.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {data.by_status.map(s => (
-                    <li key={s.status}>
-                      <Link
-                        href={statusHref(s.status)}
-                        className="flex items-center justify-between text-sm hover:text-accent-500"
-                      >
-                        <span>{STATUS_LABEL[s.status] ?? s.status}</span>
-                        <span className="tabular-nums">{count(s.count)}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
-          </div>
+            }
+            narrow={
+              <Section title="All RFQs by status">
+                {data.by_status.length === 0 ? (
+                  <p className="text-sm text-foreground-muted">No RFQs yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {data.by_status.map(s => (
+                      <li key={s.status}>
+                        <Link
+                          href={statusHref(s.status)}
+                          className="flex items-center justify-between text-sm hover:text-accent-500"
+                        >
+                          <span>{STATUS_LABEL[s.status] ?? s.status}</span>
+                          <span className="tabular-nums">{count(s.count)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            }
+          />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Section title="Top B2B customers">
               <Table

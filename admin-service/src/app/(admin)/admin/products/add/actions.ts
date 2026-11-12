@@ -392,6 +392,8 @@ export async function createProduct(formData: FormData): Promise<ProductActionRe
     await cleanupS3()
     return { error: productErrorMessage(err, 'Failed to create product. Please try again.') }
   }
+  // The create form writes product_images; product_media mirrors it (same ids).
+  await (await import('@/lib/catalog/product-media')).syncLegacyImagesToMediaSafe(productId)
   await lockNewDraft(await actionActor(), 'product', productId)
 
   const { syncProductToSheet } = await import('@/lib/shared/google-sheets')

@@ -6,8 +6,9 @@ import { queryOne, queryMany } from '@/lib/shared/db'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import HeroSlideManager from '@/components/admin/HeroSlideManager'
+import HeroSlidesBySurface from '@/components/admin/homepage/HeroSlidesBySurface'
 import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
+import HomepagePreviewButton from '@/components/admin/homepage/HomepagePreview'
 import HomepageFormFooter from '@/components/admin/homepage/HomepageFormFooter'
 import { HomepageLockBanner, HomepageLockProvider } from '@/components/admin/homepage/HomepageLock'
 import EntityDrafts from '@/components/admin/drafts/EntityDrafts'
@@ -25,23 +26,23 @@ import {
   resolveAboutStats,
   rowAudience,
   rowPage,
-  rowSurface,
   type HomepageAudience,
   type HomepagePage,
   type HomepageSurface,
   type SectionType,
 } from '@/lib/catalog/homepage-sections'
 import { getHomepagePlan, planName } from '@/lib/catalog/homepage-plan'
+import { signHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
 import { getEditableHomepage, getHomepageDraftSummary, homepageDrafts, type DraftDiff } from '@/lib/catalog/homepage-draft'
 import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
-import { Badge, PageHeader, TabLinks } from '@/components/admin/kit'
+import { Badge, PageHeader, TabStrip } from '@/components/admin/kit'
 import { resnapshotHomepageSession, startHomepageDraft } from './actions'
 
 const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
   home: {
     tab: 'Home',
     description:
-      'Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
+      'Everything on the homepage, row by row: a row is one full-width section or two side by side. Drag to reorder or pair sections, pick which devices each one shows on, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
   },
   products: {
     tab: 'All products',
@@ -61,18 +62,15 @@ const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
 }
 
 const BUSINESS_DESCRIPTION =
-  'The homepage business accounts see at /business and on the business store in the app. Drag to reorder, toggle to hide, and expand a section to edit it. Until it has sections of its own it shows the store homepage. Changes are saved as a draft and go live only when you publish.'
+  'The homepage business accounts see at /business and on the business store in the app. Drag to reorder or pair sections, pick which devices each one shows on, and expand a section to edit it. Until it has sections of its own it shows the store homepage. Changes are saved as a draft and go live only when you publish.'
 
 const AUDIENCE_TAB: Record<HomepageAudience, string> = { store: 'Store', business: 'Business' }
-
+// The kit's tabCls is client-only; same classes, usable from this server page.
+const tabCls = (active: boolean) =>
+  `inline-flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 shrink-0 transition-colors ${
+    active ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'
+  }`
 const SURFACE_TAB: Record<HomepageSurface, string> = { web: 'Desktop web', web_mobile: 'Mobile web', app: 'App' }
-
-// Phone browsers and the app use the desktop layout until they have sections of their own.
-const SURFACE_NOTE: Record<HomepageSurface, string> = {
-  web: 'Desktop and tablet browsers.',
-  web_mobile: 'Phone browsers. Until this layout has sections of its own it shows the desktop layout.',
-  app: 'The mobile app. Until this layout has sections of its own it shows the desktop layout.',
-}
 
 const changed = (d: DraftDiff) => d.added + d.removed + d.edited + (d.reordered ? 1 : 0) > 0
 
@@ -150,13 +148,12 @@ async function loadSectionOptions(
 export default async function HomepagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ surface?: string; page?: string; audience?: string; draft?: string; view?: string; merge?: string }>
+  searchParams: Promise<{ page?: string; audience?: string; draft?: string; view?: string; merge?: string; surface?: string }>
 }) {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
   const params = await searchParams
-  const surface = rowSurface({ surface: params.surface })
 
   const admin = await queryOne<{ role: string; scopes: string[] }>(`SELECT role, scopes FROM admins WHERE id = $1`, [
     adminId,
@@ -185,18 +182,15 @@ export default async function HomepagePage({
   const audience: HomepageAudience = params.audience === 'business' && plan.business ? 'business' : 'store'
   const business = audience === 'business'
   const page = business ? 'home' : rowPage({ page: params.page })
+  // The device the selector highlights: each card's switch shows / hides the section there.
+  const surface: HomepageSurface = HOMEPAGE_SURFACES.includes(params.surface as HomepageSurface) ? (params.surface as HomepageSurface) : 'web'
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
   const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
-  const onPage = editable.sections.filter(s => rowAudience(s) === audience && rowPage(s) === page)
-  const sections = onPage.filter(s => rowSurface(s) === surface)
-  const desktopCount = onPage.filter(s => rowSurface(s) === 'web').length
-  const heroSlides = editable.heroSlides.filter(s => rowSurface(s) === surface && rowAudience(s) === audience)
-  // "Start from the store homepage" copies what the store shows here: this layout, or the desktop one it mirrors.
-  const storeSource: HomepageSurface = editable.sections.some(
-    s => rowAudience(s) === 'store' && rowPage(s) === 'home' && rowSurface(s) === surface
-  )
-    ? surface
-    : 'web'
+  // One layout per page: every surface's sections, each with its own show/hide toggles.
+  const sections = editable.sections.filter(s => rowAudience(s) === audience && rowPage(s) === page)
+  const heroSlides = editable.heroSlides.filter(s => rowAudience(s) === audience)
+  // The preview iframe opens the store on its own host with a signed token naming the draft.
+  const previewToken = draftId ? await signHomepagePreviewToken({ draftId, audience }) : null
   const upgrade: Partial<Record<SectionType, string>> = {}
   for (const [type, slug] of Object.entries(plan.upgrade)) {
     const name = planName(slug)
@@ -204,7 +198,7 @@ export default async function HomepagePage({
   }
   const businessNeeds = planName(plan.businessUpgrade)
   const base = ap('/admin/settings/homepage', host)
-  const hrefFor = (p: HomepagePage, s: HomepageSurface, a: HomepageAudience = audience) => {
+  const hrefFor = (p: HomepagePage, a: HomepageAudience = audience, s: HomepageSurface = surface) => {
     const q = new URLSearchParams()
     if (a === 'business') q.set('audience', a)
     else if (p !== 'home') q.set('page', p)
@@ -216,7 +210,6 @@ export default async function HomepagePage({
     <>
       {business && <input type="hidden" name="audience" value="business" />}
       {!business && page !== 'home' && <input type="hidden" name="page" value={page} />}
-      {surface !== 'web' && <input type="hidden" name="surface" value={surface} />}
     </>
   )
   // Pending-change counts per tab come from the server render; the footer keeps the live total.
@@ -226,12 +219,58 @@ export default async function HomepagePage({
       : 0
   const pendingOnPage = (p: HomepagePage) =>
     HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.byPage[p][s]), 0)
-  const pendingOnLayout = (s: HomepageSurface) =>
-    pendingOf(business ? draftSummary.business[s] : draftSummary.byPage[page][s])
   const pendingFor: Record<HomepageAudience, number> = {
     store: HOMEPAGE_PAGES.reduce((n, p) => n + pendingOnPage(p), 0),
     business: HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.business[s]), 0),
   }
+
+  const pill = (on: boolean) =>
+    `flex items-center gap-1.5 px-3 text-xs font-medium rounded-md ${on ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`
+  const deviceTabs = (
+    <div role="tablist" aria-label="Device" className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit">
+      {HOMEPAGE_SURFACES.map(s => (
+        <Link key={s} href={hrefFor(page, audience, s)} scroll={false} role="tab" aria-selected={s === surface} className={pill(s === surface)}>
+          {SURFACE_TAB[s]}
+        </Link>
+      ))}
+    </div>
+  )
+  const audienceTabs = (
+    <div
+      role="tablist"
+      aria-label="Homepage"
+      className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit"
+    >
+      {HOMEPAGE_AUDIENCES.map(a =>
+      a === 'business' && !plan.business ? (
+        <span
+          key={a}
+          role="tab"
+          aria-selected={false}
+          aria-disabled="true"
+          title={businessNeeds ? `The business homepage comes with ${businessNeeds}` : 'Not in your plan'}
+          className="flex items-center gap-1.5 px-3 text-xs font-medium rounded-md text-foreground-muted opacity-70 cursor-not-allowed"
+        >
+          <Lock className="w-3 h-3" aria-hidden="true" />
+          {AUDIENCE_TAB[a]}
+          {businessNeeds && <span className="font-normal">· Comes with {businessNeeds}</span>}
+        </span>
+      ) : (
+        <Link
+          key={a}
+          href={hrefFor('home', a)}
+          scroll={false}
+          role="tab"
+          aria-selected={a === audience}
+          className={pill(a === audience)}
+        >
+          {AUDIENCE_TAB[a]}
+          {pendingFor[a] > 0 && <span className="tabular-nums opacity-80">{pendingFor[a]}</span>}
+        </Link>
+      )
+    )}
+    </div>
+  )
 
   // Mirror the other migrated entities: header carries only title + description + badges;
   // one shared FormFooter at the bottom owns Cancel / Save as Draft / Publish / Discard.
@@ -250,22 +289,35 @@ export default async function HomepagePage({
           }
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={draftId ? `${base}?draft=${draftId}` : base}
-            scroll={false}
-            className={`control-sm inline-flex items-center rounded-md text-xs font-medium ${showDrafts ? 'text-foreground-muted hover:text-foreground' : 'bg-surface-secondary text-foreground'}`}
-          >
+        {/* One tab line: Editor / Drafts, then the page tabs; Store / Business and Preview on the right. */}
+        <TabStrip
+          selected={showDrafts ? 'drafts' : page}
+          actions={
+            <>
+              {!showDrafts && deviceTabs}
+              {audienceTabs}
+              {previewToken && !showDrafts && page === 'home' && <HomepagePreviewButton token={previewToken} audience={audience} surface={surface} />}
+            </>
+          }
+        >
+          <Link href={draftId ? `${base}?draft=${draftId}` : base} scroll={false} role="tab" aria-selected={!showDrafts} className={tabCls(!showDrafts)}>
             {draftId ? 'Editor' : 'Live homepage'}
           </Link>
-          <Link
-            href={`${base}?view=drafts`}
-            scroll={false}
-            className={`control-sm inline-flex items-center rounded-md text-xs font-medium ${showDrafts ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground'}`}
-          >
+          <Link href={`${base}?view=drafts`} scroll={false} role="tab" aria-selected={showDrafts} className={tabCls(showDrafts)}>
             <DraftsTabLabel type="homepage" />
           </Link>
-        </div>
+          <span aria-hidden="true" className="self-center mx-1.5 h-5 w-px bg-border-default shrink-0" />
+          {(business ? (['home'] as HomepagePage[]) : HOMEPAGE_PAGES).map(p => {
+            const on = !showDrafts && p === page
+            const count = business ? 0 : pendingOnPage(p)
+            return (
+              <Link key={p} href={hrefFor(p)} scroll={false} role="tab" aria-selected={on} className={tabCls(on)}>
+                {PAGE_COPY[p].tab}
+                {count ? <span className="text-xs text-accent-500">({count})</span> : null}
+              </Link>
+            )
+          })}
+        </TabStrip>
 
         {showDrafts ? (
           <PageDrafts type="homepage">
@@ -314,104 +366,28 @@ export default async function HomepagePage({
           <MergeOnLoad
             publishPath={`/api/admin/homepage-draft/publish?draft=${draftId}`}
             doneHref={base}
-            closeHref={hrefFor(page, surface)}
+            closeHref={hrefFor(page)}
           />
         )}
         {draftId && <DraftBehindBanner info={behind} siblings={drafts.length - 1} noun="homepage" />}
 
-        <div
-          role="tablist"
-          aria-label="Homepage"
-          className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit"
-        >
-          {HOMEPAGE_AUDIENCES.map(a =>
-            a === 'business' && !plan.business ? (
-              <span
-                key={a}
-                role="tab"
-                aria-selected={false}
-                aria-disabled="true"
-                title={businessNeeds ? `The business homepage comes with ${businessNeeds}` : 'Not in your plan'}
-                className="flex items-center gap-1.5 px-3 text-xs font-medium rounded-md text-foreground-muted opacity-70 cursor-not-allowed"
-              >
-                <Lock className="w-3 h-3" aria-hidden="true" />
-                {AUDIENCE_TAB[a]}
-                {businessNeeds && <span className="font-normal">· Comes with {businessNeeds}</span>}
-              </span>
-            ) : (
-              <Link
-                key={a}
-                href={hrefFor('home', surface, a)}
-                scroll={false}
-                role="tab"
-                aria-selected={a === audience}
-                className={`flex items-center gap-1.5 px-3 text-xs font-medium rounded-md ${a === audience ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
-              >
-                {AUDIENCE_TAB[a]}
-                {pendingFor[a] > 0 && <span className="tabular-nums opacity-80">{pendingFor[a]}</span>}
-              </Link>
-            )
-          )}
-        </div>
-
-        {!business && (
-          <TabLinks
-            value={page}
-            scroll={false}
-            tabs={HOMEPAGE_PAGES.map(p => ({
-              id: p,
-              label: PAGE_COPY[p].tab,
-              href: hrefFor(p, surface),
-              count: pendingOnPage(p),
-            }))}
-          />
-        )}
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div
-            role="tablist"
-            aria-label="Layout"
-            className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit"
-          >
-            {HOMEPAGE_SURFACES.map(s => {
-              const pending = pendingOnLayout(s)
-              return (
-                <Link
-                  key={s}
-                  href={hrefFor(page, s)}
-                  scroll={false}
-                  role="tab"
-                  aria-selected={s === surface}
-                  className={`flex items-center gap-1.5 px-3 text-xs font-medium rounded-md ${s === surface ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
-                >
-                  {SURFACE_TAB[s]}
-                  {pending > 0 && <span className="tabular-nums opacity-80">{pending}</span>}
-                </Link>
-              )
-            })}
-          </div>
-          <p className="text-xs text-foreground-muted">{SURFACE_NOTE[surface]}</p>
-        </div>
-
         <HomepageLockBanner />
 
-        {/* Keyed by homepage, page and surface: both managers seed their state from props once. */}
+
+        {/* Keyed by homepage and page: both managers seed their state from props once. */}
         <HomepageSectionManager
-          key={`${audience}:${page}:${surface}`}
+          key={`${audience}:${page}`}
           audience={audience}
-          surface={surface}
           page={page}
-          desktopCount={desktopCount}
-          storeSource={storeSource}
+          surface={surface}
           initial={sections}
           options={sectionOptions}
           planTypes={plan.types}
           upgrade={upgrade}
           heroEditor={
-            <HeroSlideManager
-              key={`hero-editor-${audience}-${surface}`}
+            <HeroSlidesBySurface
+              key={`hero-editor-${audience}`}
               audience={audience}
-              surface={surface}
               initialSlides={heroSlides}
               categoryOptions={hero.categoryOptions}
               brandOptions={hero.brandOptions}

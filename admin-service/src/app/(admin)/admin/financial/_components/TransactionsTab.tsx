@@ -13,6 +13,7 @@ import {
   type FinanceBucket,
   type FinanceOverviewContract,
 } from './finance'
+import { SplitRow } from '@/components/admin/kit'
 
 type Totals = { inflow: number; outflow: number; net: number; count: number }
 type MethodRow = { method: string; inflow: number; outflow: number; count: number }
@@ -162,8 +163,9 @@ function Body({ d }: { d: TxnOverview }) {
         <Kpi label="Transactions" value={count(c.count)} delta={delta(c.count, p.count)} />
       </KpiGrid>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title="Inflow vs outflow"
             data={d.series}
@@ -171,14 +173,16 @@ function Body({ d }: { d: TxnOverview }) {
             labels={SERIES_LABELS}
             granularity={d.bucket}
           />
-        </div>
-        <MixDonutCard
-          title="By method"
-          segments={methodSegments}
-          total={money(c.inflow + c.outflow)}
-          totalLabel="Total movement"
-        />
-      </div>
+        }
+        narrow={
+          <MixDonutCard
+            title="By method"
+            segments={methodSegments}
+            total={money(c.inflow + c.outflow)}
+            totalLabel="Total movement"
+          />
+        }
+      />
 
       <Section
         title="By method"

@@ -1,5 +1,7 @@
 import { Sk } from '@/components/admin/kit/skeleton'
 import { ProductCardSkeleton } from './listing'
+import { HomeLayoutSkeleton } from './sections'
+import type { LayoutSection } from '@/lib/catalog/homepage-layout'
 
 // About, support and home loading screens, shared by the storefront and the business portal.
 
@@ -208,8 +210,11 @@ export function HomeSkeleton() {
   )
 }
 
-/** The business home renders its own fixed header (signed-in or public); this holds its place. */
-export function BusinessHomeSkeleton() {
+/**
+ * The business home renders its own fixed header (signed-in or public); this holds its place.
+ * `sections`: the published business homepage's layout; null while none is published.
+ */
+export function BusinessHomeSkeleton({ sections }: { sections?: LayoutSection[] | null }) {
   return (
     <div className="bg-surface min-h-screen">
       <div className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
@@ -224,7 +229,7 @@ export function BusinessHomeSkeleton() {
         </div>
       </div>
       <main className="pt-16 lg:pt-20">
-        <HomeSkeleton />
+        {sections ? <HomeLayoutSkeleton sections={sections} /> : <HomeSkeleton />}
       </main>
     </div>
   )

@@ -2,7 +2,9 @@ import { query, queryMany, queryOne } from '@/lib/shared/db'
 
 // Per-category notification choices (notification_preferences). A missing row means the default:
 // transactional categories on; marketing categories follow users.marketing_opt_out, which also
-// overrides an explicit marketing row.
+// overrides an explicit marketing row. Turning any marketing channel on while opted out (an email
+// unsubscribe link sets the flag) opts the customer back in on that channel alone: the other
+// marketing channels are written off explicitly first, then the flag is cleared.
 
 export const NOTIFICATION_CATEGORIES = ['orders', 'account', 'offers', 'price_alerts'] as const
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number]
@@ -52,6 +54,17 @@ export async function getPreferences(userId: string): Promise<{ categories: Cate
 export async function savePreferences(userId: string, updates: PreferenceUpdate[]): Promise<void> {
   const user = await queryOne<{ marketing_opt_out: boolean | null }>(`SELECT marketing_opt_out FROM users WHERE id = $1`, [userId])
   if (!user) return
+  const optsBackIn = !!user.marketing_opt_out && updates.some(u => isMarketingCategory(u.category) && NOTIFICATION_CHANNELS.some(ch => u[ch] === true))
+  if (optsBackIn) {
+    await query(
+      `INSERT INTO notification_preferences (user_id, category, push, email, sms, whatsapp)
+       SELECT $1, c, false, false, false, false FROM unnest($2::text[]) AS c
+       ON CONFLICT (user_id, category) DO UPDATE SET push = false, email = false, sms = false, whatsapp = false, updated_at = now()`,
+      [userId, [...MARKETING]]
+    )
+    await query(`UPDATE users SET marketing_opt_out = false, marketing_opt_out_at = NULL, updated_at = now() WHERE id = $1`, [userId])
+    user.marketing_opt_out = false
+  }
   for (const u of updates) {
     const def = isMarketingCategory(u.category) ? !user.marketing_opt_out : true
     const v = NOTIFICATION_CHANNELS.map(ch => (typeof u[ch] === 'boolean' ? u[ch] : null))

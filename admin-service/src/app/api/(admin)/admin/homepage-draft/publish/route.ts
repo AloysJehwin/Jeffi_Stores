@@ -7,6 +7,7 @@ import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { internalRequest } from '@/lib/shared/internal-http'
 import type { Resolution } from '@/lib/admin/draft-merge'
 import { homepageDraftIdFrom, homepageDraftOr, homepageLockFrom, noHomepageDraft, publishHomepageDraft } from '@/lib/catalog/homepage-draft'
+import { invalidateHomepageLayoutCache } from '@/lib/catalog/homepage-layout'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest) {
 
   revalidatePath('/')
   revalidatePath('/business')
+  // The loading skeletons read the layout from Redis, which the storefront and business apps share.
+  await invalidateHomepageLayoutCache().catch(() => {})
   await refreshStorefront(request)
   await logAdminAudit({
     adminId: admin.adminId,

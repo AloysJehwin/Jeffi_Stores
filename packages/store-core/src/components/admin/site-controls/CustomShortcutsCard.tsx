@@ -167,20 +167,20 @@ function ShortcutRow({
   const preview = parseComboDisplay(shortcut.combo, isMac)
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
-      <span className="w-32 shrink-0 text-sm font-medium text-foreground truncate" title={shortcut.label}>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary sm:flex">
+      <span className="order-1 sm:order-none min-w-0 sm:w-32 sm:shrink-0 text-sm font-medium text-foreground truncate" title={shortcut.label}>
         {shortcut.label}
       </span>
-      <span className="flex-1 min-w-0 text-xs text-foreground-muted font-mono truncate" title={shortcut.path}>
+      <span className="order-4 col-span-3 sm:order-none sm:col-span-1 sm:flex-1 min-w-0 text-xs text-foreground-muted font-mono truncate" title={shortcut.path}>
         {shortcut.path}
       </span>
-      <kbd className="w-24 shrink-0 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-border-secondary bg-surface text-xs font-mono text-foreground-secondary select-none">
+      <kbd className="order-2 sm:order-none w-24 shrink-0 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-border-secondary bg-surface text-xs font-mono text-foreground-secondary select-none">
         {preview}
       </kbd>
-      <div className="w-36 shrink-0">
+      <div className="order-5 col-span-2 sm:order-none sm:col-span-1 min-w-0 sm:w-36 sm:shrink-0">
         <AdminSelect value={modifier} options={modifierOptions} onChange={handleModChange} disabled={!canWrite} sm />
       </div>
-      <div className="w-16 shrink-0">
+      <div className="order-6 sm:order-none w-16 shrink-0">
         {modifier === 'f' ? (
           <AdminSelect
             value={/^f([1-9]|1[0-2])$/.test(key) ? key : 'f1'}
@@ -213,7 +213,7 @@ function ShortcutRow({
         <button
           type="button"
           onClick={onDelete}
-          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-foreground-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+          className="order-3 sm:order-none shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-foreground-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
           title="Remove"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -304,7 +304,7 @@ export default function CustomShortcutsCard({ initial, isMac }: { initial: Custo
             if (e.key === 'Enter') handleAdd()
           }}
           placeholder="Label"
-          className="w-36 px-3 h-control-sm text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="w-full sm:w-36 px-3 h-control-sm text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <input
           type="text"
@@ -325,7 +325,7 @@ export default function CustomShortcutsCard({ initial, isMac }: { initial: Custo
             if (e.key === 'Enter') handleAdd()
           }}
           placeholder="/admin/... or paste full URL"
-          className="flex-1 px-3 h-control-sm text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"
+          className="flex-1 min-w-0 px-3 h-control-sm text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"
         />
         <button
           type="button"

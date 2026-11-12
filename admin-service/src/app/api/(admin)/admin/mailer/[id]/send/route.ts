@@ -62,7 +62,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Fire-and-forget background send (does NOT block the response). On failure the campaign is a
   // draft again and goes back to the admin who sent it.
-  sendInBackground(id).catch(() => {
+  sendInBackground(id).catch(err => {
+    console.error(`[mailer] send ${id} failed:`, err)
     query(`UPDATE email_campaigns SET status = 'draft' WHERE id = $1`, [id])
       .then(() => lockNewDraft(actor, 'mailer', id))
       .catch(() => {})

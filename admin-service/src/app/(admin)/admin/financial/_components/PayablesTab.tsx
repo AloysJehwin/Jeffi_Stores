@@ -6,19 +6,7 @@ import { Plus } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import {
-  Banner,
-  Dialog,
-  FormField,
-  Kpi,
-  KpiGrid,
-  NumberInput,
-  Section,
-  Table,
-  TextInput,
-  useActionToast,
-  type Col,
-} from '@/components/admin/kit'
+import { Banner, Dialog, FormField, Kpi, KpiGrid, NumberInput, Section, Table, TextInput, useActionToast, type Col, SplitRow } from '@/components/admin/kit'
 import { useOverviewData } from '@/components/admin/kit/period'
 import { PayablesTabSkeleton } from './FinanceSkeletons'
 import { KeyedTrendCard, type TrendPoint } from '@/components/admin/kit/charts'
@@ -273,8 +261,9 @@ function Body({ d, canWrite, onPay }: { d: Overview; canWrite: boolean; onPay: (
         </Banner>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title="Outflow by method"
             data={d.series}
@@ -282,14 +271,16 @@ function Body({ d, canWrite, onPay }: { d: Overview; canWrite: boolean; onPay: (
             labels={METHOD_LABEL}
             granularity={d.bucket}
           />
-        </div>
-        <AgingDonutCard
-          title="Aging"
-          rows={agingRows}
-          total={formatINR(c.outstanding)}
-          centerLabel="Outstanding"
-        />
-      </div>
+        }
+        narrow={
+          <AgingDonutCard
+            title="Aging"
+            rows={agingRows}
+            total={formatINR(c.outstanding)}
+            centerLabel="Outstanding"
+          />
+        }
+      />
 
       <Section title="Open bills">
         <Table rows={d.top} cols={billCols} rowKey={r => r.id} empty="No open bills right now." />

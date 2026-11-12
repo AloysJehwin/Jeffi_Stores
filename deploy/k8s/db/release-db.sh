@@ -1,8 +1,8 @@
 #!/bin/bash
 # The release's changes to jeffi_stores, run by ci.yml's deploy job before the rollout (or by hand):
-#   --schema      10-platform-schema.sh (table ownership, the additive database/*.sql diff, manual.sql), then the
-#                 control-plane diff (database/control-plane/schema.sql) and its plan seed.
-#   --migrations  pending database/migrations files (tracked in schema_migrations).
+#   --schema      10-platform-schema.sh (table ownership, the additive diff of every <service>/database/, manual.sql),
+#                 then the control-plane diff (controller-service/database/control-plane) and its plan seed.
+#   --migrations  pending <service>/database/migrations files (tracked in schema_migrations).
 # Neither flag: both. Store tenants' databases follow in rollout.sh (40-tenant-fanout.sh) once the new
 # controller is up. --dry-run shows the SQL and applies nothing; --yes skips the prompts (CI).
 # Usage: bash deploy/k8s/db/release-db.sh [--schema] [--migrations] [--dry-run] [--yes]
@@ -24,7 +24,7 @@ if $SCHEMA; then
 fi
 
 if $MIGRATIONS; then
-  say "File migrations (database/migrations)"
+  say "File migrations (<service>/database/migrations)"
   flag=(); $DRY_RUN && flag=(--dry-run)
   RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=jeffi_stores \
     bash "$REPO/deploy/run-migrations.sh" ${flag[@]+"${flag[@]}"}

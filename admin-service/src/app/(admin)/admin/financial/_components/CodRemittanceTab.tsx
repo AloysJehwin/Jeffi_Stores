@@ -7,7 +7,7 @@ import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col, type Tone
 import { useOverviewData } from '@/components/admin/overview/kit'
 import { CodRemittanceTabSkeleton } from './FinanceSkeletons'
 import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
-import { badgeCls, useActionToast } from '@/components/admin/kit'
+import { badgeCls, useActionToast, SplitRow } from '@/components/admin/kit'
 import { delta } from '@/lib/overview/period'
 import { FinancePeriodBar, useFinancePeriod, type FinanceOverviewContract } from './finance'
 
@@ -228,8 +228,9 @@ function Body({
         <Kpi label="Remitted" value={money(c.remitted_amount)} sub={`${count(c.remitted_count)} orders`} delta={delta(c.remitted_amount, p.remitted_amount)} />
       </KpiGrid>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title="Weekly collection"
             data={d.series}
@@ -237,14 +238,16 @@ function Body({
             labels={SERIES_LABEL}
             granularity={d.bucket}
           />
-        </div>
-        <MixDonutCard
-          title="By status"
-          segments={mixSegments}
-          total={money(c.collected_amount + c.pending_amount + c.remitted_amount)}
-          totalLabel="COD this period"
-        />
-      </div>
+        }
+        narrow={
+          <MixDonutCard
+            title="By status"
+            segments={mixSegments}
+            total={money(c.collected_amount + c.pending_amount + c.remitted_amount)}
+            totalLabel="COD this period"
+          />
+        }
+      />
 
       <Section title="Orders" action={sectionActions}>
         <Table

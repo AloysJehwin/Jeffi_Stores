@@ -14,6 +14,7 @@ import { delta } from '@/lib/overview/period'
 import { ap } from '@/lib/shared/admin-path'
 import { FinancePeriodBar, useFinancePeriod, type FinanceBucket, type FinanceRange } from './finance'
 import type { PLMonth, PLTotals } from '@/lib/payments/financial'
+import { SplitRow } from '@/components/admin/kit'
 
 type SourceRow = { key: string; label: string; revenue: number }
 // Mirrors FinanceOverviewContract<PLTotals, PLMonth>, but by_dim2 carries source rows (not PLMonth).
@@ -161,8 +162,9 @@ function Body({ d }: { d: PL }) {
         <Kpi label="Orders" value={count(c.order_count)} delta={delta(c.order_count, p.order_count)} />
       </KpiGrid>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title="Revenue, COGS and gross profit"
             data={d.series ?? []}
@@ -170,18 +172,20 @@ function Body({ d }: { d: PL }) {
             labels={METRIC_LABEL}
             granularity={d.bucket}
           />
-        </div>
-        <MixDonutCard
-          title="Revenue by source"
-          segments={sources.map(s => ({
-            label: s.label,
-            value: s.revenue,
-            color: SOURCE_COLOR[s.key] ?? SOURCE_FALLBACK,
-          }))}
-          total={money(c.revenue)}
-          totalLabel="Revenue"
-        />
-      </div>
+        }
+        narrow={
+          <MixDonutCard
+            title="Revenue by source"
+            segments={sources.map(s => ({
+              label: s.label,
+              value: s.revenue,
+              color: SOURCE_COLOR[s.key] ?? SOURCE_FALLBACK,
+            }))}
+            total={money(c.revenue)}
+            totalLabel="Revenue"
+          />
+        }
+      />
 
       <Section title="Monthly P&L">
         <Table

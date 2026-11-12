@@ -7,6 +7,8 @@ import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { Dialog } from '@/components/admin/kit/dialog'
+import type { CampaignMetric } from '../../_components/campaign-presentation'
 
 export interface EligibleRecipient {
   reference_id: string
@@ -427,5 +429,94 @@ export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppL
         </>
       )}
     </CollapsibleCard>
+  )
+}
+
+interface MetricRecipient {
+  id: string
+  user_id: string | null
+  channel: string | null
+  at: string | null
+  reason: string | null
+  user_email: string | null
+  user_phone: string | null
+  user_name: string | null
+  order_number: string | null
+  total_amount: string | null
+}
+
+const METRIC_PAGE = 20
+
+/** The customers behind one performance number, 20 a page (GET …/campaigns/[kind]/recipients). */
+export function CampaignRecipientsDialog({
+  kind,
+  metric,
+  label,
+  onClose,
+}: {
+  kind: string
+  metric: CampaignMetric | null
+  label: string
+  onClose: () => void
+}) {
+  const list = usePagedList<MetricRecipient>({
+    key: metric ? `${kind}:${metric}` : null,
+    pageSize: METRIC_PAGE,
+    fetchPage: async (page, signal) => {
+      const data = await fetchJson(
+        `/api/admin/campaigns/${kind}/recipients?metric=${metric}&offset=${(page - 1) * METRIC_PAGE}`,
+        signal
+      )
+      return { rows: data.rows || [], total: data.total || 0 }
+    },
+  })
+  const push = metric?.startsWith('push_')
+  return (
+    <Dialog
+      open={!!metric}
+      onClose={onClose}
+      size="lg"
+      title={`${push ? 'App push · ' : ''}${label}`}
+      description={list.pager.total != null ? `${list.pager.total.toLocaleString('en-IN')} customers` : undefined}
+    >
+      {list.loading ? (
+        <div aria-busy="true">
+          <LoadingLines lines={6} />
+        </div>
+      ) : list.rows.length === 0 ? (
+        <p className="py-8 text-center text-sm text-foreground-muted">{list.error || 'No customers'}</p>
+      ) : (
+        <div>
+          <div className="divide-y divide-border-default rounded-lg border border-border-default">
+            {list.rows.map(r => (
+              <div key={r.id} className="flex items-center gap-3 px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-foreground">{r.user_name || r.user_email || r.user_phone || 'Unknown customer'}</p>
+                  <p className="truncate text-[11px] text-foreground-muted">
+                    {[r.user_name ? r.user_email || r.user_phone : null, r.at && new Date(r.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+                {r.order_number && (
+                  <span className="shrink-0 text-xs tabular-nums text-foreground-secondary">
+                    #{r.order_number} · ₹{Math.round(Number(r.total_amount)).toLocaleString('en-IN')}
+                  </span>
+                )}
+                {r.reason && (
+                  <span className="shrink-0 rounded-full bg-surface-secondary px-2 py-0.5 text-[10px] text-foreground-muted">
+                    {r.reason.replace(/_/g, ' ')}
+                  </span>
+                )}
+                {!push && r.channel && r.channel !== 'email' && (
+                  <span className="shrink-0 rounded-full bg-surface-secondary px-2 py-0.5 text-[10px] text-foreground-muted">{r.channel}</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <Pager className="pb-1" control={list.pager} noun="customers" />
+        </div>
+      )}
+    </Dialog>
   )
 }

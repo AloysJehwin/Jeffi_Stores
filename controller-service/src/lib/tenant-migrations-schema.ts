@@ -1,60 +1,26 @@
 import fs from 'fs'
 import path from 'path'
-import { repoPath } from '@/lib/shared/paths'
+import { repoRoot } from '@/lib/shared/paths'
+import { schemaFiles } from '@controller/lib/db-files'
 
 // Shared desired-state schema builder — used by BOTH the migration fan-out
 // (tenant-migrations.ts) and the AWS provisioning provider's loadSchema.
 // Ordering matters: extensions → tables → constraints → indexes → functions → triggers.
 
-// Every database/*.sql topic file must be listed (tests/lib/tenant-migrations-schema-files.test.ts).
-export const APPLY_ORDER = [
-  'extensions.sql',
-  'auth.sql',
-  'users.sql',
-  'catalog.sql',
-  'inventory.sql',
-  'orders.sql',
-  'payments.sql',
-  'invoices.sql',
-  'quotations.sql',
-  'crm.sql',
-  'marketing.sql',
-  'messaging.sql',
-  'reviews.sql',
-  'support.sql',
-  'drive.sql',
-  'replies.sql',
-  'logs.sql',
-  'settings.sql',
-  'editor-sessions.sql',
-  'ai.sql',
-  'amazon.sql',
-  'ads.sql',
-  'channels.sql',
-  'merchant.sql',
-  'amazon-ads.sql',
-  'meta-ads.sql',
-  'marketplace.sql',
-  'marketplace-ads.sql',
-  'setup-guide.sql',
-  // Service tables live in the main DB, but constraints/indexes.sql reference them.
-  'documents.sql',
-  'bulk.sql',
-  'services.sql',
-  'constraints.sql',
-  'indexes.sql',
-  'functions.sql',
-  'triggers.sql',
-]
+// The tenant blob keeps its own order after the tables (constraints before indexes; foreign keys are hoisted to
+// the end by hoistForeignKeys wherever they sit).
+export const TENANT_TAIL = ['constraints.sql', 'foreign-keys.sql', 'indexes.sql', 'functions.sql', 'triggers.sql']
+
+/** The platform schema files a tenant database gets, in apply order (every <service>/database/, see db-files.ts). */
+export function tenantSchemaFiles(): string[] {
+  return schemaFiles('platform', TENANT_TAIL)
+}
 
 export function buildTenantSchemaSql(): string {
-  const dir = repoPath('database')
+  const root = repoRoot()
   const parts: string[] = []
-  for (const file of APPLY_ORDER) {
-    const p = path.join(dir, file)
-    if (fs.existsSync(p)) {
-      parts.push(`-- ==== ${file} ====\n${stripPsqlMetaCommands(fs.readFileSync(p, 'utf8'))}`)
-    }
+  for (const p of tenantSchemaFiles()) {
+    parts.push(`-- ==== ${path.relative(root, p)} ====\n${stripPsqlMetaCommands(fs.readFileSync(p, 'utf8'))}`)
   }
   const raw = stripPlatformOnlySeeds(stripExtensionComments(parts.join('\n\n')))
   const built = guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
@@ -113,11 +79,8 @@ export function parseCreateTables(sql: string): DesiredTable[] {
 
 /** table name (without the schema prefix, unquoted) → column names, as the schema files declare them. */
 export function desiredTableColumns(): Map<string, string[]> {
-  const dir = repoPath('database')
   const map = new Map<string, string[]>()
-  for (const file of APPLY_ORDER) {
-    const p = path.join(dir, file)
-    if (!fs.existsSync(p)) continue
+  for (const p of tenantSchemaFiles()) {
     for (const t of parseCreateTables(fs.readFileSync(p, 'utf8'))) {
       const bare = t.table.split('.').pop()!.replace(/"/g, '')
       map.set(
@@ -194,7 +157,7 @@ function stripExtensionComments(sql: string): string {
  * Drop platform-only seed statements before the schema is applied to a TENANT DB. The
  * `administrator` role exists only on the main store (admin.jeffistores.in), where it sits above
  * super_admin and short-circuits every scope check via isPlatformAdmin(); the tenant hierarchy is
- * only super_admin > admin > moderator. database/users.sql seeds that role onto admin@jeffistores.in
+ * only super_admin > admin > moderator. The users.sql topic file seeds that role onto admin@jeffistores.in
  * — correct for the platform DB, but it must never run on a tenant (a tenant admin on that email
  * would wrongly bypass all plan entitlements). The platform DB applies users.sql unstripped, so the
  * seed still runs there. Matches the UPDATE ... SET role = 'administrator' ... block, which is the
@@ -311,7 +274,7 @@ function guardNonFkConstraints(sql: string): string {
  * databases, so nothing had a guard: 121 CREATE TABLE, 237 CREATE INDEX, 3 CREATE SEQUENCE,
  * 41 CREATE TRIGGER and 13 CREATE FUNCTION were all bare.
  *
- * Rewritten here rather than in database/*.sql because those files are also the desired-state
+ * Rewritten here rather than in the schema files because those are also the desired-state
  * input to migra in the schema-diff pipeline, which compares them against a live database and
  * expects plain pg_dump output.
  *

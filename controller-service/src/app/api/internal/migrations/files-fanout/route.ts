@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 // The fan-out opens a connection per tenant and applies each pending migration file.
 export const maxDuration = 300
 
-// Applies pending database/migrations/*.sql files to every active tenant's own RDS.
+// Applies pending <service>/database/migrations/*.sql files to every active tenant's own RDS.
 //
 // Mirrors the desired-state fanout endpoint: Bearer ${CRON_SECRET}, called from the deploy box
 // over localhost right after the flagship migration apply, so a migration on main reaches every

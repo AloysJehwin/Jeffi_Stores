@@ -9,7 +9,7 @@ source "$(dirname "$0")/../db/lib.sh"
 WORK=${RELEASE_WORK_DIR:-${TMPDIR:-/tmp}/jeffi-release}
 cd "$REPO"
 
-[ -z "$(git status --porcelain -- controller-service storefront-service admin-service business-service messaging-service document-service public-api-service mobile-service packages deploy database package.json package-lock.json vendor)" ] ||
+[ -z "$(git status --porcelain -- controller-service storefront-service admin-service business-service messaging-service document-service public-api-service mobile-service packages deploy database scripts/db-files.mjs package.json package-lock.json vendor)" ] ||
   { echo "Uncommitted changes — commit first so the release is reproducible." >&2; exit 1; }
 SHA=$(image_sha); TAG=local-$SHA
 mkdir -p "$WORK"

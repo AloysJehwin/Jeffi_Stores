@@ -557,12 +557,12 @@ export function KeyboardShortcutControl({
   }))
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
-      <span className="w-24 shrink-0 text-sm font-medium text-foreground truncate">{label}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary sm:flex">
+      <span className="min-w-0 sm:w-24 sm:shrink-0 text-sm font-medium text-foreground truncate">{label}</span>
       <kbd className="w-20 shrink-0 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-border-secondary bg-surface text-xs font-mono text-foreground-secondary select-none">
         {comboPreview || '—'}
       </kbd>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 sm:flex-1">
         <AdminSelect
           value={modifier}
           options={modifierOptions}
@@ -571,7 +571,7 @@ export function KeyboardShortcutControl({
           sm
         />
       </div>
-      <div className="w-16 shrink-0">
+      <div className="w-20 sm:w-16 shrink-0">
         {modifier === 'f' ? (
           <AdminSelect
             value={/^f([1-9]|1[0-2])$/.test(key) ? key : 'f1'}

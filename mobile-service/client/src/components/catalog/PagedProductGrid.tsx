@@ -7,6 +7,8 @@ import { listProducts, type ProductQuery } from '../../api/products'
 import ProductCard from '../product/ProductCard'
 import { useColumnWidth } from '../home/layout'
 import { ListingFeedItem, listingFeed, useListingLayout, type ListingFeedEntry } from '../home/ListingFeed'
+import { listingSkeletonInserts } from '../home/HomeLayoutSkeleton'
+import { useHomeLayout } from '../../stores/homeLayoutStore'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { toCard } from '../../lib/card'
 import { PRODUCT_SORTS, type ProductSortId } from './listing'
@@ -75,6 +77,7 @@ export default function PagedProductGrid({
   const { gstEnabled } = useStoreConfig().flags
   const w = useColumnWidth(cols, gap)
   const layout = useListingLayout(page)
+  const remembered = useHomeLayout(page)
   const opt = PRODUCT_SORTS.find(o => o.id === sort)
   const q = useInfiniteQuery({
     queryKey: ['products', 'paged', base, sort, pageSize],
@@ -139,7 +142,7 @@ export default function PagedProductGrid({
       ListEmptyComponent={
         loading ? (
           <View className="px-4">
-            <ProductGridSkeleton cols={cols} gap={gap} count={cols === 1 ? 3 : 6} />
+            <ProductGridSkeleton cols={cols} gap={gap} count={cols === 1 ? 3 : 6} inserts={listingSkeletonInserts(remembered, cols === 1 ? 3 : 6, cols)} />
           </View>
         ) : total === 0 ? (
           <View className="px-4">{empty}</View>

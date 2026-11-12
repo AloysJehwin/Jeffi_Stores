@@ -99,7 +99,7 @@ function CompanyCard() {
 // A top-level page: back goes home.
 function TopHeader() {
   const router = useRouter()
-  return <ScreenHeader title="Account" large onBack={() => router.navigate('/(tabs)')} />
+  return <ScreenHeader title="Account" onBack={() => router.navigate('/(tabs)')} />
 }
 
 function SignedOut() {
@@ -112,7 +112,7 @@ function SignedOut() {
           <Title className="text-center">Welcome Back</Title>
           <BodySmall className="mt-2 text-center">Login to your {config.identity.name || 'Jeffi Stores'} account</BodySmall>
           <View className="mt-6 self-stretch">
-            <Button label="Sign In" icon={LogIn} onPress={() => router.push('/(auth)/login')} />
+            <Button label="Sign in" icon={LogIn} onPress={() => router.push('/(auth)/login')} />
           </View>
           <Text className="mt-5 text-center text-sm text-foreground-secondary">
             Don&apos;t have an account?{' '}

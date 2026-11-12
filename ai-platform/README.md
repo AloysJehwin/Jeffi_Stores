@@ -147,4 +147,4 @@ repoint `AI_GATEWAY_URL` in the app. No app redeploy beyond the URL; no code cha
 
 The app's `src/lib/ai-client.ts`, `rag.ts` embed, and `admin-agent/vision.ts` call the SDK. The app
 env shrinks to `AI_GATEWAY_URL` (+ `AI_PROVIDER` for the openai escape hatch). See
-`docs`/the app repo for the `ai_cache` schema (in `database/ai.sql`, applied to the local db).
+`docs`/the app repo for the `ai_cache` schema (in `admin-service/database/tables/ai.sql`, applied to the local db).

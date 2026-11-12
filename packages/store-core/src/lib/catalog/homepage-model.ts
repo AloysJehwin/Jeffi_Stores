@@ -20,7 +20,7 @@ import { loadSectionExtras } from '@/lib/catalog/homepage-extras'
 import { getHomepagePlan, planAllowsAudience, planAllowsType } from '@/lib/catalog/homepage-plan'
 import {
   businessSectionPublic,
-  forSurface,
+  slidesForSurface,
   productRowKey,
   rowAudience,
   rowPage,
@@ -55,6 +55,7 @@ import { listActiveOffers, listOffersByIds } from '@/lib/catalog/product-offers'
 import { cardPropsFor, type CardProps } from '@/lib/catalog/product-card-props'
 import type { CategoryTab, CountdownDealData, SpotlightData } from '@/lib/catalog/homepage-extras'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
+import type { HomepageDraftState } from '@/lib/catalog/homepage-draft'
 
 /** What each home section reads (SectionRenderer's data prop). */
 export interface SectionData {
@@ -111,16 +112,18 @@ async function getMainCategories() {
   `)
 }
 
-async function getHeroSlides(surface: HomepageSurface, audience: HomepageAudience) {
+async function getHeroSlides(surface: HomepageSurface, audience: HomepageAudience, draftSlides?: any[]) {
   // Admin-managed hero_slides first; each carries its own copy, image and CTA link. Active is
   // filtered after the surface is picked so an app with only paused slides doesn't borrow the web's.
-  const slides = await queryMany<any>(
-    `SELECT id, title, subtitle, badge_text, badge_color, image_url, image_url_mobile, blurhash, blurhash_mobile,
+  const slides =
+    draftSlides ??
+    (await queryMany<any>(
+      `SELECT id, title, subtitle, badge_text, badge_color, image_url, image_url_mobile, blurhash, blurhash_mobile,
             video_url, cta_url, filter_category, filter_brand, filter_grade, filter_material, filter_min_price,
             filter_max_price, filter_in_stock, filter_on_sale, is_active, ${SURFACE_COLUMN_SQL('h')}, ${AUDIENCE_COLUMN_SQL('h')}
        FROM hero_slides h ORDER BY display_order ASC, created_at ASC`
-  )
-  const managed = forSurface(slides.filter(s => rowAudience(s) === audience), surface).filter(s => s.is_active)
+    ))
+  const managed = slidesForSurface(slides.filter(s => rowAudience(s) === audience), surface).filter(s => s.is_active)
   if (managed.length > 0) {
     return managed.map(s => ({
       id: s.id,
@@ -253,20 +256,28 @@ export interface PageModelOptions {
   audience?: HomepageAudience
   /** An app build from before per-surface layouts: it gets the website layout minus the types it can't render. */
   legacyClient?: boolean
+  /** Admin preview: render this homepage draft's sections and slides instead of live. */
+  draft?: HomepageDraftState | null
 }
 
 /**
  * The sections a page shows and the homepage they come from, minus the types the tenant's plan
  * doesn't include (the B2B portal's sections and the business homepage itself are Pro+, say).
  */
-async function resolvePageSections({
+export async function resolvePageSections({
   surface = 'web',
   page = 'home',
   audience = 'store',
   legacyClient = false,
+  draft,
 }: PageModelOptions = {}): Promise<{ audience: HomepageAudience; sections: HomepageSection[] }> {
   const plan = await getHomepagePlan()
-  const served = await getAudienceSections(surface, page, planAllowsAudience(plan, audience) ? audience : 'store')
+  const served = await getAudienceSections(
+    surface,
+    page,
+    planAllowsAudience(plan, audience) ? audience : 'store',
+    draft?.sections
+  )
   return {
     audience: served.audience,
     sections: served.sections.filter(
@@ -289,7 +300,7 @@ export async function buildHomeModel(opts: PageModelOptions = {}): Promise<HomeM
 /** The data the given sections need, and nothing else. */
 export async function loadSectionData(
   sections: HomepageSection[],
-  { surface = 'web', page = 'home', audience = 'store' }: Pick<PageModelOptions, 'surface' | 'page' | 'audience'> = {}
+  { surface = 'web', page = 'home', audience = 'store', draft }: Pick<PageModelOptions, 'surface' | 'page' | 'audience' | 'draft'> = {}
 ): Promise<SectionData> {
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
@@ -313,7 +324,7 @@ export async function loadSectionData(
   const [mainCategories, heroSlides, offers, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] =
     await Promise.all([
       needs.mainCategories ? getMainCategories() : Promise.resolve([]),
-      needs.heroSlides ? getHeroSlides(surface, audience) : Promise.resolve([]),
+      needs.heroSlides ? getHeroSlides(surface, audience, draft?.heroSlides) : Promise.resolve([]),
       needs.offerSlider
         ? pickedOfferIds.length > 0
           ? listOffersByIds(pickedOfferIds)

@@ -9,7 +9,7 @@ import { ORDER_ALIASES, ORDER_FIELDS, ORDER_SEARCH } from '@/lib/filters/fields/
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
-import { Kpi, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
+import { Kpi, ListFilters, PageBody, PageHeader, SplitRow, TabLinks } from '@/components/admin/kit'
 import { LoadingChart, LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import OrdersTable from './_components/OrdersTable'
 import OrdersOverview from './_components/OrdersOverview'
@@ -35,20 +35,23 @@ async function OrdersStats({ q }: { q: FilterQuery }) {
 
   const money = (v: number) => `Rs. ${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return (
-    <div className="animate-fade-in grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <div className="grid grid-cols-2 content-start gap-3">
-        <div className="col-span-2">
-          <Kpi label="Total revenue" value={money(summary.paidRevenue)} sub="Paid orders" highlight />
+    <SplitRow
+      at="xl"
+      narrowFirst
+      className="animate-fade-in"
+      narrow={
+        <div className="grid grid-cols-2 auto-rows-fr gap-3">
+          <div className="col-span-2 grid">
+            <Kpi label="Total revenue" value={money(summary.paidRevenue)} sub="Paid orders" highlight />
+          </div>
+          <Kpi label="Total" value={summary.total.toLocaleString('en-IN')} />
+          <Kpi label="Pending" value={summary.pending.toLocaleString('en-IN')} />
+          <Kpi label="Processing" value={summary.processing.toLocaleString('en-IN')} />
+          <Kpi label="Completed" value={summary.completed.toLocaleString('en-IN')} />
         </div>
-        <Kpi label="Total" value={summary.total.toLocaleString('en-IN')} />
-        <Kpi label="Pending" value={summary.pending.toLocaleString('en-IN')} />
-        <Kpi label="Processing" value={summary.processing.toLocaleString('en-IN')} />
-        <Kpi label="Completed" value={summary.completed.toLocaleString('en-IN')} />
-      </div>
-      <div className="xl:col-span-2">
-        <RevenueTrendChart data={revenueTrend} query={canonicalQuery(q, ORDER_FIELDS, { omit: ['from', 'to'] })} />
-      </div>
-    </div>
+      }
+      wide={<RevenueTrendChart data={revenueTrend} query={canonicalQuery(q, ORDER_FIELDS, { omit: ['from', 'to'] })} />}
+    />
   )
 }
 
@@ -116,12 +119,12 @@ function OrdersList({ resolved }: { resolved: SP }) {
       <Suspense
         key={JSON.stringify(q)}
         fallback={
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <LoadingKpis labels={['Total revenue', 'Total', 'Pending', 'Processing', 'Completed']} />
-            <div className="xl:col-span-2">
-              <LoadingChart title="Revenue Trend" />
-            </div>
-          </div>
+          <SplitRow
+            at="xl"
+            narrowFirst
+            narrow={<LoadingKpis labels={['Total revenue', 'Total', 'Pending', 'Processing', 'Completed']} />}
+            wide={<LoadingChart title="Revenue Trend" />}
+          />
         }
       >
         <OrdersStats q={q} />

@@ -3,7 +3,7 @@ import { query } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 /**
- * upi_payment_intents (database/payments.sql): one UPI payment attempt and what it pays for. Lives in
+ * upi_payment_intents (admin-service/database/tables/payments.sql): one UPI payment attempt and what it pays for. Lives in
  * the collecting merchant's DB: a store's for its orders, the flagship DB for everything paid to the
  * platform (flagship orders, wallet top-ups), so one queue serves the platform's UPI ID.
  */

@@ -28,7 +28,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const product = await getProduct(id)
-    return NextResponse.json(product)
+    const { loadProductFaqs, loadProductMedia } = await import('@/lib/catalog/product-media')
+    const [media, faqs] = await Promise.all([loadProductMedia(id), loadProductFaqs(id)])
+    return NextResponse.json({ ...product, media, faqs })
   } catch (err: any) {
     if (err.message === 'Product not found') return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

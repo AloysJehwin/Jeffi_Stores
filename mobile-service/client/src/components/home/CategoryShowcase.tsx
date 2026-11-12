@@ -5,7 +5,7 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { Grid, SectionHeading, useColumnWidth } from './layout'
 import { useImageSource } from '../../hooks/useImageSource'
-import { num } from '../../lib/format'
+import { inr, num } from '../../lib/format'
 import type { HomeData, HomeSection, SectionProps } from '../../types/home'
 
 // Mirror of controller-service components/visitor/home/CategoryShowcase.tsx.
@@ -98,7 +98,7 @@ function ShowcaseCard({ cat, aspect }: { cat: ShowcaseCategory; aspect?: number 
               <Text numberOfLines={2} className="text-[11px] font-medium text-foreground" style={{ lineHeight: 13.75 }}>
                 {p.name}
               </Text>
-              <Text className="text-[11px] font-bold text-accent-500">₹{num(p.displayPrice)}</Text>
+              <Text className="text-[11px] font-bold text-accent-500">₹{inr(p.displayPrice)}</Text>
             </Pressable>
           )
         })}

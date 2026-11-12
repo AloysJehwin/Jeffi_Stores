@@ -96,8 +96,9 @@ export type ProductSource = 'featured' | 'new_arrivals' | 'best_sellers' | 'on_s
 export type SectionLayout = 'grid' | 'carousel'
 
 /**
- * Desktop web, phone browsers and the app each have their own layout (sections and hero slides).
- * `web` is the desktop website; phone browsers and the app fall back to it until they have rows.
+ * Where a page shows: the desktop website, phone browsers or the app. Sections live in one layout
+ * and carry a per-surface visibility toggle (sectionSurfaces); hero slides still have a layout per
+ * surface (slidesForSurface), phones and the app falling back to the website's.
  */
 export type HomepageSurface = 'web' | 'web_mobile' | 'app'
 
@@ -152,14 +153,73 @@ export function rowAudience(row: { audience?: string | null }): HomepageAudience
 export const isListingPage = (page: HomepagePage) => page !== 'home'
 
 /**
- * The rows that belong to a surface. Phone browsers and the app mirror the desktop website until
- * they have a layout of their own (any row of theirs, active or not), so a store that never opens
- * those tabs keeps one layout. Pass the rows of one page.
+ * Hero slides that belong to a surface. Phone browsers and the app mirror the desktop website's
+ * slides until they have slides of their own (any, active or not).
  */
-export function forSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
+export function slidesForSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
   const own = rows.filter(r => rowSurface(r) === surface)
   if (own.length > 0 || surface === 'web') return own
   return rows.filter(r => rowSurface(r) === 'web')
+}
+
+export type SectionSurfaces = Record<HomepageSurface, boolean>
+
+/**
+ * Which surfaces a section shows on: `config.surfaces` ({ web, web_mobile, app }), a missing key
+ * meaning shown. A row from before the single layout (surface column web_mobile / app, no
+ * `config.surfaces`) shows only on its own surface, which is what the migration writes.
+ */
+export function sectionSurfaces(section: { config?: Record<string, unknown> | null; surface?: string | null }): SectionSurfaces {
+  const raw = section.config?.surfaces
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>
+    return { web: o.web !== false, web_mobile: o.web_mobile !== false, app: o.app !== false }
+  }
+  const legacy = rowSurface(section)
+  if (legacy !== 'web') return { web: false, web_mobile: legacy === 'web_mobile', app: legacy === 'app' }
+  return { web: true, web_mobile: true, app: true }
+}
+
+export const onSurface = (
+  section: { config?: Record<string, unknown> | null; surface?: string | null },
+  surface: HomepageSurface
+): boolean => sectionSurfaces(section)[surface]
+
+/** The sections shown on a surface (pass one page's rows). */
+export function forSurface<T extends { config?: Record<string, unknown> | null; surface?: string | null }>(
+  rows: T[],
+  surface: HomepageSurface
+): T[] {
+  return rows.filter(r => onSurface(r, surface))
+}
+
+/** A row is one full-width section, or a `left` section followed by a `right` one. */
+export type SectionSide = 'full' | 'left' | 'right'
+
+export const SECTION_SIDES_LAYOUT: SectionSide[] = ['full', 'left', 'right']
+
+/** `config.layout.side`; anything else is full width. */
+export function sectionSide(section: { config?: Record<string, unknown> | null }): SectionSide {
+  const layout = section.config?.layout
+  const side = layout && typeof layout === 'object' ? (layout as { side?: unknown }).side : null
+  return side === 'left' || side === 'right' ? side : 'full'
+}
+
+/**
+ * Groups ordered sections into rows: a `left` immediately followed by a `right` share one; any
+ * other section (including a half with no partner) takes a row of its own, full width.
+ */
+export function groupRows<T extends { config?: Record<string, unknown> | null }>(sections: T[]): T[][] {
+  const rows: T[][] = []
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i]
+    const next = sections[i + 1]
+    if (sectionSide(s) === 'left' && next && sectionSide(next) === 'right') {
+      rows.push([s, next])
+      i++
+    } else rows.push([s])
+  }
+  return rows
 }
 
 export interface SectionMeta {
@@ -184,9 +244,9 @@ export interface SectionMeta {
   sides?: 'banner' | 'slides'
 }
 
-/** The types the picker offers on a surface, page and homepage. */
+/** The types the picker offers on a page and homepage (`surface` narrows to one surface's). */
 export function sectionTypesFor(
-  surface: HomepageSurface,
+  surface: HomepageSurface | 'all',
   page: HomepagePage = 'home',
   audience: HomepageAudience = 'store'
 ): SectionType[] {
@@ -194,7 +254,7 @@ export function sectionTypesFor(
   return SECTION_TYPES.filter(t => {
     const { surfaces, pages, audiences } = SECTION_META[t]
     return (
-      (!surfaces || surfaces.includes(asSurface)) &&
+      (!surfaces || asSurface === 'all' || surfaces.includes(asSurface)) &&
       (!pages || pages.includes(page)) &&
       (!audiences || audiences.includes(audience))
     )

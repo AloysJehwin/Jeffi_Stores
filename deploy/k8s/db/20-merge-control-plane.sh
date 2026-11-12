@@ -1,12 +1,14 @@
 #!/bin/bash
 # Step 2, inside the write freeze: move the control plane into jeffi_stores. As app_user (the owner the app
 # connects as): create the control-plane tables there without their foreign keys, copy every row from
-# jeffi_control_plane in one transaction, add + validate the foreign keys, re-run seed-plans.sql and compare
+# jeffi_control_plane in one transaction, add + validate the foreign keys, re-run the plan seed and compare
 # row counts. jeffi_control_plane is left untouched (the fallback).
 # Usage: bash deploy/k8s/db/20-merge-control-plane.sh [--dry-run] [--yes]
 source "$(dirname "$0")/lib.sh"
 mkdir -p "$OUT_DIR"
-CP_SCHEMA="$REPO/database/control-plane/schema.sql"
+# The control-plane set (controller-service/database/control-plane), concatenated in manifest order.
+CP_SCHEMA="$OUT_DIR/cp-schema.sql"
+(cd "$REPO" && node scripts/db-files.mjs control-plane | xargs cat) > "$CP_SCHEMA"
 TABLES=$(grep -oiE '^CREATE TABLE (IF NOT EXISTS )?public\.[a-z_0-9]+' "$CP_SCHEMA" | sed -E 's/.*public\.//' | sort -u | tr '\n' ' ')
 tunnel
 src() { psql_app jeffi_control_plane "$@"; }
@@ -71,8 +73,8 @@ if grep -q ERROR "$OUT_DIR/cp-fkeys.err"; then
   grep -oE 'constraint "[a-z0-9_]+"' "$OUT_DIR/cp-fkeys.err" | sort -u | sed 's/^/  /'
 fi
 
-say "4/4 seed-plans.sql"
-dst -q -f "$REPO/database/control-plane/seed-plans.sql"
+say "4/4 Plan seed"
+for seed in $(node "$REPO/scripts/db-files.mjs" seeds controller-service --abs); do dst -q -f "$seed"; done
 
 say "Source vs target rows"
 join <(echo "$SRC") <(counts dst) | awk '{ printf "%-32s %8s %8s %s\n", $1, $2, $3, ($2 == -1 || $2 == $3 || $1 ~ /^plan/) ? "" : "<-- differs" }'

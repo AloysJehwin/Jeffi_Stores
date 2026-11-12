@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 import ProductActions from '@/components/business/ProductActions'
@@ -13,6 +13,12 @@ import { digitalActive } from '@/lib/catalog/digital'
 import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { round2 } from '@/lib/catalog/gst'
+import dynamic from 'next/dynamic'
+import { DocumentList } from '@/components/media/MediaItemView'
+import { resolveMedia, type ProductMediaItem } from '@/lib/catalog/product-media-shared'
+
+// Players and 3D load only when a product has such media.
+const ProductMediaGallery = dynamic(() => import('@/components/media/ProductMediaGallery'), { ssr: false })
 
 interface ProductImage {
   id: string
@@ -90,6 +96,7 @@ interface ProductDetailClientProps {
     } | null
     product_images: ProductImage[]
     product_variants: Variant[]
+    media?: ProductMediaItem[]
     product_units?: Array<{
       id: string
       variant_id: string | null
@@ -311,8 +318,30 @@ export default function ProductDetailClient({
   freeShippingThreshold = 500,
 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
+  const media = useMemo(() => product.media ?? [], [product.media])
+  const asImage = (m: ProductMediaItem) => ({
+    id: m.id,
+    image_url: m.url,
+    thumbnail_url: m.thumbnail_url || m.url,
+    is_primary: m.is_primary,
+    blurhash: m.metadata?.blurhash ?? null,
+  })
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
+  // Media follows the selection: sub-variant → variant → product, per kind.
+  const mediaImages = useMemo(() => resolveMedia(media, {}).filter(m => m.kind === 'image').map(asImage), [media])
+  const selected = useMemo(
+    () => resolveMedia(media, { variantId: selectedVariantId, subVariantId: selectedSubVariantId }),
+    [media, selectedVariantId, selectedSubVariantId]
+  )
+  const selImageKey = selected.filter(m => m.kind === 'image').map(m => m.id).join(',')
+  const selImages = useMemo(
+    () => (selectedVariantId && selImageKey !== mediaImages.map(i => i.id).join(',') ? selected.filter(m => m.kind === 'image').map(asImage) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selImageKey]
+  )
+  const extras = selected.filter(m => m.kind !== 'image' && m.kind !== 'document')
+  const docs = selected.filter(m => m.kind === 'document')
   const [selectedUnit, setSelectedUnit] = useState<{
     key: string
     label: string | null
@@ -414,9 +443,9 @@ export default function ProductDetailClient({
       <div className="order-1 lg:order-none">
         <div className="relative rounded-xl">
           <ProductImageGallery
-            images={product.product_images || []}
+            images={mediaImages.length > 0 ? mediaImages : product.product_images || []}
             productName={product.name}
-            variantImages={variantImages}
+            variantImages={mediaImages.length > 0 ? selImages : variantImages}
             discountPct={
               businessDiscountPct > 0 ? null : product.discount_pct != null ? Number(product.discount_pct) : null
             }
@@ -424,6 +453,17 @@ export default function ProductDetailClient({
           />
         </div>
 
+        {extras.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Videos, 3D &amp; more</p>
+            <ProductMediaGallery items={extras} ar aspect="aspect-video" />
+          </div>
+        )}
+        {docs.length > 0 && (
+          <div className="mt-4">
+            <DocumentList items={docs} title="Documents & downloads" />
+          </div>
+        )}
         <div className="hidden lg:block mt-4">{!isDigital && <DeliveryInfo {...policy} />}</div>
       </div>
 

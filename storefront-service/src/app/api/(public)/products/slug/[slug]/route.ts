@@ -91,7 +91,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ product })
+    // Every media kind (variant / sub-variant scopes too); the app resolves inheritance itself.
+    const { loadProductFaqs, loadProductMedia } = await import('@/lib/catalog/product-media')
+    const [media, faqs] = await Promise.all([loadProductMedia(product.id), loadProductFaqs(product.id, { publishedOnly: true })])
+    // Admin-only columns never leave the store.
+    const { internal_notes, source_url, cost_price, supplier_id, search_vector, ...pub } = product
+    return NextResponse.json({ product: { ...pub, media, faqs } })
   } catch (err) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }

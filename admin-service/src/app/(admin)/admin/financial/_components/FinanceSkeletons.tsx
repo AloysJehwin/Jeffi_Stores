@@ -1,16 +1,20 @@
 import type { ReactNode } from 'react'
 import { LoadingChart, LoadingKpis, LoadingLines, LoadingSection, LoadingTable } from '@/components/admin/kit/skeleton'
+import { SplitRow } from '@/components/admin/kit'
 
 // Each finance tab's body while its data loads: real KPI labels, chart and section titles.
 
 function ChartRow({ chart, donut }: { chart: string; donut: string }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <div className="xl:col-span-2">
+    <SplitRow
+      at="xl"
+      wide={
         <LoadingChart title={chart} />
-      </div>
-      <LoadingSection title={donut} lines={4} />
-    </div>
+      }
+      narrow={
+        <LoadingSection title={donut} lines={4} />
+      }
+    />
   )
 }
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ScrollView, View, useWindowDimensions } from 'react-native'
 import { Skeleton } from './Skeleton'
 import { cn } from './cn'
@@ -33,15 +34,22 @@ export function ProductCardSkeleton({ width }: { width?: number }) {
   )
 }
 
-export function ProductGridSkeleton({ cols = 2, count = 6, gap = 12 }: { cols?: number; count?: number; gap?: number }) {
+export interface GridInsert {
+  /** Cards before it. */
+  at: number
+  node: ReactNode
+}
+
+/** `inserts` span the grid between the cards (a listing's admin sections). */
+export function ProductGridSkeleton({ cols = 2, count = 6, gap = 12, inserts = [] }: { cols?: number; count?: number; gap?: number; inserts?: GridInsert[] }) {
   const w = useColumn(cols, gap)
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <ProductCardSkeleton key={i} width={w} />
-      ))}
-    </View>
-  )
+  const cells: ReactNode[] = []
+  let next = 0
+  for (let i = 0; i < count; i++) {
+    while (next < inserts.length && inserts[next].at <= i) cells.push(<View key={`s${next}`} className="-mx-4 w-screen">{inserts[next++].node}</View>)
+    cells.push(<ProductCardSkeleton key={i} width={w} />)
+  }
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>{cells}</View>
 }
 
 /** A horizontal rail of product cards (home rows, related products). */

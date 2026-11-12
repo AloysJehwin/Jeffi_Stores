@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { listKey } from '@/lib/admin/list-key'
 import { Suspense } from 'react'
 import { normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
-import { Kpi, ListFilters, PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
+import { Kpi, ListFilters, PageBody, PageHeader, SplitRow, TabLinks } from '@/components/admin/kit'
 import { LoadingChart, LoadingTable, Sk } from '@/components/admin/kit/skeleton'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
@@ -40,14 +40,18 @@ async function BusinessRFQsStats({ q }: { q: FilterQuery }) {
   ]
 
   return (
-    <div className="animate-fade-in grid grid-cols-1 gap-4 xl:grid-cols-3 lg:min-h-56">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:col-span-2">
-        {tiles.map((t, i) => (
-          <Kpi key={t.label} label={t.label} value={t.value.toLocaleString('en-IN')} highlight={i === 0} />
-        ))}
-      </div>
-      <RfqTrendChart data={buildMonthlyTrend(trendRows)} />
-    </div>
+    <SplitRow
+      at="xl"
+      className="animate-fade-in"
+      wide={
+        <div className="grid grid-cols-2 auto-rows-fr gap-3 sm:grid-cols-3">
+          {tiles.map((t, i) => (
+            <Kpi key={t.label} label={t.label} value={t.value.toLocaleString('en-IN')} highlight={i === 0} />
+          ))}
+        </div>
+      }
+      narrow={<RfqTrendChart data={buildMonthlyTrend(trendRows)} />}
+    />
   )
 }
 
@@ -126,17 +130,20 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
 
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:col-span-2">
-        {['Total', 'Pending', 'In Review', 'Offer Accepted', 'Converted', 'Rejected'].map(l => (
-          <div key={l} className="flex h-[84px] flex-col gap-1 rounded-xl border border-border-default bg-surface-elevated p-3 sm:p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">{l}</p>
-            <Sk className="mt-1 h-6 w-16" />
-          </div>
-        ))}
-      </div>
-      <LoadingChart title="RFQs Received" height="h-32" />
-    </div>
+    <SplitRow
+      at="xl"
+      wide={
+        <div className="grid grid-cols-2 auto-rows-fr gap-3 sm:grid-cols-3">
+          {['Total', 'Pending', 'In Review', 'Offer Accepted', 'Converted', 'Rejected'].map(l => (
+            <div key={l} className="flex flex-col gap-1 rounded-xl border border-border-default bg-surface-elevated p-3 sm:p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-foreground-muted">{l}</p>
+              <Sk className="mt-1 h-6 w-16" />
+            </div>
+          ))}
+        </div>
+      }
+      narrow={<LoadingChart title="RFQs Received" height="h-32" />}
+    />
   )
 }
 

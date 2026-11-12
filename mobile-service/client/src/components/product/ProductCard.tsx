@@ -189,7 +189,7 @@ function ProductCard({ product, handlingDays = 2, imageAspect }: { product: Card
               {strike && strike > price ? <Text className="text-xs leading-tight text-foreground-muted line-through">₹{inr(strike)}</Text> : null}
             </View>
             {gstEnabled ? <Text className="mb-2 text-[11px] text-foreground-muted">Inclusive of all taxes</Text> : null}
-            <View className="flex-row items-center justify-between gap-1">
+            <View className="flex-row flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
               <Text className={`text-xs font-medium ${inStock ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} numberOfLines={1}>
                 {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
               </Text>

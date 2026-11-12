@@ -744,6 +744,73 @@ export default async function SiteControlsPage() {
                     </SectionCard>
                   </div>
                   <div>
+                    <SectionCard title="Product media" description="Upload limits in the product editor's Media tab." columns>
+                      <NumberControl
+                        settingKey="media_max_per_scope"
+                        label="Items per product / variant / sub-variant"
+                        min={1}
+                        max={50}
+                        initial={c.media.maxPerScope}
+                      />
+                      <NumberControl
+                        settingKey="media_image_mb"
+                        label="Image size (MB)"
+                        min={1}
+                        max={20}
+                        initial={c.media.imageMb}
+                      />
+                      <NumberControl
+                        settingKey="media_video_mb"
+                        label="Video size (MB)"
+                        min={1}
+                        max={50}
+                        initial={c.media.videoMb}
+                      />
+                      <NumberControl
+                        settingKey="media_video_seconds"
+                        label="Video length (seconds)"
+                        min={5}
+                        max={1800}
+                        initial={c.media.videoSeconds}
+                      />
+                      <NumberControl
+                        settingKey="media_document_mb"
+                        label="PDF size (MB)"
+                        min={1}
+                        max={50}
+                        initial={c.media.documentMb}
+                      />
+                      <NumberControl
+                        settingKey="media_audio_mb"
+                        label="Audio size (MB)"
+                        min={1}
+                        max={50}
+                        initial={c.media.audioMb}
+                      />
+                      <NumberControl
+                        settingKey="media_audio_seconds"
+                        label="Audio length (seconds)"
+                        min={5}
+                        max={3600}
+                        initial={c.media.audioSeconds}
+                      />
+                      <NumberControl
+                        settingKey="media_model_mb"
+                        label="3D model size (MB)"
+                        min={1}
+                        max={100}
+                        initial={c.media.modelMb}
+                      />
+                      <NumberControl
+                        settingKey="media_spin_frames"
+                        label="360° frames"
+                        min={2}
+                        max={180}
+                        initial={c.media.spinFrames}
+                      />
+                    </SectionCard>
+                  </div>
+                  <div>
                     <GoogleTagCard
                       isTenant={isTenant}
                       initial={{

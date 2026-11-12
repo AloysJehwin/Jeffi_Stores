@@ -82,12 +82,12 @@ function Value({ v, strike }: { v: ShownValue; strike?: boolean }) {
 
 function FieldRow({ entityType, c }: { entityType: string; c: FieldChange }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-relaxed">
-      <span className="text-foreground-muted">{fieldLabel(c.field)}</span>
+    <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs leading-relaxed">
+      <span className="text-foreground-muted">{fieldLabel(c.field)}:</span>
       <Value v={showValue(entityType, c.field, c.from, c.fromLabel)} strike />
       <span className="text-foreground-muted">→</span>
       <Value v={showValue(entityType, c.field, c.to, c.toLabel)} />
-    </div>
+    </span>
   )
 }
 
@@ -107,7 +107,8 @@ function oneLine(item: ChangeItem, noun: string): string {
 
 const SHOW_FIELDS = 6
 
-export function ChangeEntry({ item, noun, last }: { item: ChangeItem; noun: string; last?: boolean }) {
+// One row per change, spreadsheet-style: who · when · what, with the field changes inline.
+export function ChangeEntry({ item, noun }: { item: ChangeItem; noun: string; last?: boolean }) {
   const [all, setAll] = useState(false)
   const parent = item.parts.find(p => !p.child)
   const children = item.parts.filter(p => p.child)
@@ -115,47 +116,38 @@ export function ChangeEntry({ item, noun, last }: { item: ChangeItem; noun: stri
   for (const c of parent?.action === 'update' ? parent.changes : []) rows.push(<FieldRow key={`p-${c.field}`} entityType={parent!.entityType} c={c} />)
   for (const p of children) {
     rows.push(
-      <div key={`c-${p.entityType}-${p.entityId}-${p.action}`} className="text-xs">
-        <span className="text-foreground-muted">{p.child!.label}</span>{' '}
-        <span className="text-foreground">{p.child!.name ? `“${p.child!.name}”` : ''}</span>
-        {p.action !== 'update' && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-foreground-muted">{VERB[p.action] ?? p.action}</span>}
+      <span key={`c-${p.entityType}-${p.entityId}-${p.action}`} className="inline-flex flex-wrap items-center gap-x-1 text-xs">
+        <span className="text-foreground-muted">{p.child!.label}</span>
+        {p.child!.name && <span className="text-foreground">“{p.child!.name}”</span>}
+        {p.action !== 'update' && <span className="text-[10px] uppercase tracking-wide text-foreground-muted">{VERB[p.action] ?? p.action}</span>}
         {p.image && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.image} alt="" className="inline-block ml-1.5 w-6 h-6 rounded object-cover border border-border-default align-middle" />
+          <img src={p.image} alt="" className="w-5 h-5 rounded object-cover border border-border-default" />
         )}
-        {p.action === 'update' && p.changes.length > 0 && (
-          <div className="pl-3 mt-0.5 space-y-0.5 border-l border-border-default">
-            {p.changes.map(c => (
-              <FieldRow key={c.field} entityType={p.entityType} c={c} />
-            ))}
-          </div>
-        )}
-      </div>
+        {p.action === 'update' &&
+          p.changes.map(c => <FieldRow key={c.field} entityType={p.entityType} c={c} />)}
+      </span>
     )
   }
   const shown = all ? rows : rows.slice(0, SHOW_FIELDS)
   return (
-    <li className="relative flex gap-3 pb-4 last:pb-0">
-      {!last && <span className="absolute left-3.5 top-8 bottom-0 w-px bg-border-default" aria-hidden />}
-      <ActorIcon actor={item.actor} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-sm font-medium text-foreground">{item.actor.name}</span>
-          <span className="text-xs text-foreground-muted" title={formatWhen(item.at)}>
-            {timeAgo(item.at)}
-          </span>
-          {item.ip && <span className="text-[10px] text-foreground-muted">· {item.ip}</span>}
-        </div>
-        <p className="text-sm text-foreground-secondary break-words">{headline(item, noun)}</p>
-        {rows.length > 0 && (
-          <div className="mt-1.5 space-y-1 rounded-lg bg-surface-secondary/60 px-2.5 py-2">
-            {shown}
-            {rows.length > SHOW_FIELDS && (
-              <button type="button" onClick={() => setAll(a => !a)} className="text-[11px] text-accent-600 hover:underline">
-                {all ? 'Show less' : `Show ${rows.length - SHOW_FIELDS} more`}
-              </button>
-            )}
-          </div>
+    <li className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2 border-b border-border-default last:border-0 sm:grid sm:grid-cols-[minmax(0,10rem)_5.5rem_minmax(0,1fr)]">
+      <span className="flex items-center gap-1.5 min-w-0">
+        <ActorIcon actor={item.actor} size="sm" />
+        <span className="text-xs font-medium text-foreground truncate">{item.actor.name}</span>
+      </span>
+      <span className="text-xs text-foreground-muted whitespace-nowrap sm:pt-0.5" title={`${formatWhen(item.at)}${item.ip ? ` · ${item.ip}` : ''}`}>
+        {timeAgo(item.at)}
+      </span>
+      <div className="basis-full sm:basis-auto min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1">
+        {rows.length === 0 || !parent || parent.action !== 'update' ? (
+          <span className="text-xs text-foreground-secondary break-words">{headline(item, noun)}</span>
+        ) : null}
+        {shown}
+        {rows.length > SHOW_FIELDS && (
+          <button type="button" onClick={() => setAll(a => !a)} className="text-[11px] text-accent-600 hover:underline">
+            {all ? 'Show less' : `+${rows.length - SHOW_FIELDS} more`}
+          </button>
         )}
       </div>
     </li>
@@ -217,8 +209,8 @@ function ChangeList({ log, noun, preset, step = 10 }: { log: ChangeLogState; nou
       <States log={log} empty={!items.length} />
       {!log.loading && shown.length > 0 && (
         <ul>
-          {shown.map((i, n) => (
-            <ChangeEntry key={i.id} item={i} noun={noun} last={n === shown.length - 1 && !more} />
+          {shown.map(i => (
+            <ChangeEntry key={i.id} item={i} noun={noun} />
           ))}
         </ul>
       )}
@@ -254,28 +246,30 @@ interface ChangeLogProps {
 export default function ChangeLog({ kind, id, variant = 'card', title, preset, version }: ChangeLogProps) {
   const [open, setOpen] = useState(false)
   const [sheet, setSheet] = useState(false)
-  const log = useChangeLog(kind, id, { version, enabled: variant !== 'collapsible' || open })
+  const log = useChangeLog(kind, id, { version, enabled: (variant !== 'collapsible' && variant !== 'card') || open })
   const noun = KIND_NOUN[kind] ?? 'record'
 
   if (variant === 'plain') return <ChangeList log={log} noun={noun} preset={preset} />
 
-  if (variant === 'collapsible')
+  // In the main column the log is secondary detail: start closed. The aside's compact card stays as is.
+  if (variant === 'collapsible' || variant === 'card')
     return (
       <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
           aria-expanded={open}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+          className="w-full flex items-center justify-between gap-2 px-5 py-3 text-left hover:bg-surface-secondary/40 transition-colors"
         >
-          <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-foreground">
+          <span className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-foreground">
             <History className="w-4 h-4 text-foreground-muted" />
             {title ?? 'Change log'}
+            {variant === 'card' && <span className="font-normal text-xs text-foreground-muted">Who changed what, and when</span>}
           </span>
           <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
         {open && (
-          <div className="px-4 pb-4 pt-1">
+          <div className="px-5 pb-4 pt-1 border-t border-border-default">
             <ChangeList log={log} noun={noun} preset={preset} />
           </div>
         )}
@@ -323,9 +317,5 @@ export default function ChangeLog({ kind, id, variant = 'card', title, preset, v
     )
   }
 
-  return (
-    <Card title={title ?? 'Change log'} hint="Who changed what, and when">
-      <ChangeList log={log} noun={noun} preset={preset} />
-    </Card>
-  )
+  return null
 }

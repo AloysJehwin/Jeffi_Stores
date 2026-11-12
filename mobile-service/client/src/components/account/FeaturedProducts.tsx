@@ -8,6 +8,7 @@ import { Grid } from '../home/layout'
 import { ImageOff } from 'lucide-react-native'
 import { useTokens } from '../../theme'
 import { productLabel } from '../../lib/a11y'
+import { inr } from '../../lib/format'
 
 // Mirror of controller-service components/visitor/FeaturedProducts.tsx ("You might also like").
 
@@ -55,10 +56,10 @@ export default function FeaturedProducts() {
                   {p.name}
                 </Text>
                 <View className="flex-row items-baseline gap-1.5">
-                  <Text className="text-sm font-bold text-foreground">₹{price.toLocaleString('en-IN')}</Text>
+                  <Text className="text-sm font-bold text-foreground">₹{inr(price)}</Text>
                   {mrp != null && mrp > price && (
                     <Text className="text-[11px] text-foreground-muted line-through">
-                      ₹{mrp.toLocaleString('en-IN')}
+                      ₹{inr(mrp)}
                     </Text>
                   )}
                 </View>

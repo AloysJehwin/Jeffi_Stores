@@ -48,6 +48,13 @@ type SpecColumn =
   | 'age_max'
   | 'target_gender'
   | 'target_audience'
+  | 'model_number'
+  | 'series'
+  | 'pack_size'
+  | 'moq'
+  | 'lead_time_days'
+  | 'return_window_days'
+  | 'replacement_policy'
 
 export type SpecSource = Partial<Record<SpecColumn, string | number | boolean | string[] | null>> & {
   brands?: { name?: string | null } | null
@@ -167,6 +174,8 @@ export function buildSpecGroups(product: SpecSource): { handling: HandlingFlag[]
   const groups = [
     group('key-details', 'Key details', [
       row('Brand', text(p.brands?.name)),
+      row('Model number', text(p.model_number)),
+      row('Series', text(p.series)),
       row('Part number', partNumber),
       row('Material', columnOrSpec('material')),
       row('Grade', columnOrSpec('grade')),
@@ -213,6 +222,13 @@ export function buildSpecGroups(product: SpecSource): { handling: HandlingFlag[]
           .filter(Boolean)
           .join(', ')
       ),
+    ]),
+    group('ordering', 'Ordering and returns', [
+      row('Pack size', text(p.pack_size)),
+      row('Minimum order', positive(p.moq) ? `${positive(p.moq)} units` : ''),
+      row('Lead time', positive(p.lead_time_days) ? `${positive(p.lead_time_days)} day${positive(p.lead_time_days) === 1 ? '' : 's'}` : ''),
+      row('Return window', positive(p.return_window_days) ? `${positive(p.return_window_days)} day${positive(p.return_window_days) === 1 ? '' : 's'}` : ''),
+      row('Replacement policy', text(p.replacement_policy)),
     ]),
     group('codes', 'Product codes', [
       row('SKU', text(p.sku), { copy: true }),

@@ -30,6 +30,10 @@ const ADSENSE_CONNECT =
   'https://*.googlesyndication.com https://*.doubleclick.net https://*.adtrafficquality.google https://adservice.google.com https://adservice.google.co.in https://fundingchoicesmessages.google.com'
 const ADSENSE_IMG = 'https://*.googlesyndication.com https://*.doubleclick.net https://*.adtrafficquality.google https://*.gstatic.com'
 
+// The admin's homepage preview frames the store's page (its own host in prod: {slug}. beside
+// admin-{slug}.; the same origin behind the dev router). Only the platform's hosts, never *.
+const PREVIEW_FRAME = `'self' https://jeffistores.in https://*.jeffistores.in${process.env.NODE_ENV === 'production' ? '' : ' http://localhost:* http://*.localhost:*'}`
+
 const CSP = [
   "default-src 'self' https://*.jeffistores.in",
   `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://dm9rri2wgl1e.cloudfront.net ${ADSENSE_SCRIPT}`,
@@ -37,8 +41,8 @@ const CSP = [
   "font-src 'self' https://fonts.gstatic.com",
   `connect-src 'self' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://maps.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.merchant-center-analytics.goog https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://pagead2.googlesyndication.com https://td.doubleclick.net https://*.google-analytics.com https://*.analytics.google.com ${VAULT_ORIGINS} ${S3_UPLOAD_ORIGINS} ${ADSENSE_CONNECT}`,
   `media-src 'self' blob: ${MEDIA_ORIGINS} ${VAULT_ORIGINS}`,
-  `img-src 'self' data: blob: https://*.jeffistores.in https://*.razorpay.com https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://td.doubleclick.net ${ADSENSE_IMG}`,
-  `frame-src data: https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://www.googletagmanager.com https://td.doubleclick.net ${ADSENSE_FRAME}`,
+  `img-src 'self' data: blob: https://*.jeffistores.in https://i.ytimg.com https://i.vimeocdn.com https://*.razorpay.com https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://td.doubleclick.net ${ADSENSE_IMG}`,
+  `frame-src data: ${PREVIEW_FRAME} https://www.youtube-nocookie.com https://player.vimeo.com https://*.razorpay.com https://accounts.google.com https://www.googletagmanager.com https://td.doubleclick.net ${ADSENSE_FRAME}`,
   // Protected Audience (remarketing) ads render in fenced frames, which Chrome loads only when https: is allowed.
   'fenced-frame-src https:',
   'child-src https://*.razorpay.com blob:',

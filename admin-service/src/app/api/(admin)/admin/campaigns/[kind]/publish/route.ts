@@ -5,6 +5,7 @@ import { queryOne, query } from '@/lib/shared/db'
 import { missingRequired } from '@/lib/campaigns/kind-variables'
 import { getLibraryTemplate } from '@/lib/messaging/library'
 import { renderBlocks } from '@/lib/templates/blocks'
+import { emptyWindowProblem } from '@/lib/campaigns/window-check'
 import { actorOf, campaignLockId, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 
 export const dynamic = 'force-dynamic'
@@ -24,13 +25,15 @@ export async function POST(req: NextRequest, { params }: Params) {
   const live = await queryOne<{
     kind: string
     scenario_kind: string | null
+    delay_hours: number
+    parameters: unknown
     email_template_slug: string | null
     subject_template: string
     body_template: string
     template_mode: string | null
     blocks: unknown
   }>(
-    `SELECT kind, scenario_kind, email_template_slug, subject_template, body_template, template_mode, blocks FROM campaigns WHERE kind = $1`,
+    `SELECT kind, scenario_kind, delay_hours, parameters, email_template_slug, subject_template, body_template, template_mode, blocks FROM campaigns WHERE kind = $1`,
     [kind]
   )
   if (!live) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
@@ -65,6 +68,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       { status: 400 }
     )
   }
+  const windowProblem = emptyWindowProblem(pick('scenario_kind') || kind, pick('parameters'), pick('delay_hours'))
+  if (windowProblem) return NextResponse.json({ error: windowProblem }, { status: 400 })
   const actor = actorOf(admin)
   try {
     const lockId = actor ? await campaignLockId(kind) : null

@@ -122,7 +122,11 @@ export interface PriceSet {
 }
 
 /** Errors for one product / variant / sub-variant price set. `label` prefixes each message. */
-export function priceErrors(label: string, p: PriceSet, opts: { requirePrice?: boolean } = {}): string[] {
+export function priceErrors(
+  label: string,
+  p: PriceSet,
+  opts: { requirePrice?: boolean; skipMrpCheck?: boolean } = {}
+): string[] {
   const errors: string[] = []
   const prefix = label ? `${label}: ` : ''
   const fields: [keyof PriceSet, string][] = [
@@ -149,6 +153,8 @@ export function priceErrors(label: string, p: PriceSet, opts: { requirePrice?: b
   const price = vals.price ?? null
   const mrp = vals.mrp ?? null
   if (opts.requirePrice && !(price != null && price > 0)) errors.push(`${prefix}selling price is required to publish.`)
+  // Stored prices the admin did not touch are not re-judged against MRP (see samePrices).
+  if (opts.skipMrpCheck) return errors
   if (price != null && mrp != null && mrp > 0 && price - mrp > 0.005)
     errors.push(`${prefix}selling price (₹${price}) cannot be higher than MRP (₹${mrp}).`)
   const pex = vals.priceExGst ?? null
@@ -156,6 +162,19 @@ export function priceErrors(label: string, p: PriceSet, opts: { requirePrice?: b
   if (pex != null && mex != null && mex > 0 && pex - mex > 0.005)
     errors.push(`${prefix}selling price ex. GST (₹${pex}) cannot be higher than MRP ex. GST (₹${mex}).`)
   return errors
+}
+
+type StoredPrices = { price?: AmountInput; mrp?: AmountInput; price_ex_gst?: AmountInput; mrp_ex_gst?: AmountInput }
+
+/** True when a staged row's four prices equal the stored row's (to the paisa). */
+export function samePrices(a: StoredPrices | null | undefined, b: StoredPrices | null | undefined): boolean {
+  if (!a || !b) return false
+  return (['price', 'mrp', 'price_ex_gst', 'mrp_ex_gst'] as const).every(k => {
+    const x = toAmount(a[k])
+    const y = toAmount(b[k])
+    if (x == null || y == null) return x == null && y == null
+    return Math.abs(x - y) < 0.005
+  })
 }
 
 // ── Publish shipping (weight / package dims) ─────────────────────────────────

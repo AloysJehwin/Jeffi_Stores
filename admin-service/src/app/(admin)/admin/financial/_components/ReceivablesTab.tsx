@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { useActionToast } from '@/components/admin/kit'
+import { useActionToast, SplitRow } from '@/components/admin/kit'
 import {
   Banner,
   Kpi,
@@ -221,8 +221,9 @@ function Body({ d, onChanged }: { d: Receivables; onChanged: () => void }) {
         />
       </KpiGrid>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title="Outstanding by aging"
             data={d.series ?? []}
@@ -230,13 +231,15 @@ function Body({ d, onChanged }: { d: Receivables; onChanged: () => void }) {
             labels={AGING_LABEL}
             granularity={d.bucket}
           />
-        </div>
-        <AgingDonutCard
-          rows={d.by_aging.map(a => ({ label: AGING_LABEL[a.key], value: a.amount, color: AGING_COLOR[a.key] }))}
-          total={money(agingTotal)}
-          centerLabel="Outstanding"
-        />
-      </div>
+        }
+        narrow={
+          <AgingDonutCard
+            rows={d.by_aging.map(a => ({ label: AGING_LABEL[a.key], value: a.amount, color: AGING_COLOR[a.key] }))}
+            total={money(agingTotal)}
+            centerLabel="Outstanding"
+          />
+        }
+      />
 
       <Section title="Top debtors">
         <Table

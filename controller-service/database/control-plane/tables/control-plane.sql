@@ -1,0 +1,990 @@
+-- controller-service: tables (control-plane set). Load order comes from scripts/db-files.mjs.
+
+-- Jeffi Stores SaaS control-plane schema
+-- Separate database (jeffi_control_plane) — the source of truth for tenants,
+-- plans, feature entitlements, and per-tenant infrastructure pointers.
+-- NOT the per-tenant business data (that lives in each tenant's own RDS).
+--
+-- Apply (LOCAL ONLY): psql postgresql://<user>@localhost:5432/jeffi_control_plane -f database/control-plane/schema.sql
+-- No cross-DB FK to the app schema (tenant_id on auth_sessions is validated in the app layer).
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+--
+-- plans: the 4 SaaS tiers. Feature entitlements are in plan_features.
+--
+CREATE TABLE IF NOT EXISTS public.plans (
+    id             uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    slug           character varying(40) NOT NULL,          -- 'starter' | 'basic' | 'growth' | 'pro' | 'enterprise'
+    name           character varying(80) NOT NULL,
+    tier           integer NOT NULL,                        -- 1..5, ordering
+    monthly_price_inr  numeric(12,2) NOT NULL DEFAULT 0,
+    infra_margin       numeric(4,3)  NOT NULL DEFAULT 0,       -- markup on AWS cost (0.5 = +50%)
+    min_preset         text          NOT NULL DEFAULT 'small', -- floor compute preset for this plan
+    max_custom_domains integer       NOT NULL DEFAULT 0,  -- 0=none, 1=Pro, 3=Enterprise
+    is_active          boolean       NOT NULL DEFAULT true,
+    created_at     timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at     timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- plan_features: which admin scope keys each plan enables. One row per (plan, scope_key).
+-- Storefront features are NOT gated (every plan gets the full storefront); only
+-- admin-panel scope keys (from src/lib/scopes.ts) are entitled here.
+--
+CREATE TABLE IF NOT EXISTS public.plan_features (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    plan_id     uuid NOT NULL,
+    scope_key   character varying(64) NOT NULL,             -- matches ADMIN_SCOPES key, e.g. 'quotations:read'
+    created_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenants: one row per customer store. slug drives {slug}.jeffistores.in.
+--
+CREATE TABLE IF NOT EXISTS public.tenants (
+    id             uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    slug           character varying(63) NOT NULL,          -- subdomain label; reserved words blocked in app
+    custom_domain  character varying(255),                  -- optional BYO domain (priced add-on)
+    display_name   character varying(200) NOT NULL,
+    plan_id        uuid,
+    status                   character varying(20) NOT NULL DEFAULT 'provisioning', -- pending_approval|awaiting_payment|provisioning|active|suspended|terminated|rejected
+    razorpay_subscription_id character varying(64),         -- Razorpay sub_xxxx; set after checkout redirect
+    razorpay_checkout_url    text,                           -- Razorpay hosted checkout short_url; shown to owner post-approval
+    razorpay_linked_account_id character varying(64),        -- Razorpay Route acc_xxxx; created on KYC approval for POBO transfers
+    subscription_status      character varying(20) NOT NULL DEFAULT 'created', -- created|authenticated|active|halted|cancelled|completed|expired
+    billing_interval         character varying(8)  NOT NULL DEFAULT 'monthly', -- monthly|yearly
+    -- Generated email addresses — derived from slug, no per-tenant SES identity needed
+    noreply_email  character varying(120) GENERATED ALWAYS AS ('noreply-' || slug || '@jeffistores.in') STORED,
+    campaign_email character varying(120) GENERATED ALWAYS AS ('campaigns-' || slug || '@jeffistores.in') STORED,
+    daily_payout             boolean NOT NULL DEFAULT false, -- +5% upgrade flag
+    own_delhivery            boolean NOT NULL DEFAULT false, -- ships on the tenant's own Delhivery account; skip wallet debit
+    own_razorpay             boolean NOT NULL DEFAULT false, -- collects payments on the tenant's own Razorpay; skip Route split
+    store_request            text,                           -- store application on a services tenant: pending_approval|awaiting_payment|provisioning
+    created_at     timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at     timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_infra: per-tenant infrastructure pointers used by the request-time
+-- host->tenant resolver + tenant-aware pool/S3 selection.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_infra (
+    id             uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id      uuid NOT NULL,
+    rds_endpoint   character varying(255),                  -- tenant's dedicated RDS host
+    rds_db         character varying(64) NOT NULL DEFAULT 'jeffi_stores',
+    rds_port       integer NOT NULL DEFAULT 5432,
+    db_secret_ref  character varying(255),                  -- Secrets Manager id for tenant DB creds (if not IAM)
+    iam_auth       boolean NOT NULL DEFAULT true,
+    s3_bucket      character varying(255),                  -- bucket-per-tenant
+    ec2_target     character varying(255),                  -- 'pool' or a dedicated instance/ASG id
+    region         character varying(32) NOT NULL DEFAULT 'us-east-1',
+    cloudfront_id  character varying(64),
+    cert_arn       character varying(512),
+    created_at     timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at     timestamp with time zone NOT NULL DEFAULT now()
+);
+-- host->tenant resolver looks up by slug (UNIQUE already indexes it) and custom_domain (UNIQUE too).
+
+--
+-- tenant_transactions: one row per payment on a tenant's store (POBO split).
+-- gross = what the buyer paid; tenant_share = seller's cut; platform_commission =
+-- our cut; gateway_fee = Razorpay/Route fee. is_cod flags cash-on-delivery (settled
+-- separately via COD remittance, not the online gateway).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_transactions (
+    id                  uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id           uuid NOT NULL,
+    order_ref           character varying(64),               -- the tenant order id/number
+    gross_amount        numeric(12,2) NOT NULL,
+    tenant_share        numeric(12,2) NOT NULL,
+    platform_commission numeric(12,2) NOT NULL DEFAULT 0,
+    gateway_fee         numeric(12,2) NOT NULL DEFAULT 0,
+    is_cod              boolean NOT NULL DEFAULT false,
+    gateway             character varying(32) NOT NULL DEFAULT 'razorpay_route',
+    gateway_txn_id      character varying(128),
+    status              character varying(24) NOT NULL DEFAULT 'captured', -- captured|split|settled|partially_refunded|refunded|failed
+    occurred_at         timestamp with time zone NOT NULL DEFAULT now(),
+    created_at          timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- settlement_ledger: per-tenant running money movements. The single reconciliation
+-- surface: +order_capture / -commission / -gateway_fee / -subscription_charge /
+-- +cod_remittance / -delhivery_correction / -refund / -payout. Signed amount.
+--
+CREATE TABLE IF NOT EXISTS public.settlement_ledger (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid NOT NULL,
+    entry_type    character varying(32) NOT NULL,  -- order_capture|commission|gateway_fee|subscription_charge|cod_remittance|delhivery_correction|refund|payout|adjustment
+    amount        numeric(12,2) NOT NULL,          -- signed: credits +, debits -
+    txn_id        uuid,                            -- optional link to tenant_transactions
+    note          character varying(255),
+    occurred_at   timestamp with time zone NOT NULL DEFAULT now(),
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_metrics_daily: rollup for charts (tenant count, MRR, txn volume by day).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_metrics_daily (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    metric_date   date NOT NULL,
+    active_tenants integer NOT NULL DEFAULT 0,
+    mrr_inr       numeric(14,2) NOT NULL DEFAULT 0,
+    gmv_inr       numeric(14,2) NOT NULL DEFAULT 0,     -- gross merchandise value across tenants that day
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Route lifecycle: captured -> split (transferred, on hold) -> settled (linked account paid out),
+-- or partially_refunded / refunded / failed. gateway = razorpay_route | razorpay_own | cod_remittance.
+-- refund_ids makes each Razorpay refund count exactly once across app path + webhook redeliveries.
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS payment_id              character varying(128);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS transfer_id             character varying(128);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS recipient_settlement_id character varying(64);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS refunded_amount         numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS reversed_amount         numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS refund_ids              text[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS failure_reason          character varying(255);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS transferred_at          timestamp with time zone;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS settled_at              timestamp with time zone;
+-- Idempotency key per money movement (cap:<pay>, trf:<trf>, refund id, reversal id, cod:<order>).
+ALTER TABLE public.settlement_ledger   ADD COLUMN IF NOT EXISTS external_ref            character varying(128);
+
+--
+-- tenant_wallets: per-tenant prepaid balance the platform debits for the real Delhivery
+-- cost once an AWB's invoice is known. Enforces a minimum balance before a shipment may be
+-- created (admin-editable). Recharges and debits are recorded in wallet_ledger; balance is
+-- the running total kept in sync inside the same control-plane transaction.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_wallets (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid NOT NULL,
+    balance       numeric(12,2) NOT NULL DEFAULT 0,
+    min_balance   numeric(12,2) NOT NULL DEFAULT 0,   -- placeholder; set per-tenant by admin
+    currency      character(3)  NOT NULL DEFAULT 'INR',
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- wallet_ledger: signed movements on a tenant wallet. recharge/adjustment credit (+),
+-- debit removes the real courier cost (-). A debit is keyed to its AWB so the debit-on-AWB
+-- hook is idempotent across retries (partial unique index below).
+--
+CREATE TABLE IF NOT EXISTS public.wallet_ledger (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid NOT NULL,
+    entry_type    character varying(24) NOT NULL,  -- recharge|debit|adjustment
+    amount        numeric(12,2) NOT NULL,          -- signed: recharge/adjustment +, debit -
+    order_ref     character varying(64),
+    awb           character varying(40),
+    -- Gateway reference for a credit (e.g. a Razorpay payment id). The unique index below makes
+    -- the top-up credit idempotent at the DB level; the old check-then-insert on `note` let two
+    -- concurrent verifies both credit the same payment.
+    external_ref  character varying(64),
+    note          text,
+    occurred_at   timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- What the movement was, for the Wallet page's filters/export, independent of entry_type's money
+-- direction. Nullable: existing rows read as their entry_type. Future paid features (campaign, ai)
+-- debit with their own category via debitWallet().
+ALTER TABLE public.wallet_ledger ADD COLUMN IF NOT EXISTS category character varying(32);
+
+--
+-- instance_state on tenants: tracks RDS running state for the disable toggle.
+-- 'running' (normal) | 'stopped' (RDS stopped to save cost — test tenant only).
+-- Separate from status (active/suspended/…) so a stopped test instance is still
+-- an 'active' tenant, just with its DB powered down.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS instance_state character varying(16) NOT NULL DEFAULT 'running';
+
+--
+-- ec2_instance_id on tenant_infra: durable pointer to the tenant's dedicated EC2
+-- instance so health-checks / rollback / deprovision can find and verify (or
+-- terminate) the box from the control plane instead of only the provisioning job's
+-- created_resources JSON. NULL for pool-served tenants.
+--
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS ec2_instance_id text;
+
+--
+-- provisioning_jobs: async state machine that turns a 'provisioning' tenant into
+-- a real, 'active' one. One row per tenant provision attempt; the worker advances
+-- one step per tick. created_resources tracks what's been made for rollback.
+--
+CREATE TABLE IF NOT EXISTS public.provisioning_jobs (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id          uuid NOT NULL,
+    step               character varying(32) NOT NULL DEFAULT 'preflight',
+    status             character varying(16) NOT NULL DEFAULT 'pending', -- pending|running|done|failed
+    attempts           integer NOT NULL DEFAULT 0,
+    next_attempt_at    timestamp with time zone,             -- set on retryable failure (exp backoff); worker skips until due
+    last_error         text,
+    created_resources  jsonb NOT NULL DEFAULT '{}'::jsonb,   -- {secretArn, paramGroup, dbInstanceId, bucket}
+    created_at         timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+-- The job's pipeline (controller provisioning/pipeline.ts), pinned at preflight; NULL = the legacy step list.
+ALTER TABLE public.provisioning_jobs ADD COLUMN IF NOT EXISTS pipeline        jsonb;
+ALTER TABLE public.provisioning_jobs ADD COLUMN IF NOT EXISTS step_started_at timestamp with time zone;
+
+--
+-- import_jobs: async bulk product import. One row per uploaded/synced spreadsheet.
+-- Lives in the control plane (like provisioning_jobs) so the single in-app worker can
+-- enumerate pending jobs across every tenant, then re-enter that tenant's context to
+-- write products against its own RDS. The worker claims a job (pending->running) and
+-- processes it to completion; row_results holds the per-row outcome for the history UI.
+--
+CREATE TABLE IF NOT EXISTS public.import_jobs (
+    id              uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id       uuid NOT NULL,
+    source          character varying(16) NOT NULL DEFAULT 'upload', -- upload|google_sheet
+    status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|running|done|failed
+    file_key        text,                                 -- staged upload S3 key (source=upload)
+    spreadsheet_id  text,                                 -- Google sheet id (source=google_sheet)
+    total_rows      integer NOT NULL DEFAULT 0,
+    processed_rows  integer NOT NULL DEFAULT 0,
+    created_count   integer NOT NULL DEFAULT 0,
+    updated_count   integer NOT NULL DEFAULT 0,
+    error_count     integer NOT NULL DEFAULT 0,
+    row_results     jsonb NOT NULL DEFAULT '[]'::jsonb,    -- [{row, sku, outcome, message}]
+    image_progress  jsonb NOT NULL DEFAULT '{}'::jsonb,    -- {fetched, total, failed}
+    pending_deletions jsonb NOT NULL DEFAULT '[]'::jsonb,  -- [{productId, sku, name}] sheet orphans awaiting approve/keep (source=google_sheet)
+    last_error      text,
+    created_by      uuid,                                 -- admin id that enqueued it
+    created_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at      timestamp with time zone NOT NULL DEFAULT now(),
+    finished_at     timestamp with time zone
+);
+
+--
+-- sheet_product_links: ownership map for the Google-sheet source-of-truth sync. One row per
+-- (tenant, spreadsheet, product) recording that a sheet "owns" a product. On each sync the worker
+-- upserts a link for every product the sheet touched; products linked to the sheet but absent from
+-- the current sync are orphans (staged into import_jobs.pending_deletions for approve/keep). Lives
+-- in the control plane beside import_jobs; product_id references a per-tenant store-DB row so it is
+-- intentionally NOT an FK (stale links are cleaned on reconcile). Upload imports never write here.
+--
+CREATE TABLE IF NOT EXISTS public.sheet_product_links (
+    id              uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id       uuid NOT NULL,
+    spreadsheet_id  text NOT NULL,
+    product_id      uuid NOT NULL,                         -- per-tenant store-DB product id (not an FK)
+    sku             text NOT NULL,
+    last_job_id     uuid,                                  -- the import_jobs row that last saw it
+    last_synced_at  timestamp with time zone NOT NULL DEFAULT now(),
+    created_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_migration_runs: per-tenant record of a schema/migration fan-out (Part B).
+-- One row per (tenant, deploy) so a failure on one tenant is visible, not hidden.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_migration_runs (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id   uuid NOT NULL,
+    git_sha     character varying(64),
+    status      character varying(16) NOT NULL DEFAULT 'pending', -- pending|success|failed
+    applied_sql text,
+    error       text,
+    ran_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- owners: ecom store OWNERS — the people who sign up at ecom.jeffistores.in to
+-- create/run a store. A NEW principal, distinct from admins (platform staff) and
+-- customers/business (shoppers within a tenant). Passwordless auth (OTP + Google)
+-- reusing the storefront verification services — no password stored here.
+--
+CREATE TABLE IF NOT EXISTS public.owners (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    email         character varying(255) NOT NULL,
+    name          character varying(200),
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- owner_tenants: which tenant(s) an owner owns (M:N to allow multi-store owners).
+--
+CREATE TABLE IF NOT EXISTS public.owner_tenants (
+    id         uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id   uuid NOT NULL,
+    tenant_id  uuid NOT NULL,
+    role       character varying(20) NOT NULL DEFAULT 'owner',  -- owner | member (future)
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_bank_accounts: the payout account for an owner's store, verified via
+-- penny-drop (Razorpay Fund Account Validation) before go-live. verification_status
+-- gates tenant creation (mandatory-before-go-live). linked_account_id = the Route
+-- linked-account id once created.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_bank_accounts (
+    id                  uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id            uuid NOT NULL,
+    tenant_id           uuid,                                -- set once the tenant is created
+    account_number      character varying(34),
+    ifsc                character varying(16),
+    holder_name         character varying(200),
+    upi_id              character varying(120),
+    verification_status character varying(16) NOT NULL DEFAULT 'pending', -- pending|initiated|verified|unverified|failed
+    verification_ref    character varying(128),              -- Razorpay validation id
+    verified_name       character varying(200),              -- name returned by the bank (penny-drop)
+    linked_account_id   character varying(64),               -- Razorpay Route linked account
+    -- Dual penny-drop UTR verification fields
+    penny_fund_account_id  character varying(64),            -- Razorpay fund_account id
+    penny_payout_id_1      character varying(64),            -- payout id for first ₹1 transfer
+    penny_payout_id_2      character varying(64),            -- payout id for second ₹1 transfer
+    penny_expected_utr_1   character varying(64),            -- UTR we sent (from Razorpay response)
+    penny_expected_utr_2   character varying(64),            -- UTR we sent (from Razorpay response)
+    penny_utr_1            character varying(64),            -- UTR entered by owner
+    penny_utr_2            character varying(64),            -- UTR entered by owner
+    created_at          timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at          timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- ── Custom domains (BYO CNAME): Pro=1, Enterprise=3 per plan.max_custom_domains ──
+-- Multi-domain per tenant (supersedes the single tenants.custom_domain column).
+CREATE TABLE IF NOT EXISTS public.tenant_custom_domains (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id          uuid NOT NULL,
+    domain             character varying(255) NOT NULL,
+    status             character varying(16) NOT NULL DEFAULT 'pending', -- pending|verifying|verified|failed
+    verification_token character varying(64),   -- CNAME/TXT token owner must publish
+    cert_arn           character varying(512),   -- ACM cert once issued
+    cloudfront_id      character varying(64),
+    verified_at        timestamp with time zone,
+    created_at         timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- ── Onboarding drafts: persists wizard progress so owners can resume ──────────
+CREATE TABLE IF NOT EXISTS public.onboarding_drafts (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id    uuid NOT NULL,
+    current_step integer NOT NULL DEFAULT 0,
+    data        jsonb NOT NULL DEFAULT '{}',
+    status      character varying(16) NOT NULL DEFAULT 'draft', -- draft|submitted
+    created_at  timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- ── Tenant KYC: GST cert + business details, reviewed by platform admin ───────
+CREATE TABLE IF NOT EXISTS public.tenant_kyc (
+    id              uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id       uuid NOT NULL,
+    owner_id        uuid NOT NULL,
+    gst_number      character varying(20),
+    gst_cert_s3_key character varying(512),   -- S3 key: kyc/{owner_id}/{uuid}-{filename}
+    pan             character varying(16),
+    business_name   character varying(200),
+    business_type   character varying(32),    -- proprietor|partnership|pvt_ltd|llp|other
+    business_address text,
+    product_categories text,                  -- comma-separated or free text
+    mobile          character varying(20),     -- owner mobile (distinct from warehouse sellerPhone)
+    logo_s3_key     character varying(512),    -- store logo: branding/{owner_id}/logo.*
+    seal_s3_key     character varying(512),    -- store seal (for legal docs): branding/{owner_id}/seal.*
+    warehouse       jsonb,                     -- onboarding pickup warehouse {originPincode,pickupLocation,sellerName,sellerAddress,sellerPhone}
+    legals_accepted_version character varying(20),   -- POLICY_VERSION the owner agreed to at onboarding
+    legals_accepted_at      timestamp with time zone,
+    status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
+    reviewer_note   text,
+    reviewed_by     character varying(200),   -- admin email
+    reviewed_at     timestamp with time zone,
+    created_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_social_accounts: a tenant's connected Meta accounts (one row per platform).
+-- access_token_enc is AES-256-GCM encrypted (src/lib/crypto/token-cipher.ts) — NEVER plaintext.
+-- Jeffi's OWN platform accounts do NOT live here (their token comes from env / Secrets Manager).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_social_accounts (
+    id                uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id         uuid NOT NULL,
+    provider          character varying(16) NOT NULL,          -- facebook | instagram | gbp | youtube | pinterest | linkedin | x
+    page_id           character varying(64),                   -- FB Page id
+    page_name         character varying(200),
+    ig_user_id        character varying(64),                   -- IG Business account id (when provider=instagram)
+    access_token_enc  text NOT NULL,                           -- encrypted long-lived Page token
+    token_expiry      timestamp with time zone,
+    status            character varying(16) NOT NULL DEFAULT 'connected', -- connected|expired|revoked
+    connected_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at        timestamp with time zone NOT NULL DEFAULT now(),
+    fb_user_id        character varying(64),                   -- app-scoped Facebook user who signed in (Meta deletion callbacks)
+    granted_scopes    text[]                                   -- Meta permissions granted at sign-in; NULL = unknown (manual or older)
+);
+
+--
+-- scheduled_social_posts: the auto-posting queue. tenant_id NULL = Jeffi's own platform post.
+-- The publisher (src/lib/social/publisher.ts) is driven by the publish-social-posts cron tick.
+--
+CREATE TABLE IF NOT EXISTS public.scheduled_social_posts (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,                                    -- NULL = Jeffi platform account
+    product_id    uuid,                                    -- source product (in the tenant's app DB)
+    platform      character varying(16) NOT NULL,          -- 'fb' | 'ig' | 'ig_reel'
+    caption       text,
+    hashtags      text,                                    -- space-joined '#tag' string
+    image_url     text,                                    -- public URL handed to Meta (card/product); first/primary image
+    image_urls    text[],                                  -- additional images for a carousel post (IG) / multi-photo post (FB)
+    video_url     text,                                    -- for ig_reel
+    scheduled_at  timestamp with time zone NOT NULL DEFAULT now(),
+    status        character varying(16) NOT NULL DEFAULT 'pending', -- pending|publishing|posted|failed
+    posted_id     character varying(64),                   -- Meta post/media id on success
+    last_error    text,
+    attempts      integer NOT NULL DEFAULT 0,
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now(),
+    group_id      uuid,                                    -- one composed post sent to several networks
+    title         text,                                    -- Pinterest / YouTube title
+    link_url      text,                                    -- destination; UTM tags are added at publish
+    next_attempt_at timestamp with time zone,              -- retry backoff after a failure
+    approval_status character varying(16) NOT NULL DEFAULT 'none', -- none|pending|approved|rejected
+    approved_by   text,
+    approved_at   timestamp with time zone,
+    permalink     text,
+    source        character varying(16) NOT NULL DEFAULT 'manual', -- manual|autopost
+    autopost_rule_id uuid,
+    created_by    text
+);
+
+--
+-- social_post_insights: latest metrics per published post (refreshed every 6 hours for 30 days).
+--
+CREATE TABLE IF NOT EXISTS public.social_post_insights (
+    post_id       uuid NOT NULL,
+    impressions   bigint, reach bigint, likes bigint, comments bigint, shares bigint, saves bigint, clicks bigint, video_views bigint,
+    fetched_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- social_inbox: comments on our posts and Google reviews, for one inbox with replies.
+--
+CREATE TABLE IF NOT EXISTS public.social_inbox (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,
+    network       character varying(16) NOT NULL,
+    kind          character varying(16) NOT NULL DEFAULT 'comment', -- comment|review
+    external_id   text NOT NULL,
+    post_id       uuid,
+    author        text,
+    text          text,
+    rating        smallint,
+    created_at    timestamp with time zone,
+    replied_at    timestamp with time zone,
+    reply_text    text,
+    reply_by      text,
+    is_read       boolean NOT NULL DEFAULT false,
+    fetched_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- social_templates: reusable captions ({name}, {price}, {url} are filled from the product).
+--
+CREATE TABLE IF NOT EXISTS public.social_templates (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,
+    name          character varying(80) NOT NULL,
+    caption       text NOT NULL,
+    hashtags      text,
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- social_autopost_rules: post automatically when a product is added, comes back in stock or drops
+-- in price. social_autopost_seen remembers each product's last state so a change is posted once.
+--
+CREATE TABLE IF NOT EXISTS public.social_autopost_rules (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,
+    trigger       character varying(16) NOT NULL,           -- new_product|back_in_stock|price_drop
+    platforms     text[] NOT NULL,
+    template_id   uuid,
+    min_drop_pct  numeric(5,2) NOT NULL DEFAULT 10,
+    require_approval boolean NOT NULL DEFAULT true,
+    enabled       boolean NOT NULL DEFAULT true,
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.social_autopost_seen (
+    tenant_id     uuid NOT NULL,
+    product_id    uuid NOT NULL,
+    in_stock      boolean,
+    price         numeric(12,2),
+    seen_at       timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_integration_credentials: a tenant's per-provider integration creds (Google Merchant,
+-- Amazon Seller, and future providers). config_enc is AES-256-GCM of a JSON blob holding the
+-- whole provider-specific credential set (never plaintext). meta holds NON-secret display
+-- fields (merchant id, seller id, marketplace, connected email). Meta/FB/IG creds live in
+-- tenant_social_accounts, not here.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_integration_credentials (
+    id           uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id    uuid NOT NULL,
+    provider     character varying(32) NOT NULL,           -- 'google_merchant' | 'amazon_seller' | ...
+    label        character varying(120),
+    config_enc   text NOT NULL,                             -- encrypted JSON credential blob
+    meta         jsonb NOT NULL DEFAULT '{}'::jsonb,        -- non-secret display fields
+    status       character varying(16) NOT NULL DEFAULT 'connected', -- connected|error|revoked
+    expires_at   timestamp with time zone,
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at   timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- platform_infra: singleton-ish key/value for platform-wide infra pointers that aren't tenant
+-- scoped — notably the shared pooled EC2 instance id (so create-if-missing survives restarts,
+-- vs. the read-only POOL_INSTANCE_ID env). One row per key.
+--
+CREATE TABLE IF NOT EXISTS public.platform_infra (
+    key         character varying(64) NOT NULL,   -- e.g. 'pool_instance_id', 'pool_instance_ip'
+    value       text,
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_ca: per-tenant certificate authority for tenant admin mTLS. Each tenant gets its
+-- OWN CA, so a client certificate issued for one tenant can never authenticate against
+-- another. nginx runs `ssl_verify_client optional_no_ca` on the tenant admin hosts and
+-- forwards the raw client cert; the app verifies it against THIS tenant's CA, which keeps
+-- verification dynamic (no nginx server block or reload per tenant).
+-- ca_key_pem is encrypted at rest (aes-256-gcm, TENANT_CA_ENC_KEY) — it is a signing key.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_ca (
+    tenant_id    uuid NOT NULL,
+    ca_cert_pem  text NOT NULL,                    -- public: used to verify client certs
+    ca_key_pem   text NOT NULL,                    -- ENCRYPTED signing key
+    subject      text NOT NULL,
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    expires_at   timestamp with time zone NOT NULL,
+    rotated_at   timestamp with time zone
+);
+
+--
+-- tenant_admin_certs: issued client certificates, for revocation and audit. A cert is valid
+-- only if its serial appears here with revoked_at IS NULL — revocation therefore takes effect
+-- immediately, without regenerating a CRL or touching nginx.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_admin_certs (
+    id            uuid NOT NULL DEFAULT uuid_generate_v4(),
+    tenant_id     uuid NOT NULL,
+    serial        character varying(64) NOT NULL,  -- uppercase hex, matches X509 serialNumber
+    common_name   character varying(128) NOT NULL,
+    issued_to     character varying(255) NOT NULL, -- email the p12 was sent to
+    issued_at     timestamp with time zone NOT NULL DEFAULT now(),
+    expires_at    timestamp with time zone NOT NULL,
+    revoked_at    timestamp with time zone,
+    revoked_by    character varying(255)
+);
+
+--
+-- provisioning_step_events: one row per step attempt, so the admin UI can show what each
+-- stage actually did rather than only the job's current step. provisioning_jobs keeps a
+-- single `step`/`last_error`, which means the moment a job advances, everything the previous
+-- step did is gone — including the error that made it retry.
+--
+CREATE TABLE IF NOT EXISTS public.provisioning_step_events (
+    id          uuid NOT NULL DEFAULT uuid_generate_v4(),
+    job_id      uuid NOT NULL,
+    tenant_id   uuid NOT NULL,
+    step        character varying(64) NOT NULL,
+    status      character varying(16) NOT NULL,   -- ok | skipped | warning | error
+    message     text,
+    detail      jsonb NOT NULL DEFAULT '{}'::jsonb,  -- resource keys this step produced
+    duration_ms integer,
+    created_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE public.provisioning_step_events ADD COLUMN IF NOT EXISTS started_at timestamp with time zone;
+
+
+--
+-- portal_certs: the CENTRAL downloadable certificate registry that certificate.jeffistores.in
+-- serves from. Unlike tenant_admin_certs (metadata + revocation only), this row carries the
+-- encrypted .p12 blob and its password so the shared portal host can serve a download without
+-- reaching each store's private RDS. tenant_id NULL = a platform admin cert. Blob + password are
+-- AES-256-GCM encrypted at rest, same scheme/key as tenant_ca.ca_key_pem (TENANT_CA_ENC_KEY).
+-- One-time download is tracked by downloaded_at; revoked_at mirrors the authoritative revocation.
+--
+CREATE TABLE IF NOT EXISTS public.portal_certs (
+    id              uuid NOT NULL DEFAULT uuid_generate_v4(),
+    tenant_id       uuid,
+    serial          character varying(64) NOT NULL,
+    common_name     character varying(128) NOT NULL,
+    issued_to       character varying(255) NOT NULL,   -- verified email the portal matches on
+    role            character varying(32),
+    store_name      character varying(200),
+    p12_data_enc    text NOT NULL,                      -- AES-256-GCM(base64(p12))
+    p12_password_enc text NOT NULL,                     -- AES-256-GCM(password)
+    download_token  character varying(255) NOT NULL,
+    downloaded_at   timestamp with time zone,
+    expires_at      timestamp with time zone NOT NULL,
+    revoked_at      timestamp with time zone,
+    created_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Verified admin mobile numbers across every store (tenant_id NULL = the platform): which store a
+-- WhatsApp message from an admin's number is for. The store's admins row stays the source of truth.
+CREATE TABLE IF NOT EXISTS public.admin_mobiles (
+    phone       character varying(16) NOT NULL,
+    tenant_id   uuid,
+    admin_id    uuid NOT NULL,
+    verified_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+
+-- =====================================================================
+-- Vault storage quotas + customer-subscription webhook routing
+-- =====================================================================
+
+-- Per-plan vault storage limits. 10 GB / 50 GB / 200 GB / 1 TB seeded in seed-plans.sql;
+-- max_file_bytes caps a single upload (5 GB). egress_quota_bytes is NULL = log-only for now.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS storage_quota_bytes bigint NOT NULL DEFAULT 10737418240;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS max_file_bytes      bigint NOT NULL DEFAULT 5368709120;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS egress_quota_bytes  bigint;
+
+-- Infra-cost pricing: each paid plan marks up AWS cost by infra_margin and floors compute to min_preset.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS infra_margin numeric(4,3) NOT NULL DEFAULT 0;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS min_preset   text         NOT NULL DEFAULT 'small';
+-- Markup when the store's database is on RDS; NULL uses infra_margin.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS rds_margin   numeric(4,3);
+
+-- Own-key tenants verify their customer webhook with their own secret (platform secret can't).
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS razorpay_webhook_secret character varying(255);
+
+-- Running vault storage accounting, folded into the existing tenant_infra row (not a new table).
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS used_storage_bytes bigint NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS file_count         integer NOT NULL DEFAULT 0;
+
+-- Nightly S3 bucket size, read by the cap guard in @jeffi/tenancy s3.ts.
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS s3_usage_bytes     bigint NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS s3_usage_updated_at timestamptz;
+
+--
+-- razorpay_subscription_index: platform-account subscription events carry notes.tenant_id, but
+-- we verify them against this authoritative index (and the collecting account) before trusting
+-- the notes and entering the tenant DB. One row per Razorpay subscription on the platform account.
+--
+CREATE TABLE IF NOT EXISTS public.razorpay_subscription_index (
+    razorpay_subscription_id character varying(64) NOT NULL,
+    tenant_id                uuid NOT NULL,
+    collecting_account       character varying(12) NOT NULL DEFAULT 'platform',
+    product_id               uuid,
+    local_subscription_id    uuid,
+    created_at               timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT razorpay_subscription_index_pkey PRIMARY KEY (razorpay_subscription_id)
+);
+
+--
+-- Service types + public API keys (public.jeffistores.in). A tenant may subscribe to any mix of
+-- store | messaging | documents. Services-only tenants are never provisioned (no RDS/S3/compute)
+-- and are created 'active' straight from onboarding; they keep the same tenants.id (and so the
+-- same tenant_wallets row) if they later add a store.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS service_types text[] NOT NULL DEFAULT '{store}';
+ALTER TABLE public.plans   ADD COLUMN IF NOT EXISTS product character varying(16) NOT NULL DEFAULT 'store'; -- store|services
+
+CREATE TABLE IF NOT EXISTS public.api_keys (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id           uuid NOT NULL,
+    tenant_id          uuid NOT NULL,
+    name               character varying(80) NOT NULL,
+    key_prefix         character varying(16) NOT NULL,  -- 'jk_live_' + 8 chars, shown in UI
+    key_hash           character(64) NOT NULL,          -- sha256 hex of the full key; plaintext never stored
+    scopes             text[] NOT NULL DEFAULT '{}',    -- messages:send | templates:read | templates:write | documents:render | documents:read | wallet:read
+    rate_limit_per_min integer NOT NULL DEFAULT 120,
+    status             character varying(16) NOT NULL DEFAULT 'active', -- active|revoked
+    last_used_at       timestamp with time zone,
+    revoked_at         timestamp with time zone,
+    created_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.api_key_usage_daily (
+    api_key_id   uuid NOT NULL,
+    day          date NOT NULL,
+    requests     integer NOT NULL DEFAULT 0,
+    messages     integer NOT NULL DEFAULT 0,
+    documents    integer NOT NULL DEFAULT 0,
+    spend_paise  bigint  NOT NULL DEFAULT 0
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ai_price_list: platform-wide AI price list (docs/plans/AI_MEDIA_PLATFORM_PLAN.md). One row per
+-- (capability, provider, model, unit_type). cost_inr is the platform's cost per unit; price_inr is
+-- what a tenant's wallet is charged per unit (Razer rows carry a non-zero price so local inference
+-- is still charged). Edited at /admin/ecom/ai-pricing; seeded in seed-plans.sql.
+CREATE TABLE IF NOT EXISTS public.ai_price_list (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video
+    provider    character varying(32) NOT NULL,   -- ollama | razer | anthropic | google | replicate | openai
+    model       character varying(128) NOT NULL,  -- '*' = default for the provider
+    unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call
+    cost_inr    numeric(10,4) NOT NULL DEFAULT 0,
+    price_inr   numeric(10,4) NOT NULL DEFAULT 0,
+    active      boolean NOT NULL DEFAULT true,
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- platform_provider_settings: which provider serves SMS, WhatsApp and AI (text/image/video) for a
+-- store. tenant_id NULL is the platform default; a row with a tenant_id overrides it for that store.
+-- Managed only by the platform admin at /admin/ecom/providers; read by lib/providers/policy.ts.
+-- value: "twilio"|"aws" for sms_provider/whatsapp_provider, an ordered JSON array of gateway
+-- provider names for ai_*_providers ([] = gateway default), "draft"|"standard"|"premium" for
+-- ai_image_default_quality.
+CREATE TABLE IF NOT EXISTS public.platform_provider_settings (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id   uuid,
+    key         character varying(48) NOT NULL,
+    value       jsonb NOT NULL,
+    updated_by  character varying(255),
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- ai_provider_identities: per-store AI provider workload identity (non-secret ids). For Anthropic
+-- one workspace + service account + federation rule per store; the gateway exchanges its pod token
+-- for a workspace-scoped access token with them. tenant_id is the store (the platform id for
+-- the flagship). Provisioned outside the app; read by lib/providers/policy.ts. No row = no Claude
+-- for that store (text falls back to Razer).
+CREATE TABLE IF NOT EXISTS public.ai_provider_identities (
+    tenant_id           uuid NOT NULL,
+    provider            text NOT NULL,
+    workspace_id        text NOT NULL,   -- wrkspc_...
+    service_account_id  text NOT NULL,   -- svac_...
+    federation_rule_id  text NOT NULL,   -- fdrl_...
+    created_at          timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at          timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- Ad-free add-on. Every store shows the platform's Google AdSense ads; a tenant pays Rs 500 a month
+-- from its wallet to remove them (lib/billing/ad-free.ts). Ads return once ad_free_until passes.
+-- ad_free_renew: the daily ad_free_renew cron charges the next month before the current one ends.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_until timestamp with time zone;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS ad_free_renew boolean NOT NULL DEFAULT false;
+
+--
+-- A downgrade waits for the end of the paid cycle: Razorpay switches the subscription's plan then, and the
+-- next subscription.charged moves the store onto pending_plan_id (webhook/razorpay).
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pending_plan_id uuid;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS pending_billing_interval character varying(16);
+
+--
+-- UPI collection (lib/payments/upi/creds.ts): the platform admin's switch. auto = the store's own provider
+-- (its PhonePe creds when saved, else UPG on its UPI ID); off = no UPI at checkout.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS upi_mode character varying(12) NOT NULL DEFAULT 'auto';
+
+--
+-- linked_account_settlements: a Route store's payout from its linked account to its bank, read from
+-- Razorpay (settlement.processed on the linked account, or the transfers it settled).
+--
+CREATE TABLE IF NOT EXISTS public.linked_account_settlements (
+    id                text NOT NULL,                -- setl_ on the linked account
+    tenant_id         uuid NOT NULL,
+    linked_account_id text NOT NULL,
+    amount            numeric(14,2) NOT NULL DEFAULT 0,
+    fees              numeric(12,2) NOT NULL DEFAULT 0,
+    tax               numeric(12,2) NOT NULL DEFAULT 0,
+    utr               text,
+    status            text,
+    settled_at        timestamp with time zone,
+    fetched_at        timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- razorpay_downtimes: payment-method outages Razorpay reports (payment.downtime.*), shown on every
+-- admin console. source: the account whose webhook reported it (platform, or a store slug).
+--
+CREATE TABLE IF NOT EXISTS public.razorpay_downtimes (
+    id            text NOT NULL,                    -- down_
+    method        text NOT NULL,
+    instrument    jsonb,
+    severity      text,
+    status        text NOT NULL,                    -- scheduled|started|updated|resolved
+    scheduled     boolean NOT NULL DEFAULT false,
+    begin_at      timestamp with time zone,
+    end_at        timestamp with time zone,
+    source        text NOT NULL DEFAULT 'platform',
+    notified_at   timestamp with time zone,
+    first_seen_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+
+--
+-- Owner-chosen store compute (configurable provisioning). compute_prices: AWS on-demand list prices the
+-- calculator prices from, in USD (rewritten by deploy/k8s/db/refresh-compute-prices.sh). The rate, margin and pool
+-- sizes it prices with are platform_infra key 'compute_pricing'.
+--
+CREATE TABLE IF NOT EXISTS public.compute_prices (
+    code                  text NOT NULL,                -- ec2:t4g.small | rds:db.t4g.micro | rds_storage:gp3 | ebs:gp3
+    kind                  text NOT NULL,
+    label                 text NOT NULL,
+    vcpu                  integer,
+    memory_mib            integer,
+    usd_hourly            numeric(10,5),
+    usd_hourly_multi_az   numeric(10,5),
+    usd_gb_month          numeric(10,5),
+    usd_gb_month_multi_az numeric(10,5),
+    sellable              boolean NOT NULL DEFAULT true,
+    sort                  integer NOT NULL DEFAULT 0,
+    updated_at            timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_compute: a store's chosen (desired) and running (applied) compute spec, see lib/compute/spec.ts.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_compute (
+    tenant_id     uuid NOT NULL,
+    preset        text,                                 -- shared|small|medium|large|xlarge|custom
+    desired       jsonb NOT NULL,
+    applied       jsonb,
+    status        text NOT NULL DEFAULT 'pending',
+    apply_mode    text NOT NULL DEFAULT 'window',       -- window: RDS class changes wait for the maintenance window
+    rate_inr_hour numeric(12,4),                        -- applied spec's price, margin included, GST excluded
+    price_inr_month integer,                            -- store's monthly subscription price (replaces plan fee)
+    node_gen      integer NOT NULL DEFAULT 0,           -- dedicated servers' generation; a type change starts the next
+    progress      jsonb,                                -- where a change of a running store has got to (compute-reconcile.ts)
+    attempts      integer NOT NULL DEFAULT 0,
+    next_at       timestamp with time zone,
+    last_error    text,
+    applied_at    timestamp with time zone,
+    low_balance_since timestamp with time zone,         -- the wallet went below zero; the store pauses graceDays later
+    balance_warned_at timestamp with time zone,         -- last "top up soon" email (lib/billing/infra-balance.ts)
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Store's monthly subscription price (replaces plan.monthly_price_inr as MRR source).
+ALTER TABLE public.tenant_compute ADD COLUMN IF NOT EXISTS price_inr_month integer;
+
+--
+-- tenant_compute_periods: a store's server price per hour over time, for the daily wallet debit
+-- (lib/billing/infra-billing.ts). A new period starts whenever the price or the paused state changes.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_compute_periods (
+    id               uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id        uuid NOT NULL,
+    rate_inr_hour    numeric(12,4) NOT NULL,           -- running: the applied spec's price, margin included, GST excluded
+    storage_inr_hour numeric(12,4) NOT NULL,           -- paused: disks, database storage and the platform share only
+    paused           boolean NOT NULL DEFAULT false,
+    started_at       timestamp with time zone NOT NULL DEFAULT now(),
+    ended_at         timestamp with time zone
+);
+
+-- What a plan allows: its default preset, whether the store shares a pool node and database ('pool',
+-- Starter) or gets its own ('dedicated'), and whether the owner may customise beyond the presets.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS default_preset   text;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS min_placement    text NOT NULL DEFAULT 'dedicated';
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS advanced_compute boolean NOT NULL DEFAULT true;
+
+--
+-- shared_db_hosts: RDS instances that hold Starter stores, one database + IAM login role per store
+-- (t_{slug} / app_{slug}). `tenants` counts seats taken, including stores still provisioning.
+--
+CREATE TABLE IF NOT EXISTS public.shared_db_hosts (
+    id         text NOT NULL,                           -- the RDS instance id, jeffi-starter-{n}
+    endpoint   text,
+    db_class   text NOT NULL,
+    storage_gb integer NOT NULL,
+    capacity   integer NOT NULL,
+    tenants    integer NOT NULL DEFAULT 0,
+    status     text NOT NULL DEFAULT 'creating',
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- A Starter store's own login role on its shared host (null = RDS_USER), and which host.
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS rds_user       text;
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS shared_db_host text;
+
+--
+-- admin_api_tokens: admin API credentials, resolved by the public gateway (public[-{slug}].jeffistores.in)
+-- without opening a store's DB. jfc_ = a person's token (`jeffi login` device flow, or the extension card),
+-- jsa_ = a service account's key. sha256 only; the plaintext is shown once. admin_id / service_account_id
+-- live in the store's own DB. tenant_id is the store; the flagship is the nil uuid (no tenants row, no FK).
+--
+CREATE TABLE IF NOT EXISTS public.admin_api_tokens (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    token_hash         character(64),                     -- null until a device login is collected
+    token_prefix       character varying(16),
+    tenant_id          uuid NOT NULL,
+    kind               character varying(16) NOT NULL DEFAULT 'cli',     -- cli | service_account | extension
+    admin_id           uuid,
+    service_account_id uuid,
+    admin_role         character varying(32),             -- role at approval: the gateway's platform pre-check
+    status             character varying(16) NOT NULL DEFAULT 'pending', -- pending | denied | active | revoked
+    device_code_hash   character(64),
+    user_code          character varying(9),              -- XXXX-XXXX, pending device logins only
+    scopes             jsonb NOT NULL DEFAULT '[]'::jsonb, -- ["*"] = whatever the holder holds now
+    host               character varying(255) NOT NULL,   -- admin host it was issued on
+    client_name        character varying(120),
+    client_ip          character varying(64),
+    user_agent         character varying(500),
+    created_at         timestamp with time zone NOT NULL DEFAULT now(),
+    approved_at        timestamp with time zone,
+    expires_at         timestamp with time zone,          -- null: until revoked (service-account keys)
+    revoked_at         timestamp with time zone,
+    last_used_at       timestamp with time zone
+);
+
+--
+-- platform_setup_progress: the platform administrator's manual progress on platform-level approvals
+-- (Setup guide → Platform apps): applied on a date, approved, skipped. Keyed by the item id in
+-- lib/setup-guide/registry.ts PLATFORM_ITEMS. Key presence is read live from the admin-service env.
+--
+CREATE TABLE IF NOT EXISTS public.platform_setup_progress (
+    item_id     character varying(64) NOT NULL,
+    state       character varying(16) NOT NULL,
+    applied_at  date,
+    note        text,
+    updated_by  character varying(255),
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- SMS & WhatsApp add-on (lib/billing/messaging-addon.ts). A tenant store sends SMS / WhatsApp only while
+-- messaging_addon covers the channel (sms | whatsapp | both; Rs 500 / 500 / 1,000 a month from the wallet)
+-- AND Jeffi has assigned it a sender (tenant_messaging_senders). messaging_addon_renew: the daily
+-- messaging_addon_renew cron charges the next month before the current one ends. The flagship is exempt.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon character varying(8) NOT NULL DEFAULT 'none';
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon_until timestamp with time zone;
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon_renew boolean NOT NULL DEFAULT false;
+
+--
+-- Add-ons the owner picked in the onboarding plan step (lib/billing/requested-addons.ts): 'messaging' |
+-- 'ad_free'. Bought from the wallet once the store is live; an entry is removed when bought or declined.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS requested_addons text[] NOT NULL DEFAULT '{}'::text[];
+
+--
+-- tenant_messaging_senders: the sender Jeffi assigned a tenant for a channel — a DLT-registered SMS header
+-- or a WhatsApp number — plus the provider credentials that send through it (lib/messaging/tenant-senders.ts).
+-- config_enc is AES-256-GCM of the JSON credential blob (lib/crypto/token-cipher); meta holds masked,
+-- non-secret hints for the admin UI. One row per (tenant, channel); the platform tenant never has one.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_messaging_senders (
+    id           uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id    uuid NOT NULL,
+    channel      character varying(10) NOT NULL,            -- sms | whatsapp
+    provider     character varying(16) NOT NULL,            -- twilio | aws
+    sender       character varying(120) NOT NULL,           -- DLT header or WhatsApp number
+    config_enc   text NOT NULL,                             -- encrypted JSON credential blob
+    meta         jsonb NOT NULL DEFAULT '{}'::jsonb,        -- masked display fields
+    status       character varying(16) NOT NULL DEFAULT 'active', -- active | disabled
+    created_by   character varying(255),
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at   timestamp with time zone NOT NULL DEFAULT now()
+);

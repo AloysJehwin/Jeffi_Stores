@@ -180,7 +180,12 @@ export function DeliveryInfo({
               <PerkIcon item={item} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text className="text-sm font-semibold leading-tight text-foreground">{item.label}</Text>
+              {/* A line per word, each shrinking to fit, so a long word ("Replacement") never splits at large font sizes. */}
+              {item.label.split(' ').map((w, j) => (
+                <Text key={j} className="text-sm font-semibold leading-tight text-foreground" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                  {w}
+                </Text>
+              ))}
               <Text className="mt-0.5 text-[11px] leading-snug text-foreground-muted">{item.sub}</Text>
             </View>
           </Pressable>
@@ -194,7 +199,9 @@ export function DeliveryInfo({
         className="w-full flex-row items-center gap-2.5 rounded-field border border-border-default bg-surface px-3 py-2.5 active:bg-surface-secondary"
       >
         <PerkIcon item={items[4]} />
-        <Text className="w-10 shrink-0 text-[11px] font-medium leading-tight text-foreground-muted">Secure Payment</Text>
+        <Text className="w-16 shrink-0 text-[11px] font-medium leading-tight text-foreground-muted" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+          Secure payment
+        </Text>
         <View className="ml-2 flex-1 flex-row flex-wrap items-center gap-1">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
             <Badge key={m} label={m} size="sm" />

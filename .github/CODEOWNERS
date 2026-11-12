@@ -3,6 +3,8 @@
 
 # Database schema
 /database/ @AloysJehwin
+/*/database/ @AloysJehwin
+/scripts/db-files.mjs @AloysJehwin
 
 # Next app API routes and shared code
 /controller-service/src/app/api/ @AloysJehwin

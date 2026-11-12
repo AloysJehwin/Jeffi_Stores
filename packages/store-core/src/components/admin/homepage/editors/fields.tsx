@@ -13,8 +13,8 @@ import {
   SECTION_ASPECTS,
   SECTION_META,
   businessVisitorView,
-  rowSurface,
   sectionAspectValue,
+  sectionSurfaces,
   sectionLayout,
   sectionLimit,
   sectionCopyDefaults,
@@ -52,6 +52,8 @@ export interface EditorProps {
   options?: SectionOptions
   onChange: (id: string, patch: Partial<HomepageSection>) => void
   onSave: (id: string, body: Record<string, unknown>) => Promise<void>
+  /** Which half of a two-column row the section is, if any. */
+  half?: 'left' | 'right'
 }
 
 export const INPUT_CLASS =
@@ -684,7 +686,8 @@ const SIDES_LABELS: Record<string, string> = {
 export function SidesField({ props }: { props: EditorProps }) {
   const b = useSectionBinding(props)
   const options = sideOptions(props.section.type)
-  if (!options.length || sectionAspectValue(props.section) === 'auto' || rowSurface(props.section) === 'app') return null
+  const on = sectionSurfaces(props.section)
+  if (!options.length || sectionAspectValue(props.section) === 'auto' || (!on.web && !on.web_mobile)) return null
   const peek = options.includes('peek')
   return (
     <Select
@@ -704,6 +707,15 @@ export function PlacementFields({ props }: { props: EditorProps }) {
   const p = sectionPlacement(props.section)
   const save = (next: { after: number; every: number | null }) =>
     b.saveConfig({ placement: next.every ? next : { after: next.after } })
+  // The right half of a two-column row goes wherever the left half goes.
+  if (props.half === 'right') {
+    return (
+      <p className="text-xs text-foreground-muted">
+        This section is the right half of a two-column row, so it follows the left half&apos;s position between the
+        products. Drag it out of the row to place it on its own.
+      </p>
+    )
+  }
   return (
     <Grid>
       <NumberField

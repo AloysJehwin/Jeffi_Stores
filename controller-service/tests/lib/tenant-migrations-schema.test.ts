@@ -200,7 +200,7 @@ describe('parseCreateTables', () => {
     expect(sql).toContain('ALTER TABLE public.products ADD COLUMN IF NOT EXISTS color character varying(100);')
   })
 
-  // #488: the platform-only 'administrator' seed from database/users.sql must never reach a tenant.
+  // #488: the platform-only 'administrator' seed in the users.sql topic file must never reach a tenant.
   it('strips the platform-only administrator seed UPDATE', () => {
     expect(sql).not.toMatch(/SET\s+role\s*=\s*'administrator'\s+FROM\s+public\.users/i)
     expect(sql).not.toMatch(/admin@jeffistores\.in/i)

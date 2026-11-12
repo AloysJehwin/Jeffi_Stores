@@ -19,7 +19,7 @@ import {
   SECTION_COPY_DEFAULTS,
   HOMEPAGE_AUDIENCES,
   HOMEPAGE_SURFACES,
-  forSurface,
+  slidesForSurface,
   rowAudience,
   rowSurface,
   type HomepageAudience,
@@ -193,7 +193,7 @@ async function topBrands(): Promise<PreviewItem[]> {
 // The slides the surface would show: its own, or the website's when it has none (as the live model does).
 async function heroItems(surface: HomepageSurface, audience: HomepageAudience, draftId: string | null): Promise<PreviewItem[]> {
   const { heroSlides } = await getEditableHomepage(draftId)
-  return forSurface(heroSlides.filter(s => rowAudience(s) === audience), surface)
+  return slidesForSurface(heroSlides.filter(s => rowAudience(s) === audience), surface)
     .filter(s => s.is_active)
     .slice(0, PREVIEW_LIMIT)
     .map(s => ({

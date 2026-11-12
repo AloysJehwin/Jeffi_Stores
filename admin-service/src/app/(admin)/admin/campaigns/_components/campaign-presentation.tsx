@@ -98,71 +98,91 @@ export function ChannelChip({ channel }: { channel: CampaignChannel }): ReactNod
   )
 }
 
+/** Opens the customers behind one number (see CampaignRecipientsDialog); omitted, numbers are plain text. */
+export type OpenMetric = (metric: CampaignMetric, label: string) => void
+export type CampaignMetric =
+  | 'sent' | 'opened' | 'clicked' | 'converted' | 'revenue' | 'unsubscribed'
+  | 'push_sent' | 'push_waiting' | 'push_skipped' | 'push_failed' | 'push_opened' | 'push_converted'
+
+function StatTile({ label, value, display, cls = 'text-foreground', sub, metric, onOpen }: {
+  label: string
+  value: number
+  display?: string
+  cls?: string
+  sub?: string
+  metric: CampaignMetric
+  onOpen?: OpenMetric
+}): ReactNode {
+  const text = display ?? value.toLocaleString('en-IN')
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-foreground-muted">{label}</p>
+      {onOpen && value > 0 ? (
+        <button
+          type="button"
+          onClick={() => onOpen(metric, label)}
+          title={`See the customers: ${label.toLowerCase()}`}
+          className={`text-lg font-bold tabular-nums underline decoration-dotted decoration-1 underline-offset-4 hover:decoration-solid ${cls}`}
+        >
+          {text}
+        </button>
+      ) : (
+        <p className={`text-lg font-bold tabular-nums ${cls}`}>{text}</p>
+      )}
+      {sub && <p className="text-[10px] text-foreground-muted">{sub}</p>}
+    </div>
+  )
+}
+
 /** The six campaign stat tiles, shared by the desktop card and the mobile detail sheet. */
-export function CampaignStatsGrid({ c }: { c: CampaignRow }): ReactNode {
+export function CampaignStatsGrid({ c, onOpen }: { c: CampaignRow; onOpen?: OpenMetric }): ReactNode {
+  const sent = Number(c.total_sent)
+  const revenue = Math.round(Number(c.revenue_attributed))
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Sent</p>
-        <p className="text-lg font-bold text-foreground tabular-nums">{Number(c.total_sent).toLocaleString('en-IN')}</p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Opened</p>
-        <p className="text-lg font-bold text-foreground tabular-nums">
-          {Number(c.total_opened).toLocaleString('en-IN')}
-        </p>
-        <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_opened), Number(c.total_sent))}</p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Clicked</p>
-        <p className="text-lg font-bold text-foreground tabular-nums">
-          {Number(c.total_clicked).toLocaleString('en-IN')}
-        </p>
-        <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_clicked), Number(c.total_sent))}</p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Converted</p>
-        <p className="text-lg font-bold text-green-600 dark:text-green-400 tabular-nums">
-          {Number(c.total_converted).toLocaleString('en-IN')}
-        </p>
-        <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_converted), Number(c.total_sent))}</p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Revenue</p>
-        <p className="text-lg font-bold text-foreground tabular-nums">
-          ₹{Math.round(Number(c.revenue_attributed)).toLocaleString('en-IN')}
-        </p>
-      </div>
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Unsub</p>
-        <p className="text-lg font-bold text-red-500 tabular-nums">
-          {Number(c.total_unsubscribed).toLocaleString('en-IN')}
-        </p>
-        <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_unsubscribed), Number(c.total_sent))}</p>
-      </div>
+      <StatTile label="Sent" value={sent} metric="sent" onOpen={onOpen} />
+      <StatTile label="Opened" value={Number(c.total_opened)} sub={rate(Number(c.total_opened), sent)} metric="opened" onOpen={onOpen} />
+      <StatTile label="Clicked" value={Number(c.total_clicked)} sub={rate(Number(c.total_clicked), sent)} metric="clicked" onOpen={onOpen} />
+      <StatTile
+        label="Converted"
+        value={Number(c.total_converted)}
+        cls="text-green-600 dark:text-green-400"
+        sub={rate(Number(c.total_converted), sent)}
+        metric="converted"
+        onOpen={onOpen}
+      />
+      <StatTile label="Revenue" value={revenue} display={`₹${revenue.toLocaleString('en-IN')}`} metric="revenue" onOpen={onOpen} />
+      <StatTile
+        label="Unsub"
+        value={Number(c.total_unsubscribed)}
+        cls="text-red-500"
+        sub={rate(Number(c.total_unsubscribed), sent)}
+        metric="unsubscribed"
+        onOpen={onOpen}
+      />
     </div>
   )
 }
 
 /** App push outcomes of a scenario (its push:<kind> markers). Opens are taps on the notification. */
-export function CampaignPushStats({ c }: { c: CampaignRow }): ReactNode {
+export function CampaignPushStats({ c, onOpen }: { c: CampaignRow; onOpen?: OpenMetric }): ReactNode {
   const n = (v: unknown) => Number(v ?? 0)
   const sent = n(c.push_sent)
-  const tile = (label: string, value: number, cls = 'text-foreground', sub?: string) => (
-    <div>
-      <p className="text-[10px] uppercase tracking-wide text-foreground-muted">{label}</p>
-      <p className={`text-lg font-bold tabular-nums ${cls}`}>{value.toLocaleString('en-IN')}</p>
-      {sub && <p className="text-[10px] text-foreground-muted">{sub}</p>}
-    </div>
-  )
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      {tile('Sent', sent)}
-      {tile('Waiting', n(c.push_waiting), 'text-foreground', 'quiet hours')}
-      {tile('Skipped', n(c.push_skipped), 'text-foreground', 'daily limit, push off')}
-      {tile('Failed', n(c.push_failed), 'text-red-500')}
-      {tile('Opened', n(c.push_opened), 'text-foreground', rate(n(c.push_opened), sent))}
-      {tile('Converted', n(c.push_converted), 'text-green-600 dark:text-green-400', rate(n(c.push_converted), sent))}
+      <StatTile label="Sent" value={sent} metric="push_sent" onOpen={onOpen} />
+      <StatTile label="Waiting" value={n(c.push_waiting)} sub="quiet hours" metric="push_waiting" onOpen={onOpen} />
+      <StatTile label="Skipped" value={n(c.push_skipped)} sub="daily limit, push off" metric="push_skipped" onOpen={onOpen} />
+      <StatTile label="Failed" value={n(c.push_failed)} cls="text-red-500" metric="push_failed" onOpen={onOpen} />
+      <StatTile label="Opened" value={n(c.push_opened)} sub={rate(n(c.push_opened), sent)} metric="push_opened" onOpen={onOpen} />
+      <StatTile
+        label="Converted"
+        value={n(c.push_converted)}
+        cls="text-green-600 dark:text-green-400"
+        sub={rate(n(c.push_converted), sent)}
+        metric="push_converted"
+        onOpen={onOpen}
+      />
     </div>
   )
 }
