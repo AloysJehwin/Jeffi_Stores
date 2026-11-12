@@ -70,10 +70,13 @@ ssh_forward() { # <local port> <target>; replaces one of ours that holds the por
 }
 # Close a session this script opened. A session left open stays on the core for 20 minutes, and enough of them
 # make the agent refuse new ones ("Plugin with name Port not found"), so a failure to close one is said aloud.
+# When the API call is refused, the plugin is asked to end the session itself: on SIGINT it sends the session's
+# terminate flag over its own data channel, which needs no IAM permission.
 close_session() {
-  local err
+  local err how="it stays open on the core for 20 minutes"
   err=$(aws ssm terminate-session --session-id "$1" 2>&1 >/dev/null) && return 0
-  echo "${GITHUB_ACTIONS:+::warning::}Could not close SSM session $1 (it stays open on the core for 20 minutes): $(tr '\n' ' ' <<<"$err")" >&2
+  if pkill -INT -f "session-manager-plugin.*$1" 2>/dev/null; then sleep 2; how="its plugin was asked to end it instead"; fi
+  echo "${GITHUB_ACTIONS:+::warning::}ssm:TerminateSession failed for $1 ($how; re-run github-oidc.sh if the deploy role lacks it): $(tr '\n' ' ' <<<"$err")" >&2
 }
 ssm_forward() {
   command -v session-manager-plugin >/dev/null ||
