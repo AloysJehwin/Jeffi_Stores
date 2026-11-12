@@ -49,8 +49,8 @@ export default function BusinessHeader() {
     { href: '/business', label: 'Home' },
     { href: '/business/products', label: 'Products' },
     { href: '/business/categories', label: 'Categories' },
-    { href: '/business/about', label: 'About Us' },
-    { href: '/business/support', label: 'Support' },
+    { href: '/business/about', label: 'About Us', wide: true },
+    { href: '/business/support', label: 'Support', wide: true },
   ]
   // Home is a prefix of every portal path, so it only lights up on itself.
   const isActive = (href: string) => (href === '/business' ? pathname === bp(href) : pathname.startsWith(bp(href)))
@@ -75,20 +75,20 @@ export default function BusinessHeader() {
               </div>
             </Link>
 
-            {/* Desktop Nav */}
+            {/* Desktop Nav: `wide` links drop out below xl so no label wraps */}
             <nav
-              className={`hidden lg:flex items-center gap-8 transition-all duration-300 ${
+              className={`hidden lg:flex items-center gap-5 xl:gap-8 whitespace-nowrap transition-all duration-300 ${
                 searchOpen
                   ? 'opacity-0 pointer-events-none -translate-y-1 invisible'
                   : 'opacity-100 translate-y-0 visible'
               }`}
               aria-hidden={searchOpen}
             >
-              {NAV.map(({ href, label }) => (
+              {NAV.map(({ href, label, wide }) => (
                 <Link
                   key={href}
                   href={bp(href)}
-                  className={`font-medium transition-colors ${
+                  className={`font-medium transition-colors ${wide ? 'hidden xl:inline' : ''} ${
                     isActive(href)
                       ? 'text-accent-500'
                       : 'text-foreground-secondary hover:text-accent-500'
