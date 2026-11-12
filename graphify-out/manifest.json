@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "vitest.config.ts": {
-    "mtime": 1794322216.8229074,
-    "ast_hash": "6ae00a171ebd2a7813c5bf58cfd8e489",
+    "mtime": 1794465231.393007,
+    "ast_hash": "4d2801da3ca53ac6fd89d80bda6db0a9",
     "semantic_hash": ""
   },
   ".github/pull_request_template.md": {
@@ -6935,8 +6935,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/business/Header.tsx": {
-    "mtime": 1793113081.8052719,
-    "ast_hash": "ff45be9bb182c1701d01c78a84731b8b",
+    "mtime": 1794466375.341872,
+    "ast_hash": "3d213104c08c58fe425773133c8eda14",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/business/ProductActions.tsx": {
@@ -7375,8 +7375,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/Header.tsx": {
-    "mtime": 1792953387.9570246,
-    "ast_hash": "b1557d02822bba1ff4a4eb2ac05d55fd",
+    "mtime": 1794466375.3411968,
+    "ast_hash": "2b2c5baa31aeee1c3b8b364cdf9e5aa7",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/HeroCarousel.tsx": {
@@ -14210,7 +14210,7 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/settings/homepage/page.tsx": {
-    "mtime": 1794433998.542792,
+    "mtime": 1794466606.886283,
     "ast_hash": "286901175a33d02c8fe9476eec01ded4",
     "semantic_hash": ""
   },
@@ -19775,8 +19775,8 @@
     "semantic_hash": ""
   },
   "admin-service/integration-tests/ui/business-rfqs-stats.test.tsx": {
-    "mtime": 1793377239.1582716,
-    "ast_hash": "489d4479a1815d98501ab7dadbbf26e3",
+    "mtime": 1794463378.8882997,
+    "ast_hash": "29d392619d6a7e37694a19ce85b87de3",
     "semantic_hash": ""
   },
   "admin-service/tests/actions/product-edit-digital-subscription.test.ts": {
@@ -24990,8 +24990,8 @@
     "semantic_hash": ""
   },
   "packages/cli/manifest/admin-api.json": {
-    "mtime": 1794310645.0120337,
-    "ast_hash": "ffc3200559645dbdb764a7bcf6e4699d",
+    "mtime": 1794463244.9546247,
+    "ast_hash": "05b9f3d31e0d395cdb63cb33aefde868",
     "semantic_hash": ""
   },
   "packages/cli/manifest/overrides.json": {
@@ -26590,8 +26590,8 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/settings/homepage/loading.tsx": {
-    "mtime": 1794252368.3957944,
-    "ast_hash": "6c8c1c4342397eb9dca57b0ecaf8fa37",
+    "mtime": 1794466587.6802287,
+    "ast_hash": "ef8223a3990cf3d27d2026b59b7ff63f",
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/settings/site-controls/loading.tsx": {
@@ -28757,6 +28757,11 @@
   "packages/store-core/src/lib/catalog/homepage-layout.ts": {
     "mtime": 1794435205.2726614,
     "ast_hash": "8a42620fb337fff847c430af9871664f",
+    "semantic_hash": ""
+  },
+  ".claude/launch.json": {
+    "mtime": 1794463910.7633982,
+    "ast_hash": "3b2dcf7490a5fcc1561de9a683e3a443",
     "semantic_hash": ""
   }
 }
