@@ -87,7 +87,7 @@
     "mailparser": "^3.9.38",
     "motion": "^13.4.6",
     "next": "^15.5.26",
-    "node-forge": "^1.4.0",
+    "node-forge": "^1.4.3",
     "nodemailer": "^10.0.5",
     "openai": "^6.37.0",
     "otplib": "^13.4.0",
