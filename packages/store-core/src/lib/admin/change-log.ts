@@ -26,6 +26,8 @@ export const CHANGE_LOG_KINDS: Record<string, ChangeKind> = {
       product_sub_variants: 'Sub-variant',
       product_images: 'Image',
       variant_images: 'Variant image',
+      product_media: 'Media',
+      product_faqs: 'FAQ',
       shelf_stock: 'Shelf stock',
     },
   },
@@ -134,9 +136,37 @@ function actorOf(r: Row): ChangeActor {
 
 const actorKey = (r: Row) => r.admin_id ?? r.metadata?.actor ?? 'system'
 
+/** Same value in a different spelling: null vs '', '10.00' vs 10, key order in json. */
+function norm(v: unknown): unknown {
+  if (v === undefined || v === null || v === '') return null
+  if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) return Number(v)
+  if (typeof v === 'number') return v
+  if (Array.isArray(v)) return v.length ? JSON.stringify(v.map(norm)) : null
+  if (typeof v === 'object') {
+    const keys = Object.keys(v as object).sort()
+    return keys.length ? JSON.stringify(keys.map(k => [k, norm((v as any)[k])])) : null
+  }
+  return v
+}
+export const isRealChange = (from: unknown, to: unknown) => norm(from) !== norm(to)
+
+/** A save that deletes and re-inserts the same child (images re-written in order) changed nothing. */
+function cancelReinserts(parts: ChangePart[], keys: Map<ChangePart, string>): ChangePart[] {
+  const created = new Map<string, ChangePart[]>()
+  for (const p of parts) if (p.action === 'create' && keys.has(p)) created.set(keys.get(p)!, [...(created.get(keys.get(p)!) ?? []), p])
+  const drop = new Set<ChangePart>()
+  for (const p of parts) {
+    if (p.action !== 'delete' || !keys.has(p)) continue
+    const twin = created.get(keys.get(p)!)?.find(c => !drop.has(c))
+    if (twin) drop.add(p).add(twin)
+  }
+  return drop.size ? parts.filter(p => !drop.has(p)) : parts
+}
+
 /** One save is several rows (the order + its items, the trigger row + the route's own row): one item. */
 function group(rows: Row[], kind: ChangeKind, parentTypes: Set<string>, withIp: boolean): ChangeItem[] {
   const items: ChangeItem[] = []
+  const reinsertKey = new Map<ChangePart, string>()
   let last: { item: ChangeItem; key: string; at: number } | null = null
   for (const r of rows) {
     const at = new Date(r.created_at).getTime()
@@ -144,9 +174,9 @@ function group(rows: Row[], kind: ChangeKind, parentTypes: Set<string>, withIp: 
     const isChild = !parentTypes.has(r.entity_type)
     const childLabel = isChild ? (kind.children?.[r.entity_type] ?? r.entity_type) : null
     const auto = !!r.metadata?.auto
-    const diff = Object.entries(r.diff ?? {}).filter(([field]) => !NOISE.test(field))
+    const diff = Object.entries(r.diff ?? {}).filter(([field, v]) => !NOISE.test(field) && isRealChange(v?.from, v?.to))
     // An update whose only changes were noise says nothing.
-    if (r.action === 'update' && r.diff && !diff.length && r.metadata?.auto) continue
+    if (r.action === 'update' && r.diff && !diff.length && (r.metadata?.auto || !r.summary)) continue
     const changes: FieldChange[] = diff.map(([field, v]) => ({
       field,
       from: v?.from ?? null,
@@ -154,6 +184,7 @@ function group(rows: Row[], kind: ChangeKind, parentTypes: Set<string>, withIp: 
       ...(v?.fromLabel ? { fromLabel: v.fromLabel } : {}),
       ...(v?.toLabel ? { toLabel: v.toLabel } : {}),
     }))
+    const media = r.metadata?.image_url || r.metadata?.thumbnail_url
     const part: ChangePart = {
       entityType: r.entity_type,
       entityId: r.entity_id,
@@ -162,6 +193,8 @@ function group(rows: Row[], kind: ChangeKind, parentTypes: Set<string>, withIp: 
       changes,
       ...(r.metadata?.thumbnail_url ? { image: r.metadata.thumbnail_url } : {}),
     }
+    if (isChild && media && (r.action === 'create' || r.action === 'delete'))
+      reinsertKey.set(part, `${r.entity_type}|${r.metadata?.variant_id ?? r.metadata?.parent_id ?? ''}|${media}`)
     if (last && last.key === key && last.at - at <= GROUP_GAP_MS && last.item.parts.length < 50) {
       const same = last.item.parts.find(p => p.entityType === part.entityType && p.entityId === part.entityId && p.action === part.action)
       if (same) {
@@ -185,10 +218,12 @@ function group(rows: Row[], kind: ChangeKind, parentTypes: Set<string>, withIp: 
   }
   // Explicit rows with nothing else to say are their summary; keep the part list to real changes.
   for (const item of items) {
+    item.parts = cancelReinserts(item.parts, reinsertKey)
     item.parts.sort((a, b) => Number(!!a.child) - Number(!!b.child))
-    if (item.summary) item.parts = item.parts.filter(p => p.changes.length || p.child || p.action === 'create' || p.action === 'delete')
+    item.parts = item.parts.filter(p => p.changes.length || p.action === 'create' || p.action === 'delete' || (!p.child && !!item.summary))
   }
-  return items
+  // A save whose every row cancelled out (an untouched re-save) is not an entry.
+  return items.filter(i => i.parts.length || i.summary)
 }
 
 const encodeCursor = (r: Row) => Buffer.from(`${r.at_raw}|${r.id}`).toString('base64url')

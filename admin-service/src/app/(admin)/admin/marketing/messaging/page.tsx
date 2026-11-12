@@ -124,7 +124,7 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
           It is defined in the schema file below and is created by the schema pipeline:
         </p>
         <pre className="bg-amber-500/10 rounded-lg px-4 py-3 text-xs font-mono text-amber-700 dark:text-amber-400 overflow-x-auto">
-          database/marketing.sql
+          admin-service/database/tables/marketing.sql
         </pre>
       </div>
     )

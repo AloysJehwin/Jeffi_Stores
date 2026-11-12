@@ -57,7 +57,7 @@ export function canUseAi(role: string, scopes: string[], fieldScope: string): bo
 }
 
 /** Customer-facing storefront AI (chatbot + recap/cart/pitch/affirmation). Sold on Pro + Enterprise
- *  (see database/control-plane/seed-plans.sql); the flagship is never plan-limited. */
+ *  (see controller-service/database/seeds/seed-plans.sql); the flagship is never plan-limited. */
 export const AI_STOREFRONT_SCOPE = 'ai:storefront'
 
 /** Parse a model's JSON reply, tolerating prose around the object. */

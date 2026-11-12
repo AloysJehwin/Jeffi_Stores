@@ -5,7 +5,7 @@ import { getScopeForPath, hasScope, TENANT_SCOPE_KEYS } from '@/lib/auth/scopes'
 import { CRON_JOBS, cronSchedule } from '@/lib/shared/cron-jobs'
 import { COMPARISON_ROWS } from '@/lib/tenant-registry/owners'
 
-const seed = readFileSync(join(__dirname, '../../../../../database/control-plane/seed-plans.sql'), 'utf8')
+const seed = readFileSync(join(__dirname, '../../../../../controller-service/database/seeds/seed-plans.sql'), 'utf8')
 
 describe('google_ads scopes', () => {
   it('maps the console and its APIs to google_ads:read', () => {

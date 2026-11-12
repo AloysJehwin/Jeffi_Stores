@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
+import { normalizeExtraFields } from '@/lib/catalog/product-extra-fields'
 import { productErrorMessage, roundMoneyFields } from '@/lib/catalog/product-validation'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { applyDraftSubVariantPrices, parseSubVariantPriceEntries } from '@/lib/subscriptions/sub-variant-prices'
@@ -76,6 +77,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const draftId = await productDraftIdFor(req, id, admin.adminId)
     if (!draftId) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+    Object.assign(fields, normalizeExtraFields(fields))
 
     // Build image snapshot: take live product_images, apply order/primary from client state
     const imageOrder: string[] = body?.imageOrder || []
@@ -139,8 +141,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       draftId,
       db =>
         db.query(
-          // The form never sends _files (staged digital-file changes); keep them.
-          `UPDATE product_drafts SET fields = $2::jsonb || jsonb_strip_nulls(jsonb_build_object('_files', fields->'_files')),
+          // Merged over the draft: keys the form does not send (currency, AI copy, _files, …) are kept.
+          `UPDATE product_drafts SET fields = COALESCE(fields, '{}'::jsonb) || $2::jsonb,
            images = COALESCE($3::jsonb, images),
            variants = COALESCE($4::jsonb, variants),
            updated_at = NOW() WHERE id = $1`,

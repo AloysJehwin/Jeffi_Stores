@@ -144,17 +144,17 @@ export default function ProductActions({
       {/* Price block: big price per base unit, selling-unit line, total, savings, tax note. */}
       <View className="rounded-field bg-surface p-5">
         <View className="mb-1 flex-row flex-wrap items-baseline gap-2">
-          <Text className="text-4xl font-bold text-primary-600 dark:text-primary-400">Rs. {inr(p.effectivePrice)}</Text>
+          <Text className="text-4xl font-bold text-primary-600 dark:text-primary-400">₹{inr(p.effectivePrice)}</Text>
           {p.showPerUnit ? <Text className="text-sm text-foreground-secondary">/ {unitText(p.perUnitLabel)}</Text> : null}
           {p.effectiveMrp && p.effectiveMrp > p.effectivePrice ? (
-            <Text className="text-xl text-foreground-muted line-through">Rs. {inr(p.effectiveMrp)}</Text>
+            <Text className="text-xl text-foreground-muted line-through">₹{inr(p.effectiveMrp)}</Text>
           ) : null}
         </View>
         {p.showPerBasePrice ? (
           <Text className="mb-1 text-base font-semibold text-foreground">
-            Rs. {inr(p.effectivePrice * p.unitFactor)} / {unitText(unitLabel)}
+            ₹{inr(p.effectivePrice * p.unitFactor)} / {unitText(unitLabel)}
             <Text className="text-xs font-normal text-foreground-muted">
-              {'  '}(1 {unitText(unitLabel)} = {p.unitFactor} {unitText(p.baseUnitLabel ?? unitLabel)} × Rs. {inr(p.effectivePrice)})
+              {'  '}(1 {unitText(unitLabel)} = {p.unitFactor} {unitText(p.baseUnitLabel ?? unitLabel)} × ₹{inr(p.effectivePrice)})
             </Text>
           </Text>
         ) : null}
@@ -162,14 +162,14 @@ export default function ProductActions({
           <Text className="text-sm text-foreground-secondary">
             Total ({p.quantity} {unitText(unitLabel)}):
           </Text>
-          <Text className="text-base font-semibold text-foreground">Rs. {inr(p.effectivePrice * p.unitFactor * p.quantity)}</Text>
+          <Text className="text-base font-semibold text-foreground">₹{inr(p.effectivePrice * p.unitFactor * p.quantity)}</Text>
         </View>
         {p.mrpDiscount > 0 ? (
           <View className="mb-2 flex-row flex-wrap items-center gap-2">
             {p.businessPct > 0 ? <Badge label={`Business ${p.businessPct}% extra off`} tone="brand" /> : null}
             <Badge label={`${p.mrpDiscount}% off`} tone="accent" />
             <Text className="text-sm text-foreground-secondary">
-              You save Rs. {inr((p.effectiveMrp! - p.effectivePrice) * p.unitFactor * p.quantity)}
+              You save ₹{inr((p.effectiveMrp! - p.effectivePrice) * p.unitFactor * p.quantity)}
             </Text>
           </View>
         ) : null}

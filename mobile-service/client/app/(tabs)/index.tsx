@@ -9,7 +9,8 @@ import { HomeScrollContext } from '../../src/components/home/scroll-context'
 import { BusinessHomeContext, businessHomeParams } from '../../src/components/home/business/useBusinessHome'
 import { useBusiness } from '../../src/components/account/hooks'
 import { useAuthStore } from '../../src/stores/authStore'
-import { HomeSkeleton, Screen, setFeedScrolling, useBottomInset } from '../../src/ui'
+import { Screen, setFeedScrolling, useBottomInset } from '../../src/ui'
+import { HomeLayoutSkeleton } from '../../src/components/home/HomeLayoutSkeleton'
 import { getHome } from '../../src/api/home'
 import { useTokens } from '../../src/theme'
 
@@ -56,7 +57,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen header={<TopNav />} mode="none" loading={authLoading || isLoading} skeleton={<View className="flex-1 overflow-hidden"><HomeSkeleton /></View>}>
+    <Screen header={<TopNav />} mode="none" loading={authLoading || isLoading} skeleton={<View className="flex-1 overflow-hidden"><HomeLayoutSkeleton audience={audience} /></View>}>
       {data ? (
         <HomeScrollContext.Provider value={scrollY}>
           <BusinessHomeContext.Provider value={businessParams}>

@@ -66,6 +66,11 @@ ENV NEXT_PUBLIC_ONDEVICE_MODEL_BASE=$NEXT_PUBLIC_ONDEVICE_MODEL_BASE
 ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 ENV NEXT_PUBLIC_GIT_SHA=$NEXT_PUBLIC_GIT_SHA
 
+# Every database/ folder (the root's and each service's), kept at its path, for the runner.
+RUN mkdir -p /db && for d in database *-service/database packages/*/database; do \
+      if [ -d "$d" ]; then mkdir -p "/db/$(dirname "$d")" && cp -R "$d" "/db/$d"; fi; \
+    done
+
 # Only the storefront has public/ files; the others get an empty one so the runner's COPY holds.
 RUN test -n "$APP" && mkdir -p "$APP/public" && npx next build "$APP"
 
@@ -129,8 +134,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/deploy/next-cluster-server.js ./$
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/load-secrets.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/k8s-cron.mjs ./deploy/k8s-cron.mjs
 
-# Copy database migration files
-COPY --from=builder --chown=nextjs:nodejs /app/database ./database
+# Schema and migration files: database/ and <service>/database/ (the controller's tenant fan-out reads them)
+COPY --from=builder --chown=nextjs:nodejs /db/ ./
 
 # Copy entire @aws-sdk + @smithy trees (rds-signer + s3 + secrets-manager + all transitive deps — not bundled by Next.js standalone)
 COPY --from=deps /app/node_modules/@aws-sdk ./node_modules/@aws-sdk

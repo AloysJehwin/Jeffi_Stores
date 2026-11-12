@@ -22,7 +22,7 @@ per-tenant. (#489)
 
 ### 2. RAG / embeddings — the data the agent reasons over
 Two stores exist; the tenant's OWN DB is the source of truth:
-- **Tenant DB `embeddings`** (pgvector, in `database/ai.sql`, applied to every tenant DB): written
+- **Tenant DB `embeddings`** (pgvector, in `admin-service/database/tables/ai.sql`, applied to every tenant DB): written
   by catalog-enrichment (approve/bulk-approve) via the tenant pool, read by the admin agent's
   product search (`admin-agent/tools/index.ts`) via the tenant pool. Fully isolated — a tenant DB
   only ever contains that tenant's rows.

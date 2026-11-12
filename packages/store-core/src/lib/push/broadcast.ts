@@ -38,11 +38,12 @@ export async function pushReach(
 export async function enqueueCampaignPush(campaignId: string, userIds: string[], signedOut: boolean): Promise<number> {
   const r = await query(
     `INSERT INTO email_campaign_logs (campaign_id, channel, push_device_id, user_id, to_address, status)
-     SELECT $1, 'push', d.id, d.user_id, left(COALESCE(u.email, u.phone), 255), 'queued'
+     SELECT $1::uuid, 'push', d.id, d.user_id, left(COALESCE(u.email, u.phone), 255), 'queued'
        FROM push_devices d JOIN users u ON u.id = d.user_id AND ${USER_OK}
       WHERE d.user_id = ANY($2::uuid[]) AND ${REACHABLE}
      UNION ALL
-     SELECT $1, 'push', d.id, NULL, NULL, 'queued' FROM push_devices d WHERE $3::boolean AND ${SIGNED_OUT}
+     -- Typed casts: inside a UNION an untyped $1 resolves to text and the uuid insert fails.
+     SELECT $1::uuid, 'push', d.id, NULL::uuid, NULL, 'queued' FROM push_devices d WHERE $3::boolean AND ${SIGNED_OUT}
      ON CONFLICT (campaign_id, push_device_id) WHERE push_device_id IS NOT NULL DO NOTHING`,
     [campaignId, userIds, signedOut]
   )

@@ -4,7 +4,7 @@ import { PRESETS, presetOf, presetSpec, withDedicatedDb, withHighAvailability } 
 import { validateSpec, smallestFittingNode, planCompatibilityError, fitOf, fittingServers } from '@/lib/compute/validate'
 import type { Catalog, PlanCompute, PriceRow } from '@/lib/compute/spec'
 
-// The seeded prices (database/control-plane/seed-plans.sql) and default settings.
+// The seeded prices (controller-service/database/seeds/seed-plans.sql) and default settings.
 const row = (code: string, kind: PriceRow['kind'], vcpu: number | null, memoryMib: number | null, h: number | null, hm: number | null, g: number | null, gm: number | null): PriceRow => ({
   code,
   kind,

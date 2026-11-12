@@ -1,3 +1,4 @@
+import { syncLegacyImagesToMediaSafe } from '@/lib/catalog/product-media'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -102,6 +103,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           isPrimary,
         ]
       )
+      await syncLegacyImagesToMediaSafe(id)
       return NextResponse.json({ image })
     }
 
@@ -134,6 +136,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         isPrimary,
       ]
     )
+    await syncLegacyImagesToMediaSafe(id)
     return NextResponse.json({ image })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
@@ -168,6 +171,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       [variantId]
     )
   }
+  await syncLegacyImagesToMediaSafe(id)
   return NextResponse.json({ success: true })
 }
 
@@ -191,5 +195,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (displayOrder !== undefined) {
     await query(`UPDATE variant_images SET display_order = $1 WHERE id = $2`, [displayOrder, imageId])
   }
+  await syncLegacyImagesToMediaSafe(id)
   return NextResponse.json({ success: true })
 }

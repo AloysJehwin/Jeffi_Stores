@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('@/lib/catalog/product-media', () => ({ loadProductMedia: vi.fn().mockResolvedValue([]), loadProductFaqs: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))

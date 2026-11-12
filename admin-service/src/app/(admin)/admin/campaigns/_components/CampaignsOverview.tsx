@@ -14,6 +14,7 @@ import { delta, type Bucket } from '@/lib/overview/period'
 import type { CampaignRowStats, CampaignStats, CampaignTotals } from '@/lib/overviews/campaigns'
 import { ap } from '@/lib/shared/admin-path'
 import CampaignsOverviewLoading from './CampaignsOverviewLoading'
+import { SplitRow } from '@/components/admin/kit'
 
 interface Data {
   bucket: Bucket
@@ -96,8 +97,9 @@ export default function CampaignsOverview() {
 
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <SplitRow
+            scroll="narrow"
+            wide={
               <Section title="Sends and engagement">
                 <TrendChart
                   points={data.series}
@@ -107,38 +109,40 @@ export default function CampaignsOverview() {
                   ariaLabel="Campaign sends, opens, clicks and conversions over time"
                 />
               </Section>
-            </div>
-            <Section title="By channel">
-              <Table
-                rows={data.channels}
-                rowKey={r => r.channel}
-                empty="No sends in this period."
-                cols={[
-                  { key: 'ch', label: 'Channel', render: r => CHANNEL[r.channel] ?? r.channel },
-                  { key: 'sends', label: 'Sends', num: true, render: r => count(r.sends) },
-                  { key: 'conv', label: 'Conv.', num: true, render: r => count(r.converted) },
-                  { key: 'rev', label: 'Revenue', num: true, render: r => money(r.revenue) },
-                ]}
-              />
-              {data.failures.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
-                    Failed WhatsApp / SMS
-                  </h3>
-                  <ul className="space-y-1 text-sm">
-                    {data.failures.map(f => (
-                      <li key={f.key} className="flex justify-between gap-3">
-                        <span className={f.key === '63049' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}>
-                          {f.label}
-                        </span>
-                        <span className="tabular-nums text-foreground-muted">{count(f.count)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </Section>
-          </div>
+            }
+            narrow={
+              <Section title="By channel">
+                <Table
+                  rows={data.channels}
+                  rowKey={r => r.channel}
+                  empty="No sends in this period."
+                  cols={[
+                    { key: 'ch', label: 'Channel', render: r => CHANNEL[r.channel] ?? r.channel },
+                    { key: 'sends', label: 'Sends', num: true, render: r => count(r.sends) },
+                    { key: 'conv', label: 'Conv.', num: true, render: r => count(r.converted) },
+                    { key: 'rev', label: 'Revenue', num: true, render: r => money(r.revenue) },
+                  ]}
+                />
+                {data.failures.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
+                      Failed WhatsApp / SMS
+                    </h3>
+                    <ul className="space-y-1 text-sm">
+                      {data.failures.map(f => (
+                        <li key={f.key} className="flex justify-between gap-3">
+                          <span className={f.key === '63049' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}>
+                            {f.label}
+                          </span>
+                          <span className="tabular-nums text-foreground-muted">{count(f.count)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Section>
+            }
+          />
 
           <Section
             title="By campaign"

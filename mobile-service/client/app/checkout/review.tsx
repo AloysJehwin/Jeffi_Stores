@@ -420,7 +420,7 @@ export default function CheckoutReviewScreen() {
   if (!user || authLoading || cartQ.isLoading || intentPending) {
     return (
       <Screen header={header} mode="none" loading={authLoading || !!user} skeleton={<ReviewLoading />}>
-        <EmptyState fill icon={LogIn} title="Sign in to review your order" actionLabel="Sign In" onAction={() => router.push('/(auth)/login')} />
+        <EmptyState fill icon={LogIn} title="Sign in to review your order" actionLabel="Sign in" onAction={() => router.push('/(auth)/login')} />
       </Screen>
     )
   }
@@ -524,7 +524,7 @@ export default function CheckoutReviewScreen() {
               )}
             </View>
             {!isBuyNow && (
-              <Button label="Modify Cart" icon={ArrowLeft} variant="ghost" size="md" onPress={() => router.navigate('/(tabs)/cart')} className="mt-2" />
+              <Button label="Modify cart" icon={ArrowLeft} variant="ghost" size="md" onPress={() => router.navigate('/(tabs)/cart')} className="mt-2" />
             )}
           </Card>
 
@@ -789,7 +789,7 @@ export default function CheckoutReviewScreen() {
           )}
 
           {isBuyNow ? (
-            <Button label="Go Back" icon={ArrowLeft} variant="ghost" size="md" onPress={() => router.back()} className="mt-2" />
+            <Button label="Go back" icon={ArrowLeft} variant="ghost" size="md" onPress={() => router.back()} className="mt-2" />
           ) : (
             <Button label="Back to Cart" icon={ArrowLeft} variant="ghost" size="md" onPress={() => router.navigate('/(tabs)/cart')} className="mt-2" />
           )}

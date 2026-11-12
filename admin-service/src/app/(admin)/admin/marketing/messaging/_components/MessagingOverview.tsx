@@ -13,7 +13,7 @@ import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta, type Bucket } from '@/lib/overview/period'
 import type { MessagingState, MessagingTotals } from '@/lib/overviews/marketing-messaging'
 import { ap } from '@/lib/shared/admin-path'
-import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { ListFilters, useFilterQuery, SplitRow } from '@/components/admin/kit'
 import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
 import { MessagingOverviewLoading } from './MessagingLoading'
 
@@ -110,8 +110,9 @@ export default function MessagingOverview() {
 
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <SplitRow
+            scroll="narrow"
+            wide={
               <Section title="Messages by channel">
                 <TrendChart
                   points={data.series}
@@ -121,31 +122,33 @@ export default function MessagingOverview() {
                   ariaLabel="Messages by channel over time"
                 />
               </Section>
-            </div>
-            <Section title="Failure reasons">
-              {data.failures.length ? (
-                <ul className="space-y-2 text-sm">
-                  {data.failures.map(f => (
-                    <li key={f.key} className="flex justify-between gap-3">
-                      <span
-                        className={
-                          f.key === '63049' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-foreground'
-                        }
-                      >
-                        {f.label}
-                        <span className="block text-xs text-foreground-muted">
-                          {f.channels.map(ch => CHANNEL[ch] ?? ch).join(', ')}
+            }
+            narrow={
+              <Section title="Failure reasons">
+                {data.failures.length ? (
+                  <ul className="space-y-2 text-sm">
+                    {data.failures.map(f => (
+                      <li key={f.key} className="flex justify-between gap-3">
+                        <span
+                          className={
+                            f.key === '63049' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-foreground'
+                          }
+                        >
+                          {f.label}
+                          <span className="block text-xs text-foreground-muted">
+                            {f.channels.map(ch => CHANNEL[ch] ?? ch).join(', ')}
+                          </span>
                         </span>
-                      </span>
-                      <span className="tabular-nums text-foreground-muted">{count(f.count)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-foreground-muted">No failed messages in this period.</p>
-              )}
-            </Section>
-          </div>
+                        <span className="tabular-nums text-foreground-muted">{count(f.count)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-foreground-muted">No failed messages in this period.</p>
+                )}
+              </Section>
+            }
+          />
 
           <Section title="By channel and status">
             <Table

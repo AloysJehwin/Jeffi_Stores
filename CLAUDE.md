@@ -15,8 +15,11 @@ Rules:
 
 ## Database schema
 
-- DDL lives in split, `pg_dump`-style schema files under `database/` — tables in a topic file (`catalog.sql`, `logs.sql`, `amazon.sql`, …), primary keys / CHECK constraints / sequence-owner ALTERs in `constraints.sql`, and indexes in `indexes.sql`. A schema pipeline applies these; **do NOT write migration files** in `database/migrations/` for new tables.
-- To add a table: put `CREATE TABLE public.<name> (...)` (+ any `CREATE SEQUENCE`) in the topic schema file, its PK/CHECK in `constraints.sql`, and its indexes in `indexes.sql` — mirroring an existing table's split (e.g. the `merchant_*` / `amazon_*` tables). The pipeline handles applying them; never hand-run migrations.
+- Each table belongs to one service, and its DDL lives in that service's `<service>/database/` folder (owners listed in `docs/DATABASE_OWNERSHIP.md`). Root `database/` holds only `extensions.sql` and a README; any other file placed there is never loaded.
+- Layout of `<service>/database/`: `tables/<topic>.sql` (CREATE TABLE / SEQUENCE), `constraints.sql` (PKs, UNIQUE, CHECK, defaults), `foreign-keys.sql` (loaded last), `indexes.sql`, `functions.sql` / `triggers.sql`, `seeds/`, `migrations/`. The control-plane tables sit under `controller-service/database/control-plane/` in the same shape; `legacy/` is never loaded.
+- `scripts/db-files.mjs` is the manifest: it discovers every `database/` folder and sets the load order (extensions → tables → functions → triggers → indexes → constraints → foreign keys). The release scripts, CI and the controller's tenant fan-out (`controller-service/src/lib/db-files.ts`, kept equal by a test) all read through it, so a file in the right folder is picked up without being listed anywhere.
+- To add a table: put `CREATE TABLE public.<name> (...)` (+ any `CREATE SEQUENCE`) in the owning service's `tables/<topic>.sql`, its PK/CHECK in that service's `constraints.sql`, its FKs in `foreign-keys.sql` and its indexes in `indexes.sql`, mirroring an existing table. **Do NOT write a migration** for new tables, columns or indexes.
+- Migrations (`<service>/database/migrations/`) are only for destructive or data changes: date-prefixed (`YYYY-MM-DD_what.sql`), safe to run twice, unique basename across all services (`schema_migrations` records the basename). Delete one once it is applied everywhere. See that folder's README.
 - Apply only to the LOCAL DB (port 5432); never the live RDS.
 
 ## Microservices — services split, DB unified
@@ -24,7 +27,7 @@ Rules:
 **Today only the services are segregated (four Next apps — controller-service for the control plane, storefront-service, admin-service and business-service for the stores, sharing `packages/store-core` — plus messaging-service, document-service, public-api-service and mobile-service; the Expo app is `mobile-service/client`, built by EAS and released from the same main-merge pipeline). They ALL connect to the same DB** — `jeffi_production_ready` locally, `jeffi_stores` in prod (the control plane merges into it at go-live). Every entity (control-plane, messaging, documents, templates library, business tables) lives in that one DB. See `docs/MICROSERVICES.md`.
 
 - Do NOT create new DBs. `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are legacy from an earlier design and are deprecated.
-- New tables for any service go in the main `database/*.sql` pipeline (topic file + `constraints.sql` + `indexes.sql`), applied to `jeffi_production_ready` locally.
+- New tables for any service go in that service's `database/` folder (see Database schema above). All of them still load into the one DB, `jeffi_production_ready` locally.
 - `.env` DB URLs across every service all point at the same main DB.
 - Per-service DB split and per-tenant DBs come later with multi-tenancy; resolved via `packages/tenancy` using the service-auth `tenant_id` claim.
 - Each service is its own k8s pod: `jeffi-stores-<service>-service` for the platform, `{slug}-{storefront,admin,business,messaging,document}-service` per store tenant (public-api and mobile are shared). Releases run in GitHub Actions (`.github/workflows/ci.yml`): after approval on the `production` environment the deploy job applies production DB changes with the `deploy/k8s/db/` scripts (`release-db.sh`: schema diff + migrations; tenants via the rollout's fan-out), then `release.sh --rollout-only`. From a Mac the same scripts run by hand (`deploy/k8s/README.md`, Releasing). Never apply anything to the live RDS outside those scripts.

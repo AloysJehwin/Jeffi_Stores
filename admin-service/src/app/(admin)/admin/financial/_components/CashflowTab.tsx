@@ -7,6 +7,7 @@ import { CashflowTabSkeleton } from './FinanceSkeletons'
 import { delta } from '@/lib/overview/period'
 import { CashflowTrendCard, MixDonutCard, type TrendPoint } from './OverviewCharts'
 import { FinancePeriodBar, useFinancePeriod, type FinanceOverviewContract } from './finance'
+import { SplitRow } from '@/components/admin/kit'
 
 type Totals = {
   cash_in: number
@@ -145,17 +146,20 @@ function Body({ d }: { d: Cashflow }) {
         <Kpi label="Closing balance" value={money(c.closing_balance)} sub="At period end" />
       </KpiGrid>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <CashflowTrendCard data={(d.series ?? []) as TrendPoint[]} granularity={d.bucket} />
-        </div>
-        <MixDonutCard
-          title="Cash in by source"
-          segments={sourceSegments}
-          total={money(c.cash_in)}
-          totalLabel="Total cash in"
-        />
-      </div>
+        }
+        narrow={
+          <MixDonutCard
+            title="Cash in by source"
+            segments={sourceSegments}
+            total={money(c.cash_in)}
+            totalLabel="Total cash in"
+          />
+        }
+      />
 
       {outRows.length > 0 && (
         <Section title="Cash out breakdown">

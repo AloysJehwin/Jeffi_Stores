@@ -128,7 +128,7 @@ function Tile({ product, onPress, onLongPress }: { product: RecentProduct; onPre
               <Text className="text-xs font-bold text-primary-600 dark:text-primary-400">₹{inr(product.price)}</Text>
               {product.mrp && product.mrp > product.price ? (
                 <Text className="text-xs text-foreground-muted line-through" style={{ lineHeight: 12 }}>
-                  ₹{num(product.mrp)}
+                  ₹{inr(product.mrp)}
                 </Text>
               ) : null}
             </View>

@@ -47,6 +47,10 @@ next-env.d.ts
 # CI runs the CLI manifest generator (npm run cli:check).
 !/scripts/gen-admin-manifest.ts
 !/scripts/admin-manifest/
+# The SQL file manifest the release scripts load the schema through, and the one-off split that produced the layout.
+!/scripts/db-files.mjs
+!/scripts/db-split-by-service.mjs
+!/scripts/db-ownership-evidence.mjs
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md

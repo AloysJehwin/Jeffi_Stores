@@ -415,6 +415,10 @@ body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-botto
 @container (min-width: 636px) { .kpi-grid > div { --cols: var(--kpi-c4); } }
 @container (min-width: 798px) { .kpi-grid > div { --cols: var(--kpi-c5); } }
 @container (min-width: 960px) { .kpi-grid > div { --cols: var(--kpi-c6); } }
+/* Every card in a grid is as tall as the tallest kind (one with a delta/sub line). */
+.kpi-grid > div:has(.kpi-extra) > * { min-height: 5.25rem; }
+.kpi-fill { display: flex; flex-direction: column; }
+.kpi-fill > div { flex: 1 1 auto; align-content: stretch; }
 
 /* A homepage box in the admin's chosen shape. Size containment lets the ratio alone set its height (the
    copy can't stretch it); on a short shape the copy sheds extras: -short below 15rem, -shorter below

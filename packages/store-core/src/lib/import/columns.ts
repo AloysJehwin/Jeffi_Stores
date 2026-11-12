@@ -19,7 +19,7 @@ export type SheetName =
 // and its key is omitted from the draft (coerce.ts). The documented default for every optional
 // field is therefore: on UPDATE keep the product's existing live value (backfillBlankOptionalFields
 // in to-draft.ts carries it back so the shared publish SQL cannot NULL it out), and on CREATE take
-// the DB column default (database/catalog.sql, e.g. inventory_quantity 0 / stock_status 'In Stock' /
+// the DB column default (admin-service/database/tables/catalog.sql, e.g. inventory_quantity 0 / stock_status 'In Stock' /
 // currency 'INR' / return_window_days 7). Identical for Google Sheets and CSV — both coerce here.
 // `required` columns (sku/name/row_type/variant_name/sub_variant_name) are never defaulted.
 export interface ImportColumn {

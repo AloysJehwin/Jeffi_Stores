@@ -526,7 +526,7 @@ export default function QuoteDetailScreen() {
           icon={FileText}
           title="Quote not found."
           message={(rfqQ.error as Error)?.message && (rfqQ.error as Error).message !== 'Not found' ? (rfqQ.error as Error).message : undefined}
-          actionLabel="Back to My Quotes"
+          actionLabel="Back to my quotes"
           onAction={() => router.replace('/account/quotes')}
         />
       </Screen>

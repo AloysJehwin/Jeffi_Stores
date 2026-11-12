@@ -5,6 +5,7 @@ const { queryManyMock } = vi.hoisted(() => ({
   queryManyMock: vi.fn(),
 }))
 
+vi.mock('@/lib/catalog/product-media', () => ({ loadProductMediaMany: vi.fn().mockResolvedValue(new Map()), resolveImageUrls: vi.fn().mockReturnValue([]) }))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),

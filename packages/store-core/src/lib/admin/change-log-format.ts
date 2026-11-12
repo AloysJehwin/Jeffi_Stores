@@ -165,6 +165,9 @@ export function timeAgo(iso: string): string {
 
 export const VERB: Record<string, string> = { create: 'added', delete: 'removed', update: 'changed' }
 
+// Mass nouns stay as they are.
+const plural = (w: string) => (w.endsWith('media') || w.endsWith('stock') ? w : `${w}s`)
+
 function childPhrase(parts: ChangePart[]): string[] {
   const groups = new Map<string, ChangePart[]>()
   for (const p of parts) {
@@ -173,7 +176,7 @@ function childPhrase(parts: ChangePart[]): string[] {
   }
   return [...groups.entries()].map(([key, ps]) => {
     const [verb, label] = key.split('|')
-    if (ps.length > 1) return `${verb} ${ps.length} ${label.toLowerCase()}s`
+    if (ps.length > 1) return `${verb} ${ps.length} ${plural(label.toLowerCase())}`
     const name = ps[0].child!.name
     return `${verb} ${label.toLowerCase()}${name ? ` “${name}”` : ''}`
   })

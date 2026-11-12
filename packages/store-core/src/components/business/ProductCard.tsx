@@ -264,7 +264,7 @@ export default function ProductCard({
                 </p>
               )}
               {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <span
                   className={`text-xs font-medium whitespace-nowrap ${inStock ? 'text-green-600' : 'text-red-600'}`}
                 >

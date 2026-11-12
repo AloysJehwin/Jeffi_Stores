@@ -279,7 +279,7 @@ export default function OrderDetailScreen() {
           icon={PackageOpen}
           title="Order Not Found"
           message={(orderQ.error as Error)?.message || 'Unable to load order details'}
-          actionLabel="View All Orders"
+          actionLabel="View all orders"
           onAction={() => router.replace('/orders')}
         />
       </Screen>
@@ -404,8 +404,8 @@ export default function OrderDetailScreen() {
               />
 
               <View className="gap-3">
-                <Button label="View All Orders" onPress={() => router.navigate('/orders')} />
-                <Button label="Continue Shopping" variant="outline" onPress={() => router.navigate('/(tabs)/products')} />
+                <Button label="View all orders" onPress={() => router.navigate('/orders')} />
+                <Button label="Continue shopping" variant="outline" onPress={() => router.navigate('/(tabs)/products')} />
               </View>
             </View>
           }

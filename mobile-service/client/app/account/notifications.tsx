@@ -147,11 +147,12 @@ export default function NotificationSettingsScreen() {
       ) : data ? (
         data.categories.map(c => {
           const meta = CATEGORY_META[c.category]
-          const locked = c.kind === 'marketing' && data.marketing_opt_out
           return (
             <View key={c.category} className="mb-6">
               {c.category === 'offers' && data.marketing_opt_out ? (
-                <Notice className="mb-4">You unsubscribed from marketing messages, so offers and price alerts are off.</Notice>
+                <Notice className="mb-4">
+                  You unsubscribed from marketing messages, so offers and price alerts are off. Turn one on to get it again.
+                </Notice>
               ) : null}
               <ListGroup title={meta.label}>
                 {channels.map(ch => (
@@ -159,7 +160,7 @@ export default function NotificationSettingsScreen() {
                     key={ch.id}
                     title={ch.label}
                     icon={ch.icon}
-                    trailing={<Switch value={c[ch.id]} disabled={locked} onChange={v => void save(c.category, ch.id, v)} label={`${meta.label} by ${ch.label}`} />}
+                    trailing={<Switch value={c[ch.id]} onChange={v => void save(c.category, ch.id, v)} label={`${meta.label} by ${ch.label}`} />}
                   />
                 ))}
               </ListGroup>

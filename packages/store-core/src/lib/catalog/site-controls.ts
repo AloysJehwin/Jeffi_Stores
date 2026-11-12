@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 import type { MessagingLocks } from '@/lib/billing/messaging-locks'
+import { DEFAULT_MEDIA_LIMITS, type MediaLimits } from './product-media-shared'
 
 // Centralized reader for all admin-controlled store settings, backed by the
 // site_settings key/value table. Mirrors the cache pattern in delivery-settings.ts:
@@ -153,6 +154,8 @@ export interface SiteControls {
   // 'number' = bought, waiting for Jeffi to assign the sender. push: 'app' = no store app build ID.
   // {} when nothing is locked.
   locks: MessagingLocks
+  // Product media: per-kind size/duration caps and the per-scope item count.
+  media: MediaLimits
 }
 
 export { MESSAGING_LOCK_HINT, type MessagingLock, type MessagingLocks } from '@/lib/billing/messaging-locks'
@@ -278,9 +281,23 @@ const DEFAULTS: SiteControls = {
   mobileApp: { buildId: FLAGSHIP_APP_BUILD_ID },
   ownDelhivery: true,
   locks: {},
+  media: DEFAULT_MEDIA_LIMITS,
+}
+
+export const MEDIA_LIMIT_KEYS: Record<keyof MediaLimits, string> = {
+  maxPerScope: 'media_max_per_scope',
+  imageMb: 'media_image_mb',
+  videoMb: 'media_video_mb',
+  videoSeconds: 'media_video_seconds',
+  documentMb: 'media_document_mb',
+  audioMb: 'media_audio_mb',
+  audioSeconds: 'media_audio_seconds',
+  modelMb: 'media_model_mb',
+  spinFrames: 'media_spin_frames',
 }
 
 const KEYS = [
+  ...Object.values(MEDIA_LIMIT_KEYS),
   'business_name',
   'business_email',
   'business_phone',
@@ -584,6 +601,9 @@ export async function getSiteControls(): Promise<SiteControls> {
       },
       ownDelhivery: d.ownDelhivery,
       locks: {},
+      media: Object.fromEntries(
+        Object.entries(MEDIA_LIMIT_KEYS).map(([k, key]) => [k, num(key, d.media[k as keyof MediaLimits])])
+      ) as unknown as MediaLimits,
     }
 
     // COD is offered only to tenants shipping on their own Delhivery account (own_delhivery). A

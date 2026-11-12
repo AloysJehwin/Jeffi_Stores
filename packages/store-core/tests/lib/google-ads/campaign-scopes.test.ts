@@ -6,7 +6,7 @@ import { canUseAi } from '@/lib/auth/ai-scope'
 import { COMPARISON_ROWS } from '@/lib/tenant-registry/owners'
 import { MANAGE_SCOPE } from '@/lib/google-ads/manage-route'
 
-const seed = readFileSync(join(__dirname, '../../../../../database/control-plane/seed-plans.sql'), 'utf8')
+const seed = readFileSync(join(__dirname, '../../../../../controller-service/database/seeds/seed-plans.sql'), 'utf8')
 const matrix = readFileSync(join(__dirname, '../../../../../docs/PLAN_FEATURE_MATRIX.md'), 'utf8')
 
 describe('google_ads_campaigns:write (campaign management)', () => {

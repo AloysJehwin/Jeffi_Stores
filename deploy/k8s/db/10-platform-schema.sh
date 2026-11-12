@@ -1,6 +1,6 @@
 #!/bin/bash
 # Step 1: bring jeffi_stores' schema to this commit. First 05-table-owner.sh (so app_user can alter the older
-# tables), then the additive migra diff of database/*.sql, shown and applied exactly as shown in one transaction,
+# tables), then the additive migra diff of the schema files (every <service>/database/, scripts/db-files.mjs), shown and applied exactly as shown in one transaction,
 # then manual.sql (foreign keys + the column change the diff never applies), then a re-check of what is left.
 # Usage: bash deploy/k8s/db/10-platform-schema.sh [--dry-run] [--yes]
 source "$(dirname "$0")/lib.sh"

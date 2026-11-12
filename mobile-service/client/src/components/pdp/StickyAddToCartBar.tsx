@@ -69,7 +69,7 @@ export default function StickyAddToCartBar({
           </Text>
           <View className="flex-row items-baseline gap-x-2 overflow-hidden">
             <Text numberOfLines={1} className="text-base font-extrabold text-primary-600 dark:text-primary-400">
-              Rs. {inr(price)}
+              ₹{inr(price)}
             </Text>
             {unit ? <Text className="text-xs text-foreground-secondary">/ {unit}</Text> : null}
             {quantity !== 1 ? <Text className="text-xs text-foreground-muted">Qty {quantity}</Text> : null}

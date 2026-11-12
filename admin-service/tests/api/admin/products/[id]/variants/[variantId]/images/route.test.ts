@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('@/lib/catalog/product-media', () => ({ syncLegacyImagesToMediaSafe: vi.fn(), syncLegacyImagesToMedia: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),

@@ -39,13 +39,16 @@ import { applyDiscount } from '@/lib/catalog/pricing'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useToast } from '@/contexts/ToastContext'
-import { gstError, paiseString, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
+import { gstError, paiseString, priceErrors, publishShippingError, samePrices } from '@/lib/catalog/product-validation'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders, type DraftLockState } from '@/lib/client/draft-lock-client'
 import MergeDialog from '@/components/admin/drafts/MergeDialog'
+import { AiInsightsPanel, ExtraFieldsGroup, FaqEditor, type FaqRow } from './product-form/ProductExtraSections'
+import MediaManager, { type MediaVariant } from './product-form/MediaManager'
+import { DEFAULT_MEDIA_LIMITS, scopeKey, type MediaLimits, type MediaScope, type StagedMedia } from '@/lib/catalog/product-media-shared'
 import type { MergeConflict } from '@/lib/admin/draft-merge'
 
 interface Category {
@@ -206,6 +209,11 @@ interface ProductFormProps {
   digitalProductsEnabled?: boolean // default true
   /** Draft lock state from the server (initialDraftLock), so a non-holder renders read-only. */
   initialLock?: DraftLockState | null
+  /** FAQs to edit: the draft's staged list, else the live rows. */
+  initialFaqs?: FaqRow[]
+  /** Media to edit (every scope): the draft's staged set, else live product_media. */
+  initialMedia?: StagedMedia | null
+  mediaLimits?: MediaLimits
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -475,6 +483,9 @@ export default function ProductForm({
   subscriptionsEnabled = true,
   digitalProductsEnabled = true,
   initialLock,
+  initialFaqs = [],
+  initialMedia = null,
+  mediaLimits = DEFAULT_MEDIA_LIMITS,
 }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -519,6 +530,17 @@ export default function ProductForm({
   const [imageOrder, setImageOrder] = useState<string[]>([])
   const [tempProductId] = useState<string>(productId || crypto.randomUUID())
   const useDraftImages = isDraft && !!productId
+  // Edit drafts manage every kind of media (all scopes) in the Media tab; the create form keeps ImageUpload.
+  const useMediaTab = useDraftImages && !!initialMedia
+  const [mediaScope, setMediaScope] = useState<MediaScope>({})
+  const [mediaCounts, setMediaCounts] = useState<Record<string, number>>(() => {
+    const c: Record<string, number> = {}
+    for (const m of initialMedia?.items ?? []) {
+      const k = scopeKey({ variantId: m.variant_id, subVariantId: m.sub_variant_id })
+      c[k] = (c[k] ?? 0) + 1
+    }
+    return c
+  })
   const [productImages, setProductImages] = useState<any[]>(() =>
     Array.isArray(product?.product_images) ? product!.product_images : []
   )
@@ -641,6 +663,9 @@ export default function ProductForm({
   // Physical Attributes
   const [color, setColor] = useState(product?.color || '')
   const [colorHex, setColorHex] = useState(product?.color_hex || '#000000')
+  // The picker needs a value; that default is only saved once the admin picks a colour.
+  const colorHexTouched = useRef(false)
+  const colorHexOut = () => (product?.color_hex || colorHexTouched.current ? colorHex : '')
   const [volumeMl, setVolumeMl] = useState(product?.volume_ml != null ? String(product.volume_ml) : '')
   const [netWeightGrams, setNetWeightGrams] = useState(
     product?.net_weight_grams != null ? String(product.net_weight_grams) : ''
@@ -824,40 +849,28 @@ export default function ProductForm({
       // set, sub_variant_id null) to each variant here.
       const allSuppliers: any[] = Array.isArray(product?.product_suppliers) ? product.product_suppliers : []
       return product.product_variants.map((v: any) => {
-        const discPct = product.discount_pct != null ? parseFloat(product.discount_pct) : 0
+        // Stored prices load as they are. Deriving them here (MRP less the product discount) rewrote
+        // every variant on save whenever the stored price was not exactly that product.
+        const ownDisc = v.discount_pct != null ? v.discount_pct : product.discount_pct
+        const discPct = ownDisc != null ? parseFloat(ownDisc) || 0 : 0
         const mrpEx =
           v.mrp_ex_gst != null
             ? Math.round(parseFloat(v.mrp_ex_gst) * 100) / 100
             : v.mrp != null
               ? Math.round((parseFloat(v.mrp) / (1 + rate / 100)) * 100) / 100
               : null
-        // Derive price from mrp_ex_gst + discount_pct as the authoritative source
         let priceEx: string
         let price: string
-        if (mrpEx != null && !isNaN(mrpEx) && mrpEx > 0) {
+        if (v.price == null && v.price_ex_gst == null && mrpEx != null && !isNaN(mrpEx) && mrpEx > 0) {
+          // Never priced: start from MRP less the discount.
           const derived = Math.round(mrpEx * (1 - discPct / 100) * 100) / 100
           priceEx = String(derived)
           price = String(Math.round(derived * (1 + rate / 100) * 100) / 100)
         } else {
-          priceEx =
-            v.price_ex_gst != null
-              ? paiseString(v.price_ex_gst)
-              : v.price != null
-                ? String(Math.round((parseFloat(v.price) / (1 + rate / 100)) * 100) / 100)
-                : ''
-          price =
-            v.price != null
-              ? paiseString(v.price)
-              : v.price_ex_gst != null
-                ? String(Math.round(parseFloat(v.price_ex_gst) * (1 + rate / 100) * 100) / 100)
-                : ''
+          priceEx = v.price_ex_gst != null ? paiseString(v.price_ex_gst) : deriveExGst(v.price)
+          price = v.price != null ? paiseString(v.price) : deriveIncl(v.price_ex_gst)
         }
-        const mrpInclStr =
-          mrpEx != null
-            ? String(Math.round(mrpEx * (1 + rate / 100) * 100) / 100)
-            : v.mrp != null
-              ? paiseString(v.mrp)
-              : ''
+        const mrpInclStr = v.mrp != null ? paiseString(v.mrp) : mrpEx != null ? deriveIncl(mrpEx) : ''
         const mrpExStr = mrpEx != null ? String(mrpEx) : ''
         return {
           id: v.id,
@@ -867,7 +880,7 @@ export default function ProductForm({
           mrp: mrpInclStr,
           mrp_ex_gst: mrpExStr,
           price_ex_gst: priceEx,
-          discount_pct: product.discount_pct != null ? String(product.discount_pct) : '0',
+          discount_pct: ownDisc != null ? String(ownDisc) : '0',
           priceLockSide: null,
           mrpLockSide: null,
           stock_status: v.stock_status || 'In Stock',
@@ -876,7 +889,7 @@ export default function ProductForm({
           asin: v.asin || '',
           isbn: v.isbn || '',
           pricing_type: v.pricing_type || 'unit',
-          unit: v.unit || 'pcs',
+          unit: v.unit || '',
           numeric_value: v.numeric_value != null ? String(v.numeric_value) : '',
           weight_grams: v.weight_grams != null ? String(v.weight_grams) : '',
           package_type: v.package_type || '',
@@ -926,6 +939,16 @@ export default function ProductForm({
     }
     return result
   })
+
+  const loadedVariantPrices = useRef<Map<string, VariantRow> | null>(null)
+  if (!loadedVariantPrices.current) {
+    loadedVariantPrices.current = new Map(variants.filter(v => v.id).map(v => [v.id as string, v]))
+  }
+  // Group labels as loaded: an untouched group leaves its saved variants' own variant_type alone.
+  const initialGroupTypes = useRef<Record<string, string> | null>(null)
+  if (initialGroupTypes.current === null) {
+    initialGroupTypes.current = Object.fromEntries(groups.map(g => [g.pricing_type, g.variant_type || '']))
+  }
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
@@ -1075,12 +1098,16 @@ export default function ProductForm({
     fields.mrp_ex_gst = mrpExGst
     fields.price_ex_gst = salePrice
     fields.stock_status = hasVariants ? 'In Stock' : (fields.stock_status as string) || 'In Stock'
-    fields.slug = productName
-      ? productName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '')
-      : null
+    // The slug follows the name only when the name changes.
+    fields.slug =
+      product?.slug && productName === product?.name
+        ? product.slug
+        : productName
+          ? productName
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+          : null
     fields.cost_price = costPrice
     {
       // Leaf-level multi-supplier: flatten every leaf, tagged by variant_sku /
@@ -1112,7 +1139,8 @@ export default function ProductForm({
     fields.category_id = categoryId || null
     fields.sku = sku || null
     fields.gst_percentage = gstRate
-    fields.package_type = productPackageType
+    // Variant products ship per variant: the product-level default is not an edit.
+    if (!hasVariants) fields.package_type = productPackageType
     fields.certifications = certifications
     fields.compliance_standard = complianceStandard
     fields.safety_rating = safetyRating
@@ -1147,7 +1175,7 @@ export default function ProductForm({
     fields.country_of_origin = countryOfOrigin || null
     fields.shelf_life_days = shelfLifeDays || null
     fields.color = color || null
-    fields.color_hex = colorHex || null
+    fields.color_hex = colorHexOut() || null
     fields.volume_ml = volumeMl || null
     fields.net_weight_grams = netWeightGrams || null
     fields.grade = grade || null
@@ -2398,7 +2426,11 @@ export default function ProductForm({
             ...priceErrors(
               `Variant "${v.variant_name}"`,
               { price: v.price, mrp: v.mrp, priceExGst: v.price_ex_gst, mrpExGst: v.mrp_ex_gst },
-              { requirePrice: isPublishIntent && !v.sub_variant_type_on }
+              {
+                requirePrice: isPublishIntent && !v.sub_variant_type_on,
+                // Prices as loaded are not re-judged; the server checks against the live row.
+                skipMrpCheck: samePrices(v, loadedVariantPrices.current?.get(v.id || '')),
+              }
             )
           )
         }
@@ -2516,7 +2548,7 @@ export default function ProductForm({
       formData.set('specifications', JSON.stringify(specsObj))
       // Physical Attributes
       formData.set('color', color)
-      formData.set('color_hex', colorHex)
+      formData.set('color_hex', colorHexOut())
       formData.set('volume_ml', volumeMl)
       formData.set('net_weight_grams', netWeightGrams)
       formData.set('fragile', String(fragile))
@@ -2579,15 +2611,18 @@ export default function ProductForm({
                 ? 'In Stock'
                 : 'Out of Stock'
               : v.stock_status
+          const saved = !!v.id && !String(v.id).startsWith('temp-')
+          const groupType = grp?.variant_type || ''
+          const groupUntouched = groupType === (initialGroupTypes.current?.[v.pricing_type] ?? '')
           return {
             ...v,
-            variant_type: grp?.variant_type || v.variant_type || '',
+            variant_type: saved && groupUntouched ? v.variant_type || '' : groupType || v.variant_type || '',
             stock_status: stockStatus,
             price: v.price,
             mrp: v.mrp,
             mrp_ex_gst: v.mrp_ex_gst,
             price_ex_gst: v.price_ex_gst || (v.price ? inclToEx(v.price, gstRate) : ''),
-            discount_pct: discountPct || '0',
+            discount_pct: v.discount_pct || discountPct || '0',
           }
         })
         formData.set('variants_json', JSON.stringify(convertedVariants))
@@ -2710,6 +2745,22 @@ export default function ProductForm({
       stash(`Product published, but existing stock could not be assigned: ${e?.message || 'network error'}`)
     }
   }
+
+  // Saved variants and sub-variants are media scopes (a temp row has no id to own media yet).
+  const isUuid = (v: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v ?? ''))
+  const mediaVariants: MediaVariant[] = hasVariants
+    ? variants
+        .filter((v: any) => !v._isDeleted && isUuid(v.id))
+        .map((v: any) => ({
+          id: v.id,
+          name: v.variant_name || v.sku || 'Variant',
+          useOwn: !!v.use_own_images,
+          subs: (subVariantsMap[v.id] || [])
+            .filter((sv: any) => isUuid(sv.id) && sv.is_active !== false)
+            .map((sv: any) => ({ id: sv.id, name: sv.sub_variant_name || sv.sku || 'Sub-variant', useOwn: !!sv.use_own_media })),
+        }))
+    : []
+  const mediaCountFor = (k: string) => mediaCounts[k] ?? 0
 
   const inputCls =
     'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
@@ -2855,6 +2906,7 @@ export default function ProductForm({
                   updated[popupIndex].mrp = newMrpIncl
                   const mrpExN = parseFloat(v)
                   const disc = parseFloat(discountPct || '0')
+                  updated[popupIndex].discount_pct = discountPct || '0'
                   if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
                     const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
                     const newPriceIncl = exToIncl(newPriceEx, gstRate)
@@ -3114,76 +3166,100 @@ export default function ProductForm({
       )}
 
       {/* Images */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-            Images
+      {useMediaTab ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border-secondary p-3">
+          <p className="text-xs text-foreground-secondary">
+            {String(variantPopupId).startsWith('temp-')
+              ? 'Media for a new variant is added in the Media tab once the variant is published.'
+              : popupVariant.use_own_images
+                ? `${mediaCountFor(`variant:${variantPopupId}`)} media · own`
+                : 'Uses the product media'}
           </p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground-secondary">Own images</span>
+          {!String(variantPopupId).startsWith('temp-') && (
             <button
               type="button"
-              onClick={() => updateVariant(popupIndex, 'use_own_images', !popupVariant.use_own_images)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.use_own_images ? 'bg-accent-500' : 'bg-border-secondary'}`}
-              role="switch"
-              aria-checked={popupVariant.use_own_images}
+              onClick={() => {
+                setMediaScope({ variantId: variantPopupId })
+                setTab('media')
+              }}
+              className="text-xs font-medium text-accent-600 hover:text-accent-700"
             >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${popupVariant.use_own_images ? 'translate-x-4' : 'translate-x-0'}`}
-              />
+              Manage in Media
             </button>
-          </div>
+          )}
         </div>
-        {popupVariant.use_own_images ? (
-          <>
-            <ImageGalleryEditor
-              images={variantImagesMap[variantPopupId] || []}
-              maxImages={5}
-              size="sm"
-              uploading={!!variantImageUploading[variantPopupId]}
-              pendingAdds={variantImagePendingAdds[variantPopupId] || 0}
-              deleting={variantImageDeleting}
-              error={variantImageError}
-              onUpload={file => uploadVariantImageFile(variantPopupId, file)}
-              onDelete={imageId => deleteVariantImage(variantPopupId, imageId)}
-              onSetPrimary={imageId => setVariantImagePrimary(variantPopupId, imageId)}
-              onReorder={(from, to) => reorderVariantImages(variantPopupId, from, to)}
-              onOpenGallery={productId ? openVariantGallery : undefined}
-              extraActions={
-                productId && !variantPopupId.startsWith('temp-') ? (
-                  <AiMediaButton
-                    feature="product_image"
-                    label="AI image"
-                    sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
-                    defaultPrompt={buildProductImagePrompt({
-                      name: productName,
-                      brand: brands.find(b => b.id === brandId)?.name,
-                      category: categories.find(c => c.id === categoryId)?.name,
-                      specs: specifications,
-                      variant: { label: popupVariant.variant_type, value: popupVariant.variant_name },
-                      weightGrams: popupVariant.weight_grams,
-                      dims: [popupVariant.length_cm, popupVariant.breadth_cm, popupVariant.height_cm],
-                    })}
-                    referenceImageUrl={(() => {
-                      const own = variantImagesMap[variantPopupId] || []
-                      const prod = useDraftImages ? productImages : product?.product_images || []
-                      const main = (own[0] as any) ?? (prod as any[]).find((i: any) => i.is_primary) ?? (prod as any[])[0]
-                      return absImageUrl(main?.image_url)
-                    })()}
-                    usageRef={productId}
-                    saveToGallery
-                    onPick={img => {
-                      if (img.galleryId) void addVariantImagesFromGallery([{ id: img.galleryId }], variantPopupId)
-                    }}
-                  />
-                ) : undefined
-              }
-            />
-          </>
-        ) : (
-          <p className="text-xs text-foreground-muted italic">Uses product images</p>
-        )}
-      </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+              Images
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-foreground-secondary">Own images</span>
+              <button
+                type="button"
+                onClick={() => updateVariant(popupIndex, 'use_own_images', !popupVariant.use_own_images)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.use_own_images ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                role="switch"
+                aria-checked={popupVariant.use_own_images}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${popupVariant.use_own_images ? 'translate-x-4' : 'translate-x-0'}`}
+                />
+              </button>
+            </div>
+          </div>
+          {popupVariant.use_own_images ? (
+            <>
+              <ImageGalleryEditor
+                images={variantImagesMap[variantPopupId] || []}
+                maxImages={5}
+                size="sm"
+                uploading={!!variantImageUploading[variantPopupId]}
+                pendingAdds={variantImagePendingAdds[variantPopupId] || 0}
+                deleting={variantImageDeleting}
+                error={variantImageError}
+                onUpload={file => uploadVariantImageFile(variantPopupId, file)}
+                onDelete={imageId => deleteVariantImage(variantPopupId, imageId)}
+                onSetPrimary={imageId => setVariantImagePrimary(variantPopupId, imageId)}
+                onReorder={(from, to) => reorderVariantImages(variantPopupId, from, to)}
+                onOpenGallery={productId ? openVariantGallery : undefined}
+                extraActions={
+                  productId && !variantPopupId.startsWith('temp-') ? (
+                    <AiMediaButton
+                      feature="product_image"
+                      label="AI image"
+                      sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                      defaultPrompt={buildProductImagePrompt({
+                        name: productName,
+                        brand: brands.find(b => b.id === brandId)?.name,
+                        category: categories.find(c => c.id === categoryId)?.name,
+                        specs: specifications,
+                        variant: { label: popupVariant.variant_type, value: popupVariant.variant_name },
+                        weightGrams: popupVariant.weight_grams,
+                        dims: [popupVariant.length_cm, popupVariant.breadth_cm, popupVariant.height_cm],
+                      })}
+                      referenceImageUrl={(() => {
+                        const own = variantImagesMap[variantPopupId] || []
+                        const prod = useDraftImages ? productImages : product?.product_images || []
+                        const main = (own[0] as any) ?? (prod as any[]).find((i: any) => i.is_primary) ?? (prod as any[])[0]
+                        return absImageUrl(main?.image_url)
+                      })()}
+                      usageRef={productId}
+                      saveToGallery
+                      onPick={img => {
+                        if (img.galleryId) void addVariantImagesFromGallery([{ id: img.galleryId }], variantPopupId)
+                      }}
+                    />
+                  ) : undefined
+                }
+              />
+            </>
+          ) : (
+            <p className="text-xs text-foreground-muted italic">Uses product images</p>
+          )}
+        </div>
+      )}
 
 
       {popupVariant.sub_variant_type_on && (
@@ -4209,6 +4285,27 @@ export default function ProductForm({
             </section>
           </div>
           <div data-pf-tab="media" role="tabpanel" hidden={activeTab !== 'media'}>
+            {useMediaTab && productId ? (
+              <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
+                <MediaManager
+                  productId={productId}
+                  initial={initialMedia!}
+                  variants={mediaVariants}
+                  limits={mediaLimits}
+                  readOnly={lock.readOnly}
+                  scope={mediaScope}
+                  onScope={setMediaScope}
+                  onVariantOwn={(id, on) => setVariants(vs => vs.map(v => (v.id === id ? { ...v, use_own_images: on } : v)))}
+                  onChange={() => {
+                    userEditedRef.current = true
+                    dirtyRef.current = true
+                    savedRef.current = false
+                    if (isDraft) void serverSaveNowRef.current()
+                  }}
+                  onCountsChange={setMediaCounts}
+                />
+              </section>
+            ) : (
             <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Image Upload */}
@@ -4293,6 +4390,7 @@ export default function ProductForm({
                 </div>
               </div>
             </section>
+            )}
           </div>
           <div data-pf-tab="details" role="tabpanel" hidden={activeTab !== 'details'}>
             <section className="space-y-4 rounded-xl border border-border-default bg-surface-elevated p-5">
@@ -4302,6 +4400,27 @@ export default function ProductForm({
                   <span>Product Details{showBootstrap ? ' — stock to assign' : ''}</span>
                 </div>
                 <div className="border-t border-border-default divide-y divide-border-default">
+                  <ExtraFieldsGroup group="overview" product={product} />
+                  <ExtraFieldsGroup
+                    group="commercial"
+                    product={product}
+                    omit={hasReturns ? [] : ['return_window_days', 'replacement_policy']}
+                  />
+                  <ExtraFieldsGroup group="usage" product={product} />
+                  <ExtraFieldsGroup
+                    group="legal"
+                    product={product}
+                    note="Declarations required on packaged goods (Legal Metrology (Packaged Commodities) Rules)."
+                  />
+                  {!isDigital && <ExtraFieldsGroup group="shipping" product={product} />}
+                  {isDigital && <ExtraFieldsGroup group="digital" product={product} />}
+                  {subscriptionsEnabled && isSubscription && (
+                    <ExtraFieldsGroup
+                      group="subscription"
+                      product={product}
+                      omit={hasVariants ? ['subscription_price_ex_gst'] : []}
+                    />
+                  )}
                   {/* Physical Attributes */}
                   <div>
                     <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
@@ -4386,13 +4505,19 @@ export default function ProductForm({
                             <input
                               type="color"
                               value={colorHex}
-                              onChange={e => setColorHex(e.target.value)}
+                              onChange={e => {
+                                colorHexTouched.current = true
+                                setColorHex(e.target.value)
+                              }}
                               className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface"
                             />
                             <input
                               type="text"
                               value={colorHex}
-                              onChange={e => setColorHex(e.target.value)}
+                              onChange={e => {
+                                colorHexTouched.current = true
+                                setColorHex(e.target.value)
+                              }}
                               className={inputCls}
                               placeholder="#000000"
                               maxLength={7}
@@ -5329,6 +5454,18 @@ export default function ProductForm({
                   )}
                 </div>
               </div>
+              <FaqEditor
+                initial={initialFaqs}
+                disabled={lock.readOnly}
+                onChange={() => {
+                  userEditedRef.current = true
+                  dirtyRef.current = true
+                  if (isDraft) void serverSaveNowRef.current()
+                }}
+              />
+              <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default">
+                <ExtraFieldsGroup group="internal" product={product} />
+              </div>
             </section>
           </div>
           <div data-pf-tab="seo" role="tabpanel" hidden={activeTab !== 'seo'}>
@@ -5399,7 +5536,11 @@ export default function ProductForm({
                     label="Searchable (show in search results)"
                   />
                 </div>
+                <div className="border-t border-border-default">
+                  <ExtraFieldsGroup group="seo" product={product} />
+                </div>
               </div>
+              <AiInsightsPanel product={product} />
             </section>
           </div>
           <div data-pf-tab="variants" role="tabpanel" hidden={activeTab !== 'variants'}>
@@ -5572,6 +5713,7 @@ export default function ProductForm({
                                             updated[index].mrp = newMrpIncl
                                             const mrpExN = parseFloat(v)
                                             const disc = parseFloat(discountPct || '0')
+                                            updated[index].discount_pct = discountPct || '0'
                                             if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
                                               const newPriceEx = parseFloat(
                                                 (mrpExN * (1 - disc / 100)).toFixed(2)
@@ -5964,6 +6106,7 @@ export default function ProductForm({
                                             updated[index].mrp = newMrpIncl
                                             const mrpExN = parseFloat(v)
                                             const disc = parseFloat(discountPct || '0')
+                                            updated[index].discount_pct = discountPct || '0'
                                             if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
                                               const newPriceEx = parseFloat(
                                                 (mrpExN * (1 - disc / 100)).toFixed(2)

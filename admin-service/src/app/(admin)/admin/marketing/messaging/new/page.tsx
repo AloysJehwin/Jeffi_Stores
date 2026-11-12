@@ -123,6 +123,13 @@ interface Recipient {
   email: string | null
   phone: string | null
   first_name: string | null
+  /** cooldown: had the day's offer pushes, so push is skipped; opted_out: listed, never messaged. */
+  status?: 'cooldown' | 'opted_out'
+}
+
+const STATUS_BADGE: Record<NonNullable<Recipient['status']>, { label: string; title: string }> = {
+  cooldown: { label: 'Push cooldown', title: 'Already had today’s offer pushes; the push is skipped, other channels still go' },
+  opted_out: { label: 'Opted out', title: 'Opted out of marketing; not messaged on any channel' },
 }
 type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'locked'
 
@@ -177,6 +184,8 @@ export default function NewMessagePage() {
   const [withPhone, setWithPhone] = useState(0)
   const [withEmail, setWithEmail] = useState(0)
   const [pushReach, setPushReach] = useState<{ devices: number; people: number; signedOut: number } | null>(null)
+  // App audiences: signed-in customers left out because they opted out of marketing.
+  const [optedOut, setOptedOut] = useState(0)
   const [audienceKey, setAudienceKey] = useState<string | null>(null)
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audienceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -508,8 +517,9 @@ export default function NewMessagePage() {
         setWithEmail(data.withEmail ?? data.count ?? 0)
         if (data.emailRate) setSendRate(data.emailRate)
         setPushReach(data.push ?? null)
+        setOptedOut(data.optedOut ?? 0)
       }
-      return { rows: data.recipients || [], total: data.count ?? 0 }
+      return { rows: data.recipients || [], total: data.listed ?? data.count ?? 0 }
     },
   })
   const audienceRecipients = audience.rows
@@ -1437,6 +1447,7 @@ export default function NewMessagePage() {
                       push &&
                         pushReach &&
                         `${pushReach.devices.toLocaleString()} app devices${pushReach.signedOut ? ` (${pushReach.signedOut.toLocaleString()} signed out)` : ''}`,
+                      optedOut > 0 && `${optedOut.toLocaleString()} opted out (not sent)`,
                     ]
                       .filter(Boolean)
                       .join(' · ')}
@@ -1468,7 +1479,7 @@ export default function NewMessagePage() {
                 {!audienceLoading && audienceRecipients.length > 0 && (
                   <div className="divide-y divide-border-default">
                     {audienceRecipients.map((r, i) => (
-                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                      <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${r.status === 'opted_out' ? 'opacity-60' : ''}`}>
                         <div className="w-7 h-7 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
                           <span className="text-xs font-semibold text-accent-500">
                             {(r.first_name?.[0] || r.email?.[0] || '?').toUpperCase()}
@@ -1480,6 +1491,14 @@ export default function NewMessagePage() {
                           )}
                           <p className="text-xs text-foreground-muted truncate">{r.email || r.phone || 'No email or phone'}</p>
                         </div>
+                        {r.status && (
+                          <span
+                            title={STATUS_BADGE[r.status].title}
+                            className="shrink-0 rounded-full border border-amber-500/40 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
+                          >
+                            {STATUS_BADGE[r.status].label}
+                          </span>
+                        )}
                         {(channels.sms || channels.whatsapp) && (
                           <span
                             className={`text-[10px] ${r.phone ? 'text-foreground-muted' : 'text-amber-700 dark:text-amber-400'}`}

@@ -123,7 +123,7 @@ Live-test + deprovision/backup/restore plan: `/Users/I578432/.claude/plans/cheek
 ## Important File Paths
 - `docs/PLAN_FEATURE_MATRIX.md` — authoritative plan/feature matrix
 - `controller-service/src/lib/provisioning/{aws-provider,stub-provider,steps,provider,index}.ts`
-- `database/control-plane/schema.sql`
+- `controller-service/database/control-plane/`
 - `controller-service/src/lib/{razorpay-route,razorpay-subscriptions,bank-verify,plan-gate,ecom-emails,tenant-admin-provision,tenant-migrations}.ts`
 
 ## Known Issues / Gotchas

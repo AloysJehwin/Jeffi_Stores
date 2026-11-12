@@ -5,6 +5,7 @@ import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 import { migrateLegacyCampaignDrafts } from '@/lib/campaigns/ensure-builtin-campaigns'
+import { emptyWindowProblem } from '@/lib/campaigns/window-check'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,6 +191,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ki
   if ('parameters' in body && body.parameters && typeof body.parameters === 'object') {
     updates.push(`parameters = $${i++}::jsonb`)
     vals.push(JSON.stringify(body.parameters))
+  }
+
+  if ('parameters' in body || body.delay_hours !== undefined) {
+    const cur = await queryOne<{ scenario_kind: string | null; parameters: unknown; delay_hours: number }>(
+      `SELECT scenario_kind, parameters, delay_hours FROM campaigns WHERE kind = $1`,
+      [kind]
+    )
+    const windowProblem = emptyWindowProblem(
+      cur?.scenario_kind || kind,
+      body.parameters && typeof body.parameters === 'object' ? body.parameters : cur?.parameters,
+      body.delay_hours !== undefined ? body.delay_hours : cur?.delay_hours
+    )
+    if (windowProblem) return NextResponse.json({ error: windowProblem }, { status: 400 })
   }
 
   vals.push(kind)

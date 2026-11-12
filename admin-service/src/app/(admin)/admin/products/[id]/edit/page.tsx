@@ -237,6 +237,24 @@ export default async function EditProductPage({
     }
   }
 
+  // FAQs and media: the draft's staged copy (posted as JSON), else live.
+  const staged = (k: string): any => {
+    const v = (draftRow?.fields as any)?.[k]
+    if (typeof v !== 'string') return v ?? null
+    try {
+      return JSON.parse(v)
+    } catch {
+      return null
+    }
+  }
+  const { loadProductFaqs, loadProductMedia, getMediaLimits } = await import('@/lib/catalog/product-media')
+  const stagedFaqs = staged('_faqs')
+  const initialFaqs = Array.isArray(stagedFaqs) ? stagedFaqs : await loadProductFaqs(id)
+  const stagedMedia = staged('_media')
+  const initialMedia =
+    stagedMedia && Array.isArray(stagedMedia.items) ? stagedMedia : { items: await loadProductMedia(id, { raw: true }) }
+  const mediaLimits = await getMediaLimits()
+
   return (
     <MobileEditBlock>
     <FormPage
@@ -252,6 +270,9 @@ export default async function EditProductPage({
       {isDraft && <DraftBehindBanner info={behind} siblings={siblings} noun="product" />}
       <ProductForm
         initialLock={initialLock}
+        initialFaqs={initialFaqs}
+        initialMedia={initialMedia}
+        mediaLimits={mediaLimits}
         draftId={draftRow?.id ?? null}
         categories={categories || []}
         brands={brands || []}
