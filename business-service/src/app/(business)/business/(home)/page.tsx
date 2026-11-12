@@ -9,8 +9,9 @@ import { getWebSurface } from '@/lib/catalog/web-surface'
 import { CartProvider } from '@/contexts/CartContext'
 import BusinessHeader from '@/components/business/Header'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
-import SectionRenderer from '@/components/visitor/home/SectionRenderer'
-import Reveal from '@/components/visitor/home/Reveal'
+import HomeSections from '@/components/visitor/home/HomeSections'
+import { verifyHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
+import { getEditableHomepage } from '@/lib/catalog/homepage-draft'
 import BusinessHomeProvider from '@/components/visitor/home/business/BusinessHomeProvider'
 import { businessHomeQuery } from '@/components/visitor/home/business/business-home'
 import BusinessLanding, { getBusinessAuthState } from '../_components/BusinessLanding'
@@ -25,21 +26,26 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function BusinessHomePage({ searchParams }: { searchParams: Promise<{ layout?: string }> }) {
+export default async function BusinessHomePage({ searchParams }: { searchParams: Promise<{ layout?: string; preview?: string }> }) {
   const hdrs = await headers()
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
   const authState = await getBusinessAuthState()
-  const surface = await getWebSurface((await searchParams).layout)
+  const params = await searchParams
+  // Admin preview: a signed token names the draft to render (Settings → Homepage → Preview).
+  const preview = await verifyHomepagePreviewToken(params.preview)
+  const editable = preview ? await getEditableHomepage(preview.draftId) : null
+  const draft = editable?.draft ? editable : null
+  const surface = await getWebSurface(params.layout, !!draft)
 
   // The business homepage when one is published and the plan has it; otherwise the store's rows
   // come back, and the landing (or, for a signed-in business, the catalog) stands in.
-  const sections = await getPageSections({ surface, page: 'home', audience: 'business' })
+  const sections = await getPageSections({ surface, page: 'home', audience: 'business', draft })
   if (!sections.some(s => rowAudience(s) === 'business')) {
     if (authState === 'approved') redirect(bp('/business/products', host))
     return <BusinessLanding host={host} authState={authState} />
   }
 
-  const data = await loadSectionData(sections, { surface, page: 'home', audience: 'business' })
+  const data = await loadSectionData(sections, { surface, page: 'home', audience: 'business', draft })
   const approved = authState === 'approved'
   const portal = approved ? 'business' : 'storefront'
 
@@ -50,23 +56,7 @@ export default async function BusinessHomePage({ searchParams }: { searchParams:
 
         <main className="pt-16 lg:pt-20">
           <BusinessHomeProvider query={businessHomeQuery(sections)} approved={approved} host={host}>
-            {sections.map((section, i) => {
-              const rendered = (
-                <SectionRenderer
-                  key={section.id}
-                  section={section}
-                  rowIndex={sections.slice(0, i).filter(s => s.type === 'product_row').length}
-                  data={data}
-                  portal={portal}
-                />
-              )
-              if (section.type === 'hero' || section.type === 'motion_hero') return rendered
-              return (
-                <Reveal key={section.id} disabled={i <= 1}>
-                  {rendered}
-                </Reveal>
-              )
-            })}
+            <HomeSections sections={sections} data={data} portal={portal} />
           </BusinessHomeProvider>
         </main>
       </div>

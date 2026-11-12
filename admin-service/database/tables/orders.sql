@@ -1,0 +1,197 @@
+-- admin-service: tables. Load order comes from scripts/db-files.mjs.
+
+--
+-- Name: delhivery_pickup_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.delhivery_pickup_requests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    pickup_id character varying(128),
+    pickup_date date NOT NULL,
+    awb_count integer NOT NULL,
+    awbs text[] NOT NULL,
+    raw_response jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    pickup_status character varying(32) DEFAULT 'pending'::character varying NOT NULL
+);
+
+
+--
+-- Name: orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.orders (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_number character varying(50) NOT NULL,
+    user_id uuid,
+    customer_email character varying(255),
+    customer_phone character varying(20),
+    customer_name character varying(255),
+    status character varying(50) DEFAULT 'pending'::character varying,
+    payment_status character varying(50) DEFAULT 'unpaid'::character varying,
+    subtotal numeric(12,2) NOT NULL,
+    discount_amount numeric(12,2) DEFAULT 0,
+    tax_amount numeric(12,2) DEFAULT 0,
+    shipping_amount numeric(12,2) DEFAULT 0,
+    cod_fee_amount numeric(10,2) DEFAULT 0 NOT NULL,
+    total_amount numeric(12,2) NOT NULL,
+    shipping_address_id uuid,
+    billing_address_id uuid,
+    shipping_method character varying(100),
+    tracking_number character varying(255),
+    notes text,
+    admin_notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    confirmed_at timestamp with time zone,
+    shipped_at timestamp with time zone,
+    delivered_at timestamp with time zone,
+    cancelled_at timestamp with time zone,
+    invoice_number character varying(50),
+    invoice_date timestamp with time zone,
+    taxable_amount numeric(12,2) DEFAULT 0,
+    cgst_amount numeric(12,2) DEFAULT 0,
+    sgst_amount numeric(12,2) DEFAULT 0,
+    igst_amount numeric(12,2) DEFAULT 0,
+    is_igst boolean DEFAULT false,
+    buyer_gstin character varying(20),
+    cancellation_note text,
+    tracking_url text,
+    original_order_id uuid,
+    awb_number character varying(64),
+    delhivery_shipment_id character varying(128),
+    delhivery_quoted_weight_kg numeric(8,3),
+    delhivery_charged_weight_kg numeric(8,3),
+    delhivery_extra_charge numeric(10,2),
+    delhivery_billed_amount numeric(10,2),
+    delhivery_billed_at timestamp with time zone,
+    delhivery_freight_charge numeric(10,2),
+    delhivery_cod_charge numeric(10,2),
+    delhivery_oda_charge numeric(10,2),
+    irn character varying(64),
+    irn_ack_no character varying(32),
+    irn_ack_dt timestamp with time zone,
+    signed_qr text,
+    irn_status character varying(20) DEFAULT 'pending'::character varying,
+    irn_cancelled_at timestamp with time zone,
+    eway_bill_no character varying(20),
+    eway_bill_date timestamp with time zone,
+    eway_bill_valid_upto timestamp with time zone,
+    payment_link_id character varying(64),
+    payment_link_url text,
+    payment_link_status character varying(20),
+    payment_link_expires_at timestamp with time zone,
+    source character varying(20) DEFAULT 'online'::character varying NOT NULL,
+    search_vector tsvector,
+    order_type character varying(10) DEFAULT 'cart'::character varying NOT NULL,
+    view_token uuid DEFAULT gen_random_uuid(),
+    shipping_address_snapshot jsonb,
+    billing_address_snapshot jsonb,
+    payment_mode character varying(50) DEFAULT 'cash'::character varying NOT NULL,
+    razorpay_qr_id text,
+    razorpay_qr_image_url text,
+    needs_delivery boolean DEFAULT false NOT NULL,
+    business_discount_amount numeric(12,2) DEFAULT 0 NOT NULL,
+    shipment_status text,
+    estimated_delivery_date date,
+    courier_edd date,
+    courier_edd_updated_at timestamp with time zone,
+    cod_remitted_at timestamp with time zone,
+    draft_of_id uuid,
+    granted_at timestamp with time zone,
+    subscription_id uuid,
+    subscription_cycle integer,
+    gclid text,
+    gbraid text,
+    wbraid text,
+    utm_source text,
+    utm_medium text,
+    utm_campaign text,
+    utm_term text,
+    utm_content text,
+    landing_path text,
+    attributed_at timestamp with time zone,
+    ads_consent boolean,
+    meta_click_ids jsonb,
+    dispute_status text,
+    CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
+);
+
+COMMENT ON COLUMN public.orders.estimated_delivery_date IS 'Delivery date shown to customer and admin: our computed promise, replaced by the courier EDD whenever Delhivery revises it, or set manually by an admin.';
+
+COMMENT ON COLUMN public.orders.courier_edd IS 'Latest expected delivery date reported by Delhivery (ExpectedDeliveryDate, else PromisedDeliveryDate); frozen once delivered.';
+
+COMMENT ON COLUMN public.orders.gclid IS 'Google Ads click id from the buyer''s first-party attribution cookie (last non-direct click within 90 days) at order creation.';
+
+COMMENT ON COLUMN public.orders.attributed_at IS 'When the click / UTM landing that this order is attributed to happened.';
+
+COMMENT ON COLUMN public.orders.meta_click_ids IS 'Meta browser and click ids at order creation ({fbp, fbc}) for Conversions API matching.';
+
+COMMENT ON COLUMN public.orders.ads_consent IS 'The buyer''s advertising-cookie choice (jeffi_consent cookie) at order creation; null = no choice recorded. Server-side Google Ads conversions send hashed email/phone only when true.';
+
+COMMENT ON COLUMN public.orders.shipment_status IS 'Stable internal shipment progress enum, resolved from Delhivery scan history. Set to created when AWB is assigned; updated on each track API call.';
+
+--
+-- Name: variant_change_requests; Type: TABLE; Schema: public; Owner: -
+-- Admin-initiated post-order variant/sub-variant swap on a CONFIRMED order (pre-shipment).
+-- Customer confirms; price difference is refunded (online-cheaper), collected
+-- (online-pricier, via Razorpay top-up), or absorbed into the COD total.
+--
+
+CREATE TABLE public.variant_change_requests (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    order_item_id uuid NOT NULL,
+    requested_by_admin_id uuid,
+    old_variant_id uuid,
+    old_sub_variant_id uuid,
+    new_variant_id uuid,
+    new_sub_variant_id uuid,
+    old_variant_name character varying(255),
+    new_variant_name character varying(255),
+    old_unit_price numeric(12,2) NOT NULL,
+    new_unit_price numeric(12,2) NOT NULL,
+    qty numeric(10,3) NOT NULL DEFAULT 1,
+    price_diff numeric(12,2) NOT NULL,
+    settlement_type character varying(20) NOT NULL,
+    status character varying(30) DEFAULT 'pending_customer'::character varying NOT NULL,
+    admin_notes text,
+    razorpay_order_id character varying(255),
+    razorpay_payment_id character varying(255),
+    refund_id character varying(255),
+    applied_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+--
+-- Name: order_adjustments; Type: TABLE; Schema: public; Owner: -
+-- Admin "product adjustments" on a CONFIRMED (pre-shipment) order: several lines switched (product /
+-- variant / sub-variant / selling unit), removed or re-quantified at once. The customer approves; the net
+-- difference is refunded, collected, absorbed into the COD total, or waived (settle_payment = false).
+--
+
+CREATE TABLE public.order_adjustments (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    requested_by_admin_id uuid,
+    status character varying(30) DEFAULT 'pending_customer'::character varying NOT NULL,
+    settle_payment boolean DEFAULT true NOT NULL,
+    settlement_type character varying(20) NOT NULL,
+    net_diff numeric(12,2) NOT NULL,
+    old_subtotal numeric(12,2) NOT NULL,
+    new_subtotal numeric(12,2) NOT NULL,
+    old_discount numeric(12,2) DEFAULT 0 NOT NULL,
+    new_discount numeric(12,2) DEFAULT 0 NOT NULL,
+    new_business_discount numeric(12,2) DEFAULT 0 NOT NULL,
+    old_total numeric(12,2) NOT NULL,
+    new_total numeric(12,2) NOT NULL,
+    admin_notes text,
+    razorpay_order_id character varying(255),
+    razorpay_payment_id character varying(255),
+    refunds jsonb DEFAULT '[]'::jsonb NOT NULL,
+    refund_status character varying(20),
+    applied_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);

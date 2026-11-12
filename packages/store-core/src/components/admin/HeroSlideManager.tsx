@@ -37,6 +37,7 @@ export interface HeroSlideRow {
   filter_on_sale: boolean
   display_order: number
   is_active: boolean
+  surface?: HomepageSurface | null
   audience?: HomepageAudience | null
 }
 

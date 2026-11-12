@@ -76,7 +76,7 @@ export async function api<T>(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error((err as any).error || `HTTP ${res.status}`)
+    throw Object.assign(new Error((err as any).error || `HTTP ${res.status}`), { status: res.status })
   }
 
   return res.json()

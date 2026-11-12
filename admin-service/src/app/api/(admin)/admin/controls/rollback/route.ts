@@ -218,6 +218,7 @@ export async function POST(request: NextRequest) {
               ]
             )
           }
+          await (await import('@/lib/catalog/product-media')).syncLegacyImagesToMedia(snap.product_id, client)
           restored++
         }
       } else {

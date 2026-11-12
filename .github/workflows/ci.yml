@@ -97,8 +97,8 @@ jobs:
           {
             echo "## Release $tag (HEAD ${GITHUB_SHA::8})"; echo
             if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
-              schema=$(git diff --name-only "$live..HEAD" -- database deploy/schema-diff.sh deploy/k8s/db/manual.sql ':(exclude)database/migrations')
-              migrations=$(git diff --name-only "$live..HEAD" -- database/migrations)
+              schema=$(git diff --name-only "$live..HEAD" -- ':(glob)**/database/**' scripts/db-files.mjs deploy/schema-diff.sh deploy/k8s/db/manual.sql ':(glob,exclude)**/database/migrations/**' ':(glob,exclude)**/database/legacy/**')
+              migrations=$(git diff --name-only "$live..HEAD" -- ':(glob)**/database/migrations/**')
               echo "Live: \`$live\`. Commits since:"; echo
               git log --max-count=60 --format='- %h %s' "$live..HEAD" # no pipe: head would SIGPIPE git log under pipefail
             else
@@ -107,9 +107,9 @@ jobs:
               echo "Live commit \`${live:-unknown}\` is not in this clone; the database stages will run in full."
             fi
             echo
-            if [ -n "$schema" ]; then echo "**Schema:** the flagship schema stage applies the \`database/\` diff to jeffi_stores:"; echo "$schema" | sed 's/^/- /'; else echo "**Schema:** unchanged."; fi
+            if [ -n "$schema" ]; then echo "**Schema:** the flagship schema stage applies the \`<service>/database/\` diff to jeffi_stores:"; echo "$schema" | sed 's/^/- /'; else echo "**Schema:** unchanged."; fi
             echo
-            if [ -n "$migrations" ]; then echo "**Migrations:** new \`database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the migration stages still run any not yet recorded."; fi
+            if [ -n "$migrations" ]; then echo "**Migrations:** new \`<service>/database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the migration stages still run any not yet recorded."; fi
             echo; echo "Approve the \`production\` environment to proceed."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -389,7 +389,7 @@ jobs:
         with: { job: "DB · flagship schema" }
       - uses: ./.github/actions/release-setup
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
-      - name: Pending database/migrations files on jeffi_stores
+      - name: Pending <service>/database/migrations files on jeffi_stores
         run: bash deploy/k8s/db/release-db.sh --migrations --yes ${{ env.DRY_FLAG }}
       - if: always()
         uses: ./.github/actions/db-report

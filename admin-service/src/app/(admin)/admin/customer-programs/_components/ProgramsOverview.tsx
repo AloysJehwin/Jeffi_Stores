@@ -15,6 +15,7 @@ import type { LoyaltyTotals, ReferralTotals } from '@/lib/overviews/customer-pro
 import { TIER_KEYS, tierName } from '@/lib/loyalty/tiers'
 import { ap } from '@/lib/shared/admin-path'
 import { ProgramsOverviewLoading } from './ProgramsLoading'
+import { SplitRow } from '@/components/admin/kit'
 
 interface Person {
   id: string
@@ -126,8 +127,8 @@ function Body({ data }: { data: Data }) {
 
       <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <SplitRow
+        wide={
           <Section title="Points issued and redeemed">
             <TrendChart
               points={l.series}
@@ -137,15 +138,17 @@ function Body({ data }: { data: Data }) {
               ariaLabel="Loyalty points issued and redeemed over time"
             />
           </Section>
-        </div>
-        <Section title="Members by tier">
-          <DonutSplit
-            segments={TIER_KEYS.map(k => ({ label: tierName(k), value: l.by_tier[k] ?? 0, color: TIER_COLORS[k] }))}
-            centerLabel="members"
-            centerValue={count(l.members)}
-          />
-        </Section>
-      </div>
+        }
+        narrow={
+          <Section title="Members by tier">
+            <DonutSplit
+              segments={TIER_KEYS.map(k => ({ label: tierName(k), value: l.by_tier[k] ?? 0, color: TIER_COLORS[k] }))}
+              centerLabel="members"
+              centerValue={count(l.members)}
+            />
+          </Section>
+        }
+      />
 
       <Section
         title="Top earners this period"

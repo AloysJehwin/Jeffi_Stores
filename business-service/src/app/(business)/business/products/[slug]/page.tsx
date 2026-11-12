@@ -25,8 +25,18 @@ import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
 import ProductPitchLine from '@/components/on-device/ProductPitchLine'
 import { round2 } from '@/lib/catalog/gst'
+import { loadProductFaqs, loadProductMedia, mediaStructuredData, resolveImageUrls, resolveMedia } from '@/lib/catalog/product-media'
+import ProductInfoSections, { faqJsonLd } from '@/components/visitor/pdp/ProductInfoSections'
 
 const getProductBySlug = cache(async (slug: string) => {
+  const product = await getProductRowBySlug(slug)
+  if (!product) return product
+  // product_media drives the gallery (every kind, variant / sub-variant inheritance); FAQs show below.
+  const [media, faqs] = await Promise.all([loadProductMedia(product.id), loadProductFaqs(product.id, { publishedOnly: true })])
+  return { ...product, media, faqs }
+})
+
+async function getProductRowBySlug(slug: string) {
   const { gstEnabled } = await getFeatureFlags()
   const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryOne(
@@ -95,7 +105,7 @@ const getProductBySlug = cache(async (slug: string) => {
   `,
     [slug]
   )
-})
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -129,7 +139,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 function buildProductJsonLd(product: any, baseUrl: string) {
-  const images = (product.product_images || []).map((img: any) => img.image_url)
+  const fromMedia = resolveImageUrls(product.media ?? [])
+  const images = fromMedia.length ? fromMedia : (product.product_images || []).map((img: any) => img.image_url)
+  const subjectOf = mediaStructuredData(resolveMedia(product.media ?? []), product.name, product.description)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
 
   const offers = hasVariants
@@ -174,6 +186,7 @@ function buildProductJsonLd(product: any, baseUrl: string) {
     ...(product.brands && { brand: { '@type': 'Brand', name: product.brands.name } }),
     ...(product.categories && { category: product.categories.name }),
     offers: hasVariants ? { '@type': 'AggregateOffer', offerCount: offers.length, offers } : offers[0],
+    ...(subjectOf.length > 0 && { subjectOf }),
   }
 }
 
@@ -340,6 +353,7 @@ export default async function ProductDetailPage({
   const freeShippingThreshold = deliverySettings.freeThreshold
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
+  const faqLd = faqJsonLd(product.faqs ?? [])
   const skuParam = typeof resolvedSearchParams.sku === 'string' ? resolvedSearchParams.sku : undefined
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -423,6 +437,11 @@ export default async function ProductDetailPage({
         </div>
 
         <ProductSpecifications product={product} />
+
+        <ProductInfoSections product={product} faqs={product.faqs} />
+        {faqLd && (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, '\\u003c') }} />
+        )}
 
         {/* Features & Use Cases (AI-enriched) */}
         {(() => {

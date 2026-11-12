@@ -38,11 +38,13 @@ export async function getConfiguredSections(
 export async function getAudienceSections(
   surface: HomepageSurface,
   page: HomepagePage,
-  audience: HomepageAudience
+  audience: HomepageAudience,
+  /** Preview: the rows of a homepage draft instead of the live table. */
+  rows?: HomepageSection[]
 ): Promise<{ audience: HomepageAudience; sections: HomepageSection[] }> {
   const home = page === 'home'
   try {
-    const rows = await queryMany<HomepageSection>(
+    rows ??= await queryMany<HomepageSection>(
       `SELECT id, type, title, subtitle, eyebrow, cta_label, cta_url, config,
               display_order, is_active, starts_at, ends_at,
               ${SURFACE_COLUMN_SQL('s')}, ${PAGE_COLUMN_SQL('s')}, ${AUDIENCE_COLUMN_SQL('s')}
@@ -57,8 +59,9 @@ export async function getAudienceSections(
       const business = visibleSections(forSurface(onPage.filter(r => rowAudience(r) === 'business'), surface))
       if (business.length > 0) return { audience: 'business', sections: business }
     }
-    const own = forSurface(onPage.filter(r => rowAudience(r) === 'store'), surface)
-    return { audience: 'store', sections: visibleSections(home ? withDefaults(own) : own) }
+    // Defaults before the surface filter: a layout hidden on this surface is still a layout.
+    const own = onPage.filter(r => rowAudience(r) === 'store')
+    return { audience: 'store', sections: visibleSections(forSurface(home ? withDefaults(own) : own, surface)) }
   } catch {
     // Table missing or unreachable — fall back to the built-in layout rather than an empty page.
     return { audience: 'store', sections: visibleSections(home ? withDefaults([]) : []) }

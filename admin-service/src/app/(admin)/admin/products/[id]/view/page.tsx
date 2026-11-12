@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/auth/jwt'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import ProductDetailClient from '../ProductDetailClient'
+import ProductViewClient from './ProductViewClient'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { heldDraftForView } from '@/lib/admin/draft-locks'
 import { draftsForProduct } from '@/lib/catalog/product-draft-id'
@@ -39,5 +39,5 @@ export default async function ProductViewPage({ params }: { params: Promise<{ id
     drafts.length > 0 ? (
       <EntityDrafts drafts={drafts} start={openProductDraft.bind(null, id)} back={`/admin/products/${id}`} me={me} noun="product" />
     ) : null
-  return <ProductDetailClient id={id} hasInventory={hasInventory} heldDraft={held} draftsPanel={panel} />
+  return <ProductViewClient id={id} hasInventory={hasInventory} heldDraft={held} draftsPanel={panel} />
 }

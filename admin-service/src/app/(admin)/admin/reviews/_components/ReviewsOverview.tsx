@@ -12,6 +12,7 @@ import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters
 import { REVIEW_ALIASES, REVIEW_FIELDS, REVIEW_SEARCH } from '@/lib/filters/fields/reviews'
 import { istToday, parsePeriod, runningAverage, type Period } from '@/lib/reviews/overview-period'
 import ReviewsOverviewSkeleton from './ReviewsOverviewSkeleton'
+import { SplitRow } from '@/components/admin/kit'
 
 interface Stats {
   reviews: number
@@ -411,20 +412,23 @@ export default function ReviewsOverview() {
         </p>
       </Section>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <SplitRow
+        scroll="narrow"
+        wide={
           <Section title="Reviews per day">
             <TrendChart points={trendPoints} series={TREND_SERIES} height={220} ariaLabel="Reviews per day" />
           </Section>
-        </div>
-        <Section title="Rating distribution">
-          {cur.reviews ? (
-            <Distribution rows={data.distribution} total={cur.reviews} />
-          ) : (
-            <Empty msg="No reviews in this period." />
-          )}
-        </Section>
-      </div>
+        }
+        narrow={
+          <Section title="Rating distribution">
+            {cur.reviews ? (
+              <Distribution rows={data.distribution} total={cur.reviews} />
+            ) : (
+              <Empty msg="No reviews in this period." />
+            )}
+          </Section>
+        }
+      />
 
       <Section title="Average rating trend">
         {cur.reviews ? (

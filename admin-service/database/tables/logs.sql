@@ -1,0 +1,273 @@
+-- admin-service: tables. Load order comes from scripts/db-files.mjs.
+
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
+--
+-- Name: _debug_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public._debug_log (
+    id bigint NOT NULL,
+    ts timestamp with time zone DEFAULT now() NOT NULL,
+    source text,
+    payload text
+);
+
+
+--
+-- Name: _debug_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public._debug_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public._debug_log_id_seq OWNED BY public._debug_log.id;
+ALTER TABLE ONLY public._debug_log ALTER COLUMN id SET DEFAULT nextval('public._debug_log_id_seq'::regclass);
+
+
+--
+-- Name: admin_audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid,
+    action text NOT NULL,
+    entity_type text NOT NULL,
+    entity_id text,
+    summary text NOT NULL,
+    diff jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    ip_address inet,
+    user_agent text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: entity_revisions; Type: TABLE; Schema: public; Owner: -
+-- One row per change to a draftable entity (publish, or a direct write). changes = { path: { from, to } };
+-- the merge names who changed a field since a draft started (docs/plans/MULTI_DRAFT_PLAN.md).
+--
+
+CREATE TABLE public.entity_revisions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    resource_type character varying(32) NOT NULL,
+    resource_id uuid NOT NULL,
+    revision integer NOT NULL,
+    draft_id uuid,
+    draft_title character varying(120),
+    actor_admin_id uuid,
+    actor_name text,
+    source character varying(24) DEFAULT 'publish'::character varying NOT NULL,
+    changes jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: email_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.email_logs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    email character varying(255) NOT NULL,
+    subject character varying(255),
+    template_name character varying(100),
+    status character varying(50) DEFAULT 'sent'::character varying,
+    sent_at timestamp with time zone DEFAULT now(),
+    metadata jsonb,
+    from_email character varying(255),
+    cc text,
+    bcc text,
+    body_html text,
+    body_text text,
+    kind character varying(64),
+    entity_type character varying(64),
+    entity_id character varying(128),
+    error text,
+    message_id character varying(255)
+);
+
+
+--
+-- Name: message_logs; Type: TABLE; Schema: public; Owner: -
+-- Outbound SMS + WhatsApp notifications (OTP is intentionally NOT logged here).
+--
+
+CREATE TABLE public.message_logs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    channel character varying(16) NOT NULL,
+    direction character varying(10) DEFAULT 'outbound'::character varying NOT NULL,
+    to_number character varying(32) NOT NULL,
+    from_number character varying(32),
+    body text,
+    kind character varying(64),
+    entity_type character varying(64),
+    entity_id character varying(128),
+    status character varying(50) DEFAULT 'sent'::character varying,
+    error text,
+    provider_sid character varying(128),
+    provider character varying(16),
+    price numeric(12,4),
+    currency character(3) DEFAULT 'INR'::bpchar,
+    delivery_status character varying(24),
+    priced_at timestamp with time zone,
+    sent_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: merchant_sync_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.merchant_sync_log (
+    id integer NOT NULL,
+    status character varying(20) NOT NULL,
+    synced integer DEFAULT 0 NOT NULL,
+    deleted integer DEFAULT 0 NOT NULL,
+    errors jsonb,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone
+);
+
+
+--
+-- Name: merchant_sync_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.merchant_sync_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.merchant_sync_log_id_seq OWNED BY public.merchant_sync_log.id;
+ALTER TABLE ONLY public.merchant_sync_log ALTER COLUMN id SET DEFAULT nextval('public.merchant_sync_log_id_seq'::regclass);
+
+
+--
+-- Name: merchant_gmc_status; Type: TABLE; Schema: public; Owner: -
+-- Cached snapshot of Google Merchant Center product statuses (Content API), so the
+-- Merchant Sync admin page can paginate/search ~14k items without paging GMC live.
+-- Refreshed on demand via POST /api/admin/merchant/gmc-status/refresh.
+--
+
+CREATE TABLE public.merchant_gmc_status (
+    offer_id text NOT NULL,
+    title text,
+    status text,
+    item_group_id text,
+    link text,
+    price text,
+    destination_statuses jsonb DEFAULT '[]'::jsonb NOT NULL,
+    item_issues jsonb DEFAULT '[]'::jsonb NOT NULL,
+    synced_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: merchant_gmc_refresh_meta; Type: TABLE; Schema: public; Owner: -
+-- Single-row meta tracking the last full GMC status refresh and aggregate counts.
+--
+
+CREATE TABLE public.merchant_gmc_refresh_meta (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    key character varying NOT NULL,
+    value text,
+    updated_at timestamp with time zone DEFAULT now(),
+    last_refreshed_at timestamp with time zone,
+    total integer DEFAULT 0 NOT NULL,
+    approved integer DEFAULT 0 NOT NULL,
+    pending integer DEFAULT 0 NOT NULL,
+    disapproved integer DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: price_inflation_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.price_inflation_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    category_id uuid NOT NULL,
+    category_name character varying(100) NOT NULL,
+    percentage numeric(5,2) NOT NULL,
+    applied_fields text[] NOT NULL,
+    product_count integer DEFAULT 0 NOT NULL,
+    applied_by character varying(100),
+    applied_at timestamp with time zone DEFAULT now() NOT NULL,
+    snapshot jsonb,
+    is_rollback boolean DEFAULT false NOT NULL,
+    rolled_back_at timestamp with time zone,
+    rolled_back_by character varying(100)
+);
+
+
+--
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schema_migrations (
+    filename text NOT NULL,
+    applied_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: search_queries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.search_queries (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    query character varying(255) NOT NULL,
+    results_count integer,
+    clicked_product_id uuid,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: websocket_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.websocket_connections (
+    connection_id character varying(200) NOT NULL,
+    user_id uuid,
+    session_id uuid,
+    role character varying(10) NOT NULL,
+    connected_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: upload_sessions; Type: TABLE; Schema: public; Owner: -
+--
+-- Tracks an in-progress multipart upload of a product file so an abandoned upload can be
+-- reconciled/aborted and quota reservations released.
+
+CREATE TABLE public.upload_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    product_id uuid NOT NULL,
+    storage_driver character varying(8) DEFAULT 's3'::character varying NOT NULL,
+    storage_key character varying(512) NOT NULL,
+    upload_id character varying(255),
+    display_name character varying(255) NOT NULL,
+    mime_type character varying(120) NOT NULL,
+    declared_bytes bigint DEFAULT 0 NOT NULL,
+    status character varying(12) DEFAULT 'open'::character varying NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);

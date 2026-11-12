@@ -1,5 +1,6 @@
 #!/bin/bash
-# Migration runner — applies unapplied files from database/migrations/ in filename order.
+# Migration runner — applies unapplied <service>/database/migrations/ files, all services merged, in filename order
+# (scripts/db-files.mjs migrations; a basename may exist once, schema_migrations records it).
 # Tracks applied migrations in a schema_migrations table on RDS.
 #
 # Usage:
@@ -12,7 +13,8 @@
 
 set -euo pipefail
 
-MIGRATIONS_DIR="$(cd "$(dirname "$0")/../database/migrations" && pwd)"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+MIGRATION_FILES=$(node "$REPO/scripts/db-files.mjs" migrations --abs)
 DRY_RUN=false
 
 for arg in "$@"; do
@@ -54,12 +56,13 @@ psql_cmd -c "
 APPLIED=$(psql_cmd -t -A -c "SELECT filename FROM schema_migrations ORDER BY filename;")
 
 PENDING=()
-while IFS= read -r -d '' f; do
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
   name=$(basename "$f")
   if ! echo "$APPLIED" | grep -qx "$name"; then
     PENDING+=("$f")
   fi
-done < <(find "$MIGRATIONS_DIR" -maxdepth 1 -name "*.sql" -print0 | sort -z)
+done <<< "$MIGRATION_FILES"
 
 if [[ ${#PENDING[@]} -eq 0 ]]; then
   echo "No pending migrations."

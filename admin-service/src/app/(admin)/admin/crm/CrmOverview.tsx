@@ -347,7 +347,7 @@ export default function CrmOverview({
           />
         </Section>
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
-          <div className="xl:col-span-3 min-w-0">
+          <div className="xl:col-span-3 min-w-0 xl:flex xl:flex-col xl:[&>*]:flex-1">
             <Section title="Top customers by revenue">
               <Table
                 rows={data.topCustomers}
@@ -358,7 +358,7 @@ export default function CrmOverview({
               />
             </Section>
           </div>
-          <div className="xl:col-span-2 min-w-0">
+          <div className="xl:col-span-2 min-w-0 xl:flex xl:flex-col xl:[&>*]:flex-1">
             <Section title="Retention by first-order month">
               <p className="text-[11px] text-foreground-muted -mt-2 mb-3">
                 Share of each cohort ordering again 1 to 6 months later.

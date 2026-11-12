@@ -57,21 +57,25 @@ export function Kpi({
   icon?: React.ReactNode
 }) {
   const good = delta == null ? null : invert ? delta < 0 : delta > 0
-  const cls = `min-w-0 bg-surface-elevated border rounded-xl p-3 sm:p-4 flex flex-col gap-1 ${highlight ? 'border-accent-500/50' : 'border-border-default'} ${href ? 'hover:border-accent-400 transition-colors' : ''}`
+  const cls = `kpi-card min-w-0 bg-surface-elevated border rounded-xl px-3 py-2.5 sm:px-4 flex flex-col gap-0.5 ${highlight ? 'border-accent-500/50' : 'border-border-default'} ${href ? 'hover:border-accent-400 transition-colors' : ''}`
   const inner = (
     <>
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 text-xs text-foreground-muted uppercase tracking-wide font-medium leading-tight break-words">{label}</p>
         {icon && <span className="shrink-0 text-foreground-muted [&_svg]:w-4 [&_svg]:h-4">{icon}</span>}
       </div>
-      <p className={`text-lg sm:text-xl font-bold tabular-nums [overflow-wrap:anywhere] ${highlight ? 'text-accent-500' : 'text-foreground'}`}>{value}</p>
-      {delta != null && (
-        <p className={`text-xs flex items-center gap-1 ${good ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-          {delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-          {(delta * 100).toFixed(1)}% vs previous
+      <p className={`text-lg font-bold leading-7 tabular-nums [overflow-wrap:anywhere] ${highlight ? 'text-accent-500' : 'text-foreground'}`}>{value}</p>
+      {(delta != null || sub) && (
+        <p className="kpi-extra flex min-w-0 items-center gap-1.5 text-xs leading-4 text-foreground-muted">
+          {delta != null && (
+            <span className={`flex shrink-0 items-center gap-1 ${good ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+              {delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {(delta * 100).toFixed(1)}%{!sub && ' vs previous'}
+            </span>
+          )}
+          {sub && <span className="truncate" title={sub}>{sub}</span>}
         </p>
       )}
-      {sub && <p className="text-xs text-foreground-muted">{sub}</p>}
     </>
   )
   return href ? (
@@ -84,9 +88,10 @@ export function Kpi({
 }
 
 // Columns follow the rendered card count and the width (globals.css .kpi-grid).
-export function KpiGrid({ children }: { children: React.ReactNode }) {
+// `fill`: stretch the rows to the parent's height (beside a chart in a SplitRow).
+export function KpiGrid({ children, fill }: { children: React.ReactNode; fill?: boolean }) {
   return (
-    <div className="kpi-grid">
+    <div className={fill ? 'kpi-grid kpi-fill' : 'kpi-grid'}>
       <div>{children}</div>
     </div>
   )

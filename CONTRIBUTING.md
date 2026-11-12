@@ -33,13 +33,15 @@ Useful scripts:
 
 ## Database changes
 
-The schema lives in split, `pg_dump`-style files under `database/`:
+The schema lives in split, `pg_dump`-style files in the `database/` folder of the service that owns each table
+(`docs/DATABASE_OWNERSHIP.md`):
 
-- tables in a topic file (`catalog.sql`, `orders.sql`, ...),
-- primary keys, CHECK constraints and sequence owners in `constraints.sql`,
-- indexes in `indexes.sql`.
+- tables in a topic file under `tables/` (`admin-service/database/tables/catalog.sql`, ...),
+- primary keys, CHECK constraints and sequence owners in that service's `constraints.sql`,
+- foreign keys in its `foreign-keys.sql`, indexes in its `indexes.sql`.
 
-A schema pipeline applies these files. Do not add migration files for new tables.
+`scripts/db-files.mjs` lists the files in load order and the schema pipeline applies them. Do not add migration
+files for new tables.
 
 ## Pull requests
 

@@ -147,7 +147,7 @@ export default function TransactionsScreen() {
                 icon={Receipt}
                 title="No transactions yet"
                 message="Your payment transactions will appear here once you place an order."
-                actionLabel="Browse Products"
+                actionLabel="Browse products"
                 onAction={() => router.navigate('/(tabs)/products')}
               />
             ) : null

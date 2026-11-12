@@ -40,10 +40,10 @@ describe('RfqTrendChart (render)', () => {
 describe('Business RFQs stats layout (regression guard for 50a2cb6f)', () => {
   const pageSrc = readFileSync(join(process.cwd(), 'admin-service/src/app/(admin)/admin/business/rfqs/page.tsx'), 'utf8')
 
-  // The gradient card holds 6 stat tiles (2–3 rows), taller than a fixed 14rem. A hard lg:h-56
-  // clipped it so the bottom tiles overflowed into the search bar. min-h lets the row grow.
-  it('uses lg:min-h-56 (grows to fit the stat tiles), not a fixed lg:h-56', () => {
-    expect(pageSrc).toMatch(/lg:min-h-56/)
-    expect(pageSrc).not.toMatch(/\blg:h-56\b/)
+  // The 6 stat tiles (2–3 rows) are taller than a fixed 14rem; a hard lg:h-56 clipped them into the
+  // search bar. The row is now a SplitRow, whose height comes from the tiles, with no fixed height.
+  it('lays the stats out in a SplitRow with no fixed lg:h-56', () => {
+    expect(pageSrc).toMatch(/<SplitRow\b/)
+    expect(pageSrc).not.toMatch(/\b(lg|xl):h-56\b/)
   })
 })

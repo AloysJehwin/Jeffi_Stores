@@ -127,3 +127,52 @@ export function Field({ label, value, hint, copy, mono, span }: { label: ReactNo
     </div>
   )
 }
+
+const SPLIT = {
+  lg: {
+    grid: 'grid grid-cols-1 gap-4 lg:grid-cols-3',
+    wide: 'lg:col-span-2',
+    side: 'lg:flex lg:flex-col lg:[&>*]:flex-1',
+    scroll: 'lg:relative lg:min-h-48 lg:[&>*]:absolute lg:[&>*]:inset-0 lg:[&>*]:overflow-y-auto',
+  },
+  xl: {
+    grid: 'grid grid-cols-1 gap-4 xl:grid-cols-3',
+    wide: 'xl:col-span-2',
+    side: 'xl:flex xl:flex-col xl:[&>*]:flex-1',
+    scroll: 'xl:relative xl:min-h-48 xl:[&>*]:absolute xl:[&>*]:inset-0 xl:[&>*]:overflow-y-auto',
+  },
+} as const
+
+/**
+ * Two blocks side by side at one height: wide (two thirds) and narrow (one third). The side named in
+ * `scroll` (a list) takes the other side's height and scrolls; the other side (a chart, KPIs) sets the
+ * height and its content stretches to it. Each side should be a single block (Section, KpiGrid fill, chart).
+ */
+export function SplitRow({
+  wide,
+  narrow,
+  narrowFirst,
+  scroll = 'none',
+  at = 'lg',
+  className = '',
+}: {
+  wide: ReactNode
+  narrow: ReactNode
+  /** Put the narrow block on the left. */
+  narrowFirst?: boolean
+  scroll?: 'wide' | 'narrow' | 'none'
+  at?: 'lg' | 'xl'
+  className?: string
+}) {
+  const c = SPLIT[at]
+  const box = (which: 'wide' | 'narrow') =>
+    `min-w-0 ${which === 'wide' ? c.wide : ''} ${scroll === which ? c.scroll : c.side}`
+  const w = <div className={box('wide')}>{wide}</div>
+  const n = <div className={box('narrow')}>{narrow}</div>
+  return (
+    <div className={`${c.grid} ${className}`}>
+      {narrowFirst ? n : w}
+      {narrowFirst ? w : n}
+    </div>
+  )
+}

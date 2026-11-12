@@ -2,7 +2,9 @@ import type { ComponentProps, ReactNode } from 'react'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import { getPageSections, loadSectionData } from '@/lib/catalog/homepage-model'
+import { HALF_CELL, HALF_ROW } from '@/components/visitor/home/HomeSections'
 import {
+  groupRows,
   placementPositions,
   sectionPlacement,
   type HomepagePage,
@@ -27,6 +29,8 @@ export interface ListingOpts {
 
 export interface ListingPlacement {
   section: HomepageSection
+  /** The right half of a two-column row; it follows `section`'s placement and ignores its own. */
+  partner?: HomepageSection
   /** Products before it on this page. */
   at: number
   key: string
@@ -34,7 +38,8 @@ export interface ListingPlacement {
 
 /**
  * The admin's sections for a listing page that land on page `pageNum`: a section after the Pth
- * product (P counted across the whole result) goes on the page holding that product.
+ * product (P counted across the whole result) goes on the page holding that product. A two-column
+ * row goes where its left section does.
  */
 export function placementsOnPage(
   sections: HomepageSection[],
@@ -42,10 +47,10 @@ export function placementsOnPage(
 ): ListingPlacement[] {
   const first = (pageNum - 1) * pageSize
   const out: ListingPlacement[] = []
-  sections.forEach(section => {
+  groupRows(sections).forEach(([section, partner]) => {
     for (const p of placementPositions(sectionPlacement(section), total)) {
       const onPage = Math.max(1, Math.ceil(p / pageSize))
-      if (onPage === pageNum) out.push({ section, at: p - first, key: `section:${section.id}:${p}` })
+      if (onPage === pageNum) out.push({ section, partner, at: p - first, key: `section:${section.id}:${p}` })
     }
   })
   return out.sort((a, b) => a.at - b.at)
@@ -78,9 +83,12 @@ export async function withListingSections(items: PagedItem[], opts: ListingOpts)
   const sections = await getPageSections({ surface: opts.surface, page: opts.page }).catch(() => [])
   const placed = placementsOnPage(sections, opts)
   if (placed.length === 0) return items
-  const used = [...new Map(placed.map(p => [p.section.id, p.section])).values()]
+  const used = [...new Map(placed.flatMap(p => [p.section, ...(p.partner ? [p.partner] : [])]).map(s => [s.id, s])).values()]
   const data = await loadSectionData(used, { surface: opts.surface, page: opts.page })
   let rows = 0
+  const render = (section: HomepageSection) => (
+    <SectionRenderer section={section} data={data} rowIndex={section.type === 'product_row' ? rows++ : 0} />
+  )
   return spliceAt(
     items,
     placed.map(p => ({
@@ -88,14 +96,13 @@ export async function withListingSections(items: PagedItem[], opts: ListingOpts)
       item: {
         key: p.key,
         extra: true,
-        node: (
-          <div className={WRAP}>
-            <SectionRenderer
-              section={p.section}
-              data={data}
-              rowIndex={p.section.type === 'product_row' ? rows++ : 0}
-            />
+        node: p.partner ? (
+          <div className={`${WRAP} ${HALF_ROW}`}>
+            <div className={HALF_CELL}>{render(p.section)}</div>
+            <div className={HALF_CELL}>{render(p.partner)}</div>
           </div>
+        ) : (
+          <div className={WRAP}>{render(p.section)}</div>
         ),
       },
     }))

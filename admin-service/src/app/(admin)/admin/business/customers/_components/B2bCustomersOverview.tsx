@@ -12,7 +12,7 @@ import { Kpi, KpiGrid, Section, Table, money, count, when } from '@/components/a
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
-import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { ListFilters, useFilterQuery, SplitRow } from '@/components/admin/kit'
 import { B2B_ALIASES, B2B_FIELDS, B2B_SEARCH } from '@/lib/filters/fields/business-customers'
 import B2bCustomersOverviewSkeleton from './B2bCustomersOverviewSkeleton'
 
@@ -80,8 +80,9 @@ export default function B2bCustomersOverview() {
           <Section title="B2B sales">
             <TrendChart points={data.series} bucket={data.bucket} series={SERIES} ariaLabel="B2B sales and orders" />
           </Section>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <SplitRow
+            scroll="narrow"
+            wide={
               <Section title="Top B2B customers">
                 <Table
                   rows={data.top_customers}
@@ -115,30 +116,32 @@ export default function B2bCustomersOverview() {
                   ]}
                 />
               </Section>
-            </div>
-            <Section title="Applications to review">
-              {data.pending.length === 0 ? (
-                <p className="text-sm text-foreground-muted">No applications waiting.</p>
-              ) : (
-                <ul className="divide-y divide-border-default">
-                  {data.pending.map(p => (
-                    <li key={p.user_id}>
-                      <Link
-                        href={ap(`/admin/business/customers/${p.user_id}/view`)}
-                        className="flex items-center justify-between gap-2 py-2 text-sm hover:text-accent-500"
-                      >
-                        <span className="truncate">{p.company_name}</span>
-                        <span className="text-xs text-foreground-muted whitespace-nowrap">{when(p.created_at)}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-3 text-xs text-foreground-muted">
-                {count(data.accounts.approved)} approved, {count(data.accounts.rejected)} rejected
-              </p>
-            </Section>
-          </div>
+            }
+            narrow={
+              <Section title="Applications to review">
+                {data.pending.length === 0 ? (
+                  <p className="text-sm text-foreground-muted">No applications waiting.</p>
+                ) : (
+                  <ul className="divide-y divide-border-default">
+                    {data.pending.map(p => (
+                      <li key={p.user_id}>
+                        <Link
+                          href={ap(`/admin/business/customers/${p.user_id}/view`)}
+                          className="flex items-center justify-between gap-2 py-2 text-sm hover:text-accent-500"
+                        >
+                          <span className="truncate">{p.company_name}</span>
+                          <span className="text-xs text-foreground-muted whitespace-nowrap">{when(p.created_at)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-3 text-xs text-foreground-muted">
+                  {count(data.accounts.approved)} approved, {count(data.accounts.rejected)} rejected
+                </p>
+              </Section>
+            }
+          />
         </>
       )}
     </div>

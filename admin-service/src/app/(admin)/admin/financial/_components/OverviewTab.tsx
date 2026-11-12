@@ -25,6 +25,7 @@ import {
   type FinanceBucket,
   type FinanceOverviewContract,
 } from './finance'
+import { SplitRow } from '@/components/admin/kit'
 
 type Totals = {
   revenue: number; orders: number; refunds: number; net_sales: number; cogs: number
@@ -143,22 +144,25 @@ function Body({ d }: { d: Overview }) {
 
       <NeedsAttention d={d} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
-          {hasTrend ? (
+      <SplitRow
+        at="xl"
+        wide={
+          hasTrend ? (
             <CashflowTrendCard data={trend} granularity={bucket} />
           ) : (
             <Section title="Cash flow">
               <p className="text-sm text-foreground-muted py-8 text-center">No sales or payments in this period.</p>
             </Section>
-          )}
-        </div>
-        {outflow.length ? (
-          <OutflowDonutCard segments={outflow} total={money(c.outflow)} />
-        ) : (
-          <MixDonutCard title="Outflow composition" segments={[]} total="" totalLabel="" />
-        )}
-      </div>
+          )
+        }
+        narrow={
+          outflow.length ? (
+            <OutflowDonutCard segments={outflow} total={money(c.outflow)} />
+          ) : (
+            <MixDonutCard title="Outflow composition" segments={[]} total="" totalLabel="" />
+          )
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <AgingDonutCard title="Receivables aging" hint="Days since invoice" rows={toAgingRows(d.receivables.aging)} total={money(d.receivables.total)} centerLabel={`${count(d.receivables.count)} unpaid`} />

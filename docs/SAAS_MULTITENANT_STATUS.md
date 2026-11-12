@@ -58,7 +58,7 @@ Code: `controller-service/src/lib/compute/`.
 
 ## Plans, pricing and payments (2026-11-03)
 
-- **Store plans:** Basic, Grow (slug `growth`), Pro, Enterprise (`database/control-plane/seed-plans.sql`). Starter is retired (`is_active=false`, never offered). `listPlans()` returns active store plans only; `listPlans('any')` adds the `services` workspace plan. Features per plan: [`PLAN_FEATURE_MATRIX.md`](PLAN_FEATURE_MATRIX.md).
+- **Store plans:** Basic, Grow (slug `growth`), Pro, Enterprise (`controller-service/database/seeds/seed-plans.sql`). Starter is retired (`is_active=false`, never offered). `listPlans()` returns active store plans only; `listPlans('any')` adds the `services` workspace plan. Features per plan: [`PLAN_FEATURE_MATRIX.md`](PLAN_FEATURE_MATRIX.md).
 - **Price** = flat plan fee (`plans.monthly_price_inr`: ₹0 / ₹500 / ₹1,000 / ₹2,000, GST included) + servers at AWS cost × (1 + `plans.infra_margin`: Basic 0%, others 20%) + 18% GST on the servers only — `monthlyTotal(quote, fee, gstRate).total` (`lib/compute/pricing.ts`). Floors at each plan's `min_preset`: Basic ₹2,081, Grow ₹3,188, Pro ₹5,216, Enterprise ₹9,845 per month. Yearly = 10× the month (2 months free), charged once a year.
 - **Stored price:** onboarding submit always saves the store's spec and price to `tenant_compute.desired`/`price_inr_month` — the owner's choice when `COMPUTE_SPEC_ENABLED`, else the plan's `min_preset`; Basic is always the Basic preset. Approval, the owner dashboard and billing read that price.
 - **Database:** Postgres on the store's own server is the default on every plan; a dedicated RDS database is an opt-up on Grow, Pro and Enterprise.
@@ -224,7 +224,7 @@ controller-service/src/app/api/internal/provisioning/reconcile/route.ts — hour
 controller-service/src/instrumentation.ts            — in-app scheduler; 45s provisioning worker + hourly reconcile
 controller-service/src/lib/ec2-client.ts             — minimal SigV4 EC2 Query-API client (no @aws-sdk/client-ec2 dep)
 deploy/nginx-servers.conf        — nginx including tenant wildcard server_name blocks
-database/control-plane/schema.sql
+controller-service/database/control-plane/
 ```
 
 ---

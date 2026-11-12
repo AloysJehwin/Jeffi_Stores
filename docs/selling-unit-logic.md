@@ -147,7 +147,7 @@ TAT = zone TAT + extraDeliveryDays.
 
 | File | Role |
 |------|------|
-| `database/catalog.sql` | Schema: `product_units` table + partial unique indexes |
+| `admin-service/database/tables/catalog.sql` | Schema: `product_units` table + partial unique indexes |
 | `controller-service/src/components/visitor/ProductActions.tsx` | Price display + qty input (visitor detail page) |
 | `controller-service/src/components/business/ProductActions.tsx` | Price display + qty input (business detail page) |
 | `controller-service/src/components/visitor/ProductCard.tsx` | Card EDD + price (visitor listings) |

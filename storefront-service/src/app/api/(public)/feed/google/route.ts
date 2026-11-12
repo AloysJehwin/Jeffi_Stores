@@ -1,6 +1,7 @@
 import { catalogBaseUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/shared/db'
+import { loadProductMediaMany, resolveImageUrls } from '@/lib/catalog/product-media'
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
 import { getStorefrontContent } from '@/lib/catalog/site-controls'
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
@@ -64,13 +65,19 @@ export async function GET(request: NextRequest) {
   `)
 
   const items: string[] = []
+  // product_media images (primary first), with variant / sub-variant inheritance.
+  const mediaByProduct = await loadProductMediaMany(products.map((p: any) => p.id))
 
   for (const product of products) {
     const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-    const imageUrl = primaryImage?.image_url || ''
-    const additionalImages = (product.product_images || [])
-      .filter((img: any) => img.id !== primaryImage?.id)
-      .map((img: any) => img.image_url)
+    const media = mediaByProduct.get(product.id) ?? []
+    const fromMedia = resolveImageUrls(media)
+    const imageUrl = fromMedia[0] || primaryImage?.image_url || ''
+    const additionalImages = fromMedia.length
+      ? fromMedia.slice(1, 11)
+      : (product.product_images || []).filter((img: any) => img.id !== primaryImage?.id).map((img: any) => img.image_url)
+    const imagesXmlFor = (urls: string[]) =>
+      urls.map(url => `\n      <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`).join('')
     const brandName = product.brands?.name || ''
     const description = (product.description || product.name).slice(0, 5000)
     const hasVariants = product.has_variants && product.product_variants?.length > 0
@@ -85,9 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Shared XML fragments
-    const additionalImagesXml = additionalImages
-      .map((url: string) => `\n      <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`)
-      .join('')
+    const additionalImagesXml = imagesXmlFor(additionalImages)
     const highlightsXml = highlights
       .map(h => `\n      <g:product_highlight>${escapeXml(h)}</g:product_highlight>`)
       .join('')
@@ -112,13 +117,17 @@ export async function GET(request: NextRequest) {
             ? 'out_of_stock'
             : 'in_stock'
 
+        // A variant with its own images lists them first.
+        const own = resolveImageUrls(media, { variantId: variant.id })
+        const vImage = own[0] || imageUrl
+        const vAdditionalXml = own.length && own[0] !== fromMedia[0] ? imagesXmlFor(own.slice(1, 11)) : additionalImagesXml
         items.push(`    <item>
       <g:id>${escapeXml(variant.sku)}</g:id>
       <g:item_group_id>${escapeXml(product.sku)}</g:item_group_id>
       <title>${escapeXml(clipTitle(`${product.name} - ${variant.variant_name}`))}</title>
       <description>${escapeXml(description)}</description>
       <link>${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}</link>
-      <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}${priceXml(Number(sellingPrice), variantMrp)}
+      <g:image_link>${escapeXml(vImage)}</g:image_link>${vAdditionalXml}${priceXml(Number(sellingPrice), variantMrp)}
       <g:availability>${availability}</g:availability>
       <g:condition>new</g:condition>
       <g:identifier_exists>${hasIdentifiers(variantGtin, variantMpn, brandName) ? 'yes' : 'no'}</g:identifier_exists>${

@@ -1,5 +1,6 @@
 'use server'
 
+import { extraFieldsSetSql, normalizeExtraFields } from '@/lib/catalog/product-extra-fields'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -14,6 +15,7 @@ import {
   gstError,
   parseJsonField,
   priceErrors,
+  samePrices,
   productErrorMessage,
   roundMoneyFields,
   publishShippingError,
@@ -304,6 +306,16 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     )
   )
   if (hasVariants) {
+    // A variant whose prices still equal the live row is not re-judged against its MRP:
+    // stored data that predates the rule must not block an unrelated edit.
+    const liveVariantPrices = new Map(
+      (
+        (await queryMany<{ id: string; price: string | null; mrp: string | null; price_ex_gst: string | null; mrp_ex_gst: string | null }>(
+          'SELECT id, price, mrp, price_ex_gst, mrp_ex_gst FROM product_variants WHERE product_id = $1',
+          [productId]
+        )) || []
+      ).map(r => [r.id, r])
+    )
     for (const v of sellableVariants) {
       if (!String(v.variant_name ?? '').trim()) {
         if (isPublish) errors.push('Every variant needs a name.')
@@ -315,7 +327,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         ...priceErrors(
           `Variant "${v.variant_name}"`,
           { price: v.price, mrp: v.mrp, priceExGst: v.price_ex_gst, mrpExGst: v.mrp_ex_gst, cost: v.cost_price },
-          { requirePrice: isPublish && !subsOn }
+          { requirePrice: isPublish && !subsOn, skipMrpCheck: samePrices(v, liveVariantPrices.get(v.id)) }
         )
       )
     }
@@ -453,6 +465,9 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         .filter(Boolean)
     : null
 
+  // Plain-field columns (Legal Metrology, usage, …): only the ones the form posted.
+  const extraFields = normalizeExtraFields(k => (formData.has(k) ? formData.get(k) : undefined))
+
   const host = await getHost()
   const back = formData.get('_back') as string | null
   const listDest = back && back.startsWith('/admin/products') ? back : '/admin/products'
@@ -502,7 +517,12 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     if (!productSku) {
       productSku = await generateProductSku(categoryId).catch(() => `PRD-${Date.now().toString(36).toUpperCase()}`)
     }
-    const slug = await uniqueProductSlug({ query }, name, productId)
+    // The slug follows the name only when the name changes; an unrenamed product keeps its URL.
+    const named = await queryOne<{ name: string | null; slug: string | null }>(
+      'SELECT name, slug FROM products WHERE id = $1',
+      [productId]
+    )
+    const slug = named?.slug && name === named.name ? named.slug : await uniqueProductSlug({ query }, name, productId)
 
     if (hasDraft) {
       const draftVariants = rawVariants
@@ -531,7 +551,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
       )
       if (conflict) return { error: conflict }
 
-      const draftFields = {
+      const draftFields: Record<string, unknown> = {
         name,
         slug,
         description,
@@ -617,15 +637,27 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         target_audience: targetAudience,
         inventory_sync: inventorySync,
         low_stock_threshold: lowStockThreshold,
+        ...extraFields,
+        _faqs: formData.get('_faqs') ?? undefined,
+        _media: formData.get('_media') ?? undefined,
         // Preserve the bootstrap capture across explicit saves. Fall back to the
         // existing draft value when the form didn't send one (so we never wipe it).
         _bsEntries: bsEntriesFromForm ?? (draftRow as any)?.fields?._bsEntries ?? undefined,
       }
 
+      // A field the form did not post (inputs hidden for variant products, plan-gated ones) is not
+      // an edit: leave it out so the draft keeps the value it was seeded with.
+      const derived = new Set(['name', 'slug', 'sku', 'is_active', 'stock_status', 'mpn', 'gtin', '_bsEntries'])
+      for (const key of Object.keys(draftFields)) {
+        if (derived.has(key)) continue
+        if (!formData.has(key === 'product_suppliers' ? 'product_suppliers_json' : key)) delete draftFields[key]
+      }
+
       await query(
-        // Images, sub-variants and units have their own draft endpoints; _files (staged digital files) is kept.
+        // Merged over the draft: keys the form does not carry (currency, AI copy, _files, …) are kept.
+        // Images, sub-variants and units have their own draft endpoints.
         `UPDATE product_drafts SET
-           fields = $2::jsonb || jsonb_strip_nulls(jsonb_build_object('_files', fields->'_files')),
+           fields = COALESCE(fields, '{}'::jsonb) || $2::jsonb,
            variants = COALESCE($3::jsonb, variants),
            updated_at = NOW()
          WHERE id = $1`,
@@ -861,6 +893,12 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         [productId]
       )
       await query(`UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`, params)
+      const extraSet = extraFieldsSetSql(Object.keys(extraFields), '$2::jsonb')
+      if (extraSet) await query(`UPDATE products SET ${extraSet} WHERE id = $1`, [productId, JSON.stringify(extraFields)])
+      if (formData.has('_faqs')) {
+        const { applyProductFaqsTx } = await import('@/lib/catalog/product-media')
+        await applyProductFaqsTx(client, productId, JSON.parse(String(formData.get('_faqs')) || 'null'))
+      }
       // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity then clean up batches
       if (prevRow?.perishable && !perishable) {
         // Capture per-grain batch totals BEFORE deleting.
@@ -1276,6 +1314,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
       }
     })
     copiedS3.length = 0 // committed: the copies are referenced now
+    await (await import('@/lib/catalog/product-media')).syncLegacyImagesToMediaSafe(productId)
     await removeS3(s3Deletes, 'removed-image')
     if (hasVariants && subVariantPrices.length > 0) {
       try {

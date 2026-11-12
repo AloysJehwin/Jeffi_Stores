@@ -21,7 +21,7 @@ import { queryOne, queryMany } from '@/lib/shared/db'
 import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from './ProductsTableClient'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader } from '@/components/admin/kit'
+import { DraftLockBadge, Kpi, KpiGrid, ListFilters, PageBody, PageHeader, SplitRow } from '@/components/admin/kit'
 import { draftLockChips } from '@/lib/admin/draft-locks'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
@@ -108,30 +108,33 @@ async function ProductsStats({ q }: { q: FilterQuery }) {
   const categoryCount = stats.categories
 
   return (
-    <div className="animate-fade-in space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2 space-y-3">
-          <KpiGrid>
-            <Kpi
-              label="Inventory stock value"
-              value={`Rs. ${stats.inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              highlight
-            />
-            <Kpi label="Total products" value={totalCount.toLocaleString('en-IN')} />
-            <Kpi label="Active" value={activeCount.toLocaleString('en-IN')} />
-            <Kpi label="Featured" value={`${featuredCount}/6`} sub="Shown on the storefront home" />
-            <Kpi label="Categories" value={categoryCount.toLocaleString('en-IN')} />
-            <Kpi label="Inactive" value={(totalCount - activeCount).toLocaleString('en-IN')} />
-          </KpiGrid>
-        </div>
+    <SplitRow
+      at="xl"
+      scroll="narrow"
+      className="animate-fade-in"
+      wide={
+        <KpiGrid>
+          <Kpi
+            label="Inventory stock value"
+            value={`Rs. ${stats.inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            highlight
+          />
+          <Kpi label="Total products" value={totalCount.toLocaleString('en-IN')} />
+          <Kpi label="Active" value={activeCount.toLocaleString('en-IN')} />
+          <Kpi label="Featured" value={`${featuredCount}/6`} sub="Shown on the storefront home" />
+          <Kpi label="Categories" value={categoryCount.toLocaleString('en-IN')} />
+          <Kpi label="Inactive" value={(totalCount - activeCount).toLocaleString('en-IN')} />
+        </KpiGrid>
+      }
+      narrow={
         <ProductBreakdownChart
           byCategory={stats.byCategory}
           byBrand={stats.byBrand}
           byStock={stats.byStock}
           byInventoryValue={stats.byInventoryValue}
         />
-      </div>
-    </div>
+      }
+    />
   )
 }
 

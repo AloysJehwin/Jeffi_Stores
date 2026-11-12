@@ -5,26 +5,7 @@ import type { ReactNode } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics, AnalyticsRange } from '@/lib/queries'
-import {
-  PageHeader,
-  Kpi,
-  Section,
-  ChartCard,
-  TrendChart,
-  DonutSplit,
-  RankedBars,
-  FunnelBar,
-  LinkedLegend,
-  MiniStat,
-  ListRows,
-  GroupLabel,
-  StatusBadge,
-  ORDER_STATUS,
-  rs,
-  rsCompact,
-  pctStr,
-  numStr,
-} from '@/components/admin/kit'
+import { PageHeader, Kpi, Section, ChartCard, TrendChart, DonutSplit, RankedBars, FunnelBar, LinkedLegend, MiniStat, ListRows, GroupLabel, StatusBadge, ORDER_STATUS, rs, rsCompact, pctStr, numStr, SplitRow } from '@/components/admin/kit'
 import OpsInsights from './OpsInsights'
 import ProductInsights from './ProductInsights'
 import GrowthInsights from './GrowthInsights'
@@ -173,8 +154,9 @@ export default function AnalyticsDashboardClient({
           <Kpi label="Repeat Rate" value={pctStr(repeatRate, 0)} sub={`${numStr(data.customerSplit.returningCustomers)} returning of ${numStr(activeBuyers)} buyers`} href={ap('/admin/customers', host)} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <div className="xl:col-span-2">
+        <SplitRow
+          at="xl"
+          wide={
             <ChartCard title="Revenue & Orders" action={<SectionLink href={ap('/admin/orders', host)} label="Orders" />}>
               <div className="hidden sm:block">
                 <TrendChart points={data.trend} bucket={data.trendBucket} />
@@ -190,36 +172,38 @@ export default function AnalyticsDashboardClient({
                 </div>
               </div>
             </ChartCard>
-          </div>
-          <ChartCard title="Payment Split" action={<SectionLink href={canFinancial ? ap('/admin/financial', host) : undefined} label="Ledger" />}>
-            <DonutSplit
-              size={130}
-              centerValue={rs(totalPay)}
-              centerLabel="collected"
-              segments={[
-                { label: 'Online', value: data.payment.online, color: 'rgb(59 130 246)' },
-                { label: 'COD', value: data.payment.cod, color: 'rgb(245 158 11)' },
-                ...(data.payment.other > 0 ? [{ label: 'Other', value: data.payment.other, color: 'rgb(148 163 184)' }] : []),
-              ]}
-            />
-            <LinkedLegend
-              items={[
-                { label: 'Online', value: rs(data.payment.online), color: 'rgb(59 130 246)', href: ap('/admin/orders', host) },
-                { label: 'COD', value: rs(data.payment.cod), color: 'rgb(245 158 11)', href: ap('/admin/orders', host) },
-              ]}
-            />
-            {data.payment.codOutstanding > 0 && (
-              <div className="mt-3 pt-3 border-t border-border-default">
-                <MiniStat
-                  label={`COD outstanding (${data.payment.codOutstandingCount})`}
-                  value={rs(data.payment.codOutstanding)}
-                  tone="text-amber-600 dark:text-amber-400"
-                  href={canFinancial ? ap('/admin/financial', host) : undefined}
-                />
-              </div>
-            )}
-          </ChartCard>
-        </div>
+          }
+          narrow={
+            <ChartCard title="Payment Split" action={<SectionLink href={canFinancial ? ap('/admin/financial', host) : undefined} label="Ledger" />}>
+              <DonutSplit
+                size={130}
+                centerValue={rs(totalPay)}
+                centerLabel="collected"
+                segments={[
+                  { label: 'Online', value: data.payment.online, color: 'rgb(59 130 246)' },
+                  { label: 'COD', value: data.payment.cod, color: 'rgb(245 158 11)' },
+                  ...(data.payment.other > 0 ? [{ label: 'Other', value: data.payment.other, color: 'rgb(148 163 184)' }] : []),
+                ]}
+              />
+              <LinkedLegend
+                items={[
+                  { label: 'Online', value: rs(data.payment.online), color: 'rgb(59 130 246)', href: ap('/admin/orders', host) },
+                  { label: 'COD', value: rs(data.payment.cod), color: 'rgb(245 158 11)', href: ap('/admin/orders', host) },
+                ]}
+              />
+              {data.payment.codOutstanding > 0 && (
+                <div className="mt-3 pt-3 border-t border-border-default">
+                  <MiniStat
+                    label={`COD outstanding (${data.payment.codOutstandingCount})`}
+                    value={rs(data.payment.codOutstanding)}
+                    tone="text-amber-600 dark:text-amber-400"
+                    href={canFinancial ? ap('/admin/financial', host) : undefined}
+                  />
+                </div>
+              )}
+            </ChartCard>
+          }
+        />
 
         <Section title="Order Funnel" action={<SectionLink href={ap('/admin/orders', host)} label="All orders" />}>
           <FunnelBar

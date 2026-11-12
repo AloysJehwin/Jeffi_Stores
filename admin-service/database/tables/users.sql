@@ -1,0 +1,154 @@
+-- admin-service: tables. Load order comes from scripts/db-files.mjs.
+
+--
+-- Name: account_deletions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_deletions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    requested_via character varying(20) NOT NULL,
+    performed_by_admin_id uuid,
+    reason text,
+    summary jsonb DEFAULT '{}'::jsonb NOT NULL,
+    deleted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+COMMENT ON TABLE public.account_deletions IS 'Proof of each customer account erasure. Holds no personal data; user_id points at the anonymised users row.';
+
+
+
+--
+-- Name: admin_certificates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_certificates (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    admin_id uuid NOT NULL,
+    serial_number character varying(100) NOT NULL,
+    common_name character varying(255) NOT NULL,
+    issued_at timestamp with time zone DEFAULT now(),
+    expires_at timestamp with time zone NOT NULL,
+    is_revoked boolean DEFAULT false,
+    revoked_at timestamp with time zone,
+    download_token character varying(255),
+    downloaded_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    p12_data bytea,
+    p12_password character varying(64)
+);
+
+
+
+--
+-- Name: admin_mfa_recovery_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_mfa_recovery_codes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    admin_id uuid NOT NULL,
+    code_hash text NOT NULL,
+    used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+
+--
+-- Name: admins; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admins (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    role character varying(50) DEFAULT 'admin'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    last_login timestamp with time zone,
+    scopes jsonb DEFAULT '[]'::jsonb,
+    is_active boolean DEFAULT true,
+    mfa_secret_enc text,
+    mfa_enabled boolean DEFAULT false NOT NULL,
+    mfa_enrolled_at timestamp with time zone,
+    idle_timeout_minutes integer,
+    support_language character varying(10) DEFAULT 'en'::character varying NOT NULL,
+    mobile character varying(16),
+    mobile_verified_at timestamp with time zone
+);
+
+
+
+--
+-- Name: admin_saved_views; Type: TABLE; Schema: public; Owner: -
+--
+-- A named filter set on an admin list (page_key = the filter registry key). Shared views are
+-- visible to every admin who can read that list.
+--
+
+CREATE TABLE public.admin_saved_views (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    page_key character varying(64) NOT NULL,
+    name character varying(80) NOT NULL,
+    query text DEFAULT ''::text NOT NULL,
+    is_shared boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+
+--
+-- Name: failed_login_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.failed_login_attempts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255),
+    user_id uuid,
+    ip_address character varying(64),
+    user_agent text,
+    reason character varying(64),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+
+--
+-- Name: otp_verifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.otp_verifications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255) NOT NULL,
+    otp character varying(6) NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    verified boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+
+--
+-- Name: service_accounts; Type: TABLE; Schema: public; Owner: -
+--
+-- admin_id: the inactive admins row (role service_account) the account acts as, so created_by
+-- and the audit trail resolve to it.
+--
+
+CREATE TABLE public.service_accounts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    serial_number text NOT NULL,
+    common_name text NOT NULL,
+    allowed_scopes text[] DEFAULT '{}'::text[] NOT NULL,
+    is_revoked boolean DEFAULT false NOT NULL,
+    revoked_at timestamp with time zone,
+    p12_data bytea,
+    p12_password text,
+    p12_downloaded boolean DEFAULT false NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_used_at timestamp with time zone,
+    admin_id uuid
+);

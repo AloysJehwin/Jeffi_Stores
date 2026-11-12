@@ -9,6 +9,8 @@ import TopNav from '../../src/components/layout/TopNav'
 import ProductCard from '../../src/components/product/ProductCard'
 import RecentlyViewed from '../../src/components/home/RecentlyViewed'
 import { ListingFeedItem, listingFeed, useListingLayout, type ListingFeedEntry } from '../../src/components/home/ListingFeed'
+import { listingSkeletonInserts } from '../../src/components/home/HomeLayoutSkeleton'
+import { useHomeLayout } from '../../src/stores/homeLayoutStore'
 import { useColumnWidth } from '../../src/components/home/layout'
 import CompareBar, { CompareStrip } from '../../src/components/catalog/CompareBar'
 import FilterSheet, { FiltersButton } from '../../src/components/catalog/FilterSheet'
@@ -107,6 +109,7 @@ export default function ProductsScreen() {
   // Brand slugs (links pass ?brand=<slug>) so the sheet can show them selected.
   const brandSlugs = useQuery({ queryKey: ['brands'], queryFn: listBrands, staleTime: 5 * 60_000 })
   const layout = useListingLayout('products')
+  const remembered = useHomeLayout('products')
 
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false })
@@ -230,7 +233,7 @@ export default function ProductsScreen() {
         <Skeleton width={186} height={38} rounded="rounded-full" />
         <Skeleton width={76} height={40} rounded="rounded-full" />
       </View>
-      <ProductGridSkeleton />
+      <ProductGridSkeleton inserts={listingSkeletonInserts(remembered, 6, 2)} />
     </View>
   ) : failed ? (
     <View className="px-4">

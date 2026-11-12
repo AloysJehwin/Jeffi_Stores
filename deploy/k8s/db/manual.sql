@@ -161,3 +161,30 @@ DO $$ BEGIN
   END IF;
 END $$;
 ALTER TABLE public.email_campaign_logs VALIDATE CONSTRAINT email_campaign_logs_user_id_fkey;
+
+-- product_media / product_faqs (new tables: nothing to validate).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_media_root_product_id_fkey' AND conrelid = 'public.product_media'::regclass) THEN
+    ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_root_product_id_fkey FOREIGN KEY (root_product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_media_product_id_fkey' AND conrelid = 'public.product_media'::regclass) THEN
+    ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_media_variant_id_fkey' AND conrelid = 'public.product_media'::regclass) THEN
+    ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_media_sub_variant_id_fkey' AND conrelid = 'public.product_media'::regclass) THEN
+    ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_sub_variant_id_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'product_faqs_product_id_fkey' AND conrelid = 'public.product_faqs'::regclass) THEN
+    ALTER TABLE ONLY public.product_faqs ADD CONSTRAINT product_faqs_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+  END IF;
+END $$;

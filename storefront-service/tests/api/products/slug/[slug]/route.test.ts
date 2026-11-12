@@ -5,6 +5,7 @@ const { queryOneMock } = vi.hoisted(() => ({
   queryOneMock: vi.fn(),
 }))
 
+vi.mock('@/lib/catalog/product-media', () => ({ loadProductMedia: vi.fn().mockResolvedValue([]), loadProductFaqs: vi.fn().mockResolvedValue([]) }))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: queryOneMock,

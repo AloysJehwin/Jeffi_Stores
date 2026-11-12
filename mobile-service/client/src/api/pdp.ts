@@ -12,6 +12,23 @@ export interface PdpImage {
   blurhash?: string | null
 }
 
+/** A product_media row (any kind, any scope) from the slug route. */
+export interface PdpMedia {
+  id: string
+  kind: 'image' | 'video' | 'external_video' | 'document' | 'model_3d' | 'spin_360' | 'audio'
+  url: string
+  thumbnail_url: string | null
+  file_name: string | null
+  alt: string | null
+  caption: string | null
+  sort_order: number
+  is_primary: boolean
+  metadata: Record<string, any>
+  product_id: string | null
+  variant_id: string | null
+  sub_variant_id: string | null
+}
+
 export interface PdpSubVariant {
   id: string
   sub_variant_name: string
@@ -71,6 +88,9 @@ interface PolicyRef {
 /** The /api/products/slug/:slug row (p.* plus the joined arrays); numeric columns may arrive as strings. */
 export interface PdpProduct {
   id: string
+  /** Every media kind and scope; resolvePdpMedia picks what the selection shows. */
+  media?: PdpMedia[]
+  faqs?: { id?: string; question: string; answer: string }[]
   name: string
   slug: string
   sku: string

@@ -110,7 +110,7 @@ export default function OrderConfirmationScreen() {
           fill
           title="Order Not Found"
           message={(error instanceof Error && error.message) || 'Unable to load order details'}
-          actionLabel="View All Orders"
+          actionLabel="View all orders"
           onAction={() => router.push('/orders')}
         />
       </Screen>
@@ -205,8 +205,8 @@ export default function OrderConfirmationScreen() {
       <AiInsight kind="affirmation" className="mb-6" body={{ itemNames: order.items.map(i => i.productName) }} />
 
       <View className="gap-3">
-        <Button label="View All Orders" onPress={() => router.push('/orders')} />
-        <Button label="Continue Shopping" variant="outline" onPress={() => router.navigate('/(tabs)')} />
+        <Button label="View all orders" onPress={() => router.push('/orders')} />
+        <Button label="Continue shopping" variant="outline" onPress={() => router.navigate('/(tabs)')} />
       </View>
 
       <RecommendedProducts title="Shop More Products" limit={4} />

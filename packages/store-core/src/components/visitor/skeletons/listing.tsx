@@ -38,14 +38,29 @@ export function ProductCardSkeleton() {
   )
 }
 
-export function ProductGridSkeleton({ count = 6, className = LISTING_GRID }: { count?: number; className?: string }) {
-  return (
-    <div className={className}>
-      {Array.from({ length: count }).map((_, i) => (
-        <ProductCardSkeleton key={i} />
-      ))}
-    </div>
-  )
+export interface GridInsert {
+  /** Cards before it. */
+  at: number
+  node: ReactNode
+}
+
+/** `inserts` go between the cards (the listing's admin sections, from sections.tsx listingInserts). */
+export function ProductGridSkeleton({
+  count = 6,
+  className = LISTING_GRID,
+  inserts = [],
+}: {
+  count?: number
+  className?: string
+  inserts?: GridInsert[]
+}) {
+  const cells: ReactNode[] = []
+  let next = 0
+  for (let i = 0; i < count; i++) {
+    while (next < inserts.length && inserts[next].at <= i) cells.push(<div key={`s${next}`} className="contents">{inserts[next++].node}</div>)
+    cells.push(<ProductCardSkeleton key={i} />)
+  }
+  return <div className={className}>{cells}</div>
 }
 
 const funnel = (
@@ -169,7 +184,16 @@ export function FilterSidebarSkeleton({ categories = true }: { categories?: bool
 }
 
 /** /products: sidebar (with the search box on the business portal), heading, toolbar, card grid. */
-export function ProductsListingSkeleton({ subtitle, search = false }: { subtitle?: string; search?: boolean }) {
+export function ProductsListingSkeleton({
+  subtitle,
+  search = false,
+  grid,
+}: {
+  subtitle?: string
+  search?: boolean
+  /** The card grid with the listing's sections spliced in (sections.tsx listingInserts). */
+  grid?: { count: number; inserts: GridInsert[] }
+}) {
   return (
     <div className="bg-surface min-h-screen" role="status" aria-busy="true" aria-label="Loading products">
       <div className="container mx-auto px-4">
@@ -191,7 +215,7 @@ export function ProductsListingSkeleton({ subtitle, search = false }: { subtitle
               {subtitle && <p className="text-foreground-secondary text-sm mt-1">{subtitle}</p>}
             </div>
             <ListingToolbarSkeleton />
-            <ProductGridSkeleton />
+            <ProductGridSkeleton {...grid} />
           </div>
         </div>
       </div>
@@ -272,10 +296,13 @@ export function TaxonomyDetailSkeleton({
   kind,
   toolbar = false,
   gridClassName = LISTING_GRID_WIDE,
+  grid,
 }: {
   kind: 'category' | 'brand'
   toolbar?: boolean
   gridClassName?: string
+  /** The card grid with the listing's sections spliced in (sections.tsx listingInserts). */
+  grid?: { count: number; inserts: GridInsert[] }
 }) {
   return (
     <div className="bg-surface min-h-screen" role="status" aria-busy="true" aria-label="Loading products">
@@ -314,7 +341,7 @@ export function TaxonomyDetailSkeleton({
           {!toolbar && <SortDropdownSkeleton />}
         </div>
         {toolbar && <ListingToolbarSkeleton />}
-        <ProductGridSkeleton count={8} className={gridClassName} />
+        <ProductGridSkeleton count={8} {...grid} className={gridClassName} />
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { PageLoading, LoadingKpis, LoadingSection, LoadingLines, Sk } from '@/components/admin/kit/skeleton'
+import { SplitRow } from '@/components/admin/kit'
 
 const KPIS = ['Revenue', 'Orders', 'Avg Order Value', 'Customers', 'Gross Margin', 'Units Sold', 'Conversion', 'Repeat Rate']
 
@@ -45,14 +46,17 @@ export default function Loading() {
         </div>
       </div>
       <LoadingKpis labels={KPIS} />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <Chart title="Revenue & Orders">
             <Sk className="h-44 w-full rounded-lg" />
           </Chart>
-        </div>
-        <Chart title="Payment Split">{donut}</Chart>
-      </div>
+        }
+        narrow={
+          <Chart title="Payment Split">{donut}</Chart>
+        }
+      />
       <LoadingSection title="Order Funnel">
         <Sk className="h-10 w-full rounded-lg" />
       </LoadingSection>
