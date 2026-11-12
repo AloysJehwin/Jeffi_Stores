@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "f9b3b65ae2ace2f20be5b313703a6c494f43059aed1dd281eced0c33e9e25f51",
+ "manifestHash": "0d32e097d12eaebaf46f75c2a0b0c3f112b367601de8b85c183a7724a4813b7a",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -42744,6 +42744,20 @@
       "enum": [
        true
       ]
+     },
+     "keep": {
+      "type": "object",
+      "properties": {
+       "database": {
+        "type": "boolean"
+       },
+       "media": {
+        "type": "boolean"
+       },
+       "config": {
+        "type": "boolean"
+       }
+      }
      }
     },
     "required": [
@@ -42752,7 +42766,7 @@
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
-   "summary": "Operator-triggered deprovision-with-backup for a tenant. DESTRUCTIVE — requires an explicit { confirm: true } body. Takes the store offline, snapshots its DB to S3, then deletes the RDS instance + tenant bucket.",
+   "summary": "Operator-triggered deprovision for a tenant. DESTRUCTIVE — requires an explicit { confirm: true } body.",
    "command": "platform customers deprovision"
   },
   {

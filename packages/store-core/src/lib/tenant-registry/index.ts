@@ -1,5 +1,19 @@
 export { RESERVED_LABELS, controlPlanePool } from './shared'
 export {
+  KEEP_ALL,
+  archiveRetentionDays,
+  parseArchiveKeep,
+  createTenantArchive,
+  findOwnerArchive,
+  getOwnerArchive,
+  listTenantArchives,
+  markArchiveRestored,
+  expireTenantArchives,
+  reclaimableTenantId,
+  type ArchiveKeep,
+  type TenantArchive,
+} from './archives'
+export {
   slugFromHost,
   appFromHost,
   resolveTenantFromHost,
