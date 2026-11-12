@@ -35,8 +35,18 @@ vi.mock('@/lib/tenant-registry', () => reg)
 const backupStore = {
   getTenantBackup: vi.fn(),
   putTenantBackup: vi.fn(),
+  archiveMediaPrefix: vi.fn((ownerId: string, slug: string) => `tenant-backups/media/${ownerId}/${slug}/STAMP/`),
+  deleteTenantBackups: vi.fn().mockResolvedValue({ deleted: 0 }),
 }
 vi.mock('@/lib/tenancy/tenant-backup-store', () => backupStore)
+
+// What a deprovision kept for the owner (tenant_archives).
+const archives = {
+  createTenantArchive: vi.fn().mockResolvedValue({ id: 'arch-1' }),
+  getOwnerArchive: vi.fn(),
+  markArchiveRestored: vi.fn().mockResolvedValue(undefined),
+}
+vi.mock('@/lib/tenant-registry/archives', () => archives)
 
 const seedMod = { seedTenantData: vi.fn().mockResolvedValue(undefined) }
 vi.mock('@controller/lib/provisioning/seed', () => seedMod)
@@ -732,6 +742,76 @@ describe('provisioning state machine', () => {
       expect(reg.clearTenantCache).toHaveBeenCalled()
       expect(out).toMatchObject({ ok: true, backedUp: true, backupKey: 'tenant-backups/owner-1/acme.sql.gz' })
       expect(reg.clearTenantInfra).toHaveBeenCalledWith('t-1')
+    })
+
+    it('keeps everything for the owner when nobody chose (a cancelled subscription)', async () => {
+      reg.getTenant.mockResolvedValue({ ...TENANT, display_name: 'Acme', rds_endpoint: 'ep-1', s3_bucket: 'jeffi-tenant-acme' })
+      backupStore.putTenantBackup.mockResolvedValue({ ownerKey: 'tenant-backups/by-owner/owner-1/x.sql.gz' })
+      const { deprovisionTenant } = await import('@controller/lib/provisioning/steps')
+
+      const out = await deprovisionTenant('t-1', provider, { ownerId: 'owner-1' })
+
+      expect(out).toMatchObject({ ok: true, archiveId: 'arch-1' })
+      expect(provider.archivedBuckets.get('tenant-backups/media/owner-1/acme/STAMP/')).toBe('jeffi-tenant-acme')
+      expect(archives.createTenantArchive).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 't-1',
+          ownerId: 'owner-1',
+          slug: 'acme',
+          dbBackupKey: 'tenant-backups/by-owner/owner-1/x.sql.gz',
+          mediaPrefix: 'tenant-backups/media/owner-1/acme/STAMP/',
+          config: expect.objectContaining({ displayName: 'Acme', plan: 'basic', siteSettings: {} }),
+        })
+      )
+      expect(backupStore.deleteTenantBackups).not.toHaveBeenCalled()
+    })
+
+    it('keeps only what the administrator chose and deletes the rest with no copy', async () => {
+      reg.getTenant.mockResolvedValue({ ...TENANT, rds_endpoint: 'ep-1', s3_bucket: 'jeffi-tenant-acme' })
+      const backup = vi.spyOn(provider, 'backupDb')
+      const { deprovisionTenant } = await import('@controller/lib/provisioning/steps')
+
+      const out = await deprovisionTenant('t-1', provider, {
+        ownerId: 'owner-1',
+        keep: { database: false, media: true, config: false },
+        requestedBy: 'admin@example.com',
+      })
+
+      expect(out).toMatchObject({ ok: true, backedUp: false, backupKey: null, archiveId: 'arch-1' })
+      expect(backup).not.toHaveBeenCalled()
+      expect(backupStore.putTenantBackup).not.toHaveBeenCalled()
+      // The database was not kept, so earlier backups of this store go too.
+      expect(backupStore.deleteTenantBackups).toHaveBeenCalledWith({ ownerId: 'owner-1', slug: 'acme' })
+      expect(archives.createTenantArchive).toHaveBeenCalledWith(
+        expect.objectContaining({ dbBackupKey: null, mediaPrefix: 'tenant-backups/media/owner-1/acme/STAMP/', config: null, requestedBy: 'admin@example.com' })
+      )
+    })
+
+    it('records no archive when the administrator kept nothing', async () => {
+      reg.getTenant.mockResolvedValue({ ...TENANT, rds_endpoint: 'ep-1', s3_bucket: 'jeffi-tenant-acme' })
+      const { deprovisionTenant } = await import('@controller/lib/provisioning/steps')
+
+      const out = await deprovisionTenant('t-1', provider, { ownerId: 'owner-1', keep: { database: false, media: false, config: false } })
+
+      expect(out).toMatchObject({ ok: true, archiveId: null })
+      expect(provider.archivedBuckets.size).toBe(0)
+      expect(archives.createTenantArchive).not.toHaveBeenCalled()
+    })
+
+    it('deletes nothing when the media files could not be copied', async () => {
+      reg.getTenant.mockResolvedValue({ ...TENANT, rds_endpoint: 'ep-1', s3_bucket: 'jeffi-tenant-acme' })
+      backupStore.putTenantBackup.mockResolvedValue({ ownerKey: 'k' })
+      vi.spyOn(provider, 'archiveBucket').mockRejectedValue(new Error('copy failed'))
+      const delDb = vi.spyOn(provider, 'deleteDbInstance')
+      const delBucket = vi.spyOn(provider, 'deleteBucket')
+      const { deprovisionTenant } = await import('@controller/lib/provisioning/steps')
+
+      const out = await deprovisionTenant('t-1', provider, { ownerId: 'owner-1' })
+
+      expect(out).toMatchObject({ ok: false, error: 'copy failed' })
+      expect(delDb).not.toHaveBeenCalled()
+      expect(delBucket).not.toHaveBeenCalled()
+      expect(archives.createTenantArchive).not.toHaveBeenCalled()
     })
 
     it('skips the backup for a tenant that never had a database', async () => {

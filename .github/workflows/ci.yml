@@ -10,16 +10,18 @@ name: Jeffi Stores Pipeline
 #         └→ Images (8, release only, after Lint and Type check)
 #
 # Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
-#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · prepare → Deploy (8) ─┬→ Smoke · flagship ─────────┬→ Deploy · tenants
-#                             └→ DB · flagship migrations ─┤                                 ├→ CloudFront               │   → Smoke · tenants → Post
-#                                                          │                                 ├→ DB · tenant schema ──────┤
-#                                                          │                                 └→ DB · tenant migrations ──┘
-#                                                          └→ Deploy · AI gateway ──→ Smoke · AI gateway  (Razer box; only Post waits for it)
-# Stacked stages start together; where order matters a stage waits for the one it depends on before doing
-# anything (.github/actions/wait-for-job): flagship migrations after flagship schema, tenant schema after
-# Smoke · flagship (no store is touched until the flagship is proven live), tenant migrations after tenant
-# schema, Deploy · controller after the flagship's storefront, admin and business (the store paths leave the
-# controller first). Each stage computes the release tag from history, so it needs only the stages before it.
+#   Checks passed → DB · flagship schema     ┬→ Deploy · prepare → Deploy (8) → Smoke · flagship → DB · tenant schema     → Deploy · tenants    → Smoke · tenants → Post
+#   (approval)      DB · flagship migrations │                                  CloudFront         DB · tenant migrations   Templates · catalog
+#                                            └→ Deploy · AI gateway → Smoke · AI gateway  (Razer box; only Post waits for it)
+# Stacked stages share a card and start together. GitHub draws stages in one card only when they need the same
+# stages and are needed by the same stages, so both hold for every card above. Where order matters inside a card
+# a stage waits for the one it depends on before doing anything (.github/actions/wait-for-job): flagship
+# migrations after flagship schema, tenant migrations after tenant schema, Deploy · controller after the
+# flagship's storefront, admin and business (the store paths leave the controller first). CloudFront and
+# Templates · catalog sit in a card with a stage the release depends on but gate nothing themselves: the stages
+# after those cards carry an `if` naming the results they do depend on (Smoke · flagship before any store is
+# touched, both tenant DB stages before the stores roll, Deploy · tenants before its smoke test).
+# Each stage computes the release tag from history, so it needs only the stages before it.
 #
 # Flagship first: the platform database (jeffi_stores) and the platform services, proven live before any store
 # is touched. Tenants follow, since their schema fan-out runs inside the new controller. The schema is additive,
@@ -491,7 +493,7 @@ jobs:
   cdn:
     name: CloudFront
     runs-on: ubuntu-latest
-    needs: deploy-flagship # beside the flagship smoke test
+    needs: deploy-flagship # in one card with Smoke · flagship; the tenant stages wait for it but do not depend on its result
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
     environment: production-release
     concurrency: { group: deploy-production-cdn, cancel-in-progress: false }
@@ -513,15 +515,14 @@ jobs:
   db-tenant-schema:
     name: DB · tenant schema
     runs-on: ubuntu-latest
-    needs: deploy-flagship # starts beside Smoke · flagship; touches no store until that has passed
+    needs: [smoke-flagship, cdn] # no store is touched until the flagship is proven live
+    if: ${{ !cancelled() && needs.smoke-flagship.result == 'success' }} # CloudFront failing or skipped (dry run) does not hold the stores back
     environment: production-release
     concurrency: { group: deploy-production-db-tenant-schema, cancel-in-progress: false }
-    permissions: { id-token: write, contents: read, actions: read }
+    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 } # the release tag is computed from history
-      - uses: ./.github/actions/wait-for-job
-        with: { job: "Smoke · flagship" }
       - uses: ./.github/actions/release-setup
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
       - name: Schema fan-out to every store's database
@@ -530,7 +531,8 @@ jobs:
   db-tenant-migrations:
     name: DB · tenant migrations
     runs-on: ubuntu-latest
-    needs: deploy-flagship # starts beside the schema stage; applies nothing until the schema has succeeded
+    needs: [smoke-flagship, cdn] # starts beside the schema stage; applies nothing until the schema has succeeded
+    if: ${{ !cancelled() && needs.smoke-flagship.result == 'success' }}
     environment: production-release
     concurrency: { group: deploy-production-db-tenant-migrations, cancel-in-progress: false }
     permissions: { id-token: write, contents: read, actions: read }
@@ -547,7 +549,8 @@ jobs:
   deploy-tenants:
     name: Deploy · tenants
     runs-on: ubuntu-latest
-    needs: [smoke-flagship, db-tenant-schema, db-tenant-migrations]
+    needs: [db-tenant-schema, db-tenant-migrations]
+    if: ${{ !cancelled() && needs.db-tenant-schema.result == 'success' && needs.db-tenant-migrations.result == 'success' }} # named, since CloudFront (earlier in the chain) may have failed or been skipped
     environment: production-release
     concurrency: { group: deploy-production-deploy-tenants, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -562,7 +565,8 @@ jobs:
   smoke-tenants:
     name: Smoke · tenants
     runs-on: ubuntu-latest
-    needs: deploy-tenants
+    needs: [deploy-tenants, seed-templates] # after everything the release changes in the stores
+    if: ${{ !cancelled() && needs.deploy-tenants.result == 'success' }} # the stores are still checked when the template seed failed
     environment: production-release
     concurrency: { group: deploy-production-smoke-tenants, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -577,7 +581,8 @@ jobs:
   seed-templates:
     name: Templates · catalog
     runs-on: ubuntu-latest
-    needs: [smoke-flagship, db-tenant-schema] # the scripts run in the new messaging pod; --tenant-dbs needs the store schema
+    needs: [db-tenant-schema, db-tenant-migrations] # in one card with Deploy · tenants; the scripts run in the new messaging pod and --tenant-dbs needs the store schema
+    if: ${{ !cancelled() && needs.db-tenant-schema.result == 'success' && needs.db-tenant-migrations.result == 'success' }}
     environment: production-release
     concurrency: { group: deploy-production-seed-templates, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -636,7 +641,7 @@ jobs:
   post:
     name: Post
     runs-on: ubuntu-latest
-    needs: [smoke-tenants, seed-templates, cdn, smoke-ai-gateway, mobile-android]
+    needs: [smoke-tenants, smoke-ai-gateway, mobile-android] # the last stage of each lane; the summary reads every stage from the run
     if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy))
     permissions: { actions: read, contents: read }
     steps:

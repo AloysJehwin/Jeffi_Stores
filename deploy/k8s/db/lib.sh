@@ -63,9 +63,20 @@ ssh_forward() { # <local port> <target>; replaces one of ours that holds the por
   pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true; sleep 1
   [ "${TUNNEL:-auto}" = ssm ] ||
     { ssh -i "$SSH_KEY" -f -N -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE" && return 0; }
-  for _ in 1 2 3; do ssm_forward "$1" "$2" && return 0; done # a session that didn't come up is usually fine the next time
+  # A session the agent refused is usually fine a little later (it refuses while many are opening or open).
+  local n; for n in 1 2 3 4 5; do ssm_forward "$1" "$2" && return 0; [ $n = 5 ] || sleep $((n * 5)); done
   [ "${TUNNEL:-auto}" = ssm ] || ssh_allowed || true
   return 1
+}
+# Close a session this script opened. A session left open stays on the core for 20 minutes, and enough of them
+# make the agent refuse new ones ("Plugin with name Port not found"), so a failure to close one is said aloud.
+# When the API call is refused, the plugin is asked to end the session itself: on SIGINT it sends the session's
+# terminate flag over its own data channel, which needs no IAM permission.
+close_session() {
+  local err how="it stays open on the core for 20 minutes"
+  err=$(aws ssm terminate-session --session-id "$1" 2>&1 >/dev/null) && return 0
+  if pkill -INT -f "session-manager-plugin.*$1" 2>/dev/null; then sleep 2; how="its plugin was asked to end it instead"; fi
+  echo "${GITHUB_ACTIONS:+::warning::}ssm:TerminateSession failed for $1 ($how; re-run github-oidc.sh if the deploy role lacks it): $(tr '\n' ' ' <<<"$err")" >&2
 }
 ssm_forward() {
   command -v session-manager-plugin >/dev/null ||
@@ -77,20 +88,22 @@ ssm_forward() {
   local doc=AWS-StartPortForwardingSessionToRemoteHost params="host=${2%:*},portNumber=${2##*:},localPortNumber=$1"
   [ "${2%:*}" = 127.0.0.1 ] && { doc=AWS-StartPortForwardingSession; params="portNumber=${2##*:},localPortNumber=$1"; }
   pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true
-  local log sid=
+  local log pid sid=
   log=$(mktemp "${TMPDIR:-/tmp}/ssm-forward-$1.XXXXXX")
   nohup aws ssm start-session --target "$id" --document-name "$doc" --parameters "$params" >"$log" 2>&1 &
+  pid=$!
   for _ in $(seq 1 60); do
     if listening "$1"; then
       sid=$(grep -o 'SessionId: [^ ]*' "$log" | head -1 | cut -d' ' -f2)
       # A CI runner is torn down without closing its sessions; left open on the core they pile up until
       # the agent stops opening new ones, so close ours when the job's script exits.
-      [ -n "${GITHUB_ACTIONS:-}" ] && [ -n "$sid" ] && on_exit "aws ssm terminate-session --session-id $sid >/dev/null 2>&1"
+      [ -n "${GITHUB_ACTIONS:-}" ] && [ -n "$sid" ] && on_exit "close_session $sid"
       return 0
     fi
+    kill -0 "$pid" 2>/dev/null || break # the session ended without opening the port: no point waiting out the minute
     sleep 1
   done
-  echo "SSM forward on :$1 didn't open within 60 s:" >&2
+  echo "SSM forward on :$1 didn't open:" >&2
   sed 's/^/  /' "$log" >&2
   sid=$(grep -o 'SessionId: [^ ]*' "$log" | head -1 | cut -d' ' -f2)
   [ -n "$sid" ] && aws ssm terminate-session --session-id "$sid" >/dev/null 2>&1 || true

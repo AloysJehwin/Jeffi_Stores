@@ -988,3 +988,32 @@ CREATE TABLE IF NOT EXISTS public.tenant_messaging_senders (
     created_at   timestamp with time zone NOT NULL DEFAULT now(),
     updated_at   timestamp with time zone NOT NULL DEFAULT now()
 );
+
+--
+-- tenant_archives: what a deprovision kept for the store's owner (the administrator picks each item),
+-- so the same owner coming back can restore it and take the store name again. Kept data is deleted
+-- when the archive expires (hourly sweep).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_archives (
+    id             uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id      uuid,                                      -- the deprovisioned store; NULL once it is purged
+    owner_id       uuid NOT NULL,
+    slug           character varying(63) NOT NULL,            -- the store name at deprovision (the tenants row may be renamed later)
+    display_name   character varying(200),
+    keep_database  boolean NOT NULL,
+    keep_media     boolean NOT NULL,
+    keep_config    boolean NOT NULL,
+    db_backup_key  text,                                      -- tenant-backups/by-owner/... in the platform bucket
+    media_prefix   text,                                      -- tenant-backups/media/{owner}/{slug}/{stamp}/ in the platform bucket
+    media_objects  integer NOT NULL DEFAULT 0,
+    media_bytes    bigint NOT NULL DEFAULT 0,
+    config         jsonb NOT NULL DEFAULT '{}'::jsonb,        -- plan, billing interval, custom domains, the store's site_settings
+    retention_days integer NOT NULL,
+    expires_at     timestamp with time zone NOT NULL,
+    status         character varying(16) NOT NULL DEFAULT 'available', -- available | restored | expired
+    requested_by   character varying(255),                    -- the administrator, or 'subscription'
+    restored_tenant_id uuid,
+    restored_at    timestamp with time zone,
+    created_at     timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at     timestamp with time zone NOT NULL DEFAULT now()
+);

@@ -1,6 +1,7 @@
 import { controlPlanePool, RESERVED_LABELS } from './shared'
 import { TENANT_HOST_PREFIXES } from './host-prefixes'
 import { clearTenantCache } from './host-resolution'
+import { reclaimableTenantId } from './archives'
 import type { ComputeSpec } from '@/lib/compute/spec'
 
 /** The platform admin's UPI switch for a store: 'auto' = its own provider (PhonePe when saved, else UPG), 'off' = none. */
@@ -160,6 +161,8 @@ export interface CreateTenantInput {
   ownDelhivery?: boolean
   ownRazorpay?: boolean
   status?: string
+  /** The signed-in owner: lets them take back the name of their own terminated store. */
+  reclaimForOwnerId?: string
   serviceTypes?: string[]
   warehouse?: {
     originPincode?: string
@@ -196,11 +199,31 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
   if (!plan.rows[0]) return { ok: false, error: `Unknown or inactive plan "${input.planSlug}".` }
 
   const dup = await pool.query(`SELECT 1 FROM tenants WHERE slug = $1`, [slug])
-  if (dup.rows[0]) return { ok: false, error: `Subdomain "${slug}" is already taken.` }
+  // The name of a terminated store can be taken again, by its own owner only.
+  const reclaimId = dup.rows[0] && input.reclaimForOwnerId ? await reclaimableTenantId(input.reclaimForOwnerId, slug) : null
+  if (dup.rows[0] && !reclaimId) return { ok: false, error: `Subdomain "${slug}" is already taken.` }
 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    // The terminated row gives up the name and its custom domains (the archive lists them) and keeps
+    // its history under a retired name built from its own id.
+    if (reclaimId) {
+      await client.query(`DELETE FROM tenant_custom_domains WHERE tenant_id = $1`, [reclaimId])
+      const old = await client.query(
+        `UPDATE tenants SET slug = left(slug, 40) || '--old-' || left(id::text, 8), custom_domain = NULL, updated_at = now()
+          WHERE id = $1 RETURNING razorpay_linked_account_id`,
+        [reclaimId]
+      )
+      // Razorpay allows one linked account per owner email: the new store reuses the old one's.
+      const linked = old.rows[0]?.razorpay_linked_account_id
+      if (linked) {
+        await client.query(
+          `UPDATE tenant_bank_accounts SET linked_account_id=$2, updated_at=now() WHERE owner_id=$1 AND linked_account_id IS DISTINCT FROM $2`,
+          [input.reclaimForOwnerId, linked]
+        )
+      }
+    }
     const t = await client.query(
       `INSERT INTO tenants (slug, display_name, plan_id, status, billing_interval, daily_payout, own_delhivery, own_razorpay, service_types)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,

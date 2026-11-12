@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
   if (!owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
 
   // One store per owner. A services workspace without a store applies for one on its own tenant.
-  const existing = await getOwnerTenants(owner.id)
+  // A terminated (deprovisioned) store does not count: its owner may apply again.
+  const existing = (await getOwnerTenants(owner.id)).filter(t => t.status !== 'terminated')
   const upgrade = existing.length === 1 && !hasService(existing[0], 'store') && !existing[0].store_request ? existing[0] : null
   if (existing.length > 0 && !upgrade) return NextResponse.json({ error: 'You already have a store.' }, { status: 400 })
 
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
     warehouse: d.warehouse,
     status: 'pending_approval',
     serviceTypes: ['store', ...d.extraServices],
+    reclaimForOwnerId: owner.id,
   })
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
@@ -172,11 +174,16 @@ export async function POST(request: NextRequest) {
   // 4. Persist restore intent (if any) into the draft, then mark submitted. The
   //    provision step reads this to decide whether to restore the owner's prior backup.
   // An upgrade's warehouse lives on the draft too: approval reads it for the Route linked account.
-  if (d.restorePreviousData || upgrade) {
-    const existing = (await getDraft(owner.id))?.data ?? {}
+  // `restore` names one of the owner's archives and the items to bring back; it is checked against
+  // that archive (owner, expiry, what it kept) when provisioning reads it.
+  const restore = d.restore && (d.restore.database || d.restore.media || d.restore.config) ? d.restore : null
+  {
+    // Always rewritten: a restore choice left on the draft by an earlier application must not apply to this one.
+    const { restore: _oldRestore, restorePreviousData: _oldFlag, ...existing } = ((await getDraft(owner.id))?.data ?? {}) as Record<string, any>
     await saveDraft(owner.id, 6, {
       ...existing,
       ...(d.restorePreviousData ? { restorePreviousData: true } : {}),
+      ...(restore ? { restore } : {}),
       ...(upgrade && d.warehouse ? { wh: { ...existing.wh, ...d.warehouse } } : {}),
     })
   }

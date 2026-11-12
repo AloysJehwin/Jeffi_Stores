@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "f9b3b65ae2ace2f20be5b313703a6c494f43059aed1dd281eced0c33e9e25f51",
+ "manifestHash": "ca730e66435755a5883af38121e127fe61b96c3ccc58a4c27e6d58a6c74845aa",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -28633,6 +28633,189 @@
    "command": "orders-variant-change cancel"
   },
   {
+   "id": "admin GET /api/admin/orders/bulk-mail",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/orders/bulk-mail",
+   "gatewayPath": "/v1/admin/orders/bulk-mail",
+   "file": "admin-service/src/app/api/(admin)/admin/orders/bulk-mail/route.ts",
+   "pathParams": [],
+   "query": [
+    "dir",
+    "sort"
+   ],
+   "queryParams": [
+    {
+     "name": "dir",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "sort",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "orders:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:write",
+    "orders:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET — how many orders the filters match, and the templates offered for them.",
+   "command": "orders bulk-mail"
+  },
+  {
+   "id": "admin POST /api/admin/orders/bulk-mail",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/orders/bulk-mail",
+   "gatewayPath": "/v1/admin/orders/bulk-mail",
+   "file": "admin-service/src/app/api/(admin)/admin/orders/bulk-mail/route.ts",
+   "pathParams": [],
+   "query": [
+    "dir",
+    "sort"
+   ],
+   "queryParams": [
+    {
+     "name": "dir",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "sort",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:write",
+    "orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "subject": {
+      "type": "string",
+      "minLength": 1
+     },
+     "body": {
+      "type": "string",
+      "minLength": 1
+     },
+     "preheader": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "isHtml": {
+      "type": "boolean"
+     },
+     "layout": {
+      "type": "string",
+      "enum": [
+       "template",
+       "message",
+       "raw"
+      ]
+     },
+     "scenario": {
+      "type": "string",
+      "maxLength": 40
+     },
+     "count": {
+      "type": "integer",
+      "minimum": 1
+     }
+    },
+    "required": [
+     "subject",
+     "body",
+     "count"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST — send. A few orders are sent while the request waits; more run on after the response and leave their outcome in the audit log. Every email is in its own order's mail log either way.",
+   "command": "orders bulk-mail-create"
+  },
+  {
+   "id": "admin POST /api/admin/orders/bulk-mail/preview",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/orders/bulk-mail/preview",
+   "gatewayPath": "/v1/admin/orders/bulk-mail/preview",
+   "file": "admin-service/src/app/api/(admin)/admin/orders/bulk-mail/preview/route.ts",
+   "pathParams": [],
+   "query": [
+    "dir",
+    "sort"
+   ],
+   "queryParams": [
+    {
+     "name": "dir",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "sort",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "mailer:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:write",
+    "orders:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "subject": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     },
+     "preheader": {
+      "type": "string"
+     },
+     "scenario": {
+      "type": "string",
+      "description": "type assumed from the field name"
+     },
+     "layout": {
+      "type": "string",
+      "enum": [
+       "template",
+       "message",
+       "raw"
+      ]
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "POST — the email as the customer of the list's first order will get it, plus the tokens that order has nothing for. Other orders may differ: one with a gap is skipped when the email is sent.",
+   "command": "orders-bulk-mail preview"
+  },
+  {
    "id": "admin GET /api/admin/orders/by-number",
    "host": "admin",
    "method": "GET",
@@ -42744,6 +42927,20 @@
       "enum": [
        true
       ]
+     },
+     "keep": {
+      "type": "object",
+      "properties": {
+       "database": {
+        "type": "boolean"
+       },
+       "media": {
+        "type": "boolean"
+       },
+       "config": {
+        "type": "boolean"
+       }
+      }
      }
     },
     "required": [
@@ -42752,7 +42949,7 @@
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
-   "summary": "Operator-triggered deprovision-with-backup for a tenant. DESTRUCTIVE — requires an explicit { confirm: true } body. Takes the store offline, snapshots its DB to S3, then deletes the RDS instance + tenant bucket.",
+   "summary": "Operator-triggered deprovision for a tenant. DESTRUCTIVE — requires an explicit { confirm: true } body.",
    "command": "platform customers deprovision"
   },
   {
