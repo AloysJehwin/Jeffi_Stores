@@ -59,8 +59,8 @@ The DBs `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are **legacy
 
 ## Rules
 
-1. **New tables land in `jeffi_production_ready`** — via the main `database/*.sql` pipeline (topic file + `constraints.sql` + `indexes.sql`).
-2. **Do not create new DBs.** `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are deprecated. Their schema files remain as historical references but are not applied against new DBs.
+1. **New tables land in `jeffi_production_ready`**, and their SQL in the owning service's `database/` folder: `<service>/database/tables/<topic>.sql`, plus its `constraints.sql`, `foreign-keys.sql` and `indexes.sql`. The database is one; the files are split by owner (`DATABASE_OWNERSHIP.md` lists every table). `scripts/db-files.mjs` is the manifest the pipeline loads them through, in order: extensions, every service's tables, functions, triggers, indexes, constraints, foreign keys. The root `database/` holds only `extensions.sql`.
+2. **Do not create new DBs.** `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are deprecated. Their schema files remain as historical references (`messaging-service/database/legacy/`, `document-service/database/legacy/`) but are not applied against new DBs; the control-plane tables are `controller-service/database/control-plane/`, applied to the main DB.
 3. **Service `.env` DB URLs all point at `jeffi_production_ready`.** `CONTROL_PLANE_DATABASE_URL`, `MESSAGING_DATABASE_URL`, `DOCUMENTS_DATABASE_URL`, `DATABASE_URL` — all the same URL today.
 4. **Apply only to LOCAL DB.** Never run DDL against the live RDS.
 5. **Multi-tenant lives in the services, not the DBs.** When tenants arrive, each gets a dedicated DB; the service picks the right connection via the tenancy resolver using the `tenant_id` in the service-auth claim.

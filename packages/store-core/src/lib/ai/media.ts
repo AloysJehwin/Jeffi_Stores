@@ -233,6 +233,7 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
       [opts.attachToProductId, up.url, up.thumbnailUrl, await currentBucket(), up.s3Key, up.s3ThumbnailKey, up.fileName, up.fileSize, up.mimeType, up.width, up.height, up.blurhash, opts.prompt.slice(0, 200)]
     )
     if (row) out.productImageId = row.id
+    if (row) await (await import('@/lib/catalog/product-media')).syncLegacyImagesToMediaSafe(opts.attachToProductId)
   }
   return out
 }

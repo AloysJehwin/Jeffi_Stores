@@ -306,24 +306,29 @@ export type MessagingChannels = {
   push?: PushChannel
 }
 
+// A customer signed in on the app: an install attached to them, or a live app session (an install with
+// no push token, e.g. notifications never set up, still counts). App sessions: this build's agent, or
+// okhttp / CFNetwork from older builds.
+const SIGNED_IN_ON_APP = `(
+  EXISTS (SELECT 1 FROM push_devices d WHERE d.user_id = u.id AND d.disabled_at IS NULL)
+  OR EXISTS (SELECT 1 FROM auth_sessions s WHERE s.principal_id = u.id AND s.principal_type IN ('customer', 'business')
+               AND s.revoked_at IS NULL AND s.expires_at > now()
+               AND (s.user_agent LIKE 'JeffiStoresApp/%' OR s.user_agent LIKE 'okhttp/%' OR s.user_agent LIKE '%CFNetwork/%')))`
+
+export const isAppAudience = (audienceType: string) => audienceType === 'app_users' || audienceType === 'app_installs'
+
 // Customers in an audience; each channel then reaches whoever it can (email: an address, SMS and
 // WhatsApp: a phone, push: an active app install — see lib/push/broadcast). The app audiences pick
-// customers signed in on the app: an install attached to them, or a live app session (an install
-// with no push token, e.g. notifications never set up, still counts); 'app_installs' also pushes to
-// opted-in signed-out installs. App sessions: this build's agent, or okhttp / CFNetwork from older builds.
+// customers signed in on the app; 'app_installs' also pushes to opted-in signed-out installs. Every
+// audience leaves out customers opted out of marketing (an email unsubscribe link, or the app's
+// notification settings) — see countAppOptOuts for the composer's hint.
 export async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
   const base = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name, u.unsubscribe_token::text AS unsubscribe_token FROM users u`
   const base_cp = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name, u.unsubscribe_token::text AS unsubscribe_token FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
   const where = `WHERE u.is_active = true AND u.is_guest = false AND u.marketing_opt_out = false`
 
-  if (audienceType === 'app_users' || audienceType === 'app_installs') {
-    return queryMany<Recipient>(
-      `${base} ${where} AND (
-         EXISTS (SELECT 1 FROM push_devices d WHERE d.user_id = u.id AND d.disabled_at IS NULL)
-         OR EXISTS (SELECT 1 FROM auth_sessions s WHERE s.principal_id = u.id AND s.principal_type IN ('customer', 'business')
-                      AND s.revoked_at IS NULL AND s.expires_at > now()
-                      AND (s.user_agent LIKE 'JeffiStoresApp/%' OR s.user_agent LIKE 'okhttp/%' OR s.user_agent LIKE '%CFNetwork/%')))`
-    )
+  if (isAppAudience(audienceType)) {
+    return queryMany<Recipient>(`${base} ${where} AND ${SIGNED_IN_ON_APP}`)
   }
 
   if (audienceType === 'customer_type') {
@@ -376,6 +381,26 @@ export async function resolveAudience(audienceType: string, audienceFilter: Reco
   }
 
   return queryMany<Recipient>(`${base} ${where}`)
+}
+
+/** Customers signed in on the app that an app audience leaves out because they opted out of marketing. */
+export async function appOptOuts(): Promise<Recipient[]> {
+  return queryMany<Recipient>(
+    `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u
+      WHERE u.is_active = true AND u.is_guest = false AND u.marketing_opt_out = true AND ${SIGNED_IN_ON_APP}
+      ORDER BY u.first_name NULLS LAST`
+  )
+}
+
+/** Of these users, those who already had the day's offer pushes (DAILY_CAP in 24h); a push now is skipped. */
+export async function pushCooldownUsers(userIds: string[], cap: number): Promise<Set<string>> {
+  if (!userIds.length) return new Set()
+  const rows = await queryMany<{ user_id: string }>(
+    `SELECT user_id::text FROM push_sends WHERE user_id = ANY($1::uuid[]) AND sent_at > now() - interval '24 hours'
+      GROUP BY user_id HAVING count(*) >= $2`,
+    [userIds, cap]
+  )
+  return new Set(rows.map(r => r.user_id))
 }
 
 // Sends run a few at a time; SES pacing (lib/shared/ses-pace) keeps email inside the account's rate.

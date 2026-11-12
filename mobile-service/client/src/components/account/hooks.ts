@@ -119,17 +119,18 @@ export function useSignOut() {
  *  The business store without a session opens its sign in; the storefront without one is browsed as a guest. */
 export function useSwitchStore() {
   const router = useRouter()
-  const qc = useQueryClient()
   const resetCart = useCartStore(s => s.reset)
   return async (next: AuthPortal) => {
     const auth = useAuthStore.getState()
     if (auth.portal === next) return
-    if (!(await auth.switchTo(next))) {
+    // An optimistic switch whose session the server then rejects lands on the business sign in again.
+    const lost = () => next === 'business' && router.push('/(auth)/business-login')
+    if (!(await auth.switchTo(next, lost))) {
       router.push('/(auth)/business-login')
       return
     }
+    // AccountCacheReset parks this store's data and restores the other's.
     resetCart()
-    qc.clear()
     router.navigate('/(tabs)')
   }
 }

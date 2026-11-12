@@ -13,13 +13,13 @@ import {
   SECTION_TYPES,
   rowAudience,
   rowPage,
-  rowSurface,
   sectionTypesFor,
+  type HomepageSurface,
   type SectionType,
 } from '@/lib/catalog/homepage-sections'
 import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
 import {
-  applyDraftOrder,
+  applyDraftLayout,
   endsBeforeStart,
   getEditableHomepage,
   homepageLockFrom,
@@ -60,6 +60,7 @@ const bodySchema = z.object({
   isActive: z.boolean().optional(),
   startsAt: z.string().datetime().nullish(),
   endsAt: z.string().datetime().nullish(),
+  /** One layout now; a surface here only means "show on this surface alone" (config.surfaces). */
   surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
   page: z.enum(HOMEPAGE_PAGES as [string, ...string[]]).optional(),
   audience: z.enum(HOMEPAGE_AUDIENCES as [string, ...string[]]).optional(),
@@ -76,7 +77,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'The end time must be after the start time' }, { status: 400 })
   }
 
-  const surface = rowSurface({ surface: d.surface })
   const page = rowPage({ page: d.page })
   const audience = rowAudience({ audience: d.audience })
   const type = d.type as SectionType
@@ -85,14 +85,17 @@ export async function POST(request: NextRequest) {
   if (audience === 'business' && page !== 'home') {
     return NextResponse.json({ error: 'The business homepage has no listing pages' }, { status: 400 })
   }
-  if (!sectionTypesFor(surface, page, audience).includes(type)) {
+  if (!sectionTypesFor('all', page, audience).includes(type)) {
     return NextResponse.json({ error: `${SECTION_META[type].label} can't go on this page` }, { status: 400 })
   }
   // Listing sections sit between the products; start them after the first few rows.
-  const config =
+  const config: Record<string, unknown> =
     page === 'home' || d.config?.placement
-      ? (d.config ?? {})
+      ? { ...(d.config ?? {}) }
       : { ...d.config, placement: { after: PLACEMENT_DEFAULT_AFTER } }
+  if (d.surface && !config.surfaces) {
+    config.surfaces = Object.fromEntries(HOMEPAGE_SURFACES.map(s => [s, s === d.surface])) as Record<HomepageSurface, boolean>
+  }
   const draftId = homepageDraftIdFrom(request)
   if (!draftId) return noHomepageDraft()
   const section = await withHomepageDraft(draftId, admin.adminId, draft => {
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
     const row: DraftSection = {
       id: randomUUID(),
       type,
-      surface,
+      surface: 'web',
       page,
       audience,
       title: d.title ?? null,
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
       cta_label: d.ctaLabel ?? null,
       cta_url: d.ctaUrl ?? null,
       config,
-      display_order: nextDisplayOrderOn(draft.sections, page, surface, audience),
+      display_order: nextDisplayOrderOn(draft.sections, page, audience),
       is_active: d.isActive ?? true,
       starts_at: d.startsAt ?? null,
       ends_at: d.endsAt ?? null,
@@ -131,11 +134,13 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
+  // `sides`: { [id]: 'full' | 'left' | 'right' } — a left followed by a right makes a two-column row.
+  const sides: Record<string, unknown> = body?.sides && typeof body.sides === 'object' ? body.sides : {}
 
   const draftId = homepageDraftIdFrom(request)
   if (!draftId) return noHomepageDraft()
   const saved = await withHomepageDraft(draftId, admin.adminId, draft => {
-    draft.sections = applyDraftOrder(draft.sections, order)
+    draft.sections = applyDraftLayout(draft.sections, order, sides)
   }, homepageLockFrom(admin, request)).catch(homepageDraftOr)
   if (saved instanceof NextResponse) return saved
 

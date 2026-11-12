@@ -112,6 +112,16 @@ const EDITABLE_KEYS = [
   'shortcut_custom',
   // Daily ops email settings (JSON, validated below)
   OPS_EMAIL_KEY,
+  // Product media limits (numbers)
+  'media_max_per_scope',
+  'media_image_mb',
+  'media_video_mb',
+  'media_video_seconds',
+  'media_document_mb',
+  'media_audio_mb',
+  'media_audio_seconds',
+  'media_model_mb',
+  'media_spin_frames',
 ]
 
 const EDITABLE_SET = new Set(EDITABLE_KEYS)

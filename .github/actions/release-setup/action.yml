@@ -15,6 +15,9 @@ runs:
         role-to-assume: ${{ inputs.role-arn }}
         aws-region: us-east-1
         role-duration-seconds: 7200
+    # scripts/db-files.mjs (the schema/migration manifest) runs in the DB stages; builtins only, no npm ci.
+    - uses: actions/setup-node@v4
+      with: { node-version: 20 }
     - name: Tools and kubeconfig
       shell: bash
       env:

@@ -18,7 +18,7 @@ flag() { if $DRY_RUN; then echo --dry-run; else echo --yes; fi; }
 would() { echo "(dry run) would: $*"; }
 
 preflight() {
-  [ -z "$(git -C "$REPO" status --porcelain -- controller-service messaging-service document-service public-api-service packages deploy database package.json package-lock.json vendor)" ] ||
+  [ -z "$(git -C "$REPO" status --porcelain -- controller-service messaging-service document-service public-api-service packages deploy database admin-service/database storefront-service/database business-service/database scripts/db-files.mjs package.json package-lock.json vendor)" ] ||
     { echo "Uncommitted changes: commit first." >&2; return 1; }
   echo "commit $(git -C "$REPO" rev-parse --short HEAD), AWS $(aws sts get-caller-identity --query Arn --output text)"
   [ -f "$SSH_KEY" ] || { echo "Missing $SSH_KEY" >&2; return 1; }

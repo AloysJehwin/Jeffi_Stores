@@ -20,7 +20,7 @@ export default function SupportChatScreen() {
           icon={MessageSquare}
           title="Sign in to chat with us"
           message="Log in to chat with our assistant and get help with your orders and account."
-          actionLabel="Sign In"
+          actionLabel="Sign in"
           onAction={() => openHref(router, '/login')}
         />
       )}

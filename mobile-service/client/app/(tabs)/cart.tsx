@@ -237,7 +237,7 @@ export default function CartScreen() {
           icon={ShoppingCart}
           title="Your cart is empty"
           message="Start shopping to add items to your cart"
-          actionLabel="Browse Products"
+          actionLabel="Browse products"
           onAction={() => openHref(router, '/products')}
         />
       </Screen>
@@ -306,7 +306,7 @@ export default function CartScreen() {
             <FreeShippingProgress subtotal={physicalTotal} />
             {cartItems.length === 0 ? (
               <Card padded={false}>
-                <EmptyState icon={ShoppingCart} title="Your cart is empty.">
+                <EmptyState icon={ShoppingCart} title="Your cart is empty">
                   <Text className="mt-1.5 text-center text-sm text-foreground-muted">
                     Move an item from below or{' '}
                     <Text accessibilityRole="link" className="font-semibold text-accent-600 dark:text-accent-400" onPress={() => openHref(router, '/products')}>
@@ -458,7 +458,7 @@ export default function CartScreen() {
                 {business.approved ? (
                   <Button label="Request a quote for this cart" variant="outline" size="md" onPress={requestCartQuote} className="mt-3" />
                 ) : null}
-                <Button label="Continue Shopping" variant="ghost" size="md" onPress={() => openHref(router, '/products')} className="mt-2" />
+                <Button label="Continue shopping" variant="ghost" size="md" onPress={() => openHref(router, '/products')} className="mt-2" />
               </Card>
             )}
           </>

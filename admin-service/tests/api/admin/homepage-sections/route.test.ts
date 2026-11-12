@@ -114,14 +114,26 @@ describe('POST', () => {
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
   })
 
-  it('creates an app-surface section numbered within its own surface', async () => {
+  it('adds an app-only section to the single layout, shown on that surface alone', async () => {
     const res = await POST(req('POST', { type: 'product_row', surface: 'app' }))
     expect(res.status).toBe(200)
     const { section } = await res.json()
-    expect(section).toMatchObject({ surface: 'app', display_order: 0 })
-    const web = await POST(req('POST', { type: 'trust_strip' }))
-    expect((await web.json()).section).toMatchObject({ surface: 'web', display_order: 3 })
+    expect(section).toMatchObject({ surface: 'web', display_order: 3, config: { surfaces: { web: false, web_mobile: false, app: true } } })
+    const web = (await (await POST(req('POST', { type: 'trust_strip' }))).json()).section
+    expect(web).toMatchObject({ surface: 'web', display_order: 4 })
+    expect(web.config.surfaces).toBeUndefined()
     expect(fake.state.draft!.sections).toHaveLength(5)
+  })
+
+  it('saves the order and each listed side in one reorder call', async () => {
+    const res = await PATCH(req('PATCH', { order: [B, C, A], sides: { [B]: 'left', [C]: 'right', [A]: 'nonsense' } }))
+    expect(res.status).toBe(200)
+    const rows = fake.state.draft!.sections
+    expect(rows.map(s => [s.id, s.display_order, (s.config as any)?.layout?.side ?? 'full'])).toEqual([
+      [B, 0, 'left'],
+      [C, 1, 'right'],
+      [A, 2, 'full'],
+    ])
   })
 
   it('rejects an end time before the start time without creating a draft', async () => {

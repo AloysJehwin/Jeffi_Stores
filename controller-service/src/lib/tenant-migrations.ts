@@ -4,12 +4,12 @@ import type { Pool } from 'pg'
 import { tenantAdminPool } from '@controller/lib/provisioning/tenant-admin-pool'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { buildTenantSchemaSql, desiredTableColumns } from '@controller/lib/tenant-migrations-schema'
-import { repoPath } from '@/lib/shared/paths'
+import { migrationFiles } from '@controller/lib/db-files'
 
 /**
  * Multi-tenant schema migration fan-out (Part B of the SaaS plan).
  *
- * Applies the desired-state schema (database/*.sql topic files) to every active
+ * Applies the desired-state schema (every <service>/database/, see db-files.ts) to every active
  * tenant's dedicated RDS. The topic files themselves are plain pg_dump output and are NOT
  * idempotent; buildTenantSchemaSql() rewrites them into re-appliable form (see
  * tenant-migrations-schema.ts). That matters because the whole schema is sent as one
@@ -253,15 +253,9 @@ interface MigrationFile {
   sql: string
 }
 
-/** Read database/migrations/*.sql in filename order (mirrors deploy/run-migrations.sh). */
+/** Read every <service>/database/migrations/*.sql in filename order (mirrors deploy/run-migrations.sh). */
 function readMigrationFiles(): MigrationFile[] {
-  const dir = repoPath('database', 'migrations')
-  if (!fs.existsSync(dir)) return []
-  return fs
-    .readdirSync(dir)
-    .filter(f => f.endsWith('.sql'))
-    .sort()
-    .map(filename => ({ filename, sql: fs.readFileSync(path.join(dir, filename), 'utf8') }))
+  return migrationFiles().map(file => ({ filename: path.basename(file), sql: fs.readFileSync(file, 'utf8') }))
 }
 
 const SCHEMA_MIGRATIONS_DDL = `
@@ -271,7 +265,7 @@ const SCHEMA_MIGRATIONS_DDL = `
   )`
 
 /**
- * Apply pending database/migrations/*.sql files to every active tenant's own RDS.
+ * Apply pending <service>/database/migrations/*.sql files to every active tenant's own RDS.
  *
  * The desired-state fan-out (runMigrationFanout) only re-applies the topic schema; migration
  * files that carry data fixes or one-off DDL never reached tenants — the deploy applied them to

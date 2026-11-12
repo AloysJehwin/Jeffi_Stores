@@ -302,16 +302,24 @@ export class SurfaceNotEmpty extends Error {
 
 export type CopySurfaceResult = { sections: number; slides: number; replaced: number }
 
-/** The next display_order on one page's layout. */
-export function nextDisplayOrderOn(
-  rows: HomepageSection[],
-  page: HomepagePage,
-  surface: HomepageSurface,
-  audience: HomepageAudience = 'store'
-): number {
-  return nextDisplayOrder(
-    rows.filter(r => rowPage(r) === page && rowSurface(r) === surface && rowAudience(r) === audience)
-  )
+/** The next display_order on one page's layout (one layout per page and homepage; surfaces are toggles). */
+export function nextDisplayOrderOn(rows: HomepageSection[], page: HomepagePage, audience: HomepageAudience = 'store'): number {
+  return nextDisplayOrder(rows.filter(r => rowPage(r) === page && rowAudience(r) === audience))
+}
+
+/** Reorders by `order` and sets each listed section's half/full side (`config.layout.side`). */
+export function applyDraftLayout<T extends DraftRow & { config?: Record<string, unknown> }>(
+  rows: T[],
+  order: unknown[],
+  sides: Record<string, unknown> = {}
+): T[] {
+  for (const row of rows) {
+    const side = sides[row.id]
+    if (side !== 'full' && side !== 'left' && side !== 'right') continue
+    const { layout: _l, ...rest } = row.config ?? {}
+    applyDraftPatch(row, { config: side === 'full' ? rest : { ...rest, layout: { side } } })
+  }
+  return applyDraftOrder(rows, order)
 }
 
 /**

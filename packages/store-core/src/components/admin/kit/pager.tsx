@@ -34,8 +34,11 @@ export function Pager({ control, noun = 'rows', className = '' }: { control: Pag
   const btn =
     'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-default text-foreground-secondary transition-colors hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-40'
   return (
-    // Arrows stay clear of the assistant's floating button (--dock-offset) when the list ends the page.
-    <div className={`flex flex-wrap items-center justify-between gap-2 pl-1 pr-[calc(0.25rem+var(--dock-offset,0px))] pt-3 text-xs text-foreground-muted ${className}`}>
+    // A page-level pager keeps its arrows clear of the assistant's floating button (--dock-offset); one
+    // inside a card (a className with its own padding) lines up with the card's rows instead.
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 pt-3 text-xs text-foreground-muted ${className || 'pl-1 pr-[calc(0.25rem+var(--dock-offset,0px))]'}`}
+    >
       {error ? (
         <span role="alert" className="flex items-center gap-2 text-red-600 dark:text-red-400">
           {error}

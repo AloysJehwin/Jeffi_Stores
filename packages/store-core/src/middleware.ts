@@ -34,6 +34,19 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   return response
 }
 
+const PREVIEW_FRAME_ANCESTORS = [
+  `https://*.${process.env.PLATFORM_ROOT_DOMAIN || process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN || 'jeffistores.in'}`,
+  ...(process.env.NODE_ENV === 'production' ? [] : ['http://localhost:*', 'http://*.localhost:*']),
+].join(' ')
+
+// The admin's homepage preview frames the store page with a signed `?preview=` token (the page
+// verifies it; without one it renders live). Framing opens to the platform's hosts only.
+function allowPreviewFraming(request: NextRequest, response: NextResponse) {
+  if (!request.nextUrl.searchParams.has('preview') || request.nextUrl.pathname.startsWith('/api/')) return
+  response.headers.delete('X-Frame-Options')
+  response.headers.set('Content-Security-Policy', `frame-ancestors 'self' ${PREVIEW_FRAME_ANCESTORS}`)
+}
+
 // Build a redirect URL that ignores the internal Next listener port (3000).
 // In prod the LB forwards to Next on :3000, so request.url carries that port
 // and naive `new URL('/x', request.url)` would emit redirects to :3000.
@@ -106,6 +119,7 @@ export async function middleware(request: NextRequest) {
   if (request.body && !request.bodyUsed) await request.arrayBuffer().catch(() => {})
   const traceId = currentTraceId()
   if (traceId && response) response.headers.set('x-trace-id', traceId)
+  if (response) allowPreviewFraming(request, response)
   return response
 }
 

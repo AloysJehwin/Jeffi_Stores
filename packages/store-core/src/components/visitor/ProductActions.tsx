@@ -84,6 +84,8 @@ interface ProductActionsProps {
   initialSkuParam?: string
   discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
+  /** The selected variant and sub-variant ids (media follows them). */
+  onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
   onUnitChange?: (
     unitKey: string,
     unitLabel: string | null,
@@ -148,6 +150,7 @@ export default function ProductActions({
   initialSkuParam,
   discountPct,
   onVariantChange,
+  onSelectionChange,
   onUnitChange,
   productUnits: productUnitsProp,
   sellUnitId,
@@ -326,6 +329,11 @@ export default function ProductActions({
   useEffect(() => {
     if (onVariantChange) onVariantChange(selectedVariant ?? null)
   }, [selectedVariantId])
+
+  useEffect(() => {
+    onSelectionChange?.(hasVariants ? (selectedVariantId ?? null) : null, hasVariants ? (selectedSubVariantId ?? null) : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVariantId, selectedSubVariantId, hasVariants])
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
 

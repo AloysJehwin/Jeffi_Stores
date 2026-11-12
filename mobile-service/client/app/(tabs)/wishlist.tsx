@@ -4,8 +4,6 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Heart, ImageIcon, ShoppingCart, X } from 'lucide-react-native'
-import TopNav from '../../src/components/layout/TopNav'
-import AccountMobileHeader from '../../src/components/account/AccountMobileHeader'
 import WarningBadges from '../../src/components/cart/WarningBadges'
 import FeaturedProducts from '../../src/components/account/FeaturedProducts'
 import { money } from '../../src/components/cart/lines'
@@ -97,11 +95,7 @@ function WishlistCardSkeleton() {
 }
 
 function EmptyCard({ title, body, action, onAction }: { title: string; body: string; action: string; onAction: () => void }) {
-  return (
-    <Card padded={false}>
-      <EmptyState icon={Heart} title={title} message={body} actionLabel={action} onAction={onAction} />
-    </Card>
-  )
+  return <EmptyState icon={Heart} title={title} message={body} actionLabel={action} onAction={onAction} />
 }
 
 // Memoized: marking one row busy (or the list re-rendering) doesn't re-render every card.
@@ -322,23 +316,21 @@ export default function WishlistScreen() {
 
   if (!user) {
     return (
-      <Screen header={<TopNav />}>
+      <Screen title="Wishlist">
         <EmptyCard
-          title="Sign in to view your wishlist"
-          body="Save your favorite items to buy them later"
-          action="Sign In"
+          title="Sign in to see your wishlist"
+          body="Tap the heart on any product to save it here."
+          action="Sign in"
           onAction={() => router.push('/(auth)/login')}
         />
       </Screen>
     )
   }
 
-  // The account hero runs edge to edge, so these own their ScrollView (Screen's content has a gutter).
   if (isLoading) {
     return (
-      <Screen header={<TopNav />} mode="none">
+      <Screen title="Wishlist" mode="none">
         <ScrollView scrollEnabled={false} showsVerticalScrollIndicator={false}>
-          <AccountMobileHeader />
           <View className="px-4 py-4">
             <View className="mb-4 flex-row gap-2">
               {[50, 82, 106].map((w, i) => (
@@ -361,14 +353,13 @@ export default function WishlistScreen() {
 
   if (items.length === 0) {
     return (
-      <Screen header={<TopNav />} mode="none">
+      <Screen title="Wishlist" mode="none">
         <ScrollView refreshControl={refreshControl} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomInset }}>
-          <AccountMobileHeader />
           <View className="px-4 py-4">
             <EmptyCard
-              title="Your wishlist is empty"
-              body="Save your favorite items to buy them later"
-              action="Browse Products"
+              title="No saved items yet"
+              body="Tap the heart on any product to save it here."
+              action="Browse products"
               onAction={() => openHref(router, '/products')}
             />
           </View>
@@ -382,7 +373,7 @@ export default function WishlistScreen() {
   )
 
   return (
-    <Screen header={<TopNav />} mode="none">
+    <Screen title="Wishlist" mode="none">
       <List
         data={filtered}
         keyExtractor={item => item.id}
@@ -398,8 +389,7 @@ export default function WishlistScreen() {
         contentContainerStyle={{ paddingTop: 0 }}
         ListHeaderComponent={
           <View className="-mx-4 mb-4">
-            <AccountMobileHeader />
-            <ChipGroup className="mx-4 mt-4">
+            <ChipGroup className="mx-4 mt-2">
               {FILTERS.map(([val, label]) => (
                 <Chip key={val} label={label} size="sm" selected={filter === val} onPress={() => setFilter(val)} />
               ))}

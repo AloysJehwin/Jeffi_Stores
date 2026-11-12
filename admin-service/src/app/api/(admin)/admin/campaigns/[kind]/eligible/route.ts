@@ -7,6 +7,7 @@ import { resolveScenarioParams } from '@/lib/campaigns/runner'
 import { queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 import { cooldownDays as resolveCooldownDays } from '@/lib/campaigns/duration'
+import { emptyWindowProblem } from '@/lib/campaigns/window-check'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,10 +100,13 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
   const userMap = new Map(users.map(u => [u.id, u]))
 
   if (rows.length === 0 && suppressed.length === 0) {
+    // A misconfigured window explains the empty lists instead of reading as "nobody matches".
+    const note = emptyWindowProblem(scenarioKind, campaign.parameters, campaign.delay_hours)
     return NextResponse.json({
       eligible: [],
       total: 0,
       suppressed: [],
+      ...(note ? { note } : {}),
       scenarioKind,
       params: resolvedParams,
       trigger: scenario.trigger,

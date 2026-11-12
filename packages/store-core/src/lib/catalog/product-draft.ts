@@ -17,6 +17,8 @@ import { announceDraftClosed, assertDraftHolder, closeDraftLockTx, isDraftLockEr
 import type { Resolution } from '@/lib/admin/draft-merge'
 import { currentRevision, recordRevision } from '@/lib/admin/entity-revisions'
 import { notifyDraftSiblings } from '@/lib/admin/draft-branches'
+import { extraFieldsSetSql, normalizeExtraFields } from './product-extra-fields'
+import { applyProductFaqsTx, applyProductMediaTx, syncLegacyImagesToMedia } from './product-media'
 import { liveProductSnapshot, mergeProductDraft, type ProductSnapshot } from './product-draft-merge'
 import { applyDraftFileOpsTx, releaseFileObjects } from '@/lib/vault/files'
 
@@ -290,6 +292,29 @@ export interface PublishProductOpts {
   resolutions?: Record<string, Resolution>
 }
 
+/**
+ * A staged row laid over its live row: keys the draft does not carry keep the live value,
+ * and an empty string over a live NULL stays NULL. An explicit null still clears.
+ */
+function overLive<T extends Record<string, any>>(live: Record<string, any> | null | undefined, staged: T): T {
+  if (!live) return staged
+  const out: Record<string, any> = { ...live, ...staged }
+  for (const [k, v] of Object.entries(staged)) if (v === '' && live[k] == null) out[k] = null
+  return out as T
+}
+
+const UUID_SQL = `'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'`
+
+/** A staged `_media` / `_faqs` value: the form posts it as a JSON string. */
+function parseStaged(v: unknown): any {
+  if (typeof v !== 'string') return v ?? null
+  try {
+    return JSON.parse(v)
+  } catch {
+    return null
+  }
+}
+
 /** Live moved between the merge and the write lock: merge again. */
 class StaleMergeError extends Error {}
 
@@ -316,6 +341,8 @@ async function publishProductDraftOnce(productId: string, opts: PublishProductOp
   const [liveSnap, liveRevision] = await Promise.all([liveProductSnapshot(poolDb, productId), currentRevision(poolDb, 'product', productId)])
   const merge = liveSnap ? await mergeProductDraft(poolDb, draft, liveSnap, opts.resolutions) : null
   if (merge) Object.assign(draft, merge.merged)
+  // The form replaces `fields` with what it edits; everything else publishes unchanged.
+  if (liveSnap) draft.fields = overLive(liveSnap.fields, draft.fields || {})
 
   // Hard gate: never publish while the product has open (pending/confirmed) orders.
   // This is the last line of defence — callers surface a friendlier message first.
@@ -345,8 +372,8 @@ async function publishProductDraftOnce(productId: string, opts: PublishProductOp
     )) || []
   // Every live variant (inactive too): is_active fallback for old draft rows, and toggle-off intent.
   const liveVariantRows =
-    (await queryMany<{ id: string; sku: string; is_active: boolean; subs_on: boolean }>(
-      `SELECT v.id, v.sku, v.is_active,
+    (await queryMany<{ id: string; sku: string; is_active: boolean; subs_on: boolean } & Record<string, any>>(
+      `SELECT v.*,
               (v.sub_variant_type_on OR EXISTS (SELECT 1 FROM product_sub_variants sv
                  WHERE sv.variant_id = v.id AND sv.is_active = true)) AS subs_on
          FROM product_variants v WHERE v.product_id = $1`,
@@ -388,11 +415,19 @@ async function publishProductDraftOnce(productId: string, opts: PublishProductOp
     const live = (v?.id && liveVariantById.get(v.id)) || null
     return live ? { ...v, is_active: live.is_active } : v
   }
+  // Columns the editor's variant row does not carry (cost, attributes, …) keep their live value.
+  // The sub-variant flag is left as staged: only a literal false retires sub-variants.
+  const keepLiveColumns = (v: any) => {
+    const live = (v?.id && liveVariantById.get(v.id)) || (v?.sku && liveVariantBySku.get(v.sku)) || null
+    if (!live) return v
+    const { subs_on: _s, sub_variant_type_on: _f, ...cols } = live
+    return overLive(cols, v)
+  }
   // has_variants off: the draft keeps its variants (toggle back on restores them) but none are published.
   const variants = variantsOff
     ? []
     : Array.isArray(draft.variants) && draft.variants.length > 0
-      ? draft.variants.map(fillSku).map(keepLiveStatus)
+      ? draft.variants.map(fillSku).map(keepLiveStatus).map(keepLiveColumns)
       : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
 
   const subVariants =
@@ -571,6 +606,11 @@ async function publishProductDraftOnce(productId: string, opts: PublishProductOp
         opts.activate === true,
       ]
     )
+
+    // Columns edited as plain form fields (Legal Metrology, usage, SEO keywords, …).
+    const extra = normalizeExtraFields(fields)
+    const extraSet = extraFieldsSetSql(Object.keys(extra), '$2::jsonb')
+    if (extraSet) await client.query(`UPDATE products SET ${extraSet} WHERE id = $1`, [productId, JSON.stringify(extra)])
 
     // NOTE: Leaf-level supplier reconcile runs AFTER the variant + sub-variant
     // upserts below, so each row's variant_sku / sub_variant_sku resolves to a
@@ -781,21 +821,57 @@ async function publishProductDraftOnce(productId: string, opts: PublishProductOp
       }
     }
 
-    await client.query(`DELETE FROM product_images WHERE product_id = $1`, [productId])
+    // Kept images stay the same rows (ids survive a publish); only changed ones are written.
+    const imagesJson = JSON.stringify(draft.images ?? [])
+    await client.query(
+      `DELETE FROM product_images WHERE product_id = $1
+         AND id::text NOT IN (SELECT img->>'id' FROM jsonb_array_elements($2::jsonb) AS img WHERE img->>'id' IS NOT NULL)`,
+      [productId, imagesJson]
+    )
+    // The primary moves in two steps (one primary per product is a unique index).
+    await client.query(
+      `UPDATE product_images SET is_primary = false WHERE product_id = $1 AND is_primary
+         AND id::text NOT IN (SELECT img->>'id' FROM jsonb_array_elements($2::jsonb) AS img
+                               WHERE (img->>'is_primary')::boolean AND img->>'id' IS NOT NULL)`,
+      [productId, imagesJson]
+    )
+    await client.query(
+      `UPDATE product_images pi SET
+         image_url = n.image_url, thumbnail_url = n.thumbnail_url, s3_bucket = n.s3_bucket, s3_key = n.s3_key,
+         s3_thumbnail_key = n.s3_thumbnail_key, file_name = n.file_name, file_size = n.file_size,
+         mime_type = n.mime_type, width = n.width, height = n.height, alt_text = n.alt_text,
+         display_order = n.display_order, is_primary = n.is_primary, updated_at = NOW()
+       FROM (SELECT img->>'id' AS id, img->>'image_url' AS image_url, img->>'thumbnail_url' AS thumbnail_url,
+                    img->>'s3_bucket' AS s3_bucket, img->>'s3_key' AS s3_key, img->>'s3_thumbnail_key' AS s3_thumbnail_key,
+                    img->>'file_name' AS file_name, NULLIF(img->>'file_size','')::bigint AS file_size,
+                    img->>'mime_type' AS mime_type, NULLIF(img->>'width','')::integer AS width,
+                    NULLIF(img->>'height','')::integer AS height, img->>'alt_text' AS alt_text,
+                    NULLIF(img->>'display_order','')::integer AS display_order, (img->>'is_primary')::boolean AS is_primary
+               FROM jsonb_array_elements($2::jsonb) AS img) n
+      WHERE pi.product_id = $1 AND pi.id::text = n.id
+        AND (pi.image_url, pi.thumbnail_url, pi.s3_bucket, pi.s3_key, pi.s3_thumbnail_key, pi.file_name, pi.file_size,
+             pi.mime_type, pi.width, pi.height, pi.alt_text, pi.display_order, pi.is_primary)
+            IS DISTINCT FROM
+            (n.image_url, n.thumbnail_url, n.s3_bucket, n.s3_key, n.s3_thumbnail_key, n.file_name, n.file_size,
+             n.mime_type, n.width, n.height, n.alt_text, n.display_order, n.is_primary)`,
+      [productId, imagesJson]
+    )
     await client.query(
       `INSERT INTO product_images (
-         product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+         id, product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
          file_name, file_size, mime_type, width, height, alt_text,
-         display_order, is_primary, created_at, updated_at
+         display_order, is_primary, blurhash, created_at, updated_at
        )
-       SELECT $1, img->>'image_url', img->>'thumbnail_url', img->>'s3_bucket',
+       SELECT CASE WHEN img->>'id' ~ ${UUID_SQL} THEN (img->>'id')::uuid ELSE gen_random_uuid() END,
+         $1, img->>'image_url', img->>'thumbnail_url', img->>'s3_bucket',
          img->>'s3_key', img->>'s3_thumbnail_key', img->>'file_name',
          NULLIF(img->>'file_size','')::bigint, img->>'mime_type',
          NULLIF(img->>'width','')::integer, NULLIF(img->>'height','')::integer,
          img->>'alt_text', NULLIF(img->>'display_order','')::integer,
-         (img->>'is_primary')::boolean, NOW(), NOW()
-       FROM jsonb_array_elements($2::jsonb) AS img`,
-      [productId, JSON.stringify(draft.images)]
+         (img->>'is_primary')::boolean, img->>'blurhash', NOW(), NOW()
+       FROM jsonb_array_elements($2::jsonb) AS img
+       WHERE NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.id::text = img->>'id')`,
+      [productId, imagesJson]
     )
 
     // Apply staged sub-variants only for variants the admin touched in draft mode: a
@@ -1683,6 +1759,18 @@ async function publishProductDraftOnce(productId: string, opts: PublishProductOp
         ])
       }
     }
+
+    // Media staged in the Media tab wins; otherwise product_media follows the image tables just written.
+    const stagedMedia = parseStaged((draft.fields as any)?._media)
+    if (stagedMedia && Array.isArray(stagedMedia.items)) await applyProductMediaTx(client, productId, stagedMedia)
+    else {
+      // The image tables already logged this change.
+      await client.query(`SELECT set_config('audit.skip', 'true', true)`)
+      await syncLegacyImagesToMedia(productId, client)
+      await client.query(`SELECT set_config('audit.skip', '', true)`)
+    }
+    const stagedFaqs = parseStaged((draft.fields as any)?._faqs)
+    if (Array.isArray(stagedFaqs)) await applyProductFaqsTx(client, productId, stagedFaqs)
 
     // Keep "Has sub-variants" honest: ON iff the variant still has active sub-variants.
     await client.query(

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ListFilters, useFilterQuery } from '@/components/admin/kit'
+import { ListFilters, useFilterQuery, SplitRow } from '@/components/admin/kit'
 import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import {
   AttentionList,
@@ -110,8 +110,9 @@ export default function CouponsOverview() {
 
           <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          <SplitRow
+            scroll="narrow"
+            wide={
               <Section title="Redemptions and discount">
                 <TrendChart
                   points={data.series}
@@ -121,22 +122,24 @@ export default function CouponsOverview() {
                   ariaLabel="Coupon redemptions and discount over time"
                 />
               </Section>
-            </div>
-            <Section title="By source">
-              {data.sources.length ? (
-                <RankedBars
-                  items={data.sources.map(s => ({
-                    name: s.source === 'manual' ? 'Manual' : s.source === 'auto' ? 'Auto-generated' : s.source,
-                    value: s.redemptions,
-                    sub: money(s.discount),
-                  }))}
-                  unit="uses"
-                />
-              ) : (
-                <p className="text-sm text-foreground-muted">No redemptions in this period.</p>
-              )}
-            </Section>
-          </div>
+            }
+            narrow={
+              <Section title="By source">
+                {data.sources.length ? (
+                  <RankedBars
+                    items={data.sources.map(s => ({
+                      name: s.source === 'manual' ? 'Manual' : s.source === 'auto' ? 'Auto-generated' : s.source,
+                      value: s.redemptions,
+                      sub: money(s.discount),
+                    }))}
+                    unit="uses"
+                  />
+                ) : (
+                  <p className="text-sm text-foreground-muted">No redemptions in this period.</p>
+                )}
+              </Section>
+            }
+          />
 
           <Section
             title="Top coupons"

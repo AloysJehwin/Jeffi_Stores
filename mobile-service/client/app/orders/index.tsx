@@ -191,7 +191,7 @@ export default function OrdersScreen() {
               icon={ShoppingBag}
               title="No orders yet"
               message="You haven't placed any orders yet."
-              actionLabel="Start Shopping"
+              actionLabel="Browse products"
               onAction={() => router.navigate('/(tabs)/products')}
             />
           )

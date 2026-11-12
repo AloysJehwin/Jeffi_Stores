@@ -1,5 +1,5 @@
 #!/bin/bash
-# Schema diff runner — compares database/*.sql (desired state) against live RDS
+# Schema diff runner — compares the schema files (every <service>/database/, listed by scripts/db-files.mjs) against live RDS
 # and applies only the delta using migra.
 #
 # Usage:
@@ -8,10 +8,10 @@
 #
 # Requirements (set in environment):
 #   RDS_HOST, RDS_PORT, RDS_USER, RDS_DB, AWS_REGION (RDS_CONNECT_HOST/RDS_CONNECT_PORT: where to connect,
-#   e.g. a tunnel; the IAM token stays signed for RDS_HOST:RDS_PORT). --no-seed skips seed-plans.sql.
+#   e.g. a tunnel; the IAM token stays signed for RDS_HOST:RDS_PORT). --no-seed skips the control-plane seeds.
 #   or TARGET_URL=postgresql://user:pass@host:port/db for a non-IAM target (local rehearsal).
 # The planned SQL is also written to $SCHEMA_DIFF_OUT (default /tmp)/schema-<set>-<db>.sql.
-# Needs docker, python3 (migra goes into a venv under ~/.cache) and psql.
+# Needs docker, node, python3 (migra goes into a venv under ~/.cache) and psql.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -35,22 +35,24 @@ target_psql() {
     psql -h "${RDS_CONNECT_HOST:-$RDS_HOST}" -p "${RDS_CONNECT_PORT:-${RDS_PORT:-5432}}" -U "$RDS_USER" -d "$RDS_DB" "$@"
 }
 
-# seed-plans.sql is row data (plans + plan_features), not structure, so migra never sees it.
-# It is transactional and authoritative (upsert + prune), so re-running on every deploy keeps
+# controller-service/database/seeds (seed-plans.sql) is row data (plans + plan_features), not structure, so migra
+# never sees it. It is transactional and authoritative (upsert + prune), so re-running on every deploy keeps
 # plan entitlements in step with the seed. Only meaningful for the control-plane set. Never in a dry run.
 seed_control_plane() {
   [ "${SCHEMA_SET:-}" = "control-plane" ] || return 0
-  [ -f database/control-plane/seed-plans.sql ] || return 0
+  local SEEDS
+  SEEDS=$(node scripts/db-files.mjs seeds controller-service)
+  [ -n "$SEEDS" ] || return 0
   if [ "$DRY_RUN" = "true" ]; then echo "(dry run: control-plane seed not applied)"; return 0; fi
   if [ "$NO_SEED" = "true" ]; then echo "(--no-seed: control-plane seed skipped)"; return 0; fi
   echo ""
   echo "── Seeding control-plane plans/entitlements ──"
   local SEED_LOG
   SEED_LOG=$(mktemp /tmp/schema_seed_XXXXXX.log)
-  target_psql -v ON_ERROR_STOP=1 -f database/control-plane/seed-plans.sql 2>&1 | tee "$SEED_LOG"
+  for seed in $SEEDS; do target_psql -v ON_ERROR_STOP=1 -f "$seed" 2>&1 | tee -a "$SEED_LOG"; done
   if grep -q '^ERROR:' "$SEED_LOG"; then
     echo ""
-    echo "seed-plans.sql FAILED — plan entitlements not updated."
+    echo "Control-plane seed FAILED — plan entitlements not updated."
     grep '^ERROR:' "$SEED_LOG" | sed 's/^/  /'
     rm -f "$SEED_LOG"
     exit 1
@@ -93,32 +95,16 @@ psql "$TEMP_URL" -q \
   > /dev/null
 
 # Which schema set to diff. `platform` = the main store DB (default);
-# `control-plane` = the SaaS control-plane tables (database/control-plane/schema.sql).
+# `control-plane` = the SaaS control-plane tables (controller-service/database/control-plane).
 SCHEMA_SET="${SCHEMA_SET:-platform}"
 for arg in "$@"; do
   case "$arg" in --set=*) SCHEMA_SET="${arg#--set=}" ;; esac
 done
 echo "Schema set: $SCHEMA_SET"
 
-if [ "$SCHEMA_SET" = "control-plane" ]; then
-  SCHEMA_FILES="database/control-plane/schema.sql"
-else
-  # Load EVERY database/*.sql, discovered at runtime. Ordering still matters: extensions
-  # first, then topic/table files, then the files that reference tables.
-  TAIL_FILES="indexes.sql functions.sql triggers.sql constraints.sql"
-  SCHEMA_FILES=""
-  [ -f database/extensions.sql ] && SCHEMA_FILES="database/extensions.sql"
-  for f in database/*.sql; do
-    b="$(basename "$f")"
-    case " extensions.sql $TAIL_FILES " in *" $b "*) continue ;; esac
-    SCHEMA_FILES="$SCHEMA_FILES
-$f"
-  done
-  for b in $TAIL_FILES; do
-    [ -f "database/$b" ] && SCHEMA_FILES="$SCHEMA_FILES
-database/$b"
-  done
-fi
+# The manifest lists every service's files in load order: extensions, tables, functions, triggers, indexes,
+# constraints, then foreign keys.
+SCHEMA_FILES=$(node scripts/db-files.mjs "$SCHEMA_SET")
 
 LOAD_LOG=$(mktemp /tmp/schema_load_XXXXXX.log)
 for f in $SCHEMA_FILES; do
@@ -126,8 +112,7 @@ for f in $SCHEMA_FILES; do
   psql "$TEMP_URL" -v ON_ERROR_STOP=0 -f "$f" 2>&1 | grep -E '(^|: )ERROR:' >> "$LOAD_LOG" || true
 done
 if [ -s "$LOAD_LOG" ]; then
-  echo "$(wc -l < "$LOAD_LOG" | tr -d ' ') error(s) loading the desired schema. Foreign keys in topic files load before the keys"
-  echo "they reference and the diff never applies FKs, so those are expected; anything else needs a look:"
+  echo "$(wc -l < "$LOAD_LOG" | tr -d ' ') error(s) loading the desired schema. Foreign keys load last, so these are not load-order noise:"
   head -20 "$LOAD_LOG" | sed 's/^/  /'
 fi
 rm -f "$LOAD_LOG"
@@ -166,7 +151,7 @@ fi
 rm -f "$MIGRA_ERR"
 
 # Filter to only safe additive statements — never apply drops automatically.
-# Destructive changes (DROP COLUMN, DROP TABLE) go through database/migrations/.
+# Destructive changes (DROP COLUMN, DROP TABLE) go through a <service>/database/migrations/ file.
 FILTER_SCRIPT=$(mktemp /tmp/migra_filter_XXXXXX.py)
 cat > "$FILTER_SCRIPT" << 'PYEOF'
 import sys

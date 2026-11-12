@@ -139,7 +139,7 @@ longer has those writes.
 - Keep `jeffi_control_plane` for a week, then drop it.
 - The old `jeffi-stores` ECR repository (single image) and the stopped EC2 `i-0b2466b2a540d6f23` can go too.
 - Every later release runs in GitHub Actions: merging to `main` builds the images and pauses on the `production`
-  environment; approved, it applies the `jeffi_stores` schema (when `database/` changed) and pending migration
+  environment; approved, it applies the `jeffi_stores` schema (when a `<service>/database/` folder changed) and pending migration
   files, rolls out, and fans both out to every store's database. Foreign keys and column changes the diff never
   applies go in `deploy/k8s/db/manual.sql`. Setup, dry runs and the Mac fallback: `deploy/k8s/README.md`, Releasing.
 - `MESSAGING_INLINE` is unchanged: the controller still sends some messages itself.

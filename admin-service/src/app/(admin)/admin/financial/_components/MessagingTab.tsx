@@ -8,6 +8,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { delta } from '@/lib/overview/period'
 import { KeyedTrendCard, MixDonutCard } from '@/components/admin/kit/charts'
 import { FinancePeriodBar, useFinancePeriod, type FinanceOverviewContract } from './finance'
+import { SplitRow } from '@/components/admin/kit'
 
 // Finance → Messaging. Spend across SMS / WhatsApp / email with the trend + mix split, plus four
 // breakdowns (channel, direction, template, campaign) and a top-recipient list. Rows deep-link to
@@ -170,8 +171,9 @@ function Body({ d }: { d: Payload }) {
         />
       </KpiGrid>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title="Spend by channel"
             data={d.series ?? []}
@@ -179,16 +181,18 @@ function Body({ d }: { d: Payload }) {
             labels={CHANNEL_LABEL}
             granularity={d.bucket}
           />
-        </div>
-        <MixDonutCard
-          title="By channel"
-          segments={d.by_channel
-            .filter(r => r.spent > 0)
-            .map(r => ({ label: CHANNEL_LABEL[r.key], value: r.spent, color: CHANNEL_COLOR[r.key] }))}
-          total={money(totalFromChannels)}
-          totalLabel="Spent"
-        />
-      </div>
+        }
+        narrow={
+          <MixDonutCard
+            title="By channel"
+            segments={d.by_channel
+              .filter(r => r.spent > 0)
+              .map(r => ({ label: CHANNEL_LABEL[r.key], value: r.spent, color: CHANNEL_COLOR[r.key] }))}
+            total={money(totalFromChannels)}
+            totalLabel="Spent"
+          />
+        }
+      />
 
       <Section title="By direction">
         <Table rows={d.by_direction} cols={dirCols} rowKey={r => r.key} empty="No sends in this period." />

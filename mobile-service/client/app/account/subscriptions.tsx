@@ -214,7 +214,7 @@ export default function SubscriptionsScreen() {
         {!user || isLoading ? (
           <SubscriptionsLoading />
         ) : (
-          <EmptyState icon={Repeat} title="You have no subscriptions yet." actionLabel="Browse products" onAction={() => router.navigate('/(tabs)')} />
+          <EmptyState icon={Repeat} title="No subscriptions yet" message="Subscribe to products you buy often and they arrive on schedule." actionLabel="Browse products" onAction={() => router.navigate('/(tabs)')} />
         )}
       </Screen>
     )

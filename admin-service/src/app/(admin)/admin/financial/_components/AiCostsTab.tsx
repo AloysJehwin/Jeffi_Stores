@@ -6,6 +6,7 @@ import { AiCostsTabSkeleton } from './FinanceSkeletons'
 import { delta } from '@/lib/overview/period'
 import { AI_CAPABILITY_LABEL, aiFeatureLabel } from '@/lib/ai/feature-labels'
 import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
+import { SplitRow } from '@/components/admin/kit'
 
 type Totals = { calls: number; cost_inr: number; price_inr: number; failed: number; unpaid: number }
 type Grouped = { key: string; calls: number; cost_inr: number; price_inr: number; failed: number }
@@ -89,8 +90,9 @@ function Body({ d }: { d: AiCosts }) {
         </Banner>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
+      <SplitRow
+        at="xl"
+        wide={
           <KeyedTrendCard
             title={`${label} by provider`}
             data={d.series}
@@ -98,16 +100,18 @@ function Body({ d }: { d: AiCosts }) {
             labels={PROVIDER_LABEL}
             granularity={d.bucket}
           />
-        </div>
-        <MixDonutCard
-          title="By capability"
-          segments={d.by_capability
-            .filter(g => amt(g) > 0)
-            .map(g => ({ label: AI_CAPABILITY_LABEL[g.key] ?? g.key, value: amt(g), color: CAP_COLOR[g.key] ?? 'rgb(148 163 184)' }))}
-          total={money(amt(c))}
-          totalLabel={label}
-        />
-      </div>
+        }
+        narrow={
+          <MixDonutCard
+            title="By capability"
+            segments={d.by_capability
+              .filter(g => amt(g) > 0)
+              .map(g => ({ label: AI_CAPABILITY_LABEL[g.key] ?? g.key, value: amt(g), color: CAP_COLOR[g.key] ?? 'rgb(148 163 184)' }))}
+            total={money(amt(c))}
+            totalLabel={label}
+          />
+        }
+      />
 
       <Section title="By feature">
         <Table rows={d.by_feature} cols={cols} rowKey={r => r.key} empty="No AI usage in this period." />

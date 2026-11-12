@@ -3,7 +3,11 @@ import {
   DEFAULT_SECTIONS,
   SECTION_META,
   SECTION_TYPES,
+  forSurface,
+  groupRows,
   isWithinWindow,
+  sectionSide,
+  sectionSurfaces,
   productRowKey,
   productSource,
   sectionLayout,
@@ -162,5 +166,25 @@ describe('config accessors', () => {
     expect(productRowKey(base, 8)).not.toBe(
       productRowKey(make({ config: { source: 'featured', categorySlug: 'tools' } }), 8)
     )
+  })
+})
+
+describe('single layout: sides and surfaces', () => {
+  const side = (id: string, s: 'full' | 'left' | 'right') => make({ id, config: s === 'full' ? {} : { layout: { side: s } } })
+
+  it('pairs a left followed by a right; anything else is a row of its own', () => {
+    const rows = groupRows([side('a', 'full'), side('b', 'left'), side('c', 'right'), side('d', 'right'), side('e', 'left')])
+    expect(rows.map(r => r.map(s => s.id))).toEqual([['a'], ['b', 'c'], ['d'], ['e']])
+    expect(sectionSide(make({ config: { layout: { side: 'nonsense' } } }))).toBe('full')
+  })
+
+  it('shows on every surface unless config.surfaces says otherwise', () => {
+    expect(sectionSurfaces(make())).toEqual({ web: true, web_mobile: true, app: true })
+    expect(sectionSurfaces(make({ config: { surfaces: { app: false } } }))).toEqual({ web: true, web_mobile: true, app: false })
+    // A row from before the single layout shows on its own surface alone.
+    expect(sectionSurfaces(make({ surface: 'app' }))).toEqual({ web: false, web_mobile: false, app: true })
+    const rows = [make({ id: 'w' }), make({ id: 'm', config: { surfaces: { web: false, app: false } } })]
+    expect(forSurface(rows, 'web').map(s => s.id)).toEqual(['w'])
+    expect(forSurface(rows, 'web_mobile').map(s => s.id)).toEqual(['w', 'm'])
   })
 })

@@ -191,7 +191,7 @@ export default function AddressesScreen() {
   if (loading || addresses.length === 0) {
     return (
       <Screen title="My Addresses" loading={loading} skeleton={<AddressesLoading />} footer={loading ? undefined : addButton}>
-        <EmptyState icon={MapPin} title="No addresses saved" message="Add an address to make checkout faster." />
+        <EmptyState icon={MapPin} title="No addresses yet" message="Add an address to make checkout faster." />
         <FeaturedProducts />
         {sheet}
       </Screen>

@@ -39,6 +39,7 @@ import ProductReviews, { ReviewSummaryLink, reviewSummary, useReviews } from '..
 import FrequentlyBoughtTogether from '../../src/components/pdp/FrequentlyBoughtTogether'
 import ProductSpecifications from '../../src/components/pdp/ProductSpecifications'
 import FeaturesUseCases from '../../src/components/pdp/FeaturesUseCases'
+import ProductMediaExtras, { ProductFaqs, resolvePdpMedia } from '../../src/components/pdp/ProductMediaExtras'
 import PdpCompareSection, { type CompareItem } from '../../src/components/pdp/PdpCompareSection'
 import CustomersAlsoViewed from '../../src/components/pdp/CustomersAlsoViewed'
 import PdpRecentlyViewed from '../../src/components/pdp/PdpRecentlyViewed'
@@ -174,10 +175,27 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
   const vaultOwned = vault?.owned ?? !!product.owned_in_vault
 
   const purchase = useProductPurchase(product, { gstEnabled, digital, alreadyOwned: vaultOwned, initialSku })
-  const variantImages = useMemo(
-    () => (purchase.selectedVariant?.variant_images?.length ? purchase.selectedVariant.variant_images : undefined),
-    [purchase.selectedVariantId]
+  // product_media (when the API sends it) drives the gallery, sub-variant → variant → product per kind.
+  const media = product.media ?? []
+  const selectedMedia = useMemo(
+    () => resolvePdpMedia(media, purchase.selectedVariantId, purchase.selectedSubVariantId),
+    [media, purchase.selectedVariantId, purchase.selectedSubVariantId]
   )
+  const toImage = (m: (typeof media)[number]) => ({
+    id: m.id,
+    image_url: m.url,
+    thumbnail_url: m.thumbnail_url || m.url,
+    is_primary: m.is_primary,
+    blurhash: m.metadata?.blurhash ?? null,
+  })
+  const mediaImages = useMemo(() => resolvePdpMedia(media).filter(m => m.kind === 'image').map(toImage), [media])
+  const variantImages = useMemo(() => {
+    if (mediaImages.length) {
+      const sel = selectedMedia.filter(m => m.kind === 'image')
+      return purchase.selectedVariantId && sel.map(m => m.id).join() !== mediaImages.map(i => i.id).join() ? sel.map(toImage) : undefined
+    }
+    return purchase.selectedVariant?.variant_images?.length ? purchase.selectedVariant.variant_images : undefined
+  }, [purchase.selectedVariantId, purchase.selectedSubVariantId, mediaImages])
 
   const { data: reviews } = useReviews(product.id)
   const summary = reviewSummary(reviews)
@@ -292,7 +310,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
             <Card padded={false} className="mb-6 overflow-hidden">
               <View className="gap-4 p-4">
                 <ProductImageGallery
-                  images={product.product_images || []}
+                  images={mediaImages.length ? mediaImages : product.product_images || []}
                   productName={product.name}
                   variantImages={variantImages}
                   discountPct={discountPct}
@@ -340,7 +358,7 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
                             accessibilityLabel="Email for back-in-stock alert"
                             containerClassName="flex-1"
                           />
-                          <Button label="Notify Me" block={false} onPress={handleNotifyMe} />
+                          <Button label="Notify me" block={false} onPress={handleNotifyMe} />
                         </View>
                       )
                     ) : null}
@@ -386,7 +404,11 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
               onChooseOptions={() => scrollToRef(optionsRef, true)}
             />
 
+            <ProductMediaExtras items={selectedMedia} />
+
             <ProductSpecifications product={product} />
+
+            <ProductFaqs faqs={product.faqs ?? []} />
 
             <FeaturesUseCases product={product} />
 

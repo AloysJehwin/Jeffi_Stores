@@ -1,5 +1,6 @@
 import { LoadingChart, LoadingKpis, LoadingSection, LoadingTable, Sk } from '@/components/admin/kit/skeleton'
 import { PERIOD_PRESETS } from '@/lib/overview/period'
+import { SplitRow } from '@/components/admin/kit'
 
 /** The overview's period bar (30 days by default) while it loads. */
 export function PeriodBarLoading() {
@@ -28,14 +29,16 @@ export function ProgramsOverviewLoading() {
     <>
       <Heading title="Loyalty" />
       <LoadingKpis labels={['Points issued', 'Points redeemed', 'Points reversed', 'Liability', 'Active members', 'New members']} />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <SplitRow
+        wide={
           <LoadingChart title="Points issued and redeemed" />
-        </div>
-        <LoadingSection title="Members by tier">
-          <Sk className="mx-auto h-36 w-36 rounded-full" />
-        </LoadingSection>
-      </div>
+        }
+        narrow={
+          <LoadingSection title="Members by tier">
+            <Sk className="mx-auto h-36 w-36 rounded-full" />
+          </LoadingSection>
+        }
+      />
       <LoadingSection title="Top earners this period">
         <LoadingTable columns={['Customer', 'Tier', 'Earned', 'Redeemed', 'Balance']} rows={5} bare />
       </LoadingSection>

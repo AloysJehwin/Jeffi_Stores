@@ -21,6 +21,7 @@ import {
   ChannelChip,
   CampaignStatsGrid,
   CampaignPushStats,
+  type CampaignMetric,
 } from '@admin/app/(admin)/admin/campaigns/_components/campaign-presentation'
 import {
   EligibleRecipientsPanel,
@@ -28,6 +29,7 @@ import {
   WhatsAppLogPanel,
   type RecentSend,
   type WhatsAppLog,
+  CampaignRecipientsDialog,
 } from '@admin/app/(admin)/admin/campaigns/[kind]/_components/CampaignOpsPanels'
 import { startCampaignDraft } from './actions'
 import { ChangeLog } from '@/components/admin/change-log'
@@ -88,6 +90,8 @@ export default function CampaignViewClient({
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
   const [sendsTotal, setSendsTotal] = useState(0)
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([])
+  // The performance number whose customers are open in a dialog.
+  const [openMetric, setOpenMetric] = useState<{ metric: CampaignMetric; label: string } | null>(null)
   const [smsLibraryBody, setSmsLibraryBody] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -209,11 +213,11 @@ export default function CampaignViewClient({
 
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Performance</h3>
-            <CampaignStatsGrid c={c} />
+            <CampaignStatsGrid c={c} onOpen={(metric, label) => setOpenMetric({ metric, label })} />
             {(pushEnabled || pushHistory) && (
               <div className="mt-4 pt-4 border-t border-border-default">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">App push</p>
-                <CampaignPushStats c={c} />
+                <CampaignPushStats c={c} onOpen={(metric, label) => setOpenMetric({ metric, label })} />
               </div>
             )}
           </div>
@@ -222,6 +226,13 @@ export default function CampaignViewClient({
           <EligibleRecipientsPanel kind={kind} />
           <RecentSendsPanel kind={kind} initialSends={recentSends} initialTotal={sendsTotal} />
           <WhatsAppLogPanel kind={kind} logs={whatsappLogs} />
+          <ChangeLog kind="campaign" id={kind} version={c.updated_at} />
+          <CampaignRecipientsDialog
+            kind={kind}
+            metric={openMetric?.metric ?? null}
+            label={openMetric?.label ?? ''}
+            onClose={() => setOpenMetric(null)}
+          />
         </div>
 
         {/* Right: previews */}
@@ -276,7 +287,6 @@ export default function CampaignViewClient({
         </div>
       </div>
 
-      <ChangeLog kind="campaign" id={kind} version={c.updated_at} />
     </div>
   )
 }

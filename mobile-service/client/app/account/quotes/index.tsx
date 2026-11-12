@@ -180,8 +180,8 @@ export default function QuotesScreen() {
           rfqs.length === 0 ? (
             <EmptyState icon={FileText} title="No quote requests yet" message="Use the “Request Quote” button on any product page or cart to get started.">
               <View className="mt-5 w-full max-w-[260px] gap-2">
-                <Button label="New Quote Request" size="md" onPress={() => router.push('/account/quotes/new')} />
-                <Button label="Browse Products" variant="ghost" size="md" onPress={() => router.navigate('/(tabs)/products')} />
+                <Button label="New quote request" size="md" onPress={() => router.push('/account/quotes/new')} />
+                <Button label="Browse products" variant="ghost" size="md" onPress={() => router.navigate('/(tabs)/products')} />
               </View>
             </EmptyState>
           ) : (

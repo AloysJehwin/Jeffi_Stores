@@ -1,6 +1,6 @@
 'use client'
 
-import { SECTION_META, rowAudience, rowPage, rowSurface, type SectionType } from '@/lib/catalog/homepage-sections'
+import { SECTION_META, rowAudience, rowPage, type SectionType } from '@/lib/catalog/homepage-sections'
 import {
   AiCopyScope,
   AspectField,
@@ -80,10 +80,9 @@ export default function SectionConfigFields(props: EditorProps) {
   const { section } = props
   const Editor = EDITORS[section.type]
   const meta = SECTION_META[section.type]
-  const surface = SURFACE_NAMES[rowSurface(section)]
   const page = rowPage(section)
   const home = rowAudience(section) === 'business' ? 'business homepage' : 'homepage'
-  const where = page === 'home' ? `the ${surface} ${home}` : `the ${surface} ${PAGE_NAMES[page]}, between the products`
+  const where = page === 'home' ? `the ${home}` : `the ${PAGE_NAMES[page]}, between the products`
   const heading = section.title ? ` Section heading: "${section.title}".` : ''
   const aiContext = `Section "${meta.label}" on ${where}: ${meta.description}${heading}`
 
@@ -111,7 +110,6 @@ export default function SectionConfigFields(props: EditorProps) {
   )
 }
 
-const SURFACE_NAMES = { web: 'desktop website', web_mobile: 'mobile website', app: 'mobile app' } as const
 const PAGE_NAMES = { products: 'all-products page', category: 'category pages', brand: 'brand pages' } as const
 
 function Scheduling(props: EditorProps) {

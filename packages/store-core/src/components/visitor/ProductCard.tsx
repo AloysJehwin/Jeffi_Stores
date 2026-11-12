@@ -356,8 +356,9 @@ export default function ProductCard({
             {gstEnabled && (
               <p className="text-[11px] sm:text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>
             )}
-            <div className="flex items-center justify-between gap-1 mt-1 sm:mt-0">
-              <span className={`text-xs font-medium truncate ${inStock ? 'text-green-600' : 'text-red-600'}`}>
+            {/* Wraps: "Instant access" (digital) plus View Details overflow a narrow card on one line. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 mt-1 sm:mt-0">
+              <span className={`text-xs font-medium whitespace-nowrap ${inStock ? 'text-green-600' : 'text-red-600'}`}>
                 {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
               </span>
               <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">

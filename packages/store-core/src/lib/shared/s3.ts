@@ -756,3 +756,43 @@ export async function deleteObjectsUnder(canonicalPrefix: string): Promise<numbe
   } while (ContinuationToken)
   return deleted
 }
+
+// Product media files the browser uploads straight to S3 (documents, audio, 3D models).
+export const PRODUCT_MEDIA_TYPES: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/ogg': 'ogg',
+  'model/gltf-binary': 'glb',
+  'model/vnd.usdz+zip': 'usdz',
+}
+export const PRODUCT_MEDIA_KEY_RE =
+  /^products\/[0-9a-f-]{36}\/media\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|mp3|m4a|ogg|glb|usdz)$/
+
+/** A presigned PUT under products/<id>/media/; type and length are signed in, as for gallery videos. */
+export async function presignProductMediaUpload(
+  productId: string,
+  mime: string,
+  bytes: number,
+  ttlSeconds = 10 * 60
+): Promise<{ uploadUrl: string; key: string; url: string; expiresIn: number }> {
+  const ext = PRODUCT_MEDIA_TYPES[mime]
+  if (!ext) throw new UploadValidationError('Unsupported file type')
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+  presignClient ??= new S3Client({
+    region: AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+  })
+  const key = `products/${productId}/media/${randomUUID()}.${ext}`
+  const uploadUrl = await getSignedUrl(
+    presignClient,
+    new PutObjectCommand({ Bucket: await resolveBucket(), Key: `${KEY_PREFIX}${key}`, ContentType: mime, ContentLength: bytes }),
+    { expiresIn: ttlSeconds, signableHeaders: new Set(['content-type']) }
+  )
+  return { uploadUrl, key, url: await getS3Url(key), expiresIn: ttlSeconds }
+}

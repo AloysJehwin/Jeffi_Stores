@@ -756,6 +756,7 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
             ]
           )
         })
+        await (await import('@/lib/catalog/product-media')).syncLegacyImagesToMediaSafe(pid)
         snapshot.productImages!.push({ product_id: pid, rows: [old as unknown as Record<string, unknown>] })
         done++
         await query(`UPDATE bulk_image_jobs SET done = $2, updated_at = NOW() WHERE id = $1`, [jobId, done]).catch(

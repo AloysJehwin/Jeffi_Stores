@@ -1,10 +1,13 @@
 'use client'
 
 import { updateChannelsLabel, useMessagingChannels } from '@/hooks/useStoreFlags'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
+import dynamic from 'next/dynamic'
+import { DocumentList } from '@/components/media/MediaItemView'
+import { resolveMedia, type MediaScope, type ProductMediaItem } from '@/lib/catalog/product-media-shared'
 
 import ProductActions from './ProductActions'
 import BusinessPriceBadge from './BusinessPriceBadge'
@@ -20,6 +23,9 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewSummaryLink from './pdp/ReviewSummaryLink'
 import type { ReviewSummary } from '@/lib/shared/review-summary-types'
 import { round2 } from '@/lib/catalog/gst'
+
+// Players and 3D load only when a product has such media.
+const ProductMediaGallery = dynamic(() => import('@/components/media/ProductMediaGallery'), { ssr: false })
 
 interface ProductImage {
   id: string
@@ -108,6 +114,8 @@ interface ProductDetailClientProps {
     } | null
     product_images: ProductImage[]
     product_variants: Variant[]
+    /** product_media (every scope); when present it drives the gallery, variant switching included. */
+    media?: ProductMediaItem[]
     product_units?: Array<{
       id: string
       variant_id: string | null
@@ -540,6 +548,26 @@ export default function ProductDetailClient({
   reviewSummary,
 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
+  const [mediaSel, setMediaSel] = useState<MediaScope>({})
+  const media = useMemo(() => product.media ?? [], [product.media])
+  const asImage = (m: ProductMediaItem): ProductImage & { blurhash?: string | null } => ({
+    id: m.id,
+    image_url: m.url,
+    thumbnail_url: m.thumbnail_url || m.url,
+    is_primary: m.is_primary,
+    blurhash: m.metadata?.blurhash ?? null,
+  })
+  // Product-scope images, and the selection's own (sub-variant → variant) when it has any.
+  const mediaImages = useMemo(() => resolveMedia(media, {}).filter(m => m.kind === 'image').map(asImage), [media])
+  const selected = useMemo(() => resolveMedia(media, mediaSel), [media, mediaSel])
+  const selImageKey = selected.filter(m => m.kind === 'image').map(m => m.id).join(',')
+  const selImages = useMemo(
+    () => (mediaSel.variantId && selImageKey !== mediaImages.map(i => i.id).join(',') ? selected.filter(m => m.kind === 'image').map(asImage) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selImageKey]
+  )
+  const extras = selected.filter(m => m.kind !== 'image' && m.kind !== 'document')
+  const docs = selected.filter(m => m.kind === 'document')
   const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
   const isInWishlist = inWishlist(product.id)
   const [wishlistLoading, setWishlistLoading] = useState(false)
@@ -717,11 +745,23 @@ export default function ProductDetailClient({
       {/* Image column — order-1 on mobile, natural on desktop */}
       <div className="order-1 lg:order-none">
         <ProductImageGallery
-          images={product.product_images || []}
+          images={mediaImages.length > 0 ? mediaImages : product.product_images || []}
           productName={product.name}
-          variantImages={variantImages}
+          variantImages={mediaImages.length > 0 ? selImages : variantImages}
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
         />
+
+        {extras.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Videos, 3D &amp; more</p>
+            <ProductMediaGallery items={extras} ar aspect="aspect-video" />
+          </div>
+        )}
+        {docs.length > 0 && (
+          <div className="mt-4">
+            <DocumentList items={docs} title="Documents & downloads" />
+          </div>
+        )}
 
         <div className="hidden lg:block mt-4">
           {isDigital ? (
@@ -853,6 +893,9 @@ export default function ProductDetailClient({
           handlingDays={Number(product.handling_days ?? 2)}
           isCodAllowed={product.is_cod_allowed ?? false}
           onVariantChange={handleVariantChange}
+          onSelectionChange={(variantId, subVariantId) =>
+            setMediaSel(cur => (cur.variantId === variantId && cur.subVariantId === subVariantId ? cur : { variantId, subVariantId }))
+          }
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           productUnits={product.product_units ?? []}
           sellUnitId={product.sell_unit_id ?? null}
