@@ -23,7 +23,7 @@ function getS3Client(): S3Client {
 }
 
 /** Platform bucket — same resolution as KYC uploads. */
-function backupBucket(): string {
+export function backupBucket(): string {
   const b =
     process.env.PLATFORM_S3_BUCKET || process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'jeffi-stores-bucket'
   if (!b) throw new Error('No S3 bucket configured for tenant backups')
@@ -166,4 +166,34 @@ export async function deleteTenantBackups(opts: { ownerId: string; slug: string 
   const slugKeys = slugObjs.map(o => o.key)
   const deleted = await deleteKeys([...ownerKeysForSlug, ...slugKeys])
   return { deleted }
+}
+
+/** Delete one store's backup by its by-owner key, with the by-slug copy that shares its stamp. */
+export async function deleteBackupByKey(ownerKey: string, slug: string): Promise<void> {
+  const file = ownerKey.split('/').pop()
+  await deleteKeys(file ? [ownerKey, `${slugPrefix(slug)}${file}`] : [ownerKey])
+}
+
+// Under tenant-backups/: the only prefix of the platform bucket the provisioner's role may write.
+const ARCHIVE_PREFIX = `${PREFIX}/media`
+
+/** Where a deprovisioned store's media files are kept in the platform bucket (ends with '/'). */
+export function archiveMediaPrefix(ownerId: string, slug: string, iso = new Date().toISOString()): string {
+  return `${ARCHIVE_PREFIX}/${ownerId}/${slug}/${stamp(iso)}/`
+}
+
+/** Delete everything under a kept-media prefix. Refuses anything outside tenant-backups/media/. */
+export async function deleteArchivePrefix(prefix: string): Promise<number> {
+  if (!prefix.startsWith(`${ARCHIVE_PREFIX}/`) || !prefix.endsWith('/')) throw new Error(`Not an archive prefix: ${prefix}`)
+  const s3 = getS3Client()
+  const bucket = backupBucket()
+  let deleted = 0
+  for (;;) {
+    const listed = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1000 }))
+    const keys = (listed.Contents ?? []).map(o => o.Key!).filter(Boolean)
+    if (!keys.length) break
+    deleted += await deleteKeys(keys)
+    if (!listed.IsTruncated) break
+  }
+  return deleted
 }

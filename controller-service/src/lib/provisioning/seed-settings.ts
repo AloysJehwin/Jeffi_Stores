@@ -233,3 +233,37 @@ export async function seedTenantSiteSettings(
     return { attempted: entries.length, written }
   })
 }
+
+/**
+ * Write kept site_settings into a store's database without touching a key that already has a value
+ * (what onboarding seeded stays). Returns how many keys were written.
+ */
+export async function applySiteSettings(target: SeedTarget, settings: Record<string, string>): Promise<{ attempted: number; written: number }> {
+  if (!target?.endpoint) throw new Error('tenant DB endpoint is required')
+  const entries = Object.entries(settings).filter(([, v]) => v != null && String(v).trim() !== '')
+  if (entries.length === 0) return { attempted: 0, written: 0 }
+  return withTenantAdminPool(target, async pool => {
+    const client = await pool.connect()
+    let written = 0
+    try {
+      await client.query('BEGIN')
+      for (const [key, value] of entries) {
+        const r = await client.query(
+          `INSERT INTO site_settings (key, value, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+           WHERE site_settings.value IS NULL OR site_settings.value = ''`,
+          [key, String(value)]
+        )
+        written += r.rowCount ?? 0
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      client.release()
+    }
+    return { attempted: entries.length, written }
+  })
+}

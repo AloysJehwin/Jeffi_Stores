@@ -18,6 +18,7 @@ import {
   PutBucketCorsCommand,
   DeleteBucketCommand,
   ListObjectsV2Command,
+  CopyObjectCommand,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
 import type { Pool } from 'pg'
@@ -408,6 +409,59 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
       .catch(err => {
         if (!/NotFound/i.test(err?.name || '')) throw err
       })
+  }
+
+  /** Server-side copy of every object under `fromPrefix` in one bucket to `toPrefix` in another. */
+  private async copyObjects(from: { bucket: string; prefix: string }, to: { bucket: string; prefix: string }) {
+    let objects = 0
+    let bytes = 0
+    let token: string | undefined
+    do {
+      const listed = await this.s3.send(
+        new ListObjectsV2Command({ Bucket: from.bucket, Prefix: from.prefix || undefined, ContinuationToken: token, MaxKeys: 1000 })
+      )
+      for (const o of listed.Contents ?? []) {
+        if (!o.Key) continue
+        // CopyObject takes objects up to 5 GB; a larger one fails the copy, and with it the step that asked.
+        await this.s3.send(
+          new CopyObjectCommand({
+            Bucket: to.bucket,
+            Key: `${to.prefix}${o.Key.slice(from.prefix.length)}`,
+            CopySource: `${from.bucket}/${o.Key.split('/').map(encodeURIComponent).join('/')}`,
+          })
+        )
+        objects++
+        bytes += o.Size ?? 0
+      }
+      token = listed.IsTruncated ? listed.NextContinuationToken : undefined
+    } while (token)
+    return { objects, bytes }
+  }
+
+  async archiveBucket(bucket: string, destPrefix: string): Promise<{ objects: number; bytes: number }> {
+    const { backupBucket } = await import('@/lib/tenancy/tenant-backup-store')
+    try {
+      return await this.copyObjects({ bucket, prefix: '' }, { bucket: backupBucket(), prefix: destPrefix })
+    } catch (err: any) {
+      if (/NoSuchBucket/i.test(err?.name || '')) return { objects: 0, bytes: 0 }
+      throw err
+    }
+  }
+
+  async restoreBucket(srcPrefix: string, bucket: string): Promise<{ objects: number }> {
+    const { backupBucket } = await import('@/lib/tenancy/tenant-backup-store')
+    const { objects } = await this.copyObjects({ bucket: backupBucket(), prefix: srcPrefix }, { bucket, prefix: '' })
+    return { objects }
+  }
+
+  async readSiteSettings(endpoint: string, dbName: string, db?: DbAuth): Promise<Record<string, string>> {
+    const pool = await tenantAdminPool(dbTarget(endpoint, dbName, db))
+    try {
+      const r = await pool.query(`SELECT key, value FROM site_settings WHERE value IS NOT NULL AND value <> ''`)
+      return Object.fromEntries(r.rows.map((x: { key: string; value: string }) => [x.key, String(x.value)]))
+    } finally {
+      await pool.end().catch(() => {})
+    }
   }
 
   async deleteBucket(bucket: string): Promise<void> {
