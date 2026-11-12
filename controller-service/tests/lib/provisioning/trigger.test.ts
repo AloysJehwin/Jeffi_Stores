@@ -142,3 +142,59 @@ describe('triggerProvisioning', () => {
     expect(out).toMatchObject({ ok: true, jobStatus: 'pending' })
   })
 })
+
+// What a returning owner chose to bring back from the archive a deprovision kept.
+const archivesMod = vi.hoisted(() => ({ getOwnerArchive: vi.fn() }))
+vi.mock('@/lib/tenant-registry/archives', () => archivesMod)
+
+describe('resolveRestorePlan', () => {
+  const ARCHIVE = {
+    id: 'arch-1',
+    keep_database: true,
+    keep_media: true,
+    keep_config: false,
+    db_backup_key: 'tenant-backups/by-owner/o-1/x.sql.gz',
+    media_prefix: 'tenant-backups/media/o-1/acme/STAMP/',
+  }
+  beforeEach(() => {
+    vi.clearAllMocks()
+    reg.controlPlanePool.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [{ owner_id: 'o-1' }] }) })
+  })
+
+  it('restores only what the owner ticked and the archive kept', async () => {
+    reg.getDraft.mockResolvedValue({ data: { restore: { archiveId: 'arch-1', database: false, media: true, config: true } } })
+    archivesMod.getOwnerArchive.mockResolvedValue(ARCHIVE)
+    const { resolveRestorePlan } = await import('@controller/lib/provisioning/trigger')
+
+    // Database: kept but not ticked. Configuration: ticked but not kept.
+    expect(await resolveRestorePlan('t-1', 'acme')).toEqual({
+      restoreMediaPrefix: 'tenant-backups/media/o-1/acme/STAMP/',
+      restoreArchiveId: 'arch-1',
+    })
+    expect(archivesMod.getOwnerArchive).toHaveBeenCalledWith('o-1', 'arch-1')
+  })
+
+  it('restores nothing from an archive that is not this owner’s (or has expired)', async () => {
+    reg.getDraft.mockResolvedValue({ data: { restore: { archiveId: 'someone-elses', database: true, media: true, config: true } } })
+    archivesMod.getOwnerArchive.mockResolvedValue(null)
+    const { resolveRestorePlan, resolveRestoreKey } = await import('@controller/lib/provisioning/trigger')
+
+    expect(await resolveRestorePlan('t-1', 'acme')).toEqual({})
+    expect(await resolveRestoreKey('t-1', 'acme')).toBeUndefined()
+    expect(backup.findLatestBackup).not.toHaveBeenCalled()
+  })
+
+  it('still restores the newest database backup for a draft from before archives', async () => {
+    reg.getDraft.mockResolvedValue({ data: { restorePreviousData: true } })
+    backup.findLatestBackup.mockResolvedValue({ key: 'tenant-backups/by-owner/o-1/old.sql.gz' })
+    const { resolveRestorePlan } = await import('@controller/lib/provisioning/trigger')
+
+    expect(await resolveRestorePlan('t-1', 'acme')).toEqual({ restoreFromKey: 'tenant-backups/by-owner/o-1/old.sql.gz' })
+  })
+
+  it('restores nothing when the owner did not ask', async () => {
+    reg.getDraft.mockResolvedValue({ data: {} })
+    const { resolveRestorePlan } = await import('@controller/lib/provisioning/trigger')
+    expect(await resolveRestorePlan('t-1', 'acme')).toEqual({})
+  })
+})

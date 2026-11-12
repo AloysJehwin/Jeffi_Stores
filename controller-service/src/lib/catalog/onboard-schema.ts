@@ -62,6 +62,10 @@ export const OnboardSchema = z
     razorpayWebhookSecret: z.string().optional(),
     // Restore-on-re-onboard — owner opted to restore a prior deprovisioned store's data.
     restorePreviousData: z.boolean().optional(),
+    // What to bring back from the archive a deprovision kept for this owner.
+    restore: z
+      .object({ archiveId: z.string().uuid(), database: z.boolean(), media: z.boolean(), config: z.boolean() })
+      .optional(),
     // Step 6 — Branding & legals
     mobile: z.string().optional(),
     logoS3Key: z.string().optional(),

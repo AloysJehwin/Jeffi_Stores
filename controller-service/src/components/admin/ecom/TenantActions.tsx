@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Play, Power, PowerOff, RotateCcw, Server } from 'lucide-react'
 import { ActionButton, useActionToast } from '@/components/admin/kit'
+import DeprovisionDialog from './DeprovisionDialog'
 
 // Operator actions on a tenant: Provision / Retry / Deprovision + test-tenant-only
 // Disable/Enable instance. Rendered in the tenant detail header.
@@ -14,6 +16,7 @@ export default function TenantActions({
   jobStatus,
   jobStep,
   rolledBack,
+  retentionDays = 30,
 }: {
   tenantId: string
   slug: string
@@ -23,9 +26,12 @@ export default function TenantActions({
   jobStatus?: string | null
   jobStep?: string | null
   rolledBack?: boolean
+  /** Days a deprovisioned store's kept data stays (archiveRetentionDays). */
+  retentionDays?: number
 }) {
   const router = useRouter()
   const toast = useActionToast()
+  const [deprovisionOpen, setDeprovisionOpen] = useState(false)
 
   const call = (path: string, body?: object) => async () => {
     const res = await fetch(path, {
@@ -77,20 +83,19 @@ export default function TenantActions({
       )}
 
       {status === 'active' && (
-        <ActionButton
-          action={{
-            label: 'Deprovision',
-            icon: Server,
-            danger: true,
-            onClick: call(`${base}/deprovision`, { confirm: true }),
-            confirm: {
-              title: `Deprovision "${slug}"?`,
-              message: 'The store goes offline immediately and its database is backed up to S3, then the RDS instance and bucket are DELETED. This cannot be undone.',
-              variant: 'danger',
-              confirmLabel: 'Deprovision & back up',
-            },
-          }}
-        />
+        <>
+          <ActionButton action={{ label: 'Deprovision', icon: Server, danger: true, onClick: () => setDeprovisionOpen(true) }} />
+          <DeprovisionDialog
+            open={deprovisionOpen}
+            slug={slug}
+            retentionDays={retentionDays}
+            onClose={() => setDeprovisionOpen(false)}
+            onConfirm={async keep => {
+              await call(`${base}/deprovision`, { confirm: true, keep })()
+              setDeprovisionOpen(false)
+            }}
+          />
+        </>
       )}
 
       {isTest && stopped && <span className="w-full text-xs text-amber-600 dark:text-amber-400">Instance stopped: DB powered down (auto-restarts after 7 days)</span>}

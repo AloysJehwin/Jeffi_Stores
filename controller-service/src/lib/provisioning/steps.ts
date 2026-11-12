@@ -384,6 +384,15 @@ const HANDLERS: Record<Step, Handler> = {
             const { seedTenantSiteSettings } = await import('./seed-settings')
             await seedTenantSiteSettings(job.tenant_id, ownerId, jobDbTarget(slug, res))
             res.settingsSeeded = true
+            // A returning owner chose the configuration a deprovision kept, on a fresh database (a restored
+            // database already carries its settings). What they entered at onboarding stays on top.
+            if (res.restoreConfigArchiveId && !res.restored) {
+              const { getOwnerArchive } = await import('@/lib/tenant-registry/archives')
+              const archive = await getOwnerArchive(ownerId, res.restoreConfigArchiveId as string)
+              const kept = (archive?.config?.siteSettings ?? {}) as Record<string, string>
+              const { applySiteSettings } = await import('./seed-settings')
+              res.configRestored = await applySiteSettings(jobDbTarget(slug, res), kept)
+            }
           } else {
             res.settingsSeeded = 'skipped (missing owner or db endpoint)'
             outcome = skip('missing owner or db endpoint')
@@ -398,6 +407,12 @@ const HANDLERS: Record<Step, Handler> = {
   async create_bucket({ slug, res, provider }) {
         await provider.ensureBucket(bucketName(slug))
         res.bucket = bucketName(slug)
+        // A returning owner chose to bring back the media files a deprovision kept. Copying again on a
+        // retry overwrites the same keys.
+        if (res.restoreMediaPrefix && !res.mediaRestored) {
+          const { objects } = await provider.restoreBucket(res.restoreMediaPrefix as string, res.bucket)
+          res.mediaRestored = { objects }
+        }
         return ok()
   },
 
@@ -667,6 +682,10 @@ const HANDLERS: Record<Step, Handler> = {
         }
         await setTenantStatus(job.tenant_id, 'active')
         await setStoreRequest(job.tenant_id, null)
+        if (res.restoreArchiveId) {
+          const { markArchiveRestored } = await import('@/lib/tenant-registry/archives')
+          await markArchiveRestored(res.restoreArchiveId as string, job.tenant_id).catch(() => {})
+        }
         // Once per store; never throws.
         const { notifyStoreLive } = await import('./start-store')
         await notifyStoreLive(job.tenant_id)
@@ -1305,16 +1324,91 @@ export interface DeprovisionResult {
   ok: boolean
   backupKey: string | null
   backedUp: boolean
+  /** The tenant_archives row listing what was kept for the owner; null when nothing was. */
+  archiveId?: string | null
   error?: string
 }
 
+/** What a deprovision keeps for the store's owner. Left out, everything is kept. */
+export interface DeprovisionKeep {
+  database: boolean
+  media: boolean
+  config: boolean
+}
+
 /**
- * Deprovision a tenant with a backup-first teardown:
+ * Access a deprovisioned store must not keep, whatever was chosen to keep: its API keys and its
+ * admin and portal certificates are revoked. Custom-domain certificates and CloudFront
+ * distributions have no delete in this codebase yet, so they are returned for closing by hand.
+ * Best-effort: the store's billable resources are already gone when this runs.
+ */
+async function revokeStoreAccess(tenantId: string): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {}
+  const pool = controlPlanePool()
+  const run = async (what: string, sql: string, args: unknown[] = [tenantId]) => {
+    try {
+      const r = await pool.query(sql, args)
+      return r.rowCount ?? 0
+    } catch (e: any) {
+      out[`${what}Error`] = e?.message || String(e)
+      return 0
+    }
+  }
+  out.apiKeysRevoked = await run('apiKeys', `UPDATE api_keys SET status='revoked', revoked_at=now() WHERE tenant_id=$1 AND status='active'`)
+  out.adminCertsRevoked = await run(
+    'adminCerts',
+    `UPDATE tenant_admin_certs SET revoked_at=now(), revoked_by='deprovision' WHERE tenant_id=$1 AND revoked_at IS NULL`
+  )
+  out.portalCertsRevoked = await run('portalCerts', `UPDATE portal_certs SET revoked_at=now() WHERE tenant_id=$1 AND revoked_at IS NULL`)
+  try {
+    const d = await pool.query(
+      `SELECT domain, cert_arn, cloudfront_id FROM tenant_custom_domains WHERE tenant_id=$1 AND (cert_arn IS NOT NULL OR cloudfront_id IS NOT NULL)`,
+      [tenantId]
+    )
+    if (d.rows.length) out.customDomains = d.rows
+  } catch {
+    /* listed for an operator only */
+  }
+  return out
+}
+
+/** The store's configuration as kept for its owner: what the control plane holds, plus its own site_settings. */
+async function snapshotStoreConfig(
+  tenant: Record<string, any>,
+  provider: ProvisioningProvider,
+  db: { endpoint: string | null; dbName: string; auth?: DbAuth }
+): Promise<Record<string, unknown>> {
+  let domains: unknown[] = []
+  try {
+    const r = await controlPlanePool().query(`SELECT domain, status FROM tenant_custom_domains WHERE tenant_id=$1 ORDER BY created_at`, [tenant.id])
+    domains = r.rows
+  } catch {
+    /* the list of custom domains is a nicety; the settings below are the configuration */
+  }
+  const siteSettings = db.endpoint
+    ? db.auth
+      ? await provider.readSiteSettings(db.endpoint, db.dbName, db.auth)
+      : await provider.readSiteSettings(db.endpoint, db.dbName)
+    : {}
+  return {
+    displayName: tenant.display_name ?? null,
+    plan: tenant.plan ?? null,
+    billingInterval: tenant.billing_interval ?? null,
+    customDomain: tenant.custom_domain ?? null,
+    customDomains: domains,
+    siteSettings,
+  }
+}
+
+/**
+ * Deprovision a tenant with a copy-first teardown:
  *   1. Flip status → 'terminated' + clear resolver cache → store goes OFFLINE immediately.
- *   2. If the DB was ever provisioned, dump it and stash the archive in S3 (dual
- *      owner/slug keys) so a returning owner can restore.
+ *   2. Take a copy of everything `keep` names, before anything is deleted: the database dump (dual
+ *      owner/slug keys in S3), the bucket's media files, the configuration. What `keep` leaves out
+ *      is deleted with no copy.
  *   3. Delete the RDS instance + tenant bucket so nothing keeps billing.
- *   4. Null the infra pointers.
+ *   4. Revoke the store's API keys and certificates, null the infra pointers.
+ *   5. Record what was kept (tenant_archives) so the same owner can restore it for a while.
  *
  * Idempotent + defensive: a never-provisioned tenant just goes terminated (no backup);
  * "already gone" deletes are treated as success by the provider.
@@ -1322,7 +1416,15 @@ export interface DeprovisionResult {
 export async function deprovisionTenant(
   tenantId: string,
   provider: ProvisioningProvider,
-  ctx: { ownerId?: string | null; /** Tear down even when the backup fails (the data is lost). */ force?: boolean }
+  ctx: {
+    ownerId?: string | null
+    /** Tear down even when a copy fails (that data is lost). */
+    force?: boolean
+    /** What to keep for the owner. Left out, everything is kept (a cancelled subscription has no one to ask). */
+    keep?: DeprovisionKeep
+    /** Who asked, for the archive record. */
+    requestedBy?: string | null
+  }
 ): Promise<DeprovisionResult> {
   const tenant = await getTenant(tenantId)
   if (!tenant) return { ok: false, backupKey: null, backedUp: false, error: 'tenant not found' }
@@ -1344,10 +1446,16 @@ export async function deprovisionTenant(
 
   let backupKey: string | null = null
   let backedUp = false
+  const keep: DeprovisionKeep = ctx.keep ?? { database: true, media: true, config: true }
+  // Media and configuration are kept for an owner to restore; with no owner there is no one to keep them for.
+  const ownerId = ctx.ownerId || null
+  let mediaPrefix: string | null = null
+  let media = { objects: 0, bytes: 0 }
+  let config: Record<string, unknown> | null = null
 
   try {
-    // 2. Backup (only if there was ever a DB to back up).
-    if (endpoint) {
+    // 2. Copies first (only if there was ever a DB to back up).
+    if (endpoint && keep.database) {
       const dbName = tenant.rds_db || created.dbName || TENANT_DB
       try {
         const archive = nodeDb
@@ -1365,6 +1473,30 @@ export async function deprovisionTenant(
         // Nothing is deleted without a backup unless the operator said so.
         if (!ctx.force) throw e
         created.backupError = e?.message || String(e)
+      }
+    }
+    if (ownerId && keep.config) {
+      try {
+        const dbName = tenant.rds_db || created.dbName || TENANT_DB
+        config = await snapshotStoreConfig(tenant as Record<string, any>, provider, {
+          endpoint,
+          dbName,
+          auth: nodeDb ? { iamAuth: false, dbSecretRef: tenantDbSecretRef(slug) } : undefined,
+        })
+      } catch (e: any) {
+        if (!ctx.force) throw e
+        created.configArchiveError = e?.message || String(e)
+      }
+    }
+    if (ownerId && keep.media) {
+      try {
+        const { archiveMediaPrefix } = await import('@/lib/tenancy/tenant-backup-store')
+        const prefix = archiveMediaPrefix(ownerId, slug)
+        media = await provider.archiveBucket(bucket, prefix)
+        mediaPrefix = prefix
+      } catch (e: any) {
+        if (!ctx.force) throw e
+        created.mediaArchiveError = e?.message || String(e)
       }
     }
 
@@ -1493,10 +1625,42 @@ export async function deprovisionTenant(
     } catch {
       /* bookkeeping must never fail a teardown that already deleted the billable resources */
     }
+    // 3e. Access the store must not keep. The database was not kept: earlier backups of it go too.
+    const access = await revokeStoreAccess(tenantId).catch(() => ({}) as Record<string, unknown>)
+    if ((access as any).customDomains) manualCleanup.customDomains = (access as any).customDomains
+    if (ownerId && !keep.database) {
+      const { deleteTenantBackups } = await import('@/lib/tenancy/tenant-backup-store')
+      await deleteTenantBackups({ ownerId, slug }).catch((e: any) => {
+        manualCleanup.oldBackups = `delete failed: ${e?.message || e}`
+      })
+    }
     const routeAccount = Object.keys(manualCleanup).length ? manualCleanup : undefined
 
     // 4. Clear infra pointers.
     await clearTenantInfra(tenantId)
+
+    // 5. What was kept, for the owner to restore. A copy that exists is never left unrecorded silently.
+    let archiveId: string | null = null
+    if (ownerId && (backupKey || mediaPrefix || config)) {
+      try {
+        const { createTenantArchive } = await import('@/lib/tenant-registry/archives')
+        const archive = await createTenantArchive({
+          tenantId,
+          ownerId,
+          slug,
+          displayName: tenant.display_name,
+          dbBackupKey: backupKey,
+          mediaPrefix,
+          mediaObjects: media.objects,
+          mediaBytes: media.bytes,
+          config,
+          requestedBy: ctx.requestedBy ?? null,
+        })
+        archiveId = archive.id
+      } catch (e: any) {
+        created.archiveError = e?.message || String(e)
+      }
+    }
 
     if (job) {
       await updateProvisioningJob(job.id, {
@@ -1506,11 +1670,15 @@ export async function deprovisionTenant(
           k8sPendingPlan: undefined,
           deprovisioned: true,
           backupKey,
+          kept: { database: !!backupKey, media: !!mediaPrefix, config: !!config },
+          ...(mediaPrefix ? { mediaArchivePrefix: mediaPrefix, mediaArchived: media } : {}),
+          ...(archiveId ? { archiveId } : {}),
+          access,
           ...(routeAccount ? { manualCleanup: routeAccount } : {}),
         },
       })
     }
-    return { ok: true, backupKey, backedUp }
+    return { ok: true, backupKey, backedUp, archiveId }
   } catch (e: any) {
     if (job) {
       await updateProvisioningJob(job.id, {

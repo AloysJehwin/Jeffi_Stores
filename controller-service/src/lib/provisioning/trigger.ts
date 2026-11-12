@@ -1,5 +1,5 @@
 import { getProvisioningProvider } from './index'
-import { advanceProvisioningJob, deprovisionTenant, reprovisionDns } from './steps'
+import { advanceProvisioningJob, deprovisionTenant, reprovisionDns, type DeprovisionKeep } from './steps'
 import {
   getTenant,
   getProvisioningJob,
@@ -51,6 +51,10 @@ export interface ProvisioningTrigger {
   seedProfile?: string
   hostnames?: string[]
   reason?: ProvisioningReason
+  /** deprovision: what to keep for the owner (left out, everything). */
+  keep?: DeprovisionKeep
+  /** deprovision: who asked, for the archive record. */
+  requestedBy?: string | null
 }
 
 export interface TriggerResult {
@@ -59,6 +63,8 @@ export interface TriggerResult {
   added?: string[]
   removed?: string[]
   error?: string
+  /** deprovision: the record of what was kept, if anything was. */
+  archiveId?: string | null
 }
 
 /**
@@ -67,15 +73,44 @@ export interface TriggerResult {
  * Shared by the owner route, the payment webhook and the admin operator route.
  */
 export async function resolveRestoreKey(tenantId: string, slug: string): Promise<string | undefined> {
+  return (await resolveRestorePlan(tenantId, slug)).restoreFromKey
+}
+
+/** What a provision brings back, as the engine reads it out of created_resources. */
+export interface RestorePlan {
+  restoreFromKey?: string
+  restoreMediaPrefix?: string
+  restoreConfigArchiveId?: string
+  restoreArchiveId?: string
+}
+
+/**
+ * What the owner chose to restore during onboarding (draft `restore`: an archive of theirs and the
+ * items they ticked), limited to what that archive kept. An archive is only ever read for its owner.
+ * A draft from before archives (`restorePreviousData`) restores the newest database backup, as it did.
+ */
+export async function resolveRestorePlan(tenantId: string, slug: string): Promise<RestorePlan> {
   const ownerRow = await controlPlanePool()
     .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
     .catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id
-  if (!ownerId) return undefined
+  if (!ownerId) return {}
   const draft = await getDraft(ownerId).catch(() => null)
-  if (!draft?.data?.restorePreviousData) return undefined
+  const choice = draft?.data?.restore as { archiveId?: string; database?: boolean; media?: boolean; config?: boolean } | undefined
+  if (choice?.archiveId) {
+    const { getOwnerArchive } = await import('@/lib/tenant-registry/archives')
+    const archive = await getOwnerArchive(ownerId, choice.archiveId).catch(() => null)
+    if (!archive) return {}
+    const plan: RestorePlan = {}
+    if (choice.database && archive.keep_database && archive.db_backup_key) plan.restoreFromKey = archive.db_backup_key
+    if (choice.media && archive.keep_media && archive.media_prefix) plan.restoreMediaPrefix = archive.media_prefix
+    if (choice.config && archive.keep_config) plan.restoreConfigArchiveId = archive.id
+    if (Object.keys(plan).length) plan.restoreArchiveId = archive.id
+    return plan
+  }
+  if (!draft?.data?.restorePreviousData) return {}
   const backup = await findLatestBackup({ ownerId, slug }).catch(() => null)
-  return backup?.key
+  return backup?.key ? { restoreFromKey: backup.key } : {}
 }
 
 const usingStub = () => process.env.PROVISIONING_PROVIDER !== 'aws'
@@ -107,8 +142,8 @@ export async function triggerProvisioning(t: ProvisioningTrigger): Promise<Trigg
   }
 
   if (t.action === 'deprovision') {
-    const r = await deprovisionTenant(t.tenantId, provider, { ownerId: t.ownerId })
-    return { ok: r.ok, error: r.error }
+    const r = await deprovisionTenant(t.tenantId, provider, { ownerId: t.ownerId, keep: t.keep, requestedBy: t.requestedBy })
+    return { ok: r.ok, error: r.error, archiveId: r.archiveId ?? null }
   }
 
   // action === 'provision'
@@ -116,9 +151,11 @@ export async function triggerProvisioning(t: ProvisioningTrigger): Promise<Trigg
   // Seed optional payload fields the engine reads out of created_resources. A restored
   // store keeps its own data, so seeding is skipped there.
   const seedProfile = t.restoreFromKey ? undefined : (t.seedProfile ?? (await resolveSeedProfile(t.tenantId)))
-  if (seedProfile) {
+  // The media files and configuration the owner chose to bring back ride on the job like the backup key.
+  const { restoreFromKey: _key, ...restoreExtras } = await resolveRestorePlan(t.tenantId, t.slug).catch(() => ({}) as RestorePlan)
+  if (seedProfile || Object.keys(restoreExtras).length) {
     await updateProvisioningJob(job.id, {
-      created_resources: { ...(job.created_resources || {}), seedProfile },
+      created_resources: { ...(job.created_resources || {}), ...restoreExtras, ...(seedProfile ? { seedProfile } : {}) },
     })
   }
 

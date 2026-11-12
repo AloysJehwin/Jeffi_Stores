@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { FileText } from 'lucide-react'
@@ -67,6 +67,22 @@ const lbl = fieldLabel
 
 // Same shape check as the bank endpoint (lib/payments/bank-verify.ts).
 const UPI_ID_RE = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/
+
+/** What a deprovision kept for this owner (GET /api/ecom/onboard/restore-available). */
+interface RestoreArchive {
+  id: string
+  slug: string
+  displayName: string | null
+  expiresAt: string
+  database: boolean
+  media: boolean
+  config: boolean
+}
+const RESTORE_ITEMS: { key: 'database' | 'media' | 'config'; label: string; what: string }[] = [
+  { key: 'database', label: 'Store data', what: 'Products, customers, orders and settings, as they were.' },
+  { key: 'media', label: 'Images and files', what: 'Product images, uploads and documents.' },
+  { key: 'config', label: 'Store settings only', what: 'Your settings on a fresh, empty store. Not needed when you restore the store data.' },
+]
 
 function slugify(s: string) {
   return s
@@ -189,21 +205,39 @@ export default function OnboardWizard({
   const [legalsAccepted, setLegalsAccepted] = useState(init.legalsAccepted ?? false)
 
   // Restore-on-re-onboard — detect a backup from a previously deprovisioned store.
-  const [restoreBackup, setRestoreBackup] = useState<{ capturedAt: string } | null>(null)
+  const [restoreBackup, setRestoreBackup] = useState<{ capturedAt: string; archive?: RestoreArchive } | null>(null)
   const [restoreOptIn, setRestoreOptIn] = useState<boolean>(init.restorePreviousData ?? false)
+  // What to bring back from the archive a deprovision kept: the owner ticks each item.
+  const [restorePick, setRestorePick] = useState<{ database: boolean; media: boolean; config: boolean }>({
+    database: init.restore?.database ?? false,
+    media: init.restore?.media ?? false,
+    config: init.restore?.config ?? false,
+  })
 
   useEffect(() => {
     let cancelled = false
     fetch('/api/ecom/onboard/restore-available')
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
-        if (!cancelled && d?.available) setRestoreBackup({ capturedAt: d.capturedAt })
+        if (!cancelled && d?.available) setRestoreBackup({ capturedAt: d.capturedAt, archive: d.archive })
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [])
+  // Sent with the draft and the submit: only items the archive kept and the owner ticked.
+  const restoreArchive = restoreBackup?.archive
+  const restoreChoice = useMemo(() => {
+    if (!restoreArchive) return undefined
+    const c = {
+      archiveId: restoreArchive.id,
+      database: restoreArchive.database && restorePick.database,
+      media: restoreArchive.media && restorePick.media,
+      config: restoreArchive.config && restorePick.config,
+    }
+    return c.database || c.media || c.config ? c : undefined
+  }, [restoreArchive, restorePick])
 
   const effectiveSlug = upgrade ? upgrade.slug : slugEdited ? slug : slugify(displayName)
   const selectedPlan = plans.find(p => p.slug === planSlug)
@@ -254,7 +288,8 @@ export default function OnboardWizard({
         sealS3Key,
         sealUrl,
         legalsAccepted,
-        restorePreviousData: restoreBackup ? restoreOptIn : false,
+        restorePreviousData: restoreBackup && !restoreBackup.archive ? restoreOptIn : false,
+        restore: restoreChoice,
       }
       await fetch('/api/ecom/onboard/draft', {
         method: 'POST',
@@ -295,6 +330,7 @@ export default function OnboardWizard({
       legalsAccepted,
       restoreBackup,
       restoreOptIn,
+      restoreChoice,
     ]
   )
 
@@ -422,7 +458,8 @@ export default function OnboardWizard({
           logoS3Key: logoS3Key || undefined,
           sealS3Key: sealS3Key || undefined,
           legalsAccepted,
-          restorePreviousData: restoreBackup ? restoreOptIn : undefined,
+          restorePreviousData: restoreBackup && !restoreBackup.archive ? restoreOptIn : undefined,
+          restore: restoreChoice,
         }),
       })
       const data = await res.json()
@@ -523,7 +560,34 @@ export default function OnboardWizard({
         <PageHeader eyebrow={`Step ${step + 1} of ${STEPS.length}`} title={HEAD[step].title} description={HEAD[step].description} />
 
           {/* ── Restore banner (returning owner with a prior backup) ── */}
-          {restoreBackup && step <= 1 && (
+          {restoreBackup?.archive && step <= 1 && (
+            <div className={`${noteCls} org-peach mb-6`}>
+              <div className="font-semibold text-foreground">We kept data from your previous store</div>
+              <p className="text-foreground-secondary mt-1">
+                From “{restoreBackup.archive.displayName || restoreBackup.archive.slug}”, closed on{' '}
+                {new Date(restoreBackup.capturedAt).toLocaleDateString('en-IN')}. Tick what to bring back; it is kept until{' '}
+                {new Date(restoreBackup.archive.expiresAt).toLocaleDateString('en-IN')}. You can also use the store name “
+                {restoreBackup.archive.slug}” again.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                {RESTORE_ITEMS.filter(i => restoreBackup.archive![i.key]).map(i => (
+                  <label key={i.key} className="inline-flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={restorePick[i.key]}
+                      onChange={e => setRestorePick(p => ({ ...p, [i.key]: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 rounded accent-accent-600"
+                    />
+                    <span>
+                      <span className="font-medium text-foreground">{i.label}</span>
+                      <span className="block text-foreground-secondary text-xs">{i.what}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {restoreBackup && !restoreBackup.archive && step <= 1 && (
             <div className={`${noteCls} org-peach mb-6`}>
               <div className="font-semibold text-foreground">We found a backup of your previous store</div>
               <p className="text-foreground-secondary mt-1">
@@ -1215,9 +1279,13 @@ export default function OnboardWizard({
                     ? [
                         [
                           'Restore data',
-                          restoreOptIn
-                            ? `Yes — from ${new Date(restoreBackup.capturedAt).toLocaleDateString('en-IN')}`
-                            : 'No — start fresh',
+                          restoreBackup.archive
+                            ? RESTORE_ITEMS.filter(i => restoreChoice?.[i.key])
+                                .map(i => i.label)
+                                .join(', ') || 'No — start fresh'
+                            : restoreOptIn
+                              ? `Yes — from ${new Date(restoreBackup.capturedAt).toLocaleDateString('en-IN')}`
+                              : 'No — start fresh',
                         ] as [string, string],
                       ]
                     : []),

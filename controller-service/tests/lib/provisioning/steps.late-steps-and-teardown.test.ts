@@ -31,7 +31,13 @@ const reg = {
 }
 vi.mock('@/lib/tenant-registry', () => reg)
 
-vi.mock('@/lib/tenancy/tenant-backup-store', () => ({ getTenantBackup: vi.fn(), putTenantBackup: vi.fn() }))
+vi.mock('@/lib/tenancy/tenant-backup-store', () => ({
+  getTenantBackup: vi.fn(),
+  putTenantBackup: vi.fn(),
+  archiveMediaPrefix: (ownerId: string, slug: string) => `tenant-backups/media/${ownerId}/${slug}/STAMP/`,
+  deleteTenantBackups: vi.fn(async () => ({ deleted: 0 })),
+}))
+vi.mock('@/lib/tenant-registry/archives', () => ({ createTenantArchive: vi.fn(async () => ({ id: 'arch-1' })) }))
 vi.mock('@controller/lib/provisioning/seed', () => ({ seedTenantData: vi.fn() }))
 
 // ── dynamically-imported step dependencies ───────────────────────────────────

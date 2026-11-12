@@ -74,7 +74,9 @@ export default async function OnboardPage({
   if (!owner) redirect('/signup')
   const who = { email: owner.email, name: owner.name }
 
-  const existing = await getOwnerTenants(owner.id)
+  // A terminated (deprovisioned) store does not hold its owner here: they may apply again, and the
+  // wizard offers what the deprovision kept for them.
+  const existing = (await getOwnerTenants(owner.id)).filter(t => t.status !== 'terminated')
   if (existing.length > 0) {
     const t = existing[0]
     if (!hasService(t, 'store') && !t.store_request) {

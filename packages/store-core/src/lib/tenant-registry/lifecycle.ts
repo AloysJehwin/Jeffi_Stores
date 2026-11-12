@@ -290,6 +290,9 @@ export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; erro
     const res = await deleteTenantBackups({ ownerId, slug: tenant.slug })
     deletedBackups = res.deleted
   }
+  // What a deprovision kept for the owner (database backup, media files, configuration) goes with the store.
+  const { expireTenantArchives } = await import('./archives')
+  await expireTenantArchives({ tenantId }).catch(warn('archive delete'))
 
   const k8s = await import('@/lib/k8s/tenant-compute')
   if (k8s.k8sComputeEnabled()) {

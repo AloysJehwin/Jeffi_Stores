@@ -76,33 +76,52 @@ export interface OrderMailTemplate {
   fits: boolean
 }
 
+const rank = (s: PlacementScenario | null) => (s ? PAGES.order.scenarios.indexOf(s) : 99)
+
+/** An order-page template as the panel shows it; with no order it suits any (a send to a list of orders). */
+function toMailTemplate(t: Awaited<ReturnType<typeof listPageTemplates>>[number], o: OrderRow | null) {
+  const s = scenarioOf('order', t.tags)
+  return {
+    slug: t.slug,
+    name: t.name,
+    subject: t.subject,
+    preheader: t.preheader,
+    body: t.body,
+    layout: t.layout,
+    scenario: s ? { id: s.id, label: s.label, reply: s.reply, pickItem: s.pickItem } : null,
+    fits: o ? scenarioFits(s, o) : true,
+    rank: rank(s),
+  }
+}
+type Ranked = ReturnType<typeof toMailTemplate>
+const byFitThenRank = (a: Ranked, b: Ranked) => Number(b.fits) - Number(a.fits) || a.rank - b.rank || a.name.localeCompare(b.name)
+
 /** The order-page templates for this order, the ones that suit its state first. */
 export async function orderMailTemplates(orderId: string) {
   const [o, items, list] = await Promise.all([loadOrder(orderId), loadItems(orderId), listPageTemplates('page:order')])
   if (!o) return null
-  const rank = (s: PlacementScenario | null) => (s ? PAGES.order.scenarios.indexOf(s) : 99)
   const templates: OrderMailTemplate[] = list
-    .map(t => {
-      const s = scenarioOf('order', t.tags)
-      return {
-        slug: t.slug,
-        name: t.name,
-        subject: t.subject,
-        preheader: t.preheader,
-        body: t.body,
-        layout: t.layout,
-        scenario: s ? { id: s.id, label: s.label, reply: s.reply, pickItem: s.pickItem } : null,
-        fits: scenarioFits(s, o),
-        rank: rank(s),
-      }
-    })
-    .sort((a, b) => Number(b.fits) - Number(a.fits) || a.rank - b.rank || a.name.localeCompare(b.name))
+    .map(t => toMailTemplate(t, o))
+    .sort(byFitThenRank)
     .map(({ rank: _rank, ...t }) => t)
   return {
     order: { status: o.status, paymentStatus: o.payment_status, email: recipient(o).email },
     items: items.map(i => ({ id: i.id, name: itemName(i), quantity: i.quantity })),
     templates,
   }
+}
+
+/**
+ * The order-page templates for a send to a list of orders: every one that needs no item picked
+ * (an item belongs to one order, so those stay on the order page).
+ */
+export async function orderListMailTemplates(): Promise<OrderMailTemplate[]> {
+  const list = await listPageTemplates('page:order')
+  return list
+    .map(t => toMailTemplate(t, null))
+    .filter(t => !t.scenario?.pickItem)
+    .sort(byFitThenRank)
+    .map(({ rank: _rank, ...t }) => t)
 }
 
 /**

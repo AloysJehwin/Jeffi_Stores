@@ -102,6 +102,20 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   async ensureBucket(bucket: string): Promise<void> {
     this.buckets.add(bucket)
   }
+  /** destPrefix → source bucket, for tests. */
+  archivedBuckets = new Map<string, string>()
+  restoredBuckets = new Map<string, string>()
+  async archiveBucket(bucket: string, destPrefix: string): Promise<{ objects: number; bytes: number }> {
+    this.archivedBuckets.set(destPrefix, bucket)
+    return { objects: 0, bytes: 0 }
+  }
+  async restoreBucket(srcPrefix: string, bucket: string): Promise<{ objects: number }> {
+    this.restoredBuckets.set(bucket, srcPrefix)
+    return { objects: 0 }
+  }
+  async readSiteSettings(_endpoint: string, _dbName: string, _db?: DbAuth): Promise<Record<string, string>> {
+    return {}
+  }
 
   async ensureDns(hostnames: string[], _targetIp?: string): Promise<void> {
     hostnames.forEach(h => this.dns.add(h))

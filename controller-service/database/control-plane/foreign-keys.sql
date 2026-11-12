@@ -61,3 +61,7 @@ ALTER TABLE ONLY public.tenant_compute ADD CONSTRAINT tenant_compute_tenant_id_f
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_compute_periods ADD CONSTRAINT tenant_compute_periods_tenant_id_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE SET NULL;

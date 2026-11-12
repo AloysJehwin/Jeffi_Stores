@@ -12,6 +12,7 @@ import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
 import { Kpi, ListFilters, PageBody, PageHeader, SplitRow, TabLinks } from '@/components/admin/kit'
 import { LoadingChart, LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import OrdersTable from './_components/OrdersTable'
+import BulkOrderMailButton from './_components/BulkOrderMailButton'
 import OrdersOverview from './_components/OrdersOverview'
 
 export const dynamic = 'force-dynamic'
@@ -130,7 +131,9 @@ function OrdersList({ resolved }: { resolved: SP }) {
         <OrdersStats q={q} />
       </Suspense>
 
-      <ListFilters entity="orders" fields={ORDER_FIELDS} aliases={ORDER_ALIASES} search={ORDER_SEARCH} noun="Orders" tab="list" exportable />
+      <ListFilters entity="orders" fields={ORDER_FIELDS} aliases={ORDER_ALIASES} search={ORDER_SEARCH} noun="Orders" tab="list" exportable>
+        <BulkOrderMailButton fields={ORDER_FIELDS} search={ORDER_SEARCH.param} />
+      </ListFilters>
 
       <OrdersListSection resolvedSearchParams={resolved} />
     </>

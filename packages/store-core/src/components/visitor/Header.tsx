@@ -65,9 +65,9 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* Desktop Navigation */}
+            {/* Desktop Navigation: About Us and Support drop out below xl so no label wraps */}
             <nav
-              className={`hidden lg:flex items-center gap-8 transition-all duration-300 ${
+              className={`hidden lg:flex items-center gap-5 xl:gap-8 whitespace-nowrap transition-all duration-300 ${
                 searchOpen
                   ? 'opacity-0 pointer-events-none -translate-y-1 invisible'
                   : 'opacity-100 translate-y-0 visible'
@@ -91,13 +91,13 @@ export default function Header() {
               </Link>
               <Link
                 href="/about"
-                className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
+                className="hidden xl:inline text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
               >
                 About Us
               </Link>
               <Link
                 href="/support"
-                className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
+                className="hidden xl:inline text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
               >
                 Support
               </Link>

@@ -161,3 +161,6 @@ ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging
     CHECK (provider IN ('twilio','aws'));
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_status_check
     CHECK (status IN ('active','disabled'));
+ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_status_check
+    CHECK (status IN ('available','restored','expired'));

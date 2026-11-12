@@ -1,6 +1,7 @@
 import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { DetailHeader } from '@/components/admin/kit/actions'
 import { badgeCls } from '@/components/admin/kit/tones'
+import { archiveRetentionDays } from '@/lib/tenant-registry/archives'
 import { TenantStatus, storeHost } from './cells'
 import TenantActions from './TenantActions'
 import PurgeCustomerButton from './PurgeCustomerButton'
@@ -44,6 +45,7 @@ export default function TenantObjectHeader({ d, back, section }: { d: TenantDeta
                   jobStatus={job?.status ?? null}
                   jobStep={job?.step ?? null}
                   rolledBack={(job?.created_resources as Record<string, unknown> | null)?.rolledBack === true}
+                  retentionDays={archiveRetentionDays()}
                 />
               )}
               {d.purgeable && <PurgeCustomerButton tenantId={t.id} slug={t.slug} afterHref="/admin/ecom/customers?tab=list" />}

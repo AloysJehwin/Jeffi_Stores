@@ -80,6 +80,16 @@ export interface ProvisioningProvider {
   /** Create + lock down the tenant bucket (public-access-block on; writes to app IAM only). */
   ensureBucket(bucket: string): Promise<void>
 
+  /** Copy every object of a store's bucket under `destPrefix` in the platform bucket (deprovision keeping
+   * the media files). A bucket that does not exist counts as empty. */
+  archiveBucket(bucket: string, destPrefix: string): Promise<{ objects: number; bytes: number }>
+
+  /** Copy the objects kept under `srcPrefix` in the platform bucket back into a store's bucket. */
+  restoreBucket(srcPrefix: string, bucket: string): Promise<{ objects: number }>
+
+  /** The store's own site_settings (key → value), read before its database is deleted. */
+  readSiteSettings(endpoint: string, dbName: string, db?: DbAuth): Promise<Record<string, string>>
+
   /** Point the tenant's subdomains at the given target IP (Route53 A-records; idempotent).
    * targetIp is the tenant's serving host — a dedicated instance IP or the shared pool IP;
    * omitted falls back to TENANT_APP_TARGET_IP. */

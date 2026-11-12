@@ -86,3 +86,5 @@ CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_admin ON public.admin_api_tokens
 CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_service_account ON public.admin_api_tokens USING btree (tenant_id, service_account_id) WHERE (service_account_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_platform_setup_progress_state ON public.platform_setup_progress USING btree (state);
 CREATE INDEX IF NOT EXISTS idx_tenant_messaging_senders_tenant ON public.tenant_messaging_senders USING btree (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_archives_owner ON public.tenant_archives USING btree (owner_id, created_at DESC) WHERE (status = 'available');
+CREATE INDEX IF NOT EXISTS idx_tenant_archives_expiry ON public.tenant_archives USING btree (expires_at) WHERE (status <> 'expired');
