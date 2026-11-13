@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "615dccd96fd1cfda42dd9985ee19b15ef1b18bb27bfe2030dc08294a855ae178",
+ "manifestHash": "f7e5987aedb2399f7e576852dd444a8a70cd7b33f2c46729de6ff05c1af090a1",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -44035,6 +44035,84 @@
    "body": null,
    "summary": "Get overview (customers)",
    "command": "platform customers overview"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/domains",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/domains",
+   "gatewayPath": "/v1/platform/ecom/domains",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/domains/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_billing:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:read"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "List domains",
+   "command": "platform domains get"
+  },
+  {
+   "id": "platform PUT /api/admin/ecom/domains",
+   "host": "platform",
+   "method": "PUT",
+   "path": "/api/admin/ecom/domains",
+   "gatewayPath": "/v1/platform/ecom/domains",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/domains/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_billing:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "marginPct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 500
+     },
+     "renewLeadDays": {
+      "type": "integer",
+      "minimum": 7,
+      "maximum": 60
+     },
+     "renewCutoffDays": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30
+     },
+     "tlds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "pattern": "^[a-z]{2,24}(\\.[a-z]{2,24})?$"
+      },
+      "minItems": 1,
+      "maxItems": 30
+     }
+    },
+    "required": [
+     "marginPct",
+     "renewLeadDays",
+     "renewCutoffDays",
+     "tlds"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update domains",
+   "command": "platform domains update"
   },
   {
    "id": "platform GET /api/admin/ecom/google-ads",
