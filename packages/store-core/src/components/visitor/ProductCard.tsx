@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { backdropImg, onImgError } from '@/lib/shared/image-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -38,6 +39,8 @@ interface ProductCardProps {
   portal?: 'storefront' | 'business'
   /** The image box's width / height, in place of 5:3. */
   imageAspect?: number | null
+  /** One of a long list: images load lazily and the link prefetches on hover/focus instead of on sight. */
+  deferred?: boolean
 }
 
 // Two columns on phones, two or three beside the filters on wider screens.
@@ -67,7 +70,9 @@ export default function ProductCard({
   isDigital = false,
   portal = 'storefront',
   imageAspect,
+  deferred = false,
 }: ProductCardProps) {
+  const router = useRouter()
   const { user } = useAuth()
   const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
   const digital = digitalActive(digitalProductsEnabled, isDigital)
@@ -190,6 +195,7 @@ export default function ProductCard({
             <>
               <img
                 {...backdropImg(primaryImage.image_url)}
+                loading={deferred ? 'lazy' : undefined}
                 onError={onImgError}
                 alt=""
                 aria-hidden="true"
@@ -201,6 +207,7 @@ export default function ProductCard({
                   alt={name}
                   blurhash={primaryImage.blurhash}
                   sizes={CARD_SIZES}
+                  loading={deferred ? 'lazy' : undefined}
                   className="w-full h-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                 />
               </div>
@@ -275,6 +282,9 @@ export default function ProductCard({
               {/* Stretched link: the whole card opens the product; the buttons sit above it. */}
               <Link
                 href={productHref}
+                prefetch={deferred ? false : undefined}
+                onPointerEnter={deferred ? () => router.prefetch(productHref) : undefined}
+                onFocus={deferred ? () => router.prefetch(productHref) : undefined}
                 className="after:absolute after:inset-0 after:rounded-[20px] sm:after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-500"
               >
                 {name}

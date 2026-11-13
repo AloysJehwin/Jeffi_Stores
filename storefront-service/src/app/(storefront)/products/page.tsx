@@ -3,10 +3,9 @@ import type { Metadata } from 'next'
 import { listingMetadata } from '@/lib/catalog/listing-seo'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import FilterSidebar from '@/components/visitor/FilterSidebar'
-import { renderProductItem } from '@/components/visitor/listing/listing-items'
-import { LISTING_PAGE_SIZE, buildListingModel } from '@/lib/catalog/listing-model'
+import { LISTING_PAGE_SIZE, buildListingModel, getListingProducts } from '@/lib/catalog/listing-model'
 import { getWebSurface } from '@/lib/catalog/web-surface'
-import { withListingSections, type PagedItem } from '@/components/visitor/listing/listing-sections'
+import { EAGER_CARDS, productPageItems } from '@/components/visitor/listing/listing-sections'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
@@ -80,19 +79,16 @@ export default async function ProductsPage({
     filterOffers,
   } = await buildListingModel(resolvedSearchParams)
 
-  // Server-renders this page's product cards; useServerPages accumulates page 1..N under one
-  // ?page URL replace per advance (no router.push).
-  const items: PagedItem[] = (products as any[]).map(product => ({
-    key: String(product.id),
-    node: renderProductItem(product, gstEnabled),
-  }))
-  const pagedItems = await withListingSections(items, {
-    page: 'products',
-    surface: await getWebSurface(resolvedSearchParams.layout),
-    pageNum: page,
-    pageSize: LISTING_PAGE_SIZE,
-    total,
-  })
+  // Server-renders this page's product cards; later pages come from loadPage, appended on scroll
+  // without touching the URL.
+  const surface = await getWebSurface(resolvedSearchParams.layout)
+  const pagedItems = await productPageItems(products as any[], gstEnabled, { page: 'products', surface, pageNum: page, pageSize: LISTING_PAGE_SIZE, total }, EAGER_CARDS)
+  async function loadPage(p: number) {
+    'use server'
+    const next = await getListingProducts({ ...resolvedSearchParams, page: String(p) })
+    const rows = await productPageItems(next.products as any[], next.gstEnabled, { page: 'products', surface, pageNum: p, pageSize: LISTING_PAGE_SIZE, total: next.total })
+    return { rows, total: next.total }
+  }
 
   const allCats = categories as any[]
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
@@ -154,6 +150,7 @@ export default async function ProductsPage({
                   />
                 }
                 pagedItems={pagedItems}
+                loadPage={loadPage}
                 page={page}
               />
             ) : (

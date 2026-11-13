@@ -7,7 +7,7 @@ import HoverCard from '@/components/ui/HoverCard'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, Dialog, Field, Fields, StatusBadge, ACTIVE_STATUS, badgeCls, type DataCol } from '@/components/admin/kit'
+import { DataTable, Dialog, Field, Fields, StatusBadge, ACTIVE_STATUS, badgeCls, type DataCol, type LoadPage } from '@/components/admin/kit'
 import BrandsMobileList from './BrandsMobileList'
 
 interface Brand {
@@ -81,6 +81,7 @@ export default function BrandsTable({
   total,
   page,
   pageSize,
+  loadPage,
   isActive,
   search,
   backUrl,
@@ -89,6 +90,7 @@ export default function BrandsTable({
   total: number
   page: number
   pageSize: number
+  loadPage?: LoadPage<Brand>
   isActive?: string
   search?: string
   backUrl: string
@@ -188,6 +190,7 @@ export default function BrandsTable({
     <>
       <DataTable<Brand>
         mode="server"
+        loadPage={loadPage}
         hide={r => gone.has(String(r.id))}
         rows={brands}
         cols={cols}

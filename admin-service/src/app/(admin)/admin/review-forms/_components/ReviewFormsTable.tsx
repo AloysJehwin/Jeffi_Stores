@@ -16,7 +16,7 @@ import {
   StatusBadge,
   ACTIVE_STATUS,
   badgeCls,
-  type DataCol,
+  type DataCol, type LoadPage,
 } from '@/components/admin/kit'
 import ReviewFormsMobileList from './ReviewFormsMobileList'
 
@@ -56,6 +56,7 @@ export default function ReviewFormsTable({
   total,
   page,
   pageSize,
+  loadPage,
   search,
   backUrl,
   formsBase,
@@ -64,6 +65,7 @@ export default function ReviewFormsTable({
   total: number
   page: number
   pageSize: number
+  loadPage?: LoadPage<FormRow>
   search?: string
   backUrl: string
   formsBase: string
@@ -193,6 +195,7 @@ export default function ReviewFormsTable({
     <>
       <DataTable<FormRow>
         mode="server"
+        loadPage={loadPage}
         hide={r => gone.has(String(r.id))}
         rows={forms}
         cols={cols}

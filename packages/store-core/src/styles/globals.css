@@ -419,7 +419,11 @@ body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-botto
 @container (min-width: 798px) { .kpi-grid > div { --cols: var(--kpi-c5); } }
 @container (min-width: 960px) { .kpi-grid > div { --cols: var(--kpi-c6); } }
 /* Every card in a grid is as tall as the tallest kind (one with a delta/sub line). */
-.kpi-grid > div:has(.kpi-extra) > * { min-height: 5.25rem; }
+/* The :has() stays on the subject and hands the height down: as `div:has(.kpi-extra) > *` it made every
+   DOM insert or removal anywhere on the page restyle the whole document, so long lists stalled a little
+   more with each page appended. */
+.kpi-grid > div:has(.kpi-extra) { --kpi-card-min-h: 5.25rem; }
+:where(.kpi-grid > div > *) { min-height: var(--kpi-card-min-h, auto); }
 .kpi-fill { display: flex; flex-direction: column; }
 .kpi-fill > div { flex: 1 1 auto; align-content: stretch; }
 
