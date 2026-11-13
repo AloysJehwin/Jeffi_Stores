@@ -88,3 +88,9 @@ CREATE INDEX IF NOT EXISTS idx_platform_setup_progress_state ON public.platform_
 CREATE INDEX IF NOT EXISTS idx_tenant_messaging_senders_tenant ON public.tenant_messaging_senders USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_archives_owner ON public.tenant_archives USING btree (owner_id, created_at DESC) WHERE (status = 'available');
 CREATE INDEX IF NOT EXISTS idx_tenant_archives_expiry ON public.tenant_archives USING btree (expires_at) WHERE (status <> 'expired');
+-- One live order per domain; failed, cancelled and expired ones free the name.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_domain_orders_live ON public.tenant_domain_orders USING btree (domain) WHERE (status NOT IN ('failed','cancelled','expired'));
+CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_tenant ON public.tenant_domain_orders USING btree (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_inflight ON public.tenant_domain_orders USING btree (next_at) WHERE (status IN ('requested','registering','configuring'));
+CREATE INDEX IF NOT EXISTS idx_tenant_domain_renewals_open ON public.tenant_domain_renewals USING btree (next_at) WHERE (status IN ('due','renewing'));
+CREATE INDEX IF NOT EXISTS idx_tcd_order ON public.tenant_custom_domains USING btree (order_id) WHERE (order_id IS NOT NULL);

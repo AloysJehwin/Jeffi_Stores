@@ -31,6 +31,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const res = await auth(request, id)
   if ('error' in res) return NextResponse.json({ error: res.error }, { status: res.status })
+  if (res.row.order_id) return NextResponse.json({ error: 'This host belongs to a domain you bought; it is managed with that domain.' }, { status: 409 })
   await deleteCustomDomain(id, res.row.tenant_id)
   // Prune its route, certificate and TLS secret; a store not yet running has none to prune.
   if (res.row.status === 'cert-pending' || res.row.status === 'verified') await reconcileDomains(res.row.tenant_id).catch(() => {})

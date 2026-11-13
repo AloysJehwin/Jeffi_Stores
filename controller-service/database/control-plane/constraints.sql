@@ -164,3 +164,12 @@ ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging
 ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_status_check
     CHECK (status IN ('available','restored','expired'));
+ALTER TABLE ONLY public.tenant_domain_orders ADD CONSTRAINT tenant_domain_orders_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_domain_orders ADD CONSTRAINT tenant_domain_orders_status_check
+    CHECK (status IN ('requested','registering','configuring','active','failed','cancelled','expired'));
+ALTER TABLE ONLY public.tenant_domain_orders ADD CONSTRAINT tenant_domain_orders_source_check
+    CHECK (source IN ('dashboard','onboarding'));
+ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_order_term_key UNIQUE (order_id, term_expires_at);
+ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_status_check
+    CHECK (status IN ('due','renewing','done','lapsed','off'));

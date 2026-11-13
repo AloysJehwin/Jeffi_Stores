@@ -65,3 +65,11 @@ ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_owner_id_
     FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_tenant_id_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.tenant_domain_orders ADD CONSTRAINT tenant_domain_orders_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_order_id_fkey
+    FOREIGN KEY (order_id) REFERENCES public.tenant_domain_orders(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_order_id_fkey
+    FOREIGN KEY (order_id) REFERENCES public.tenant_domain_orders(id) ON DELETE CASCADE;
