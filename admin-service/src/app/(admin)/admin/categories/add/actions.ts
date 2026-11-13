@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/shared/db'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { resolveCategoryGoogleCategory } from '@/lib/catalog/google-taxonomy'
+import { canUseAi } from '@/lib/auth/ai-scope'
 import { actionActor, lockNewDraft } from '@/lib/admin/draft-locks'
 import { applyCategoryProfile, reorderIntervalDays } from '@/lib/catalog/category-draft'
 import { CATEGORY_PROFILE_FIELDS } from '@/lib/catalog/category-fields'
@@ -30,10 +31,12 @@ export async function createCategory(formData: FormData) {
   const replacementWindowDays = policyOverride
     ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
     : null
+  const actor = await actionActor()
   const googleProductCategory = await resolveCategoryGoogleCategory(formData.get('google_product_category') as string, {
     name,
     description,
     parentId: parentCategoryId,
+    ai: !!actor?.role && canUseAi(actor.role, actor.scopes ?? [], 'categories:write'),
   })
   const imageUrl = ((formData.get('image_url') as string) || '').trim().slice(0, 500) || null
   const heroMobile = ((formData.get('hero_image_mobile') as string) || '').trim() || null
@@ -74,7 +77,7 @@ export async function createCategory(formData: FormData) {
 
   if (created.rows[0]) {
     await applyCategoryProfile(poolDb, created.rows[0].id, parseFields(CATEGORY_PROFILE_FIELDS, formData))
-    await lockNewDraft(await actionActor(), 'category', created.rows[0].id)
+    await lockNewDraft(actor, 'category', created.rows[0].id)
     await triggerEntityEnrichment('category', created.rows[0].id)
   }
   revalidatePath('/admin/categories')
