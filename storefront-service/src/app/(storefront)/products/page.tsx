@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
+import { listingMetadata } from '@/lib/catalog/listing-seo'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import FilterSidebar from '@/components/visitor/FilterSidebar'
 import { renderProductItem } from '@/components/visitor/listing/listing-items'
@@ -38,6 +40,24 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
   return `/products${qs ? `?${qs}` : ''}`
+}
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}): Promise<Metadata> {
+  const sp = await searchParams
+  const search = sp.search?.trim()
+  const page = Number(sp.page) > 1 ? Number(sp.page) : 1
+  const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'dir', 'order', 'layout'].includes(k))
+  // Filter and search combinations collapse onto /products; result pages stay out of the index.
+  return listingMetadata({
+    title: search ? `Results for "${search}"` : 'All Products',
+    fallbackDescription: search ? `Products matching "${search}".` : 'Browse our full catalogue of products.',
+    path: !filtered && page > 1 ? `/products?page=${page}` : '/products',
+    noindex: !!search,
+  })
 }
 
 export default async function ProductsPage({

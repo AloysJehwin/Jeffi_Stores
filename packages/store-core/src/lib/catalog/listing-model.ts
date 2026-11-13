@@ -8,6 +8,7 @@ import { cardPropsFor, type CardProps } from '@/lib/catalog/product-card-props'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
 import { positiveInt, productOrderBy, productSortSql } from '@/lib/catalog/product-sort'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 // The storefront /products listing: everything app/(storefront)/products/page.tsx reads before it
 // renders, built once for the page and for GET /api/products/listing (the mobile app).
@@ -133,7 +134,7 @@ async function getProducts(searchParams: any) {
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `
 
-  const products = await queryMany(sql, [...params, ...rankParams])
+  const products = publicProducts(await queryMany(sql, [...params, ...rankParams]))
   return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 

@@ -1,8 +1,18 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { responsiveImg } from '@/lib/shared/image-url'
 import { listBrandsWithCounts } from '@/lib/catalog/storefront-counts'
+import { listingMetadata } from '@/lib/catalog/listing-seo'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  return listingMetadata({
+    title: 'All Brands',
+    fallbackDescription: 'Browse products by brand.',
+    path: '/brands',
+  })
+}
 
 export default async function BrandsPage() {
   const brands = await listBrandsWithCounts()
@@ -54,6 +64,7 @@ export default async function BrandsPage() {
                       <h2 className="text-xl font-bold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
                         {brand.name}
                       </h2>
+                      {brand.tagline && <p className="text-sm text-foreground-secondary mt-0.5">{brand.tagline}</p>}
                       <p className="text-sm text-foreground-muted mt-1">
                         {count} {count === 1 ? 'product' : 'products'}
                       </p>

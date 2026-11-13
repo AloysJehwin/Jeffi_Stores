@@ -1,12 +1,12 @@
 import { Platform } from 'react-native'
-import Constants from 'expo-constants'
+import { appVersion } from '../lib/appVersion'
 import * as SecureStore from 'expo-secure-store'
 
 // The mobile backend (mobile-service pod). Override for a local run: EXPO_PUBLIC_API_URL=http://<mac-ip>:3103
 export const BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://mobile.jeffistores.in').replace(/\/$/, '')
 
 // Names the app and its OS in sessions and logs, instead of the bare okhttp/CFNetwork agent.
-export const APP_USER_AGENT = `JeffiStoresApp/${Constants.expoConfig?.version ?? '0'} (${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Platform.Version})`
+export const APP_USER_AGENT = `JeffiStoresApp/${appVersion().version}${appVersion().build ? `+${appVersion().build}` : ''} (${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Platform.Version})`
 
 /** Which account a session belongs to: a customer, or a business (a separate account, as on the web). */
 export type AuthPortal = 'customer' | 'business'

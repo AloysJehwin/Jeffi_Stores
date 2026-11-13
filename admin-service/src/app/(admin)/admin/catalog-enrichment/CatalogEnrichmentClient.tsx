@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, Fragment } from 'react'
+import { ProposedFills } from '@/components/admin/enrichment/ProposedFills'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
@@ -10,6 +11,8 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import EnrichmentOverview from './EnrichmentOverview'
+import EntityEnrichmentPanel from './EntityEnrichmentPanel'
+import { useSearchParams } from 'next/navigation'
 import { TabLinks, useListTab } from '../products/_components/catalog-overview'
 
 interface Item {
@@ -26,6 +29,13 @@ interface Item {
   ai_product_type: string | null
   ai_features: string[] | null
   ai_search_tags: string[] | null
+  short_description?: string | null
+  usage_instructions?: string | null
+  care_instructions?: string | null
+  safety_warnings?: string | null
+  meta_title?: string | null
+  meta_description?: string | null
+  faqs?: { question: string; answer: string }[] | null
   model: string
   status: string
   proposed_at: string
@@ -60,7 +70,8 @@ function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max
 
 export default function CatalogEnrichmentPage() {
   const { showToast } = useToast()
-  const tab = useListTab()
+  const listTab = useListTab()
+  const tab = useSearchParams().get('tab') === 'entities' ? 'entities' : listTab
   const [busyId, setBusyId] = useState<string | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [runningAll, setRunningAll] = useState(false)
@@ -194,6 +205,7 @@ export default function CatalogEnrichmentPage() {
         tabs={[
           { id: 'overview', label: 'Overview' },
           { id: 'list', label: 'Suggestions' },
+          { id: 'entities', label: 'Brands & categories' },
         ]}
         actions={
           tab === 'list' && (
@@ -241,7 +253,9 @@ export default function CatalogEnrichmentPage() {
         }
       />
 
-      {tab === 'overview' ? (
+      {tab === 'entities' ? (
+        <EntityEnrichmentPanel />
+      ) : tab === 'overview' ? (
         <EnrichmentOverview />
       ) : (
         <>
@@ -459,6 +473,7 @@ export default function CatalogEnrichmentPage() {
                                     <TagList tags={item.ai_search_tags} max={20} />
                                   </div>
                                 )}
+                                <ProposedFills item={item} />
                                 {item.error && (
                                   <div>
                                     <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-1">

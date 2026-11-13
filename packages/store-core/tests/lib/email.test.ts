@@ -89,7 +89,7 @@ describe('email.ts', () => {
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       const opts = mockSendAuditedMail.mock.calls[0][0]
       expect(opts.to).toBe('user@example.com')
-      expect(opts.subject).toContain('Verification')
+      expect(opts.subject).toMatch(/verification code/i)
     })
 
     it('includes OTP code in html body', async () => {

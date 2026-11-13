@@ -20,6 +20,8 @@ const DEFS: Record<string, [label: string, description: string, sample: string]>
   productCard: ['Product card', 'Block: product image + name + price', 'card'],
   productName: ['Product name', 'Featured product name', 'Sample Product'],
   productImageUrl: ['Product image URL', 'Use inside an image src', 'https://…'],
+  productSummary: ['Product summary', "The product's short description", 'Compact cordless drill for home projects.'],
+  productHighlights: ['Product highlights', 'Top three features, one line', '18V battery · 2-speed gearbox · LED light'],
   oldPrice: ['Old price', 'Price before the drop', '999'],
   newPrice: ['New price', 'Current price', '799'],
   categoryName: ['Category', 'The category they browsed', 'Power tools'],
@@ -35,14 +37,15 @@ const DEFS: Record<string, [label: string, description: string, sample: string]>
 const OFFER = ['firstName', 'ctaUrl', 'couponCode', 'discountPercent']
 const CART = [...OFFER, 'itemsHtml', 'cartItems', 'itemCount']
 const PRODUCT = [...OFFER, 'productCard', 'productName', 'productImageUrl']
+const PRODUCT_RICH = [...PRODUCT, 'productSummary', 'productHighlights']
 const ORDER = [...OFFER, 'itemsHtml', 'orderNumber']
 
 const EMAIL: Record<string, string[]> = {
   abandoned_cart: CART, high_value_cart: CART, cart_price_drop: CART, wishlist_reminder: CART,
   abandoned_checkout: [...OFFER, 'itemsHtml', 'orderNumber', 'total'],
   post_purchase: ORDER, review_reminder: ORDER,
-  restock: PRODUCT, back_in_stock_wishlist: PRODUCT, review_photo_followup: PRODUCT,
-  price_drop: [...PRODUCT, 'oldPrice', 'newPrice'],
+  restock: PRODUCT_RICH, back_in_stock_wishlist: PRODUCT_RICH, review_photo_followup: PRODUCT,
+  price_drop: [...PRODUCT_RICH, 'oldPrice', 'newPrice'],
   viewed_product: [...OFFER, 'itemsHtml', 'cartItems', 'productName'],
   viewed_category: [...OFFER, 'itemsHtml', 'cartItems', 'categoryName'],
   replenishment: [...OFFER, 'itemsHtml', 'cartItems', 'productName'],

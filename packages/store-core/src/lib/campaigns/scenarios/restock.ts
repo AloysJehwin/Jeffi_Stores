@@ -17,6 +17,7 @@ import {
   syncWishlistSnapshots,
 } from './_wishlist-base'
 import type { ScenarioModule } from '../types'
+import { PRODUCT_CONTENT_SQL, productContentVars } from '@/lib/campaigns/product-content'
 
 interface Params extends Record<string, unknown> {
   maxWatchesPerSweep: number
@@ -69,7 +70,7 @@ export const restock: ScenarioModule<Params, Row> = {
     await syncWishlistSnapshots()
     return queryMany<Row>(
       `
-      SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
+      SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug, ${PRODUCT_CONTENT_SQL},
              EXTRACT(EPOCH FROM wi.snapshot_taken_at)::bigint::text AS out_of_stock_since
       FROM ${SAVED_ITEMS_SQL} wi
       JOIN products p ON p.id = wi.product_id
@@ -107,6 +108,7 @@ export const restock: ScenarioModule<Params, Row> = {
       vars: {
         firstName: user.first_name || 'there',
         productName: row.product_name,
+        ...productContentVars(row),
         productImageUrl,
         productCard,
         couponCode,

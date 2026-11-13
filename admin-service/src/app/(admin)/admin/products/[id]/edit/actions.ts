@@ -65,53 +65,21 @@ async function triggerEnrichment(productId: string) {
   const { aiChat } = await import('@/lib/shared/ai-client')
   const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
   const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+  const enr = await import('@/lib/catalog/enrichment')
   const cacheNamespace = (await resolveTenantId()) ?? 'platform'
-  const SYSTEM_PROMPT = `You write product intelligence data for ${await storeDescriptorForPrompt()}.
-Given a product name, category, brand, and description, produce ALL of the following fields:
-1. ai_description: A clear 1-2 sentence customer-facing description. No marketing fluff.
-2. ai_use_cases: 4-10 short buyer search-intent phrases describing what it is used for. Lowercase, 1-4 words.
-3. ai_keywords: 5-12 synonyms and alternate names buyers use. Lowercase.
-4. ai_who_uses_it: Short phrase on who buys this.
-5. ai_application: One sentence on where/how it is used.
-6. ai_product_type: Normalized product type in 1-3 words.
-7. ai_features: 3-8 key features or specs as short phrases.
-8. ai_search_tags: 5-15 broader semantic search tags.
-Rules: Only use facts from input. Stay within this store's product category; do not assume an industry the input does not show. All arrays lowercase, no duplicates. Strict JSON only.
-Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai_who_uses_it":"...","ai_application":"...","ai_product_type":"...","ai_features":["..."],"ai_search_tags":["..."]}`
+  const SYSTEM_PROMPT = enr.enrichmentSystemPrompt(await storeDescriptorForPrompt())
 
   ;(async () => {
     try {
-      const product = await queryOne<{
-        name: string
-        description: string | null
-        sku: string | null
-        category_name: string | null
-        brand_name: string | null
-        material: string | null
-        size: string | null
-      }>(
-        `SELECT p.name, p.description, p.sku, p.material, p.size,
-                c.name AS category_name, b.name AS brand_name
+      const product = await queryOne<import('@/lib/catalog/enrichment').EnrichSource & { has_faqs: boolean }>(
+        `SELECT ${enr.ENRICH_SELECT},
+                EXISTS (SELECT 1 FROM product_faqs f WHERE f.product_id = p.id) AS has_faqs
            FROM products p
-           LEFT JOIN categories c ON c.id = p.category_id
-           LEFT JOIN brands b ON b.id = p.brand_id
+           ${enr.ENRICH_JOINS}
           WHERE p.id = $1::uuid`,
         [productId]
       )
       if (!product) return
-
-      const userPrompt = [
-        `Name: ${product.name}`,
-        product.category_name ? `Category: ${product.category_name}` : null,
-        product.brand_name ? `Brand: ${product.brand_name}` : null,
-        product.sku ? `SKU: ${product.sku}` : null,
-        product.description ? `Existing description: ${product.description}` : 'Existing description: (empty)',
-        product.material ? `Material: ${product.material}` : null,
-        product.size ? `Size: ${product.size}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n')
-
       const r = await aiChat({
         feature: 'product_copy',
         cacheNamespace,
@@ -120,56 +88,10 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
         temperature: 0.3,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
+          { role: 'user', content: enr.buildEnrichmentPrompt(product, product.has_faqs) },
         ],
       })
-      const raw = r.content
-      let obj: Record<string, unknown>
-      try {
-        obj = JSON.parse(raw)
-      } catch {
-        const m = raw.match(/\{[\s\S]*\}/)
-        if (!m) return
-        obj = JSON.parse(m[0])
-      }
-      const desc = String(obj.ai_description || '').trim()
-      const cleanArr = (v: unknown, max = 40, n = 15) =>
-        !Array.isArray(v)
-          ? []
-          : [
-              ...new Set((v as unknown[]).map(c => String(c).toLowerCase().trim()).filter(c => c && c.length <= max)),
-            ].slice(0, n)
-      const use_cases = cleanArr(obj.ai_use_cases, 50, 12)
-      if (!desc || desc.length < 20 || use_cases.length < 2) return
-
-      await query(
-        `INSERT INTO product_ai_enrichment_log
-           (product_id, source_name, source_desc,
-            ai_description, ai_use_cases, ai_keywords, ai_who_uses_it,
-            ai_application, ai_product_type, ai_features, ai_search_tags,
-            model, status)
-         VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'proposed')`,
-        [
-          productId,
-          product.name,
-          product.description || null,
-          desc,
-          use_cases,
-          cleanArr(obj.ai_keywords, 50, 15),
-          String(obj.ai_who_uses_it || '')
-            .trim()
-            .slice(0, 300),
-          String(obj.ai_application || '')
-            .trim()
-            .slice(0, 500),
-          String(obj.ai_product_type || '')
-            .trim()
-            .slice(0, 100),
-          cleanArr(obj.ai_features, 100, 10),
-          cleanArr(obj.ai_search_tags, 50, 20),
-          r.model,
-        ]
-      )
+      await enr.insertEnrichmentProposal(product, enr.parseEnrichment(r.content), r.model)
     } catch {
       void 0
     }

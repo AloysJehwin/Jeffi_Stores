@@ -21,6 +21,10 @@ interface Category {
   slug: string
 }
 
+interface Brand extends Category {
+  logo_url: string | null
+}
+
 interface SearchBarProps {
   isOpen: boolean
   onOpen: () => void
@@ -48,6 +52,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
   const [query, setQuery] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const [searchHistory, setSearchHistory] = useState<string[]>([])
@@ -59,13 +64,16 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
   const skipFetchRef = useRef(false)
   const router = useRouter()
 
-  const totalItems = categories.length + products.length
+  // Keyboard order: categories, then brands, then products.
+  const leadCount = categories.length + brands.length
+  const totalItems = leadCount + products.length
 
   const close = useCallback(() => {
     onClose()
     setQuery('')
     setProducts([])
     setCategories([])
+    setBrands([])
     setActiveIdx(-1)
   }, [onClose])
 
@@ -108,6 +116,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
     if (query.trim().length < 2) {
       setProducts([])
       setCategories([])
+      setBrands([])
       return
     }
 
@@ -123,11 +132,13 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
           const data = await res.json()
           setProducts(data.products || [])
           setCategories(data.categories || [])
+          setBrands(data.brands || [])
         }
       } catch (err: unknown) {
         if ((err as { name?: string }).name !== 'AbortError') {
           setProducts([])
           setCategories([])
+          setBrands([])
         }
       } finally {
         setIsLoading(false)
@@ -163,7 +174,12 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
       setQuery(typedQueryRef.current)
     } else {
       const catCount = categories.length
-      const name = idx < catCount ? categories[idx].name : products[idx - catCount].name
+      const name =
+        idx < catCount
+          ? categories[idx].name
+          : idx < leadCount
+            ? brands[idx - catCount].name
+            : products[idx - leadCount].name
       setQuery(name)
     }
   }
@@ -195,8 +211,10 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
       const catCount = categories.length
       if (activeIdx < catCount) {
         router.push(`${basePath}?category=${categories[activeIdx].slug}`)
+      } else if (activeIdx < leadCount) {
+        router.push(`${basePath}?brand=${brands[activeIdx - catCount].slug}`)
       } else {
-        router.push(`${basePath}/${products[activeIdx - catCount].slug}`)
+        router.push(`${basePath}/${products[activeIdx - leadCount].slug}`)
       }
       close()
     }
@@ -211,7 +229,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
     }
   }
 
-  const hasResults = categories.length > 0 || products.length > 0
+  const hasResults = totalItems > 0
   const showHistoryPanel = isOpen && query.trim().length === 0 && searchHistory.length > 0
   const showResultsPanel = isOpen && !showHistoryPanel && (query.trim().length >= 2 || isLoading)
 
@@ -282,7 +300,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Search products, categories..."
+              placeholder="Search products, brands, categories..."
               autoComplete="off"
               tabIndex={isOpen ? 0 : -1}
               className="w-full pl-11 pr-28 sm:pr-24 py-3 rounded-full border border-border-secondary bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 text-base sm:text-sm shadow-lg [&::-webkit-search-cancel-button]:appearance-none"
@@ -295,6 +313,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                     setQuery('')
                     setProducts([])
                     setCategories([])
+                    setBrands([])
                     inputRef.current?.focus()
                   }}
                   className="p-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
@@ -417,13 +436,46 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                     </>
                   )}
 
+                  {brands.length > 0 && (
+                    <>
+                      <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                        Brands
+                      </p>
+                      {brands.map((brand, idx) => {
+                        const itemIdx = categories.length + idx
+                        return (
+                          <Link
+                            key={brand.id}
+                            href={`${basePath}?brand=${brand.slug}`}
+                            onClick={() => {
+                              saveSearchHistory(typedQueryRef.current.trim())
+                              close()
+                            }}
+                            className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === itemIdx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
+                          >
+                            <span className="flex-shrink-0 w-7 h-7 rounded-md bg-surface-secondary border border-border-default overflow-hidden flex items-center justify-center text-xs font-semibold text-foreground-secondary">
+                              {brand.logo_url ? (
+                                <img src={brand.logo_url} alt="" className="w-full h-full object-contain p-0.5" />
+                              ) : (
+                                brand.name.charAt(0).toUpperCase()
+                              )}
+                            </span>
+                            <span className="text-sm text-foreground">
+                              <Highlight text={brand.name} query={query} />
+                            </span>
+                          </Link>
+                        )
+                      })}
+                    </>
+                  )}
+
                   {products.length > 0 && (
                     <>
                       <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
                         Products
                       </p>
                       {products.map((product, idx) => {
-                        const itemIdx = categories.length + idx
+                        const itemIdx = leadCount + idx
                         const primaryImage =
                           product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
                         const displayPrice =

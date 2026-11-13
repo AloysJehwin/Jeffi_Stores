@@ -117,8 +117,14 @@ function buildItemLengthWidth(product: any, marketplaceId: string) {
   ]
 }
 
-function buildUnitCount(marketplaceId: string) {
-  return [{ value: 1, type: { value: 'count', language_tag: 'en_IN' }, marketplace_id: marketplaceId }]
+const UNIT_TYPES: Record<string, string> = { pcs: 'count', pair: 'count', set: 'count', g: 'gram', kg: 'kilogram', ml: 'millilitre', l: 'litre' }
+
+// Net quantity as Amazon's unit count when the product declares one; else one item.
+function buildUnitCount(marketplaceId: string, product?: any) {
+  const n = Number(product?.net_quantity)
+  const type = UNIT_TYPES[String(product?.net_quantity_unit ?? '')]
+  const [value, unit] = n > 0 && type ? [n, type] : [1, 'count']
+  return [{ value, type: { value: unit, language_tag: 'en_IN' }, marketplace_id: marketplaceId }]
 }
 
 function buildItemTypeName(product: any, marketplaceId: string) {
@@ -139,7 +145,7 @@ function buildProductIdentity(product: any, marketplaceId: string, variant?: any
 }
 
 function buildModelNumber(product: any, marketplaceId: string, variant?: any): Record<string, unknown> {
-  const model = variant?.mpn || product.mpn || variant?.sku || product.sku
+  const model = variant?.mpn || product.model_number || product.mpn || variant?.sku || product.sku
   return model ? { model_number: attr(String(model), marketplaceId) } : {}
 }
 
@@ -150,8 +156,10 @@ const STORE_CONTACT_TEXT =
   'Jeffi Stores, Sanjay Gandhi Chowk, Opposite Arihant Complex, Station Road, Raipur, ' +
   'Chhattisgarh 492001, India. Phone: +919685354099. Email: admin@jeffistores.in'
 
-function contactInfoAttr(marketplaceId: string, contactText?: string) {
-  return [{ value: contactText || STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: marketplaceId }]
+function contactInfoAttr(marketplaceId: string, contactText?: string, name?: string | null, address?: string | null) {
+  // The product's own declaration (Legal Metrology fields) wins over the store contact.
+  const own = [name, address].map(v => String(v ?? '').trim()).filter(Boolean).join(', ')
+  return [{ value: own || contactText || STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: marketplaceId }]
 }
 
 // external_product_information carries the HSN code on the India marketplace.
@@ -162,13 +170,18 @@ function externalProductInfoAttr(product: any, marketplaceId: string) {
 }
 
 function buildColorAndComponents(product: any, marketplaceId: string): Record<string, unknown> {
-  const out: Record<string, unknown> = { included_components: attr('Handle', marketplaceId) }
+  const box = String(product.in_the_box ?? '').split(/\n+/).map((l: string) => l.trim()).filter(Boolean).join(', ')
+  const out: Record<string, unknown> = { included_components: attr(box || 'Handle', marketplaceId) }
   if (product.color) out.color = attr(product.color, marketplaceId)
   return out
 }
 
 function buildImageAttributes(product: any, marketplaceId: string): Record<string, unknown> {
-  const images = (product.product_images || []).filter((img: any) => img.image_url)
+  // product_media is the current gallery; product_images is the legacy fallback.
+  const media: string[] = Array.isArray(product.media_image_urls) ? product.media_image_urls.filter(Boolean) : []
+  const images = media.length
+    ? media.map((url, i) => ({ id: `m${i}`, image_url: url, is_primary: i === 0 }))
+    : (product.product_images || []).filter((img: any) => img.image_url)
   const primary = images.find((img: any) => img.is_primary) || images[0]
   const others = images.filter((img: any) => img.id !== primary?.id).slice(0, 8)
   const out: Record<string, unknown> = {}
@@ -225,6 +238,8 @@ function childVariationAttrs(parentSku: string, marketplaceId: string): Record<s
   }
 }
 
+const CONDITION: Record<string, string> = { new: 'new_new', refurbished: 'refurbished_refurbished', used: 'used_good', open_box: 'used_like_new' }
+
 // Attributes shared by every SKU (parent + children + simple).
 function buildCommonAttributes(
   product: any,
@@ -232,10 +247,10 @@ function buildCommonAttributes(
   marketplaceId: string,
   contactText?: string
 ): Record<string, unknown> {
-  const description = (product.description || product.name || '').slice(0, 2000)
-  const bullets = buildProductHighlights(product).slice(0, 5)
+  const description = (product.description || product.ai_description || product.name || '').slice(0, 2000)
+  const bullets = (buildProductHighlights(product) ?? []).slice(0, 5)
   const common: Record<string, unknown> = {
-    condition_type: attr('new_new', marketplaceId),
+    condition_type: attr(CONDITION[product.condition] ?? 'new_new', marketplaceId),
     product_description: attr(description, marketplaceId),
     supplier_declared_dg_hz_regulation: attr('not_applicable', marketplaceId),
     batteries_required: attr(false, marketplaceId),
@@ -243,17 +258,25 @@ function buildCommonAttributes(
     item_type_name: buildItemTypeName(product, marketplaceId),
     item_weight: buildItemWeight(product, marketplaceId),
     item_length_width: buildItemLengthWidth(product, marketplaceId),
-    unit_count: buildUnitCount(marketplaceId),
-    rtip_manufacturer_contact_information: contactInfoAttr(marketplaceId, contactText),
-    importer_contact_information: contactInfoAttr(marketplaceId, contactText),
-    packer_contact_information: contactInfoAttr(marketplaceId, contactText),
+    unit_count: buildUnitCount(marketplaceId, product),
+    rtip_manufacturer_contact_information: contactInfoAttr(marketplaceId, contactText, product.manufacturer_name, product.manufacturer_address),
+    importer_contact_information: contactInfoAttr(marketplaceId, contactText, product.importer_name, product.importer_address),
+    packer_contact_information: contactInfoAttr(marketplaceId, contactText, product.packer_name, product.packer_address),
     ...buildColorAndComponents(product, marketplaceId),
     ...buildImageAttributes(product, marketplaceId),
   }
   const epi = externalProductInfoAttr(product, marketplaceId)
   if (epi) common.external_product_information = epi
   if (brandName) common.brand = attr(brandName, marketplaceId)
-  if (brandName) common.manufacturer = attr(brandName, marketplaceId)
+  const maker = product.manufacturer_name || brandName
+  if (maker) common.manufacturer = attr(maker, marketplaceId)
+  if (product.brand_part_number) common.part_number = attr(product.brand_part_number, marketplaceId)
+  if (product.safety_warnings) common.safety_warning = attr(String(product.safety_warnings).slice(0, 1000), marketplaceId)
+  const months = Number(product.warranty_months)
+  if (months > 0)
+    common.warranty_description = attr(`${months} month${months === 1 ? '' : 's'}${product.warranty_type ? ` ${product.warranty_type}` : ''} warranty`, marketplaceId)
+  const keywords = [...(product.ai_keywords ?? []), ...(product.ai_search_tags ?? [])].filter(Boolean)
+  if (keywords.length) common.generic_keyword = attr([...new Set(keywords)].join(' ').slice(0, 250), marketplaceId)
   if (bullets.length) common.bullet_point = bullets.map(b => ({ value: b, marketplace_id: marketplaceId }))
   if (product.material) common.material = attr(product.material, marketplaceId)
   return common

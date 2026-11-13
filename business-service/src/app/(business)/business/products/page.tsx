@@ -18,6 +18,7 @@ import { round2 } from '@/lib/catalog/gst'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import { bp } from '@/lib/shared/business-path'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 const PAGE_SIZE = 60
 
@@ -131,7 +132,7 @@ async function getProducts(searchParams: any) {
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `
 
-  const products = await queryMany(sql, [...params, ...rankParams])
+  const products = publicProducts(await queryMany(sql, [...params, ...rankParams]))
   return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 

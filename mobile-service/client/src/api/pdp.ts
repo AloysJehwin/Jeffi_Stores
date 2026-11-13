@@ -95,6 +95,7 @@ export interface PdpProduct {
   slug: string
   sku: string
   description?: string | null
+  return_window_days?: number | string | null
   base_price: number | string
   mrp?: number | string | null
   price_ex_gst?: number | string | null

@@ -6,6 +6,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Card, Dialog, StatusBadge, useActionToast, type StatusMap } from '@/components/admin/kit'
 import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { useEnrichment } from './hooks'
+import { ProposedFills } from '@/components/admin/enrichment/ProposedFills'
 
 const ENRICHMENT_STATUS: StatusMap = {
   proposed: { label: 'proposed', tone: 'amber' },
@@ -152,6 +153,7 @@ export function AiEnrichmentDialog({ productId, onClose, onApproved }: { product
           <Tags label="Keywords" tags={item.ai_keywords} />
           <Tags label="Features" tags={item.ai_features} />
           <Tags label="Search Tags" tags={item.ai_search_tags} />
+          <ProposedFills item={item} />
           {item.error && (
             <Fact label="Embed Error" danger>
               <p className="text-xs text-red-600 dark:text-red-400">{item.error}</p>

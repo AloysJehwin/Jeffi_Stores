@@ -1884,3 +1884,6 @@ CREATE INDEX IF NOT EXISTS idx_product_media_root ON public.product_media USING 
 CREATE INDEX IF NOT EXISTS idx_product_media_variant ON public.product_media USING btree (variant_id) WHERE (variant_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_product_media_sub_variant ON public.product_media USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_product_faqs_product ON public.product_faqs USING btree (product_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_category_faqs_category ON public.category_faqs USING btree (category_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_entity_ai_log_entity ON public.entity_ai_enrichment_log USING btree (entity_type, entity_id, proposed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_entity_ai_log_status ON public.entity_ai_enrichment_log USING btree (status, proposed_at DESC);

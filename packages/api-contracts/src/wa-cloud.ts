@@ -4,13 +4,15 @@
 /**
  * An AWS template reference: `aws:<metaName>:<lang>`, optionally followed by `|h=<slot>:<kind>` for a
  * header media slot and `|b=<slot>@<index>` per URL button with a variable. The numbered slots are
- * the planSlots() layout, so the same variable map serves Twilio and AWS.
+ * the planSlots() layout, so the same variable map serves Twilio and AWS. `|otp` marks an
+ * AUTHENTICATION template with a copy-code button: sends repeat the code ({{1}}) as button 0's parameter.
  */
 export interface AwsTemplateRef {
   name: string
   lang: string
   header?: { slot: string; kind: 'image' | 'video' | 'document' }
   buttons: Array<{ slot: string; index: number }>
+  otp?: boolean
 }
 
 export function isAwsTemplateRef(ref: string | null | undefined): boolean {
@@ -21,6 +23,7 @@ export function formatAwsTemplateRef(r: AwsTemplateRef): string {
   let s = `aws:${r.name}:${r.lang}`
   if (r.header) s += `|h=${r.header.slot}:${r.header.kind}`
   for (const b of r.buttons) s += `|b=${b.slot}@${b.index}`
+  if (r.otp) s += '|otp'
   return s
 }
 
@@ -34,6 +37,7 @@ export function parseAwsTemplateRef(ref: string): AwsTemplateRef {
     if (h) out.header = { slot: h[1], kind: h[2] as 'image' | 'video' | 'document' }
     const b = /^b=(\d+)@(\d+)$/.exec(p)
     if (b) out.buttons.push({ slot: b[1], index: Number(b[2]) })
+    if (p === 'otp') out.otp = true
   }
   return out
 }
@@ -74,6 +78,9 @@ export function cloudTemplate(to: string, ref: AwsTemplateRef, vars: Record<stri
   for (const b of ref.buttons) {
     if (vars[b.slot] === undefined) continue
     components.push({ type: 'button', sub_type: 'url', index: String(b.index), parameters: [{ type: 'text', text: String(vars[b.slot]) }] })
+  }
+  if (ref.otp && vars['1'] !== undefined) {
+    components.push({ type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: String(vars['1']) }] })
   }
   return { ...base(to), type: 'template', template: { name: ref.name, language: { code: ref.lang }, ...(components.length ? { components } : {}) } }
 }

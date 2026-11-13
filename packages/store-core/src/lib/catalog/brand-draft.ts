@@ -1,6 +1,14 @@
 import { mergeAndPublish, type DraftAdapter } from '@/lib/admin/draft-branches'
 import type { Resolution } from '@/lib/admin/draft-merge'
 import type { DraftActor, DraftDb } from '@/lib/admin/draft-locks'
+import { BRAND_PROFILE_FIELDS } from './brand-fields'
+import { contentOfSpecs, specLabels, specUpdate } from './entity-fields'
+
+/** Writes the profile columns (brand-fields.ts) present in `f`; older drafts without them keep live values. */
+export async function applyBrandProfile(db: DraftDb, brandId: string, f: Record<string, unknown>) {
+  const upd = specUpdate(BRAND_PROFILE_FIELDS, f, 2)
+  if (upd) await db.query(`UPDATE brands SET ${upd.set} WHERE id = $1`, [brandId, ...upd.params])
+}
 
 const slugOf = (name: unknown) =>
   typeof name === 'string' && name
@@ -43,19 +51,24 @@ export async function applyBrandContent(db: DraftDb, brandId: string, f: Record<
       f.replacement_window_days != null ? parseInt(f.replacement_window_days) : null,
     ]
   )
+  await applyBrandProfile(db, brandId, f)
   if (f.is_active != null && f.is_active !== prevIsActive) {
     await db.query(`UPDATE products SET is_active = $1 WHERE brand_id = $2`, [f.is_active, brandId])
   }
 }
 
-const CONTENT_COLS = [
+const BASE_COLS = [
   'name', 'slug', 'description', 'website', 'logo_url', 'is_active',
   'return_allowed', 'return_window_days', 'replacement_allowed', 'replacement_window_days',
 ] as const
+const CONTENT_COLS = [...BASE_COLS, ...BRAND_PROFILE_FIELDS.map(f => f.key)]
 
 /** A brands row in the shape the edit form saves. */
 export function brandContentOf(row: Record<string, any>): Record<string, unknown> {
-  return Object.fromEntries(CONTENT_COLS.map(k => [k, row[k] ?? null]))
+  return {
+    ...Object.fromEntries(BASE_COLS.map(k => [k, row[k] ?? null])),
+    ...contentOfSpecs(BRAND_PROFILE_FIELDS, row),
+  }
 }
 
 export async function liveBrandContent(db: DraftDb, brandId: string): Promise<Record<string, unknown> | null> {
@@ -68,6 +81,7 @@ export const brandDrafts: DraftAdapter = {
   table: 'brand_drafts',
   entityKey: 'brand_id',
   labels: {
+    ...specLabels(BRAND_PROFILE_FIELDS),
     logo_url: 'Logo',
     is_active: 'Active',
     return_allowed: 'Returns allowed',

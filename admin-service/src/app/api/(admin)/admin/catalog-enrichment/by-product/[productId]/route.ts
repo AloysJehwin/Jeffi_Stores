@@ -25,6 +25,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prod
     ai_product_type: string | null
     ai_features: string[] | null
     ai_search_tags: string[] | null
+    short_description: string | null
+    usage_instructions: string | null
+    care_instructions: string | null
+    safety_warnings: string | null
+    meta_title: string | null
+    meta_description: string | null
+    faqs: { question: string; answer: string }[] | null
     model: string
     status: string
     proposed_at: string
@@ -33,6 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prod
     `SELECT id::text, product_id::text, source_desc,
             ai_description, ai_use_cases, ai_keywords, ai_who_uses_it,
             ai_application, ai_product_type, ai_features, ai_search_tags,
+            short_description, usage_instructions, care_instructions, safety_warnings,
+            meta_title, meta_description, faqs,
             model, status, proposed_at, error
        FROM product_ai_enrichment_log
       WHERE product_id = $1::uuid

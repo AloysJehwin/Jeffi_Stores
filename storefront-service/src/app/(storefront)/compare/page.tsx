@@ -15,6 +15,7 @@ import CompareChangeButton from '@/components/visitor/CompareChangeButton'
 import CompareAddButton from '@/components/visitor/CompareAddButton'
 import CopySku from '@/components/ui/CopySku'
 import { round2 } from '@/lib/catalog/gst'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,7 @@ async function getProductsByIds(ids: string[], gstEnabled: boolean) {
     WHERE p.id IN (${placeholders}) AND p.is_active = true
   `,
     ids
-  )
+  ).then(publicProducts)
 }
 
 async function getDefaultCompareIds(seedId?: string): Promise<string[]> {

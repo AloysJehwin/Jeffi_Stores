@@ -158,23 +158,39 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   },
   {
     name: 'get_product',
-    description: 'Fetch full product details by id or slug. Use after a search to elaborate on one product.',
+    description:
+      "Fetch full product details by id or slug: description, features, what's in the box, how to use, care, safety, warranty, return window, maker/importer, specifications and FAQs. Use after a search, or to answer a question about one product. Answer only from these fields.",
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' }, slug: { type: 'string' } },
     },
     handler: async ({ id, slug }) => {
       if (!id && !slug) throw new Error('Provide id or slug')
-      const row = await queryOne(
+      const row = await queryOne<Record<string, unknown>>(
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.stock_status
+                p.stock_status, b.name AS brand, c.name AS category,
+                p.ai_features AS features, p.ai_use_cases AS use_cases, p.color, p.material, p.size,
+                p.model_number, p.series, p.pack_size, p.net_quantity, p.net_quantity_unit,
+                p.in_the_box, p.usage_instructions, p.care_instructions, p.safety_warnings,
+                p.warranty_months, p.warranty_type,
+                COALESCE(p.return_window_days, b.return_window_days, c.return_window_days) AS return_window_days,
+                p.replacement_policy, p.country_of_origin, p.manufacturer_name, p.importer_name,
+                p.consumer_care, p.best_before, p.moq, p.lead_time_days, p.specifications,
+                (SELECT json_agg(json_build_object('q', f.question, 'a', f.answer) ORDER BY f.sort_order)
+                   FROM product_faqs f WHERE f.product_id = p.id AND f.published) AS faqs
            FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+           LEFT JOIN categories c ON c.id = p.category_id
           WHERE (p.id::text = $1 OR p.slug = $2) AND p.is_active = TRUE
           LIMIT 1`,
         [id || '', slug || '']
       )
-      return row || { error: 'Product not found' }
+      if (!row) return { error: 'Product not found' }
+      // Drop empty fields so the model only sees what the store declared.
+      return Object.fromEntries(
+        Object.entries(row).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && !v.length) && !(typeof v === 'object' && !Array.isArray(v) && !Object.keys(v as object).length))
+      )
     },
   },
   {

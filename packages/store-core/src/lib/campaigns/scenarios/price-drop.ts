@@ -17,6 +17,7 @@ import {
   syncWishlistSnapshots,
 } from './_wishlist-base'
 import type { ScenarioModule } from '../types'
+import { PRODUCT_CONTENT_SQL, productContentVars } from '@/lib/campaigns/product-content'
 
 interface Params extends Record<string, unknown> {
   priceDropThresholdPct: number
@@ -79,7 +80,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
     const factor = (100 - params.priceDropThresholdPct) / 100
     return queryMany<Row>(
       `
-      SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
+      SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug, ${PRODUCT_CONTENT_SQL},
              wi.snapshot_price::text AS snapshot_price,
              p.base_price::text AS current_price
       FROM ${SAVED_ITEMS_SQL} wi
@@ -124,6 +125,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
       vars: {
         firstName: user.first_name || 'there',
         productName: row.product_name,
+        ...productContentVars(row),
         productImageUrl,
         productCard,
         oldPrice: Math.round(oldPrice).toString(),

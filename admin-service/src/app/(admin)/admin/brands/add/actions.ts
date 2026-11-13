@@ -6,6 +6,12 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/shared/db'
 import { actionActor, lockNewDraft } from '@/lib/admin/draft-locks'
+import { applyBrandProfile } from '@/lib/catalog/brand-draft'
+import { BRAND_PROFILE_FIELDS } from '@/lib/catalog/brand-fields'
+import { parseFields } from '@/lib/catalog/entity-fields'
+import { triggerEntityEnrichment } from '@/lib/catalog/entity-enrichment'
+
+const poolDb = { query: (t: string, p?: unknown[]) => query(t, p) } as any
 
 export async function createBrand(formData: FormData) {
   const name = formData.get('name') as string
@@ -42,7 +48,11 @@ export async function createBrand(formData: FormData) {
       ]
     )
 
-    if (created.rows[0]) await lockNewDraft(await actionActor(), 'brand', created.rows[0].id)
+    if (created.rows[0]) {
+      await applyBrandProfile(poolDb, created.rows[0].id, parseFields(BRAND_PROFILE_FIELDS, formData))
+      await lockNewDraft(await actionActor(), 'brand', created.rows[0].id)
+      await triggerEntityEnrichment('brand', created.rows[0].id)
+    }
     revalidatePath('/admin/brands')
 
     const host = await getHost()

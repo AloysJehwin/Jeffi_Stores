@@ -21,18 +21,26 @@ CREATE TRIGGER orders_search_vector_trig BEFORE INSERT OR UPDATE OF order_number
 
 
 --
--- Name: products products_search_vector_trig; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER products_search_vector_trig BEFORE INSERT OR UPDATE OF name, sku, short_description, description ON public.products FOR EACH ROW EXECUTE FUNCTION public.products_search_vector_update();
-
-
-
---
 -- Name: brands trg_audit_brands; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_audit_brands AFTER INSERT OR DELETE OR UPDATE ON public.brands FOR EACH ROW EXECUTE FUNCTION public.audit_row_change();
+
+
+
+--
+-- Name: brands trg_brands_search_vector; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_brands_search_vector AFTER UPDATE OF name ON public.brands FOR EACH ROW WHEN (OLD.name IS DISTINCT FROM NEW.name) EXECUTE FUNCTION public.refresh_product_search_vectors();
+
+
+
+--
+-- Name: categories trg_categories_search_vector; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_categories_search_vector AFTER UPDATE OF name, parent_category_id ON public.categories FOR EACH ROW WHEN (OLD.name IS DISTINCT FROM NEW.name OR OLD.parent_category_id IS DISTINCT FROM NEW.parent_category_id) EXECUTE FUNCTION public.refresh_product_search_vectors();
 
 
 
@@ -241,6 +249,14 @@ CREATE TRIGGER trg_audit_variant_images AFTER INSERT OR DELETE OR UPDATE ON publ
 --
 
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+
+--
+-- Name: brands update_brands_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_brands_updated_at BEFORE UPDATE ON public.brands FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 

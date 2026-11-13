@@ -12,6 +12,7 @@ import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { cooldownMinutes } from '../duration'
 import { NOT_RECENTLY_EMAILED_SQL, SAVED_ITEMS_SQL, settleWishlistEvent, syncWishlistSnapshots } from './_wishlist-base'
 import type { ScenarioModule } from '../types'
+import { PRODUCT_CONTENT_SQL, productContentVars } from '@/lib/campaigns/product-content'
 
 interface Params extends Record<string, unknown> {
   maxWatchesPerSweep: number
@@ -69,7 +70,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
     await syncWishlistSnapshots()
     return queryMany<Row>(
       `
-      SELECT wi.user_id::text, wi.product_id::text, p.name AS product_name, p.slug AS product_slug,
+      SELECT wi.user_id::text, wi.product_id::text, p.name AS product_name, p.slug AS product_slug, ${PRODUCT_CONTENT_SQL},
              EXTRACT(EPOCH FROM wi.snapshot_taken_at)::bigint::text AS out_of_stock_since
       FROM ${SAVED_ITEMS_SQL} wi
       JOIN users u ON u.id = wi.user_id
@@ -147,6 +148,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
       vars: {
         firstName: user.first_name || 'there',
         productName: row.product_name,
+        ...productContentVars(row),
         productCard,
         couponCode,
         discountPercent,
