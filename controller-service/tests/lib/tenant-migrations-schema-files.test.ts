@@ -39,6 +39,21 @@ describe('schema file manifest', () => {
     expect(refs.length).toBeGreaterThan(0)
     expect([...new Set(refs.filter(r => !created.has(r)))]).toEqual([])
   })
+  // The one-off that drops flagship-only tables from stores provisioned before the split (held until a live inventory).
+  const CONVERGE = '2026-11-13_drop_platform_tables_from_stores.sql'
+  it('lets the store convergence migration name only flagship-only tables, and skip the flagship', () => {
+    const dir = path.join(root, 'controller-service', 'database', 'migrations')
+    const file = [path.join(dir, CONVERGE), path.join(dir, 'held', CONVERGE)].find(f => fs.existsSync(f))
+    if (!file) return // applied everywhere and deleted
+    const body = fs.readFileSync(file, 'utf8')
+    const named = [...body.slice(body.indexOf('ARRAY['), body.indexOf('];')).matchAll(/'(\w+)'/g)].map(m => m[1])
+    const tenantTables = new Set(
+      tenantSchemaFiles().flatMap(f => [...fs.readFileSync(f, 'utf8').matchAll(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:public\.)?"?(\w+)/gi)].map(m => m[1]))
+    )
+    expect(named.length).toBeGreaterThan(0)
+    expect(named.filter(n => tenantTables.has(n))).toEqual([])
+    expect(body).toMatch(/to_regclass\('public\.plans'\)[\s\S]*RETURN;[\s\S]*FOREACH/)
+  })
   it('keeps tenant migrations off platform-only and control-plane tables', () => {
     const tenantTables = new Set(
       tenantSchemaFiles().flatMap(f => [...fs.readFileSync(f, 'utf8').matchAll(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:public\.)?"?(\w+)/gi)].map(m => m[1]))
@@ -47,7 +62,7 @@ describe('schema file manifest', () => {
       .flatMap(f => [...fs.readFileSync(f, 'utf8').matchAll(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:public\.)?"?(\w+)/gi)].map(m => m[1]))
       .filter(t => !tenantTables.has(t))
     expect(flagshipOnly.length).toBeGreaterThan(0)
-    const touched = migrationFiles('tenant').flatMap(f => {
+    const touched = migrationFiles('tenant').filter(f => path.basename(f) !== CONVERGE).flatMap(f => {
       const body = fs.readFileSync(f, 'utf8').replace(/--[^\n]*/g, '')
       return flagshipOnly.filter(t => new RegExp(`\\b(?:public\\.)?${t}\\b`, 'i').test(body)).map(t => `${path.basename(f)}: ${t}`)
     })
