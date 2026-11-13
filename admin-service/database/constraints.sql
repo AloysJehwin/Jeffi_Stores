@@ -1702,12 +1702,6 @@ ALTER TABLE ONLY public.gallery_videos
 ALTER TABLE ONLY public.gallery_videos
     ADD CONSTRAINT gallery_videos_source_check CHECK (source IN ('upload','ai','import')) NOT VALID;
 
-ALTER TABLE ONLY public.ai_prompt_presets
-    ADD CONSTRAINT ai_prompt_presets_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.ai_prompt_presets
-    ADD CONSTRAINT ai_prompt_presets_kind_check CHECK (kind IN ('image','video')) NOT VALID;
-
 ALTER TABLE ONLY public.payments ADD CONSTRAINT payments_gateway_account_check CHECK (gateway_account IS NULL OR gateway_account IN ('platform','own')) NOT VALID;
 ALTER TABLE ONLY public.orders ADD CONSTRAINT orders_dispute_status_check CHECK (dispute_status IS NULL OR dispute_status IN ('open','under_review','won','lost','closed')) NOT VALID;
 

@@ -68,6 +68,12 @@ export const tenantWorkloadNames = (slug: string) => [
   tenantServiceName(slug, 'messaging'),
   tenantServiceName(slug, 'documents'),
 ]
+/** A store service the release rolls on its own across every store (rollout.sh `stores <part>`). */
+export type StorePart = ServiceRole | BackingService
+export const STORE_PARTS: readonly StorePart[] = [...STORE_ROLES, 'messaging', 'documents']
+/** One store service's Deployment/Service/HPA/PDB name. */
+export const tenantPartName = (slug: string, part: StorePart) =>
+  part === 'messaging' || part === 'documents' ? tenantServiceName(slug, part) : tenantRoleName(slug, part)
 /** IngressRoutes the renderer owns (custom-{domain} ones are pruned by label). */
 export const TENANT_ROUTE_NAMES = ['controller', 'store', 'admin', 'business', 'documents', 'razorpay-webhook']
 /** Earlier store Deployment names (Service and IngressRoute were `storefront`); retired once the controller serves. */

@@ -112,8 +112,11 @@ export async function restoreTenantDb(
     await client.query('BEGIN')
     await client.query(`SET session_replication_role = replica`) // disable FK + triggers for the load
 
+    // An archive of an older store database can hold platform-only tables the tenant schema no longer has.
+    const present = new Set(await listTables(client))
     for (const t of archive.tables) {
       const q = quoteIdent(t.table)
+      if (!present.has(t.table)) continue
       await client.query(`TRUNCATE public.${q} CASCADE`)
       if (t.rows.length === 0) {
         tableCount++
