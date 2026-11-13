@@ -20,6 +20,7 @@ import { B2B_ENTITY } from '@/lib/filters/entities/business-customers'
 import { B2B_ALIASES, B2B_FIELDS, B2B_SEARCH } from '@/lib/filters/fields/business-customers'
 import BusinessCustomersTable from './_components/BusinessCustomersTable'
 import B2bCustomersOverview from './_components/B2bCustomersOverview'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 const PAGE_SIZE = 25
 
@@ -58,29 +59,35 @@ async function BusinessCustomersStats({ q, resolved, host }: { q: FilterQuery; r
   )
 }
 
+async function customerPage(q: FilterQuery, page: number, sp: SP, host: string) {
+  const { rows, total } = await listBusinessCustomers(q, page, PAGE_SIZE, { get: k => sp[k] ?? null })
+  return {
+    total,
+    rows: rows.map(c => ({
+      user_id: c.user_id,
+      email: c.email,
+      first_name: c.first_name,
+      last_name: c.last_name,
+      company_name: c.company_name,
+      gst_number: c.gst_number,
+      industry: c.industry,
+      approval_status: c.approval_status,
+      created_at: c.created_at,
+      href: ap(`/admin/business/customers/${c.user_id}/view`, host),
+    })),
+  }
+}
+
 async function BusinessCustomersListContent({ q, page: pageParam, sp, host }: { q: FilterQuery; page?: string; sp: SP; host: string }) {
   const page = Math.max(1, parseInt(pageParam || '1', 10) || 1)
-  const { rows: customers, total } = await listBusinessCustomers(q, page, PAGE_SIZE, { get: k => sp[k] ?? null })
+  const { rows: customers, total } = await customerPage(q, page, sp, host)
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/business/customers')
+    return customerPage(q, p, sp, host)
+  }
 
-  return (
-    <BusinessCustomersTable
-      total={total}
-      page={page}
-      pageSize={PAGE_SIZE}
-      customers={customers.map(c => ({
-        user_id: c.user_id,
-        email: c.email,
-        first_name: c.first_name,
-        last_name: c.last_name,
-        company_name: c.company_name,
-        gst_number: c.gst_number,
-        industry: c.industry,
-        approval_status: c.approval_status,
-        created_at: c.created_at,
-        href: ap(`/admin/business/customers/${c.user_id}/view`, host),
-      }))}
-    />
-  )
+  return <BusinessCustomersTable total={total} page={page} pageSize={PAGE_SIZE} customers={customers} loadPage={loadPage} />
 }
 
 export default async function BusinessCustomersPage({ searchParams }: { searchParams: Promise<SP> }) {

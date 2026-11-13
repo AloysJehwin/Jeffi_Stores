@@ -20,6 +20,7 @@ import OverviewTabs from './_components/OverviewTabs'
 import CouponsOverview from './_components/CouponsOverview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -241,6 +242,12 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
   const q = normalizeQuery(COUPONS_ENTITY, resolvedSearchParams)
 
   const { coupons, total } = await queryCoupons(q, { page, limit: PAGE_SIZE, sort, dir })
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/coupons')
+    const res = await queryCoupons(normalizeQuery(COUPONS_ENTITY, resolvedSearchParams), { page: p, limit: PAGE_SIZE, sort, dir })
+    return { rows: res.coupons as CouponRow[], total: res.total }
+  }
 
   const currentListUrl = (() => {
     const params = new URLSearchParams(`tab=list&${canonicalQuery(q, COUPON_FIELDS)}`)
@@ -258,6 +265,7 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
       pageSize={PAGE_SIZE}
       query={{ ...q, sort, dir }}
       backUrl={currentListUrl}
+      loadPage={loadPage}
     />
   )
 }

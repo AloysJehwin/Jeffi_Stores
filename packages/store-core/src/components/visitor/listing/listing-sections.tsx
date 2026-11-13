@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
 import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { renderProductItem } from '@/components/visitor/listing/listing-items'
 import { getPageSections, loadSectionData } from '@/lib/catalog/homepage-model'
 import { HALF_CELL, HALF_ROW } from '@/components/visitor/home/HomeSections'
 import {
@@ -108,6 +109,18 @@ export async function withListingSections(items: PagedItem[], opts: ListingOpts)
     }))
   )
 }
+
+/** One page of a listing: its product cards with the sections that land on that page. The first
+ *  `eager` cards (the first screen of the server page) load their images and prefetch as usual. */
+export function productPageItems(products: any[], gstEnabled: boolean, listing: ListingOpts, eager = 0): Promise<PagedItem[]> {
+  return withListingSections(
+    products.map((product, i) => ({ key: String(product.id), node: renderProductItem(product, gstEnabled, i >= eager) })),
+    listing
+  )
+}
+
+/** Cards on the first screen of a listing; the rest are deferred. */
+export const EAGER_CARDS = 6
 
 /** ServerPagedItems with the listing's sections spliced between the products. */
 export async function ListingPagedItems({

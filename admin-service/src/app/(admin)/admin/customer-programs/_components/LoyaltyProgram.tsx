@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { ServerPagedItems, type PagedNode } from '@/components/admin/kit/infinite'
+import { requireListAccess } from '@/lib/admin/list-access'
 import { SortTh, type SortCol } from '@/components/admin/kit/list-sort'
-import { getLoyaltyStats, listLoyaltyMembers, type LoyaltyStats } from '@/lib/loyalty/queries'
+import { getLoyaltyStats, listLoyaltyMembers, type LoyaltyMember, type LoyaltyStats } from '@/lib/loyalty/queries'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { TIER_KEYS, TIER_NAMES, tierName } from '@/lib/loyalty/tiers'
 import { ap } from '@/lib/shared/admin-path'
@@ -36,6 +37,83 @@ const COLS: SortCol[] = [
   { key: 'updated_at', label: 'Updated', type: 'date' },
 ]
 
+const number = (value: number) => value.toLocaleString('en-IN')
+
+const memberCard = (member: LoyaltyMember, host: string): PagedNode => ({
+  key: String(member.userId),
+  node: (
+    <Link
+      key={member.userId}
+      href={ap(`/admin/customers/${member.userId}/view`, host)}
+      className="block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium text-foreground truncate">{member.name}</p>
+          <p className="text-xs text-foreground-muted truncate">{member.email}</p>
+        </div>
+        <span
+          className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
+        >
+          {tierName(member.tier)}
+        </span>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs text-foreground-muted">
+        <span>
+          <span className="font-medium text-foreground">{number(member.points)}</span> pts ·{' '}
+          <span>{number(member.lifetimePoints)}</span> ever
+        </span>
+        <span className="whitespace-nowrap">
+          {new Date(member.updatedAt).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })}
+        </span>
+      </div>
+    </Link>
+  ),
+})
+
+const memberRow = (member: LoyaltyMember, host: string): PagedNode => ({
+  key: String(member.userId),
+  node: (
+  <tr key={member.userId} className="border-t border-border-default">
+    <td className="px-4 py-3">
+      <Link
+        href={ap(`/admin/customers/${member.userId}/view`, host)}
+        className="font-medium text-foreground hover:text-accent-600"
+      >
+        {member.name}
+      </Link>
+      <p className="text-xs text-foreground-muted">{member.email}</p>
+    </td>
+    <td className="px-4 py-3">
+      <span
+        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
+      >
+        {tierName(member.tier)}
+      </span>
+    </td>
+    <td className="px-4 py-3 text-right font-medium text-foreground">{number(member.points)}</td>
+    <td className="px-4 py-3 text-right text-foreground-secondary">{number(member.lifetimePoints)}</td>
+    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+      {new Date(member.updatedAt).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })}
+    </td>
+  </tr>
+  ),
+})
+
+async function memberPage(page: number, q: { tier: string; search: string; sort?: string; dir?: string }, host: string, as: 'card' | 'row') {
+  await requireListAccess(PROGRAMS_PATH)
+  const list = await listLoyaltyMembers({ page, pageSize: PAGE_SIZE, tier: q.tier, search: q.search, sort: new URLSearchParams({ sort: q.sort ?? '', dir: q.dir ?? '' }) })
+  return { rows: list.members.map(r => (as === 'card' ? memberCard : memberRow)(r, host)), total: list.total }
+}
+
 export default async function LoyaltyProgram({ host, query }: { host: string; query: LoyaltyQuery }) {
   const { page, tier, search, sort, dir } = query
   const [settings, stats, list, campaign] = await Promise.all([
@@ -47,8 +125,15 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
     ),
   ])
 
+  async function loadCards(p: number) {
+    'use server'
+    return memberPage(p, { tier, search, sort, dir }, host, 'card')
+  }
+  async function loadRows(p: number) {
+    'use server'
+    return memberPage(p, { tier, search, sort, dir }, host, 'row')
+  }
   const basePath = ap(PROGRAMS_PATH, host)
-  const number = (value: number) => value.toLocaleString('en-IN')
   const outstandingValue = Math.max(0, stats.outstandingPoints) * settings.pointValue
 
   return (
@@ -146,41 +231,8 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                 page={page}
                 total={list.total}
                 noun="members"
-                items={list.members.map(member => ({
-                  key: String(member.userId),
-                  node: (
-                    <Link
-                      key={member.userId}
-                      href={ap(`/admin/customers/${member.userId}/view`, host)}
-                      className="block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium text-foreground truncate">{member.name}</p>
-                          <p className="text-xs text-foreground-muted truncate">{member.email}</p>
-                        </div>
-                        <span
-                          className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
-                        >
-                          {tierName(member.tier)}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between text-xs text-foreground-muted">
-                        <span>
-                          <span className="font-medium text-foreground">{number(member.points)}</span> pts ·{' '}
-                          <span>{number(member.lifetimePoints)}</span> ever
-                        </span>
-                        <span className="whitespace-nowrap">
-                          {new Date(member.updatedAt).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </span>
-                      </div>
-                    </Link>
-                  ),
-                }))}
+                items={list.members.map(r => memberCard(r, host))}
+                loadPage={loadCards}
               />
             </div>
             {/* Desktop table */}
@@ -198,38 +250,8 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                   page={page}
                   total={list.total}
                   noun="members"
-                  items={list.members.map(member => ({
-                    key: String(member.userId),
-                    node: (
-                    <tr key={member.userId} className="border-t border-border-default">
-                      <td className="px-4 py-3">
-                        <Link
-                          href={ap(`/admin/customers/${member.userId}/view`, host)}
-                          className="font-medium text-foreground hover:text-accent-600"
-                        >
-                          {member.name}
-                        </Link>
-                        <p className="text-xs text-foreground-muted">{member.email}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${TIER_BADGE[member.tier] ?? TIER_BADGE.bronze}`}
-                        >
-                          {tierName(member.tier)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-foreground">{number(member.points)}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary">{number(member.lifetimePoints)}</td>
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                        {new Date(member.updatedAt).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </td>
-                    </tr>
-                    ),
-                  }))}
+                  items={list.members.map(r => memberRow(r, host))}
+                  loadPage={loadRows}
                 />
               </table>
             </div>

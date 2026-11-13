@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { canonicalQuery, filterScope, normalizeQuery, type FilterQuery } from '@jeffi/list-filters'
 import { listKey } from '@/lib/admin/list-key'
 import { pageUrls } from '@/lib/admin/page-urls'
+import { requireListAccess } from '@/lib/admin/list-access'
 import { isListUrl, tabHref } from '@/lib/admin/filter-url'
 import { getOrdersSummary, getRevenueTrendBySource, queryOrders } from '@/lib/queries'
 import { ORDERS_ENTITY } from '@/lib/filters/entities/orders'
@@ -62,12 +63,14 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   const sort = sp(resolvedSearchParams, 'sort')
   const dir = sp(resolvedSearchParams, 'dir') as 'asc' | 'desc' | undefined
 
-  const { orders, total } = await queryOrders(normalizeQuery(ORDERS_ENTITY, resolvedSearchParams), {
-    page,
-    limit: PAGE_SIZE,
-    sort,
-    dir,
-  })
+  const { orders, total } = await queryOrders(normalizeQuery(ORDERS_ENTITY, resolvedSearchParams), { page, limit: PAGE_SIZE, sort, dir })
+  // Captures only serializable values: the server encrypts them into the action's reference.
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/orders')
+    const res = await queryOrders(normalizeQuery(ORDERS_ENTITY, resolvedSearchParams), { page: p, limit: PAGE_SIZE, sort, dir })
+    return { rows: res.orders ?? [], total: res.total }
+  }
 
   // Clone every param except `page` so advancing a page never drops ?tab=list or any filter.
   const listParams = (p: number) => {
@@ -81,7 +84,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   const buildUrl = (p: number) => ap(`/admin/orders${listParams(p) ? `?${listParams(p)}` : ''}`, host)
   const currentListUrl = `/admin/orders${listParams(page) ? `?${listParams(page)}` : ''}`
 
-  return <OrdersTable orders={orders ?? []} total={total} page={page} pageSize={PAGE_SIZE} backUrl={currentListUrl} pageUrls={pageUrls(buildUrl)} />
+  return <OrdersTable orders={orders ?? []} total={total} page={page} pageSize={PAGE_SIZE} backUrl={currentListUrl} pageUrls={pageUrls(buildUrl)} loadPage={loadPage} />
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {

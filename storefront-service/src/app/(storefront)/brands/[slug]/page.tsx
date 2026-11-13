@@ -15,7 +15,7 @@ import {
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductCard from '@/components/visitor/ProductCard'
-import { ListingPagedItems } from '@/components/visitor/listing/listing-sections'
+import { EAGER_CARDS, ListingPagedItems, withListingSections, type PagedItem } from '@/components/visitor/listing/listing-sections'
 import { getWebSurface } from '@/lib/catalog/web-surface'
 import { round2 } from '@/lib/catalog/gst'
 import { positiveInt, productOrderBy, type ProductSortQuery } from '@/lib/catalog/product-sort'
@@ -89,6 +89,58 @@ async function getBrandProducts(brandId: string, page: number, gstEnabled: boole
   return { products: publicProducts(products), total }
 }
 
+/** One product card of the brand's listing (its own MRP rule: the product's, else its cheapest variant's). */
+function brandItem(product: any, gstEnabled: boolean, deferred: boolean): PagedItem {
+  const primaryImage =
+    product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+  const hasVariants = product.has_variants
+  const displayPrice =
+    hasVariants && product.variant_min_price
+      ? product.variant_min_price
+      : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+  const effectiveStock = hasVariants
+    ? Number(product.variant_stock_total)
+    : product.stock_status !== 'Out of Stock'
+      ? 1
+      : 0
+  const rawMrp = product.mrp
+    ? Number(product.mrp)
+    : product.variant_min_mrp
+      ? Number(product.variant_min_mrp)
+      : null
+  const gstRate = Number(product.gst_percentage ?? 0)
+  // When GST is off, displayPrice is ex-GST — put MRP on the same ex-GST basis before computing the discount and passing it to the card.
+  const mrp =
+    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
+  const priceForDiscount = Number(displayPrice)
+  const mrpDiscount =
+    mrp && mrp > priceForDiscount ? Math.round(((mrp - priceForDiscount) / mrp) * 100) : 0
+
+  return {
+    key: String(product.id),
+    node: (
+      <ProductCard
+        id={product.id}
+        name={product.name}
+        slug={product.slug}
+        hasVariants={hasVariants}
+        displayPrice={Number(displayPrice)}
+        mrp={mrp}
+        mrpDiscount={mrpDiscount}
+        effectiveStock={effectiveStock}
+        isDigital={!!product.is_digital}
+        primaryImage={primaryImage || null}
+        brandName={product.brands?.name || null}
+        categoryName={product.categories?.name || null}
+        discountPct={Number(product.discount_pct ?? 0)}
+        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+        handlingDays={Number(product.handling_days ?? 2)}
+        deferred={deferred}
+      />
+    ),
+  }
+}
+
 export default async function BrandDetailPage({
   params,
   searchParams,
@@ -108,6 +160,17 @@ export default async function BrandDetailPage({
   const { gstEnabled } = await getFeatureFlags()
   const { products, total } = await getBrandProducts(brand.id, page, gstEnabled, resolvedSearchParams)
   const surface = await getWebSurface(resolvedSearchParams.layout)
+  const brandId = brand.id
+  async function loadPage(p: number) {
+    'use server'
+    const flags = await getFeatureFlags()
+    const next = await getBrandProducts(brandId, p, flags.gstEnabled, resolvedSearchParams)
+    const rows = await withListingSections(
+      next.products.map((product: any) => brandItem(product, flags.gstEnabled, true)),
+      { page: 'brand', surface, pageNum: p, pageSize: PAGE_SIZE, total: next.total }
+    )
+    return { rows, total: next.total }
+  }
   const crumbLd = await breadcrumbJsonLd([
     { name: 'Home', path: '/' },
     { name: 'Brands', path: '/brands' },
@@ -190,68 +253,16 @@ export default async function BrandDetailPage({
 
           {products.length > 0 ? (
             <>
-              {(() => {
-                const items = products.map(product => {
-                  const primaryImage =
-                    product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                  const hasVariants = product.has_variants
-                  const displayPrice =
-                    hasVariants && product.variant_min_price
-                      ? product.variant_min_price
-                      : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
-                  const effectiveStock = hasVariants
-                    ? Number(product.variant_stock_total)
-                    : product.stock_status !== 'Out of Stock'
-                      ? 1
-                      : 0
-                  const rawMrp = product.mrp
-                    ? Number(product.mrp)
-                    : product.variant_min_mrp
-                      ? Number(product.variant_min_mrp)
-                      : null
-                  const gstRate = Number(product.gst_percentage ?? 0)
-                  // When GST is off, displayPrice is ex-GST — put MRP on the same ex-GST basis before computing the discount and passing it to the card.
-                  const mrp =
-                    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
-                  const priceForDiscount = Number(displayPrice)
-                  const mrpDiscount =
-                    mrp && mrp > priceForDiscount ? Math.round(((mrp - priceForDiscount) / mrp) * 100) : 0
-
-                  return {
-                    key: String(product.id),
-                    node: (
-                      <ProductCard
-                        id={product.id}
-                        name={product.name}
-                        slug={product.slug}
-                        hasVariants={hasVariants}
-                        displayPrice={Number(displayPrice)}
-                        mrp={mrp}
-                        mrpDiscount={mrpDiscount}
-                        effectiveStock={effectiveStock}
-                        isDigital={!!product.is_digital}
-                        primaryImage={primaryImage || null}
-                        brandName={product.brands?.name || null}
-                        categoryName={product.categories?.name || null}
-                        discountPct={Number(product.discount_pct ?? 0)}
-                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-                        handlingDays={Number(product.handling_days ?? 2)}
-                      />
-                    ),
-                  }
-                })
-                return (
-                  <ListingPagedItems
-                    items={items}
-                    listing={{ page: 'brand', surface, pageNum: page, pageSize: PAGE_SIZE, total }}
-                    page={page}
-                    total={total}
-                    noun="products"
-                    wrap="div"
-                    wrapClassName="grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
-                  />
-                )
-              })()}
+              <ListingPagedItems
+                items={products.map((product, i) => brandItem(product, gstEnabled, i >= EAGER_CARDS))}
+                loadPage={loadPage}
+                listing={{ page: 'brand', surface, pageNum: page, pageSize: PAGE_SIZE, total }}
+                page={page}
+                total={total}
+                noun="products"
+                wrap="div"
+                wrapClassName="grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
+              />
             </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
