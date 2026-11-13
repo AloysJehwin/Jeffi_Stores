@@ -9,7 +9,7 @@ import { migrationFiles } from '@controller/lib/db-files'
 /**
  * Multi-tenant schema migration fan-out (Part B of the SaaS plan).
  *
- * Applies the desired-state schema (every <service>/database/, see db-files.ts) to every active
+ * Applies the desired-state tenant schema (the tenant set, see db-files.ts) to every active
  * tenant's dedicated RDS. The topic files themselves are plain pg_dump output and are NOT
  * idempotent; buildTenantSchemaSql() rewrites them into re-appliable form (see
  * tenant-migrations-schema.ts). That matters because the whole schema is sent as one
@@ -253,9 +253,9 @@ interface MigrationFile {
   sql: string
 }
 
-/** Read every <service>/database/migrations/*.sql in filename order (mirrors deploy/run-migrations.sh). */
+/** The tenant set's migrations in filename order (platform-only/migrations never reach a tenant). */
 function readMigrationFiles(): MigrationFile[] {
-  return migrationFiles().map(file => ({ filename: path.basename(file), sql: fs.readFileSync(file, 'utf8') }))
+  return migrationFiles('tenant').map(file => ({ filename: path.basename(file), sql: fs.readFileSync(file, 'utf8') }))
 }
 
 const SCHEMA_MIGRATIONS_DDL = `

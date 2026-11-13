@@ -11,9 +11,9 @@ import { schemaFiles } from '@controller/lib/db-files'
 // the end by hoistForeignKeys wherever they sit).
 export const TENANT_TAIL = ['constraints.sql', 'foreign-keys.sql', 'indexes.sql', 'functions.sql', 'triggers.sql']
 
-/** The platform schema files a tenant database gets, in apply order (every <service>/database/, see db-files.ts). */
+/** The schema files a tenant database gets, in apply order: the tenant set (every <service>/database/ without platform-only/, see db-files.ts). */
 export function tenantSchemaFiles(): string[] {
-  return schemaFiles('platform', TENANT_TAIL)
+  return schemaFiles('tenant', TENANT_TAIL)
 }
 
 export function buildTenantSchemaSql(): string {
