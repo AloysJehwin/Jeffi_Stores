@@ -13,6 +13,8 @@ How the owner was picked (`scripts/db-split-by-service.mjs`, evidence from `scri
    for a store table only when no store service writes it.
 4. A close call (top two within one statement or 20%) or a table nobody writes follows the owner of most of its topic file.
 
+A file under `platform-only/` is a platform-only table: the flagship DB only, never a store tenant's (`database/README.md`).
+
 | Owner | Store tables | Control-plane tables |
 | --- | ---: | ---: |
 | admin-service | 196 | 0 |
@@ -68,8 +70,8 @@ How the owner was picked (`scripts/db-split-by-service.mjs`, evidence from `scri
 | `ads_search_terms` | `tables/ads.sql` | no writes found; follows ads.sql |
 | `ads_sync_log` | `tables/ads.sql` | writes: admin 1 |
 | `ai_briefing_log` | `tables/ai.sql` | writes: admin 2 |
-| `ai_cache` | `tables/ai.sql` | no writes found; follows ai.sql |
-| `ai_prompt_presets` | `tables/catalog.sql` | writes: admin 2 |
+| `ai_cache` | `platform-only/tables/ai.sql` | no writes found; follows ai.sql |
+| `ai_prompt_presets` | `platform-only/tables/catalog.sql` | writes: admin 2 |
 | `ai_usage` | `tables/ai.sql` | writes: admin 9 |
 | `amazon_fee_estimates` | `tables/amazon.sql` | writes: admin 1 |
 | `amazon_inventory_state` | `tables/amazon.sql` | writes: admin 4 |
@@ -252,7 +254,7 @@ How the owner was picked (`scripts/db-split-by-service.mjs`, evidence from `scri
 | `plan_features` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `plans` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `platform_infra` | `control-plane/tables/control-plane.sql` | control-plane set |
-| `platform_invoices` | `tables/payments.sql` | writes: controller 2 |
+| `platform_invoices` | `platform-only/tables/payments.sql` | writes: controller 2 |
 | `platform_provider_settings` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `platform_setup_progress` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `portal_certs` | `control-plane/tables/control-plane.sql` | control-plane set |
@@ -281,7 +283,7 @@ How the owner was picked (`scripts/db-split-by-service.mjs`, evidence from `scri
 | `tenant_messaging_senders` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_metrics_daily` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_migration_runs` | `control-plane/tables/control-plane.sql` | control-plane set |
-| `tenant_service_approvals` | `tables/services.sql` | writes: controller 2 |
+| `tenant_service_approvals` | `platform-only/tables/services.sql` | writes: controller 2 |
 | `tenant_social_accounts` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_transactions` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_wallets` | `control-plane/tables/control-plane.sql` | control-plane set |
@@ -321,22 +323,22 @@ How the owner was picked (`scripts/db-split-by-service.mjs`, evidence from `scri
 | Table | File | Evidence |
 | --- | --- | --- |
 | `brand_theme` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `bulk_job_items` | `tables/bulk.sql` | writes: messaging 9 |
-| `bulk_jobs` | `tables/bulk.sql` | writes: messaging 6 |
-| `message_events` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 3) |
-| `messages` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 10) |
-| `messaging_tenant_settings` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: controller 1, messaging 1) |
-| `platform_template` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `platform_template_family` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `platform_template_variant` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `platform_template_version` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `pub_short_link` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `pub_template` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `pub_template_asset` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `pub_template_family` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `pub_template_variant` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `pub_template_version` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `short_link` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 3, storefront 2) |
+| `bulk_job_items` | `platform-only/tables/bulk.sql` | writes: messaging 9 |
+| `bulk_jobs` | `platform-only/tables/bulk.sql` | writes: messaging 6 |
+| `message_events` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 3) |
+| `messages` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 10) |
+| `messaging_tenant_settings` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: controller 1, messaging 1) |
+| `platform_template` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `platform_template_family` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `platform_template_variant` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `platform_template_version` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `pub_short_link` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `pub_template` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `pub_template_asset` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `pub_template_family` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `pub_template_variant` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `pub_template_version` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `short_link` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 3, storefront 2) |
 | `sms_dlt` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
 | `sms_dlt_template` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
 | `template` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 3) |
@@ -345,8 +347,8 @@ How the owner was picked (`scripts/db-split-by-service.mjs`, evidence from `scri
 | `template_variable` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
 | `template_variant` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 14) |
 | `template_version` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 4) |
-| `wa_pricing` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
-| `waba_capacity` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `wa_pricing` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+| `waba_capacity` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
 
 ## storefront-service
 

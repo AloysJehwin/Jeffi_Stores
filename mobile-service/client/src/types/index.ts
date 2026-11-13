@@ -24,16 +24,70 @@ export interface Category {
   parent_category_id: string | null
   image_url: string | null
   display_order?: number
-  /** With /api/categories?counts=1: description, icon and own active product count. */
+  /** With /api/categories?counts=1: description, icon, tagline, menu flags and own active product count. */
   description?: string | null
   icon_name?: string | null
+  short_name?: string | null
+  tagline?: string | null
+  show_in_nav?: boolean
+  is_featured?: boolean
   product_count?: number
+}
+
+export interface CategoryFaq {
+  id: string
+  question: string
+  answer: string
+}
+
+/** GET /api/categories?slug=: the category page's profile (docs/BRAND_CATEGORY_PLAN.md §3.2) with its FAQs. */
+export interface CategoryProfile extends Category {
+  hero_image_desktop?: string | null
+  hero_image_mobile?: string | null
+  banner_link_url?: string | null
+  /** A ?sort= key (created_at | price | name | discount) the listing opens with. */
+  default_sort?: string | null
+  listing_layout?: 'grid' | 'table' | null
+  seo_content?: string | null
+  non_returnable_reason?: string | null
+  cod_allowed?: boolean | null
+  faqs: CategoryFaq[]
 }
 
 export interface Brand {
   id: string
   name: string
   slug: string
+}
+
+export type BrandSocialLinks = Partial<Record<'instagram' | 'youtube' | 'facebook' | 'linkedin' | 'x', string | null>>
+
+/** GET /api/brands/{slug}: the brand page's public profile (docs/BRAND_CATEGORY_PLAN.md §3.1). */
+export interface BrandProfile extends Brand {
+  description?: string | null
+  website?: string | null
+  logo_url?: string | null
+  logo_dark_url?: string | null
+  logo_square_url?: string | null
+  tagline?: string | null
+  story?: string | null
+  brand_type?: string | null
+  banner_desktop_url?: string | null
+  banner_mobile_url?: string | null
+  brand_color?: string | null
+  founded_year?: number | null
+  headquarters?: string | null
+  country_of_origin?: string | null
+  social_links?: BrandSocialLinks | null
+  catalogue_pdf_url?: string | null
+  default_warranty_months?: number | null
+  default_warranty_type?: string | null
+  warranty_terms?: string | null
+  service_phone?: string | null
+  service_email?: string | null
+  service_url?: string | null
+  return_policy_note?: string | null
+  seo_content?: string | null
 }
 
 export interface Product {

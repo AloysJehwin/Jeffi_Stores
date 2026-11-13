@@ -295,7 +295,7 @@ export interface HomeData {
   heroSlides: HeroSlide[]
   offers: ProductOffer[]
   mainCategories: HomeCategory[]
-  topBrands: { id: string; name: string; slug: string; product_count: number }[]
+  topBrands: { id: string; name: string; slug: string; logo_url?: string | null; product_count: number }[]
   categoryShowcase: { id: string; name: string; slug: string; products: CardProduct[] }[]
   dealOfTheDay: CardProduct[]
   productRows: Record<string, CardProduct[]>

@@ -4,6 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Copy, Link2, Loader2, Star, Trash2, Upload, Images as ImagesIcon, X } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import GalleryPicker, { type GalleryImage, type GalleryVideo } from '../GalleryPicker'
+import AiMediaButton from '../ai/AiMediaButton'
+import AiVideoButton from '../ai/AiVideoButton'
+import AdminSelect from '../AdminSelect'
+import AIEnrichButton from '../AIEnrichButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import { galleryUpload, readVideoFile, uploadGalleryVideo } from '../media/media-upload'
 import MediaItemView, { KIND_ICON, KIND_LABEL, MediaThumb } from '@/components/media/MediaItemView'
 import {
@@ -127,7 +132,10 @@ export default function MediaManager({
   onVariantOwn,
   onChange,
   onCountsChange,
+  ai,
 }: {
+  /** Prompt seeds for the AI image and video generators. */
+  ai?: { imagePrompt?: string; videoPrompt?: string; context?: string }
   productId: string
   initial: StagedMedia
   variants: MediaVariant[]
@@ -199,6 +207,7 @@ export default function MediaManager({
 
   const countFor = (k: string) => inScopeOf(k).length
   const room = () => limits.maxPerScope - scoped.length
+  const primaryImageUrl = (scoped.find(m => m.kind === 'image' && m.is_primary) ?? scoped.find(m => m.kind === 'image'))?.url || undefined
 
   const add = (partial: Partial<ProductMediaItem> & { kind: MediaKind }, at = scope) => {
     const base = blank(partial.kind, at, productId)
@@ -524,6 +533,42 @@ export default function MediaManager({
               <button type="button" className={btn} disabled={readOnly || room() < 1} onClick={() => spinRef.current?.click()}>
                 360° set
               </button>
+              {!readOnly && room() > 0 && (
+                <>
+                  <AiMediaButton
+                    feature="product_image"
+                    scope="products"
+                    sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                    defaultPrompt={ai?.imagePrompt}
+                    referenceImageUrl={primaryImageUrl}
+                    usageRef={productId}
+                    saveToGallery
+                    label="Generate with AI"
+                    triggerClassName={btn}
+                    onPick={img => {
+                      if (img.galleryId) addFromGallery([{ id: img.galleryId } as GalleryImage])
+                    }}
+                  />
+                  <AiVideoButton
+                    scope="products"
+                    defaultPrompt={ai?.videoPrompt ?? ai?.imagePrompt}
+                    referenceImageUrl={primaryImageUrl}
+                    defaultAspect="1:1"
+                    usageRef={productId}
+                    label="AI video"
+                    triggerClassName={btn}
+                    onPick={v =>
+                      add({
+                        kind: 'video',
+                        url: v.url,
+                        thumbnail_url: v.posterUrl ?? null,
+                        duration_seconds: v.durationSec ?? null,
+                        metadata: v.galleryVideoId ? { gallery_video_id: v.galleryVideoId } : {},
+                      })
+                    }
+                  />
+                </>
+              )}
               <button type="button" className={btn} disabled={readOnly || scoped.length === 0} onClick={() => setCopyOpen(true)}>
                 <Copy className="h-3.5 w-3.5" /> Copy {selected.size ? `${selected.size} selected` : 'all'} to…
               </button>
@@ -644,6 +689,7 @@ export default function MediaManager({
             {open && scopeKey({ variantId: open.variant_id, subVariantId: open.sub_variant_id }) === key && (
               <ItemEditor
                 m={open}
+                aiContext={ai?.context}
                 readOnly={readOnly}
                 onPatch={p => patch(open.id, p)}
                 onClose={() => setOpenId(null)}
@@ -794,8 +840,10 @@ function ItemEditor({
   onClose,
   uploadImage,
   uploadUsdz,
+  aiContext,
 }: {
   m: ProductMediaItem
+  aiContext?: string
   readOnly?: boolean
   onPatch: (p: Partial<ProductMediaItem>) => void
   onClose: () => void
@@ -836,15 +884,25 @@ function ItemEditor({
         </p>
         <div>
           <label className="mb-1 block text-xs font-medium text-foreground-secondary">Alt text</label>
-          <input
-            type="text"
-            maxLength={255}
-            disabled={readOnly}
+          <AIEnrichButton
+            fieldLabel={`Alt text for a product ${KIND_LABEL[m.kind].toLowerCase()}`}
             value={m.alt ?? ''}
-            onChange={e => onPatch({ alt: e.target.value || null })}
-            className={inputCls}
-            placeholder="Describe it for screen readers"
-          />
+            onChange={v => onPatch({ alt: v.slice(0, 255) || null })}
+            scope="products:write"
+            context={[aiContext, m.caption && `Caption: ${m.caption}`, 'Short, literal description of what the media shows, under 125 characters.'].filter(Boolean).join('. ')}
+            maxLength={125}
+            write
+          >
+            <input
+              type="text"
+              maxLength={255}
+              disabled={readOnly}
+              value={m.alt ?? ''}
+              onChange={e => onPatch({ alt: e.target.value || null })}
+              className={`${inputCls} pr-8`}
+              placeholder="Describe it for screen readers"
+            />
+          </AIEnrichButton>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-foreground-secondary">
@@ -863,18 +921,18 @@ function ItemEditor({
         {m.kind === 'document' && (
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">Document type</label>
-            <select
+            <AdminSelect
               disabled={readOnly}
               value={m.metadata?.doc_type ?? ''}
-              onChange={e => onPatch({ metadata: { ...m.metadata, doc_type: e.target.value || undefined } })}
-              className={inputCls}
-            >
-              <option value="">Other</option>
-              <option value="datasheet">Datasheet</option>
-              <option value="manual">Manual</option>
-              <option value="certificate">Certificate</option>
-              <option value="warranty">Warranty card</option>
-            </select>
+              onChange={v => onPatch({ metadata: { ...m.metadata, doc_type: v || undefined } })}
+              options={[
+                { value: '', label: 'Other' },
+                { value: 'datasheet', label: 'Datasheet' },
+                { value: 'manual', label: 'Manual' },
+                { value: 'certificate', label: 'Certificate' },
+                { value: 'warranty', label: 'Warranty card' },
+              ]}
+            />
           </div>
         )}
         {(m.kind === 'model_3d' || m.kind === 'video' || m.kind === 'audio') && (

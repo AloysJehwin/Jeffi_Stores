@@ -31,6 +31,7 @@ const KEY_FILL = 'FFA6A6A6' // mid grey — link/key columns
 // Header-band fill per sheet — saturated, clearly distinct hues so sheets read apart at a glance.
 const SHEET_FILL: Record<SheetName, string> = {
   Products: 'FF2E75B6', // blue
+  'Product · Details': 'FFFFE699', // light yellow
   Variants: 'FF548235', // green
   'Sub-variants': 'FFBF8F00', // amber
   'Product · Shipping': 'FF9DC3E6', // light blue
@@ -268,6 +269,8 @@ function exampleFor(sheet: SheetName): Record<string, string>[] {
           'sub_variant.stock_status': 'In Stock',
         },
       ]
+    case 'Product · Details':
+      return [{ sku: 'TSHIRT-001', model_number: 'TS-01', pack_size: 'Pack of 1', care_instructions: 'Machine wash cold' }]
     case 'Product · Shipping':
       return [
         { sku: 'TSHIRT-001', weight_grams: '200', length_cm: '25', breadth_cm: '20', height_cm: '2', fragile: 'FALSE' },

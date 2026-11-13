@@ -21,6 +21,10 @@ interface Category {
   slug: string
 }
 
+interface Brand extends Category {
+  logo_url: string | null
+}
+
 function Highlight({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim()
   if (!trimmed) return <>{text}</>
@@ -49,6 +53,7 @@ export default function ProductsSearch({
   const [query, setQuery] = useState(defaultValue || '')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
@@ -57,7 +62,9 @@ export default function ProductsSearch({
   const abortRef = useRef<AbortController | null>(null)
   const router = useRouter()
 
-  const totalItems = categories.length + products.length
+  // Keyboard order: categories, then brands, then products.
+  const leadCount = categories.length + brands.length
+  const totalItems = leadCount + products.length
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -74,6 +81,7 @@ export default function ProductsSearch({
     if (query.trim().length < 2) {
       setProducts([])
       setCategories([])
+      setBrands([])
       setOpen(false)
       return
     }
@@ -90,12 +98,14 @@ export default function ProductsSearch({
           const data = await res.json()
           setProducts(data.products || [])
           setCategories(data.categories || [])
+          setBrands(data.brands || [])
           setOpen(true)
         }
       } catch (err: unknown) {
         if ((err as { name?: string }).name !== 'AbortError') {
           setProducts([])
           setCategories([])
+          setBrands([])
         }
       } finally {
         setLoading(false)
@@ -145,8 +155,10 @@ export default function ProductsSearch({
       if (activeIdx >= 0) {
         if (activeIdx < categories.length) {
           navigate(basePath + `?category=${categories[activeIdx].slug}`, query.trim())
+        } else if (activeIdx < leadCount) {
+          navigate(basePath + `?brand=${brands[activeIdx - categories.length].slug}`, query.trim())
         } else {
-          navigate(basePath + `/${products[activeIdx - categories.length].slug}`, query.trim())
+          navigate(basePath + `/${products[activeIdx - leadCount].slug}`, query.trim())
         }
       } else if (query.trim()) {
         navigate(basePath + `?search=${encodeURIComponent(query.trim())}`, query.trim())
@@ -159,7 +171,7 @@ export default function ProductsSearch({
     if (query.trim()) navigate(basePath + `?search=${encodeURIComponent(query.trim())}`, query.trim())
   }
 
-  const hasResults = categories.length > 0 || products.length > 0
+  const hasResults = totalItems > 0
 
   return (
     <div ref={containerRef} className="relative">
@@ -231,13 +243,40 @@ export default function ProductsSearch({
                   </>
                 )}
 
+                {brands.length > 0 && (
+                  <>
+                    <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                      Brands
+                    </p>
+                    {brands.map((brand, idx) => (
+                      <Link
+                        key={brand.id}
+                        href={basePath + `?brand=${brand.slug}`}
+                        onClick={() => navigate(basePath + `?brand=${brand.slug}`, query.trim())}
+                        className={`flex items-center gap-2 px-3 py-2 transition-colors text-sm ${activeIdx === categories.length + idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
+                      >
+                        <span className="flex-shrink-0 w-6 h-6 rounded bg-surface-secondary border border-border-default overflow-hidden flex items-center justify-center text-[11px] font-semibold text-foreground-secondary">
+                          {brand.logo_url ? (
+                            <img src={brand.logo_url} alt="" className="w-full h-full object-contain p-0.5" />
+                          ) : (
+                            brand.name.charAt(0).toUpperCase()
+                          )}
+                        </span>
+                        <span className="text-foreground">
+                          <Highlight text={brand.name} query={query} />
+                        </span>
+                      </Link>
+                    ))}
+                  </>
+                )}
+
                 {products.length > 0 && (
                   <>
                     <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
                       Products
                     </p>
                     {products.map((product, idx) => {
-                      const itemIdx = categories.length + idx
+                      const itemIdx = leadCount + idx
                       const primaryImage =
                         product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
                       const displayPrice =

@@ -4,10 +4,15 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { canUseAi } from '@/lib/auth/ai-scope'
+import { resolveCategoryGoogleCategory } from '@/lib/catalog/google-taxonomy'
 import { revalidatePath } from 'next/cache'
 import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 import { recordDirectRevision } from '@/lib/admin/entity-revisions'
-import { categoryContentOf } from '@/lib/catalog/category-draft'
+import { applyCategoryProfile, categoryContentOf, reorderIntervalDays } from '@/lib/catalog/category-draft'
+import { CATEGORY_PROFILE_FIELDS } from '@/lib/catalog/category-fields'
+import { parseBodyFields } from '@/lib/catalog/entity-fields'
+
+const poolDb = { query: (t: string, p?: unknown[]) => query(t, p) } as any
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -70,6 +75,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     icon_name?.trim() ||
     (canUseAi(admin.role, admin.scopes, 'categories:write') ? await suggestIcon(name.trim()) : 'Package')
 
+  const googleCategory = await resolveCategoryGoogleCategory(google_product_category, {
+    name: name.trim(),
+    description,
+    parentId: parent_id || null,
+    ai: canUseAi(admin.role, admin.scopes, 'categories:write'),
+  })
+
   const retAllowed = return_allowed == null ? null : !!return_allowed
   const retDays = return_allowed == null ? null : Math.max(1, parseInt(return_window_days) || 7)
   const replAllowed = replacement_allowed == null ? null : !!replacement_allowed
@@ -84,7 +96,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       icon_name = $9, return_allowed = $10, return_window_days = $11,
       replacement_allowed = $12, replacement_window_days = $13, updated_at = $14,
       hero_image_mobile = COALESCE($16, hero_image_mobile),
-      hero_image_desktop = COALESCE($17, hero_image_desktop)
+      hero_image_desktop = COALESCE($17, hero_image_desktop),
+      reorder_interval_days = CASE WHEN $18::boolean THEN $19::integer ELSE reorder_interval_days END
     WHERE id = $15`,
     [
       name.trim(),
@@ -94,7 +107,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       skuPrefix,
       parseInt(display_order) || 0,
       !!is_active,
-      google_product_category || null,
+      googleCategory,
       iconToUse,
       retAllowed,
       retDays,
@@ -104,8 +117,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       id,
       hero_image_mobile || null,
       hero_image_desktop || null,
+      'reorder_interval_days' in body,
+      reorderIntervalDays(body.reorder_interval_days),
     ]
   )
+  // Profile columns (category-fields.ts): only the keys the body carries.
+  await applyCategoryProfile(poolDb, id, parseBodyFields(CATEGORY_PROFILE_FIELDS, body))
 
   revalidatePath('/admin/categories')
 

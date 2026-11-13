@@ -7,6 +7,7 @@ import { STORE_ROLES, type ServiceRole } from '@/lib/service-routing'
 import type { K8sObject } from './client'
 import { DB_READY_LABEL } from './node-user-data'
 import { EDGE_NS, hostMatch, PRIORITY_BAND, trafficRoutes, type HostGroup } from './traefik-routes'
+import { customHostApp } from '@/lib/tenancy/admin-host'
 
 // Renders one tenant's namespace: its storefront, admin and business services (or, in the old layout, one
 // all-in-one controller), messaging and documents (Deployment + Service each, wired to one another),
@@ -39,7 +40,7 @@ export interface TenantWorkloadInput {
   slug: string
   plan: string | null
   hosts: string[] // platform subdomains from tenantHostnames()
-  customDomains?: string[] // customer-owned, cert-pending or verified
+  customDomains?: string[] // customer-owned, cert-pending or verified; <app>.<bought domain> goes where <app>-{slug} does
   images?: Partial<Record<TenantService, string>>
   compute?: ComputeSpec // defaults to the plan's pre-configurable tier
   dbPoolMax?: number // per-pod database pool (DB_POOL_MAX)
@@ -68,6 +69,12 @@ export const tenantWorkloadNames = (slug: string) => [
   tenantServiceName(slug, 'messaging'),
   tenantServiceName(slug, 'documents'),
 ]
+/** A store service the release rolls on its own across every store (rollout.sh `stores <part>`). */
+export type StorePart = ServiceRole | BackingService
+export const STORE_PARTS: readonly StorePart[] = [...STORE_ROLES, 'messaging', 'documents']
+/** One store service's Deployment/Service/HPA/PDB name. */
+export const tenantPartName = (slug: string, part: StorePart) =>
+  part === 'messaging' || part === 'documents' ? tenantServiceName(slug, part) : tenantRoleName(slug, part)
 /** IngressRoutes the renderer owns (custom-{domain} ones are pruned by label). */
 export const TENANT_ROUTE_NAMES = ['controller', 'store', 'admin', 'business', 'documents', 'razorpay-webhook']
 /** Earlier store Deployment names (Service and IngressRoute were `storefront`); retired once the controller serves. */
@@ -322,7 +329,13 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const businessHosts = input.hosts.filter(h => h.startsWith(`${slug}.business.`))
   // public-{slug} is the shared public API gateway's (platform IngressRoute), never the store's.
   const publicHosts = input.hosts.filter(h => !adminHosts.includes(h) && !docHosts.includes(h) && !h.startsWith(`public-${slug}.`))
-  const customDomains = input.customDomains ?? []
+  // A bought domain carries every host the plan gives the store: admin., invoice./quotation./purchaseorder.,
+  // business. by their app; the apex, www., forms., vault. and owners' own domains are store hosts.
+  const customOf = (apps: string[]) => (input.customDomains ?? []).filter(d => apps.includes(customHostApp(d) ?? ''))
+  const customAdminDomains = customOf(['admin'])
+  const customDocDomains = customOf(DOC_APPS)
+  const customBusinessDomains = customOf(['business'])
+  const customDomains = (input.customDomains ?? []).filter(d => !['admin', 'business', ...DOC_APPS].includes(customHostApp(d) ?? ''))
 
   // The store's app pods per layout; the one being left (while switching) runs a single copy, no autoscale.
   const apps: { name: string; role: ServiceRole | null; svc: ServiceSpec; sizeOf: ServiceName; image: string }[] = []
@@ -474,7 +487,10 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     const whole = (hosts: string[], middlewares = [strip]) => [{ match: hostMatch(hosts), kind: 'Rule', middlewares, services: app }]
     objs.push(ingress('controller', whole(publicHosts)))
     if (adminHosts.length) objs.push(ingress('admin', whole(adminHosts, adminMiddlewares), adminTls))
-    for (const domain of customDomains) objs.push(customDomainCert(ns, domain), ingress(customDomainName(domain), whole([domain]), { secretName: customDomainSecret(domain) }, CUSTOM_DOMAIN_LABEL))
+    for (const domain of [...customDomains, ...customBusinessDomains])
+      objs.push(customDomainCert(ns, domain), ingress(customDomainName(domain), whole([domain]), { secretName: customDomainSecret(domain) }, CUSTOM_DOMAIN_LABEL))
+    for (const domain of customAdminDomains)
+      objs.push(customDomainCert(ns, domain), ingress(customDomainName(domain), whole([domain], adminMiddlewares), { secretName: customDomainSecret(domain), ...adminTls }, CUSTOM_DOMAIN_LABEL))
   } else {
     // Each path goes to the service service-routing.ts names for it. A store without the B2B portal
     // sends its business paths to its storefront, which answers them 404.
@@ -504,10 +520,19 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     if (adminHosts.length) objs.push(ingress('admin', routes([{ classes: ['admin'], match: hostMatch(adminHosts) }], adminMiddlewares), adminTls))
     for (const domain of customDomains)
       objs.push(customDomainCert(ns, domain), ingress(customDomainName(domain), routes([{ classes: ['store'], match: hostMatch([domain]) }]), { secretName: customDomainSecret(domain) }, CUSTOM_DOMAIN_LABEL))
+    for (const domain of customBusinessDomains)
+      objs.push(customDomainCert(ns, domain), ingress(customDomainName(domain), routes([{ classes: ['business'], match: hostMatch([domain]) }]), { secretName: customDomainSecret(domain) }, CUSTOM_DOMAIN_LABEL))
+    // admin.<bought domain>: the admin service behind the store's mTLS, like admin-{slug}.
+    for (const domain of customAdminDomains)
+      objs.push(
+        customDomainCert(ns, domain),
+        ingress(customDomainName(domain), routes([{ classes: ['admin'], match: hostMatch([domain]) }], adminMiddlewares), { secretName: customDomainSecret(domain), ...adminTls }, CUSTOM_DOMAIN_LABEL)
+      )
   }
-  if (docHosts.length) {
-    objs.push(ingress('documents', [{ match: hostMatch(docHosts), kind: 'Rule', middlewares: [strip], services: [{ name: tenantServiceName(slug, 'documents'), port: SERVICES.documents.port }] }]))
-  }
+  const docRoute = (hosts: string[]) => [{ match: hostMatch(hosts), kind: 'Rule', middlewares: [strip], services: [{ name: tenantServiceName(slug, 'documents'), port: SERVICES.documents.port }] }]
+  if (docHosts.length) objs.push(ingress('documents', docRoute(docHosts)))
+  for (const domain of customDocDomains)
+    objs.push(customDomainCert(ns, domain), ingress(customDomainName(domain), docRoute([domain]), { secretName: customDomainSecret(domain) }, CUSTOM_DOMAIN_LABEL))
   return objs
 }
 

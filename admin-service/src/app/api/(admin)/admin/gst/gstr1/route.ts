@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
         o.irn_ack_dt,
         json_agg(json_build_object(
           'product_name', oi.product_name,
-          'hsn_code', COALESCE(oi.hsn_code, '9999'),
+          -- Lines saved without HSN fall back to the product's category default.
+          'hsn_code', COALESCE(NULLIF(oi.hsn_code, ''), c.default_hsn_code, pc.default_hsn_code, '9999'),
+          'uqc', COALESCE(NULLIF(c.default_uqc, ''), NULLIF(pc.default_uqc, ''), 'NOS'),
           'gst_rate', COALESCE(oi.gst_rate, 18),
           'quantity', oi.quantity,
           'taxable_amount', oi.taxable_amount,
@@ -56,6 +58,9 @@ export async function GET(request: NextRequest) {
         ) ORDER BY oi.created_at) AS items
       FROM orders o
       JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN products p ON p.id = oi.product_id
+      LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN categories pc ON pc.id = c.parent_category_id
       LEFT JOIN addresses a ON a.id = o.shipping_address_id
       WHERE o.invoice_date >= $1
         AND o.invoice_date < ($2::date + interval '1 day')
@@ -111,21 +116,25 @@ function sum(rows: any[], field: string): number {
 function buildHsnSummary(rows: any[]) {
   const map: Record<
     string,
-    { hsnCode: string; gstRate: number; taxableVal: number; igst: number; cgst: number; sgst: number }
+    { hsnCode: string; gstRate: number; uqc: string; qty: number; taxableVal: number; igst: number; cgst: number; sgst: number }
   > = {}
   for (const row of rows) {
     for (const item of row.items || []) {
-      const key = `${item.hsn_code}-${item.gst_rate}`
+      const uqc = item.uqc || 'NOS'
+      const key = `${item.hsn_code}-${item.gst_rate}-${uqc}`
       if (!map[key]) {
         map[key] = {
           hsnCode: item.hsn_code || '9999',
           gstRate: parseFloat(item.gst_rate || '18'),
+          uqc,
+          qty: 0,
           taxableVal: 0,
           igst: 0,
           cgst: 0,
           sgst: 0,
         }
       }
+      map[key].qty += parseFloat(item.quantity || '0')
       map[key].taxableVal += parseFloat(item.taxable_amount || '0')
       map[key].igst += parseFloat(item.igst_amount || '0')
       map[key].cgst += parseFloat(item.cgst_amount || '0')
@@ -135,6 +144,8 @@ function buildHsnSummary(rows: any[]) {
   return Object.values(map).map(h => ({
     hsnCode: h.hsnCode,
     gstRate: h.gstRate,
+    uqc: h.uqc,
+    qty: round2(h.qty),
     taxableVal: round2(h.taxableVal),
     igstAmt: round2(h.igst),
     cgstAmt: round2(h.cgst),

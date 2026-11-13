@@ -1702,12 +1702,6 @@ ALTER TABLE ONLY public.gallery_videos
 ALTER TABLE ONLY public.gallery_videos
     ADD CONSTRAINT gallery_videos_source_check CHECK (source IN ('upload','ai','import')) NOT VALID;
 
-ALTER TABLE ONLY public.ai_prompt_presets
-    ADD CONSTRAINT ai_prompt_presets_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY public.ai_prompt_presets
-    ADD CONSTRAINT ai_prompt_presets_kind_check CHECK (kind IN ('image','video')) NOT VALID;
-
 ALTER TABLE ONLY public.payments ADD CONSTRAINT payments_gateway_account_check CHECK (gateway_account IS NULL OR gateway_account IN ('platform','own')) NOT VALID;
 ALTER TABLE ONLY public.orders ADD CONSTRAINT orders_dispute_status_check CHECK (dispute_status IS NULL OR dispute_status IN ('open','under_review','won','lost','closed')) NOT VALID;
 
@@ -1793,3 +1787,13 @@ ALTER TABLE public.product_media ADD CONSTRAINT product_media_owner_check CHECK 
 ALTER TABLE public.product_media ADD CONSTRAINT product_media_kind_check CHECK (kind IN ('image','video','external_video','document','model_3d','spin_360','audio'));
 ALTER TABLE public.product_media ADD CONSTRAINT product_media_status_check CHECK (status IN ('processing','ready','failed'));
 ALTER TABLE ONLY public.product_faqs ADD CONSTRAINT product_faqs_pkey PRIMARY KEY (id);
+
+-- brand / category profile (docs/BRAND_CATEGORY_PLAN.md)
+ALTER TABLE ONLY public.category_faqs ADD CONSTRAINT category_faqs_pkey PRIMARY KEY (id);
+ALTER TABLE public.brands ADD CONSTRAINT brands_brand_type_check CHECK (brand_type IN ('manufacturer','private_label','distributor','white_label'));
+ALTER TABLE public.brands ADD CONSTRAINT brands_brand_color_check CHECK (brand_color IS NULL OR brand_color ~ '^#[0-9A-Fa-f]{6}$');
+ALTER TABLE public.categories ADD CONSTRAINT categories_listing_layout_check CHECK (listing_layout IN ('grid','table'));
+ALTER TABLE public.categories ADD CONSTRAINT categories_default_gst_rate_check CHECK (default_gst_rate IS NULL OR (default_gst_rate >= 0 AND default_gst_rate <= 100));
+ALTER TABLE ONLY public.entity_ai_enrichment_log ADD CONSTRAINT entity_ai_enrichment_log_pkey PRIMARY KEY (id);
+ALTER TABLE public.entity_ai_enrichment_log ADD CONSTRAINT entity_ai_enrichment_log_type_check CHECK (entity_type IN ('brand','category'));
+ALTER TABLE public.entity_ai_enrichment_log ADD CONSTRAINT entity_ai_enrichment_log_status_check CHECK (status IN ('proposed','approved','rejected','failed'));

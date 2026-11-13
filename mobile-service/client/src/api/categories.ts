@@ -1,9 +1,20 @@
 import { api } from './client'
-import type { Category } from '../types'
+import type { Category, CategoryProfile } from '../types'
 
 export async function listCategories(): Promise<Category[]> {
   const data = await api<{ categories: Category[] }>('/api/categories?counts=1', { token: null })
   return data.categories
+}
+
+/** The category page's profile and FAQs (GET /api/categories?slug=); null when missing or inactive. */
+export async function getCategory(slug: string): Promise<CategoryProfile | null> {
+  try {
+    const data = await api<{ category: CategoryProfile }>(`/api/categories?slug=${encodeURIComponent(slug)}`, { token: null })
+    return data.category ?? null
+  } catch (e: any) {
+    if (e?.status === 404) return null
+    throw e
+  }
 }
 
 /** A category with the storefront extras the home model carries for top-level categories. */

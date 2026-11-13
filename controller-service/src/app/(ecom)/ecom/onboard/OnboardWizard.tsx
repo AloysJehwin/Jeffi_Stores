@@ -15,6 +15,10 @@ import OnboardShell from './OnboardShell'
 import { WIZARD_STEPS } from './steps'
 import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
 import { ADDON_INFO, cleanAddonIds, type AddonId, type AddonPrice } from '@/lib/billing/addons'
+import DomainSearch from '../_domains/DomainSearch'
+import ContactFields from '../_domains/ContactFields'
+import { contactProblem, EMPTY_CONTACT, type DomainContact } from '../_domains/types'
+import { defaultContact } from '@controller/lib/domains/contact'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -204,6 +208,10 @@ export default function OnboardWizard({
   const [brandErr, setBrandErr] = useState<string | null>(null)
   const [legalsAccepted, setLegalsAccepted] = useState(init.legalsAccepted ?? false)
 
+  // Optional own domain (Store step), bought from the wallet once the store is approved.
+  const [domainPick, setDomainPick] = useState<{ name: string; priceInr: number; renewalPriceInr: number } | null>(init.domainPick ?? null)
+  const [domainContact, setDomainContact] = useState<DomainContact>({ ...EMPTY_CONTACT, ...(init.domainContact ?? {}) })
+
   // Restore-on-re-onboard — detect a backup from a previously deprovisioned store.
   const [restoreBackup, setRestoreBackup] = useState<{ capturedAt: string; archive?: RestoreArchive } | null>(null)
   const [restoreOptIn, setRestoreOptIn] = useState<boolean>(init.restorePreviousData ?? false)
@@ -290,6 +298,8 @@ export default function OnboardWizard({
         legalsAccepted,
         restorePreviousData: restoreBackup && !restoreBackup.archive ? restoreOptIn : false,
         restore: restoreChoice,
+        domainPick,
+        domainContact: domainPick ? domainContact : undefined,
       }
       await fetch('/api/ecom/onboard/draft', {
         method: 'POST',
@@ -331,6 +341,8 @@ export default function OnboardWizard({
       restoreBackup,
       restoreOptIn,
       restoreChoice,
+      domainPick,
+      domainContact,
     ]
   )
 
@@ -425,6 +437,11 @@ export default function OnboardWizard({
 
   // ── Final submit ─────────────────────────────────────────────────────────────
   async function submit() {
+    const domainIssue = domainPick ? contactProblem(domainContact) : null
+    if (domainIssue) {
+      showToast(`Domain contact: ${domainIssue}`, 'error')
+      return
+    }
     setBusy(true)
     try {
       const res = await fetch('/api/ecom/onboard/submit', {
@@ -460,6 +477,7 @@ export default function OnboardWizard({
           legalsAccepted,
           restorePreviousData: restoreBackup && !restoreBackup.archive ? restoreOptIn : undefined,
           restore: restoreChoice,
+          domain: domainPick ? { name: domainPick.name, contact: domainContact } : undefined,
         }),
       })
       const data = await res.json()
@@ -467,6 +485,7 @@ export default function OnboardWizard({
         showToast(data.error || 'Submission failed', 'error')
         return
       }
+      if (data.domainError) showToast(`Application submitted. The domain wasn't reserved: ${data.domainError} You can buy one from your dashboard.`, 'info')
       trackStoreApplication({ slug: planSlug, name: selectedPlan?.name, monthlyPrice: monthly, interval })
       // Application submitted → tenant is pending_approval (NOT paid/live). Stay in the onboard
       // flow, which shows the 'under review' → payment states. Only a live store goes to /dashboard.
@@ -478,6 +497,15 @@ export default function OnboardWizard({
       setBusy(false)
     }
   }
+
+  // Prefill the domain's registrant contact from what the wizard collected, once.
+  useEffect(() => {
+    if (step !== 7 || !domainPick || domainContact.email) return
+    setDomainContact({
+      ...EMPTY_CONTACT,
+      ...defaultContact({ ownerName: ownerFullName, email: owner.email, mobile, businessName: bizName, businessType: bizType, businessAddress: bizAddress, warehouse: wh }),
+    } as DomainContact)
+  }, [step, domainPick, domainContact.email, ownerFullName, owner.email, mobile, bizName, bizType, bizAddress, wh])
 
   // ── Can proceed? ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -725,6 +753,25 @@ export default function OnboardWizard({
                       </a>
                       .
                     </p>
+                  )}
+                </div>
+                <div className="border-t border-border-default pt-5">
+                  <label className={lbl}>
+                    Your own domain <span className="text-foreground-muted font-normal">(optional)</span>
+                  </label>
+                  <p className="text-xs text-foreground-muted mb-3">
+                    Get a domain like yourbrand.in for your store. We buy it from your wallet once your store is approved, renew it yearly, and set it up for you.
+                  </p>
+                  {domainPick ? (
+                    <div className="flex flex-wrap items-center gap-3 rounded-xl org-sand px-4 py-3">
+                      <span className="min-w-0 flex-1 break-all font-mono text-sm text-foreground">{domainPick.name}</span>
+                      <span className="text-sm text-foreground">₹{domainPick.priceInr.toLocaleString('en-IN')}/year</span>
+                      <button type="button" onClick={() => setDomainPick(null)} className={ghostBtn}>
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <DomainSearch onPick={r => setDomainPick({ name: r.domain, priceInr: r.priceInr, renewalPriceInr: r.renewalPriceInr })} />
                   )}
                 </div>
               </div>
@@ -1260,6 +1307,9 @@ export default function OnboardWizard({
                       ]
                     : []),
                   ['Store', `${displayName} (${effectiveSlug}.jeffistores.in)`],
+                  ...(domainPick
+                    ? [['Domain', `${domainPick.name} · ₹${domainPick.priceInr.toLocaleString('en-IN')}/year from your wallet once approved`] as [string, string]]
+                    : []),
                   ['Products', productCats.join(', ') || '—'],
                   ['Business', `${bizName} · ${bizType}`],
                   ['PAN', pan],
@@ -1337,6 +1387,16 @@ export default function OnboardWizard({
                 </div>
               </Card>
               </div>
+              {domainPick && (
+                <Card title={`Your domain: ${domainPick.name}`}>
+                  <p className="text-sm text-foreground-secondary mb-4">
+                    Bought for ₹{domainPick.priceInr.toLocaleString('en-IN')} (first year) from your wallet once your store is approved, then renewed yearly at ₹
+                    {domainPick.renewalPriceInr.toLocaleString('en-IN')}. Top up your wallet before approval so it goes through; if the name is taken by then, nothing is charged.
+                  </p>
+                  <ContactFields value={domainContact} onChange={setDomainContact} />
+                  <p className="mt-2 text-xs text-foreground-muted">The registry emails this address to confirm it. Confirm within 15 days or the domain is suspended.</p>
+                </Card>
+              )}
               <div className={`${noteCls} org-peach`}>
                 After submitting, our team will review your GST certificate (1–2 business days).{' '}
                 {paymentsEnabled

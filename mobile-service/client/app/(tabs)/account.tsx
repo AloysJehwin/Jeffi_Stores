@@ -10,6 +10,7 @@ import {
 import { clearSearchHistory, getDashboard, getSearchHistory } from '../../src/api/account'
 import { useStoreConfig } from '../../src/hooks/useStoreConfig'
 import { openHref } from '../../src/lib/links'
+import { appVersionLabel } from '../../src/lib/appVersion'
 import { accent, useTokens } from '../../src/theme'
 import Gradient from '../../src/components/account/Gradient'
 import BuyAgainRow from '../../src/components/account/BuyAgainRow'
@@ -121,9 +122,15 @@ function SignedOut() {
             </Text>
           </Text>
         </Card>
+        <AppVersionLine />
       </View>
     </Screen>
   )
+}
+
+/** The running build, for support: "Version 1.0.0 (23) · u1a2b3c4d". */
+function AppVersionLine() {
+  return <Text className="mt-4 text-center text-xs text-foreground-muted">Version {appVersionLabel()}</Text>
 }
 
 export default function AccountScreen() {
@@ -296,6 +303,7 @@ export default function AccountScreen() {
           {/* Business accounts are closed through support, as on the web portal. */}
           {!isBusiness && <ListRow title="Delete account" icon={Trash2} onPress={() => router.push('/account/delete')} />}
         </ListGroup>
+        <AppVersionLine />
       </View>
     </Screen>
   )

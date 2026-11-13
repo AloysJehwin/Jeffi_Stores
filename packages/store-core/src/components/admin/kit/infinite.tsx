@@ -1,14 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from 'react'
+import { memo, startTransition, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useAgentChanges } from '@/lib/client/agent-events'
 
 // Infinite lists. Three sources, one footer:
 // - useInfiniteList: client fetch of page N from an API (page/limit or offset), appended on scroll.
-// - useServerPages: a server page renders ?page=N; rows accumulate client-side while the URL is
-//   replaced with page+1. A fresh load with page>1 is replaced back to page 1 (no burst of N loads).
+// - useServerPages: a server-rendered page plus later pages from a server action, appended on scroll;
+//   the URL never carries the scroll position.
 // - useReveal: data that is already in memory (report payloads); shows it pageSize rows at a time.
 
 export interface InfiniteControl {
@@ -18,24 +18,42 @@ export interface InfiniteControl {
   error?: string | null
   loadMore: () => void
   retry?: () => void
+  /** The next page as a plain link (crawlers, open in a new tab); a click still loads in place. */
+  href?: string
+  /** false: only the footer's link or button loads more, never the sentinel. */
+  auto?: boolean
 }
+
+/** Nearest ancestor that scrolls vertically (the admin shell's <main>); null = the viewport. */
+function scrollRoot(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const ov = getComputedStyle(p).overflowY
+    if ((ov === 'auto' || ov === 'scroll') && (p.scrollHeight > p.clientHeight + 1 || p.tagName === 'MAIN')) return p
+  }
+  return null
+}
+
+const plainClick = (e: { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean }) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
 
 /** Sentinel + "Load more" fallback + "Showing X of Y", loading and error rows. */
 export function InfiniteFooter({ shown, control, noun = 'rows', className = '' }: { shown: number; control: InfiniteControl; noun?: string; className?: string }) {
-  const { total, hasMore, loadingMore, error, loadMore, retry } = control
+  const { total, hasMore, loadingMore, error, loadMore, retry, href, auto = true } = control
   const ref = useRef<HTMLDivElement | null>(null)
   const [visible, setVisible] = useState(false)
+  // Observed against the list's own scroller: against the viewport, a scrolling <main> clips the
+  // margin away and the next page only starts once the sentinel is on screen. Three screens ahead, so
+  // the rows are in before the reader gets there.
   useEffect(() => {
     const el = ref.current
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: '300px 0px' })
+    if (!el || !auto || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { root: scrollRoot(el), rootMargin: '0px 0px 300% 0px' })
     io.observe(el)
     return () => io.disconnect()
-  }, [hasMore])
-  // Re-fires while the sentinel stays on screen, so short pages chain until the viewport fills.
+  }, [hasMore, auto])
+  // Re-fires while the sentinel stays in range, so short pages chain until the margin fills.
   useEffect(() => {
-    if (visible && hasMore && !loadingMore && !error) loadMore()
-  }, [visible, hasMore, loadingMore, error, loadMore])
+    if (auto && visible && hasMore && !loadingMore && !error) loadMore()
+  }, [auto, visible, hasMore, loadingMore, error, loadMore])
 
   if (!shown && !hasMore && !error) return null
   const of = total != null && total >= shown ? total : null
@@ -55,9 +73,24 @@ export function InfiniteFooter({ shown, control, noun = 'rows', className = '' }
         </div>
       ) : hasMore ? (
         <div className="flex justify-center py-1">
-          <button type="button" onClick={loadMore} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary">
-            Load more
-          </button>
+          {href ? (
+            <a
+              href={href}
+              rel="next"
+              onClick={e => {
+                if (!plainClick(e)) return
+                e.preventDefault()
+                loadMore()
+              }}
+              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+            >
+              Load more
+            </a>
+          ) : (
+            <button type="button" onClick={loadMore} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary">
+              Load more
+            </button>
+          )}
         </div>
       ) : null}
       <div ref={ref} aria-hidden className="h-px" />
@@ -204,135 +237,138 @@ function withoutPage(sp: URLSearchParams | { toString(): string }, param: string
   return q.toString()
 }
 
-/** First scrollable ancestor (admin shell's <main>, else the document scroller). SSR-safe. */
-function findScrollParent(): HTMLElement | null {
-  if (typeof document === 'undefined') return null
-  // AdminShell wraps the pane in <main class="... overflow-y-auto">; use it when present.
-  const main = document.querySelector('main') as HTMLElement | null
-  if (main) {
-    const ov = getComputedStyle(main).overflowY
-    if (ov === 'auto' || ov === 'scroll') return main
+/** A server action that returns one more page: `page` is 1-based, rows as the server page renders them. */
+export type LoadPage<T> = (page: number) => Promise<PageResult<T> | T[]>
+
+const LAZY = Symbol.for('react.lazy')
+const ELEMENTS = [Symbol.for('react.transitional.element'), Symbol.for('react.element')]
+
+// JSX from a server action arrives as lazy references to rows that may still be streaming in. Resolve
+// them before rendering: an append that suspends on one can be left waiting on a wake-up that never
+// comes (seen with Next 15.5's React canary), which blocks every later transition too.
+function pendingLazies(v: unknown, seen: Set<object>, out: Promise<unknown>[], depth = 0): void {
+  if (!v || typeof v !== 'object' || seen.has(v) || depth > 40) return
+  seen.add(v)
+  const o = v as { $$typeof?: symbol; _init?: (p: unknown) => unknown; _payload?: unknown; type?: unknown; props?: unknown; [k: string]: unknown }
+  if (o.$$typeof === LAZY && typeof o._init === 'function') {
+    try {
+      pendingLazies(o._init(o._payload), seen, out, depth + 1)
+    } catch (e) {
+      if (e && typeof (e as PromiseLike<unknown>).then === 'function') out.push(new Promise(r => (e as PromiseLike<unknown>).then(r, r)))
+    }
+    return
   }
-  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement
+  if (Array.isArray(v)) for (const x of v) pendingLazies(x, seen, out, depth + 1)
+  else if (o.$$typeof && ELEMENTS.includes(o.$$typeof)) {
+    pendingLazies(o.type, seen, out, depth + 1)
+    pendingLazies(o.props, seen, out, depth + 1)
+  } else if (Object.getPrototypeOf(v) === Object.prototype) for (const k in o) pendingLazies(o[k], seen, out, depth + 1)
 }
 
+async function settle(v: unknown): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    const out: Promise<unknown>[] = []
+    pendingLazies(v, new Set(), out)
+    if (!out.length) return
+    await Promise.all(out)
+  }
+}
+
+type Pages<T> = { key: string; start: number; more: T[][]; total: number | null; done: boolean; loading: boolean; error: string | null }
+const freshPages = <T,>(key: string, start: number): Pages<T> => ({ key, start, more: [], total: null, done: false, loading: false, error: null })
+
 /**
- * Server-rendered pages (?page=N) accumulated client-side. Advancing replaces the URL with page+1
- * (scroll: false, no history entry) and appends the rows the server renders for it. Any other
- * param change starts over. A fresh mount with page>1 (refresh, back) is replaced to page 1, so
- * the list is always complete from the top without fetching pages 1..N at once.
+ * A server page (?page=N, page 1 without it) plus the pages after it, fetched with `loadPage` and
+ * appended client-side. The URL is never touched while scrolling: no navigation, no re-render of the
+ * route, and a ?page=N link (old bookmark, crawler) still renders that page and continues from it.
+ * Any other param change starts over. `isExtra` marks rows that aren't part of the paged total
+ * (a promo or section between products). Without `loadPage` the footer links to the next page.
  */
-/** `isExtra` marks rows that aren't part of the paged total (a promo or section between products). */
-export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param = 'page', isExtra }: { rows: T[]; page: number; total: number; rowKey: (r: T) => string; pageHref?: (p: number) => string; param?: string; isExtra?: (r: T) => boolean }): { rows: T[]; shown: number; resetting: boolean; control: InfiniteControl } {
+export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param = 'page', isExtra, loadPage, pageSize }: { rows: T[]; page: number; total: number; rowKey: (r: T) => string; pageHref?: (p: number) => string; param?: string; isExtra?: (r: T) => boolean; loadPage?: LoadPage<T>; pageSize?: number }): { rows: T[]; shown: number; control: InfiniteControl } {
   const sp = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const key = withoutPage(sp, param)
-  const [pending, startTransition] = useTransition()
-  const store = useRef<{ key: string; pages: Map<number, T[]> } | null>(null)
-  // Where the scroll was when load-more started; restored below.
-  const scrollSnap = useRef<{ el: HTMLElement; top: number; page: number } | null>(null)
-
-  let s = store.current
-  if (!s || s.key !== key) {
-    s = { key, pages: new Map() }
-    store.current = s
+  const [state, setState] = useState<Pages<T>>(() => freshPages(key, page))
+  let s = state
+  if (s.key !== key || s.start !== page) {
+    s = freshPages(key, page)
+    setState(s)
   }
-  const resetting = page > 1 && !s.pages.has(1)
-  if (!resetting) {
-    s.pages.set(page, rows)
-    for (const p of [...s.pages.keys()]) if (p > page) s.pages.delete(p)
-  }
-
-  const href = useCallback(
-    (p: number) => {
-      if (pageHref) return pageHref(p)
-      const q = new URLSearchParams(sp.toString())
-      if (p > 1) q.set(param, String(p))
-      else q.delete(param)
-      const qs = q.toString()
-      return `${pathname}${qs ? `?${qs}` : ''}`
-    },
-    [pageHref, sp, param, pathname]
-  )
-
-  // One replace per target: href changes identity every render when pageHref is inline.
-  const requested = useRef<string | null>(null)
-  useEffect(() => {
-    if (!resetting) return
-    const target = `${key}#1`
-    if (requested.current === target) return
-    requested.current = target
-    router.replace(href(1), { scroll: false })
-  }, [resetting, router, href, key])
 
   const merged: T[] = []
-  if (!resetting) {
-    const seen = new Set<string>()
-    for (let p = 1; p <= page; p++) {
-      for (const r of s.pages.get(p) ?? []) {
-        const k = rowKey(r)
-        if (seen.has(k)) continue
-        seen.add(k)
-        merged.push(r)
-      }
+  const seen = new Set<string>()
+  for (const list of [rows, ...s.more]) {
+    for (const r of list) {
+      const k = rowKey(r)
+      if (seen.has(k)) continue
+      seen.add(k)
+      merged.push(r)
     }
   }
-  const shown = isExtra ? merged.filter(r => !isExtra(r)).length : merged.length
-  const hasMore = !resetting && rows.length > 0 && shown < total
-  useEffect(() => {
-    if (!pending && requested.current && !requested.current.endsWith('#1')) requested.current = null
-  }, [pending, page])
-  // Put the scroll back where load-more left it. In production Next reuses the route's param-less
-  // prefetch for ?page=N and then ignores `scroll: false`: it scrolls the page to the top from a
-  // parent layout effect, on the commit that shows the route's loading skeleton or on the one that
-  // brings the rows back. So after each commit check from the next frame (before paint) and keep
-  // checking while the rows stream in, a few frames more once the page has advanced. Gives up if the
-  // user has scrolled themselves.
-  useLayoutEffect(() => {
-    const snap = scrollSnap.current
-    if (!snap || pending) return
-    const { el, top } = snap
-    const landed = page >= snap.page
-    let frames = 0
-    let raf = 0
-    const put = () => {
-      const y = el.scrollTop
-      if (y < top - 2 && y <= top / 2 && el.scrollHeight - el.clientHeight >= top) el.scrollTop = top
-      if (++frames < (landed ? 12 : 300)) raf = requestAnimationFrame(put)
-      else if (landed && scrollSnap.current === snap) scrollSnap.current = null
-    }
-    raf = requestAnimationFrame(put)
-    return () => cancelAnimationFrame(raf)
-  }, [page, pending])
-  // Filter/search change (key change) invalidates the snapshot — don't restore to a stale offset.
-  useEffect(() => {
-    scrollSnap.current = null
-  }, [key])
-  const loadMore = useCallback(() => {
-    if (pending || !hasMore) return
-    const target = `${key}#${page + 1}`
-    if (requested.current === target) return
-    requested.current = target
-    // A page that chains straight after the last one can start while Next has just scrolled to the
-    // top and the restore below hasn't run yet: keep the higher of the two positions.
-    const el = findScrollParent()
-    const prev = scrollSnap.current
-    if (el) scrollSnap.current = { el, top: Math.max(el.scrollTop, prev?.el === el ? prev.top : 0), page: page + 1 }
-    startTransition(() => router.replace(href(page + 1), { scroll: false }))
-  }, [pending, hasMore, router, href, page, key])
+  const count = (list: T[]) => (isExtra ? list.filter(r => !isExtra(r)).length : list.length)
+  const shown = count(merged)
+  const firstCount = count(rows)
+  const tot = s.total ?? total
+  const hasMore = !s.done && firstCount > 0 && (s.start - 1) * (pageSize ?? firstCount) + shown < tot
+  const next = s.start + 1 + s.more.length
 
-  return { rows: merged, shown, resetting, control: { total, hasMore, loadingMore: pending, loadMore } }
+  const href = (p: number) => {
+    if (pageHref) return pageHref(p)
+    const q = new URLSearchParams(sp.toString())
+    if (p > 1) q.set(param, String(p))
+    else q.delete(param)
+    const qs = q.toString()
+    return `${pathname}${qs ? `?${qs}` : ''}`
+  }
+  const nextHref = hasMore ? href(next) : undefined
+
+  const live = useRef({ s, hasMore, next, loadPage, nextHref })
+  live.current = { s, hasMore, next, loadPage, nextHref }
+  const inflight = useRef<string | null>(null)
+  const loadMore = useCallback(() => {
+    const { s, hasMore, next, loadPage, nextHref } = live.current
+    if (!hasMore) return
+    if (!loadPage) {
+      if (nextHref) router.push(nextHref)
+      return
+    }
+    const tag = `${s.key}#${s.start}#${next}`
+    if (inflight.current === tag) return
+    inflight.current = tag
+    const mine = (x: Pages<T>) => x.key === s.key && x.start === s.start && x.start + 1 + x.more.length === next
+    setState(x => (mine(x) ? { ...x, loading: true, error: null } : x))
+    loadPage(next)
+      .then(async res => {
+        const r = Array.isArray(res) ? { rows: res, total: null } : res
+        await settle(r.rows)
+        if (inflight.current === tag) inflight.current = null
+        // A transition: the new rows render in slices, so scrolling never waits on a long commit.
+        startTransition(() => setState(x => (mine(x) ? { ...x, loading: false, more: [...x.more, r.rows], total: r.total ?? x.total, done: r.rows.length === 0 } : x)))
+      })
+      .catch(e => {
+        if (inflight.current === tag) inflight.current = null
+        setState(x => (mine(x) ? { ...x, loading: false, error: e instanceof Error && e.message ? e.message : 'Failed to load' } : x))
+      })
+  }, [router])
+
+  return { rows: merged, shown, control: { total: tot, hasMore, loadingMore: s.loading, error: s.error, loadMore, retry: loadMore, href: nextHref, auto: !!loadPage } }
+}
+
+export interface PagedNode {
+  key: string
+  node: ReactNode
+  /** Not counted in the paged total (a section between products). */
+  extra?: boolean
 }
 
 /**
- * Server components with ?page lists of rendered nodes (no row data on the client): pass this
- * page's rendered items; earlier pages are kept and the footer advances the URL.
+ * Server-rendered nodes (no row data on the client): pass this page's items and a `loadPage`
+ * server action that renders the items of any other page; they are appended on scroll.
  */
-export function ServerPagedItems({ items, page, total, noun, wrap, param, wrapClassName, footerClassName }: { items: { key: string; node: ReactNode; extra?: boolean }[]; page: number; total: number; noun?: string; wrap?: 'tbody' | 'div' | 'ul'; param?: string; wrapClassName?: string; footerClassName?: string }) {
-  const { rows, shown, resetting, control } = useServerPages({ rows: items, page, total, rowKey: i => i.key, param, isExtra: i => !!i.extra })
-  if (resetting) return null
-  const nodes = rows.map(i => <FragmentKey key={i.key}>{i.node}</FragmentKey>)
+export function ServerPagedItems({ items, page, total, noun, wrap, param, wrapClassName, footerClassName, loadPage, pageSize }: { items: PagedNode[]; page: number; total: number; noun?: string; wrap?: 'tbody' | 'div' | 'ul'; param?: string; wrapClassName?: string; footerClassName?: string; loadPage?: LoadPage<PagedNode>; pageSize?: number }) {
+  const { rows, shown, control } = useServerPages({ rows: items, page, total, rowKey: i => i.key, param, isExtra: i => !!i.extra, loadPage, pageSize })
+  const nodes = rows.map(i => <ItemNode key={i.key} node={i.node} />)
   return (
     <>
       {wrap === 'tbody' ? <tbody className={wrapClassName}>{nodes}</tbody> : wrap === 'ul' ? <ul className={wrapClassName}>{nodes}</ul> : <div className={wrapClassName}>{nodes}</div>}
@@ -341,9 +377,10 @@ export function ServerPagedItems({ items, page, total, noun, wrap, param, wrapCl
   )
 }
 
-function FragmentKey({ children }: { children: ReactNode }) {
-  return <>{children}</>
-}
+// Each node keeps its identity across appends, so earlier items never re-render.
+const ItemNode = memo(function ItemNode({ node }: { node: ReactNode }) {
+  return <>{node}</>
+})
 
 function InfiniteFooterOutsideTable({ wrap, className, ...p }: { wrap?: string; className?: string; shown: number; control: InfiniteControl; noun?: string }) {
   if (wrap === 'tbody')

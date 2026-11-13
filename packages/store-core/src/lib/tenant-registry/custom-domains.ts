@@ -8,19 +8,21 @@ export interface CustomDomain {
   status: string
   verification_token: string | null
   cert_arn: string | null
+  /** Set on the apex/www/admin rows of a domain bought through the platform; its order manages them. */
+  order_id: string | null
   verified_at: string | null
   created_at: string
   updated_at: string
 }
 
-const COLS = 'id, tenant_id, domain, status, verification_token, cert_arn, verified_at, created_at, updated_at'
+const COLS = 'id, tenant_id, domain, status, verification_token, cert_arn, order_id, verified_at, created_at, updated_at'
 const ROOT = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 // First labels the platform routes by name (host-resolution APP_PREFIXES, middleware public./img./…).
 const RESERVED_LABELS = new Set(['admin', 'invoice', 'quotation', 'purchaseorder', 'forms', 'business', 'vault', 'public', 'img', 'certificate', 'ecom'])
 /** A claim that never completed stops blocking the name (and the quota) after this. */
 const STALE_CLAIM_MS = 48 * 60 * 60 * 1000
-/** Statuses that take a slot: everything still live or on its way. */
-const ACTIVE = `status NOT IN ('expired','failed')`
+/** Statuses that take a slot: everything still live or on its way. Bought domains don't use the plan's quota. */
+const ACTIVE = `status NOT IN ('expired','failed') AND order_id IS NULL`
 
 /** Domains the cluster routes and issues certificates for: cert-manager's HTTP-01 needs the Certificate before it can issue. */
 export async function routedCustomDomains(tenantId: string): Promise<string[]> {
@@ -31,10 +33,11 @@ export async function routedCustomDomains(tenantId: string): Promise<string[]> {
   return res.rows.map(r => r.domain)
 }
 
+/** The owner's own (bring-your-own) domains; a bought domain's hosts are listed with its order. */
 export async function listCustomDomains(tenantId: string): Promise<CustomDomain[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT ${COLS} FROM tenant_custom_domains WHERE tenant_id=$1 ORDER BY created_at ASC`,
+    `SELECT ${COLS} FROM tenant_custom_domains WHERE tenant_id=$1 AND order_id IS NULL ORDER BY created_at ASC`,
     [tenantId]
   )
   return res.rows

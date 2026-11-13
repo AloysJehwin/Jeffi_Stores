@@ -164,11 +164,17 @@ describe('GET /api/brands/[id]', () => {
     expect(body.error).toMatch(/not found/i)
   })
 
-  it('returns 401 when not authenticated', async () => {
+  it('serves the public profile of an active brand by slug when not authenticated', async () => {
     authenticateAdminMock.mockResolvedValue(null)
+    queryOneMock.mockResolvedValue({ id: 'brand-1', name: 'Unbrako', slug: 'unbrako', tagline: 'Fasteners' })
 
-    const res = await getBrand(makeReq('GET') as any, { params: Promise.resolve({ id: 'brand-1' }) })
-    expect(res.status).toBe(401)
+    const res = await getBrand(makeReq('GET') as any, { params: Promise.resolve({ id: 'unbrako' }) })
+    expect(res.status).toBe(200)
+    expect((await res.json()).brand).toMatchObject({ slug: 'unbrako', tagline: 'Fasteners' })
+    const [sql, params] = queryOneMock.mock.calls.at(-1)!
+    expect(sql).toMatch(/is_active = true AND slug = \$1/)
+    expect(sql).not.toMatch(/SELECT \*/)
+    expect(params).toEqual(['unbrako'])
   })
 })
 

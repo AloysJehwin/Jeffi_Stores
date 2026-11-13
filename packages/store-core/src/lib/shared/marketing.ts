@@ -1,6 +1,6 @@
 import { query, queryOne } from '@/lib/shared/db'
 import { currentBrandName } from '@/lib/catalog/brand'
-import { FREQUENCY_CAP_HOURS, cooldownMinutes, hours } from '@/lib/campaigns/duration'
+import { FREQUENCY_CAP_HOURS, cooldownMinutes, days, hours, readDurationParam } from '@/lib/campaigns/duration'
 
 export type CampaignKind =
   | 'abandoned_cart'
@@ -129,6 +129,20 @@ export async function canSendMarketing(
   )
   if (recent && parseInt(recent.cnt, 10) >= 1) {
     return { ok: false, reason: 'frequency_cap' }
+  }
+
+  // Per-person cap (campaign parameter; 0 or unset = no limit). Counted from email_logs, one row per email:
+  // email_campaigns_sent keeps one row per reference, which a repeat send overwrites.
+  const cap = Number(params?.maxSendsPerPerson) || 0
+  if (cap > 0) {
+    const capWindow = readDurationParam(params as Record<string, unknown>, 'maxSendsWindow') ?? days(30)
+    const sent = await queryOne<{ cnt: string }>(
+      `SELECT COUNT(*)::text AS cnt FROM email_logs
+       WHERE user_id = $1 AND template_name = $2 AND status = 'sent'
+         AND sent_at > NOW() - (${Number(capWindow)}::text || ' minutes')::interval`,
+      [userId, campaignKind]
+    )
+    if (sent && parseInt(sent.cnt, 10) >= cap) return { ok: false, reason: 'person_cap' }
   }
 
   return { ok: true }

@@ -11,6 +11,11 @@ vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
 }))
 vi.mock('@/lib/shared/icon-suggest', () => ({ suggestIcon: vi.fn() }))
+// The Google taxonomy match falls back to keywords at once: no AI gateway call (CI can't reach it).
+vi.mock('@/lib/shared/ai-client', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  aiChat: vi.fn(() => Promise.reject(new Error('no AI in tests'))),
+}))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────

@@ -150,31 +150,6 @@ CREATE INDEX idx_embeddings_tenant ON public.embeddings USING btree (tenant_id);
 
 
 --
--- Name: ai_cache; Type: TABLE; Schema: public; Owner: -
---
--- Semantic LLM response cache for the ai-platform gateway. A cacheable prompt is embedded
--- (nomic-embed-text, 768-dim) and matched by cosine distance; a close-enough hit returns the
--- stored response instead of calling the model. Written and read only by the gateway.
-
-CREATE TABLE public.ai_cache (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    namespace character varying(64) DEFAULT 'platform'::character varying NOT NULL,
-    model_hint character varying(32) NOT NULL,
-    context_hash character varying(64) DEFAULT ''::character varying NOT NULL,
-    prompt text NOT NULL,
-    embedding public.vector(768),
-    response text NOT NULL,
-    hits integer DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    last_used_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ai_cache_pkey PRIMARY KEY (id)
-);
-
-CREATE INDEX idx_ai_cache_partition ON public.ai_cache USING btree (namespace, model_hint, context_hash);
-CREATE INDEX idx_ai_cache_embedding ON public.ai_cache USING hnsw (embedding public.vector_cosine_ops);
-
-
---
 -- Name: product_ai_enrichment_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -201,5 +176,35 @@ CREATE TABLE public.product_ai_enrichment_log (
     ai_product_type text,
     ai_features text[],
     ai_search_tags text[],
+    short_description text,
+    usage_instructions text,
+    care_instructions text,
+    safety_warnings text,
+    meta_title text,
+    meta_description text,
+    faqs jsonb,
     CONSTRAINT product_ai_enrichment_log_status_chk CHECK ((status = ANY (ARRAY['proposed'::text, 'approved'::text, 'rejected'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: entity_ai_enrichment_log; Type: TABLE; Schema: public; Owner: -
+-- AI proposals for brand / category profile fields (docs/BRAND_CATEGORY_PLAN.md §3.4); an admin approves.
+-- entity_id is a brand or category id (no FK: two parents); fields = proposed column values, faqs for categories.
+--
+
+CREATE TABLE public.entity_ai_enrichment_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_type text NOT NULL,
+    entity_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    faqs jsonb,
+    sources jsonb DEFAULT '{}'::jsonb NOT NULL,
+    model text,
+    status text DEFAULT 'proposed'::text NOT NULL,
+    error text,
+    proposed_at timestamp with time zone DEFAULT now() NOT NULL,
+    decided_at timestamp with time zone,
+    decided_by_admin_id uuid,
+    applied_fields text[]
 );

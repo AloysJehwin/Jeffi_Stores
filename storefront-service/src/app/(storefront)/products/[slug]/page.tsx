@@ -26,15 +26,20 @@ import CustomersAlsoViewed from '@/components/visitor/pdp/CustomersAlsoViewed'
 import { getApprovedReviewSummary } from '@/lib/shared/review-summary'
 import { PDP_REVIEWS_ID } from '@/components/visitor/pdp/pdp'
 import { round2 } from '@/lib/catalog/gst'
+import { siteOrigin } from '@/app-shell/site-origin'
+import { breadcrumbJsonLd, ldJson } from '@/lib/catalog/listing-seo'
 import { loadProductFaqs, loadProductMedia, mediaStructuredData, resolveImageUrls, resolveMedia } from '@/lib/catalog/product-media'
 import ProductInfoSections, { faqJsonLd } from '@/components/visitor/pdp/ProductInfoSections'
+import { itemConditionLd, productExtrasLd, returnPolicyLd } from '@/lib/catalog/product-jsonld'
+import { publicProduct } from '@/lib/catalog/public-product'
+import { BRAND_DEFAULTS_SQL, withBrandDefaults } from '@/lib/catalog/catalog-defaults'
 
 const getProductBySlug = cache(async (slug: string) => {
   const product = await getProductRowBySlug(slug)
   if (!product) return product
   // product_media drives the gallery (every kind, variant / sub-variant inheritance); FAQs show below.
   const [media, faqs] = await Promise.all([loadProductMedia(product.id), loadProductFaqs(product.id, { publishedOnly: true })])
-  return { ...product, media, faqs }
+  return { ...publicProduct(withBrandDefaults(product)), media, faqs }
 })
 
 async function getProductRowBySlug(slug: string) {
@@ -43,11 +48,13 @@ async function getProductRowBySlug(slug: string) {
   return queryOne(
     `
     SELECT p.*,
+      ${BRAND_DEFAULTS_SQL},
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug,
-        'return_allowed',          COALESCE(c.return_allowed,          pc.return_allowed,          true),
-        'return_window_days',      COALESCE(c.return_window_days,      pc.return_window_days,      7),
-        'replacement_allowed',     COALESCE(c.replacement_allowed,     pc.replacement_allowed,     true),
-        'replacement_window_days', COALESCE(c.replacement_window_days, pc.replacement_window_days, 7)
+        'return_allowed',          COALESCE(c.return_allowed,          pc.return_allowed),
+        'return_window_days',      COALESCE(c.return_window_days,      pc.return_window_days),
+        'replacement_allowed',     COALESCE(c.replacement_allowed,     pc.replacement_allowed),
+        'replacement_window_days', COALESCE(c.replacement_window_days, pc.replacement_window_days),
+        'parent_name', pc.name, 'parent_slug', pc.slug
       ) AS categories,
       json_build_object('id', b.id, 'name', b.name, 'slug', b.slug,
         'return_allowed', b.return_allowed, 'return_window_days', b.return_window_days,
@@ -119,10 +126,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     product.has_variants && product.variant_min_price
       ? product.variant_min_price
       : pickUnitPrice({ inclusive: product.base_price || 0, exGst: product.price_ex_gst }, gstEnabled)
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 
   return {
     title: `${product.name} | ${identity.name}`,
+    alternates: { canonical: `${await siteOrigin()}/products/${product.slug}` },
     description: product.description?.slice(0, 160) || `Buy ${product.name} at ${identity.name}`,
     openGraph: {
       title: product.name,
@@ -143,6 +151,8 @@ function buildProductJsonLd(product: any, baseUrl: string) {
   const images = fromMedia.length ? fromMedia : (product.product_images || []).map((img: any) => img.image_url)
   const subjectOf = mediaStructuredData(resolveMedia(product.media ?? []), product.name, product.description)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
+  const itemCondition = itemConditionLd(product)
+  const returns = returnPolicyLd(product)
 
   const offers = hasVariants
     ? product.product_variants.map((v: any) => {
@@ -157,7 +167,8 @@ function buildProductJsonLd(product: any, baseUrl: string) {
           priceCurrency: 'INR',
           availability:
             v.stock_status !== 'Out of Stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
+          itemCondition,
+          ...(returns && { hasMerchantReturnPolicy: returns }),
           url: `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
         }
       })
@@ -169,7 +180,8 @@ function buildProductJsonLd(product: any, baseUrl: string) {
           priceCurrency: 'INR',
           availability:
             product.stock_status !== 'Out of Stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
+          itemCondition,
+          ...(returns && { hasMerchantReturnPolicy: returns }),
           url: `${baseUrl}/products/${product.slug}`,
         },
       ]
@@ -178,13 +190,14 @@ function buildProductJsonLd(product: any, baseUrl: string) {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description || undefined,
+    description: product.description || product.short_description || undefined,
     sku: product.sku,
     ...(product.mpn && { mpn: product.mpn }),
     ...(product.gtin && { gtin: product.gtin }),
     image: images.length > 0 ? images : undefined,
     ...(product.brands && { brand: { '@type': 'Brand', name: product.brands.name } }),
     ...(product.categories && { category: product.categories.name }),
+    ...productExtrasLd(product),
     offers: hasVariants ? { '@type': 'AggregateOffer', offerCount: offers.length, offers } : offers[0],
     ...(subjectOf.length > 0 && { subjectOf }),
   }
@@ -352,6 +365,14 @@ export default async function ProductDetailPage({
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
   const faqLd = faqJsonLd(product.faqs ?? [])
+  const cat = product.categories?.id ? product.categories : null
+  const crumbLd = await breadcrumbJsonLd([
+    { name: 'Home', path: '/' },
+    { name: 'Products', path: '/products' },
+    ...(cat?.parent_slug ? [{ name: cat.parent_name, path: `/categories/${cat.parent_slug}` }] : []),
+    ...(cat ? [{ name: cat.name, path: `/categories/${cat.slug}` }] : []),
+    { name: product.name },
+  ])
   const skuParam = typeof resolvedSearchParams.sku === 'string' ? resolvedSearchParams.sku : undefined
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -374,6 +395,7 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson(crumbLd) }} />
       <TrackRecentlyViewed
         id={product.id}
         name={product.name}
@@ -397,6 +419,17 @@ export default async function ProductDetailPage({
             <Link href="/products" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
               Products
             </Link>
+            {cat?.parent_slug && (
+              <>
+                <span className="text-foreground-muted hidden sm:inline">/</span>
+                <Link
+                  href={`/categories/${cat.parent_slug}`}
+                  className="text-foreground-muted hover:text-accent-500 whitespace-nowrap hidden sm:inline"
+                >
+                  {cat.parent_name}
+                </Link>
+              </>
+            )}
             {product.categories && (
               <>
                 <span className="text-foreground-muted">/</span>

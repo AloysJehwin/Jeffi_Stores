@@ -44,6 +44,13 @@ export async function GET(req: NextRequest) {
     ai_product_type: string | null
     ai_features: string[] | null
     ai_search_tags: string[] | null
+    short_description: string | null
+    usage_instructions: string | null
+    care_instructions: string | null
+    safety_warnings: string | null
+    meta_title: string | null
+    meta_description: string | null
+    faqs: { question: string; answer: string }[] | null
     model: string
     status: string
     proposed_at: string
@@ -55,6 +62,8 @@ export async function GET(req: NextRequest) {
             l.source_desc, l.ai_description, l.ai_use_cases,
             l.ai_keywords, l.ai_who_uses_it, l.ai_application,
             l.ai_product_type, l.ai_features, l.ai_search_tags,
+            l.short_description, l.usage_instructions, l.care_instructions, l.safety_warnings,
+            l.meta_title, l.meta_description, l.faqs,
             l.model, l.status, l.proposed_at, l.promoted_at, l.error
        FROM product_ai_enrichment_log l
        JOIN products p ON p.id = l.product_id

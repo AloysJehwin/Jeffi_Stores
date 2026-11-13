@@ -56,6 +56,7 @@ import { cardPropsFor, type CardProps } from '@/lib/catalog/product-card-props'
 import type { CategoryTab, CountdownDealData, SpotlightData } from '@/lib/catalog/homepage-extras'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 import type { HomepageDraftState } from '@/lib/catalog/homepage-draft'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 /** What each home section reads (SectionRenderer's data prop). */
 export interface SectionData {
@@ -100,7 +101,7 @@ async function getProductsForSource(
   })
   const params: unknown[] = [limit]
   if (source === 'category' && categorySlug) params.push(categorySlug)
-  return queryMany(sql, params)
+  return publicProducts(await queryMany(sql, params))
 }
 
 async function getMainCategories() {
@@ -173,11 +174,11 @@ async function getHeroSlides(surface: HomepageSurface, audience: HomepageAudienc
 }
 
 async function getTopBrands() {
-  return queryMany<{ id: string; name: string; slug: string; product_count: number }>(`
-    SELECT b.id, b.name, b.slug, COUNT(p.id)::int AS product_count
+  return queryMany<{ id: string; name: string; slug: string; logo_url: string | null; product_count: number }>(`
+    SELECT b.id, b.name, b.slug, b.logo_url, COUNT(p.id)::int AS product_count
     FROM brands b
     JOIN products p ON p.brand_id = b.id AND p.is_active = true
-    GROUP BY b.id, b.name, b.slug
+    GROUP BY b.id, b.name, b.slug, b.logo_url
     HAVING COUNT(p.id) >= 2
     ORDER BY COUNT(p.id) DESC
     LIMIT 8
@@ -204,7 +205,7 @@ async function getDealOfTheDay(gstEnabled: boolean) {
     WHERE p.is_active = true AND p.is_featured = true
     ORDER BY RANDOM()
     LIMIT 4
-  `)
+  `).then(publicProducts)
 }
 
 async function getFreeShippingThreshold() {

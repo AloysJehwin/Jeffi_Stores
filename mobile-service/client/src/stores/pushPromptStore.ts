@@ -2,8 +2,9 @@ import { create } from 'zustand'
 
 // The push soft ask, mounted once at the root (PushPermissionSheetHost).
 
-/** welcome: first launch; order: after an order is placed; settings: the user tapped "Turn on". */
-export type PushPromptReason = 'welcome' | 'order' | 'settings'
+/** welcome: first launch; order: after an order is placed; settings: the user tapped "Turn on";
+ *  reminder: push still off on a periodic app open. */
+export type PushPromptReason = 'welcome' | 'order' | 'settings' | 'reminder'
 
 interface PushPromptState {
   reason: PushPromptReason | null

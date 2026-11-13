@@ -9,6 +9,7 @@ import {
 } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { positiveInt, productOrderBy, productSortSql } from '@/lib/catalog/product-sort'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 const PAGE_SIZE = 21
 
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
     )
 
     // Public route: never return the store's cost price, supplier link or search index.
-    const publicRows = (products || []).map(({ cost_price: _c, supplier_id: _s, search_vector: _v, ...rest }: any) => rest)
+    const publicRows = publicProducts(products || [])
     return NextResponse.json({
       products: publicRows,
       total,

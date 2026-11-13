@@ -485,6 +485,9 @@ CREATE INDEX idx_message_logs_provider_sid ON public.message_logs USING btree (p
 
 CREATE INDEX idx_email_logs_status_sent_at ON public.email_logs USING btree (status, sent_at DESC);
 
+-- The campaign per-person cap counts one person's emails of one campaign (canSendMarketing).
+CREATE INDEX IF NOT EXISTS idx_email_logs_user_template_sent ON public.email_logs USING btree (user_id, template_name, sent_at DESC);
+
 
 
 --
@@ -1810,17 +1813,6 @@ CREATE INDEX IF NOT EXISTS idx_gallery_videos_tenant_created ON public.gallery_v
 CREATE INDEX IF NOT EXISTS idx_gallery_videos_tenant_source ON public.gallery_videos USING btree (tenant_id, source);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_gallery_videos_bucket_key ON public.gallery_videos USING btree (s3_bucket, s3_key);
 
-CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_tenant_kind_feature_order ON public.ai_prompt_presets USING btree (tenant_id, kind, feature, display_order);
-CREATE INDEX IF NOT EXISTS idx_ai_prompt_presets_kind_feature ON public.ai_prompt_presets USING btree (kind, feature);
--- Nullable tenant_id/feature mean a plain UNIQUE would allow dupes; COALESCE collapses NULL so the
--- (tenant, kind, feature, scenario) key is enforced even for platform rows and the "any-feature" slot.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_prompt_presets_scope_scenario ON public.ai_prompt_presets USING btree (
-    COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid),
-    kind,
-    COALESCE(feature, ''::text),
-    scenario
-);
-
 
 -- Several drafts per entity (docs/plans/MULTI_DRAFT_PLAN.md): the old key is a plain index.
 CREATE INDEX IF NOT EXISTS idx_brand_drafts_brand ON public.brand_drafts USING btree (brand_id);
@@ -1884,3 +1876,6 @@ CREATE INDEX IF NOT EXISTS idx_product_media_root ON public.product_media USING 
 CREATE INDEX IF NOT EXISTS idx_product_media_variant ON public.product_media USING btree (variant_id) WHERE (variant_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_product_media_sub_variant ON public.product_media USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_product_faqs_product ON public.product_faqs USING btree (product_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_category_faqs_category ON public.category_faqs USING btree (category_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_entity_ai_log_entity ON public.entity_ai_enrichment_log USING btree (entity_type, entity_id, proposed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_entity_ai_log_status ON public.entity_ai_enrichment_log USING btree (status, proposed_at DESC);

@@ -10,6 +10,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { TONE_CLS, type Tone } from '@/components/admin/kit/tones'
 import { Card, DetailHeader, Field, Fields, Kpi, KpiGrid, PageBody, badgeCls } from '@/components/admin/kit'
 import { campaignPushReport } from '@/lib/push/broadcast'
+import { pushReady } from '@/lib/push/send'
 import { ChangeLog } from '@/components/admin/change-log'
 
 export const dynamic = 'force-dynamic'
@@ -193,6 +194,12 @@ export default async function CampaignDetailPage({
           title="App push"
           hint="Sent, failed and skipped count app installs. Opens and orders count signed-in customers (a tap on the push or the inbox, and an order within 24 hours of it); taps on signed-out installs can't be tied to anyone."
         >
+          {!pushReady() && (
+            <p className={`mb-3 rounded-lg px-3 py-2 text-xs ${TONE_CLS.amber}`}>
+              App push isn&apos;t set up on this server, so every push fails. Add the Firebase service account JSON (project of the app&apos;s
+              google-services.json) as FCM_SERVICE_ACCOUNT_JSON in the production secrets, then roll out.
+            </p>
+          )}
           <KpiGrid>
             <Kpi label="Sent" value={push.sent.toLocaleString('en-IN')} sub={push.signedOut ? `${push.signedOut.toLocaleString('en-IN')} signed-out installs` : undefined} />
             <Kpi label="Failed" value={push.failed.toLocaleString('en-IN')} />

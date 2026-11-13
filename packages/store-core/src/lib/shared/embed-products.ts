@@ -20,6 +20,8 @@ interface ProductRow {
   ai_product_type: string | null
   ai_features: string[] | null
   ai_search_tags: string[] | null
+  brand_name: string | null
+  category_name: string | null
 }
 
 function buildContent(p: ProductRow): string {
@@ -27,6 +29,8 @@ function buildContent(p: ProductRow): string {
   return [
     p.name,
     p.sku ? `SKU: ${p.sku}` : '',
+    p.brand_name ? `Brand: ${p.brand_name}` : '',
+    p.category_name ? `Category: ${p.category_name}` : '',
     p.ai_product_type ? `Type: ${p.ai_product_type}` : '',
     desc ? `Description: ${desc}` : '',
     p.ai_application ? `Application: ${p.ai_application}` : '',
@@ -59,12 +63,16 @@ export async function backfillProductEmbeddings(
   const limit = opts.limit ?? 1000
 
   const products = await queryMany<ProductRow>(
-    `SELECT id::text, name, sku, ai_description, description, ai_use_cases,
-            ai_keywords, ai_who_uses_it, ai_application, ai_product_type,
-            ai_features, ai_search_tags
-       FROM products
-      WHERE is_active = TRUE
-      ORDER BY updated_at DESC NULLS LAST
+    `SELECT p.id::text, p.name, p.sku, p.ai_description, p.description, p.ai_use_cases,
+            p.ai_keywords, p.ai_who_uses_it, p.ai_application, p.ai_product_type,
+            p.ai_features, p.ai_search_tags, b.name AS brand_name,
+            NULLIF(concat_ws(' > ', pc.name, c.name), '') AS category_name
+       FROM products p
+       LEFT JOIN brands b ON b.id = p.brand_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN categories pc ON pc.id = c.parent_category_id
+      WHERE p.is_active = TRUE
+      ORDER BY p.updated_at DESC NULLS LAST
       LIMIT $1`,
     [limit]
   )

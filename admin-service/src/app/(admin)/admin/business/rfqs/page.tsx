@@ -20,6 +20,7 @@ import BusinessRfqsTable from './_components/BusinessRfqsTable'
 import RfqTrendChart, { type RfqTrendPoint } from './_components/RfqTrendChart'
 import RfqsOverview from './_components/RfqsOverview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 const PAGE_SIZE = 25
 
@@ -147,27 +148,33 @@ function StatsSkeleton() {
   )
 }
 
+async function rfqPage(q: FilterQuery, page: number, sp: SP, host: string) {
+  const { rows, total } = await listBusinessRfqs(q, page, PAGE_SIZE, { get: k => sp[k] ?? null })
+  return {
+    total,
+    rows: rows.map(rfq => ({
+      id: rfq.id,
+      rfq_number: rfq.rfq_number,
+      status: rfq.status,
+      item_count: rfq.item_count,
+      created_at: rfq.created_at,
+      company_name: rfq.company_name,
+      first_name: rfq.first_name,
+      last_name: rfq.last_name,
+      email: rfq.email,
+      href: ap(`/admin/business/rfqs/${rfq.id}/view`, host),
+    })),
+  }
+}
+
 async function BusinessRFQsListContent({ q, page: pageParam, sp, host }: { q: FilterQuery; page?: string; sp: SP; host: string }) {
   const page = Math.max(1, parseInt(pageParam || '1', 10) || 1)
-  const { rows: rfqs, total } = await listBusinessRfqs(q, page, PAGE_SIZE, { get: k => sp[k] ?? null })
+  const { rows: rfqs, total } = await rfqPage(q, page, sp, host)
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/business/rfqs')
+    return rfqPage(q, p, sp, host)
+  }
 
-  return (
-    <BusinessRfqsTable
-      total={total}
-      page={page}
-      pageSize={PAGE_SIZE}
-      rfqs={rfqs.map(rfq => ({
-        id: rfq.id,
-        rfq_number: rfq.rfq_number,
-        status: rfq.status,
-        item_count: rfq.item_count,
-        created_at: rfq.created_at,
-        company_name: rfq.company_name,
-        first_name: rfq.first_name,
-        last_name: rfq.last_name,
-        email: rfq.email,
-        href: ap(`/admin/business/rfqs/${rfq.id}/view`, host),
-      }))}
-    />
-  )
+  return <BusinessRfqsTable total={total} page={page} pageSize={PAGE_SIZE} rfqs={rfqs} loadPage={loadPage} />
 }

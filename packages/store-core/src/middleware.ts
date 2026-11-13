@@ -10,6 +10,7 @@ import { documentHostForSlug } from './lib/tenancy/forms-host'
 import { currentApp, pinnedHost, servesRequest } from './lib/service-routing'
 import { runWithTenantContext } from './lib/tenancy/tenant-context'
 import { adminCookieNameForHost } from './lib/auth/admin-cookie'
+import { isTenantAdminHost } from './lib/tenancy/admin-host'
 import { bindingGate } from './lib/auth/session-binding-gate'
 import { currentTraceId } from './lib/shared/otel'
 import { clientCertFromProxy, TRAEFIK_CERT_HEADER, TRAEFIK_CERT_INFO_HEADER } from './lib/tenancy/edge-client-cert'
@@ -173,7 +174,8 @@ async function handle(request: NextRequest) {
   const rebind = bindingGate(request, hostname, hostApp)
   if (rebind) return addSecurityHeaders(rebind)
   const isAdminSubdomain = hostApp === 'admin'
-  const isTenantAdminSubdomain = isAdminSubdomain && /^admin-[^.]+\./.test(hostname)
+  // admin-{slug}.<root>, or admin.<a store's bought domain>: tenant mTLS, never the platform admin.
+  const isTenantAdminSubdomain = isAdminSubdomain && isTenantAdminHost(hostname)
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
   const adminCookie = adminCookieNameForHost(hostname)
 

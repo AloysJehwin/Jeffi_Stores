@@ -140,6 +140,30 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Bought domains: wallet charge → registration → DNS → certificates (lib/domains/orders.ts).
+    id: 'domain_orders',
+    name: 'Domain purchases',
+    path: '/api/internal/domains/orders-cron',
+    method: 'POST',
+    intervalMs: 5 * MIN,
+    intervalLabel: 'every 5 min',
+    startDelayMs: 165 * SEC,
+    lockTtlMs: 5 * MIN - 30 * SEC,
+    tenantScope: null,
+  },
+  {
+    // Yearly renewals of bought domains from the wallet; unpaid ones expire (lib/domains/renewal.ts).
+    id: 'domain_renew',
+    name: 'Renew bought domains',
+    path: '/api/internal/domains/renew-cron',
+    method: 'POST',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 255 * SEC,
+    lockTtlMs: HOUR,
+    tenantScope: null,
+  },
+  {
     // Daily S3 dump of each database on a store's own server, checked hourly (lib/provisioning/node-db-backup.ts).
     id: 'node_db_backup',
     name: 'Store server database backups',
@@ -666,6 +690,7 @@ const DAILY_AT_IST: Record<string, string> = {
   // Early morning IST, so a lapsing month is charged before most store traffic.
   ad_free_renew: '0 5',
   messaging_addon_renew: '10 5',
+  domain_renew: '20 5',
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
   s3_usage: '30 2',

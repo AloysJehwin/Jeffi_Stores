@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, X } from 'lucide-react'
 import Select from '@/components/ui/Select'
@@ -9,15 +9,16 @@ import RowActions, { type RowAction } from '@/components/admin/RowActions'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { EmptyState, ErrorState, TableSkeleton, type EmptyStateProps } from './states'
-import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl } from './infinite'
+import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl, type LoadPage } from './infinite'
 import { Pager, usePagedRows, EMBEDDED_PAGE_SIZE, type PagerControl } from './pager'
 import { SortArrow, useListSort, type SortType } from './list-sort'
 
 // List tables. A page's main list scrolls infinitely; a list inside a page (paged / pager) shows ‹ ›
 // arrows and a fixed page of rows. Client mode sorts in memory and reveals
 // pageSize rows at a time, or shows rows an `infinite` source (useInfiniteList) fetched so far.
-// Server mode reads and writes the page's existing query params (?page, ?sort&dir, filters,
-// search); rows of ?page=1..N accumulate client-side (see useServerPages). Both modes keep the
+// Server mode reads and writes the page's existing query params (?sort&dir, filters, search); the
+// server renders the first page and `loadPage` (a server action) appends the next ones without
+// touching the URL (see useServerPages). Both modes keep the
 // sort in ?sort&dir (see list-sort); column titles are the only sort control. A server page cannot pass `cols` (functions) across the
 // client boundary: define the columns in a small client component next to the page.
 
@@ -66,6 +67,8 @@ export interface DataTableProps<T> {
   pageSize?: number
   /** Server mode: page link builder; defaults to the current URL with ?page set. */
   pageHref?: (page: number) => string
+  /** Server mode: server action returning the rows of a later page, appended on scroll. */
+  loadPage?: LoadPage<T>
   /** Client mode fed page by page from an API (useInfiniteList): rows are everything loaded so far. */
   infinite?: InfiniteControl & { loading?: boolean }
   /** A list inside a page (more content below it): rows in memory, shown a page at a time with ‹ › arrows. */
@@ -223,9 +226,63 @@ function BulkButton<T>({ a, rows, done }: { a: BulkAction<T>; rows: T[]; done: (
   )
 }
 
+interface DataRowProps<T> {
+  r: T
+  k: string
+  cols: DataCol<T>[]
+  selectable?: boolean
+  isSelected: boolean
+  onToggle: (k: string) => void
+  onRowClick?: (r: T) => void
+  rowActions?: (r: T) => RowAction[]
+}
+
+// Memoized: appending a page renders only the new rows (cols and handlers keep their identity until
+// the parent itself re-renders).
+const DataRow = memo(function DataRow<T>({ r, k, cols, selectable, isSelected, onToggle, onRowClick, rowActions }: DataRowProps<T>) {
+  return (
+    <tr onClick={onRowClick ? () => onRowClick(r) : undefined} className={`border-b border-border-default/60 last:border-0 ${onRowClick ? 'cursor-pointer hover:bg-surface-secondary/60' : ''}`}>
+      {selectable && (
+        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" aria-label="Select row" checked={isSelected} onChange={() => onToggle(k)} />
+        </td>
+      )}
+      {cols.map(c => (
+        <td key={c.key} className={`whitespace-nowrap px-3 py-2.5 align-middle ${c.num ? 'text-right tabular-nums' : ''} ${c.hideBelow ? HIDE[c.hideBelow] : ''} ${c.className ?? ''}`}>
+          {c.render(r)}
+        </td>
+      ))}
+      {rowActions && (
+        <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+          <RowActions actions={rowActions(r)} size="sm" />
+        </td>
+      )}
+    </tr>
+  )
+}) as <T>(p: DataRowProps<T>) => ReactNode
+
+// After hydration only the layout that is showing renders (the server sends both, one hidden by CSS):
+// a long list otherwise keeps a second, invisible copy of every row and re-renders it on each append.
+function useWide(): boolean | null {
+  const [wide, setWide] = useState<boolean | null>(null)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const on = () => setWide(mq.matches)
+    on()
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return wide
+}
+
+const MobileCardRow = memo(function MobileCardRow<T>({ r, render }: { r: T; render: (r: T) => ReactNode }) {
+  return <div>{render(r)}</div>
+}) as <T>(p: { r: T; render: (r: T) => ReactNode }) => ReactNode
+
 export function DataTable<T>(props: DataTableProps<T>) {
   const { rows, cols, rowKey, mode = 'client', pageSize = props.paged ? EMBEDDED_PAGE_SIZE : 25, search, filters, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, pager, noun, hide, sortNs } = props
   const server = mode === 'server'
+  const wide = useWide()
   const listSort = useListSort(server ? undefined : sortNs)
   const sortKey = listSort.sort
   const desc = listSort.dir === 'desc'
@@ -251,14 +308,14 @@ export function DataTable<T>(props: DataTableProps<T>) {
     return r
   }, [server, rows, cols, sortKey, desc, q, search, infinite])
 
-  const sv = useServerPages({ rows: server ? rows : [], page: server ? (props.page ?? 1) : 1, total: server ? (props.total ?? rows.length) : 0, rowKey, pageHref: props.pageHref })
+  const sv = useServerPages({ rows: server ? rows : [], page: server ? (props.page ?? 1) : 1, total: server ? (props.total ?? rows.length) : 0, rowKey, pageHref: props.pageHref, loadPage: props.loadPage, pageSize: props.pageSize })
   const reveal = useReveal(shownRows, pageSize, `${q}|${sortKey}|${desc}`)
   const paging = usePagedRows(shownRows, pageSize, `${q}|${sortKey}|${desc}`)
   const pagerCtl = pager ?? (props.paged && !server ? paging.pager : null)
   const visibleAll = server ? sv.rows : infinite || pager ? shownRows : props.paged ? paging.shown : reveal.shown
   const visible = hide ? visibleAll.filter(r => !hide(r)) : visibleAll
   const control: InfiniteControl = server ? sv.control : infinite ? { ...infinite, total: q.trim() ? null : infinite.total } : reveal.control
-  const loading = props.loading || (server && sv.resetting) || !!infinite?.loading
+  const loading = props.loading || !!infinite?.loading
   const firstPageError = infinite && !rows.length ? infinite.error : null
   const error = props.error ?? firstPageError
   const loadedRows = server ? sv.rows : rows
@@ -274,6 +331,16 @@ export function DataTable<T>(props: DataTableProps<T>) {
     return key ? listSort.stateOf(key) : null
   }
 
+  const toggleRow = useCallback(
+    (k: string) =>
+      setSelected(prev => {
+        const n = new Set(prev)
+        if (n.has(k)) n.delete(k)
+        else n.add(k)
+        return n
+      }),
+    []
+  )
   const keys = visible.map(rowKey)
   const allOn = keys.length > 0 && keys.every(k => selected.has(k))
   const selectedRows = loadedRows.filter(r => selected.has(rowKey(r)))
@@ -324,7 +391,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
   else
     body = (
       <>
-        {(mobile || mobileCard) && <div className="space-y-2 md:hidden">{typeof mobile === 'function' ? mobile(visible) : (mobile ?? visible.map(r => <div key={rowKey(r)}>{mobileCard!(r)}</div>))}</div>}
+        {(mobile || mobileCard) && wide !== true && <div className="space-y-2 md:hidden">{typeof mobile === 'function' ? mobile(visible) : (mobile ?? visible.map(r => <MobileCardRow key={rowKey(r)} r={r} render={mobileCard!} />))}</div>}
+        {(!(mobile || mobileCard) || wide !== false) && (
         <div className={`${mobile || mobileCard ? 'hidden md:block' : ''} ${bare ? '' : 'rounded-xl border border-border-default bg-surface-elevated'} overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -368,42 +436,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
               <tbody>
                 {visible.map(r => {
                   const k = rowKey(r)
-                  return (
-                    <tr key={k} onClick={onRowClick ? () => onRowClick(r) : undefined} className={`border-b border-border-default/60 last:border-0 ${onRowClick ? 'cursor-pointer hover:bg-surface-secondary/60' : ''}`}>
-                      {selectable && (
-                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            aria-label="Select row"
-                            checked={selected.has(k)}
-                            onChange={() =>
-                              setSelected(prev => {
-                                const n = new Set(prev)
-                                if (n.has(k)) n.delete(k)
-                                else n.add(k)
-                                return n
-                              })
-                            }
-                          />
-                        </td>
-                      )}
-                      {cols.map(c => (
-                        <td key={c.key} className={`whitespace-nowrap px-3 py-2.5 align-middle ${c.num ? 'text-right tabular-nums' : ''} ${c.hideBelow ? HIDE[c.hideBelow] : ''} ${c.className ?? ''}`}>
-                          {c.render(r)}
-                        </td>
-                      ))}
-                      {rowActions && (
-                        <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                          <RowActions actions={rowActions(r)} size="sm" />
-                        </td>
-                      )}
-                    </tr>
-                  )
+                  return <DataRow key={k} r={r} k={k} cols={cols} selectable={selectable} isSelected={selected.has(k)} onToggle={toggleRow} onRowClick={onRowClick} rowActions={rowActions} />
                 })}
               </tbody>
             </table>
           </div>
         </div>
+        )}
       </>
     )
 
