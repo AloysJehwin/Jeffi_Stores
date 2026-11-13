@@ -485,6 +485,9 @@ CREATE INDEX idx_message_logs_provider_sid ON public.message_logs USING btree (p
 
 CREATE INDEX idx_email_logs_status_sent_at ON public.email_logs USING btree (status, sent_at DESC);
 
+-- The campaign per-person cap counts one person's emails of one campaign (canSendMarketing).
+CREATE INDEX IF NOT EXISTS idx_email_logs_user_template_sent ON public.email_logs USING btree (user_id, template_name, sent_at DESC);
+
 
 
 --
