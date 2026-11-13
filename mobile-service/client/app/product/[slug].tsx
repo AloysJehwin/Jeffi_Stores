@@ -39,6 +39,7 @@ import ProductReviews, { ReviewSummaryLink, reviewSummary, useReviews } from '..
 import FrequentlyBoughtTogether from '../../src/components/pdp/FrequentlyBoughtTogether'
 import ProductSpecifications from '../../src/components/pdp/ProductSpecifications'
 import FeaturesUseCases from '../../src/components/pdp/FeaturesUseCases'
+import ProductInfoSections from '../../src/components/pdp/ProductInfoSections'
 import ProductMediaExtras, { ProductFaqs, resolvePdpMedia } from '../../src/components/pdp/ProductMediaExtras'
 import PdpCompareSection, { type CompareItem } from '../../src/components/pdp/PdpCompareSection'
 import CustomersAlsoViewed from '../../src/components/pdp/CustomersAlsoViewed'
@@ -46,6 +47,7 @@ import PdpRecentlyViewed from '../../src/components/pdp/PdpRecentlyViewed'
 import FeaturedForYou from '../../src/components/pdp/FeaturedForYou'
 import { RequestQuoteSheet } from '../../src/components/business/RequestQuoteSheet'
 import { useBusiness } from '../../src/components/account/hooks'
+import { resolveReturnPolicy } from '../../src/lib/return-policy'
 
 // Mirror of controller-service app/(storefront)/products/[slug]/page.tsx + ProductDetailClient at the mobile breakpoint.
 
@@ -268,25 +270,12 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
     }
   }
 
-  // Effective return / replacement policy: a brand opt-out wins, then category, then brand, then 7 days.
-  const brand = product.brands
-  const cat = product.categories
-  const returnAllowed =
-    brand?.return_allowed === false || cat?.return_allowed === false ? false : (brand?.return_allowed ?? cat?.return_allowed ?? true)
-  const returnDays = returnAllowed
-    ? brand?.return_allowed === false
-      ? (brand.return_window_days ?? 7)
-      : (cat?.return_window_days ?? brand?.return_window_days ?? 7)
-    : 0
-  const replacementAllowed =
-    brand?.replacement_allowed === false || cat?.replacement_allowed === false
-      ? false
-      : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
-  const replacementDays = replacementAllowed
-    ? brand?.replacement_allowed === false
-      ? (brand.replacement_window_days ?? 7)
-      : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7)
-    : 0
+  // Same rule as the website and order-time returns.
+  const { returnAllowed, returnDays, replacementAllowed, replacementDays } = resolveReturnPolicy({
+    productReturnWindowDays: product.return_window_days,
+    brand: product.brands,
+    category: product.categories,
+  })
 
   const primaryImage = primaryOf(product)
   const currentCard = toCard(product as any, gstEnabled)
@@ -407,6 +396,8 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
             <ProductMediaExtras items={selectedMedia} />
 
             <ProductSpecifications product={product} />
+
+            <ProductInfoSections product={product} />
 
             <ProductFaqs faqs={product.faqs ?? []} />
 

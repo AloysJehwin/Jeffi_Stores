@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { listBrandsWithCounts } from '@/lib/catalog/storefront-counts'
+import { applyBrandProfile } from '@/lib/catalog/brand-draft'
+import { BRAND_PROFILE_FIELDS } from '@/lib/catalog/brand-fields'
+import { parseBodyFields } from '@/lib/catalog/entity-fields'
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,6 +37,8 @@ export async function POST(request: NextRequest) {
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
       [name, slug, description || null, website || null, logo_url || null, is_active ?? true]
     )
+    // Profile columns (brand-fields.ts) when the body carries any.
+    await applyBrandProfile({ query: (t: string, p?: unknown[]) => query(t, p) } as any, brand.rows[0].id, parseBodyFields(BRAND_PROFILE_FIELDS, body))
 
     return NextResponse.json({ success: true, id: brand.rows[0].id })
   } catch (error: any) {

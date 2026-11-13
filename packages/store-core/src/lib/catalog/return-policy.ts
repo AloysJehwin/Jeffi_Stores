@@ -1,29 +1,19 @@
 import { queryMany } from '@/lib/shared/db'
+import { resolveReturnPolicy, type ReturnPolicy, type ReturnPolicySource } from './return-policy-rules'
 
-export interface ReturnPolicy {
-  return_allowed: boolean
-  return_window_days: number
-  replacement_allowed: boolean
-  replacement_window_days: number
-}
+export type { ReturnPolicy } from './return-policy-rules'
 
 export interface OrderItemPolicy extends ReturnPolicy {
   product_id: string
   product_name: string
-  source: 'brand' | 'category' | 'parent_category' | 'default' | 'restrictive'
-}
-
-const DEFAULT_POLICY: ReturnPolicy = {
-  return_allowed: true,
-  return_window_days: 7,
-  replacement_allowed: true,
-  replacement_window_days: 7,
+  source: ReturnPolicySource
 }
 
 export async function getOrderItemsPolicy(orderId: string): Promise<OrderItemPolicy[]> {
   const rows = await queryMany<{
     product_id: string
     product_name: string
+    product_return_window_days: number | null
     brand_return_allowed: boolean | null
     brand_return_window_days: number | null
     brand_replacement_allowed: boolean | null
@@ -40,6 +30,7 @@ export async function getOrderItemsPolicy(orderId: string): Promise<OrderItemPol
     `SELECT
        oi.product_id::text,
        p.name AS product_name,
+       p.return_window_days AS product_return_window_days,
        b.return_allowed AS brand_return_allowed,
        b.return_window_days AS brand_return_window_days,
        b.replacement_allowed AS brand_replacement_allowed,
@@ -61,50 +52,31 @@ export async function getOrderItemsPolicy(orderId: string): Promise<OrderItemPol
     [orderId]
   )
 
-  return rows.map(r => {
-    const returnFlags = [r.brand_return_allowed, r.category_return_allowed, r.parent_return_allowed].filter(
-      v => v !== null
-    ) as boolean[]
-    const replaceFlags = [
-      r.brand_replacement_allowed,
-      r.category_replacement_allowed,
-      r.parent_replacement_allowed,
-    ].filter(v => v !== null) as boolean[]
-    const returnWindows = [
-      r.brand_return_window_days,
-      r.category_return_window_days,
-      r.parent_return_window_days,
-    ].filter(v => v !== null) as number[]
-    const replaceWindows = [
-      r.brand_replacement_window_days,
-      r.category_replacement_window_days,
-      r.parent_replacement_window_days,
-    ].filter(v => v !== null) as number[]
-
-    const return_allowed = returnFlags.length > 0 ? returnFlags.every(Boolean) : DEFAULT_POLICY.return_allowed
-    const replacement_allowed =
-      replaceFlags.length > 0 ? replaceFlags.every(Boolean) : DEFAULT_POLICY.replacement_allowed
-    const return_window_days = returnWindows.length > 0 ? Math.min(...returnWindows) : DEFAULT_POLICY.return_window_days
-    const replacement_window_days =
-      replaceWindows.length > 0 ? Math.min(...replaceWindows) : DEFAULT_POLICY.replacement_window_days
-
-    let source: OrderItemPolicy['source'] = 'default'
-    if (returnFlags.length === 0 && replaceFlags.length === 0) source = 'default'
-    else if (returnFlags.length + replaceFlags.length > 2) source = 'restrictive'
-    else if (r.brand_return_allowed !== null || r.brand_replacement_allowed !== null) source = 'brand'
-    else if (r.category_return_allowed !== null || r.category_replacement_allowed !== null) source = 'category'
-    else source = 'parent_category'
-
-    return {
-      product_id: r.product_id,
-      product_name: r.product_name,
-      return_allowed,
-      return_window_days,
-      replacement_allowed,
-      replacement_window_days,
-      source,
-    }
-  })
+  return rows.map(r => ({
+    product_id: r.product_id,
+    product_name: r.product_name,
+    ...resolveReturnPolicy({
+      productReturnWindowDays: r.product_return_window_days,
+      brand: {
+        return_allowed: r.brand_return_allowed,
+        return_window_days: r.brand_return_window_days,
+        replacement_allowed: r.brand_replacement_allowed,
+        replacement_window_days: r.brand_replacement_window_days,
+      },
+      category: {
+        return_allowed: r.category_return_allowed,
+        return_window_days: r.category_return_window_days,
+        replacement_allowed: r.category_replacement_allowed,
+        replacement_window_days: r.category_replacement_window_days,
+      },
+      parent: {
+        return_allowed: r.parent_return_allowed,
+        return_window_days: r.parent_return_window_days,
+        replacement_allowed: r.parent_replacement_allowed,
+        replacement_window_days: r.parent_replacement_window_days,
+      },
+    }),
+  }))
 }
 
 export async function checkReturnEligibility(

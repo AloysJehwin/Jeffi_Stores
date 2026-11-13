@@ -5,7 +5,21 @@ import { useQueryClient } from '@tanstack/react-query'
 import * as Notifications from 'expo-notifications'
 import { markNotificationOpened } from '../../api/notifications'
 import { openHref } from '../../lib/links'
-import { detachPushDevice, initPush, maybePromptForPush, maybePromptOnFirstLaunch, PUSH_PERMISSION_KEY, pushData, syncPushDevice } from '../../lib/push'
+import {
+  detachPushDevice,
+  initPush,
+  maybePromptForPush,
+  maybePromptOnFirstLaunch,
+  maybeRemindOnOpen,
+  PUSH_PERMISSION_KEY,
+  pushData,
+  recordAppOpen,
+  syncPushDevice,
+} from '../../lib/push'
+import { usePushPromptStore } from '../../stores/pushPromptStore'
+
+// Back after this long in the background counts as a new app open.
+const REOPEN_AFTER_MS = 10 * 60_000
 import { useAuthStore } from '../../stores/authStore'
 
 // Root-level push wiring: channels and handler, device registration per signed-in user, taps from a
@@ -75,13 +89,29 @@ export function PushBootstrap() {
     else if (userId) router.push('/notifications')
   }, [tap, authLoading, navReady, userId, router, qc])
 
-  // First launch: offer notifications once the storefront has settled (once per install).
+  // First launch: offer notifications once the storefront has settled (once per install). Every
+  // later open is counted, and push still off on every third one brings the ask back.
   const onTabs = segments[0] === '(tabs)'
+  const pendingOpen = useRef(true)
   useEffect(() => {
-    if (!navReady || authLoading || !onTabs) return
-    const timer = setTimeout(() => void maybePromptOnFirstLaunch(), 2500)
+    let backgroundedAt = 0
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'background') backgroundedAt = Date.now()
+      else if (s === 'active' && backgroundedAt && Date.now() - backgroundedAt >= REOPEN_AFTER_MS) pendingOpen.current = true
+    })
+    return () => sub.remove()
+  }, [])
+  const appActive = useAppActive()
+  useEffect(() => {
+    if (!navReady || authLoading || !onTabs || !appActive || !pendingOpen.current) return
+    pendingOpen.current = false
+    const timer = setTimeout(async () => {
+      const opens = await recordAppOpen()
+      if (opens === 1) await maybePromptOnFirstLaunch()
+      else if (!usePushPromptStore.getState().reason) await maybeRemindOnOpen(opens)
+    }, 2500)
     return () => clearTimeout(timer)
-  }, [navReady, authLoading, onTabs])
+  }, [navReady, authLoading, onTabs, appActive])
 
   // The order placed page: offer delivery updates once the celebration has played.
   const onConfirmation = segments.join('/') === 'checkout/confirmation'
@@ -92,4 +122,14 @@ export function PushBootstrap() {
   }, [onConfirmation])
 
   return null
+}
+
+/** Re-renders when the app comes to the foreground, so a counted reopen runs its effect. */
+function useAppActive(): boolean {
+  const [active, setActive] = useState(AppState.currentState === 'active')
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => setActive(s === 'active'))
+    return () => sub.remove()
+  }, [])
+  return active
 }

@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_INTERVALS, type SubscriptionInterval } from '@/lib/subscriptions/intervals'
+import { EXTRA_FIELDS, type ExtraField, type ExtraGroup } from '@/lib/catalog/product-extra-fields'
 
 export type RowType = 'product' | 'variant' | 'sub_variant'
 export type Coercer = 'text' | 'number' | 'int' | 'bool' | 'date' | 'csv' | 'json'
@@ -8,6 +9,7 @@ export type Coercer = 'text' | 'number' | 'int' | 'bool' | 'date' | 'csv' | 'jso
 // unwieldy. Attribute sheets are keyed back to their level's SKU.
 export type SheetName =
   | 'Products'
+  | 'Product · Details'
   | 'Variants'
   | 'Sub-variants'
   | 'Product · Shipping'
@@ -254,6 +256,48 @@ export const PRODUCT_COLUMNS: ImportColumn[] = [
   { key: 'target_audience', header: 'target_audience', coerce: 'csv', rowTypes: ['product'] },
 ]
 
+// The product form's detail fields (product-extra-fields.ts) join the template automatically, so a
+// field added to the editor is importable and syncable without being listed here too.
+const EXTRA_COERCE: Record<ExtraField['type'], Coercer> = {
+  text: 'text',
+  textarea: 'text',
+  url: 'text',
+  select: 'text',
+  month: 'text',
+  int: 'int',
+  numeric: 'number',
+  bool: 'bool',
+  list: 'csv',
+}
+const EXTRA_SHEET: Record<ExtraGroup, SheetName> = {
+  overview: 'Product · Details',
+  commercial: 'Product · Details',
+  usage: 'Product · Details',
+  internal: 'Product · Details',
+  legal: 'Product · Compliance',
+  shipping: 'Product · Shipping',
+  digital: 'Product · Digital',
+  subscription: 'Product · Digital',
+  seo: 'Product · SEO & Audience',
+}
+export const extraEnumKey = (key: string) => `extra_${key}`
+const known = new Set(PRODUCT_COLUMNS.map(c => c.key))
+for (const f of EXTRA_FIELDS) {
+  if (known.has(f.key)) continue
+  PRODUCT_COLUMNS.push({
+    key: f.key,
+    header: f.key,
+    coerce: EXTRA_COERCE[f.type],
+    rowTypes: ['product'],
+    sheet: EXTRA_SHEET[f.group],
+    help:
+      [f.label, f.type === 'month' ? 'YYYY-MM' : f.type === 'list' ? 'comma separated' : f.type === 'url' ? 'https://…' : '', f.hint]
+        .filter(Boolean)
+        .join(' — '),
+    ...(f.type === 'select' && f.options ? { enumKey: extraEnumKey(f.key) } : {}),
+  })
+}
+
 // Variant columns — the product_variants INSERT list in the publish path.
 export const VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'sku', header: 'variant.sku', coerce: 'text', rowTypes: ['variant'], required: true },
@@ -441,6 +485,7 @@ export function sheetFor(col: ImportColumn): SheetName {
 // Sheets in workbook order (after the README sheet, which the template builder adds first).
 export const SHEET_ORDER: SheetName[] = [
   'Products',
+  'Product · Details',
   'Product · Shipping',
   'Product · Compliance',
   'Product · Digital',

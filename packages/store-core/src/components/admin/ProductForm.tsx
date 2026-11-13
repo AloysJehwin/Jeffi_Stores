@@ -50,11 +50,13 @@ import { AiInsightsPanel, ExtraFieldsGroup, FaqEditor, type FaqRow } from './pro
 import MediaManager, { type MediaVariant } from './product-form/MediaManager'
 import { DEFAULT_MEDIA_LIMITS, scopeKey, type MediaLimits, type MediaScope, type StagedMedia } from '@/lib/catalog/product-media-shared'
 import type { MergeConflict } from '@/lib/admin/draft-merge'
+import { hsnMatchesPrefixes, resolveCategoryDefaults } from '@/lib/catalog/category-fields'
 
 interface Category {
   id: string
   name: string
   parent_category_id: string | null
+  [key: string]: unknown
 }
 
 interface Brand {
@@ -413,6 +415,19 @@ function inclToEx(inclVal: string, rate: number): string {
   return String(Math.round((n / (1 + rate / 100)) * 100) / 100)
 }
 
+type DetailsTab = 'overview' | 'specs' | 'commercial' | 'compliance' | 'shipping' | 'digital' | 'faqs' | 'internal'
+
+const DETAILS_TABS: { id: DetailsTab; label: string }[] = [
+  { id: 'overview', label: 'Overview & usage' },
+  { id: 'specs', label: 'Specifications' },
+  { id: 'commercial', label: 'Commercial & tax' },
+  { id: 'compliance', label: 'Compliance' },
+  { id: 'shipping', label: 'Shipping & lifecycle' },
+  { id: 'digital', label: 'Digital & subscription' },
+  { id: 'faqs', label: 'FAQs' },
+  { id: 'internal', label: 'Internal' },
+]
+
 type PfTab = 'basics' | 'pricing' | 'media' | 'details' | 'seo' | 'variants' | 'subvariants' | 'units'
 
 const PF_TAB_LABELS: Record<PfTab, string> = {
@@ -770,6 +785,7 @@ export default function ProductForm({
     if (q && q in PF_TAB_LABELS) return q
     return searchParams.get('popup') ? 'variants' : 'basics'
   })
+  const [detailsTab, setDetailsTab] = useState<DetailsTab>('overview')
   const [svVariantId, setSvVariantId] = useState<string | null>(null)
   // Variant details (images, sub-variants, units) load once the Variants or Sub-variants tab is opened.
   const [variantsOpened, setVariantsOpened] = useState(false)
@@ -786,6 +802,34 @@ export default function ProductForm({
   // Tax & Finance
   const [taxClass, setTaxClass] = useState(product?.tax_class || 'standard')
   const [inclusiveTax, setInclusiveTax] = useState(product?.inclusive_tax ?? false)
+  // Category defaults (category-fields.ts): a new product starts with them; HSN is checked against the prefixes.
+  const hsnRef = useRef<HTMLInputElement>(null)
+  const [hsnValue, setHsnValue] = useState<string>(product?.hsn_code || '')
+  const categoryDefaults = useMemo(() => resolveCategoryDefaults(categories, categoryId), [categories, categoryId])
+  const [prefilledFrom, setPrefilledFrom] = useState<string[]>([])
+  useEffect(() => {
+    if (product || !categoryId) return
+    const d = categoryDefaults
+    const filled: string[] = []
+    if (d.default_hsn_code && hsnRef.current && !hsnRef.current.value.trim()) {
+      hsnRef.current.value = d.default_hsn_code
+      setHsnValue(d.default_hsn_code)
+      filled.push(`HSN ${d.default_hsn_code}`)
+    }
+    if (d.default_gst_rate != null) {
+      setGstRate(Number(d.default_gst_rate))
+      filled.push(`GST ${Number(d.default_gst_rate)}%`)
+    }
+    if (d.default_tax_class) setTaxClass(d.default_tax_class)
+    if (d.default_handling_days != null) {
+      setHandlingDays(String(d.default_handling_days))
+      filled.push(`${d.default_handling_days} handling days`)
+    }
+    if (d.default_shipping_class) setShippingClass(d.default_shipping_class)
+    if (d.default_package_type) setProductPackageType(d.default_package_type)
+    if (d.cod_allowed != null) setIsCodAllowed(!!d.cod_allowed)
+    setPrefilledFrom(filled)
+  }, [categoryId]) // eslint-disable-line react-hooks/exhaustive-deps
   // Age / Audience
   const [ageMin, setAgeMin] = useState(product?.age_min != null ? String(product.age_min) : '')
   const [ageMax, setAgeMax] = useState(product?.age_max != null ? String(product.age_max) : '')
@@ -2258,6 +2302,13 @@ export default function ProductForm({
 
   const subVariantParents = hasVariants ? activeVariants.filter(v => v.sub_variant_type_on) : []
   const svParent = subVariantParents.find(v => v.id === svVariantId) || subVariantParents[0] || null
+  const productAiContext = [
+    productName && `Product: ${productName}`,
+    brands.find(b => b.id === brandId)?.name && `Brand: ${brands.find(b => b.id === brandId)?.name}`,
+    categories.find(c => c.id === categoryId)?.name && `Category: ${categories.find(c => c.id === categoryId)?.name}`,
+  ]
+    .filter(Boolean)
+    .join('. ')
   const visibleTabs: PfTab[] = ['basics', 'pricing', 'media', 'details', 'seo']
   if (hasVariants) visibleTabs.push('variants')
   if (subVariantParents.length > 0) visibleTabs.push('subvariants')
@@ -2309,6 +2360,7 @@ export default function ProductForm({
   useEffect(() => {
     const t = errorMessages.map(m => errorTab(m, hasVariants)).find(Boolean)
     if (t) setTab(t)
+    if (t === 'details') setDetailsTab(errorMessages.some(m => /^subscription|cycle/i.test(m.trim())) ? 'digital' : 'specs')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, errorDetails])
 
@@ -2325,8 +2377,10 @@ export default function ProductForm({
       }, 0)
       const el = e.target as HTMLInputElement
       const panel = el.closest<HTMLElement>('[data-pf-tab]')
-      if (!panel?.hidden) return
-      setTab(panel.dataset.pfTab as PfTab)
+      const sub = el.closest<HTMLElement>('[data-pf-subtab]')
+      if (!panel?.hidden && !sub?.hidden) return
+      if (panel?.hidden) setTab(panel.dataset.pfTab as PfTab)
+      if (sub?.hidden) setDetailsTab(sub.dataset.pfSubtab as DetailsTab)
       setTimeout(() => el.reportValidity?.(), 30)
     }
     form.addEventListener('invalid', onInvalid, true)
@@ -3777,11 +3831,22 @@ export default function ProductForm({
                     type="text"
                     id="hsn_code"
                     name="hsn_code"
+                    ref={hsnRef}
                     defaultValue={product?.hsn_code}
+                    onChange={e => setHsnValue(e.target.value)}
                     className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    placeholder="e.g., 8531"
+                    placeholder={categoryDefaults.default_hsn_code ? `Category default: ${categoryDefaults.default_hsn_code}` : 'e.g., 8531'}
                   />
-                  <p className="text-xs text-foreground-muted mt-1">Required for GST invoices</p>
+                  {hsnMatchesPrefixes(hsnValue, categoryDefaults.hsn_prefixes) ? (
+                    <p className="text-xs text-foreground-muted mt-1">
+                      Required for GST invoices
+                      {!hsnValue.trim() && categoryDefaults.default_hsn_code ? `. Invoices use the category's ${categoryDefaults.default_hsn_code} while empty.` : ''}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      This category expects HSN starting with {categoryDefaults.hsn_prefixes.join(', ')}.
+                    </p>
+                  )}
                 </div>
 
                 {/* MPN — hidden when has variants */}
@@ -3847,6 +3912,7 @@ export default function ProductForm({
                     })
                     return opts.map(({ _hasParent, ...rest }) => rest)
                   })()}
+                  hint={prefilledFrom.length ? `Filled from the category: ${prefilledFrom.join(', ')}.` : undefined}
                 />
 
                 {/* Brand */}
@@ -4288,6 +4354,18 @@ export default function ProductForm({
             {useMediaTab && productId ? (
               <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
                 <MediaManager
+                  ai={{
+                    context: productAiContext,
+                    imagePrompt: buildProductImagePrompt({
+                      name: productName,
+                      brand: brands.find(b => b.id === brandId)?.name,
+                      category: categories.find(c => c.id === categoryId)?.name,
+                      specs: specifications,
+                    }),
+                    videoPrompt: productName
+                      ? `${productName} slowly rotating on a clean studio surface, soft light, smooth camera orbit, no text`
+                      : undefined,
+                  }}
                   productId={productId}
                   initial={initialMedia!}
                   variants={mediaVariants}
@@ -4393,1078 +4471,1125 @@ export default function ProductForm({
             )}
           </div>
           <div data-pf-tab="details" role="tabpanel" hidden={activeTab !== 'details'}>
-            <section className="space-y-4 rounded-xl border border-border-default bg-surface-elevated p-5">
-              {/* Product Details */}
-              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                  <span>Product Details{showBootstrap ? ' — stock to assign' : ''}</span>
+            <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
+              <div className="flex flex-col gap-5 md:flex-row">
+              <nav aria-label="Details sections" className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-48 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+                {DETAILS_TABS.map(d => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    aria-current={detailsTab === d.id ? 'true' : undefined}
+                    onClick={() => setDetailsTab(d.id)}
+                    className={`flex shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                      detailsTab === d.id
+                        ? 'bg-accent-50 font-medium text-accent-700 dark:bg-accent-500/15 dark:text-accent-300'
+                        : 'text-foreground-secondary hover:bg-surface-secondary hover:text-foreground'
+                    }`}
+                  >
+                    {d.label}
+                    {d.id === 'specs' && showBootstrap && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title="Existing stock to assign" />
+                    )}
+                  </button>
+                ))}
+              </nav>
+              <div className="min-w-0 flex-1">
+                <div data-pf-subtab="overview" hidden={detailsTab !== 'overview'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default empty:hidden">
+                      <ExtraFieldsGroup aiContext={productAiContext} group="overview" product={product} />
+                      <ExtraFieldsGroup aiContext={productAiContext} group="usage" product={product} />
+                  </div>
                 </div>
-                <div className="border-t border-border-default divide-y divide-border-default">
-                  <ExtraFieldsGroup group="overview" product={product} />
-                  <ExtraFieldsGroup
-                    group="commercial"
-                    product={product}
-                    omit={hasReturns ? [] : ['return_window_days', 'replacement_policy']}
-                  />
-                  <ExtraFieldsGroup group="usage" product={product} />
-                  <ExtraFieldsGroup
-                    group="legal"
-                    product={product}
-                    note="Declarations required on packaged goods (Legal Metrology (Packaged Commodities) Rules)."
-                  />
-                  {!isDigital && <ExtraFieldsGroup group="shipping" product={product} />}
-                  {isDigital && <ExtraFieldsGroup group="digital" product={product} />}
-                  {subscriptionsEnabled && isSubscription && (
-                    <ExtraFieldsGroup
-                      group="subscription"
-                      product={product}
-                      omit={hasVariants ? ['subscription_price_ex_gst'] : []}
-                    />
-                  )}
-                  {/* Physical Attributes */}
-                  <div>
-                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                      <span>Physical Attributes</span>
-                    </div>
-                    <div className="p-4 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Grade</label>
-                          <input
-                            type="text"
-                            value={grade}
-                            onChange={e => setGrade(e.target.value)}
-                            className={inputCls}
-                            placeholder="e.g. 8.8, 10.9, 304, M2 HSS"
-                          />
-                        </div>
-                      </div>
+                <div data-pf-subtab="specs" hidden={detailsTab !== 'specs'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default empty:hidden">
+                      {/* Physical Attributes */}
                       <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Technical Specifications
-                        </label>
-                        <div className="space-y-2">
-                          {specifications.map((spec, i) => (
-                            <div key={i} className="flex gap-2">
+                        <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                          <span>Physical Attributes</span>
+                        </div>
+                        <div className="p-4 space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Grade</label>
                               <input
                                 type="text"
-                                value={spec.key}
-                                onChange={e =>
-                                  setSpecifications(s =>
-                                    s.map((x, j) => (j === i ? { ...x, key: e.target.value } : x))
-                                  )
-                                }
+                                value={grade}
+                                onChange={e => setGrade(e.target.value)}
                                 className={inputCls}
-                                placeholder="e.g. thread_type"
+                                placeholder="e.g. 8.8, 10.9, 304, M2 HSS"
                               />
-                              <input
-                                type="text"
-                                value={spec.value}
-                                onChange={e =>
-                                  setSpecifications(s =>
-                                    s.map((x, j) => (j === i ? { ...x, value: e.target.value } : x))
-                                  )
-                                }
-                                className={inputCls}
-                                placeholder="e.g. Metric"
-                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                              Technical Specifications
+                            </label>
+                            <div className="space-y-2">
+                              {specifications.map((spec, i) => (
+                                <div key={i} className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={spec.key}
+                                    onChange={e =>
+                                      setSpecifications(s =>
+                                        s.map((x, j) => (j === i ? { ...x, key: e.target.value } : x))
+                                      )
+                                    }
+                                    className={inputCls}
+                                    placeholder="e.g. thread_type"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={spec.value}
+                                    onChange={e =>
+                                      setSpecifications(s =>
+                                        s.map((x, j) => (j === i ? { ...x, value: e.target.value } : x))
+                                      )
+                                    }
+                                    className={inputCls}
+                                    placeholder="e.g. Metric"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setSpecifications(s => s.filter((_, j) => j !== i))}
+                                    className="px-2 text-foreground-muted hover:text-red-500"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
                               <button
                                 type="button"
-                                onClick={() => setSpecifications(s => s.filter((_, j) => j !== i))}
-                                className="px-2 text-foreground-muted hover:text-red-500"
+                                onClick={() => setSpecifications(s => [...s, { key: '', value: '' }])}
+                                className="text-xs text-accent-600 hover:text-accent-700 font-medium"
                               >
-                                ✕
+                                + Add specification
                               </button>
                             </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => setSpecifications(s => [...s, { key: '', value: '' }])}
-                            className="text-xs text-accent-600 hover:text-accent-700 font-medium"
-                          >
-                            + Add specification
-                          </button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Color</label>
-                          <input
-                            type="text"
-                            value={color}
-                            onChange={e => setColor(e.target.value)}
-                            className={inputCls}
-                            placeholder="e.g. Stainless Silver"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Color Hex
-                          </label>
-                          <div className="flex gap-2 items-center">
-                            <input
-                              type="color"
-                              value={colorHex}
-                              onChange={e => {
-                                colorHexTouched.current = true
-                                setColorHex(e.target.value)
-                              }}
-                              className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface"
-                            />
-                            <input
-                              type="text"
-                              value={colorHex}
-                              onChange={e => {
-                                colorHexTouched.current = true
-                                setColorHex(e.target.value)
-                              }}
-                              className={inputCls}
-                              placeholder="#000000"
-                              maxLength={7}
-                            />
                           </div>
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Volume (ml)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={volumeMl}
-                            onChange={e => setVolumeMl(e.target.value)}
-                            className={inputCls}
-                            placeholder="For liquids/paints"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Net Weight (g)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={netWeightGrams}
-                            onChange={e => setNetWeightGrams(e.target.value)}
-                            className={inputCls}
-                            placeholder="Product without packaging"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-                        <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
-                        <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
-                        <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
-                        {hasInventory && (
-                          <Toggle
-                            id="perishable"
-                            checked={perishable}
-                            onChange={next => {
-                              if (!next && perishableBatchTotal > 0) {
-                                setConfirmUnperishable(true)
-                                return
-                              }
-                              setPerishable(next)
-                            }}
-                            label="Perishable"
-                          />
-                        )}
-                        {hasInventory && (
-                          <Toggle
-                            id="serialized"
-                            checked={serialized}
-                            onChange={next => {
-                              if (!next && serializedStockTotal > 0) {
-                                setConfirmUnSerialized(true)
-                                return
-                              }
-                              setSerialized(next)
-                            }}
-                            label="Serialized"
-                          />
-                        )}
-                      </div>
-
-                      {showBootstrap &&
-                        (() => {
-                          const sku = (product?.sku || '')
-                            .replace(/[^A-Z0-9]/gi, '')
-                            .slice(0, 8)
-                            .toUpperCase()
-                          const autoSerial = () => generateSerialNumber(sku)
-                          const keyOf = (g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`
-                          // Read a grain's entry, materialising the lazy default when absent.
-                          // Backfill the newer selected/assignQty fields for entries restored
-                          // from a pre-change draft (they'd otherwise be undefined).
-                          const entryOf = (g: BsGrain): BsEntry => {
-                            const e = bsEntries[keyOf(g)]
-                            if (!e) return _bsMakeEntry(g.qty)
-                            return {
-                              ...e,
-                              selected: e.selected ?? true,
-                              assignQty: e.assignQty ?? g.qty,
-                            }
-                          }
-                          const patchEntry = (g: BsGrain, patch: Partial<BsEntry>) => {
-                            const key = keyOf(g)
-                            setBsEntries(prev => {
-                              const base = prev[key] ?? _bsMakeEntry(g.qty)
-                              return { ...prev, [key]: { ...base, ...patch } }
-                            })
-                          }
-                          const regenLot = (g: BsGrain) => {
-                            patchEntry(g, { lot: generateLotNumber(sku) })
-                          }
-                          const updateSerial = (g: BsGrain, i: number, val: string) => {
-                            const key = keyOf(g)
-                            setBsEntries(prev => {
-                              const base = prev[key] ?? _bsMakeEntry(g.qty)
-                              const a = [...(base.serials || [])]
-                              a[i] = val
-                              return { ...prev, [key]: { ...base, serials: a } }
-                            })
-                          }
-                          const generateAll = (g: BsGrain) => {
-                            patchEntry(g, { serials: generateSerialRun(sku, bsSerialCount(g, entryOf(g).assignQty)) })
-                          }
-                          // Clamp an assignQty edit to [1, g.qty]; also trim serials to fit.
-                          const setAssignQty = (g: BsGrain, raw: number) => {
-                            const key = keyOf(g)
-                            const clamped = Math.max(1, Math.min(g.qty, Math.floor(raw) || 1))
-                            setBsEntries(prev => {
-                              const base = prev[key] ?? _bsMakeEntry(g.qty)
-                              const serials = (base.serials || []).slice(0, bsSerialCount(g, clamped))
-                              return { ...prev, [key]: { ...base, assignQty: clamped, serials } }
-                            })
-                          }
-                          // Running total of units that will be tracked (selected grains).
-                          const selectedTotal = bsGrains.reduce((s, g) => {
-                            const e = entryOf(g)
-                            return s + (e.selected === false ? 0 : e.assignQty)
-                          }, 0)
-                          return (
-                            <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-4">
-                              <div>
-                                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
-                                  Assign Existing Stock
-                                </p>
-                                <p className="text-xs text-foreground-secondary mt-0.5">
-                                  Choose which variants and how many units to track.
-                                </p>
-                                <p className="text-xs text-foreground-muted mt-0.5">
-                                  <span className="font-semibold">{selectedTotal}</span> of {_bsStockTotal} units will
-                                  be tracked; {_bsStockTotal - selectedTotal} stay as plain stock.
-                                </p>
-                              </div>
-
-                              {bsGrains.map(g => {
-                                const entry = entryOf(g)
-                                const serials = entry.serials || []
-                                const entered = serials.filter(Boolean).length
-                                const isSelected = entry.selected !== false
-                                const assignQty = entry.assignQty
-                                const serialCount = bsSerialCount(g, assignQty)
-                                return (
-                                  <div
-                                    key={keyOf(g)}
-                                    className="rounded-lg border border-border-default bg-surface/60 p-3 space-y-3"
-                                  >
-                                    <div className="flex items-center justify-between gap-3">
-                                      <label className="flex items-center gap-2 min-w-0">
-                                        <input
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={e => patchEntry(g, { selected: e.target.checked })}
-                                          className="h-4 w-4 rounded border-border-default text-secondary-600 focus:ring-secondary-500"
-                                        />
-                                        <span className="text-xs font-semibold text-foreground truncate">
-                                          {g.label}
-                                        </span>
-                                      </label>
-                                      <div className="flex items-center gap-1.5 shrink-0">
-                                        <input
-                                          type="number"
-                                          min={1}
-                                          max={g.qty}
-                                          disabled={!isSelected}
-                                          value={assignQty}
-                                          onChange={e => setAssignQty(g, Number(e.target.value))}
-                                          className="field-compact w-16 border border-border-default bg-surface text-foreground text-xs text-right disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                        />
-                                        <span className="text-xs text-foreground-muted">/ {g.qty}</span>
-                                      </div>
-                                    </div>
-
-                                    {isSelected && _serializedPending && bsWriteOff(g, assignQty) > 0 && (
-                                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
-                                        <p className="text-xs text-foreground">
-                                          Sold in steps of {g.qty_step} — only {serialCount * (g.qty_step || 1)} of{' '}
-                                          {assignQty} units can be labelled.{' '}
-                                          <strong>
-                                            {bsWriteOff(g, assignQty)} unit{bsWriteOff(g, assignQty) !== 1 ? 's' : ''}{' '}
-                                            will be written off
-                                          </strong>{' '}
-                                          on save, leaving {serialCount * (g.qty_step || 1)} in stock.
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    {isSelected && _perishablePending && (
-                                      <div className="rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
-                                        <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">
-                                          Batch Details
-                                        </p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                                          <div>
-                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                              Expiry Date <span className="text-red-500">*</span>
-                                            </label>
-                                            <DatePicker
-                                              value={entry.expiry}
-                                              onChange={v => patchEntry(g, { expiry: v })}
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                              Manufacture Date
-                                            </label>
-                                            <DatePicker value={entry.mfg} onChange={v => patchEntry(g, { mfg: v })} />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                              Lot Number
-                                            </label>
-                                            <div className="flex gap-1">
-                                              <input
-                                                type="text"
-                                                className="field-compact border border-border-default bg-surface text-foreground flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                                value={entry.lot}
-                                                onChange={e => patchEntry(g, { lot: e.target.value })}
-                                              />
-                                              <button
-                                                type="button"
-                                                title="Regenerate"
-                                                onClick={() => regenLot(g)}
-                                                className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
-                                              >
-                                                ↺
-                                              </button>
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
-                                              Shelf Location
-                                            </label>
-                                            <AdminSelect
-                                              id={`bs-location-${keyOf(g)}`}
-                                              value={entry.location}
-                                              onChange={v => patchEntry(g, { location: v })}
-                                              sm
-                                              options={[
-                                                { value: '', label: '— none —' },
-                                                ...bsShelfLocations.map(sl => ({
-                                                  value: sl.id,
-                                                  label: sl.display_code,
-                                                })),
-                                              ]}
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {isSelected && _serializedPending && (
-                                      <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 p-3">
-                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                          <div>
-                                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
-                                              Serial Numbers
-                                            </p>
-                                            <span className="text-xs text-foreground-muted">
-                                              ({serialCount} required
-                                              {g.qty_step && g.qty_step !== 1 ? ` — 1 per ${g.qty_step} units` : ''})
-                                            </span>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            {entered === serialCount ? (
-                                              <span className="text-xs text-green-600 dark:text-green-400">
-                                                {entered}/{serialCount} entered ✓
-                                              </span>
-                                            ) : (
-                                              <span className="text-xs text-amber-600 dark:text-amber-400">
-                                                {entered}/{serialCount} entered
-                                              </span>
-                                            )}
-                                            <button
-                                              type="button"
-                                              className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                              onClick={() => generateAll(g)}
-                                            >
-                                              Generate All
-                                            </button>
-                                          </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                                          {Array.from({ length: serialCount }, (_, n) => (
-                                            <div key={n} className="flex gap-1">
-                                              <input
-                                                ref={el => {
-                                                  bsSerialRefs.current[`${keyOf(g)}#${n}`] = el
-                                                }}
-                                                type="text"
-                                                placeholder={autoSerial()}
-                                                className="field-compact rounded border border-border-secondary bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:border-secondary-500"
-                                                value={serials[n] ?? ''}
-                                                onChange={e => updateSerial(g, n, e.target.value)}
-                                                onKeyDown={e => {
-                                                  // A barcode scanner types the code then sends Enter — commit and
-                                                  // jump to the next empty serial field (same for manual Enter).
-                                                  if (e.key === 'Enter') {
-                                                    e.preventDefault()
-                                                    bsFocusNextSerial(`${keyOf(g)}#${n}`)
-                                                  }
-                                                }}
-                                              />
-                                              <button
-                                                type="button"
-                                                title="Auto-generate"
-                                                className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                                onClick={() => updateSerial(g, n, autoSerial())}
-                                              >
-                                                Auto
-                                              </button>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-
-                              {bootstrapError && (
-                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/40 text-red-600 dark:text-red-400 text-xs">
-                                  {bootstrapError}
-                                </div>
-                              )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Color</label>
+                              <input
+                                type="text"
+                                value={color}
+                                onChange={e => setColor(e.target.value)}
+                                className={inputCls}
+                                placeholder="e.g. Stainless Silver"
+                              />
                             </div>
-                          )
-                        })()}
-                    </div>
-                  </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Color Hex
+                              </label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="color"
+                                  value={colorHex}
+                                  onChange={e => {
+                                    colorHexTouched.current = true
+                                    setColorHex(e.target.value)
+                                  }}
+                                  className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface"
+                                />
+                                <input
+                                  type="text"
+                                  value={colorHex}
+                                  onChange={e => {
+                                    colorHexTouched.current = true
+                                    setColorHex(e.target.value)
+                                  }}
+                                  className={inputCls}
+                                  placeholder="#000000"
+                                  maxLength={7}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Volume (ml)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={volumeMl}
+                                onChange={e => setVolumeMl(e.target.value)}
+                                className={inputCls}
+                                placeholder="For liquids/paints"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Net Weight (g)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={netWeightGrams}
+                                onChange={e => setNetWeightGrams(e.target.value)}
+                                className={inputCls}
+                                placeholder="Product without packaging"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+                            <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
+                            <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
+                            <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
+                            {hasInventory && (
+                              <Toggle
+                                id="perishable"
+                                checked={perishable}
+                                onChange={next => {
+                                  if (!next && perishableBatchTotal > 0) {
+                                    setConfirmUnperishable(true)
+                                    return
+                                  }
+                                  setPerishable(next)
+                                }}
+                                label="Perishable"
+                              />
+                            )}
+                            {hasInventory && (
+                              <Toggle
+                                id="serialized"
+                                checked={serialized}
+                                onChange={next => {
+                                  if (!next && serializedStockTotal > 0) {
+                                    setConfirmUnSerialized(true)
+                                    return
+                                  }
+                                  setSerialized(next)
+                                }}
+                                label="Serialized"
+                              />
+                            )}
+                          </div>
 
-                  {/* Certifications & Standards */}
-                  <div>
-                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                      <span>Certifications &amp; Standards</span>
-                    </div>
-                    <div className="p-4 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="sm:col-span-2">
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Certifications
-                          </label>
-                          <input
-                            type="text"
-                            value={certifications}
-                            onChange={e => setCertifications(e.target.value)}
-                            className={inputCls}
-                            placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Compliance Standard
-                          </label>
-                          <input
-                            type="text"
-                            value={complianceStandard}
-                            onChange={e => setComplianceStandard(e.target.value)}
-                            className={inputCls}
-                            placeholder="e.g. DIN, ISO, IS, ASTM"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Safety Rating
-                          </label>
-                          <input
-                            type="text"
-                            value={safetyRating}
-                            onChange={e => setSafetyRating(e.target.value)}
-                            className={inputCls}
-                            placeholder="e.g. IP65, Class I"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Warranty (months)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={warrantyMonths}
-                            onChange={e => setWarrantyMonths(e.target.value)}
-                            className={inputCls}
-                            placeholder="e.g. 12"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Warranty Type
-                          </label>
-                          <AdminSelect
-                            value={warrantyType}
-                            onChange={setWarrantyType}
-                            options={[
-                              { value: '', label: 'None' },
-                              { value: 'manufacturer', label: 'Manufacturer' },
-                              { value: 'seller', label: 'Seller' },
-                            ]}
-                            placeholder="Select type"
-                          />
+                          {showBootstrap &&
+                            (() => {
+                              const sku = (product?.sku || '')
+                                .replace(/[^A-Z0-9]/gi, '')
+                                .slice(0, 8)
+                                .toUpperCase()
+                              const autoSerial = () => generateSerialNumber(sku)
+                              const keyOf = (g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+                              // Read a grain's entry, materialising the lazy default when absent.
+                              // Backfill the newer selected/assignQty fields for entries restored
+                              // from a pre-change draft (they'd otherwise be undefined).
+                              const entryOf = (g: BsGrain): BsEntry => {
+                                const e = bsEntries[keyOf(g)]
+                                if (!e) return _bsMakeEntry(g.qty)
+                                return {
+                                  ...e,
+                                  selected: e.selected ?? true,
+                                  assignQty: e.assignQty ?? g.qty,
+                                }
+                              }
+                              const patchEntry = (g: BsGrain, patch: Partial<BsEntry>) => {
+                                const key = keyOf(g)
+                                setBsEntries(prev => {
+                                  const base = prev[key] ?? _bsMakeEntry(g.qty)
+                                  return { ...prev, [key]: { ...base, ...patch } }
+                                })
+                              }
+                              const regenLot = (g: BsGrain) => {
+                                patchEntry(g, { lot: generateLotNumber(sku) })
+                              }
+                              const updateSerial = (g: BsGrain, i: number, val: string) => {
+                                const key = keyOf(g)
+                                setBsEntries(prev => {
+                                  const base = prev[key] ?? _bsMakeEntry(g.qty)
+                                  const a = [...(base.serials || [])]
+                                  a[i] = val
+                                  return { ...prev, [key]: { ...base, serials: a } }
+                                })
+                              }
+                              const generateAll = (g: BsGrain) => {
+                                patchEntry(g, { serials: generateSerialRun(sku, bsSerialCount(g, entryOf(g).assignQty)) })
+                              }
+                              // Clamp an assignQty edit to [1, g.qty]; also trim serials to fit.
+                              const setAssignQty = (g: BsGrain, raw: number) => {
+                                const key = keyOf(g)
+                                const clamped = Math.max(1, Math.min(g.qty, Math.floor(raw) || 1))
+                                setBsEntries(prev => {
+                                  const base = prev[key] ?? _bsMakeEntry(g.qty)
+                                  const serials = (base.serials || []).slice(0, bsSerialCount(g, clamped))
+                                  return { ...prev, [key]: { ...base, assignQty: clamped, serials } }
+                                })
+                              }
+                              // Running total of units that will be tracked (selected grains).
+                              const selectedTotal = bsGrains.reduce((s, g) => {
+                                const e = entryOf(g)
+                                return s + (e.selected === false ? 0 : e.assignQty)
+                              }, 0)
+                              return (
+                                <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-4">
+                                  <div>
+                                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                                      Assign Existing Stock
+                                    </p>
+                                    <p className="text-xs text-foreground-secondary mt-0.5">
+                                      Choose which variants and how many units to track.
+                                    </p>
+                                    <p className="text-xs text-foreground-muted mt-0.5">
+                                      <span className="font-semibold">{selectedTotal}</span> of {_bsStockTotal} units will
+                                      be tracked; {_bsStockTotal - selectedTotal} stay as plain stock.
+                                    </p>
+                                  </div>
+
+                                  {bsGrains.map(g => {
+                                    const entry = entryOf(g)
+                                    const serials = entry.serials || []
+                                    const entered = serials.filter(Boolean).length
+                                    const isSelected = entry.selected !== false
+                                    const assignQty = entry.assignQty
+                                    const serialCount = bsSerialCount(g, assignQty)
+                                    return (
+                                      <div
+                                        key={keyOf(g)}
+                                        className="rounded-lg border border-border-default bg-surface/60 p-3 space-y-3"
+                                      >
+                                        <div className="flex items-center justify-between gap-3">
+                                          <label className="flex items-center gap-2 min-w-0">
+                                            <input
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={e => patchEntry(g, { selected: e.target.checked })}
+                                              className="h-4 w-4 rounded border-border-default text-secondary-600 focus:ring-secondary-500"
+                                            />
+                                            <span className="text-xs font-semibold text-foreground truncate">
+                                              {g.label}
+                                            </span>
+                                          </label>
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            <input
+                                              type="number"
+                                              min={1}
+                                              max={g.qty}
+                                              disabled={!isSelected}
+                                              value={assignQty}
+                                              onChange={e => setAssignQty(g, Number(e.target.value))}
+                                              className="field-compact w-16 border border-border-default bg-surface text-foreground text-xs text-right disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                            />
+                                            <span className="text-xs text-foreground-muted">/ {g.qty}</span>
+                                          </div>
+                                        </div>
+
+                                        {isSelected && _serializedPending && bsWriteOff(g, assignQty) > 0 && (
+                                          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                                            <p className="text-xs text-foreground">
+                                              Sold in steps of {g.qty_step} — only {serialCount * (g.qty_step || 1)} of{' '}
+                                              {assignQty} units can be labelled.{' '}
+                                              <strong>
+                                                {bsWriteOff(g, assignQty)} unit{bsWriteOff(g, assignQty) !== 1 ? 's' : ''}{' '}
+                                                will be written off
+                                              </strong>{' '}
+                                              on save, leaving {serialCount * (g.qty_step || 1)} in stock.
+                                            </p>
+                                          </div>
+                                        )}
+
+                                        {isSelected && _perishablePending && (
+                                          <div className="rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
+                                            <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">
+                                              Batch Details
+                                            </p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                              <div>
+                                                <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                                  Expiry Date <span className="text-red-500">*</span>
+                                                </label>
+                                                <DatePicker
+                                                  value={entry.expiry}
+                                                  onChange={v => patchEntry(g, { expiry: v })}
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                                  Manufacture Date
+                                                </label>
+                                                <DatePicker value={entry.mfg} onChange={v => patchEntry(g, { mfg: v })} />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                                  Lot Number
+                                                </label>
+                                                <div className="flex gap-1">
+                                                  <input
+                                                    type="text"
+                                                    className="field-compact border border-border-default bg-surface text-foreground flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                                    value={entry.lot}
+                                                    onChange={e => patchEntry(g, { lot: e.target.value })}
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    title="Regenerate"
+                                                    onClick={() => regenLot(g)}
+                                                    className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                                  >
+                                                    ↺
+                                                  </button>
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
+                                                  Shelf Location
+                                                </label>
+                                                <AdminSelect
+                                                  id={`bs-location-${keyOf(g)}`}
+                                                  value={entry.location}
+                                                  onChange={v => patchEntry(g, { location: v })}
+                                                  sm
+                                                  options={[
+                                                    { value: '', label: '— none —' },
+                                                    ...bsShelfLocations.map(sl => ({
+                                                      value: sl.id,
+                                                      label: sl.display_code,
+                                                    })),
+                                                  ]}
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {isSelected && _serializedPending && (
+                                          <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                              <div>
+                                                <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
+                                                  Serial Numbers
+                                                </p>
+                                                <span className="text-xs text-foreground-muted">
+                                                  ({serialCount} required
+                                                  {g.qty_step && g.qty_step !== 1 ? ` — 1 per ${g.qty_step} units` : ''})
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {entered === serialCount ? (
+                                                  <span className="text-xs text-green-600 dark:text-green-400">
+                                                    {entered}/{serialCount} entered ✓
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                                                    {entered}/{serialCount} entered
+                                                  </span>
+                                                )}
+                                                <button
+                                                  type="button"
+                                                  className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                                  onClick={() => generateAll(g)}
+                                                >
+                                                  Generate All
+                                                </button>
+                                              </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                                              {Array.from({ length: serialCount }, (_, n) => (
+                                                <div key={n} className="flex gap-1">
+                                                  <input
+                                                    ref={el => {
+                                                      bsSerialRefs.current[`${keyOf(g)}#${n}`] = el
+                                                    }}
+                                                    type="text"
+                                                    placeholder={autoSerial()}
+                                                    className="field-compact rounded border border-border-secondary bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:border-secondary-500"
+                                                    value={serials[n] ?? ''}
+                                                    onChange={e => updateSerial(g, n, e.target.value)}
+                                                    onKeyDown={e => {
+                                                      // A barcode scanner types the code then sends Enter — commit and
+                                                      // jump to the next empty serial field (same for manual Enter).
+                                                      if (e.key === 'Enter') {
+                                                        e.preventDefault()
+                                                        bsFocusNextSerial(`${keyOf(g)}#${n}`)
+                                                      }
+                                                    }}
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    title="Auto-generate"
+                                                    className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                                    onClick={() => updateSerial(g, n, autoSerial())}
+                                                  >
+                                                    Auto
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+
+                                  {bootstrapError && (
+                                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/40 text-red-600 dark:text-red-400 text-xs">
+                                      {bootstrapError}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
                         </div>
                       </div>
-                    </div>
                   </div>
-
-                  {/* Condition & Lifecycle */}
-                  <div>
-                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                      <span>Condition &amp; Lifecycle</span>
-                    </div>
-                    <div className="p-4 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Condition
-                          </label>
-                          <AdminSelect
-                            value={condition}
-                            onChange={setCondition}
-                            options={[
-                              { value: 'new', label: 'New' },
-                              { value: 'refurbished', label: 'Refurbished' },
-                              { value: 'used', label: 'Used' },
-                              { value: 'open_box', label: 'Open Box' },
-                            ]}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Sort Order
-                          </label>
-                          <input
-                            type="number"
-                            step="1"
-                            value={sortOrderVal}
-                            onChange={e => setSortOrderVal(e.target.value)}
-                            className={inputCls}
-                            placeholder="0"
-                          />
-                          <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Launch Date
-                          </label>
-                          <DatePicker value={launchDate} onChange={setLaunchDate} />
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Discontinue Date
-                          </label>
-                          <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
-                        </div>
-                      </div>
-                      <Toggle
-                        id="is_cod_allowed"
-                        checked={isCodAllowed}
-                        onChange={setIsCodAllowed}
-                        label="COD Allowed"
+                </div>
+                <div data-pf-subtab="commercial" hidden={detailsTab !== 'commercial'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default empty:hidden">
+                      <ExtraFieldsGroup aiContext={productAiContext}
+                        group="commercial"
+                        product={product}
+                        omit={hasReturns ? [] : ['return_window_days', 'replacement_policy']}
                       />
-                    </div>
                   </div>
-
-                  {/* Shipping & Logistics */}
-                  <div>
-                    <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
-                      <span>Shipping &amp; Logistics</span>
+                  {/* Tax & Finance */}
+                  <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                    <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                      <span>Tax &amp; Finance</span>
                     </div>
-                    <div className="p-4 space-y-4">
+                    <div className="p-4 space-y-4 border-t border-border-default">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Handling Days
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={handlingDays}
-                            onChange={e => setHandlingDays(e.target.value)}
-                            className={inputCls}
-                            placeholder="1"
-                          />
-                          <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                            Shipping Class
-                          </label>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
                           <AdminSelect
-                            value={shippingClass}
-                            onChange={setShippingClass}
+                            value={taxClass}
+                            onChange={v => setTaxClass(v)}
+                            className="w-full"
                             options={[
                               { value: 'standard', label: 'Standard' },
-                              { value: 'express', label: 'Express' },
-                              { value: 'freight', label: 'Freight' },
-                              { value: 'cold_chain', label: 'Cold Chain' },
+                              { value: 'reduced', label: 'Reduced' },
+                              { value: 'zero', label: 'Zero' },
+                              { value: 'exempt', label: 'Exempt' },
                             ]}
                           />
                         </div>
                       </div>
                       <Toggle
-                        id="is_oversized"
-                        checked={isOversized}
-                        onChange={setIsOversized}
-                        label="Oversized / Freight"
+                        id="inclusive_tax"
+                        checked={inclusiveTax}
+                        onChange={setInclusiveTax}
+                        label="Price includes tax (inclusive tax)"
                       />
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Identification & Compliance */}
-              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                  <span>Identification &amp; Compliance</span>
-                </div>
-                <div className="p-4 space-y-4 border-t border-border-default">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {!hasVariants && (
+                <div data-pf-subtab="compliance" hidden={detailsTab !== 'compliance'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default empty:hidden">
+                      <ExtraFieldsGroup aiContext={productAiContext}
+                        group="legal"
+                        product={product}
+                        note="Declarations required on packaged goods (Legal Metrology (Packaged Commodities) Rules)."
+                      />
+                      {/* Certifications & Standards */}
                       <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Barcode (EAN/UPC)
-                        </label>
-                        <input
-                          type="text"
-                          value={barcode}
-                          onChange={e => setBarcode(e.target.value)}
-                          className={inputCls}
-                          placeholder="e.g. 8901234567890"
-                        />
-                      </div>
-                    )}
-                    {!hasVariants && (
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ISBN</label>
-                        <input
-                          type="text"
-                          value={isbn}
-                          onChange={e => setIsbn(e.target.value)}
-                          className={inputCls}
-                          placeholder="For books"
-                        />
-                      </div>
-                    )}
-                    {!hasVariants && (
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ASIN</label>
-                        <input
-                          type="text"
-                          value={asin}
-                          onChange={e => setAsin(e.target.value)}
-                          className={inputCls}
-                          placeholder="Amazon reference"
-                        />
-                      </div>
-                    )}
-                    {!hasVariants && (
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                          Brand Part Number
-                        </label>
-                        <input
-                          type="text"
-                          value={brandPartNumber}
-                          onChange={e => setBrandPartNumber(e.target.value)}
-                          className={inputCls}
-                          placeholder="Manufacturer's part no."
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                        Country of Origin
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={2}
-                        value={countryOfOrigin}
-                        onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())}
-                        className={inputCls}
-                        placeholder="IN"
-                      />
-                      <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
-                        Shelf Life (days)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={shelfLifeDays}
-                        onChange={e => setShelfLifeDays(e.target.value)}
-                        className={inputCls}
-                        placeholder="e.g. 365"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tax & Finance */}
-              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                  <span>Tax &amp; Finance</span>
-                </div>
-                <div className="p-4 space-y-4 border-t border-border-default">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
-                      <AdminSelect
-                        value={taxClass}
-                        onChange={v => setTaxClass(v)}
-                        className="w-full"
-                        options={[
-                          { value: 'standard', label: 'Standard' },
-                          { value: 'reduced', label: 'Reduced' },
-                          { value: 'zero', label: 'Zero' },
-                          { value: 'exempt', label: 'Exempt' },
-                        ]}
-                      />
-                    </div>
-                  </div>
-                  <Toggle
-                    id="inclusive_tax"
-                    checked={inclusiveTax}
-                    onChange={setInclusiveTax}
-                    label="Price includes tax (inclusive tax)"
-                  />
-                </div>
-              </div>
-
-              {/* Age & Audience */}
-              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                  <span>Age &amp; Audience</span>
-                </div>
-                <div className="p-4 space-y-4 border-t border-border-default">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={ageMin}
-                          onChange={e => setAgeMin(e.target.value)}
-                          placeholder="Min"
-                          className={inputCls}
-                        />
-                        <span className="text-foreground-muted text-sm">–</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={ageMax}
-                          onChange={e => setAgeMax(e.target.value)}
-                          placeholder="Max"
-                          className={inputCls}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
-                      <AdminSelect
-                        value={targetGender}
-                        onChange={v => setTargetGender(v)}
-                        className="w-full"
-                        options={[
-                          { value: '', label: '— any —' },
-                          { value: 'male', label: 'Male' },
-                          { value: 'female', label: 'Female' },
-                          { value: 'unisex', label: 'Unisex' },
-                        ]}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-foreground-muted mb-1">
-                        Target Audience <span className="text-foreground-muted/60">(comma-separated)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={targetAudience}
-                        onChange={e => setTargetAudience(e.target.value)}
-                        placeholder="e.g. professionals, students, DIY"
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Digital & Subscription */}
-              <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
-                <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
-                  <span>Digital &amp; Subscription</span>
-                </div>
-                <div className="p-4 space-y-4 border-t border-border-default">
-                  <div className="flex flex-wrap gap-6">
-                    {digitalProductsEnabled && (
-                      <Toggle
-                        id="is_digital"
-                        checked={isDigital}
-                        onChange={handleDigitalToggle}
-                        label="Digital Product"
-                      />
-                    )}
-                    <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
-                    {subscriptionsEnabled && (
-                      <Toggle
-                        id="is_subscription"
-                        checked={isSubscription}
-                        onChange={setIsSubscription}
-                        label="Subscription"
-                      />
-                    )}
-                  </div>
-                  {isDigital && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
-                        <input
-                          type="text"
-                          value={licenseType}
-                          onChange={e => setLicenseType(e.target.value)}
-                          placeholder="e.g. MIT, Commercial"
-                          className={inputCls}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
-                        <input
-                          type="text"
-                          value={fileFormat}
-                          onChange={e => setFileFormat(e.target.value)}
-                          placeholder="e.g. PDF, ZIP, EXE"
-                          className={inputCls}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={platformCompatibility}
-                          onChange={e => setPlatformCompatibility(e.target.value)}
-                          placeholder="e.g. Windows, macOS, Linux"
-                          className={inputCls}
-                        />
-                      </div>
-                      {productId ? (
-                        <DigitalFilesPanel productId={productId} draftId={isDraft ? draftId : null} />
-                      ) : (
-                        <p className="sm:col-span-2 text-xs text-foreground-muted">
-                          Save the product first, then upload files in the Digital Files panel. Buyers open them in the
-                          vault.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {subscriptionsEnabled && isSubscription && (
-                    <div className="pt-2 border-t border-border-default space-y-2">
-                      <AdminSelect
-                        label="Billing intervals offered"
-                        placeholder={
-                          subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length
-                            ? 'All intervals added'
-                            : 'Add a billing interval…'
-                        }
-                        value=""
-                        options={SUBSCRIPTION_INTERVALS.filter(o => !subscriptionIntervals.includes(o.value))}
-                        disabled={subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length}
-                        onChange={v => v && setSubscriptionIntervals(prev => (prev.includes(v) ? prev : [...prev, v]))}
-                      />
-                      {subscriptionIntervals.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
-                            <span
-                              key={opt.value}
-                              className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 text-accent-500 px-2.5 py-1 text-xs font-medium"
-                            >
-                              {opt.label}
-                              <button
-                                type="button"
-                                aria-label={`Remove ${opt.label}`}
-                                onClick={() => setSubscriptionIntervals(prev => prev.filter(v => v !== opt.value))}
-                                className="hover:text-red-600"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
+                        <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                          <span>Certifications &amp; Standards</span>
                         </div>
-                      )}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                        <div>
-                          <label className="block text-xs font-medium text-foreground-muted mb-1">
-                            Number of billing cycles
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={MAX_BILLING_CYCLES}
-                            step={1}
-                            value={totalCycles}
-                            onChange={e => setTotalCycles(e.target.value)}
-                            placeholder="Until cancelled"
-                            className={inputCls}
-                          />
-                          <p className="text-xs text-foreground-muted mt-1">
-                            Leave blank to bill until the customer cancels.
-                          </p>
+                        <div className="p-4 space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="sm:col-span-2">
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Certifications
+                              </label>
+                              <input
+                                type="text"
+                                value={certifications}
+                                onChange={e => setCertifications(e.target.value)}
+                                className={inputCls}
+                                placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Compliance Standard
+                              </label>
+                              <input
+                                type="text"
+                                value={complianceStandard}
+                                onChange={e => setComplianceStandard(e.target.value)}
+                                className={inputCls}
+                                placeholder="e.g. DIN, ISO, IS, ASTM"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Safety Rating
+                              </label>
+                              <input
+                                type="text"
+                                value={safetyRating}
+                                onChange={e => setSafetyRating(e.target.value)}
+                                className={inputCls}
+                                placeholder="e.g. IP65, Class I"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Warranty (months)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={warrantyMonths}
+                                onChange={e => setWarrantyMonths(e.target.value)}
+                                className={inputCls}
+                                placeholder="e.g. 12"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Warranty Type
+                              </label>
+                              <AdminSelect
+                                value={warrantyType}
+                                onChange={setWarrantyType}
+                                options={[
+                                  { value: '', label: 'None' },
+                                  { value: 'manufacturer', label: 'Manufacturer' },
+                                  { value: 'seller', label: 'Seller' },
+                                ]}
+                                placeholder="Select type"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-foreground-muted mb-1">
-                            Minimum billing cycles
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={MAX_BILLING_CYCLES}
-                            step={1}
-                            value={minCycles}
-                            onChange={e => setMinCycles(e.target.value)}
-                            placeholder="No minimum"
-                            className={inputCls}
-                          />
-                          <p className="text-xs text-foreground-muted mt-1">
-                            Customers can&apos;t cancel or pause before this many charges.
-                          </p>
-                        </div>
-                        {cyclesError && <p className="sm:col-span-2 text-xs text-red-600">{cyclesError}</p>}
                       </div>
-                      <div className="pt-2">
-                        <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
-                        {offeredIntervals.length === 0 ? (
-                          <p className="text-xs text-foreground-muted">Add a billing interval to set its prices.</p>
-                        ) : (
-                          <div className="overflow-x-auto rounded-md border border-border-default">
-                            <table className="w-full text-xs" data-testid="subscription-prices">
-                              <thead className="bg-surface-secondary text-foreground-muted">
-                                <tr>
-                                  <th className="text-left font-medium px-3 py-2">Item</th>
-                                  <th className="text-right font-medium px-3 py-2">One-time</th>
-                                  {offeredIntervals.map(o => (
-                                    <th key={o.value} className="text-left font-medium px-3 py-2 whitespace-nowrap">
-                                      {o.label} (₹ per cycle)
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {sellableItems.map(item => (
-                                  <tr key={item.key} className="border-t border-border-default align-top">
-                                    <td className="px-3 py-2">
-                                      <div className="text-foreground">{item.name}</div>
-                                      {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
-                                    </td>
-                                    <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
-                                      {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
-                                    </td>
-                                    {offeredIntervals.map(o => {
-                                      const raw = item.subscriptionPrices[o.value] ?? ''
-                                      const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
-                                      const err = subscriptionPriceError(raw)
-                                      const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
-                                      const perMonth =
-                                        err || !isSubscriptionInterval(o.value)
-                                          ? null
-                                          : monthlyEquivalentLabel(o.value, effective)
-                                      const fallback =
-                                        item.subscriptionPrice ||
-                                        (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
-                                      return (
-                                        <td key={o.value} className="px-3 py-2">
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            max={MAX_CYCLE_AMOUNT_INR}
-                                            step="0.01"
-                                            inputMode="decimal"
-                                            aria-label={`${o.label} subscription price for ${item.name}`}
-                                            aria-invalid={!!err}
-                                            value={raw}
-                                            placeholder={fallback}
-                                            onChange={e => setSellableIntervalPrice(item, o.value, e.target.value)}
-                                            className={`${inputCls} w-28 ${err ? 'border-red-500' : ''}`}
-                                          />
-                                          {err && <div className="text-red-600 mt-0.5">{err}</div>}
-                                          {(hint || perMonth) && (
-                                            <div className="mt-0.5 space-x-1 whitespace-nowrap">
-                                              {perMonth && <span className="text-foreground-muted">{perMonth}</span>}
-                                              {hint && (
-                                                <span
-                                                  className={
-                                                    hint.endsWith('less')
-                                                      ? 'text-green-700 dark:text-green-400'
-                                                      : 'text-amber-700 dark:text-amber-400'
-                                                  }
-                                                >
-                                                  {hint}
-                                                </span>
-                                              )}
-                                            </div>
-                                          )}
-                                        </td>
-                                      )
-                                    })}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                  </div>
+                  {/* Identification & Compliance */}
+                  <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                    <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                      <span>Identification &amp; Compliance</span>
+                    </div>
+                    <div className="p-4 space-y-4 border-t border-border-default">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {!hasVariants && (
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                              Barcode (EAN/UPC)
+                            </label>
+                            <input
+                              type="text"
+                              value={barcode}
+                              onChange={e => setBarcode(e.target.value)}
+                              className={inputCls}
+                              placeholder="e.g. 8901234567890"
+                            />
                           </div>
                         )}
-                        {subscriptionPricesError && (
-                          <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>
+                        {!hasVariants && (
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ISBN</label>
+                            <input
+                              type="text"
+                              value={isbn}
+                              onChange={e => setIsbn(e.target.value)}
+                              className={inputCls}
+                              placeholder="For books"
+                            />
+                          </div>
                         )}
-                        <p className="text-xs text-foreground-muted mt-1">
-                          GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
-                          Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
-                        </p>
+                        {!hasVariants && (
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ASIN</label>
+                            <input
+                              type="text"
+                              value={asin}
+                              onChange={e => setAsin(e.target.value)}
+                              className={inputCls}
+                              placeholder="Amazon reference"
+                            />
+                          </div>
+                        )}
+                        {!hasVariants && (
+                          <div>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                              Brand Part Number
+                            </label>
+                            <input
+                              type="text"
+                              value={brandPartNumber}
+                              onChange={e => setBrandPartNumber(e.target.value)}
+                              className={inputCls}
+                              placeholder="Manufacturer's part no."
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Country of Origin
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={2}
+                            value={countryOfOrigin}
+                            onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())}
+                            className={inputCls}
+                            placeholder="IN"
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                            Shelf Life (days)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={shelfLifeDays}
+                            onChange={e => setShelfLifeDays(e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. 365"
+                          />
+                        </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                  {/* Age & Audience */}
+                  <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                    <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                      <span>Age &amp; Audience</span>
+                    </div>
+                    <div className="p-4 space-y-4 border-t border-border-default">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={ageMin}
+                              onChange={e => setAgeMin(e.target.value)}
+                              placeholder="Min"
+                              className={inputCls}
+                            />
+                            <span className="text-foreground-muted text-sm">–</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={ageMax}
+                              onChange={e => setAgeMax(e.target.value)}
+                              placeholder="Max"
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
+                          <AdminSelect
+                            value={targetGender}
+                            onChange={v => setTargetGender(v)}
+                            className="w-full"
+                            options={[
+                              { value: '', label: '— any —' },
+                              { value: 'male', label: 'Male' },
+                              { value: 'female', label: 'Female' },
+                              { value: 'unisex', label: 'Unisex' },
+                            ]}
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Target Audience <span className="text-foreground-muted/60">(comma-separated)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={targetAudience}
+                            onChange={e => setTargetAudience(e.target.value)}
+                            placeholder="e.g. professionals, students, DIY"
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div data-pf-subtab="shipping" hidden={detailsTab !== 'shipping'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default empty:hidden">
+                      {!isDigital && <ExtraFieldsGroup aiContext={productAiContext} group="shipping" product={product} />}
+                      {/* Condition & Lifecycle */}
+                      <div>
+                        <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                          <span>Condition &amp; Lifecycle</span>
+                        </div>
+                        <div className="p-4 space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Condition
+                              </label>
+                              <AdminSelect
+                                value={condition}
+                                onChange={setCondition}
+                                options={[
+                                  { value: 'new', label: 'New' },
+                                  { value: 'refurbished', label: 'Refurbished' },
+                                  { value: 'used', label: 'Used' },
+                                  { value: 'open_box', label: 'Open Box' },
+                                ]}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Sort Order
+                              </label>
+                              <input
+                                type="number"
+                                step="1"
+                                value={sortOrderVal}
+                                onChange={e => setSortOrderVal(e.target.value)}
+                                className={inputCls}
+                                placeholder="0"
+                              />
+                              <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Launch Date
+                              </label>
+                              <DatePicker value={launchDate} onChange={setLaunchDate} />
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Discontinue Date
+                              </label>
+                              <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
+                            </div>
+                          </div>
+                          <Toggle
+                            id="is_cod_allowed"
+                            checked={isCodAllowed}
+                            onChange={setIsCodAllowed}
+                            label="COD Allowed"
+                          />
+                        </div>
+                      </div>
+                      {/* Shipping & Logistics */}
+                      <div>
+                        <div className="flex items-center px-4 h-10 bg-surface-secondary/30 text-sm font-medium text-foreground">
+                          <span>Shipping &amp; Logistics</span>
+                        </div>
+                        <div className="p-4 space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Handling Days
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={handlingDays}
+                                onChange={e => setHandlingDays(e.target.value)}
+                                className={inputCls}
+                                placeholder="1"
+                              />
+                              <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                                Shipping Class
+                              </label>
+                              <AdminSelect
+                                value={shippingClass}
+                                onChange={setShippingClass}
+                                options={[
+                                  { value: 'standard', label: 'Standard' },
+                                  { value: 'express', label: 'Express' },
+                                  { value: 'freight', label: 'Freight' },
+                                  { value: 'cold_chain', label: 'Cold Chain' },
+                                ]}
+                              />
+                            </div>
+                          </div>
+                          <Toggle
+                            id="is_oversized"
+                            checked={isOversized}
+                            onChange={setIsOversized}
+                            label="Oversized / Freight"
+                          />
+                        </div>
+                      </div>
+                  </div>
+                </div>
+                <div data-pf-subtab="digital" hidden={detailsTab !== 'digital'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default empty:hidden">
+                      {isDigital && <ExtraFieldsGroup aiContext={productAiContext} group="digital" product={product} />}
+                      {subscriptionsEnabled && isSubscription && (
+                        <ExtraFieldsGroup aiContext={productAiContext}
+                          group="subscription"
+                          product={product}
+                          omit={hasVariants ? ['subscription_price_ex_gst'] : []}
+                        />
+                      )}
+                  </div>
+                  {/* Digital & Subscription */}
+                  <div className="md:col-span-2 border border-border-default rounded-xl overflow-hidden">
+                    <div className="flex items-center px-4 h-11 bg-surface-secondary/50 text-sm font-semibold text-foreground">
+                      <span>Digital &amp; Subscription</span>
+                    </div>
+                    <div className="p-4 space-y-4 border-t border-border-default">
+                      <div className="flex flex-wrap gap-6">
+                        {digitalProductsEnabled && (
+                          <Toggle
+                            id="is_digital"
+                            checked={isDigital}
+                            onChange={handleDigitalToggle}
+                            label="Digital Product"
+                          />
+                        )}
+                        <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
+                        {subscriptionsEnabled && (
+                          <Toggle
+                            id="is_subscription"
+                            checked={isSubscription}
+                            onChange={setIsSubscription}
+                            label="Subscription"
+                          />
+                        )}
+                      </div>
+                      {isDigital && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
+                          <div>
+                            <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
+                            <input
+                              type="text"
+                              value={licenseType}
+                              onChange={e => setLicenseType(e.target.value)}
+                              placeholder="e.g. MIT, Commercial"
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
+                            <input
+                              type="text"
+                              value={fileFormat}
+                              onChange={e => setFileFormat(e.target.value)}
+                              placeholder="e.g. PDF, ZIP, EXE"
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-foreground-muted mb-1">
+                              Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={platformCompatibility}
+                              onChange={e => setPlatformCompatibility(e.target.value)}
+                              placeholder="e.g. Windows, macOS, Linux"
+                              className={inputCls}
+                            />
+                          </div>
+                          {productId ? (
+                            <DigitalFilesPanel productId={productId} draftId={isDraft ? draftId : null} />
+                          ) : (
+                            <p className="sm:col-span-2 text-xs text-foreground-muted">
+                              Save the product first, then upload files in the Digital Files panel. Buyers open them in the
+                              vault.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {subscriptionsEnabled && isSubscription && (
+                        <div className="pt-2 border-t border-border-default space-y-2">
+                          <AdminSelect
+                            label="Billing intervals offered"
+                            placeholder={
+                              subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length
+                                ? 'All intervals added'
+                                : 'Add a billing interval…'
+                            }
+                            value=""
+                            options={SUBSCRIPTION_INTERVALS.filter(o => !subscriptionIntervals.includes(o.value))}
+                            disabled={subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length}
+                            onChange={v => v && setSubscriptionIntervals(prev => (prev.includes(v) ? prev : [...prev, v]))}
+                          />
+                          {subscriptionIntervals.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
+                                <span
+                                  key={opt.value}
+                                  className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 text-accent-500 px-2.5 py-1 text-xs font-medium"
+                                >
+                                  {opt.label}
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove ${opt.label}`}
+                                    onClick={() => setSubscriptionIntervals(prev => prev.filter(v => v !== opt.value))}
+                                    className="hover:text-red-600"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div>
+                              <label className="block text-xs font-medium text-foreground-muted mb-1">
+                                Number of billing cycles
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={MAX_BILLING_CYCLES}
+                                step={1}
+                                value={totalCycles}
+                                onChange={e => setTotalCycles(e.target.value)}
+                                placeholder="Until cancelled"
+                                className={inputCls}
+                              />
+                              <p className="text-xs text-foreground-muted mt-1">
+                                Leave blank to bill until the customer cancels.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-foreground-muted mb-1">
+                                Minimum billing cycles
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={MAX_BILLING_CYCLES}
+                                step={1}
+                                value={minCycles}
+                                onChange={e => setMinCycles(e.target.value)}
+                                placeholder="No minimum"
+                                className={inputCls}
+                              />
+                              <p className="text-xs text-foreground-muted mt-1">
+                                Customers can&apos;t cancel or pause before this many charges.
+                              </p>
+                            </div>
+                            {cyclesError && <p className="sm:col-span-2 text-xs text-red-600">{cyclesError}</p>}
+                          </div>
+                          <div className="pt-2">
+                            <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
+                            {offeredIntervals.length === 0 ? (
+                              <p className="text-xs text-foreground-muted">Add a billing interval to set its prices.</p>
+                            ) : (
+                              <div className="overflow-x-auto rounded-md border border-border-default">
+                                <table className="w-full text-xs" data-testid="subscription-prices">
+                                  <thead className="bg-surface-secondary text-foreground-muted">
+                                    <tr>
+                                      <th className="text-left font-medium px-3 py-2">Item</th>
+                                      <th className="text-right font-medium px-3 py-2">One-time</th>
+                                      {offeredIntervals.map(o => (
+                                        <th key={o.value} className="text-left font-medium px-3 py-2 whitespace-nowrap">
+                                          {o.label} (₹ per cycle)
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {sellableItems.map(item => (
+                                      <tr key={item.key} className="border-t border-border-default align-top">
+                                        <td className="px-3 py-2">
+                                          <div className="text-foreground">{item.name}</div>
+                                          {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
+                                          {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
+                                        </td>
+                                        {offeredIntervals.map(o => {
+                                          const raw = item.subscriptionPrices[o.value] ?? ''
+                                          const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
+                                          const err = subscriptionPriceError(raw)
+                                          const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
+                                          const perMonth =
+                                            err || !isSubscriptionInterval(o.value)
+                                              ? null
+                                              : monthlyEquivalentLabel(o.value, effective)
+                                          const fallback =
+                                            item.subscriptionPrice ||
+                                            (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
+                                          return (
+                                            <td key={o.value} className="px-3 py-2">
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max={MAX_CYCLE_AMOUNT_INR}
+                                                step="0.01"
+                                                inputMode="decimal"
+                                                aria-label={`${o.label} subscription price for ${item.name}`}
+                                                aria-invalid={!!err}
+                                                value={raw}
+                                                placeholder={fallback}
+                                                onChange={e => setSellableIntervalPrice(item, o.value, e.target.value)}
+                                                className={`${inputCls} w-28 ${err ? 'border-red-500' : ''}`}
+                                              />
+                                              {err && <div className="text-red-600 mt-0.5">{err}</div>}
+                                              {(hint || perMonth) && (
+                                                <div className="mt-0.5 space-x-1 whitespace-nowrap">
+                                                  {perMonth && <span className="text-foreground-muted">{perMonth}</span>}
+                                                  {hint && (
+                                                    <span
+                                                      className={
+                                                        hint.endsWith('less')
+                                                          ? 'text-green-700 dark:text-green-400'
+                                                          : 'text-amber-700 dark:text-amber-400'
+                                                      }
+                                                    >
+                                                      {hint}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </td>
+                                          )
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {subscriptionPricesError && (
+                              <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>
+                            )}
+                            <p className="text-xs text-foreground-muted mt-1">
+                              GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
+                              Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div data-pf-subtab="faqs" hidden={detailsTab !== 'faqs'} className="space-y-4">
+                  <FaqEditor
+                  aiContext={productAiContext}
+                  aiDetails={() =>
+                    [
+                      description,
+                      specifications.filter(x => x.key && x.value).map(x => `${x.key}: ${x.value}`).join('; '),
+                      (formRef.current?.elements.namedItem('short_description') as HTMLTextAreaElement | null)?.value,
+                    ]
+                      .filter(Boolean)
+                      .join('\n')
+                  }
+                    initial={initialFaqs}
+                    disabled={lock.readOnly}
+                    onChange={() => {
+                      userEditedRef.current = true
+                      dirtyRef.current = true
+                      if (isDraft) void serverSaveNowRef.current()
+                    }}
+                  />
+                </div>
+                <div data-pf-subtab="internal" hidden={detailsTab !== 'internal'} className="space-y-4">
+                  <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default">
+                    <ExtraFieldsGroup aiContext={productAiContext} group="internal" product={product} />
+                  </div>
                 </div>
               </div>
-              <FaqEditor
-                initial={initialFaqs}
-                disabled={lock.readOnly}
-                onChange={() => {
-                  userEditedRef.current = true
-                  dirtyRef.current = true
-                  if (isDraft) void serverSaveNowRef.current()
-                }}
-              />
-              <div className="border border-border-default rounded-xl overflow-hidden divide-y divide-border-default">
-                <ExtraFieldsGroup group="internal" product={product} />
               </div>
             </section>
           </div>
@@ -5537,7 +5662,7 @@ export default function ProductForm({
                   />
                 </div>
                 <div className="border-t border-border-default">
-                  <ExtraFieldsGroup group="seo" product={product} />
+                  <ExtraFieldsGroup aiContext={productAiContext} group="seo" product={product} />
                 </div>
               </div>
               <AiInsightsPanel product={product} />

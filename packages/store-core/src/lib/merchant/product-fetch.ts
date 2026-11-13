@@ -21,7 +21,15 @@ const PRODUCT_SELECT = `
       (SELECT json_agg(pv ORDER BY pv.variant_name)
        FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
       '[]'::json
-    ) AS product_variants
+    ) AS product_variants,
+    -- Product-level gallery from product_media (primary first); feeds prefer it over product_images.
+    COALESCE(
+      (SELECT json_agg(m.url ORDER BY m.is_primary DESC, m.sort_order)
+       FROM product_media m
+       WHERE m.root_product_id = p.id AND m.variant_id IS NULL AND m.sub_variant_id IS NULL
+         AND m.kind = 'image' AND m.status = 'ready'),
+      '[]'::json
+    ) AS media_image_urls
   FROM products p
   LEFT JOIN categories c ON p.category_id = c.id
   LEFT JOIN categories pc ON c.parent_category_id = pc.id

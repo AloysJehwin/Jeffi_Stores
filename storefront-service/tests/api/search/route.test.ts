@@ -102,7 +102,7 @@ describe('GET /api/search', () => {
     expect(res.status).toBe(200)
 
     const body = await res.json()
-    expect(body).toEqual({ products: [], categories: [] })
+    expect(body).toEqual({ products: [], categories: [], brands: [] })
     expect(queryManyMock).not.toHaveBeenCalled()
   })
 
@@ -111,7 +111,7 @@ describe('GET /api/search', () => {
     expect(res.status).toBe(200)
 
     const body = await res.json()
-    expect(body).toEqual({ products: [], categories: [] })
+    expect(body).toEqual({ products: [], categories: [], brands: [] })
   })
 
   it('returns products and categories for a valid query', async () => {

@@ -27,13 +27,16 @@ import ProductPitchLine from '@/components/on-device/ProductPitchLine'
 import { round2 } from '@/lib/catalog/gst'
 import { loadProductFaqs, loadProductMedia, mediaStructuredData, resolveImageUrls, resolveMedia } from '@/lib/catalog/product-media'
 import ProductInfoSections, { faqJsonLd } from '@/components/visitor/pdp/ProductInfoSections'
+import { itemConditionLd, productExtrasLd, returnPolicyLd } from '@/lib/catalog/product-jsonld'
+import { publicProduct } from '@/lib/catalog/public-product'
+import { BRAND_DEFAULTS_SQL, withBrandDefaults } from '@/lib/catalog/catalog-defaults'
 
 const getProductBySlug = cache(async (slug: string) => {
   const product = await getProductRowBySlug(slug)
   if (!product) return product
   // product_media drives the gallery (every kind, variant / sub-variant inheritance); FAQs show below.
   const [media, faqs] = await Promise.all([loadProductMedia(product.id), loadProductFaqs(product.id, { publishedOnly: true })])
-  return { ...product, media, faqs }
+  return { ...publicProduct(withBrandDefaults(product)), media, faqs }
 })
 
 async function getProductRowBySlug(slug: string) {
@@ -42,11 +45,12 @@ async function getProductRowBySlug(slug: string) {
   return queryOne(
     `
     SELECT p.*,
+      ${BRAND_DEFAULTS_SQL},
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug,
-        'return_allowed',          COALESCE(c.return_allowed,          pc.return_allowed,          true),
-        'return_window_days',      COALESCE(c.return_window_days,      pc.return_window_days,      7),
-        'replacement_allowed',     COALESCE(c.replacement_allowed,     pc.replacement_allowed,     true),
-        'replacement_window_days', COALESCE(c.replacement_window_days, pc.replacement_window_days, 7)
+        'return_allowed',          COALESCE(c.return_allowed,          pc.return_allowed),
+        'return_window_days',      COALESCE(c.return_window_days,      pc.return_window_days),
+        'replacement_allowed',     COALESCE(c.replacement_allowed,     pc.replacement_allowed),
+        'replacement_window_days', COALESCE(c.replacement_window_days, pc.replacement_window_days)
       ) AS categories,
       json_build_object('id', b.id, 'name', b.name, 'slug', b.slug,
         'return_allowed', b.return_allowed, 'return_window_days', b.return_window_days,
@@ -143,6 +147,8 @@ function buildProductJsonLd(product: any, baseUrl: string) {
   const images = fromMedia.length ? fromMedia : (product.product_images || []).map((img: any) => img.image_url)
   const subjectOf = mediaStructuredData(resolveMedia(product.media ?? []), product.name, product.description)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
+  const itemCondition = itemConditionLd(product)
+  const returns = returnPolicyLd(product)
 
   const offers = hasVariants
     ? product.product_variants.map((v: any) => {
@@ -157,7 +163,8 @@ function buildProductJsonLd(product: any, baseUrl: string) {
           priceCurrency: 'INR',
           availability:
             v.stock_status !== 'Out of Stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
+          itemCondition,
+          ...(returns && { hasMerchantReturnPolicy: returns }),
           url: `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
         }
       })
@@ -169,7 +176,8 @@ function buildProductJsonLd(product: any, baseUrl: string) {
           priceCurrency: 'INR',
           availability:
             product.stock_status !== 'Out of Stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
+          itemCondition,
+          ...(returns && { hasMerchantReturnPolicy: returns }),
           url: `${baseUrl}/products/${product.slug}`,
         },
       ]
@@ -178,13 +186,14 @@ function buildProductJsonLd(product: any, baseUrl: string) {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description || undefined,
+    description: product.description || product.short_description || undefined,
     sku: product.sku,
     ...(product.mpn && { mpn: product.mpn }),
     ...(product.gtin && { gtin: product.gtin }),
     image: images.length > 0 ? images : undefined,
     ...(product.brands && { brand: { '@type': 'Brand', name: product.brands.name } }),
     ...(product.categories && { category: product.categories.name }),
+    ...productExtrasLd(product),
     offers: hasVariants ? { '@type': 'AggregateOffer', offerCount: offers.length, offers } : offers[0],
     ...(subjectOf.length > 0 && { subjectOf }),
   }

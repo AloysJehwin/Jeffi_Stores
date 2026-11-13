@@ -189,6 +189,9 @@ textarea.field-sm,
 textarea.field-compact,
 textarea.field-xs {
   height: auto;
+  /* field-* sets py-0 to centre one-line inputs; a textarea needs the padding back or text hugs the top edge. */
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 /* Toast notification animation */

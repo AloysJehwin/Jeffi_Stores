@@ -7,7 +7,11 @@ import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { actorOf, draftLockResponse, epochFrom, withDraftPublish } from '@/lib/admin/draft-locks'
 import { recordDirectRevision } from '@/lib/admin/entity-revisions'
-import { brandContentOf } from '@/lib/catalog/brand-draft'
+import { applyBrandProfile, brandContentOf } from '@/lib/catalog/brand-draft'
+import { BRAND_PROFILE_FIELDS } from '@/lib/catalog/brand-fields'
+import { parseBodyFields } from '@/lib/catalog/entity-fields'
+
+const poolDb = { query: (t: string, p?: unknown[]) => query(t, p) } as any
 
 const patchSchema = z
   .object({
@@ -97,6 +101,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       id,
     ]
   )
+  // Profile columns (brand-fields.ts): only the keys the body carries.
+  await applyBrandProfile(poolDb, id, parseBodyFields(BRAND_PROFILE_FIELDS, body))
 
   if (existingBrand && existingBrand.is_active !== !!is_active) {
     await query('UPDATE products SET is_active = $1 WHERE brand_id = $2', [!!is_active, id])

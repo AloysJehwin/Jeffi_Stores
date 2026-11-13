@@ -31,6 +31,11 @@ export function renumberForSubmit(body: string, blocks: Blocks | null | undefine
 // new SID on the submitted version only; sync promotes it to the variant once Meta approves, so a
 // pending or rejected edit never breaks sending.
 
+const AUTH_TYPE = {
+  body: '{{1}}', add_security_recommendation: true, code_expiration_minutes: 10,
+  actions: [{ type: 'COPY_CODE', copy_code_text: 'Copy code' }],
+}
+
 function actions(buttons: Button[] | undefined) {
   return (buttons ?? []).filter(b => b.label?.trim()).map(b =>
     b.type === 'quick_reply' ? { type: 'QUICK_REPLY', title: b.label.trim(), id: b.label.trim().toLowerCase().replace(/\W+/g, '_') }
@@ -39,7 +44,9 @@ function actions(buttons: Button[] | undefined) {
 }
 
 /** One Twilio Content type built from what the editor stores. Body always comes from the saved body. */
-export function composeTypes(body: string, blocks: Blocks | null | undefined): Record<string, any> {
+export function composeTypes(body: string, blocks: Blocks | null | undefined, category?: string): Record<string, any> {
+  // Meta fixes the OTP body; the code is {{1}} and the button copies it.
+  if (category === 'AUTHENTICATION') return { 'whatsapp/authentication': AUTH_TYPE }
   const b = blocks ?? {}
   const cards = b.carousel?.cards?.filter(c => c.body || c.title || c.media_url) ?? []
   const media: string | undefined = b.types?.['twilio/media']?.media?.[0]
@@ -73,13 +80,14 @@ export async function submit(pool: pg.Pool, tenantId: string, tenantSlug: string
   const blocks = (t.version.blocks ?? {}) as Blocks
   const samples = metaSamples(t.version.body, blocks)
   const outbound = renumberForSubmit(t.version.body, blocks, samples)
-  const errors = validateForMeta(t.version.body, blocks, samples)
-  if (errors.length) throw Object.assign(new Error(errors.join(' ')), { status: 422, errors })
   const category = (opts.category ?? t.variant.meta_category ?? 'UTILITY') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
+  // Meta writes the AUTHENTICATION body itself; only {{1}} (the code) is ours.
+  const errors = category === 'AUTHENTICATION' ? [] : validateForMeta(t.version.body, blocks, samples)
+  if (errors.length) throw Object.assign(new Error(errors.join(' ')), { status: 422, errors })
   const name = opts.name || metaName(opts.space === 'api' ? `${tenantSlug ?? 'jeffi'}_api` : tenantSlug, t.family.slug, t.version.version)
   if (onAws) return submitAws(pool, t, name, category, planSlots(t.version.body, blocks, samples))
   const content = await twContent.createContent({
-    friendly_name: name, language: t.variant.locale, types: composeTypes(outbound.body, outbound.blocks), variables: outbound.samples,
+    friendly_name: name, language: t.variant.locale, types: composeTypes(outbound.body, outbound.blocks, category), variables: outbound.samples,
   })
   let approval: twContent.ApprovalResource
   try {
@@ -123,6 +131,19 @@ export function awsTemplate(rawName: string, locale: string, category: string, p
   const b = plan.blocks
   const lang = locale.replace(/-/g, '_')
   let name = rawName.toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 512)
+  if (category === 'AUTHENTICATION') {
+    const room = MAX_REF - `aws::${lang}|otp`.length
+    if (name.length > room) name = fitName(name, room)
+    return {
+      name,
+      ref: formatAwsTemplateRef({ name, lang, buttons: [], otp: true }),
+      definition: { name, language: lang, category, components: [
+        { type: 'BODY', add_security_recommendation: true },
+        { type: 'FOOTER', code_expiration_minutes: 10 },
+        { type: 'BUTTONS', buttons: [{ type: 'OTP', otp_type: 'COPY_CODE', text: 'Copy code' }] },
+      ] },
+    }
+  }
   if (b.carousel?.cards?.some(c => c.body || c.title || c.media_url))
     throw Object.assign(new Error('Carousel templates are not supported on AWS yet.'), { status: 422 })
   const components: any[] = []

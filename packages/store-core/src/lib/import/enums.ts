@@ -1,4 +1,5 @@
 import type { PackageType } from '@/lib/shipping/shipping'
+import { EXTRA_FIELDS } from '@/lib/catalog/product-extra-fields'
 
 // Dropdown value sets for the import template. Only stock_status is DB-enforced
 // (CHECK in catalog.sql); the rest mirror the product form's option lists so the
@@ -29,3 +30,6 @@ export const ENUMS: Record<string, string[]> = {
   unit: ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet'],
   bool: ['TRUE', 'FALSE'],
 }
+
+// Dropdowns for the editor's select-type detail fields (see extraEnumKey in columns.ts).
+for (const f of EXTRA_FIELDS) if (f.type === 'select' && f.options) ENUMS[`extra_${f.key}`] = ['', ...f.options.map(o => o.value)]

@@ -86,7 +86,7 @@ describe('suggestTemplateColumns', () => {
     expect(s['Front Image']).toEqual({ field: 'image_1' })
     expect(s['Back Image']).toEqual({ field: 'image_2' })
     expect(s['Neck']).toEqual({ field: 'attr:Neck' })
-    expect(s['Country of Origin']).toBeUndefined()
+    expect(s['Country of Origin']).toEqual({ field: 'country_of_origin' })
   })
 })
 

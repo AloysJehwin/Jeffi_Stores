@@ -10,6 +10,7 @@ import {
 } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 // ── "Featured For You" recommender ─────────────────────────────────────────
 // Turns a logged-in user's captured browsing/purchase signals into a curated
@@ -149,7 +150,7 @@ async function hydrate(ids: string[]): Promise<RecCard[]> {
     [ids]
   )
   const order = new Map(ids.map((id, i) => [id, i]))
-  return rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
+  return publicProducts(rows).sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
 }
 
 // ── 1. Signal aggregation ───────────────────────────────────────────────────

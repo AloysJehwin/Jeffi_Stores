@@ -19,6 +19,7 @@ import ProductCard from '@/components/business/ProductCard'
 import { round2 } from '@/lib/catalog/gst'
 import { positiveInt, productOrderBy, type ProductSortQuery } from '@/lib/catalog/product-sort'
 import SortDropdown from '@/components/visitor/SortDropdown'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 const PAGE_SIZE = 24
 
@@ -70,7 +71,7 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
     [allCategoryIds, PAGE_SIZE, offset]
   )
 
-  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
+  return { products: publicProducts(products), total, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 
 export default async function BusinessCategoryDetailPage({

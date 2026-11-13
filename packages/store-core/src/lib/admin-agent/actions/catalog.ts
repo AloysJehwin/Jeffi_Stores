@@ -1,6 +1,7 @@
 import { queryOne, getClient } from '@/lib/shared/db'
 import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/orders/inventory'
 import type { AgentAction, ActionResult } from './shared'
+import { resolveGoogleCategory } from '@/lib/catalog/google-taxonomy'
 
 export async function createCoupon(action: AgentAction): Promise<ActionResult> {
   const { code, discountType, discountValue, validUntil, minPurchaseAmount, usageLimit, description } =
@@ -224,17 +225,23 @@ export async function createBrand(action: AgentAction): Promise<ActionResult> {
 export async function createCategory(action: AgentAction): Promise<ActionResult> {
   const { name, slug, parentId } = action.payload as { name: string; slug: string; parentId: string | null }
   if (!name || !slug) return { result: null, error: 'name and slug required' }
+  let parent: { name?: string; google_product_category?: string | null } | null = null
   if (parentId) {
-    const parent = await queryOne(`SELECT id FROM categories WHERE id = $1::uuid`, [parentId])
+    parent = await queryOne(`SELECT id, name, google_product_category FROM categories WHERE id = $1::uuid`, [parentId])
     if (!parent) return { result: null, error: 'Parent category not found' }
   }
   const dup = await queryOne<{ id: string }>(`SELECT id FROM categories WHERE slug = $1 LIMIT 1`, [slug])
   if (dup) return { result: null, error: `Category slug "${slug}" already exists` }
+  const googleCategory = await resolveGoogleCategory(null, {
+    name,
+    parentName: parent?.name,
+    parentGoogleCategory: parent?.google_product_category,
+  }).catch(() => null)
   const created = await queryOne(
-    `INSERT INTO categories (name, slug, parent_category_id, is_active, display_order)
-     VALUES ($1, $2, $3::uuid, TRUE, 0)
-     RETURNING id::text, name, slug, parent_category_id::text AS parent_id, is_active`,
-    [name, slug, parentId]
+    `INSERT INTO categories (name, slug, parent_category_id, is_active, display_order, google_product_category)
+     VALUES ($1, $2, $3::uuid, TRUE, 0, $4)
+     RETURNING id::text, name, slug, parent_category_id::text AS parent_id, is_active, google_product_category`,
+    [name, slug, parentId, googleCategory]
   )
   if (!created) return { result: null, error: 'Insert failed' }
   return { result: created, error: null }

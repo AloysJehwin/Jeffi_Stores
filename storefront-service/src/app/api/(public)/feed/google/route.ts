@@ -5,6 +5,7 @@ import { loadProductMediaMany, resolveImageUrls } from '@/lib/catalog/product-me
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
 import { getStorefrontContent } from '@/lib/catalog/site-controls'
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
+import { gmcAgeGroup, gmcCondition, gmcGender, gmcMultipack } from '@/lib/merchant/attributes'
 import { clipTitle, hasIdentifiers, listedPrices } from '@/lib/merchant/item-rules'
 
 export const dynamic = 'force-dynamic'
@@ -79,14 +80,16 @@ export async function GET(request: NextRequest) {
     const imagesXmlFor = (urls: string[]) =>
       urls.map(url => `\n      <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`).join('')
     const brandName = product.brands?.name || ''
-    const description = (product.description || product.name).slice(0, 5000)
+    const description = (product.description || product.ai_description || product.short_description || product.name).slice(0, 5000)
     const hasVariants = product.has_variants && product.product_variants?.length > 0
     const productActive = product.is_active !== false
 
     const highlights = buildProductHighlights(product)
     const details = buildProductDetails(product)
 
+    // Cost of goods only in a token-protected feed: an open feed URL would show the store's costs to anyone.
     const cogs = (cost: any): string => {
+      if (!feedSecret) return ''
       const n = Number(cost)
       return n > 0 ? `\n      <g:cost_of_goods_sold>${n.toFixed(2)} INR</g:cost_of_goods_sold>` : ''
     }
@@ -103,13 +106,23 @@ export async function GET(request: NextRequest) {
       )
       .join('')
     const materialXml = product.material ? `\n      <g:material>${escapeXml(product.material)}</g:material>` : ''
+    const gender = gmcGender(product)
+    const multipack = gmcMultipack(product)
+    const attrsXml =
+      `\n      <g:age_group>${gmcAgeGroup(product)}</g:age_group>` +
+      (gender ? `\n      <g:gender>${gender}</g:gender>` : '') +
+      (product.color ? `\n      <g:color>${escapeXml(product.color)}</g:color>` : '') +
+      (multipack ? `\n      <g:multipack>${multipack}</g:multipack>` : '') +
+      (product.is_bundle ? `\n      <g:is_bundle>yes</g:is_bundle>` : '')
+    const condition = gmcCondition(product)
+    const productMpn = product.mpn || product.brand_part_number || product.model_number || ''
 
     if (hasVariants) {
       for (const variant of product.product_variants) {
         const sellingPrice = variant.price
         if (sellingPrice == null) continue
         const variantMrp = variant.mrp ? Number(variant.mrp) : product.mrp ? Number(product.mrp) : null
-        const variantMpn = variant.mpn || product.mpn || ''
+        const variantMpn = variant.mpn || productMpn
         const variantGtin = variant.gtin || product.gtin || ''
         const availability = !productActive
           ? 'out_of_stock'
@@ -129,7 +142,7 @@ export async function GET(request: NextRequest) {
       <link>${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}</link>
       <g:image_link>${escapeXml(vImage)}</g:image_link>${vAdditionalXml}${priceXml(Number(sellingPrice), variantMrp)}
       <g:availability>${availability}</g:availability>
-      <g:condition>new</g:condition>
+      <g:condition>${condition}</g:condition>
       <g:identifier_exists>${hasIdentifiers(variantGtin, variantMpn, brandName) ? 'yes' : 'no'}</g:identifier_exists>${
         brandName
           ? `
@@ -145,7 +158,7 @@ export async function GET(request: NextRequest) {
           ? `
       <g:gtin>${escapeXml(variantGtin)}</g:gtin>`
           : ''
-      }${highlightsXml}${detailsXml}${materialXml}
+      }${highlightsXml}${detailsXml}${materialXml}${attrsXml}
       <g:size>${escapeXml(variant.variant_name)}</g:size>${cogs(variant.cost_price ?? product.cost_price)}
     </item>`)
       }
@@ -165,23 +178,23 @@ export async function GET(request: NextRequest) {
       <link>${baseUrl}/products/${product.slug}</link>
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}${priceXml(Number(sellingPrice), productMrp)}
       <g:availability>${availability}</g:availability>
-      <g:condition>new</g:condition>
-      <g:identifier_exists>${hasIdentifiers(product.gtin, product.mpn, brandName) ? 'yes' : 'no'}</g:identifier_exists>${
+      <g:condition>${condition}</g:condition>
+      <g:identifier_exists>${hasIdentifiers(product.gtin, productMpn, brandName) ? 'yes' : 'no'}</g:identifier_exists>${
         brandName
           ? `
       <g:brand>${escapeXml(brandName)}</g:brand>`
           : ''
       }${
-        product.mpn
+        productMpn
           ? `
-      <g:mpn>${escapeXml(product.mpn)}</g:mpn>`
+      <g:mpn>${escapeXml(productMpn)}</g:mpn>`
           : ''
       }${
         product.gtin
           ? `
       <g:gtin>${escapeXml(product.gtin)}</g:gtin>`
           : ''
-      }${highlightsXml}${detailsXml}${materialXml}${
+      }${highlightsXml}${detailsXml}${materialXml}${attrsXml}${
         product.size
           ? `
       <g:size>${escapeXml(product.size)}</g:size>`

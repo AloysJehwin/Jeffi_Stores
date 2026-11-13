@@ -51,6 +51,9 @@ next-env.d.ts
 !/scripts/db-files.mjs
 !/scripts/db-split-by-service.mjs
 !/scripts/db-ownership-evidence.mjs
+# Operator tools: set a key in every Secrets Manager secret; rebuild the Google taxonomy snapshot.
+!/scripts/set-secret.sh
+!/scripts/refresh-google-taxonomy.mjs
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md

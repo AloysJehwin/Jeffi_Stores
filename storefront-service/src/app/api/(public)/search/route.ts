@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const q = request.nextUrl.searchParams.get('q')?.trim() || ''
 
     if (q.length < 2) {
-      return NextResponse.json({ products: [], categories: [] })
+      return NextResponse.json({ products: [], categories: [], brands: [] })
     }
 
     const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', 1)
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const { gstEnabled } = await getFeatureFlags()
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
-    const [products, categories] = await Promise.all([
+    const [products, categories, brands] = await Promise.all([
       queryMany(
         `
         SELECT
@@ -49,8 +49,18 @@ export async function GET(request: NextRequest) {
       queryMany(
         `
         SELECT id, name, slug FROM categories
-        WHERE ${catSc.clause}
+        WHERE is_active = true AND is_draft = false AND ${catSc.clause}
         ORDER BY name ASC
+        LIMIT 3
+      `,
+        catSc.params
+      ),
+      queryMany(
+        `
+        SELECT b.id, b.name, b.slug, b.logo_url FROM brands b
+        WHERE b.is_active = true AND b.is_draft = false AND ${catSc.clause}
+          AND EXISTS (SELECT 1 FROM products p WHERE p.brand_id = b.id AND p.is_active = true)
+        ORDER BY b.name ASC
         LIMIT 3
       `,
         catSc.params
@@ -59,6 +69,7 @@ export async function GET(request: NextRequest) {
 
     const productsArr = products || []
     const categoriesArr = categories || []
+    const brandsArr = brands || []
 
     void (async () => {
       try {
@@ -68,15 +79,15 @@ export async function GET(request: NextRequest) {
         const userId = authUser?.userId ?? null
         await query(`INSERT INTO search_logs (query, results_count, user_id, session_id) VALUES ($1, $2, $3, $4)`, [
           q.slice(0, 200),
-          productsArr.length + categoriesArr.length,
+          productsArr.length + categoriesArr.length + brandsArr.length,
           userId,
           sessionId,
         ])
       } catch {}
     })()
 
-    return NextResponse.json({ products: productsArr, categories: categoriesArr })
+    return NextResponse.json({ products: productsArr, categories: categoriesArr, brands: brandsArr })
   } catch (err) {
-    return NextResponse.json({ products: [], categories: [] }, { status: 500 })
+    return NextResponse.json({ products: [], categories: [], brands: [] }, { status: 500 })
   }
 }

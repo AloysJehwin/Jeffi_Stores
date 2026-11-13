@@ -1,5 +1,9 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { cache } from 'react'
+import type { Metadata } from 'next'
+import { breadcrumbJsonLd, ldJson, listingMetadata } from '@/lib/catalog/listing-seo'
+import { siteOrigin } from '@/app-shell/site-origin'
 import { responsiveImg } from '@/lib/shared/image-url'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import {
@@ -16,11 +20,36 @@ import { getWebSurface } from '@/lib/catalog/web-surface'
 import { round2 } from '@/lib/catalog/gst'
 import { positiveInt, productOrderBy, type ProductSortQuery } from '@/lib/catalog/product-sort'
 import SortDropdown from '@/components/visitor/SortDropdown'
+import { publicProducts } from '@/lib/catalog/public-product'
+import {
+  BrandAccentBar,
+  BrandBanner,
+  BrandFacts,
+  BrandSocialLinks,
+  BrandStory,
+  BrandWarrantyService,
+  SeoContent,
+  brandSocialLinks,
+} from '@/components/visitor/brand/BrandProfile'
 
 const PAGE_SIZE = 25
 
-async function getBrandBySlug(slug: string) {
-  return queryOne('SELECT * FROM brands WHERE slug = $1 AND is_active = true LIMIT 1', [slug])
+const getBrandBySlug = cache(async (slug: string) =>
+  queryOne('SELECT * FROM brands WHERE slug = $1 AND is_active = true LIMIT 1', [slug])
+)
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const brand = await getBrandBySlug(slug)
+  if (!brand) return { title: 'Brand Not Found' }
+  return listingMetadata({
+    title: brand.meta_title || brand.name,
+    description: brand.meta_description || brand.description,
+    fallbackDescription: `Shop ${brand.name} products.`,
+    path: `/brands/${brand.slug}`,
+    image: brand.banner_desktop_url || brand.logo_url,
+    noindex: brand.seo_noindex === true,
+  })
 }
 
 async function getBrandProducts(brandId: string, page: number, gstEnabled: boolean, sort: ProductSortQuery) {
@@ -57,7 +86,7 @@ async function getBrandProducts(brandId: string, page: number, gstEnabled: boole
     [brandId, PAGE_SIZE, offset]
   )
 
-  return { products, total }
+  return { products: publicProducts(products), total }
 }
 
 export default async function BrandDetailPage({
@@ -79,9 +108,26 @@ export default async function BrandDetailPage({
   const { gstEnabled } = await getFeatureFlags()
   const { products, total } = await getBrandProducts(brand.id, page, gstEnabled, resolvedSearchParams)
   const surface = await getWebSurface(resolvedSearchParams.layout)
+  const crumbLd = await breadcrumbJsonLd([
+    { name: 'Home', path: '/' },
+    { name: 'Brands', path: '/brands' },
+    { name: brand.name },
+  ])
+  const sameAs = [brand.website, ...brandSocialLinks(brand.social_links).map(([, url]) => url)].filter(Boolean)
+  const brandLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Brand',
+    name: brand.name,
+    url: `${await siteOrigin()}/brands/${brand.slug}`,
+    ...(brand.logo_url ? { logo: brand.logo_url } : {}),
+    ...(brand.description ? { description: brand.description } : {}),
+    ...(sameAs.length ? { sameAs } : {}),
+  }
 
   return (
     <div className="bg-surface min-h-screen">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson([crumbLd, brandLd]) }} />
+      <BrandAccentBar color={brand.brand_color} />
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm mb-4">
@@ -110,6 +156,7 @@ export default async function BrandDetailPage({
               <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
                 {brand.name}
               </h1>
+              {brand.tagline && <p className="text-lg text-foreground font-medium mb-1">{brand.tagline}</p>}
               {brand.description && <p className="text-foreground-secondary">{brand.description}</p>}
               {brand.website && (
                 <a
@@ -121,12 +168,20 @@ export default async function BrandDetailPage({
                   {brand.website}
                 </a>
               )}
+              <div className="mt-3 flex flex-col gap-2">
+                <BrandFacts brand={brand} />
+                <BrandSocialLinks brand={brand} />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      <BrandBanner brand={brand} />
+
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+        <BrandStory brand={brand} />
+        <BrandWarrantyService brand={brand} />
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <h2 className="text-xl font-bold text-foreground">Products ({total})</h2>
@@ -226,6 +281,7 @@ export default async function BrandDetailPage({
             </div>
           )}
         </div>
+        <SeoContent text={brand.seo_content} />
       </div>
     </div>
   )

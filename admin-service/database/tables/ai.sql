@@ -201,5 +201,35 @@ CREATE TABLE public.product_ai_enrichment_log (
     ai_product_type text,
     ai_features text[],
     ai_search_tags text[],
+    short_description text,
+    usage_instructions text,
+    care_instructions text,
+    safety_warnings text,
+    meta_title text,
+    meta_description text,
+    faqs jsonb,
     CONSTRAINT product_ai_enrichment_log_status_chk CHECK ((status = ANY (ARRAY['proposed'::text, 'approved'::text, 'rejected'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: entity_ai_enrichment_log; Type: TABLE; Schema: public; Owner: -
+-- AI proposals for brand / category profile fields (docs/BRAND_CATEGORY_PLAN.md §3.4); an admin approves.
+-- entity_id is a brand or category id (no FK: two parents); fields = proposed column values, faqs for categories.
+--
+
+CREATE TABLE public.entity_ai_enrichment_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_type text NOT NULL,
+    entity_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    faqs jsonb,
+    sources jsonb DEFAULT '{}'::jsonb NOT NULL,
+    model text,
+    status text DEFAULT 'proposed'::text NOT NULL,
+    error text,
+    proposed_at timestamp with time zone DEFAULT now() NOT NULL,
+    decided_at timestamp with time zone,
+    decided_by_admin_id uuid,
+    applied_fields text[]
 );

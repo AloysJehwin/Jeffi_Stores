@@ -1,7 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ChevronDown, ChevronUp, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { RequireAi } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '../AIEnrichButton'
+import AdminSelect from '../AdminSelect'
 import {
   EXTRA_FIELDS,
   EXTRA_GROUP_LABEL,
@@ -14,38 +17,126 @@ const inputCls =
   'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 const labelCls = 'mb-1.5 block text-xs font-medium text-foreground-secondary'
 
-function FieldInput({ f, value }: { f: ExtraField; value: unknown }) {
+/** Uncontrolled textarea with the AI sparkle; an AI rewrite fires a real input event so autosave sees it. */
+function AiTextarea({ f, initial, context }: { f: ExtraField; initial: string; context?: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const [value, setValue] = useState(initial)
+  const apply = (next: string) => {
+    const el = ref.current
+    if (!el) return
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(el, next)
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+    setValue(next)
+  }
+  return (
+    <AIEnrichButton fieldLabel={f.label} value={value} onChange={apply} scope="products:write" context={context} maxLength={f.max} multiline write>
+      <textarea
+        ref={ref}
+        id={`pf_${f.key}`}
+        name={f.key}
+        defaultValue={initial}
+        placeholder={f.placeholder}
+        rows={f.key === 'short_description' ? 2 : 3}
+        maxLength={f.max}
+        onInput={e => setValue(e.currentTarget.value)}
+        className={`${inputCls} resize-y pr-8`}
+      />
+    </AIEnrichButton>
+  )
+}
+
+/** A hidden input the form reads, plus a nudge that fires input/change so autosave and dirty tracking see a pick. */
+function useFormValue(name: string, initial: string) {
+  const ref = useRef<HTMLInputElement>(null)
+  const [value, setValue] = useState(initial)
+  const set = (next: string) => {
+    setValue(next)
+    setTimeout(() => {
+      ref.current?.dispatchEvent(new Event('input', { bubbles: true }))
+      ref.current?.dispatchEvent(new Event('change', { bubbles: true }))
+    }, 0)
+  }
+  const input = <input ref={ref} type="hidden" name={name} value={value} readOnly />
+  return { value, set, input }
+}
+
+function SelectField({ f, initial, options }: { f: ExtraField; initial: string; options: { value: string; label: string }[] }) {
+  const { value, set, input } = useFormValue(f.key, initial)
+  return (
+    <>
+      {input}
+      <AdminSelect id={`pf_${f.key}`} value={value} onChange={set} options={options} placeholder="—" />
+    </>
+  )
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** YYYY-MM as two admin dropdowns (the calendar picks days; this field stores a month). */
+function MonthField({ f, initial }: { f: ExtraField; initial: string }) {
+  const { value, set, input } = useFormValue(f.key, initial)
+  const [y, m] = value ? value.split('-') : ['', '']
+  const now = new Date().getFullYear()
+  const years = Array.from({ length: 16 }, (_, i) => String(now + 1 - i))
+  if (y && !years.includes(y)) years.push(y)
+  const pick = (ny: string, nm: string) => set(ny && nm ? `${ny}-${nm}` : '')
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {input}
+      <AdminSelect
+        id={`pf_${f.key}`}
+        value={m}
+        onChange={nm => pick(y || String(now), nm)}
+        placeholder="Month"
+        options={[{ value: '', label: '—' }, ...MONTHS.map((l, i) => ({ value: String(i + 1).padStart(2, '0'), label: l }))]}
+      />
+      <AdminSelect
+        value={y}
+        onChange={ny => pick(ny, ny ? m || '01' : '')}
+        placeholder="Year"
+        options={[{ value: '', label: '—' }, ...years.map(v => ({ value: v, label: v }))]}
+      />
+    </div>
+  )
+}
+
+function FieldInput({ f, value, context }: { f: ExtraField; value: unknown; context?: string }) {
   const v = extraFieldInput(f.key, value)
   const common = { id: `pf_${f.key}`, name: f.key, defaultValue: v, placeholder: f.placeholder }
   switch (f.type) {
     case 'textarea':
-      return <textarea {...common} rows={3} maxLength={f.max} className={`${inputCls} resize-y`} />
+      return <AiTextarea f={f} initial={String(v ?? '')} context={context} />
     case 'int':
       return <input {...common} type="number" min={0} step={1} className={inputCls} />
     case 'numeric':
       return <input {...common} type="number" min={0} step="any" className={inputCls} />
     case 'month':
-      return <input {...common} type="month" className={inputCls} />
+      return <MonthField f={f} initial={v} />
     case 'url':
       return <input {...common} type="url" className={inputCls} />
     case 'bool':
       return (
-        <select {...common} className={inputCls}>
-          <option value="false">No</option>
-          <option value="true">Yes</option>
-        </select>
+        <SelectField
+          f={f}
+          initial={v || 'false'}
+          options={[
+            { value: 'false', label: 'No' },
+            { value: 'true', label: 'Yes' },
+          ]}
+        />
       )
     case 'select':
       return (
-        <select {...common} className={inputCls}>
-          <option value="">—</option>
-          {f.options?.map(o => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-          {v && !f.options?.some(o => o.value === v) && <option value={v}>{v}</option>}
-        </select>
+        <SelectField
+          f={f}
+          initial={v}
+          options={[
+            { value: '', label: '—' },
+            ...(f.options ?? []),
+            ...(v && !f.options?.some(o => o.value === v) ? [{ value: v, label: v }] : []),
+          ]}
+        />
       )
     default:
       return <input {...common} type="text" maxLength={f.max} className={inputCls} />
@@ -58,11 +149,14 @@ export function ExtraFieldsGroup({
   product,
   note,
   omit = [],
+  aiContext,
 }: {
   group: ExtraGroup
   product: Record<string, any> | null | undefined
   note?: string
   omit?: string[]
+  /** What the AI sparkle is told about the product (name, brand, category). */
+  aiContext?: string
 }) {
   const fields = EXTRA_FIELDS.filter(f => f.group === group && !omit.includes(f.key))
   if (fields.length === 0) return null
@@ -79,7 +173,7 @@ export function ExtraFieldsGroup({
               <label htmlFor={`pf_${f.key}`} className={labelCls}>
                 {f.label}
               </label>
-              <FieldInput f={f} value={product?.[f.key]} />
+              <FieldInput f={f} value={product?.[f.key]} context={aiContext ?? (product?.name ? `Product: ${product.name}` : undefined)} />
               {f.hint && <p className="text-xs text-foreground-muted mt-1">{f.hint}</p>}
             </div>
           ))}
@@ -159,13 +253,38 @@ export function FaqEditor({
   initial,
   onChange,
   disabled,
+  aiContext,
+  aiDetails,
 }: {
   initial: FaqRow[]
   onChange: () => void
   disabled?: boolean
+  aiContext?: string
+  /** Description and specs at click time, so generated answers stay factual. */
+  aiDetails?: () => string
 }) {
   const [rows, setRows] = useState<FaqRow[]>(initial)
   const [touched, setTouched] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  async function generate() {
+    setGenerating(true)
+    setAiError(null)
+    try {
+      const res = await fetch('/api/admin/products/ai-faqs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ context: aiContext, details: aiDetails?.(), existing: rows.map(r => r.question).filter(Boolean) }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'Could not generate FAQs')
+      update(rs => [...rs.filter(r => r.question.trim() || r.answer.trim()), ...d.faqs.map((f: FaqRow) => ({ ...f, published: true }))])
+    } catch (e: any) {
+      setAiError(e.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
   const update = (fn: (r: FaqRow[]) => FaqRow[]) => {
     setRows(fn)
     setTouched(true)
@@ -219,15 +338,26 @@ export function FaqEditor({
                 </button>
               </div>
             </div>
-            <textarea
+            <AIEnrichButton
+              fieldLabel="FAQ answer"
               value={r.answer}
-              disabled={disabled}
-              rows={2}
+              onChange={next => update(rs => rs.map((x, j) => (j === i ? { ...x, answer: next } : x)))}
+              scope="products:write"
+              context={`${aiContext ? `${aiContext}. ` : ''}Question: ${r.question}`}
               maxLength={2000}
-              onChange={e => update(rs => rs.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)))}
-              placeholder="Answer"
-              className={`${inputCls} resize-y`}
-            />
+              multiline
+              write={!!r.question.trim()}
+            >
+              <textarea
+                value={r.answer}
+                disabled={disabled}
+                rows={2}
+                maxLength={2000}
+                onChange={e => update(rs => rs.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)))}
+                placeholder="Answer"
+                className={`${inputCls} resize-y pr-8`}
+              />
+            </AIEnrichButton>
             <label className="flex items-center gap-2 text-xs text-foreground-secondary">
               <input
                 type="checkbox"
@@ -247,6 +377,18 @@ export function FaqEditor({
         >
           <Plus className="h-3.5 w-3.5" /> Add question
         </button>
+        <RequireAi scope="products:write">
+          <button
+            type="button"
+            disabled={disabled || generating || !aiContext}
+            onClick={generate}
+            className="ml-4 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-40 dark:text-violet-400"
+          >
+            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {generating ? 'Writing FAQs…' : rows.length ? 'Suggest more with AI' : 'Generate FAQs with AI'}
+          </button>
+        </RequireAi>
+        {aiError && <p className="text-xs text-red-600">{aiError}</p>}
       </div>
     </div>
   )

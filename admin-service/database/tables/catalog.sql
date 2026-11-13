@@ -21,7 +21,45 @@ CREATE TABLE public.brands (
     return_window_days integer DEFAULT 7 NOT NULL,
     replacement_allowed boolean DEFAULT true NOT NULL,
     replacement_window_days integer DEFAULT 7 NOT NULL,
-    is_draft boolean DEFAULT false NOT NULL
+    is_draft boolean DEFAULT false NOT NULL,
+    -- Profile (docs/BRAND_CATEGORY_PLAN.md §3.1). Origin, maker, warranty and lead time are product defaults.
+    updated_at timestamp with time zone DEFAULT now(),
+    legal_name character varying(255),
+    aliases text[] DEFAULT '{}'::text[] NOT NULL,
+    tagline character varying(160),
+    story text,
+    brand_type character varying(20) DEFAULT 'manufacturer'::character varying NOT NULL,
+    logo_dark_url character varying(500),
+    logo_square_url character varying(500),
+    banner_desktop_url text,
+    banner_mobile_url text,
+    brand_color character varying(7),
+    is_featured boolean DEFAULT false NOT NULL,
+    display_order integer DEFAULT 0 NOT NULL,
+    country_of_origin character varying(2),
+    founded_year smallint,
+    headquarters character varying(255),
+    manufacturer_name character varying(255),
+    manufacturer_address text,
+    importer_name character varying(255),
+    importer_address text,
+    packer_name character varying(255),
+    packer_address text,
+    consumer_care text,
+    default_warranty_months integer,
+    default_warranty_type character varying(30),
+    warranty_terms text,
+    service_phone character varying(30),
+    service_email character varying(255),
+    service_url character varying(500),
+    return_policy_note text,
+    default_lead_time_days integer,
+    social_links jsonb DEFAULT '{}'::jsonb NOT NULL,
+    catalogue_pdf_url text,
+    meta_title character varying(160),
+    meta_description character varying(320),
+    seo_content text,
+    seo_noindex boolean DEFAULT false NOT NULL
 );
 
 
@@ -68,7 +106,47 @@ CREATE TABLE public.categories (
     hero_image_mobile text,
     hero_image_desktop text,
     is_draft boolean DEFAULT false NOT NULL,
-    reorder_interval_days integer
+    reorder_interval_days integer,
+    -- Profile (docs/BRAND_CATEGORY_PLAN.md §3.2). default_* prefill new products; HSN/GST/UQC also back invoices.
+    short_name character varying(40),
+    tagline character varying(160),
+    show_in_nav boolean DEFAULT true NOT NULL,
+    is_featured boolean DEFAULT false NOT NULL,
+    banner_link_url text,
+    default_sort character varying(20),
+    listing_layout character varying(10) DEFAULT 'grid'::character varying NOT NULL,
+    meta_title character varying(160),
+    meta_description character varying(320),
+    seo_content text,
+    seo_noindex boolean DEFAULT false NOT NULL,
+    product_title_template character varying(255),
+    default_hsn_code character varying(8),
+    hsn_prefixes text[] DEFAULT '{}'::text[] NOT NULL,
+    default_gst_rate numeric(5,2),
+    default_uqc character varying(3),
+    default_tax_class character varying(30),
+    default_handling_days integer,
+    default_shipping_class character varying(30),
+    default_package_type character varying(30),
+    cod_allowed boolean,
+    non_returnable_reason text
+);
+
+
+--
+-- Name: category_faqs; Type: TABLE; Schema: public; Owner: -
+-- FAQs shown on a category page (FAQPage JSON-LD); same shape as product_faqs.
+--
+
+CREATE TABLE public.category_faqs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    category_id uuid NOT NULL,
+    question text NOT NULL,
+    answer text NOT NULL,
+    sort_order integer DEFAULT 0 NOT NULL,
+    published boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
