@@ -66,6 +66,12 @@ Code: `controller-service/src/lib/compute/`.
 - **Live email:** sent once per store by `notifyStoreLive(tenantId)` (`lib/provisioning/start-store.ts`, claimed by a `store_live_email` row in `provisioning_step_events`) when the store is actually serving — not when the build starts.
 - **Plan changes:** Razorpay plans are cached by slug, interval and amount. An upgrade cancels the old subscription only after the new one is saved; a downgrade waits in `tenants.pending_plan_id` until the next recurring charge.
 
+## Bought domains (2026-11-13, not deployed)
+
+- Owners buy a domain from the ecom portal (onboarding Store step or Dashboard → Domains): Route 53 Domains from the platform's account, first year from the wallet, yearly renewal from the wallet with a 3-day cut-off, AWS auto-renew off. Price = AWS × catalog USD rate × (1 + margin, default 25%). Admin: Ecom Store → Domains.
+- Every host the plan has moves onto it (`brand.in`, `www.`, `admin.` behind the store's mTLS, `invoice.`/`quotation.`/`purchaseorder.`, `forms.`, `vault.`, `business.` on Pro+), each a `tenant_custom_domains` row with `order_id` and its own cert-manager certificate. Routing is by first label (`lib/tenancy/admin-host.ts`).
+- Off in production until `DOMAIN_REGISTRAR=route53`; everywhere else a fake registrar. Details, renewal policy and production setup: [`DOMAIN_PURCHASE.md`](DOMAIN_PURCHASE.md).
+
 ---
 
 ## What Has Been Done

@@ -63,7 +63,7 @@ export async function runDomainVerifyCron(): Promise<{
   errors: Array<{ id: string; error: string }>
 }> {
   const res = await controlPlanePool().query(
-    `SELECT id FROM tenant_custom_domains WHERE status IN ('pending','dns-verified','cert-pending')`
+    `SELECT id FROM tenant_custom_domains WHERE status IN ('pending','dns-verified','cert-pending') AND order_id IS NULL`
   )
   let advanced = 0
   const errors: Array<{ id: string; error: string }> = []
