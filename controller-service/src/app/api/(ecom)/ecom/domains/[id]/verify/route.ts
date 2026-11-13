@@ -15,7 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
 
   const row = await getCustomDomain(id)
-  if (!row) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
+  if (!row || row.order_id) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
   const tenants = await getOwnerTenants(owner.id)
   if (!tenants.find(t => t.id === row.tenant_id)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })

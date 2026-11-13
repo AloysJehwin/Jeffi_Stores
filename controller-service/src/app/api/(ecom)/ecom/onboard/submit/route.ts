@@ -29,6 +29,7 @@ import { quoteForPlan } from '@controller/lib/compute/quote'
 import { saveDesiredCompute } from '@controller/lib/compute/store'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { setRequestedAddons } from '@/lib/billing/requested-addons'
+import { requestDomain } from '@controller/lib/domains/orders'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,6 +172,13 @@ export async function POST(request: NextRequest) {
     review_again: !!upgrade,
   })
 
+  // 3a. The domain the owner chose: bought from the wallet once the store is approved. Never blocks the application.
+  let domainError: string | undefined
+  if (d.domain) {
+    const r = await requestDomain({ tenantId: result.tenantId, domain: d.domain.name, contact: d.domain.contact }).catch(e => ({ ok: false as const, error: String(e?.message || e) }))
+    if (!r.ok) domainError = r.error
+  }
+
   // 4. Persist restore intent (if any) into the draft, then mark submitted. The
   //    provision step reads this to decide whether to restore the owner's prior backup.
   // An upgrade's warehouse lives on the draft too: approval reads it for the Route linked account.
@@ -197,5 +205,6 @@ export async function POST(request: NextRequest) {
     tenantId: result.tenantId,
     slug: result.slug,
     status: 'pending_approval',
+    ...(domainError ? { domainError } : {}),
   })
 }

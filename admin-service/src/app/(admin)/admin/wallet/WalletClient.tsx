@@ -39,6 +39,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   media: 'Media',
   ad_free: 'Ad-free',
   messaging_addon: 'SMS & WhatsApp add-on',
+  domain: 'Domain',
   infra: 'Servers',
   adjustment: 'Adjustment',
 }

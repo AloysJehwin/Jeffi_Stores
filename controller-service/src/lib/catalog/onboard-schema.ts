@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ComputeSpecSchema } from '@controller/lib/compute/schema'
 import { ADDON_IDS } from '@/lib/billing/addons'
+import { ContactSchema } from '@controller/lib/domains/contact'
 
 /**
  * Onboarding payload validation.
@@ -71,6 +72,8 @@ export const OnboardSchema = z
     logoS3Key: z.string().optional(),
     sealS3Key: z.string().optional(),
     legalsAccepted: z.boolean().optional(),
+    // A domain to buy from the wallet once the store is approved (lib/domains/orders.ts requestDomain).
+    domain: z.object({ name: z.string().min(3).max(253), contact: ContactSchema }).optional(),
   })
   .superRefine((d, ctx) => {
     // A store cannot go live without a pincode we can give Razorpay and Delhivery.

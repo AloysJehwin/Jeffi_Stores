@@ -139,6 +139,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       platformAdminOnly: true,
     },
     {
+      href: '/admin/ecom/domains',
+      label: 'Domains',
+      scope: 'ecom_billing:read',
+      group: 'Ecom Store',
+      platformAdminOnly: true,
+    },
+    {
       href: '/admin/ecom/configuration',
       label: 'Configuration',
       scope: 'ecom_billing:read',

@@ -46,6 +46,7 @@ export type WalletCategory =
   | 'media'
   | 'ad_free'
   | 'messaging_addon'
+  | 'domain'
   | 'infra'
   | 'adjustment'
 
@@ -622,6 +623,36 @@ export async function debitWallet(opts: {
     })
   } catch (e: any) {
     return { ok: false, error: e?.message || 'Wallet debit failed.' }
+  }
+}
+
+/**
+ * Credit back a charge (a refund for something not delivered). Idempotent on externalRef. Flagship exempt.
+ */
+export async function creditWallet(opts: {
+  tenantId: string
+  amountInr: number
+  category: WalletCategory
+  externalRef: string
+  note: string
+}): Promise<{ ok: true; credited: boolean; balance: number } | { ok: false; error: string }> {
+  if (isFlagshipTenant(opts.tenantId)) return { ok: true, credited: false, balance: 0 }
+  if (!(opts.amountInr > 0)) return { ok: false, error: 'Credit amount must be positive.' }
+  try {
+    return await withWalletTx(opts.tenantId, async client => {
+      const { balance } = await lockWallet(client, opts.tenantId, 0)
+      const amount = round2(opts.amountInr)
+      const ins = await client.query(
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
+         VALUES ($1, 'adjustment', $2, $3, $4, $5)
+         ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
+        [opts.tenantId, opts.category, amount, opts.externalRef, opts.note]
+      )
+      if (!ins.rowCount) return { ok: true as const, credited: false, balance }
+      return { ok: true as const, credited: true, balance: await moveBalance(client, opts.tenantId, amount) }
+    })
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Wallet credit failed.' }
   }
 }
 
