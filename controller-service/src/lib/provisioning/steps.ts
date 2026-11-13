@@ -1,4 +1,5 @@
 import type { ProvisioningProvider } from './provider'
+import type { StorePart } from '@/lib/k8s/tenant-workload'
 import { appBootUserData } from './user-data'
 import { dedicatedNodeName } from '@/lib/provisioning/tiers'
 import {
@@ -169,7 +170,9 @@ const nodeCtx = ({ job, tenant, slug, res }: StepCtx): NodeDbCtx => ({
   res,
   compute: () => jobCompute(job.tenant_id, tenant.plan, res),
   placeNodes: (c, opts) => placeNodes(job.id, slug, c, res, opts),
-  applyWorkload: c => applyWorkload(job.tenant_id, slug, tenant.plan, c),
+  applyWorkload: async c => {
+    await applyWorkload(job.tenant_id, slug, tenant.plan, c)
+  },
 })
 
 /** One handler per step. Bodies are the old switch cases; `ok()` replaces next(<following step>). */
@@ -1040,21 +1043,45 @@ async function applyWorkload(
   slug: string,
   plan: string | null,
   c: Pick<JobCompute, 'spec' | 'dbPoolMax' | 'nodeGen'>,
-  hosts = tenantHostnames(slug, plan)
-): Promise<void> {
+  hosts = tenantHostnames(slug, plan),
+  part?: 'shared' | StorePart
+): Promise<boolean> {
   const k8s = await import('@/lib/k8s/tenant-compute')
   const { routedCustomDomains } = await import('@/lib/tenant-registry/custom-domains')
   const customDomains = await routedCustomDomains(tenantId).catch(() => [])
-  await k8s.applyTenantWorkload({
-    slug,
-    plan,
-    hosts,
-    customDomains,
-    compute: c.spec,
-    dbPoolMax: c.dbPoolMax,
-    nodeGen: c.nodeGen,
-    ...(await nodeDbPassword(slug, c.spec)),
-  })
+  return k8s.applyTenantWorkload(
+    {
+      slug,
+      plan,
+      hosts,
+      customDomains,
+      compute: c.spec,
+      dbPoolMax: c.dbPoolMax,
+      nodeGen: c.nodeGen,
+      ...(await nodeDbPassword(slug, c.spec)),
+    },
+    { part }
+  )
+}
+
+/**
+ * One slice of an active store's namespace at the release images (rollout.sh `stores <part>`): 'shared', or
+ * one service's own objects. A paused store, or one moving to its own services, is left for the full
+ * reconcile when it resumes. `runs` says whether the store has that service at all.
+ */
+export async function applyK8sStorePart(
+  tenantId: string,
+  part: 'shared' | StorePart
+): Promise<{ ok: boolean; runs: boolean; error: string | null }> {
+  const tenant = await getTenant(tenantId)
+  if (!tenant || tenant.status !== 'active') return { ok: true, runs: false, error: 'not active' }
+  const { computeHold } = await import('@controller/lib/compute/store')
+  const hold = await computeHold(tenantId)
+  if (hold) return { ok: true, runs: false, error: `pending: ${hold}` }
+  const { resolveCompute } = await import('@controller/lib/compute/resolve')
+  const c = await resolveCompute(tenantId, tenant.plan, { which: 'applied' })
+  const runs = await applyWorkload(tenantId, tenant.slug, tenant.plan, c, undefined, part)
+  return { ok: true, runs, error: null }
 }
 
 const NODE_DB_WAIT_DEADLINE_MS = 30 * 60 * 1000

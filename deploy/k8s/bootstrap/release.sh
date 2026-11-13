@@ -1,9 +1,11 @@
 #!/bin/bash
-# Release the committed HEAD, from a Mac or from GitHub Actions (ci.yml): build the images (arm64) from a
-# clean `git archive`, push them to ECR (tags already there are skipped), roll out with rollout.sh, smoke-test.
-# --build-only stops after the push, so images can be ready before a window; --rollout-only skips the builds
-# (CI builds them in parallel first). After the smoke test, 50-seeds.sh brings the message templates up to the catalog. Images are tagged local-<image_sha> (lib.sh): commits that only touch
-# docs or deploy/k8s reuse the images already pushed, and a Mac and CI build of the same commit share a tag.
+# Release the committed HEAD from a Mac (ci.yml runs the same steps as stages): build the images (arm64) from a
+# clean `git archive` and push them to ECR (tags already there are skipped), roll out with rollout.sh, smoke-test.
+# The databases change between the two, with deploy/k8s/db/release-db.sh, which needs the controller image in ECR:
+#   release.sh --build-only  →  db/release-db.sh  →  release.sh --rollout-only
+# No flag builds and rolls out in one go (a release without database changes). After the smoke test, 50-seeds.sh
+# brings the message templates up to the catalog. Images are tagged local-<image_sha> (lib.sh): commits that only
+# touch docs or deploy/k8s reuse the images already pushed, and a Mac and CI build of the same commit share a tag.
 # Usage: bash deploy/k8s/bootstrap/release.sh [--build-only|--rollout-only]
 source "$(dirname "$0")/../db/lib.sh"
 WORK=${RELEASE_WORK_DIR:-${TMPDIR:-/tmp}/jeffi-release}
@@ -30,7 +32,7 @@ else
     tail -1 "$WORK/build-$s.log"
   done
   docker builder prune -af >/dev/null 2>&1 || true
-  if [ "${1:-}" = --build-only ]; then echo "Pushed. Roll out with: bash deploy/k8s/bootstrap/release.sh"; exit 0; fi
+  if [ "${1:-}" = --build-only ]; then echo "Pushed. Next: bash deploy/k8s/db/release-db.sh, then bash deploy/k8s/bootstrap/release.sh --rollout-only"; exit 0; fi
 fi
 
 echo "== 2/3 Roll out"
