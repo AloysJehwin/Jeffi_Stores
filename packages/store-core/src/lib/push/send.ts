@@ -2,6 +2,7 @@ import { sendPush, pushConfigured, type PushMessage, type PushResult } from '@je
 import { callService } from '@/lib/ecom/service-client'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { messagingInline } from '@/lib/shared/messaging/remote'
+import { fcmImage } from '@/lib/push/image'
 
 // FCM sends. MESSAGING_INLINE (default) calls FCM in-process; otherwise messaging-service's
 // internal /push does it and logs a `messages` row per token.
@@ -13,7 +14,8 @@ export const pushReady = () => !messagingInline() || pushConfigured()
 
 export async function sendToTokens(tokens: string[], msg: PushMessage & { reference?: string }): Promise<PushResult[]> {
   if (!tokens.length) return []
-  const { reference, ...m } = msg
+  const { reference, ...rest } = msg
+  const m = { ...rest, image: await fcmImage(rest.image) }
   if (messagingInline()) return sendPush(tokens, m)
   const tenantId = await resolveTenantId().catch(() => null)
   const fail = (list: string[], error: string) => list.map(token => ({ token, ok: false, error, invalidToken: false }))
