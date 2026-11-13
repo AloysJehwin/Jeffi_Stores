@@ -4,13 +4,25 @@ release's database stage runs the tenant fan-out this way, in the release's cont
 controller rolls out. The pod carries its own label only, so no Service, HPA or PDB selects it; no probes,
 never restarted, deleted a day after it finishes.
 Usage: kubectl create --dry-run=client -f - -o json | release-job.py <deployment> <job> <sh script> [KEY=VALUE ...]
+kubectl prints several objects back to back (not a List), so stdin is read as a stream, as platform-part.py does.
 """
 import json
 import sys
 
+
+def objects(text):
+    out, i, dec = [], 0, json.JSONDecoder()
+    while i < len(text):
+        if text[i].isspace():
+            i += 1
+            continue
+        d, i = dec.raw_decode(text, i)
+        out += d['items'] if isinstance(d.get('items'), list) else [d]
+    return out
+
+
 dep_name, job_name, script, *env = sys.argv[1:]
-doc = json.load(sys.stdin)
-items = doc.get('items', [doc])
+items = objects(sys.stdin.read())
 dep = next((o for o in items if o.get('kind') == 'Deployment' and o['metadata']['name'] == dep_name), None)
 if dep is None:
     sys.exit(f'no Deployment {dep_name} in the rendered manifests')
