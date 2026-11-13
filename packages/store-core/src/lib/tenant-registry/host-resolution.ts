@@ -1,6 +1,7 @@
 import type { TenantContext } from '@/lib/tenancy/tenant-context'
 import { controlPlanePool, RESERVED_LABELS, ROOT_DOMAIN } from './shared'
 import { TENANT_HOST_PREFIXES } from './host-prefixes'
+import { customHostApp } from '@/lib/tenancy/admin-host'
 
 const APP_PREFIXED = new RegExp(`^(${TENANT_HOST_PREFIXES.join('|')})-(.+)$`)
 
@@ -68,8 +69,8 @@ export function appFromHost(hostname: string): HostApp | null {
   // Local dev: `*.localhost` is an alternate root (see slugFromHost).
   const root = host === 'localhost' || host.endsWith('.localhost') ? 'localhost' : ROOT_DOMAIN
   const underRoot = host.endsWith('.' + root)
-  // A customer's own domain (shop.brand.com, even admin.brand.com) is always their storefront.
-  if (!underRoot) return null
+  // A customer's own domain is their storefront, except <app>.<a domain bought through the platform>.
+  if (!underRoot) return customHostApp(host)
   const label = host.slice(0, host.length - root.length - 1)
   const parts = label.split('.')
   if (parts.length === 2 && parts[1] === 'business') return 'business'

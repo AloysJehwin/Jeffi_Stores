@@ -23,6 +23,12 @@ describe('routeFor', () => {
     ['admin-acme.jeffistores.in', '/orders', 'admin'],
     ['admin-acme.jeffistores.in', '/ecom', 'admin'],
     ['admin-acme.jeffistores.in', '/api/admin/products', 'admin'],
+    // admin.<a bought domain> is that store's admin, never the platform's ecom pages
+    ['admin.acme.in', '/', 'admin'],
+    ['admin.acme.in', '/ecom/customers', 'admin'],
+    ['acme.in', '/admin', 'admin'],
+    ['business.acme.in', '/', 'business'],
+    ['invoice.acme.in', '/abc', 'storefront'],
     ['admin-acme.jeffistores.in', '/_admin/_next/static/chunks/a.js', 'admin'],
     ['acme.jeffistores.in', '/_business/_next/static/chunks/a.js', 'business'],
     ['admin-acme.jeffistores.in', '/_next/static/chunks/a.js', 'storefront'],

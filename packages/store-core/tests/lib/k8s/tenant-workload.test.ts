@@ -125,6 +125,17 @@ describe('renderTenantWorkload', () => {
     expect(route.spec.tls.secretName).toBe(cert.spec.secretName)
   })
 
+  it('serves every app of a bought domain where its {slug} host goes', () => {
+    const objs = renderTenantWorkload({ slug: 'acme', plan: 'pro', hosts: hosts('acme'), customDomains: ['acme.in', 'admin.acme.in', 'invoice.acme.in', 'business.acme.in'], layout: 'services' }) as any[]
+    const admin = byKind(objs, 'IngressRoute', 'custom-admin.acme.in')[0]
+    expect(admin.spec.tls).toMatchObject({ secretName: 'custom-admin.acme.in-tls', options: { name: 'tenant-mtls' } })
+    expect(admin.spec.routes.every((r: any) => r.middlewares.some((m: any) => m.name === 'pass-client-cert'))).toBe(true)
+    expect(byKind(objs, 'IngressRoute', 'custom-acme.in')[0].spec.tls.options).toBeUndefined()
+    expect(byKind(objs, 'IngressRoute', 'custom-invoice.acme.in')[0].spec.routes[0].services[0].name).toBe('acme-document-service')
+    expect(byKind(objs, 'IngressRoute', 'custom-business.acme.in')[0].spec.routes.some((r: any) => r.services[0].name === 'acme-business-service')).toBe(true)
+    expect(byKind(objs, 'Certificate').map((c: any) => c.spec.dnsNames[0])).toEqual(expect.arrayContaining(['acme.in', 'admin.acme.in', 'invoice.acme.in', 'business.acme.in']))
+  })
+
   it('uses the release image when given', () => {
     const objs = renderTenantWorkload({
       slug: 'a',
