@@ -46,6 +46,9 @@ function makeDb(
   return { query, release, queries, connect: undefined as any }
 }
 
+/** A restore destination that has the tables the restore tests use. */
+const dest = (o: Parameters<typeof makeDb>[0] = {}) => makeDb({ tables: ['t', 'orders', 'a', 'b', 'empty', 'docs'], ...o })
+
 /** A pool-shaped db (has connect(), no release()) so restore checks out a client. */
 function makePool(client: any) {
   return { connect: vi.fn().mockResolvedValue(client), query: client.query }
@@ -143,13 +146,13 @@ describe('tenant-db-backup', () => {
     }
 
     it('rejects an archive from a future/unknown version', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([], 99)
       await expect(restoreTenantDb(client as any, buf)).rejects.toThrow(/Unsupported backup archive version 99/)
     })
 
     it('disables FK/triggers for the load so table order does not matter', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows: [[1]] }])
       await restoreTenantDb(client as any, buf)
 
@@ -161,14 +164,14 @@ describe('tenant-db-backup', () => {
     })
 
     it('truncates each table before inserting (idempotent re-runs)', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([{ table: 'orders', columns: ['a'], rows: [[1]] }])
       await restoreTenantDb(client as any, buf)
       expect(client.queries.map(q => q.sql)).toContain('TRUNCATE public."orders" CASCADE')
     })
 
     it('reports how many tables and rows were restored', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([
         { table: 'a', columns: ['x'], rows: [[1], [2], [3]] },
         { table: 'b', columns: ['y'], rows: [[9]] },
@@ -177,7 +180,7 @@ describe('tenant-db-backup', () => {
     })
 
     it('still truncates a table that has no rows', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([{ table: 'empty', columns: ['a'], rows: [] }])
       const out = await restoreTenantDb(client as any, buf)
       expect(out).toEqual({ tables: 1, rows: 0 })
@@ -186,7 +189,7 @@ describe('tenant-db-backup', () => {
     })
 
     it('binds parameters positionally for a multi-row insert', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([
         {
           table: 't',
@@ -204,7 +207,7 @@ describe('tenant-db-backup', () => {
     })
 
     it('CHUNKS inserts to stay under the bind-parameter limit', async () => {
-      const client = makeDb()
+      const client = dest()
       // 1 column → chunk size is 60000; 60001 rows must split into 2 statements.
       const rows = Array.from({ length: 60001 }, (_, i) => [i])
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows }])
@@ -215,14 +218,14 @@ describe('tenant-db-backup', () => {
     })
 
     it('ROLLS BACK and rethrows when a statement fails', async () => {
-      const client = makeDb({ failOn: /INSERT INTO/ })
+      const client = dest({ failOn: /INSERT INTO/ })
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows: [[1]] }])
       await expect(restoreTenantDb(client as any, buf)).rejects.toThrow('boom')
       expect(client.queries.map(q => q.sql)).toContain('ROLLBACK')
     })
 
     it('checks out AND releases a client when given a pool', async () => {
-      const client = makeDb()
+      const client = dest()
       const pool = makePool(client)
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows: [[1]] }])
       await restoreTenantDb(pool as any, buf)
@@ -231,15 +234,22 @@ describe('tenant-db-backup', () => {
     })
 
     it('releases the pooled client even when the restore fails', async () => {
-      const client = makeDb({ failOn: /TRUNCATE/ })
+      const client = dest({ failOn: /TRUNCATE/ })
       const pool = makePool(client)
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows: [[1]] }])
       await expect(restoreTenantDb(pool as any, buf)).rejects.toThrow('boom')
       expect(client.release).toHaveBeenCalled()
     })
 
+    it('skips a table the destination does not have (an older store database\'s platform-only tables)', async () => {
+      const client = dest()
+      const buf = await archiveOf([{ table: 'messages', columns: ['a'], rows: [[1]] }, { table: 't', columns: ['a'], rows: [[2]] }])
+      await expect(restoreTenantDb(client as any, buf)).resolves.toEqual({ tables: 1, rows: 1 })
+      expect(client.queries.some(q => /"messages"/.test(q.sql))).toBe(false)
+    })
+
     it('rejects an unsafe identifier on the way back in', async () => {
-      const client = makeDb()
+      const client = dest()
       const buf = await archiveOf([{ table: 'bad"; DROP', columns: ['a'], rows: [[1]] }])
       await expect(restoreTenantDb(client as any, buf)).rejects.toThrow(/Unsafe identifier/)
     })
@@ -256,7 +266,7 @@ describe('tenant-db-backup', () => {
 
       const archive = await dumpTenantDb(source as any, { database: 'jeffi_stores' })
 
-      const target = makeDb()
+      const target = dest()
       const out = await restoreTenantDb(target as any, archive)
       expect(out).toEqual({ tables: 1, rows: 1 })
 
@@ -274,7 +284,7 @@ describe('tenant-db-backup', () => {
         data: { t: { fields: ['a', 'b'], rows: [{ a: null, b: 'x' }] } },
       })
       const archive = await dumpTenantDb(source as any)
-      const target = makeDb()
+      const target = dest()
       await restoreTenantDb(target as any, archive)
       const insert = target.queries.find(q => /INSERT INTO/.test(q.sql))!
       expect(insert.params).toEqual([null, 'x'])

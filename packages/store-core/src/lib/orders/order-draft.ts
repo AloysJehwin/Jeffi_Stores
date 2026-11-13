@@ -54,9 +54,10 @@ export async function signDraftToken(payload: DraftPayload): Promise<string> {
     .sign(SECRET)
 }
 
-export async function verifyDraftToken(token: string): Promise<DraftPayload | null> {
+/** `ignoreExpiry`: a draft stored with a payment attempt, read after its 30-minute life (signature still checked). */
+export async function verifyDraftToken(token: string, opts: { ignoreExpiry?: boolean } = {}): Promise<DraftPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET)
+    const { payload } = await jwtVerify(token, SECRET, opts.ignoreExpiry ? { clockTolerance: 365 * 24 * 3600 } : undefined)
     if (
       typeof payload.userId !== 'string' ||
       (payload.mode !== 'cart' && payload.mode !== 'buyNow') ||

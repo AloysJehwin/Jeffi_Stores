@@ -5,7 +5,7 @@ import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 const COPY = SECTION_COPY_DEFAULTS.brand_carousel
 
 interface BrandCarouselProps {
-  brands: { id: string; name: string; slug: string; product_count: number }[]
+  brands: { id: string; name: string; slug: string; logo_url?: string | null; product_count: number }[]
   title?: string | null
   eyebrow?: string | null
   carousel?: boolean
@@ -18,11 +18,17 @@ export default function BrandCarousel({ brands, title, eyebrow, carousel = false
       href={`/brands/${brand.slug}`}
       className="flex flex-col items-center gap-2 p-3 rounded-xl bg-surface border border-border-default hover:border-accent-500/40 hover:bg-surface-secondary transition-all group"
     >
-      <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center">
-        <span className="text-accent-600 dark:text-accent-400 text-xs font-black">
-          {brand.name.slice(0, 2).toUpperCase()}
-        </span>
-      </div>
+      {brand.logo_url ? (
+        <div className="w-10 h-10 rounded-full bg-surface-elevated border border-border-default overflow-hidden flex items-center justify-center">
+          <img src={brand.logo_url} alt="" loading="lazy" className="w-full h-full object-contain p-1" />
+        </div>
+      ) : (
+        <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center">
+          <span className="text-accent-600 dark:text-accent-400 text-xs font-black">
+            {brand.name.slice(0, 2).toUpperCase()}
+          </span>
+        </div>
+      )}
       <span className="text-[11px] font-semibold text-foreground text-center leading-tight line-clamp-2">
         {brand.name}
       </span>

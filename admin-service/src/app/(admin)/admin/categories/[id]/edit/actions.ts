@@ -5,10 +5,14 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne } from '@/lib/shared/db'
-import { categoryDrafts, publishCategoryDraft } from '@/lib/catalog/category-draft'
+import { applyCategoryProfile, categoryDrafts, publishCategoryDraft, reorderIntervalDays } from '@/lib/catalog/category-draft'
+import { CATEGORY_PROFILE_FIELDS } from '@/lib/catalog/category-fields'
+import { parseFields } from '@/lib/catalog/entity-fields'
 import { DraftConflictError, discardDraftRow, getDraftRow, saveDraftContent } from '@/lib/admin/draft-branches'
 import { suggestIcon } from '@/lib/shared/icon-suggest'
+import { resolveCategoryGoogleCategory } from '@/lib/catalog/google-taxonomy'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import { canUseAi } from '@/lib/auth/ai-scope'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
 import { closeAfter, guardDraftAction } from '@/lib/admin/draft-locks'
 
@@ -46,8 +50,17 @@ export async function updateCategory(categoryId: string, draftId: string | null,
   const replacementWindowDays = policyOverride
     ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
     : null
-  const googleProductCategory = (formData.get('google_product_category') as string) || null
+  const session = await getAdminSession().catch(() => null)
+  const googleProductCategory = await resolveCategoryGoogleCategory(formData.get('google_product_category') as string, {
+    name,
+    description,
+    parentId: parentCategoryId,
+    ai: !!session?.role && canUseAi(session.role, session.scopes ?? [], 'categories:write'),
+  })
   const imageUrl = ((formData.get('image_url') as string) || '').trim().slice(0, 500) || null
+  const heroMobile = ((formData.get('hero_image_mobile') as string) || '').trim() || null
+  const heroDesktop = ((formData.get('hero_image_desktop') as string) || '').trim() || null
+  const reorderDays = reorderIntervalDays(formData.get('reorder_interval_days'))
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -55,6 +68,7 @@ export async function updateCategory(categoryId: string, draftId: string | null,
   const manualIcon = ((formData.get('icon_name') as string) || '').trim()
   const iconName = manualIcon || (await suggestIcon(name))
   const intent = formData.get('intent') as string | null
+  const profile = parseFields(CATEGORY_PROFILE_FIELDS, formData)
 
   const draftRow = draftId ? await getDraftRow(categoryDrafts, draftId) : null
   const hasDraft = !!draftRow && draftRow.category_id === categoryId
@@ -77,6 +91,10 @@ export async function updateCategory(categoryId: string, draftId: string | null,
     google_product_category: googleProductCategory,
     icon_name: iconName,
     image_url: imageUrl,
+    hero_image_mobile: heroMobile,
+    hero_image_desktop: heroDesktop,
+    reorder_interval_days: reorderDays,
+    ...profile,
   }
 
   const host = await getHost()
@@ -93,7 +111,8 @@ export async function updateCategory(categoryId: string, draftId: string | null,
       `UPDATE categories SET name=$1, slug=$2, description=$3, parent_category_id=$4,
        display_order=$5, sku_prefix=$6, is_active=$7, is_draft=$8, google_product_category=$9,
        icon_name=$10, return_allowed=$11, return_window_days=$12, replacement_allowed=$13,
-       replacement_window_days=$14, image_url=$16, updated_at=NOW() WHERE id=$15`,
+       replacement_window_days=$14, image_url=$16, hero_image_mobile=$17, hero_image_desktop=$18,
+       reorder_interval_days=$19, updated_at=NOW() WHERE id=$15`,
       [
         name,
         slug,
@@ -111,8 +130,12 @@ export async function updateCategory(categoryId: string, draftId: string | null,
         replacementWindowDays,
         categoryId,
         imageUrl,
+        heroMobile,
+        heroDesktop,
+        reorderDays,
       ]
     )
+    await applyCategoryProfile(poolDb, categoryId, profile)
     if (publish) await closeAfter(actor, 'category', categoryId, 'published')
     revalidatePath('/admin/categories')
     redirect(ap('/admin/categories', host))

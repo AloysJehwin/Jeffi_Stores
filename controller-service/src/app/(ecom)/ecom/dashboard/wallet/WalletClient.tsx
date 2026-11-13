@@ -12,7 +12,7 @@ import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, useUpiPayment,
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
 const AMOUNTS = [500, 1000, 2500, 5000]
-const CATEGORY: Record<string, string> = { ad_free: 'ad-free', messaging_addon: 'SMS & WhatsApp add-on' }
+const CATEGORY: Record<string, string> = { ad_free: 'ad-free', messaging_addon: 'SMS & WhatsApp add-on', domain: 'domain' }
 
 export default function WalletClient({ initial, keyId, tenantName, upiEnabled = false }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string; upiEnabled?: boolean }) {
   const router = useRouter()

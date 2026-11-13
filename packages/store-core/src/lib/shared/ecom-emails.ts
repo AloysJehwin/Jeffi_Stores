@@ -404,3 +404,24 @@ export async function sendInfraBalanceEmail(
   )
   await send(owner.email, copy.subject, html)
 }
+
+const escHtml = (s: string) => s.replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!)
+
+/** A notice about a domain the owner bought through the platform (registered, failed, renewal, expiry). */
+export async function sendDomainEmail(
+  owner: { email: string; name: string | null },
+  mail: { subject: string; title: string; lines: string[]; rows?: Row[]; cta?: { href: string; label: string }; warn?: string }
+) {
+  const html = baseHtml(
+    mail.lines[0] ?? mail.title,
+    mail.title,
+    `
+    <p style="margin:0 0 14px;">Hi ${escHtml(owner.name ?? 'there')},</p>
+    ${mail.lines.map(l => `<p style="margin:0 0 14px;">${l}</p>`).join('')}
+    ${mail.rows?.length ? detailTable(mail.rows) : ''}
+    ${mail.warn ? notice(mail.warn, 'warn') : ''}
+    ${mail.cta ? button(mail.cta.href, mail.cta.label) : ''}
+  `
+  )
+  await send(owner.email, mail.subject, html)
+}

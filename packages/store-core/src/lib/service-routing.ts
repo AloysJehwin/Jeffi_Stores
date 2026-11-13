@@ -1,6 +1,7 @@
 import { CRON_JOBS, CRON_PING_PATH } from '@/lib/shared/cron-jobs'
 import { storeHostForSlug } from '@/lib/tenancy/forms-host'
 import { appFromHost } from '@/lib/tenant-registry/host-resolution'
+import { isCustomAdminHost } from '@/lib/tenancy/admin-host'
 
 // Which Next app answers a request. One ordered table (ROUTES) is the request gate (each app 404s what
 // isn't its own), the local dev router (scripts/dev-router.ts) and, through lib/k8s/traefik-routes.ts,
@@ -98,7 +99,7 @@ export function hostClasses(host: string): HostClass[] {
   const label = firstLabel(host)
   if (label === 'ecom' || label === 'certificate') return ['console']
   const app = appFromHost(host)
-  if (app === 'admin') return label === 'admin' ? ['platform-admin', 'admin'] : ['admin']
+  if (app === 'admin') return label === 'admin' && !isCustomAdminHost(host) ? ['platform-admin', 'admin'] : ['admin']
   if (app === 'business') return ['business']
   return ['store']
 }

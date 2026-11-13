@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { DataTable, StatusBadge, type DataCol, type LoadPage } from '@/components/admin/kit'
 import { SUBSCRIPTION_STATUS, fmtDate, inr } from '../_status'
 import type { AdminSubscriptionListItem as SubscriptionRow } from '@/lib/queries/subscriptions'
 
@@ -21,6 +21,7 @@ export default function SubscriptionsTable({
   total,
   page,
   pageSize,
+  loadPage,
   status,
   search,
 }: {
@@ -28,6 +29,7 @@ export default function SubscriptionsTable({
   total: number
   page: number
   pageSize: number
+  loadPage?: LoadPage<SubscriptionRow>
   status?: string
   search?: string
 }) {
@@ -88,6 +90,7 @@ export default function SubscriptionsTable({
   return (
     <DataTable<SubscriptionRow>
       mode="server"
+      loadPage={loadPage}
       rows={items}
       cols={cols}
       rowKey={s => s.id}

@@ -5,7 +5,9 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne } from '@/lib/shared/db'
-import { brandDrafts, publishBrandDraft } from '@/lib/catalog/brand-draft'
+import { applyBrandProfile, brandDrafts, publishBrandDraft } from '@/lib/catalog/brand-draft'
+import { BRAND_PROFILE_FIELDS } from '@/lib/catalog/brand-fields'
+import { parseFields } from '@/lib/catalog/entity-fields'
 import { DraftConflictError, discardDraftRow, getDraftRow, saveDraftContent } from '@/lib/admin/draft-branches'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
@@ -47,6 +49,7 @@ export async function updateBrand(brandId: string, draftId: string | null, formD
   const replacement_allowed = formData.get('replacement_allowed') !== 'false'
   const replacement_window_days = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
   const intent = formData.get('intent') as string | null
+  const profile = parseFields(BRAND_PROFILE_FIELDS, formData)
   const host = await getHost()
   const draftRow = draftId ? await getDraftRow(brandDrafts, draftId) : null
   const hasDraft = !!draftRow && draftRow.brand_id === brandId
@@ -65,6 +68,7 @@ export async function updateBrand(brandId: string, draftId: string | null, formD
     return_window_days,
     replacement_allowed,
     replacement_window_days,
+    ...profile,
   }
 
   // Create-draft brand (is_draft = true, no draft row): edit the row in place, never
@@ -91,6 +95,7 @@ export async function updateBrand(brandId: string, draftId: string | null, formD
         brandId,
       ]
     )
+    await applyBrandProfile(poolDb, brandId, profile)
     revalidatePath('/admin/brands')
     if (publish) await closeAfter(actor, 'brand', brandId, 'published')
     // Save-as-Draft on a create-draft: resnapshot so Cancel reverts here.

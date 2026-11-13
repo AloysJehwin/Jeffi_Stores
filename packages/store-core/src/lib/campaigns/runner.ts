@@ -3,6 +3,7 @@ import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { getCampaign } from '@/lib/shared/marketing'
 import type { AnyScenarioModule, ScenarioModule, SweepResult } from './types'
 import { resolveParams } from './types'
+import { emptyWindowFor } from './window-rule'
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -30,6 +31,13 @@ export async function runScenario<P extends Record<string, unknown>, Row>(
     const campaign = await withLibraryContent(await getCampaign(campaignKind))
     if (!campaign?.enabled) return result
 
+    // Saved before the editor checked it, a lookback no longer than the delay matches nobody: fail loudly
+    // (the sweep and the cron status report it) instead of an empty run every time.
+    const empty = emptyWindowFor(scenario, (campaign as any).parameters, (campaign as any).delay_hours)
+    if (empty) {
+      result.error = empty
+      return result
+    }
     const params = resolveScenarioParams(scenario, (campaign as any).parameters)
     const rows = await scenario.findEligible({ campaign, params })
     result.attempted = rows.length

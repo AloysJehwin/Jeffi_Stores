@@ -7,10 +7,20 @@ import { ap } from '@/lib/shared/admin-path'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import AIFillForm from './AIFillForm'
+import EntityProfileFields from './EntityProfileFields'
+import { BRAND_PROFILE_FIELDS, BRAND_SECTIONS } from '@/lib/catalog/brand-fields'
 import { useEditSession } from '@/hooks/useEditSession'
 import { Badge, DraftLockBanner, FormField, FormFooter, FormGrid, FormSection, LockedFieldset, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import type { DraftLockState } from '@/lib/client/draft-lock-client'
+
+const BRAND_SECTION_HELP: Record<(typeof BRAND_SECTIONS)[number], string> = {
+  Profile: 'Company, story, type and where the brand appears.',
+  Media: 'Extra logos, banners and the accent colour.',
+  'Origin & legal': 'Country of origin and the maker, importer and packer products inherit.',
+  'Warranty & service': 'Warranty, support contacts, lead time and return note.',
+  SEO: 'Brand page title, description and copy.',
+}
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -234,6 +244,12 @@ export default function BrandForm({
             </FormGrid>
           </FormSection>
         )}
+
+        {BRAND_SECTIONS.map(section => (
+          <FormSection key={section} title={section} description={BRAND_SECTION_HELP[section]} collapsible>
+            <EntityProfileFields specs={BRAND_PROFILE_FIELDS} section={section} values={brand} />
+          </FormSection>
+        ))}
       </LockedFieldset>
 
       {/* Shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}

@@ -142,7 +142,7 @@ async function sendOne(sa: ServiceAccount, token: string, m: PushMessage): Promi
 export async function sendPush(tokens: string[], msg: PushMessage): Promise<PushResult[]> {
   const list = [...new Set(tokens.filter(t => typeof t === 'string' && t.length > 0))]
   const sa = serviceAccount()
-  if (!sa) return list.map(token => ({ token, ok: false, error: 'push is not configured', invalidToken: false }))
+  if (!sa) return list.map(token => ({ token, ok: false, error: 'push is not configured: FCM_SERVICE_ACCOUNT_JSON is missing on the server', invalidToken: false }))
   try {
     await accessToken(sa)
   } catch (e: any) {

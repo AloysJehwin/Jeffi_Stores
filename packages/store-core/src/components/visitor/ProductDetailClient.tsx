@@ -23,6 +23,7 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewSummaryLink from './pdp/ReviewSummaryLink'
 import type { ReviewSummary } from '@/lib/shared/review-summary-types'
 import { round2 } from '@/lib/catalog/gst'
+import { resolveReturnPolicy } from '@/lib/catalog/return-policy-rules'
 
 // Players and 3D load only when a product has such media.
 const ProductMediaGallery = dynamic(() => import('@/components/media/ProductMediaGallery'), { ssr: false })
@@ -87,6 +88,7 @@ interface ProductDetailClientProps {
     finish?: string | null
     size?: string | null
     hsn_code?: string | null
+    return_window_days?: number | null
     mpn?: string | null
     gtin?: string | null
     weight_grams?: number | null
@@ -670,26 +672,17 @@ export default function ProductDetailClient({
   const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? round2(rawMrp / (1 + gstRatePdp / 100)) : rawMrp
   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
 
-  const brand = product.brands
-  const cat = product.categories
-  const returnAllowed =
-    brand?.return_allowed === false || cat?.return_allowed === false
-      ? false
-      : (brand?.return_allowed ?? cat?.return_allowed ?? true)
-  const returnDays = returnAllowed
-    ? brand?.return_allowed === false
-      ? (brand.return_window_days ?? 7)
-      : (cat?.return_window_days ?? brand?.return_window_days ?? 7)
-    : 0
-  const replacementAllowed =
-    brand?.replacement_allowed === false || cat?.replacement_allowed === false
-      ? false
-      : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
-  const replacementDays = replacementAllowed
-    ? brand?.replacement_allowed === false
-      ? (brand.replacement_window_days ?? 7)
-      : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7)
-    : 0
+  // Same rule as order-time returns (lib/catalog/return-policy.ts); the category arrives already
+  // falling back to its parent.
+  const resolved = resolveReturnPolicy({
+    productReturnWindowDays: product.return_window_days,
+    brand: product.brands,
+    category: product.categories,
+  })
+  const returnAllowed = resolved.return_allowed
+  const returnDays = returnAllowed ? resolved.return_window_days : 0
+  const replacementAllowed = resolved.replacement_allowed
+  const replacementDays = replacementAllowed ? resolved.replacement_window_days : 0
   const policy: PolicyProps = {
     returnAllowed,
     returnDays,

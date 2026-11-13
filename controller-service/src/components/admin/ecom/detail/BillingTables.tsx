@@ -67,6 +67,7 @@ const WALLET_LABEL: Record<string, string> = {
   email: 'Email',
   ad_free: 'Ad-free',
   messaging_addon: 'SMS & WhatsApp add-on',
+  domain: 'Domain',
   infra: 'Servers',
 }
 export const walletLabel = (e: Pick<WalletLedgerEntry, 'category' | 'entry_type'>) => WALLET_LABEL[e.category ?? ''] ?? humanize(e.category || e.entry_type)

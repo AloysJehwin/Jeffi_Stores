@@ -10,6 +10,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { toSellingUnit, validatePurchaseQuantity } from '@/lib/catalog/selling-unit'
 import { unitCapError } from '@/lib/catalog/cart-unit-cap'
+import { moqError } from '@/lib/catalog/moq'
 
 const AddCartSchema = z
   .object({
@@ -40,7 +41,9 @@ async function resolveUserId(request: NextRequest) {
     sessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
     cookieStore.set('session_id', sessionId, { maxAge: 30 * 24 * 60 * 60, path: '/' })
   }
-  return { userId, sessionId, authUserId }
+  // Same rule as checkout's business pricing: a business session or the business portal.
+  const isBusiness = authResult?.isBusiness === true || (!!authUserId && request.headers.get('x-auth-portal') === 'business')
+  return { userId, sessionId, authUserId, isBusiness }
 }
 
 async function activeLineQuantity(
@@ -202,10 +205,10 @@ export async function POST(request: NextRequest) {
     const buyUnit = parsedCart.data.buyUnit
     const quantity = parsedCart.data.quantity ?? 1
 
-    const { userId } = await resolveUserId(request)
+    const { userId, isBusiness } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date, stock_status, is_digital FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date, stock_status, is_digital, moq FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -307,6 +310,11 @@ export async function POST(request: NextRequest) {
     if (!qtyCheck.ok) {
       return NextResponse.json({ error: qtyCheck.reason }, { status: 400 })
     }
+    if (isBusiness && Number(product.moq) > 1) {
+      const inLine = sellingUnit ? existingQty : await activeLineQuantity(userId, productId, variantId, subVariantId, buyMode)
+      const err = moqError(product.moq, Number(quantity) + inLine, sellingUnit)
+      if (err) return NextResponse.json({ error: err, code: 'BELOW_MOQ' }, { status: 400 })
+    }
 
     const upsertResult = await query(
       `INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit)
@@ -361,12 +369,12 @@ export async function PATCH(request: NextRequest) {
     if (!parsedUpdate.ok) return parsedUpdate.response
     const { cartItemId, quantity, savedForLater } = parsedUpdate.data
 
-    const { userId, sessionId, authUserId } = await resolveUserId(request)
+    const { userId, sessionId, authUserId, isBusiness } = await resolveUserId(request)
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
 
     const cartItem = await queryOne(
       `
-      SELECT ci.*, COALESCE(p.is_digital, FALSE) AS is_digital
+      SELECT ci.*, COALESCE(p.is_digital, FALSE) AS is_digital, p.moq
       FROM cart_items ci
       LEFT JOIN products p ON p.id = ci.product_id
       WHERE ci.id = $1 AND ci.user_id = $2
@@ -393,17 +401,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof quantity === 'number') {
-      if (quantity > 0 && cartItem.buy_unit) {
-        const unit = toSellingUnit(
-          await lineUnitConstraint(cartItem.product_id, cartItem.buy_unit, cartItem.variant_id, cartItem.sub_variant_id)
+      const unit =
+        quantity > 0 && cartItem.buy_unit
+          ? toSellingUnit(await lineUnitConstraint(cartItem.product_id, cartItem.buy_unit, cartItem.variant_id, cartItem.sub_variant_id))
+          : null
+      if (unit?.max_qty != null && quantity > unit.max_qty) {
+        return NextResponse.json(
+          { error: `Maximum quantity is ${unit.max_qty} ${unit.unit}.`, code: 'UNIT_MAX_EXCEEDED' },
+          { status: 400 }
         )
-        if (unit?.max_qty != null && quantity > unit.max_qty) {
-          return NextResponse.json(
-            { error: `Maximum quantity is ${unit.max_qty} ${unit.unit}.`, code: 'UNIT_MAX_EXCEEDED' },
-            { status: 400 }
-          )
-        }
       }
+      // Removing the line (quantity 0) is always allowed.
+      const moqErr = isBusiness ? moqError(cartItem.moq, quantity, unit) : null
+      if (moqErr) return NextResponse.json({ error: moqErr, code: 'BELOW_MOQ' }, { status: 400 })
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
       return NextResponse.json({ message: 'Cart updated' })
     }

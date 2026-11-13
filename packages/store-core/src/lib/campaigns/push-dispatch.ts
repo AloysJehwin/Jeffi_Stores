@@ -118,7 +118,7 @@ export async function sendCampaignPush(
       return { ok: false, reason: 'push_disabled' }
     }
     if (!pushReady()) {
-      await markerStatus(sentId, 'failed', 'push is not configured')
+      await markerStatus(sentId, 'failed', 'push is not configured: FCM_SERVICE_ACCOUNT_JSON is missing on the server')
       return { ok: false, reason: 'not_configured' }
     }
 

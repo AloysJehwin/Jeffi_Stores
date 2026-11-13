@@ -5,6 +5,11 @@ import { resolveBuyNowItem, loadActiveCart } from '@/lib/orders/order-commit'
 import { signIntent } from '@/lib/orders/checkout-intent'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { parseBody, zUuid } from '@/lib/shared/validate'
+import { buyNowMoqProblem, cartMoqProblem } from '@/lib/orders/moq-check'
+
+// Business buyers (business session or portal) must meet each product's MOQ; retail never does.
+const isBusinessBuyer = (req: NextRequest, auth: { isBusiness?: boolean } | null) =>
+  !!auth && (auth.isBusiness === true || req.headers.get('x-auth-portal') === 'business')
 
 const IntentSchema = z.object({
   mode: z.string().optional(),
@@ -31,6 +36,10 @@ export async function POST(req: NextRequest) {
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const cart = await loadActiveCart(auth.userId)
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
+    if (isBusinessBuyer(req, auth)) {
+      const moq = await cartMoqProblem(auth.userId)
+      if (moq) return NextResponse.json({ error: moq, code: 'BELOW_MOQ' }, { status: 400 })
+    }
     const token = await signIntent({
       mode: 'cart',
       userId: auth.userId,
@@ -55,6 +64,16 @@ export async function POST(req: NextRequest) {
     gstEnabled,
   })
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
+  if (isBusinessBuyer(req, await authenticateUser(req))) {
+    const moq = await buyNowMoqProblem({
+      productId: resolved.item.productId,
+      variantId: resolved.item.variantId ?? null,
+      subVariantId: resolved.item.subVariantId ?? null,
+      qty: Number(resolved.item.qty),
+      buyUnit: resolved.item.buyUnit ?? null,
+    })
+    if (moq) return NextResponse.json({ error: moq, code: 'BELOW_MOQ' }, { status: 400 })
+  }
 
   const token = await signIntent({
     mode: 'buyNow',

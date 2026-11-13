@@ -1,4 +1,4 @@
--- controller-service: tables. Load order comes from scripts/db-files.mjs.
+-- controller-service: platform-only tables (flagship DB only, never a store tenant's). Load order comes from scripts/db-files.mjs.
 
 -- Jeffi's own tax invoices to tenants (plan subscription charges, wallet top-ups). One per Razorpay
 -- payment (kind + external_ref), so the browser verify, admin verify and webhook paths issue it once.

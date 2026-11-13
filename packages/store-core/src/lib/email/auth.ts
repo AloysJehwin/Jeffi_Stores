@@ -10,22 +10,27 @@ import {
   storeBaseUrlAsync,
 } from './shared'
 
+// Plain-text part: the code alone on its own line helps mail clients offer "Copy code".
+const otpText = (otp: string, lead: string) =>
+  `${lead}\n\n${otp}\n\nIt expires in 10 minutes. Do not share this code with anyone.`
+
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
   const contactLine = await storeContactLine()
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const subject = `Your Verification Code - ${brand}`
+  const subject = `${otp} is your ${brand} verification code`
   const html = mailShell({
     brand,
     kicker: 'Verification Code',
     title: 'Email Verification',
     preheader: `Your ${brand} OTP is ${otp} — valid for 10 minutes. Do not share.`,
     content: `
-      <p>Hello ${name || 'Customer'},</p>
-      <p>Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:</p>
+      <p>Hello ${name || 'Customer'}, your verification code is:</p>
 
       <div class="code-box">${otp}</div>
+
+      <p>Enter this code to verify your email address.</p>
 
       <div class="warning">
         <strong>This OTP will expire in 10 minutes.</strong>
@@ -44,6 +49,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
       to: email,
       subject,
       html,
+      text: otpText(otp, `Your ${brand} verification code is ${otp}.`),
       kind: 'otp',
       templateName: 'otp',
       redactBody: true,
@@ -68,10 +74,11 @@ export async function sendPhoneOTPEmail(email: string, otp: string, phone: strin
     title: 'Verify your mobile number',
     preheader: `Your ${brand} code is ${otp} — valid for 10 minutes. Do not share.`,
     content: `
-      <p>Hello ${name || 'Customer'},</p>
-      <p>Use this code to verify your mobile number <strong>+91 ${phone}</strong>:</p>
+      <p>Hello ${name || 'Customer'}, your verification code is:</p>
 
       <div class="code-box">${otp}</div>
+
+      <p>Enter this code to verify your mobile number <strong>+91 ${phone}</strong>.</p>
 
       <div class="warning">
         <strong>This code will expire in 10 minutes.</strong>
@@ -88,8 +95,9 @@ export async function sendPhoneOTPEmail(email: string, otp: string, phone: strin
     const info = await sendAuditedMail({
       from,
       to: email,
-      subject: `Your mobile verification code - ${brand}`,
+      subject: `${otp} is your ${brand} mobile verification code`,
       html,
+      text: otpText(otp, `Your ${brand} code to verify +91 ${phone} is ${otp}.`),
       kind: 'otp',
       templateName: 'otp',
       redactBody: true,
@@ -105,17 +113,18 @@ export async function sendPhoneOTPEmail(email: string, otp: string, phone: strin
 export async function sendAdminOTPEmail(email: string, otp: string, name?: string) {
   const from = adminMailFrom()
   const brand = await currentBrandNameAsync()
-  const subject = `Admin sign-in code — ${brand}`
+  const subject = `${otp} is your ${brand} admin sign-in code`
   const html = mailShell({
     brand,
     kicker: 'Admin Access',
     title: 'Verify your admin sign-in',
     preheader: `${brand} admin sign-in code: ${otp} — valid for 10 minutes. If this wasn't you, do not share it.`,
     content: `
-      <p>Hello ${name || 'Admin'},</p>
-      <p>Use this one-time code to complete sign-in to the admin dashboard:</p>
+      <p>Hello ${name || 'Admin'}, your sign-in code is:</p>
 
       <div class="code-box mono">${otp}</div>
+
+      <p>Enter this code to complete sign-in to the admin dashboard.</p>
 
       <div class="danger">
         <strong>This code authorizes staff access. It expires in 10 minutes.</strong>
@@ -132,6 +141,7 @@ export async function sendAdminOTPEmail(email: string, otp: string, name?: strin
       to: email,
       subject,
       html,
+      text: otpText(otp, `Your ${brand} admin sign-in code is ${otp}.`),
       kind: 'otp',
       templateName: 'admin_otp',
       redactBody: true,

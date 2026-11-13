@@ -3,13 +3,13 @@ import path from 'path'
 import type { Pool } from 'pg'
 import { tenantAdminPool } from '@controller/lib/provisioning/tenant-admin-pool'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { buildTenantSchemaSql, desiredTableColumns } from '@controller/lib/tenant-migrations-schema'
+import { buildTenantSchemaSql, desiredTableColumns, schemaTables } from '@controller/lib/tenant-migrations-schema'
 import { migrationFiles } from '@controller/lib/db-files'
 
 /**
  * Multi-tenant schema migration fan-out (Part B of the SaaS plan).
  *
- * Applies the desired-state schema (every <service>/database/, see db-files.ts) to every active
+ * Applies the desired-state tenant schema (the tenant set, see db-files.ts) to every active
  * tenant's dedicated RDS. The topic files themselves are plain pg_dump output and are NOT
  * idempotent; buildTenantSchemaSql() rewrites them into re-appliable form (see
  * tenant-migrations-schema.ts). That matters because the whole schema is sent as one
@@ -52,13 +52,15 @@ interface TenantTarget {
   db_secret_ref: string | null
 }
 
-async function listActiveTenantTargets(): Promise<TenantTarget[]> {
+/** Active stores with a database; `slug` limits it to one. */
+async function listActiveTenantTargets(slug?: string): Promise<TenantTarget[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, i.rds_endpoint, i.rds_port, i.rds_db, i.region, i.iam_auth, i.db_secret_ref
      FROM tenants t
      JOIN tenant_infra i ON i.tenant_id = t.id
-     WHERE t.status = 'active' AND i.rds_endpoint IS NOT NULL`
+     WHERE t.status = 'active' AND i.rds_endpoint IS NOT NULL${slug ? ' AND t.slug = $1' : ''}`,
+    slug ? [slug] : undefined
   )
   return res.rows
 }
@@ -217,8 +219,8 @@ export interface FanoutResult {
  * Apply the current desired-state schema to all active tenant DBs.
  * Idempotent — skips tenants already on this gitSha, safe to re-run.
  */
-export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> {
-  const targets = await listActiveTenantTargets()
+export async function runMigrationFanout(gitSha: string, opts: { slug?: string } = {}): Promise<FanoutResult> {
+  const targets = await listActiveTenantTargets(opts.slug)
   const result: FanoutResult = { gitSha, total: targets.length, applied: 0, skipped: 0, failed: 0, failures: [] }
   const schemaSql = buildTenantSchemaSql()
   const desired = desiredTableColumns()
@@ -253,9 +255,9 @@ interface MigrationFile {
   sql: string
 }
 
-/** Read every <service>/database/migrations/*.sql in filename order (mirrors deploy/run-migrations.sh). */
+/** The tenant set's migrations in filename order (platform-only/migrations never reach a tenant). */
 function readMigrationFiles(): MigrationFile[] {
-  return migrationFiles().map(file => ({ filename: path.basename(file), sql: fs.readFileSync(file, 'utf8') }))
+  return migrationFiles('tenant').map(file => ({ filename: path.basename(file), sql: fs.readFileSync(file, 'utf8') }))
 }
 
 const SCHEMA_MIGRATIONS_DDL = `
@@ -276,8 +278,8 @@ const SCHEMA_MIGRATIONS_DDL = `
  * Not gated on git_sha: the pending set is derived from each DB's ledger, so a new migration added
  * under a SHA already recorded still applies.
  */
-export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutResult> {
-  const targets = await listActiveTenantTargets()
+export async function runMigrationFilesFanout(gitSha: string, opts: { slug?: string } = {}): Promise<FanoutResult> {
+  const targets = await listActiveTenantTargets(opts.slug)
   const files = readMigrationFiles()
   const result: FanoutResult = { gitSha, total: targets.length, applied: 0, skipped: 0, failed: 0, failures: [] }
   if (files.length === 0) return result
@@ -313,6 +315,58 @@ export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutRes
   }
 
   return result
+}
+
+export interface SchemaReportTenant {
+  slug: string
+  /** Tables beyond the tenant set, with their row count and the set they belong to. */
+  extra: { table: string; rows: number; set: 'platform-only' | 'control-plane' | 'unknown' }[]
+  /** Tenant-set tables the database lacks (the next schema fan-out adds them). */
+  missing: string[]
+  error?: string
+}
+
+/**
+ * Read-only: how far each active store's database is from the tenant schema set. Stores provisioned before
+ * the split still carry platform-only (and possibly control-plane) tables; this lists them with exact row
+ * counts, in a READ ONLY transaction, so a person can decide before anything is dropped.
+ */
+export async function runTenantSchemaReport(opts: { slug?: string } = {}): Promise<{ total: number; failed: number; tenants: SchemaReportTenant[] }> {
+  const targets = await listActiveTenantTargets(opts.slug)
+  const tenant = schemaTables('tenant')
+  const platform = schemaTables('platform')
+  const controlPlane = schemaTables('control-plane')
+  const out = { total: targets.length, failed: 0, tenants: [] as SchemaReportTenant[] }
+  for (const t of targets) {
+    let pool: Pool | null = null
+    try {
+      pool = await tenantPool(t)
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN READ ONLY')
+        const have = (
+          await client.query<{ table_name: string }>(
+            `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY 1`
+          )
+        ).rows.map(r => r.table_name)
+        const extra: SchemaReportTenant['extra'] = []
+        for (const name of have.filter(n => !tenant.has(n))) {
+          const rows = Number((await client.query(`SELECT count(*) AS n FROM public."${name.replace(/"/g, '""')}"`)).rows[0].n)
+          extra.push({ table: name, rows, set: controlPlane.has(name) ? 'control-plane' : platform.has(name) ? 'platform-only' : 'unknown' })
+        }
+        out.tenants.push({ slug: t.slug, extra, missing: [...tenant].filter(n => !have.includes(n)).sort() })
+        await client.query('COMMIT')
+      } finally {
+        client.release()
+      }
+    } catch (err: any) {
+      out.failed++
+      out.tenants.push({ slug: t.slug, extra: [], missing: [], error: err?.message ?? String(err) })
+    } finally {
+      if (pool) await pool.end().catch(() => {})
+    }
+  }
+  return out
 }
 
 export interface TenantMigrationRun {

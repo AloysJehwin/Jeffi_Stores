@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { publicProduct } from '@/lib/catalog/public-product'
+import { BRAND_DEFAULTS_SQL, withBrandDefaults } from '@/lib/catalog/catalog-defaults'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -10,8 +12,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
     const product = await queryOne(
       `SELECT p.*,
-        json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-        json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      ${BRAND_DEFAULTS_SQL},
+        json_build_object('id', c.id, 'name', c.name, 'slug', c.slug,
+          'return_allowed',          COALESCE(c.return_allowed,          pc.return_allowed),
+          'return_window_days',      COALESCE(c.return_window_days,      pc.return_window_days),
+          'replacement_allowed',     COALESCE(c.replacement_allowed,     pc.replacement_allowed),
+          'replacement_window_days', COALESCE(c.replacement_window_days, pc.replacement_window_days)
+        ) AS categories,
+        json_build_object('id', b.id, 'name', b.name, 'slug', b.slug,
+          'return_allowed', b.return_allowed, 'return_window_days', b.return_window_days,
+          'replacement_allowed', b.replacement_allowed, 'replacement_window_days', b.replacement_window_days
+        ) AS brands,
         COALESCE(
           (SELECT json_agg(pi ORDER BY pi.display_order)
            FROM product_images pi WHERE pi.product_id = p.id),
@@ -82,6 +93,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         ) AS product_unit_rules
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN categories pc ON pc.id = c.parent_category_id
        LEFT JOIN brands b ON p.brand_id = b.id
        WHERE p.slug = $1 AND p.is_active = true AND p.is_draft = false`,
       [slug]
@@ -95,8 +107,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const { loadProductFaqs, loadProductMedia } = await import('@/lib/catalog/product-media')
     const [media, faqs] = await Promise.all([loadProductMedia(product.id), loadProductFaqs(product.id, { publishedOnly: true })])
     // Admin-only columns never leave the store.
-    const { internal_notes, source_url, cost_price, supplier_id, search_vector, ...pub } = product
-    return NextResponse.json({ product: { ...pub, media, faqs } })
+    return NextResponse.json({ product: { ...publicProduct(withBrandDefaults(product)), media, faqs } })
   } catch (err) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }

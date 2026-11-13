@@ -1,4 +1,4 @@
--- messaging-service: tables. Load order comes from scripts/db-files.mjs.
+-- messaging-service: platform-only tables (flagship DB only, never a store tenant's). Load order comes from scripts/db-files.mjs.
 
 -- Bulk jobs for the public Documents / Messaging APIs. Items are claimed by each service's worker
 -- (FOR UPDATE SKIP LOCKED). Applied by the schema pipeline. LOCAL ONLY (never RDS).

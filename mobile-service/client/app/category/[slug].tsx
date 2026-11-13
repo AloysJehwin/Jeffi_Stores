@@ -3,7 +3,7 @@ import { View } from 'react-native'
 import { Card, Screen, ScreenHeader, Text, useBottomInset } from '../../src/ui'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
-import { listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
+import { getCategory, listCategories, withDetails, type CategoryDetail } from '../../src/api/categories'
 import { getHome } from '../../src/api/home'
 import CategoryIcon from '../../src/components/catalog/CategoryIcon'
 import CompareBar from '../../src/components/catalog/CompareBar'
@@ -47,8 +47,14 @@ export default function CategoryScreen() {
   const [sortOpen, setSortOpen] = useState(false)
   const { data: all, isLoading, error, refetch } = useQuery({ queryKey: ['categories'], queryFn: listCategories, staleTime: 5 * 60_000 })
   const { data: home } = useQuery({ queryKey: ['home', 'store'], queryFn: () => getHome(), staleTime: 120_000 })
+  // The page profile (tagline, default sort, buying guide, FAQs) rides on its own request so the tree stays small.
+  const { data: profile } = useQuery({ queryKey: ['category', slug], queryFn: () => getCategory(slug), staleTime: 5 * 60_000 })
   const categories = withDetails(all ?? [], home?.data.mainCategories as Record<string, any>[] | undefined)
   const category = categories.find(c => c.slug === slug)
+  const tagline = profile?.tagline ?? category?.tagline ?? null
+  // The category's default_sort opens the listing when the link carries no ?sort and the shopper has not picked one.
+  const defaultSort = !sort && profile?.default_sort ? productSortKey(profile.default_sort) : 'featured'
+  const effectiveSort = sortId === 'featured' ? defaultSort : sortId
   const subcategories = category
     ? categories.filter(c => c.parent_category_id === category.id).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
     : []
@@ -81,9 +87,10 @@ export default function CategoryScreen() {
 
   const listHeader = (total: number | null) => (
     <>
-      {category.description ? (
+      {tagline || category.description ? (
         <View className="border-b border-border-default bg-surface-elevated px-4 py-4">
-          <Text className="text-foreground-secondary">{category.description}</Text>
+          {tagline ? <Text className="text-base font-semibold text-foreground">{tagline}</Text> : null}
+          {category.description ? <Text className="text-foreground-secondary">{category.description}</Text> : null}
         </View>
       ) : null}
 
@@ -104,7 +111,7 @@ export default function CategoryScreen() {
           <Text accessibilityRole="header" className="font-display text-xl font-extrabold text-foreground">
             Products ({total ?? 0})
           </Text>
-          {(total ?? 0) > 1 || sortId !== 'featured' ? <SortButton value={sortId} onPress={() => setSortOpen(true)} /> : null}
+          {(total ?? 0) > 1 || effectiveSort !== 'featured' ? <SortButton value={effectiveSort} onPress={() => setSortOpen(true)} /> : null}
         </View>
       </View>
     </>
@@ -115,7 +122,7 @@ export default function CategoryScreen() {
       <PagedProductGrid
         page="category"
         base={{ category: category.slug }}
-        sort={sortId}
+        sort={effectiveSort}
         pageSize={PAGE_SIZE}
         cols={2}
         gap={12}
@@ -126,7 +133,7 @@ export default function CategoryScreen() {
         }
       />
       <CompareBar />
-      <SortSheet open={sortOpen} onClose={() => setSortOpen(false)} value={sortId} onApply={setSortId} />
+      <SortSheet open={sortOpen} onClose={() => setSortOpen(false)} value={effectiveSort} onApply={setSortId} />
     </Screen>
   )
 }

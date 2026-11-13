@@ -13,6 +13,7 @@ import { digitalActive } from '@/lib/catalog/digital'
 import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { round2 } from '@/lib/catalog/gst'
+import { resolveReturnPolicy } from '@/lib/catalog/return-policy-rules'
 import dynamic from 'next/dynamic'
 import { DocumentList } from '@/components/media/MediaItemView'
 import { resolveMedia, type ProductMediaItem } from '@/lib/catalog/product-media-shared'
@@ -76,6 +77,7 @@ interface ProductDetailClientProps {
     handling_days?: number | null
     weight?: number | null
     dimensions?: string | null
+    return_window_days?: number | null
     brands?: {
       id: string
       name: string
@@ -387,26 +389,16 @@ export default function ProductDetailClient({
 
   const mrpDiscount = mrp && mrp > displayPrice ? mrpDiscountPct(mrp, displayPrice) : 0
 
-  const brand = product.brands
-  const cat = product.categories
-  const returnAllowed =
-    brand?.return_allowed === false || cat?.return_allowed === false
-      ? false
-      : (brand?.return_allowed ?? cat?.return_allowed ?? true)
-  const returnDays = returnAllowed
-    ? brand?.return_allowed === false
-      ? (brand.return_window_days ?? 7)
-      : (cat?.return_window_days ?? brand?.return_window_days ?? 7)
-    : 0
-  const replacementAllowed =
-    brand?.replacement_allowed === false || cat?.replacement_allowed === false
-      ? false
-      : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
-  const replacementDays = replacementAllowed
-    ? brand?.replacement_allowed === false
-      ? (brand.replacement_window_days ?? 7)
-      : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7)
-    : 0
+  // Same rule as order-time returns (lib/catalog/return-policy.ts).
+  const resolved = resolveReturnPolicy({
+    productReturnWindowDays: product.return_window_days,
+    brand: product.brands,
+    category: product.categories,
+  })
+  const returnAllowed = resolved.return_allowed
+  const returnDays = returnAllowed ? resolved.return_window_days : 0
+  const replacementAllowed = resolved.replacement_allowed
+  const replacementDays = replacementAllowed ? resolved.replacement_window_days : 0
   const policy: PolicyProps = {
     returnAllowed,
     returnDays,
@@ -505,7 +497,9 @@ export default function ProductDetailClient({
           initialSkuParam={initialSkuParam}
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-          handlingDays={Number(product.handling_days ?? 2)}
+          // Bulk orders take the product's lead time when it is longer than normal handling.
+          handlingDays={Math.max(Number(product.handling_days ?? 2), Number((product as { lead_time_days?: number | null }).lead_time_days ?? 0))}
+          moq={(product as { moq?: number | null }).moq ?? null}
           isCodAllowed={product.is_cod_allowed ?? false}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => {

@@ -1,4 +1,5 @@
 import { View } from 'react-native'
+import { Image } from 'expo-image'
 import { Card, Rail, Text } from '../../ui'
 import { useRouter } from 'expo-router'
 import { Grid, SectionHeading } from './layout'
@@ -20,9 +21,15 @@ export default function BrandCarousel({ section, data }: SectionProps) {
       wrapperClassName="flex-1"
       className="flex-1 items-center gap-2 p-3"
     >
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-accent-500/10">
-        <Text className="text-xs font-black text-accent-600 dark:text-accent-400">{brand.name.slice(0, 2).toUpperCase()}</Text>
-      </View>
+      {brand.logo_url ? (
+        <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-border-default bg-surface-elevated">
+          <Image source={{ uri: brand.logo_url }} recyclingKey={brand.logo_url} accessible={false} contentFit="contain" style={{ width: 32, height: 32 }} />
+        </View>
+      ) : (
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-accent-500/10">
+          <Text className="text-xs font-black text-accent-600 dark:text-accent-400">{brand.name.slice(0, 2).toUpperCase()}</Text>
+        </View>
+      )}
       <Text numberOfLines={2} className="text-center text-[11px] font-semibold text-foreground" style={{ lineHeight: 14 }}>
         {brand.name}
       </Text>

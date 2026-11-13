@@ -155,6 +155,12 @@ schema_diff() {
   fi
 }
 
+# The platform manifests with every jeffi-stores-* image at <tag> (rollout.sh, and 40-tenant-fanout.sh's Job).
+platform_manifests() {
+  kubectl kustomize "$REPO/deploy/k8s/platform" |
+    sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:$1#g"
+}
+
 k8s_up() { kubectl get nodes --request-timeout=10s >/dev/null 2>&1; }
 k8s_tunnel() {
   if listening 16443; then for _ in 1 2 3; do k8s_up && return 0; sleep 2; done; fi

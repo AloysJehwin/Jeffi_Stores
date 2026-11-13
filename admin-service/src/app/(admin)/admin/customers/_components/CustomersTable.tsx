@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Tooltip from '@/components/ui/Tooltip'
 import HoverCard from '@/components/ui/HoverCard'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, Dialog, Field, Fields, badgeCls, type DataCol } from '@/components/admin/kit'
+import { DataTable, Dialog, Field, Fields, badgeCls, type DataCol, type LoadPage } from '@/components/admin/kit'
 import CustomersMobileList from './CustomersMobileList'
 import { businessLabel, businessTone, customerStatus, fullName, healthTone, inr } from './status-maps'
 
@@ -76,6 +76,7 @@ export default function CustomersTable({
   total,
   page,
   pageSize,
+  loadPage,
   query,
   backUrl,
 }: {
@@ -83,6 +84,7 @@ export default function CustomersTable({
   total: number
   page: number
   pageSize: number
+  loadPage?: LoadPage<any>
   /** The list's own params (tab, filters, sort), carried on page links as before. */
   query: Record<string, string | undefined>
   backUrl: string
@@ -235,6 +237,7 @@ export default function CustomersTable({
     <>
       <DataTable<any>
         mode="server"
+        loadPage={loadPage}
         rows={customers}
         cols={cols}
         rowKey={c => c.id}

@@ -29,7 +29,8 @@ interface SearchProduct {
   product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean }> | null
 }
 interface SearchCategory { id: string; name: string; slug: string }
-interface SearchResult { products: SearchProduct[]; categories: SearchCategory[] }
+interface SearchBrand extends SearchCategory { logo_url: string | null }
+interface SearchResult { products: SearchProduct[]; categories: SearchCategory[]; brands?: SearchBrand[] }
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const q = query.trim()
@@ -112,6 +113,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
     staleTime: 30_000,
   })
   const categories = live ? results?.categories ?? [] : []
+  const brands = live ? results?.brands ?? [] : []
   const products = live ? results?.products ?? [] : []
   const isLoading = live && isFetching
 
@@ -152,7 +154,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
 
   const showHistoryPanel = searchOpen && query.trim().length === 0 && history.length > 0
   const showResultsPanel = searchOpen && !showHistoryPanel && (query.trim().length >= 2 || isLoading)
-  const hasResults = categories.length > 0 || products.length > 0
+  const hasResults = categories.length > 0 || brands.length > 0 || products.length > 0
   const panelMax = Math.min(height - 128, height - insets.top - 12 - 56 - 12 - kb - 16)
 
   const iconColor = t.foregroundSecondary
@@ -195,7 +197,7 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
               onChangeText={setQuery}
               onSubmitEditing={submit}
               accessibilityLabel="Search"
-              placeholder="Search products, categories..."
+              placeholder="Search products, brands, categories..."
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="none"
@@ -266,6 +268,36 @@ export default function TopNav({ onSearchPress }: TopNavProps) {
                             </View>
                             <Text className="flex-1 text-sm text-foreground">
                               <Highlight text={cat.name} query={query} />
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </>
+                    )}
+
+                    {brands.length > 0 && (
+                      <>
+                        <Overline className="px-4 pb-1 pt-3">Brands</Overline>
+                        {brands.map(brand => (
+                          <Pressable
+                            key={brand.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Brand, ${brand.name}`}
+                            onPress={() => {
+                              saveHistory(query)
+                              closeSearch()
+                              router.push(`/brands/${brand.slug}`)
+                            }}
+                            className="min-h-[44px] flex-row items-center gap-3 px-4 py-2.5 active:bg-surface-secondary"
+                          >
+                            <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-md border border-border-default bg-surface-secondary">
+                              {brand.logo_url ? (
+                                <Image source={{ uri: brand.logo_url }} recyclingKey={brand.logo_url} accessible={false} contentFit="contain" style={{ width: 24, height: 24 }} />
+                              ) : (
+                                <Text className="text-xs font-semibold text-foreground-secondary">{brand.name.charAt(0).toUpperCase()}</Text>
+                              )}
+                            </View>
+                            <Text className="flex-1 text-sm text-foreground">
+                              <Highlight text={brand.name} query={query} />
                             </Text>
                           </Pressable>
                         ))}

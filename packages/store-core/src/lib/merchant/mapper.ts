@@ -1,4 +1,5 @@
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
+import { gmcAgeGroup, gmcCondition, gmcGender, gmcMultipack } from '@/lib/merchant/attributes'
 import { clipTitle, hasIdentifiers, listedPrices } from './item-rules'
 import { itemLabels, type SalesVelocity } from './custom-labels'
 
@@ -71,14 +72,18 @@ export function productToGmcItems(product: any, baseUrl: string, opts: { velocit
   if (product.is_digital) return []
   const base = baseUrl.replace(/\/+$/, '')
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-  const imageLink = primaryImage?.image_url || ''
-  const additionalImages = buildAdditionalImages(product, primaryImage?.id)
+  // product_media is the current gallery; product_images is the legacy fallback.
+  const mediaUrls: string[] = Array.isArray(product.media_image_urls) ? product.media_image_urls.filter(Boolean) : []
+  const imageLink = mediaUrls[0] || primaryImage?.image_url || ''
+  const additionalImages = mediaUrls.length ? mediaUrls.slice(1, 11).map(link => ({ link })) : buildAdditionalImages(product, primaryImage?.id)
   const brandName = product.brands?.name || ''
-  const description = (product.description || product.name || '').slice(0, 5000)
+  const description = (product.description || product.ai_description || product.short_description || product.name || '').slice(0, 5000)
   const highlights = buildProductHighlights(product)
   const details = buildDetails(product)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const productActive = product.is_active !== false
+  // Manufacturer part number: the MPN, else the brand's part number or model number.
+  const mpn = product.mpn || product.brand_part_number || product.model_number
 
   const cogs = (cost: any) => {
     const n = Number(cost)
@@ -98,15 +103,18 @@ export function productToGmcItems(product: any, baseUrl: string, opts: { velocit
     additionalImageLinks: additionalImages.map(i => i.link),
     brand: brandName || undefined,
     gtins: gtins(product.gtin),
-    mpn: product.mpn || undefined,
-    identifierExists: hasIdentifiers(product.gtin, product.mpn, brandName),
-    condition: 'NEW',
-    ageGroup: 'ADULT',
+    mpn: mpn || undefined,
+    identifierExists: hasIdentifiers(product.gtin, mpn, brandName),
+    condition: gmcCondition(product).toUpperCase(),
+    ageGroup: gmcAgeGroup(product).toUpperCase(),
+    gender: gmcGender(product)?.toUpperCase(),
+    color: product.color || undefined,
     material: product.material || undefined,
+    multipack: gmcMultipack(product),
     shipping: buildShipping(0),
     productHighlights: highlights.length ? highlights : undefined,
     productDetails: details.length ? details : undefined,
-    isBundle: false,
+    isBundle: !!product.is_bundle,
   }
 
   if (hasVariants) {
@@ -122,8 +130,8 @@ export function productToGmcItems(product: any, baseUrl: string, opts: { velocit
           itemGroupId: buildOfferId(product.sku),
           size: v.variant_name || undefined,
           gtins: gtins(v.gtin || product.gtin),
-          mpn: v.mpn || product.mpn || undefined,
-          identifierExists: hasIdentifiers(v.gtin || product.gtin, v.mpn || product.mpn, brandName),
+          mpn: v.mpn || mpn || undefined,
+          identifierExists: hasIdentifiers(v.gtin || product.gtin, v.mpn || mpn, brandName),
           costOfGoodsSold: cogs(v.cost_price ?? product.cost_price),
           ...itemLabels(
             {

@@ -977,3 +977,4 @@ ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_product_id_fk
 ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.product_media ADD CONSTRAINT product_media_sub_variant_id_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.product_faqs ADD CONSTRAINT product_faqs_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.category_faqs ADD CONSTRAINT category_faqs_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE CASCADE;

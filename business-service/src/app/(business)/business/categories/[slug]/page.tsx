@@ -14,11 +14,12 @@ import {
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { bp } from '@/lib/shared/business-path'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { ServerPagedItems, type PagedNode } from '@/components/admin/kit/infinite'
 import ProductCard from '@/components/business/ProductCard'
 import { round2 } from '@/lib/catalog/gst'
 import { positiveInt, productOrderBy, type ProductSortQuery } from '@/lib/catalog/product-sort'
 import SortDropdown from '@/components/visitor/SortDropdown'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 const PAGE_SIZE = 24
 
@@ -70,7 +71,60 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
     [allCategoryIds, PAGE_SIZE, offset]
   )
 
-  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
+  return { products: publicProducts(products), total, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
+}
+
+function categoryItem(product: any, gstEnabled: boolean): PagedNode {
+  const primaryImage =
+    product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+  const hasVariants = product.has_variants
+  const displayPrice =
+    hasVariants && product.variant_min_price
+      ? Number(product.variant_min_price)
+      : pickUnitPrice(
+          {
+            inclusive: Number(product.base_price),
+            exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined,
+          },
+          gstEnabled
+        )
+  const effectiveStock = hasVariants
+    ? Number(product.variant_stock_total)
+    : product.stock_status !== 'Out of Stock'
+      ? 1
+      : 0
+  const rawMrp = product.mrp
+    ? Number(product.mrp)
+    : product.variant_min_mrp
+      ? Number(product.variant_min_mrp)
+      : null
+  const gstRate = Number(product.gst_percentage ?? 0)
+  const mrp =
+    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
+  const mrpDiscount = mrpDiscountPct(mrp, displayPrice)
+
+  return {
+    key: String(product.id),
+    node: (
+      <ProductCard
+        id={product.id}
+        name={product.name}
+        slug={product.slug}
+        hasVariants={hasVariants}
+        displayPrice={Number(displayPrice)}
+        mrp={mrp}
+        mrpDiscount={mrpDiscount}
+        effectiveStock={effectiveStock}
+        isDigital={!!product.is_digital}
+        primaryImage={primaryImage || null}
+        brandName={product.brands?.name || null}
+        categoryName={product.categories?.name || null}
+        categoryId={product.categories?.id || null}
+        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+        handlingDays={Number(product.handling_days ?? 2)}
+      />
+    ),
+  }
 }
 
 export default async function BusinessCategoryDetailPage({
@@ -104,6 +158,14 @@ export default async function BusinessCategoryDetailPage({
     page,
     { sort: one('sort'), dir: one('dir'), order: one('order') }
   )
+  const categoryId = category.id
+  const subIds = subcategories.map(sub => sub.id)
+  const sort = { sort: one('sort'), dir: one('dir'), order: one('order') }
+  async function loadPage(p: number) {
+    'use server'
+    const next = await getCategoryProducts(categoryId, subIds, p, sort)
+    return { rows: next.products.map((product: any) => categoryItem(product, next.gstEnabled)), total: next.total }
+  }
 
   return (
     <div className="bg-surface min-h-screen">
@@ -172,70 +234,15 @@ export default async function BusinessCategoryDetailPage({
 
           {products.length > 0 ? (
             <>
-              {(() => {
-                const items = products.map(product => {
-                  const primaryImage =
-                    product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                  const hasVariants = product.has_variants
-                  const displayPrice =
-                    hasVariants && product.variant_min_price
-                      ? Number(product.variant_min_price)
-                      : pickUnitPrice(
-                          {
-                            inclusive: Number(product.base_price),
-                            exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined,
-                          },
-                          gstEnabled
-                        )
-                  const effectiveStock = hasVariants
-                    ? Number(product.variant_stock_total)
-                    : product.stock_status !== 'Out of Stock'
-                      ? 1
-                      : 0
-                  const rawMrp = product.mrp
-                    ? Number(product.mrp)
-                    : product.variant_min_mrp
-                      ? Number(product.variant_min_mrp)
-                      : null
-                  const gstRate = Number(product.gst_percentage ?? 0)
-                  const mrp =
-                    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
-                  const mrpDiscount = mrpDiscountPct(mrp, displayPrice)
-
-                  return {
-                    key: String(product.id),
-                    node: (
-                      <ProductCard
-                        id={product.id}
-                        name={product.name}
-                        slug={product.slug}
-                        hasVariants={hasVariants}
-                        displayPrice={Number(displayPrice)}
-                        mrp={mrp}
-                        mrpDiscount={mrpDiscount}
-                        effectiveStock={effectiveStock}
-                        isDigital={!!product.is_digital}
-                        primaryImage={primaryImage || null}
-                        brandName={product.brands?.name || null}
-                        categoryName={product.categories?.name || null}
-                        categoryId={product.categories?.id || null}
-                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-                        handlingDays={Number(product.handling_days ?? 2)}
-                      />
-                    ),
-                  }
-                })
-                return (
-                  <ServerPagedItems
-                    items={items}
-                    page={page}
-                    total={total}
-                    noun="products"
-                    wrap="div"
-                    wrapClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
-                  />
-                )
-              })()}
+              <ServerPagedItems
+                items={products.map((product: any) => categoryItem(product, gstEnabled))}
+                loadPage={loadPage}
+                page={page}
+                total={total}
+                noun="products"
+                wrap="div"
+                wrapClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+              />
             </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">

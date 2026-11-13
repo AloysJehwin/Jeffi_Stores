@@ -34,6 +34,21 @@ export const TEMPLATE_FIELDS: { key: string; label: string }[] = [
   { key: 'length_cm', label: 'Length (cm)' },
   { key: 'breadth_cm', label: 'Breadth (cm)' },
   { key: 'height_cm', label: 'Height (cm)' },
+  { key: 'country_of_origin', label: 'Country of origin' },
+  { key: 'manufacturer_details', label: 'Manufacturer name & address' },
+  { key: 'packer_details', label: 'Packer name & address' },
+  { key: 'importer_details', label: 'Importer name & address' },
+  { key: 'consumer_care', label: 'Customer care' },
+  { key: 'net_quantity', label: 'Net quantity' },
+  { key: 'model_number', label: 'Model number' },
+  { key: 'mpn', label: 'Part number (MPN)' },
+  { key: 'pack_size', label: 'Pack size' },
+  { key: 'in_the_box', label: 'Sales package (in the box)' },
+  { key: 'warranty', label: 'Warranty summary' },
+  { key: 'care_instructions', label: 'Care / wash care' },
+  { key: 'safety_warnings', label: 'Safety warnings' },
+  { key: 'gender', label: 'Gender' },
+  { key: 'return_window_days', label: 'Return window (days)' },
   ...Array.from({ length: MAX_IMAGE_COLUMNS }, (_, i) => ({ key: `image_${i + 1}`, label: `Image ${i + 1} URL` })),
 ]
 const FIELD_KEYS = new Set(TEMPLATE_FIELDS.map(f => f.key))
@@ -77,6 +92,18 @@ const SYNONYMS: Record<string, string[]> = {
   length_cm: ['package length', 'length'],
   breadth_cm: ['package breadth', 'package width', 'breadth', 'width'],
   height_cm: ['package height', 'height'],
+  country_of_origin: ['country of origin', 'origin country', 'country'],
+  manufacturer_details: ['manufacturer details', 'manufacturer name and address', 'manufacturer address', 'manufacturer'],
+  packer_details: ['packer details', 'packer name and address', 'packer address', 'packer'],
+  importer_details: ['importer details', 'importer name and address', 'importer address', 'importer'],
+  consumer_care: ['customer care details', 'customer care', 'consumer care'],
+  net_quantity: ['net quantity', 'net qty', 'net content'],
+  model_number: ['model number', 'model name', 'model id', 'model'],
+  pack_size: ['pack of', 'pack size', 'number of items'],
+  in_the_box: ['sales package', 'in the box', 'package contents', 'whats in the box'],
+  warranty: ['warranty summary', 'warranty period', 'warranty'],
+  care_instructions: ['wash care', 'care instructions', 'care'],
+  gender: ['gender', 'ideal for', 'target gender'],
 }
 
 const text = (v: ExcelJS.CellValue): string => {
@@ -157,6 +184,8 @@ export function suggestTemplateColumns(headers: string[], attributeKeys: string[
   return out
 }
 
+const d = (u: SellableUnit, k: string) => u.details?.[k] ?? null
+
 /** The value a unit puts in a column. */
 export function sourceValue(u: SellableUnit, src: ColumnSource): string | number | null {
   if (src.value != null && src.value !== '') return src.value
@@ -212,8 +241,24 @@ export function sourceValue(u: SellableUnit, src: ColumnSource): string | number
       return u.breadthCm
     case 'height_cm':
       return u.heightCm
+    case 'manufacturer_details':
+    case 'packer_details':
+    case 'importer_details': {
+      const who = f.replace('_details', '')
+      return [d(u, `${who}_name`), d(u, `${who}_address`)].filter(Boolean).join(', ') || null
+    }
+    case 'net_quantity':
+      return d(u, 'net_quantity') ? `${Number(d(u, 'net_quantity'))} ${d(u, 'net_quantity_unit') ?? ''}`.trim() : null
+    case 'in_the_box':
+      return d(u, 'in_the_box')?.split(/\n+/).map(l => l.trim()).filter(Boolean).join(', ') || null
+    case 'warranty': {
+      const m = Number(d(u, 'warranty_months'))
+      return m > 0 ? `${m} month${m === 1 ? '' : 's'}${d(u, 'warranty_type') ? ` ${d(u, 'warranty_type')}` : ''} warranty` : null
+    }
+    case 'gender':
+      return d(u, 'target_gender')
     default:
-      return null
+      return d(u, f)
   }
 }
 

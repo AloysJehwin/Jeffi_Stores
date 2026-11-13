@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { isInterState, calculateGST, round2 } from '@/lib/catalog/gst'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { CATEGORY_HSN_SQL } from '@/lib/catalog/catalog-defaults'
 import { createDraftInvoice } from '@/lib/documents/invoice'
 import { computeEdd } from '@/lib/shipping/edd'
 import type { DraftBuyNowItem, DraftCartItem } from '@/lib/orders/order-draft'
@@ -700,6 +701,14 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     // A paid all-digital order is fulfilled at payment: access is granted below in this txn.
     const isGranted = !!input.paymentRecord && allDigital
     const orderStatus = isGranted ? 'granted' : input.paymentRecord ? 'confirmed' : 'pending'
+
+    // Lines whose product has no HSN take its category's default (nearest ancestor).
+    const missingHsn = isGSTEnabled ? itemRows.filter(r => !r.hsn && r.productId).map(r => r.productId) : []
+    if (missingHsn.length) {
+      const res = await client.query<{ id: string; hsn: string | null }>(CATEGORY_HSN_SQL, [missingHsn])
+      const byId = new Map((res?.rows ?? []).map(r => [r.id, r.hsn]))
+      for (const r of itemRows) if (!r.hsn) r.hsn = byId.get(r.productId) ?? null
+    }
 
     const orderResult = await client.query(
       `INSERT INTO orders (

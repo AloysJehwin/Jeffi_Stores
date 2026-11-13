@@ -1,7 +1,7 @@
 import { Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import Constants from 'expo-constants'
 import * as Notifications from 'expo-notifications'
+import { appVersionLabel } from './appVersion'
 import { registerPushDevice, unregisterPushDevice, type NotificationCategory } from '../api/notifications'
 import { openPushPrompt, type PushPromptReason } from '../stores/pushPromptStore'
 
@@ -20,6 +20,9 @@ const TOKEN_KEY = 'push.token'
 const OFFERS_KEY = 'push.offersOptIn'
 const DECLINED_KEY = 'push.softAskDeclinedAt'
 const WELCOME_KEY = 'push.welcomeAskedAt'
+const OPENS_KEY = 'push.appOpens'
+/** While push is off, the soft ask comes back on every Nth app open. */
+export const REMIND_EVERY_OPENS = 3
 const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000
 
 export const PUSH_PERMISSION_KEY = ['push-permission'] as const
@@ -82,7 +85,7 @@ function deviceInfo() {
   const os = Platform.OS === 'android' ? `Android ${Platform.constants.Release}` : `${Platform.OS} ${Platform.Version}`
   return {
     platform: (Platform.OS === 'ios' ? 'ios' : 'android') as 'android' | 'ios',
-    app_version: Constants.expoConfig?.version ?? null,
+    app_version: appVersionLabel(),
     os_version: os.slice(0, 40),
     locale: intl?.locale ?? null,
     timezone: intl?.timeZone ?? null,
@@ -182,5 +185,24 @@ export async function maybePromptOnFirstLaunch(): Promise<void> {
     if (await AsyncStorage.getItem(WELCOME_KEY)) return
     await AsyncStorage.setItem(WELCOME_KEY, String(Date.now()))
     await maybePromptForPush('welcome')
+  } catch {}
+}
+
+/** Count an app open (cold start, or back after a long time away); returns the running count. */
+export async function recordAppOpen(): Promise<number> {
+  const n = (Number(await AsyncStorage.getItem(OPENS_KEY).catch(() => null)) || 0) + 1
+  await AsyncStorage.setItem(OPENS_KEY, String(n)).catch(() => {})
+  return n
+}
+
+/**
+ * Every REMIND_EVERY_OPENS opens while push is off, ask again. Unlike the automatic asks this also
+ * shows when Android won't prompt any more: the sheet then sends the user to Settings.
+ */
+export async function maybeRemindOnOpen(opens: number): Promise<void> {
+  try {
+    if (opens < REMIND_EVERY_OPENS || opens % REMIND_EVERY_OPENS !== 0) return
+    if ((await getPushPermission()).granted) return
+    openPushPrompt('reminder')
   } catch {}
 }

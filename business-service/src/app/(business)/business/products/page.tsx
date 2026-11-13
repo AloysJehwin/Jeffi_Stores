@@ -18,6 +18,7 @@ import { round2 } from '@/lib/catalog/gst'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import { bp } from '@/lib/shared/business-path'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 const PAGE_SIZE = 60
 
@@ -131,7 +132,7 @@ async function getProducts(searchParams: any) {
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `
 
-  const products = await queryMany(sql, [...params, ...rankParams])
+  const products = publicProducts(await queryMany(sql, [...params, ...rankParams]))
   return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 
@@ -195,7 +196,7 @@ async function getCategoryBanners() {
   return withProducts.filter(c => c.products.length >= 2)
 }
 
-function renderProductItem(product: any, gstEnabled: boolean) {
+function renderProductItem(product: any, gstEnabled: boolean, deferred = false) {
   const primaryImage = product.product_images?.find((i: any) => i.is_primary) || product.product_images?.[0]
   const hasVariants = product.has_variants
   const displayPrice =
@@ -245,6 +246,7 @@ function renderProductItem(product: any, gstEnabled: boolean) {
       hazardous={product.hazardous}
       flammable={product.flammable}
       portal="business"
+      deferred={deferred}
     />
   )
 }
@@ -292,6 +294,11 @@ export default async function BusinessProductsPage({
   const basePath = bp('/business/products', host)
 
   const { products, total, page, totalPages, gstEnabled } = await getProducts(resolvedSearchParams)
+  async function loadPage(p: number) {
+    'use server'
+    const next = await getProducts({ ...resolvedSearchParams, page: String(p) })
+    return { rows: (next.products as any[]).map(product => ({ key: String(product.id), node: renderProductItem(product, next.gstEnabled, true) })), total: next.total }
+  }
   const [categories, brands] = await Promise.all([getCategories(), getBrands()])
   const categoryBanners = await getCategoryBanners()
 
@@ -367,9 +374,9 @@ export default async function BusinessProductsPage({
             {products.length > 0 ? (
               <>
                 {(() => {
-                  const items = (products as any[]).map(product => ({
+                  const items = (products as any[]).map((product, i) => ({
                     key: String(product.id),
-                    node: renderProductItem(product, gstEnabled),
+                    node: renderProductItem(product, gstEnabled, i >= 6),
                   }))
                   return (
                     <ProductGrid
@@ -391,6 +398,7 @@ export default async function BusinessProductsPage({
                         />
                       }
                       pagedItems={items}
+                      loadPage={loadPage}
                       page={page}
                       basePath={basePath}
                     />

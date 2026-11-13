@@ -439,37 +439,55 @@ $$;
 
 
 --
--- Name: products_search_vector_update(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.products_search_vector_update() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  NEW.search_vector :=
-    setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(NEW.sku, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(NEW.short_description, '')), 'C') ||
-    setweight(to_tsvector('english', coalesce(NEW.description, '')), 'D');
-  RETURN NEW;
-END
-$$;
-
-
-
---
 -- Name: update_product_search_vector(); Type: FUNCTION; Schema: public; Owner: -
+-- Brand, category and parent category names are indexed too, so "taparia spanner" finds the products.
 --
 
 CREATE FUNCTION public.update_product_search_vector() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
+DECLARE
+    v_brand text;
+    v_category text;
 BEGIN
+    SELECT b.name INTO v_brand FROM public.brands b WHERE b.id = NEW.brand_id;
+    SELECT concat_ws(' ', c.name, pc.name) INTO v_category
+      FROM public.categories c LEFT JOIN public.categories pc ON pc.id = c.parent_category_id
+     WHERE c.id = NEW.category_id;
     NEW.search_vector :=
         setweight(to_tsvector('english', COALESCE(NEW.name, '')), 'A') ||
+        setweight(to_tsvector('english', COALESCE(v_brand, '')), 'B') ||
         setweight(to_tsvector('english', COALESCE(NEW.description, '')), 'B') ||
+        setweight(to_tsvector('english', COALESCE(v_category, '')), 'C') ||
+        setweight(to_tsvector('english', COALESCE(NEW.short_description, '')), 'C') ||
         setweight(to_tsvector('english', COALESCE(NEW.sku, '')), 'C');
     RETURN NEW;
+END;
+$$;
+
+
+
+--
+-- Name: refresh_product_search_vectors(); Type: FUNCTION; Schema: public; Owner: -
+-- A brand or category rename re-indexes its products (the BEFORE trigger recomputes on any UPDATE).
+--
+
+CREATE FUNCTION public.refresh_product_search_vectors() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_skip text := current_setting('audit.skip', true);
+BEGIN
+    PERFORM set_config('audit.skip', 'true', true);
+    IF TG_TABLE_NAME = 'brands' THEN
+        UPDATE public.products SET search_vector = NULL WHERE brand_id = NEW.id;
+    ELSE
+        UPDATE public.products SET search_vector = NULL
+         WHERE category_id = NEW.id
+            OR category_id IN (SELECT c.id FROM public.categories c WHERE c.parent_category_id = NEW.id);
+    END IF;
+    PERFORM set_config('audit.skip', COALESCE(v_skip, ''), true);
+    RETURN NULL;
 END;
 $$;
 

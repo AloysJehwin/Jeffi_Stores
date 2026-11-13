@@ -9,18 +9,21 @@ export interface BrandWithCount {
   slug: string
   description: string | null
   logo_url: string | null
+  tagline: string | null
+  is_featured: boolean
   product_count: string
 }
 
+/** Active brands: featured first, then display_order, then name. */
 export async function listBrandsWithCounts(): Promise<BrandWithCount[]> {
   return queryMany<BrandWithCount>(`
-    SELECT b.id, b.name, b.slug, b.description, b.logo_url,
+    SELECT b.id, b.name, b.slug, b.description, b.logo_url, b.tagline, COALESCE(b.is_featured, false) AS is_featured,
       COUNT(p.id) FILTER (WHERE p.is_active = true) AS product_count
     FROM brands b
     LEFT JOIN products p ON p.brand_id = b.id
     WHERE b.is_active = true
     GROUP BY b.id
-    ORDER BY b.name ASC
+    ORDER BY COALESCE(b.is_featured, false) DESC, COALESCE(b.display_order, 0) ASC, b.name ASC
   `)
 }
 

@@ -15,7 +15,7 @@ import ProductsMobileList from './_components/ProductsMobileList'
 import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import HoverCard from '@/components/ui/HoverCard'
 import CopySku from '@/components/ui/CopySku'
-import { DataTable, badgeCls, useActionToast, type DataCol } from '@/components/admin/kit'
+import { DataTable, badgeCls, useActionToast, type DataCol, type LoadPage } from '@/components/admin/kit'
 
 interface Props {
   products: any[]
@@ -27,6 +27,7 @@ interface Props {
   backUrl?: string
   isSuperAdmin?: boolean
   canWrite?: boolean
+  loadPage?: LoadPage<any>
 }
 
 const rs = (n: unknown) => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -124,6 +125,7 @@ export default function ProductsTableClient({
   page,
   pageSize,
   pageUrls,
+  loadPage,
   backUrl = '/admin/products',
   isSuperAdmin = false,
   canWrite = false,
@@ -293,6 +295,7 @@ export default function ProductsTableClient({
     <>
       <DataTable<any>
         mode="server"
+        loadPage={loadPage}
         rows={products}
         cols={cols}
         rowKey={p => p.id}

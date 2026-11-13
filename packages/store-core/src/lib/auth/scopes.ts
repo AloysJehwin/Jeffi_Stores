@@ -825,7 +825,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_billing:read',
     label: 'Ecom Billing (Read)',
     description: 'View tenant subscriptions, settlement ledger and payouts',
-    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing', '/admin/ecom/configuration', '/admin/ecom/server-pricing'],
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing', '/admin/ecom/configuration', '/admin/ecom/server-pricing', '/admin/ecom/domains'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -833,7 +833,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_billing:write',
     label: 'Ecom Billing (Write)',
     description: 'Manage tenant subscriptions, adjust settlements, trigger payouts and edit the AI and server price lists',
-    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing', '/admin/ecom/configuration', '/admin/ecom/server-pricing'],
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing', '/admin/ecom/configuration', '/admin/ecom/server-pricing', '/admin/ecom/domains'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -967,6 +967,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/ecom/ai-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/compute-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/messaging-addon-pricing')) return 'ecom_billing:read'
+  if (pathname.startsWith('/api/admin/ecom/domains')) return 'ecom_billing:read'
   if (/^\/api\/admin\/ecom\/[^/]+\/compute/.test(pathname)) return 'ecom_instances:read'
   if (/^\/api\/admin\/ecom\/[^/]+\/certs/.test(pathname)) return 'ecom_customers:read'
   if (pathname.startsWith('/api/admin/ecom/store-status')) return 'ecom_customers:read'

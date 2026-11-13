@@ -1,9 +1,19 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { queryMany } from '@/lib/shared/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import { categoryProductCounts } from '@/lib/catalog/storefront-counts'
+import { listingMetadata } from '@/lib/catalog/listing-seo'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  return listingMetadata({
+    title: 'All Categories',
+    fallbackDescription: 'Browse our complete range of product categories.',
+    path: '/categories',
+  })
+}
 
 async function getAllCategories() {
   return queryMany('SELECT * FROM categories WHERE is_active = true ORDER BY display_order ASC')
@@ -58,6 +68,9 @@ export default async function CategoriesPage() {
                         <h2 className="text-xl font-bold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
                           {category.name}
                         </h2>
+                        {category.tagline && (
+                          <p className="text-sm text-foreground-secondary mt-0.5">{category.tagline}</p>
+                        )}
                         <p className="text-sm text-foreground-muted mt-1">
                           {totalProducts} {totalProducts === 1 ? 'product' : 'products'}
                         </p>

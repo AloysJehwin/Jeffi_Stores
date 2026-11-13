@@ -4,6 +4,7 @@ import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { sendCampaignPush } from '@/lib/campaigns/push-dispatch'
 import { minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
+import { verifyDraftToken } from '@/lib/orders/order-draft'
 
 interface Params extends Record<string, unknown> {
   minMinutesAfterCancel: number
@@ -20,14 +21,21 @@ interface Row {
   order_number: string
   total_amount: string
   order_type?: string | null
+  /** 'intent': a payment attempt that never became an order (pending_payment_intents). */
+  source?: 'order' | 'intent'
+  razorpay_order_id?: string
+  draft_token?: string
 }
+
+// A checkout draft lives 30 minutes (order-draft.ts); a payment can still land until then.
+const DRAFT_LIFE_MINUTES = 30
 
 export const abandonedCheckout: ScenarioModule<Params, Row> = {
   kind: 'abandoned_checkout',
   name: 'Abandoned Checkout',
-  description: 'Order auto-cancelled after the 10-minute payment window expired',
+  description: 'Checkout started but payment never completed',
   trigger:
-    "Fires when an order is auto-cancelled because Razorpay payment didn't complete within the 10-minute window. Only orders cancelled within ~15 min of creation are treated as auto-cancels (not manual cancellations days later). Sends at most once per cooldown window per user.",
+    "Fires when a customer starts paying at checkout and the payment never completes: a payment attempt that never became an order (once its 30-minute checkout has expired plus the wait below), or an order auto-cancelled within ~15 min of creation because its payment didn't complete. Skipped if the customer has ordered since. Sends at most once per cooldown window per user.",
   defaultParams: {
     minMinutesAfterCancel: minutes(15),
     autoCancelMaxMinutes: minutes(15),
@@ -82,7 +90,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     const minAfterCancel = readDurationParam(params, 'minMinutesAfterCancel') ?? minutes(15)
     const autoCancelMax = readDurationParam(params, 'autoCancelMaxMinutes') ?? minutes(15)
     const cooldownMin = cooldownMinutes(params)
-    return queryMany<Row>(
+    const orders = await queryMany<Row>(
       `
       SELECT DISTINCT ON (o.user_id)
         o.id, o.user_id, o.order_number, o.total_amount::text, o.order_type
@@ -114,6 +122,41 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         String(autoCancelMax),
       ]
     )
+    // Checkout now creates the order only once payment succeeds: an abandoned payment leaves an uncommitted
+    // pending_payment_intents row and no order. One that expired (draft life + the wait) within the last
+    // delay_hours, from a customer who has not ordered or paid since.
+    const intents = await queryMany<Row>(
+      `
+      SELECT DISTINCT ON (pi.user_id)
+        pi.id::text, pi.user_id::text, '' AS order_number, (pi.amount_paise / 100.0)::text AS total_amount,
+        'intent' AS source, pi.razorpay_order_id, pi.draft_token
+      FROM pending_payment_intents pi
+      JOIN users u ON u.id = pi.user_id
+      LEFT JOIN business_profiles bp ON bp.user_id = u.id
+      WHERE pi.committed = FALSE
+        AND pi.created_at < NOW() - ($3 || ' minutes')::interval
+        AND pi.created_at > NOW() - ($3 || ' minutes')::interval - ($2 || ' hours')::interval
+        AND u.is_active = TRUE AND u.marketing_opt_out = FALSE
+        AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
+        AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = pi.user_id AND o.created_at > pi.created_at)
+        AND NOT EXISTS (
+          SELECT 1 FROM pending_payment_intents p2
+          WHERE p2.user_id = pi.user_id AND p2.committed = TRUE AND p2.created_at > pi.created_at
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM email_campaigns_sent ecs
+          WHERE ecs.campaign_kind = $1
+            AND ecs.channel = 'email'
+            AND ecs.user_id = pi.user_id
+            AND ecs.sent_at > NOW() - ($4 || ' minutes')::interval
+        )
+      ORDER BY pi.user_id, pi.created_at DESC
+      LIMIT $5
+    `,
+      [campaign.kind, campaign.delay_hours, String(DRAFT_LIFE_MINUTES + minAfterCancel), String(cooldownMin), params.maxRecipientsPerSweep]
+    )
+    const seen = new Set(orders.map(r => r.user_id))
+    return [...orders, ...intents.filter(r => !seen.has(r.user_id))].slice(0, params.maxRecipientsPerSweep)
   },
 
   async findSuppressed({ campaign, params }) {
@@ -187,14 +230,12 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
-    const items = await queryMany<{
-      name: string
-      quantity: number
-      unit_price: number
-      product_slug: string | null
-      image_url: string | null
-    }>(
-      `
+    const intent = row.source === 'intent' ? await intentItems(row) : null
+    if (row.source === 'intent' && !intent?.items.length) return { ok: false, reason: 'no_items' }
+    const items =
+      intent?.items ??
+      (await queryMany<CheckoutItem>(
+        `
       SELECT oi.product_name AS name,
              oi.quantity::float AS quantity,
              oi.unit_price::float AS unit_price,
@@ -205,8 +246,8 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       WHERE oi.order_id = $1::uuid
       LIMIT 8
     `,
-      [row.id]
-    )
+        [row.id]
+      ))
 
     const itemsHtml = renderItemRows(
       items.map(i => ({
@@ -224,7 +265,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     // in it, so that customer goes back to the product instead of an empty cart.
     const firstSlug = items.find(i => i.product_slug)?.product_slug
     const ctaUrl =
-      row.order_type === 'direct' && firstSlug
+      (row.order_type === 'direct' || intent?.mode === 'buyNow') && firstSlug
         ? `${user.baseUrl}/products/${encodeURIComponent(firstSlug)}`
         : `${user.baseUrl}/cart`
 
@@ -234,7 +275,8 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       referenceId: row.id,
       vars: {
         firstName: user.first_name || 'there',
-        orderNumber: row.order_number,
+        // A payment attempt has no order number: its payment reference stands in.
+        orderNumber: row.order_number || (row.razorpay_order_id ?? '').replace(/^order_/, '').slice(-8).toUpperCase(),
         total: Number(row.total_amount).toFixed(2),
         itemsHtml,
         couponCode,
@@ -251,4 +293,38 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     }
     return emailResult
   },
+}
+
+interface CheckoutItem {
+  name: string
+  quantity: number
+  unit_price: number
+  product_slug: string | null
+  image_url: string | null
+}
+
+const PRODUCT_SQL = `p.name, p.slug AS product_slug,
+  (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS image_url`
+
+/** What a payment attempt was for: the buy-now item in its draft, or the customer's cart (still holding the items). */
+async function intentItems(row: Row): Promise<{ mode: 'cart' | 'buyNow'; items: CheckoutItem[] } | null> {
+  const draft = row.draft_token ? await verifyDraftToken(row.draft_token, { ignoreExpiry: true }) : null
+  if (draft?.mode === 'buyNow' && draft.buyNowItem) {
+    const b = draft.buyNowItem
+    const items = await queryMany<CheckoutItem>(
+      `SELECT ${PRODUCT_SQL}, $2::float AS quantity, $3::float AS unit_price FROM products p WHERE p.id = $1::uuid`,
+      [b.productId, b.qty, b.price]
+    )
+    return { mode: 'buyNow', items }
+  }
+  const items = await queryMany<CheckoutItem>(
+    `SELECT ${PRODUCT_SQL}, ci.quantity::float AS quantity, COALESCE(pv.price, p.base_price)::float AS unit_price
+     FROM cart_items ci
+     JOIN products p ON p.id = ci.product_id
+     LEFT JOIN product_variants pv ON pv.id = ci.variant_id
+     WHERE ci.user_id = $1::uuid AND ci.saved_for_later = FALSE
+     LIMIT 8`,
+    [row.user_id]
+  )
+  return { mode: 'cart', items }
 }

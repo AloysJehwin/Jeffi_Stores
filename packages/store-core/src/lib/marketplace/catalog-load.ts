@@ -50,9 +50,19 @@ export interface SellableUnit {
   breadthCm: number | null
   heightCm: number | null
   attributes: Record<string, string>
+  /** Product-level catalogue fields (Legal Metrology, warranty, usage…) keyed by DETAIL_FIELDS. */
+  details?: Record<string, string | null>
   images: string[]
   listing: UnitListing | null
 }
+
+/** Product columns a marketplace template can take as-is. */
+export const DETAIL_FIELDS = [
+  'country_of_origin', 'manufacturer_name', 'manufacturer_address', 'packer_name', 'packer_address',
+  'importer_name', 'importer_address', 'consumer_care', 'model_number', 'pack_size', 'in_the_box',
+  'care_instructions', 'safety_warnings', 'target_gender', 'mpn', 'warranty_type', 'warranty_months',
+  'return_window_days', 'net_quantity', 'net_quantity_unit',
+] as const
 
 export const unitKey = (productId: string, variantId?: string | null, subVariantId?: string | null) => `${productId}:${variantId ?? ''}:${subVariantId ?? ''}`
 
@@ -107,6 +117,8 @@ export function sizeAndColour(r: {
   return { size, colour }
 }
 
+const DETAIL_COLS = DETAIL_FIELDS.map(f => `p.${f}`).join(', ')
+
 const UNITS_SQL = `
   WITH u AS (
     SELECT 'sub_variant' AS level, p.id AS product_id, v.id AS variant_id, sv.id AS sub_variant_id, sv.sku AS our_sku,
@@ -134,6 +146,7 @@ const UNITS_SQL = `
        AND NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND COALESCE(v.is_active, true))
   )
   SELECT u.*, p.name, p.description, p.short_description, p.material, p.hsn_code, p.gst_percentage, p.size AS product_size,
+         p.color AS product_color, p.specifications AS p_specs, ${DETAIL_COLS},
          b.name AS brand, c.name AS category,
          l.id AS listing_id, l.marketplace_sku, l.style_id, l.status AS listing_status, l.issues, l.category AS listing_category,
          l.listing_ref, l.listed_price, l.listed_mrp, l.last_task_id, l.synced_at
@@ -156,8 +169,13 @@ export async function loadSellableUnits(
   const rows = await queryMany<any>(UNITS_SQL, [channel, opts.productIds?.length ? opts.productIds : null, Math.min(opts.limit ?? MAX_UNITS, MAX_UNITS)])
   const images = opts.images === false ? null : await loadImages(rows)
   return rows.map(r => {
-    const attributes = flatAttrs(r.v_attrs, r.sv_attrs)
-    const { size, colour } = sizeAndColour({ ...r, attributes })
+    const unitAttrs = flatAttrs(r.v_attrs, r.sv_attrs)
+    const sc = sizeAndColour({ ...r, attributes: unitAttrs })
+    const size = sc.size
+    const colour = sc.colour ?? r.product_color ?? null
+    // Product specifications are selectable as attr:<key> too; the unit's own attributes win.
+    const attributes = { ...flatAttrs(r.p_specs), ...unitAttrs }
+    const details = Object.fromEntries(DETAIL_FIELDS.map(f => [f, r[f] == null || r[f] === '' ? null : String(r[f])]))
     const variantImgs = r.variant_id ? images?.variant.get(r.variant_id) ?? [] : []
     const productImgs = images?.product.get(r.product_id) ?? []
     return {
@@ -189,6 +207,7 @@ export async function loadSellableUnits(
       breadthCm: num(r.breadth_cm),
       heightCm: num(r.height_cm),
       attributes,
+      details,
       images: [...new Set([...variantImgs, ...productImgs])].slice(0, 20),
       listing: r.listing_id
         ? {

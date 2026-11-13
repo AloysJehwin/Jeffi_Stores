@@ -8,6 +8,7 @@ import {
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
+import { publicProducts } from '@/lib/catalog/public-product'
 
 export const TOTAL_SOLD_SQL = `COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.product_id = p.id), 0)`
 
@@ -30,7 +31,7 @@ export async function getProductCards(opts: {
       totalSoldSql: TOTAL_SOLD_SQL,
     }
   )
-  return queryMany(sql, [...params, opts.limit])
+  return publicProducts(await queryMany(sql, [...params, opts.limit]))
 }
 
 /** Active products for these ids, card-ready, in the order the ids were given. */

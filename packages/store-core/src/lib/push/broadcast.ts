@@ -189,7 +189,7 @@ export async function drainCampaignPush(opts: { campaignId?: string; budgetMs?: 
         ).catch(() => null)
       }
       if (!flagOn) return set(g.rows.map(x => x.row.id), { status: 'skipped', error: 'push_disabled' })
-      if (!ready) return set(g.rows.map(x => x.row.id), { status: 'failed', error: 'push is not configured' })
+      if (!ready) return set(g.rows.map(x => x.row.id), { status: 'failed', error: 'push is not configured: FCM_SERVICE_ACCOUNT_JSON is missing on the server' })
 
       const now: typeof g.rows = []
       for (const x of g.rows) {

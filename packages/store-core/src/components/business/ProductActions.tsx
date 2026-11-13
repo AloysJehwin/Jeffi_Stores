@@ -93,6 +93,8 @@ interface ProductActionsProps {
   sellUnitId?: string | null
   extraDeliveryDays?: number
   handlingDays?: number
+  /** Minimum order quantity in base pieces (products.moq). */
+  moq?: number | null
   is_active?: boolean
   isCodAllowed?: boolean | null
   digital?: boolean
@@ -150,6 +152,7 @@ export default function ProductActions({
   sellUnitId,
   extraDeliveryDays = 0,
   handlingDays = 2,
+  moq = null,
   is_active = true,
   isCodAllowed,
   digital = false,
@@ -468,7 +471,10 @@ export default function ProductActions({
         : isContinuous
           ? 0.001
           : 1
-  const qtyMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
+  const unitMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
+  // MOQ is in pieces: in a pack unit it is that many packs, rounded up; continuous units ignore it.
+  const moqUnits = Number(moq) > 0 && (!sellUnit || sellUnit.dimension === 'count') ? Math.ceil(Number(moq) / (unitFactor || 1)) : 0
+  const qtyMin = Math.max(unitMin, moqUnits)
   const qtyMax = sellUnit?.max_qty != null ? Number(sellUnit.max_qty) : undefined
   // Input stays at max_qty for Buy Now; Add to Cart is capped by what this line already holds.
   const cartCap = pickerQtyCap(
@@ -968,7 +974,10 @@ export default function ProductActions({
               />
             )}
             {!subscribing && !digital && (
-              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+              <>
+                <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+                {moqUnits > 1 && <p className="mt-1 text-xs text-foreground-muted">Minimum order: {moqUnits} {effectiveUnitLabel ?? 'pcs'}</p>}
+              </>
             )}
           </div>
         </>
@@ -1228,7 +1237,10 @@ export default function ProductActions({
               />
             )}
             {!subscribing && !digital && (
-              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+              <>
+                <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+                {moqUnits > 1 && <p className="mt-1 text-xs text-foreground-muted">Minimum order: {moqUnits} {effectiveUnitLabel ?? 'pcs'}</p>}
+              </>
             )}
           </div>
         </>

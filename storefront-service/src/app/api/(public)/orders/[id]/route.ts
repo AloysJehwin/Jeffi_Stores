@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { pendingUpiConfirmation } from '@/lib/payments/upi/intents'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import { productLabel } from '@/lib/catalog/product-label'
+import { resolveReturnPolicy } from '@/lib/catalog/return-policy-rules'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { authenticateAnyUser as authenticateUser, requireAdminScope } from '@/lib/auth/jwt'
@@ -139,30 +140,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             '[]'::json
           )
         ) AS products,
-        COALESCE(
-          (CASE WHEN b.return_allowed IS NULL AND c.return_allowed IS NULL AND pc.return_allowed IS NULL THEN true
-                ELSE COALESCE(b.return_allowed, true) AND COALESCE(c.return_allowed, true) AND COALESCE(pc.return_allowed, true)
-           END),
-          true
-        ) AS return_allowed,
-        LEAST(
-          COALESCE(b.return_window_days, 9999),
-          COALESCE(c.return_window_days, 9999),
-          COALESCE(pc.return_window_days, 9999),
-          7
-        ) AS return_window_days,
-        COALESCE(
-          (CASE WHEN b.replacement_allowed IS NULL AND c.replacement_allowed IS NULL AND pc.replacement_allowed IS NULL THEN true
-                ELSE COALESCE(b.replacement_allowed, true) AND COALESCE(c.replacement_allowed, true) AND COALESCE(pc.replacement_allowed, true)
-           END),
-          true
-        ) AS replacement_allowed,
-        LEAST(
-          COALESCE(b.replacement_window_days, 9999),
-          COALESCE(c.replacement_window_days, 9999),
-          COALESCE(pc.replacement_window_days, 9999),
-          7
-        ) AS replacement_window_days
+        p.return_window_days AS product_return_window_days,
+        json_build_object('return_allowed', b.return_allowed, 'return_window_days', b.return_window_days,
+          'replacement_allowed', b.replacement_allowed, 'replacement_window_days', b.replacement_window_days) AS brand_policy,
+        json_build_object('return_allowed', c.return_allowed, 'return_window_days', c.return_window_days,
+          'replacement_allowed', c.replacement_allowed, 'replacement_window_days', c.replacement_window_days) AS category_policy,
+        json_build_object('return_allowed', pc.return_allowed, 'return_window_days', pc.return_window_days,
+          'replacement_allowed', pc.replacement_allowed, 'replacement_window_days', pc.replacement_window_days) AS parent_policy
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
       LEFT JOIN product_sub_variants psv ON oi.sub_variant_id = psv.id
@@ -276,7 +260,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       isAllDigital,
       hasDigital,
       vaultUrl,
-      items: orderItems.map((item: any) => ({
+      items: orderItems.map((item: any) => {
+        const policy = resolveReturnPolicy({
+          productReturnWindowDays: item.product_return_window_days,
+          brand: item.brand_policy,
+          category: item.category_policy,
+          parent: item.parent_policy,
+        })
+        return {
         id: item.id,
         productId: item.product_id,
         productName: item.product_name,
@@ -298,17 +289,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         // Basic plan tenants don't have the returns module — force false so the
         // UI never shows Return/Replace buttons regardless of product settings.
         // Digital lines are never returnable.
-        returnAllowed:
-          returnsEnabled && !item.is_digital ? (item.return_allowed === false ? false : !!item.return_allowed) : false,
-        returnWindowDays: parseInt(item.return_window_days) || 7,
-        replacementAllowed:
-          returnsEnabled && !item.is_digital
-            ? item.replacement_allowed === false
-              ? false
-              : !!item.replacement_allowed
-            : false,
-        replacementWindowDays: parseInt(item.replacement_window_days) || 7,
-      })),
+        // Same rule as order-time returns (lib/catalog/return-policy-rules.ts).
+        returnAllowed: returnsEnabled && !item.is_digital ? policy.return_allowed : false,
+        returnWindowDays: policy.return_window_days,
+        replacementAllowed: returnsEnabled && !item.is_digital ? policy.replacement_allowed : false,
+        replacementWindowDays: policy.replacement_window_days,
+        }
+      }),
       pendingAdjustment,
       pendingVariantChange: pendingVcr
         ? {

@@ -7,6 +7,10 @@ import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import ImageUrlInput from './ImageUrlInput'
+import GoogleTaxonomyPicker from './GoogleTaxonomyPicker'
+import EntityProfileFields from './EntityProfileFields'
+import CategoryFaqEditor from './CategoryFaqEditor'
+import { CATEGORY_PROFILE_FIELDS } from '@/lib/catalog/category-fields'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 import { useEditSession } from '@/hooks/useEditSession'
 import { DraftLockBanner, FormButton, FormFooter, FormSection, LockedFieldset, fieldInputCls, useActionToast } from '@/components/admin/kit'
@@ -214,6 +218,40 @@ const NAME_MAP: Record<string, string> = {
   components: 'Boxes',
 }
 
+const CATEGORY_SECTIONS: Array<{ title: string; description: string }> = [
+  { title: 'Display', description: 'Menu label, tagline, where the category appears and how its listing opens.' },
+  { title: 'SEO', description: 'Category page title, description, buying guide and product title template.' },
+  { title: 'Tax', description: 'HSN, GST and unit defaults new products start with; invoices fall back to them.' },
+  { title: 'Fulfilment', description: 'Handling, shipping and COD defaults for new products.' },
+]
+
+/** Every category as an indented tree (depth-first), leaving out `excludeId` and everything under it. */
+function parentOptions(categories: Category[], excludeId?: string | null): Array<{ value: string; label: string }> {
+  const kids = new Map<string | null, Category[]>()
+  for (const c of categories) {
+    const k = c.parent_category_id ?? null
+    kids.set(k, [...(kids.get(k) ?? []), c])
+  }
+  const out: Array<{ value: string; label: string }> = []
+  const walk = (parent: string | null, depth: number) => {
+    for (const c of kids.get(parent) ?? []) {
+      if (c.id === excludeId) continue
+      out.push({ value: c.id, label: `${'    '.repeat(depth)}${depth ? '└ ' : ''}${c.name}` })
+      if (depth < 12) walk(c.id, depth + 1)
+    }
+  }
+  walk(null, 0)
+  // Orphans (parent not in the list, e.g. a draft parent) still show, at the top level.
+  const seen = new Set(out.map(o => o.value))
+  for (const c of categories) {
+    if (seen.has(c.id) || c.id === excludeId) continue
+    if (c.parent_category_id && categories.some(p => p.id === c.parent_category_id)) continue
+    out.push({ value: c.id, label: c.name })
+    seen.add(c.id)
+  }
+  return out
+}
+
 function resolveIconByName(name: string): string {
   const lower = name.toLowerCase()
   const words = lower.split(/[\s\-_&]+/)
@@ -255,6 +293,8 @@ export default function CategoryForm({
   const [categoryName, setCategoryName] = useState<string>(category?.name || '')
   const [description, setDescription] = useState<string>(category?.description || '')
   const [imageUrl, setImageUrl] = useState<string>(category?.image_url || '')
+  const [heroMobile, setHeroMobile] = useState<string>(category?.hero_image_mobile || '')
+  const [heroDesktop, setHeroDesktop] = useState<string>(category?.hero_image_desktop || '')
   const [returnAllowed, setReturnAllowed] = useState<boolean>(
     category?.return_allowed ?? parentCat?.return_allowed ?? true
   )
@@ -272,7 +312,7 @@ export default function CategoryForm({
   const lock = useDraftLock({ resourceType: 'category', resourceId: lockKey, initial: initialLock })
   const edit = useEditSession({ resourceType: 'category', resourceId: lockKey, lock })
 
-  const mainCategories = categories.filter(c => !c.parent_category_id)
+  const parentChoices = useMemo(() => parentOptions(categories, category?.id), [categories, category?.id])
 
   const filteredIcons = useMemo(
     () => ICON_OPTIONS.filter(n => n.toLowerCase().includes(iconSearch.toLowerCase())),
@@ -455,15 +495,9 @@ export default function CategoryForm({
               name="parent_id"
               label="Parent Category"
               defaultValue={category?.parent_category_id || ''}
-              hint="Leave empty to create a main category"
+              hint="Leave empty to create a main category. Any category can be the parent, at any depth."
               placeholder="None (Main Category)"
-              options={[
-                { value: '', label: 'None (Main Category)' },
-                ...mainCategories.map(cat => ({
-                  value: cat.id,
-                  label: cat.name,
-                })),
-              ]}
+              options={[{ value: '', label: 'None (Main Category)' }, ...parentChoices]}
             />
 
             <div>
@@ -508,16 +542,14 @@ export default function CategoryForm({
               >
                 Google Product Category
               </label>
-              <input
-                type="text"
-                id="google_product_category"
+              <GoogleTaxonomyPicker
                 name="google_product_category"
-                defaultValue={category?.google_product_category || ''}
-                className={`${fieldInputCls}`}
-                placeholder="e.g., Hardware > Fasteners > Bolts"
+                defaultValue={category?.google_product_category}
+                categoryName={categoryName}
+                description={description}
               />
               <p className="text-xs text-foreground-muted mt-1">
-                Google taxonomy path or ID for Merchant Center.{' '}
+                Used by Merchant Center. Left blank, it is matched automatically from the name when you save.{' '}
                 <a
                   href="https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt"
                   target="_blank"
@@ -558,6 +590,51 @@ export default function CategoryForm({
                 <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
                 <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
               </div>
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="Banner & reminders" description="Banner on the category page, and when to remind customers to reorder.">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Banner (desktop)</label>
+              <ImageUrlInput
+                name="hero_image_desktop"
+                value={heroDesktop}
+                onChange={setHeroDesktop}
+                className={fieldInputCls}
+                placeholder="https://… or upload"
+              />
+              <p className="text-xs text-foreground-muted mt-1">Wide image across the top of the category page.</p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Banner (mobile)</label>
+              <ImageUrlInput
+                name="hero_image_mobile"
+                value={heroMobile}
+                onChange={setHeroMobile}
+                className={fieldInputCls}
+                placeholder="https://… or upload"
+              />
+              <p className="text-xs text-foreground-muted mt-1">Leave empty to use the desktop banner on phones.</p>
+            </div>
+            <div>
+              <label htmlFor="reorder_interval_days" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+                Reorder reminder (days)
+              </label>
+              <input
+                type="number"
+                id="reorder_interval_days"
+                name="reorder_interval_days"
+                min="1"
+                max="365"
+                defaultValue={category?.reorder_interval_days ?? ''}
+                className={fieldInputCls}
+                placeholder={isSubcat ? 'Same as parent' : 'No reminder'}
+              />
+              <p className="text-xs text-foreground-muted mt-1">
+                Days after delivery to remind a customer to buy again. Leave empty to {isSubcat ? 'use the parent’s value' : 'send none'}.
+              </p>
             </div>
           </div>
         </FormSection>
@@ -671,6 +748,18 @@ export default function CategoryForm({
             </>
           )}
         </FormSection>
+
+        {CATEGORY_SECTIONS.map(s => (
+          <FormSection key={s.title} title={s.title} description={s.description} collapsible>
+            <EntityProfileFields specs={CATEGORY_PROFILE_FIELDS} section={s.title} values={category} />
+          </FormSection>
+        ))}
+
+        {category?.id && (
+          <FormSection title="FAQs" description="Shown on the category page and in its FAQPage schema. Saved on their own, not with the draft." collapsible>
+            <CategoryFaqEditor categoryId={category.id} disabled={lock.readOnly} />
+          </FormSection>
+        )}
       </LockedFieldset>
 
       {/* Form Actions — shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
