@@ -13,6 +13,7 @@ import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
 import CustomerEngagementChart from '@/components/admin/CustomerEngagementChart'
 import CustomersOverview from './_components/CustomersOverview'
 import OverviewTabs from '../coupons/_components/OverviewTabs'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -109,6 +110,12 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
   const q = normalizeQuery(CUSTOMERS_ENTITY, resolvedSearchParams)
 
   const { customers, total } = await queryCustomers(q, { page, limit: PAGE_SIZE, sort, dir })
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/customers')
+    const res = await queryCustomers(normalizeQuery(CUSTOMERS_ENTITY, resolvedSearchParams), { page: p, limit: PAGE_SIZE, sort, dir })
+    return { rows: res.customers ?? [], total: res.total }
+  }
 
   const currentListUrl = (() => {
     const params = new URLSearchParams(`tab=list&${canonicalQuery(q, CUSTOMER_FIELDS)}`)
@@ -126,6 +133,7 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
       pageSize={PAGE_SIZE}
       query={{ ...q, sort, dir }}
       backUrl={currentListUrl}
+      loadPage={loadPage}
     />
   )
 }

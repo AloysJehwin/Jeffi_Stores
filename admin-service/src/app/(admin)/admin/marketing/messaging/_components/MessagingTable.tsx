@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import MailerRowActions from '@/components/admin/MailerRowActions'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, DraftLockBadge, StatusBadge, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, DraftLockBadge, StatusBadge, type DataCol, type StatusMap, type LoadPage } from '@/components/admin/kit'
 import type { DraftLockView } from '@/lib/client/draft-lock-client'
 import MailerMobileList from './MailerMobileList'
 
@@ -22,6 +22,8 @@ export interface Campaign {
   sent_at: string | null
   created_at: string
   error?: string | null
+  /** Draft lock, on rows a later page brought in (the first page's come in `locks`). */
+  lock?: MailerLocks[string]
 }
 
 /** Open draft locks by campaign id, for the owner badge. */
@@ -55,6 +57,7 @@ export default function MessagingTable({
   total,
   page,
   pageSize,
+  loadPage,
   search,
   host,
   currentListUrl,
@@ -67,6 +70,7 @@ export default function MessagingTable({
   total: number
   page: number
   pageSize: number
+  loadPage?: LoadPage<Campaign>
   search: string
   host: string
   currentListUrl: string
@@ -75,6 +79,7 @@ export default function MessagingTable({
   locks?: MailerLocks
   meId?: string | null
 }) {
+  const lockOf = (c: Campaign) => locks[c.id] ?? c.lock
   const viewHref = (c: Campaign) =>
     ap(`/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
   // Clone every param so advancing page keeps tab/filters; otherwise the parent Suspense re-keys.
@@ -131,7 +136,7 @@ export default function MessagingTable({
       render: c => (
         <div className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={c.status} map={MESSAGE_STATUS} title={c.error ?? undefined} />
-          <DraftLockBadge lock={locks[c.id]} mine={!!meId && locks[c.id]?.ownerId === meId} />
+          <DraftLockBadge lock={lockOf(c)} mine={!!meId && lockOf(c)?.ownerId === meId} />
         </div>
       ),
     },
@@ -168,6 +173,7 @@ export default function MessagingTable({
   return (
     <DataTable<Campaign>
       mode="server"
+      loadPage={loadPage}
       rows={campaigns}
       cols={cols}
       rowKey={c => c.id}
@@ -182,7 +188,7 @@ export default function MessagingTable({
           statusStyles={statusStyles}
           currentListUrl={currentListUrl}
           host={host}
-          locks={locks}
+          locks={{ ...locks, ...Object.fromEntries(rows.flatMap(r => (r.lock ? [[r.id, r.lock]] : []))) }}
           meId={meId}
         />
       )}

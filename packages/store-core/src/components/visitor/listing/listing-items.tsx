@@ -4,7 +4,7 @@ import { round2 } from '@/lib/catalog/gst'
 
 // Pre-render each product as a server-side ReactNode so pages 2..N appended via
 // ServerPagedItems carry the same GST / discount maths without re-shipping product data.
-export function renderProductItem(product: any, gstEnabled: boolean) {
+export function renderProductItem(product: any, gstEnabled: boolean, deferred = false) {
   const primaryImage = product.product_images?.find((i: any) => i.is_primary) || product.product_images?.[0]
   const hasVariants = product.has_variants
   const displayPrice =
@@ -53,6 +53,7 @@ export function renderProductItem(product: any, gstEnabled: boolean) {
       fragile={product.fragile}
       hazardous={product.hazardous}
       flammable={product.flammable}
+      deferred={deferred}
     />
   )
 }

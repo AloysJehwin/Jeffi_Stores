@@ -17,6 +17,7 @@ import { REVIEW_FORM_FIELDS, REVIEW_FORM_SEARCH } from '@/lib/filters/fields/rev
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -202,6 +203,12 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const q = normalizeQuery(REVIEW_FORMS_ENTITY, resolvedSearchParams)
   const { forms, total } = await getForms(q, page, resolvedSearchParams)
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/review-forms')
+    const res = await getForms(normalizeQuery(REVIEW_FORMS_ENTITY, resolvedSearchParams), p, resolvedSearchParams)
+    return { rows: res.forms as FormRow[], total: res.total }
+  }
   const formsBase = `https://${formsHostForHost(host)}`
   const listUrl = tabHref('/admin/review-forms', 'list', resolvedSearchParams, REVIEW_FORM_FIELDS)
 
@@ -214,6 +221,7 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
       search={q.search}
       backUrl={page > 1 ? `${listUrl}&page=${page}` : listUrl}
       formsBase={formsBase}
+      loadPage={loadPage}
     />
   )
 }

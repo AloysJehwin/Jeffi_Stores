@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { DataTable, StatusBadge, type DataCol, type LoadPage } from '@/components/admin/kit'
 import { APPROVAL_STATUS, fmtDay } from '../../_status'
 import BusinessCustomersMobileList from './BusinessCustomersMobileList'
 
@@ -19,7 +19,7 @@ export interface BusinessCustomerRow {
 }
 
 // Page links fall back to the current URL with ?page set, which carries tab/status/search as before.
-export default function BusinessCustomersTable({ customers, total, page, pageSize }: { customers: BusinessCustomerRow[]; total: number; page: number; pageSize: number }) {
+export default function BusinessCustomersTable({ customers, total, page, pageSize, loadPage }: { customers: BusinessCustomerRow[]; total: number; page: number; pageSize: number; loadPage?: LoadPage<BusinessCustomerRow> }) {
   const cols: DataCol<BusinessCustomerRow>[] = [
     {
       key: 'company',
@@ -53,6 +53,7 @@ export default function BusinessCustomersTable({ customers, total, page, pageSiz
   return (
     <DataTable<BusinessCustomerRow>
       mode="server"
+      loadPage={loadPage}
       rows={customers}
       cols={cols}
       rowKey={c => c.user_id}

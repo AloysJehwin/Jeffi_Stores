@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { ServerPagedItems, type PagedNode } from '@/components/admin/kit/infinite'
+import { requireListAccess } from '@/lib/admin/list-access'
 import { SortTh, type SortCol } from '@/components/admin/kit/list-sort'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
-import { getReferralStats, listReferralSignups, type ReferralStats, type ReferralStatus } from '@/lib/referrals/queries'
+import { getReferralStats, listReferralSignups, type AdminReferralRow, type ReferralStats, type ReferralStatus } from '@/lib/referrals/queries'
 import { getReferralSettings } from '@/lib/referrals/settings'
 import { ap } from '@/lib/shared/admin-path'
 import { queryOne } from '@/lib/shared/db'
@@ -53,6 +54,105 @@ const COLS: SortCol[] = [
   { key: 'signed_up_at', label: 'Joined', type: 'date' },
 ]
 
+const number = (value: number) => value.toLocaleString('en-IN')
+
+const referralCard = (row: AdminReferralRow, host: string): PagedNode => ({
+  key: String(row.id),
+  node: (
+    <div
+      key={row.id}
+      className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS[row.status].className}`}
+        >
+          {STATUS[row.status].label}
+        </span>
+        <span className="text-xs text-foreground-muted whitespace-nowrap">
+          {formatDate(row.signedUpAt)}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {[
+          { role: 'Referrer', person: row.referrer },
+          { role: 'Friend', person: row.friend },
+        ].map(({ role, person }) => (
+          <div key={role} className="min-w-0">
+            <p className="text-[10px] uppercase tracking-wide text-foreground-muted">{role}</p>
+            <Link
+              href={ap(`/admin/customers/${person.id}/view`, host)}
+              className="block font-medium text-foreground hover:text-accent-600 truncate"
+            >
+              {person.name}
+            </Link>
+            <p className="text-xs text-foreground-muted truncate">{person.email}</p>
+          </div>
+        ))}
+      </div>
+      {(row.rejectReason || row.points != null) && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+          {row.rejectReason ? (
+            <span className="text-foreground-muted">
+              {REJECT_REASON[row.rejectReason] ?? row.rejectReason}
+            </span>
+          ) : (
+            <span />
+          )}
+          {row.points != null && (
+            <span className="font-medium text-foreground whitespace-nowrap">
+              {number(row.points)} pts
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  ),
+})
+
+const referralRow = (row: AdminReferralRow, host: string): PagedNode => ({
+  key: String(row.id),
+  node: (
+  <tr key={row.id} className="border-t border-border-default">
+    {[row.referrer, row.friend].map((person, i) => (
+      <td key={i} className="px-4 py-3">
+        <Link
+          href={ap(`/admin/customers/${person.id}/view`, host)}
+          className="font-medium text-foreground hover:text-accent-600"
+        >
+          {person.name}
+        </Link>
+        <p className="text-xs text-foreground-muted">{person.email}</p>
+      </td>
+    ))}
+    <td className="px-4 py-3">
+      <span
+        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS[row.status].className}`}
+      >
+        {STATUS[row.status].label}
+      </span>
+      {row.rejectReason && (
+        <p className="mt-1 text-xs text-foreground-muted">
+          {REJECT_REASON[row.rejectReason] ?? row.rejectReason}
+        </p>
+      )}
+    </td>
+    <td className="px-4 py-3 text-right font-medium text-foreground">
+      {row.points != null ? number(row.points) : '—'}
+    </td>
+    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+      {formatDate(row.signedUpAt)}
+    </td>
+  </tr>
+  ),
+})
+
+async function referralPage(page: number, q: { status: string; search: string; sort?: string; dir?: string }, host: string, as: 'card' | 'row') {
+  await requireListAccess(PROGRAMS_PATH)
+  const list = await listReferralSignups({ page, pageSize: PAGE_SIZE, status: q.status, search: q.search, sort: new URLSearchParams({ sort: q.sort ?? '', dir: q.dir ?? '' }) })
+  return { rows: list.rows.map(r => (as === 'card' ? referralCard : referralRow)(r, host)), total: list.total }
+}
+
 export default async function ReferralProgram({ host, query }: { host: string; query: ReferralQuery }) {
   const { page, status, search, sort, dir } = query
   const [settings, loyalty, stats, list, campaign] = await Promise.all([
@@ -64,8 +164,15 @@ export default async function ReferralProgram({ host, query }: { host: string; q
   ])
   const live = settings.enabled && loyalty.enabled
 
+  async function loadCards(p: number) {
+    'use server'
+    return referralPage(p, { status, search, sort, dir }, host, 'card')
+  }
+  async function loadRows(p: number) {
+    'use server'
+    return referralPage(p, { status, search, sort, dir }, host, 'row')
+  }
   const basePath = ap(PROGRAMS_PATH, host)
-  const number = (value: number) => value.toLocaleString('en-IN')
 
   return (
     <ProgramSection
@@ -144,59 +251,8 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                 page={page}
                 total={list.total}
                 noun="referrals"
-                items={list.rows.map(row => ({
-                  key: String(row.id),
-                  node: (
-                    <div
-                      key={row.id}
-                      className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span
-                          className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS[row.status].className}`}
-                        >
-                          {STATUS[row.status].label}
-                        </span>
-                        <span className="text-xs text-foreground-muted whitespace-nowrap">
-                          {formatDate(row.signedUpAt)}
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {[
-                          { role: 'Referrer', person: row.referrer },
-                          { role: 'Friend', person: row.friend },
-                        ].map(({ role, person }) => (
-                          <div key={role} className="min-w-0">
-                            <p className="text-[10px] uppercase tracking-wide text-foreground-muted">{role}</p>
-                            <Link
-                              href={ap(`/admin/customers/${person.id}/view`, host)}
-                              className="block font-medium text-foreground hover:text-accent-600 truncate"
-                            >
-                              {person.name}
-                            </Link>
-                            <p className="text-xs text-foreground-muted truncate">{person.email}</p>
-                          </div>
-                        ))}
-                      </div>
-                      {(row.rejectReason || row.points != null) && (
-                        <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-                          {row.rejectReason ? (
-                            <span className="text-foreground-muted">
-                              {REJECT_REASON[row.rejectReason] ?? row.rejectReason}
-                            </span>
-                          ) : (
-                            <span />
-                          )}
-                          {row.points != null && (
-                            <span className="font-medium text-foreground whitespace-nowrap">
-                              {number(row.points)} pts
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ),
-                }))}
+                items={list.rows.map(r => referralCard(r, host))}
+                loadPage={loadCards}
               />
             </div>
             {/* Desktop table */}
@@ -214,42 +270,8 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                   page={page}
                   total={list.total}
                   noun="referrals"
-                  items={list.rows.map(row => ({
-                    key: String(row.id),
-                    node: (
-                    <tr key={row.id} className="border-t border-border-default">
-                      {[row.referrer, row.friend].map((person, i) => (
-                        <td key={i} className="px-4 py-3">
-                          <Link
-                            href={ap(`/admin/customers/${person.id}/view`, host)}
-                            className="font-medium text-foreground hover:text-accent-600"
-                          >
-                            {person.name}
-                          </Link>
-                          <p className="text-xs text-foreground-muted">{person.email}</p>
-                        </td>
-                      ))}
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS[row.status].className}`}
-                        >
-                          {STATUS[row.status].label}
-                        </span>
-                        {row.rejectReason && (
-                          <p className="mt-1 text-xs text-foreground-muted">
-                            {REJECT_REASON[row.rejectReason] ?? row.rejectReason}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-foreground">
-                        {row.points != null ? number(row.points) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                        {formatDate(row.signedUpAt)}
-                      </td>
-                    </tr>
-                    ),
-                  }))}
+                  items={list.rows.map(r => referralRow(r, host))}
+                  loadPage={loadRows}
                 />
               </table>
             </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { DataTable, StatusBadge, type DataCol, type LoadPage } from '@/components/admin/kit'
 import { RFQ_STATUS, fmtDay } from '../../_status'
 import BusinessRfqsMobileList from './BusinessRfqsMobileList'
 
@@ -19,7 +19,7 @@ export interface RfqListRow {
 }
 
 // Page links fall back to the current URL with ?page set, which carries tab/status/search as before.
-export default function BusinessRfqsTable({ rfqs, total, page, pageSize }: { rfqs: RfqListRow[]; total: number; page: number; pageSize: number }) {
+export default function BusinessRfqsTable({ rfqs, total, page, pageSize, loadPage }: { rfqs: RfqListRow[]; total: number; page: number; pageSize: number; loadPage?: LoadPage<RfqListRow> }) {
   const cols: DataCol<RfqListRow>[] = [
     {
       key: 'rfq',
@@ -54,6 +54,7 @@ export default function BusinessRfqsTable({ rfqs, total, page, pageSize }: { rfq
   return (
     <DataTable<RfqListRow>
       mode="server"
+      loadPage={loadPage}
       rows={rfqs}
       cols={cols}
       rowKey={r => r.id}

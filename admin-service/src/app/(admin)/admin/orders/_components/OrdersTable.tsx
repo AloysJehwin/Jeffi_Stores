@@ -8,7 +8,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import HoverCard from '@/components/ui/HoverCard'
 import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
 import { ap } from '@/lib/shared/admin-path'
-import { Badge, DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
+import { Badge, DataTable, StatusBadge, type DataCol, type LoadPage } from '@/components/admin/kit'
 import OrderDetailModal from './OrderDetailModal'
 import OrdersMobileList from './OrdersMobileList'
 import { ORDER_STATUS_FULL, PAYMENT_STATUS_FULL, inr, sourceLabel, sourceTone } from './status-maps'
@@ -59,7 +59,7 @@ function CustomerPopover({ order }: { order: any }) {
   )
 }
 
-export default function OrdersTable({ orders, total, page, pageSize, backUrl, pageUrls }: { orders: any[]; total: number; page: number; pageSize: number; backUrl: string; pageUrls: PageUrls }) {
+export default function OrdersTable({ orders, total, page, pageSize, backUrl, pageUrls, loadPage }: { orders: any[]; total: number; page: number; pageSize: number; backUrl: string; pageUrls: PageUrls; loadPage: LoadPage<any> }) {
   const canPackingSlips = useHasScope('packing_slips:read')
   const [selected, setSelected] = useState<any>(null)
   const viewHref = (o: any) => ap(`/admin/orders/${o.id}/view?back=${encodeURIComponent(backUrl)}`)
@@ -156,6 +156,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
         page={page}
         pageSize={pageSize}
         pageHref={pageHrefFrom(pageUrls)}
+        loadPage={loadPage}
         onRowClick={setSelected}
         mobile={rows => <OrdersMobileList orders={rows} backUrl={backUrl} />}
         empty="No orders found."

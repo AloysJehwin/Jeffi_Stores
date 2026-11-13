@@ -33,6 +33,7 @@ import ProductsOverview from './_components/ProductsOverview'
 import { TabLinks, TabMemory } from './_components/catalog-overview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -83,8 +84,27 @@ async function ProductsListContent({
   const currentListUrl = `/admin/products${listParams(page) ? `?${listParams(page)}` : ''}`
   const buildUrl = (p: number) => ap(`/admin/products${listParams(p) ? `?${listParams(p)}` : ''}`, host)
 
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/products')
+    const res = await getFilteredProducts({
+      category_id: resolvedSearchParams.category_id,
+      brand_id: resolvedSearchParams.brand_id,
+      is_active: resolvedSearchParams.is_active,
+      stock: resolvedSearchParams.stock,
+      search: resolvedSearchParams.search,
+      attributes: resolvedSearchParams,
+      page: p,
+      limit: PAGE_SIZE,
+      sort,
+      dir,
+    })
+    return { rows: res.products || [], total: res.total }
+  }
+
   return (
     <ProductsTableClient
+      loadPage={loadPage}
       products={products || []}
       featuredCount={featuredCount}
       total={total}
