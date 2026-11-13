@@ -1,27 +1,30 @@
 #!/bin/bash
-# Roll a release, in phases (ci.yml runs each as its own job; no phase = all three, in order):
+# Roll a release, in phases (ci.yml runs each part as its own job; no phase = platform, then stores):
 #   platform   the platform (controller; the flagship's storefront, admin and business; messaging, document,
 #              public-api and mobile services; CronJobs), then its routes once those serve. ci.yml runs it in
 #              parts: `platform prep` (room on the core, the pull secret, what the services share), then
-#              `platform <service>` for each service side by side; the controller (with the routes and CronJobs)
-#              waits for the flagship's storefront, admin and business
-#   tenant-db  the schema and migration files fanned out to every store tenant's database (40-tenant-fanout.sh);
-#              tenant-schema / tenant-migrations run just one half (the pipeline's separate stages)
-#   stores     every store: the controller re-applies its namespace at the release images (its storefront, admin,
-#              business, messaging and document pods), moves a store still on the old all-in-one app onto those
-#              (one store at a time), and we wait for them, stopping at the first failure
-# --dry-run changes nothing: platform shows `kubectl diff`, tenant-db what it would post, stores what it would wait on.
-# Usage: rollout.sh <tag> [platform [prep|<service>]|tenant-db|tenant-schema|tenant-migrations|stores] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
+#              `platform <service>` in that service's own job; the controller (with the routes and CronJobs)
+#              waits until the flagship's storefront, admin and business run the release
+#   stores     every store, through the release's controller: `stores shared` re-applies each store's namespace
+#              without its service pods (routes, config, database) and moves a store still on the old all-in-one
+#              app onto its own services (one store at a time); `stores <service>` re-applies that service's pods
+#              in every store that runs it and waits for them, undoing a store's that fails and stopping there.
+#              ci.yml runs `stores shared` in the controller's job and `stores <service>` in each store service's
+#              job after the flagship's; no part = shared, then each service in turn
+#   tenant-db  the tenant schema set fanned out to every store's database (40-tenant-fanout.sh); the release
+#              runs it in the database stage (release-db.sh --tenants), before this script
+# --dry-run changes nothing: platform shows `kubectl diff`, stores what it would apply and wait on.
+# Usage: rollout.sh <tag> [platform [prep|<service>]|stores [shared|<service>]|tenant-db] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
 source "$(dirname "$0")/../db/lib.sh"
 TAG=${1:?tag}
 PHASE=all PART=
 for a in "${@:2}"; do case $a in
   platform|tenant-db|tenant-schema|tenant-migrations|stores) PHASE=$a ;;
-  prep|controller|storefront|admin|business|messaging|documents|public-api|mobile) PART=$a ;;
+  prep|shared|controller|storefront|admin|business|messaging|documents|public-api|mobile) PART=$a ;;
 esac; done
-REG='708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com'
+STORE_PARTS="storefront admin business messaging documents"
 k8s_tunnel
-manifests() { kubectl kustomize "$REPO/deploy/k8s/platform" | sed -E "s#(${REG}/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g"; }
+manifests() { platform_manifests "$TAG"; }
 tenants() { kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'; }
 # The flagship's store pods the release adds to the core must fit its CPU, checked before anything changes.
 core_room() {
@@ -43,6 +46,19 @@ apply_part() {
   else part "$1" | kubectl apply -f -; fi
 }
 deploy_of() { [ "$1" = documents ] && echo jeffi-stores-document-service || echo "jeffi-stores-$1-service"; }
+# A store's Deployment for one service: {slug}-{storefront,admin,business,messaging,document}-service.
+store_deploy_of() { [ "$2" = documents ] && echo "$1-document-service" || echo "$1-$2-service"; }
+# Wait until a platform Deployment runs this release (another job applies it), then until it has rolled out.
+at_release() {
+  local d=$1 end=$((SECONDS + 1200)) img
+  while :; do
+    img=$(kubectl -n jeffi get "deploy/$d" -o jsonpath='{.spec.template.spec.containers[0].image}')
+    [ "${img##*:}" = "$TAG" ] && break
+    [ $SECONDS -lt $end ] || { echo "$d is not at $TAG after 20 min (still $img)" >&2; return 1; }
+    echo "   waiting for $d to be applied at $TAG"; sleep 15
+  done
+  kubectl -n jeffi rollout status "deploy/$d" --timeout=600s
+}
 
 platform_prep() {
   say "Platform at $TAG: room on the core, then what the services share"
@@ -63,7 +79,7 @@ platform_service() {
   say "$s at $TAG"
   if [ "$s" = controller ]; then
     if ! $DRY_RUN; then
-      for d in storefront admin business; do kubectl -n jeffi rollout status "deploy/$(deploy_of $d)" --timeout=600s; done
+      for d in storefront admin business; do at_release "$(deploy_of $d)" || exit 1; done
     fi
     apply_part routes
   fi
@@ -91,24 +107,40 @@ tenant_db() {
   else bash "$REPO/deploy/k8s/db/40-tenant-fanout.sh" "${TAG#local-}" "$@"; fi
 }
 
-stores() {
-  say "Stores"
+# One slice of every store at the release images, applied by the release's controller (reconcile-k8s ?part=).
+stores_part() {
+  local p=$1 slug d
+  say "Stores: $p"
   if $DRY_RUN; then
-    for ns in $(tenants); do echo "── $ns"; kubectl -n "$ns" get deploy -l jeffi.io/service -o wide; done
-    echo "Dry run: would re-apply each store at $TAG, move any still on the old all-in-one app ($(kubectl get deploy -A -l jeffi.io/service=controller -o jsonpath='{.items[*].metadata.namespace}' 2>/dev/null || true)) onto its own services, and wait for the deployments above."; return 0
-  fi
-  in_cluster reconcile_k8s /api/internal/provisioning/reconcile-k8s
-  for ns in $(tenants); do
-    echo "── $ns"
-    switch_layout "${ns#tenant-}" || exit 1
-    for d in $(kubectl -n "$ns" get deploy -l jeffi.io/service -o name); do
-      if ! kubectl -n "$ns" rollout status "$d" --timeout=600s; then
-        kubectl -n "$ns" rollout undo "$d"
-        echo "rollout failed in $ns ($d) — undone; remaining tenants left as they were" >&2
-        exit 1
-      fi
+    for ns in $(tenants); do
+      slug=${ns#tenant-}
+      if [ "$p" = shared ]; then echo "   $slug: namespace, routes and config$(kubectl -n "$ns" get deploy "$slug-controller-service" >/dev/null 2>&1 && echo '; still on the old all-in-one app, would move onto its own services')"
+      else d=$(store_deploy_of "$slug" "$p"); kubectl -n "$ns" get deploy "$d" -o jsonpath="{'   $slug: '}{.spec.template.spec.containers[0].image}{'\n'}" 2>/dev/null || echo "   $slug: no $p"; fi
     done
+    echo "Dry run: would re-apply each store's $p objects at $TAG$([ "$p" = shared ] || echo ' and wait for them')."; return 0
+  fi
+  in_cluster reconcile_k8s "/api/internal/provisioning/reconcile-k8s?part=$p" || { echo "re-applying the stores' $p failed (the body above names the stores)" >&2; exit 1; }
+  if [ "$p" = shared ]; then
+    for ns in $(tenants); do switch_layout "${ns#tenant-}" || exit 1; done
+    return 0
+  fi
+  for ns in $(tenants); do
+    slug=${ns#tenant-}; d=$(store_deploy_of "$slug" "$p")
+    kubectl -n "$ns" get deploy "$d" >/dev/null 2>&1 || { echo "   $slug: no $p"; continue; }
+    if ! kubectl -n "$ns" rollout status "deploy/$d" --timeout=600s; then
+      kubectl -n "$ns" rollout undo "deploy/$d"
+      echo "rollout failed in $ns ($d), undone; the remaining stores' $p left as they were" >&2
+      exit 1
+    fi
   done
+}
+
+stores() {
+  case $PART in
+    '') stores_part shared; for p in $STORE_PARTS; do stores_part "$p"; done ;;
+    shared|storefront|admin|business|messaging|documents) stores_part "$PART" ;;
+    *) echo "stores takes shared or one of: $STORE_PARTS" >&2; exit 2 ;;
+  esac
 }
 
 # Move a store still on the old all-in-one app onto its own services (a few minutes; the store keeps serving).
@@ -136,5 +168,5 @@ case $PHASE in
   tenant-schema) tenant_db --schema ;;
   tenant-migrations) tenant_db --migrations ;;
   stores) stores ;;
-  all) platform; tenant_db; stores ;;
+  all) platform; stores ;;
 esac
