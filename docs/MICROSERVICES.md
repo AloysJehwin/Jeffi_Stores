@@ -43,6 +43,7 @@ That one DB holds every entity:
 - **messaging entity** — `messages`, `message_events`, legacy `message_templates`
 - **documents entity** — `documents`, `document_sequences`
 - **templates library** — `template_*` (per-tenant copies), `platform_template_*` (singleton defaults), `pub_template_*` (public-API customer copies), `brand_theme`, `sms_dlt*`, `short_link`, `waba_capacity`, `wa_pricing`
+  (`platform_template_*`, `pub_template_*`, `short_link`, `waba_capacity`, `wa_pricing` and the send log are platform-only: flagship DB only, never a store tenant's DB; `database/README.md`)
 - **business tables** — products, orders, campaigns, …
 
 The DBs `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are **legacy** from an earlier design that jumped straight to per-service DBs. They should not be used. The service `.env.local` URLs now all point at `jeffi_production_ready`.
@@ -52,7 +53,7 @@ The DBs `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are **legacy
 **Multi-tenant.** When we onboard real tenants:
 - Each **tenant** gets its own DB (e.g. `jeffi_tenant_<slug>`).
 - Services still connect to the **main DB** for the control-plane entity (tenant registry, api keys, wallet, …).
-- Services connect to the **tenant DB** for that tenant's business data (products, orders, templates).
+- Services connect to the **tenant DB** for that tenant's business data (products, orders, templates). A tenant DB holds the tenant schema set only: every `<service>/database/` without `platform-only/` (`scripts/db-files.mjs tenant`).
 - Resolution: the service-auth claim carries `tenant_id`; the service's tenancy resolver (`packages/tenancy`) opens a connection to the right tenant DB.
 
 **Per-service DB split**: later. Not now. When traffic patterns force it, we'll peel `messaging-service` off into its own DB (send log is high-churn), `document-service` into its own, etc. The current unified DB is a conscious phase-1 choice.
