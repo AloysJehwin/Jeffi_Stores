@@ -17,6 +17,7 @@ import { MESSAGING_ENTITY } from '@/lib/filters/entities/messaging'
 import { MESSAGING_FIELDS, MESSAGING_SEARCH } from '@/lib/filters/fields/messaging'
 import { getDraftLockMap } from '@/lib/admin/draft-locks'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import { requireListAccess } from '@/lib/admin/list-access'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 
@@ -130,8 +131,17 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
     )
   }
 
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/marketing/messaging')
+    const res = await listCampaigns<Campaign>(normalizeQuery(MESSAGING_ENTITY, resolvedSearchParams), p, PAGE_SIZE, { get: k => resolvedSearchParams[k] ?? null })
+    const pageLocks = await getDraftLockMap('mailer', res.campaigns.filter(c => c.status === 'draft').map(c => c.id))
+    return { rows: res.campaigns.map(c => ({ ...c, lock: pageLocks[c.id] })), total: res.total }
+  }
+
   return (
     <MessagingTable
+      loadPage={loadPage}
       campaigns={campaigns}
       total={total}
       page={page}

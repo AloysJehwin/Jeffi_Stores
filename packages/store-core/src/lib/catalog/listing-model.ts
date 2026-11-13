@@ -214,6 +214,12 @@ export interface ListingModel {
   filterOffers: { slug: string; title: string }[]
 }
 
+/** Just the product page (no facets, categories or banners): what load-more needs for page N. */
+export async function getListingProducts(resolvedSearchParams: ListingSearchParams) {
+  const { products, total, gstEnabled } = await getProducts(resolvedSearchParams)
+  return { products, total, gstEnabled }
+}
+
 export async function buildListingModel(
   resolvedSearchParams: ListingSearchParams,
   { categoryBanners: withBanners = true }: { categoryBanners?: boolean } = {}

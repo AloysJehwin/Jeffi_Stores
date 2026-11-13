@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment, type ReactNode } from 'react'
+import { useState, Fragment } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProductCard from './ProductCard'
@@ -8,7 +8,7 @@ import SortDropdown from './SortDropdown'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import { round2 } from '@/lib/catalog/gst'
-import { ServerPagedItems } from '@/components/admin/kit/infinite'
+import { ServerPagedItems, type LoadPage, type PagedNode } from '@/components/admin/kit/infinite'
 import { onImgError, responsiveImg } from '@/lib/shared/image-url'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 // Deep import: the package index pulls zod into the client bundle.
@@ -70,10 +70,11 @@ interface Props {
   end?: number
   filterSlot?: React.ReactNode
   portal?: 'storefront' | 'business'
-  // When provided, grid-view + non-grouped renders ServerPagedItems so pages 2..N
-  // accumulate client-side instead of needing a page-number pager. Each item is a
-  // server-rendered node; the page itself has already applied GST / discount maths.
-  pagedItems?: { key: string; node: ReactNode; extra?: boolean }[]
+  // When provided, grid-view + non-grouped renders ServerPagedItems: later pages come from
+  // loadPage (a server action) and are appended on scroll. Each item is a server-rendered node;
+  // the page itself has already applied GST / discount maths.
+  pagedItems?: PagedNode[]
+  loadPage?: LoadPage<PagedNode>
   page?: number
   /** Where sort changes navigate (the listing's own path). */
   basePath?: string
@@ -331,6 +332,7 @@ export default function ProductGrid({
   filterSlot,
   portal = 'storefront',
   pagedItems,
+  loadPage,
   page,
   total,
   basePath = '/products',
@@ -497,6 +499,7 @@ export default function ProductGrid({
         // Table view and the grouped view fall back to the current-page products[] above.
         <ServerPagedItems
           items={pagedItems}
+          loadPage={loadPage}
           page={page}
           total={total}
           noun="products"

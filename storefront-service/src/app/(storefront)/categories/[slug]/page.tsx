@@ -3,14 +3,13 @@ import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import { LISTING_PAGE_SIZE, buildListingModel } from '@/lib/catalog/listing-model'
+import { LISTING_PAGE_SIZE, buildListingModel, getListingProducts } from '@/lib/catalog/listing-model'
 import { getWebSurface } from '@/lib/catalog/web-surface'
 import { breadcrumbJsonLd, ldJson, listingMetadata } from '@/lib/catalog/listing-seo'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
-import { renderProductItem } from '@/components/visitor/listing/listing-items'
-import { withListingSections } from '@/components/visitor/listing/listing-sections'
+import { EAGER_CARDS, productPageItems } from '@/components/visitor/listing/listing-sections'
 import { SeoContent } from '@/components/visitor/brand/BrandProfile'
 import { CategoryFaqs, listCategoryFaqs } from '@/components/visitor/category/CategoryFaqs'
 
@@ -83,15 +82,17 @@ export default async function CategoryDetailPage({
   if (!sp.sort && category.default_sort) sp.sort = String(category.default_sort)
   const ownSubs = new Set(subcategories.flatMap(sub => [String(sub.id), sub.slug]))
   const picked = (sp.category ?? '').split(',').filter(c => ownSubs.has(c))
-  const { products, total, page, start, end, gstEnabled, facets, filterOffers } = await buildListingModel(
-    { ...sp, category: picked.length ? picked.join(',') : String(category.id) },
-    { categoryBanners: false }
-  )
+  const listingSp = { ...sp, category: picked.length ? picked.join(',') : String(category.id) }
+  const { products, total, page, start, end, gstEnabled, facets, filterOffers } = await buildListingModel(listingSp, { categoryBanners: false })
   const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'dir', 'order', 'layout'].includes(k))
-  const pagedItems = await withListingSections(
-    products.map(product => ({ key: String(product.id), node: renderProductItem(product, gstEnabled) })),
-    { page: 'category', surface: await getWebSurface(sp.layout), pageNum: page, pageSize: LISTING_PAGE_SIZE, total }
-  )
+  const surface = await getWebSurface(sp.layout)
+  const pagedItems = await productPageItems(products, gstEnabled, { page: 'category', surface, pageNum: page, pageSize: LISTING_PAGE_SIZE, total }, EAGER_CARDS)
+  async function loadPage(p: number) {
+    'use server'
+    const next = await getListingProducts({ ...listingSp, page: String(p) })
+    const rows = await productPageItems(next.products, next.gstEnabled, { page: 'category', surface, pageNum: p, pageSize: LISTING_PAGE_SIZE, total: next.total })
+    return { rows, total: next.total }
+  }
   const filterSheet = (
     <MobileFilterSheet
       key="mobile-filters"
@@ -210,6 +211,7 @@ export default async function CategoryDetailPage({
               end={end}
               filterSlot={filterSheet}
               pagedItems={pagedItems}
+              loadPage={loadPage}
               page={page}
               basePath={`/categories/${category.slug}`}
               gridClassName={GRID}

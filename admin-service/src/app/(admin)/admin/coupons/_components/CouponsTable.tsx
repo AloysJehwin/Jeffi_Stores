@@ -14,7 +14,7 @@ import {
   StatusBadge,
   ACTIVE_STATUS,
   badgeCls,
-  type DataCol,
+  type DataCol, type LoadPage,
 } from '@/components/admin/kit'
 import CouponsMobileList from './CouponsMobileList'
 
@@ -43,6 +43,7 @@ export default function CouponsTable({
   total,
   page,
   pageSize,
+  loadPage,
   query,
   backUrl,
 }: {
@@ -50,6 +51,7 @@ export default function CouponsTable({
   total: number
   page: number
   pageSize: number
+  loadPage?: LoadPage<CouponRow>
   /** The list's own params, carried on page links as before. */
   query: Record<string, string | undefined>
   backUrl: string
@@ -201,6 +203,7 @@ export default function CouponsTable({
     <>
       <DataTable<CouponRow>
         mode="server"
+        loadPage={loadPage}
         hide={r => gone.has(String(r.id))}
         rows={coupons}
         cols={cols}

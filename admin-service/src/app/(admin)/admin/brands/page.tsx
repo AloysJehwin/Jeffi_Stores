@@ -18,6 +18,7 @@ import GroupOverview from '../categories/_components/GroupOverview'
 import { TabMemory } from '../products/_components/catalog-overview'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { LoadingKpis, LoadingTable } from '@/components/admin/kit/skeleton'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -165,6 +166,12 @@ async function BrandsListContent({ resolvedSearchParams }: { resolvedSearchParam
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const q = normalizeQuery(BRANDS_ENTITY, resolvedSearchParams)
   const { brands, total } = await getFilteredBrands(q, { page, limit: PAGE_SIZE, sp: resolvedSearchParams })
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/brands')
+    const res = await getFilteredBrands(normalizeQuery(BRANDS_ENTITY, resolvedSearchParams), { page: p, limit: PAGE_SIZE, sp: resolvedSearchParams })
+    return { rows: res.brands as any[], total: res.total }
+  }
   const currentListUrl = tabHref('/admin/brands', 'list', resolvedSearchParams, BRAND_FIELDS, { aliases: BRAND_ALIASES })
 
   return (
@@ -176,6 +183,7 @@ async function BrandsListContent({ resolvedSearchParams }: { resolvedSearchParam
       isActive={q.active}
       search={q.search}
       backUrl={page > 1 ? `${currentListUrl}&page=${page}` : currentListUrl}
+      loadPage={loadPage}
     />
   )
 }

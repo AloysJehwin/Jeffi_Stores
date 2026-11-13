@@ -12,6 +12,7 @@ import SubscriptionsTable from './_components/SubscriptionsTable'
 import SubscriptionsTabBar from './_components/SubscriptionsTabBar'
 import SubscriptionsOverview from './_components/SubscriptionsOverview'
 import SubscriptionsOverviewSkeleton from './_components/SubscriptionsOverviewSkeleton'
+import { requireListAccess } from '@/lib/admin/list-access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -85,8 +86,15 @@ function SubscriptionsListSection({ sp }: { sp: SP }) {
 async function SubscriptionsListContent({ sp }: { sp: SP }) {
   const page = Math.max(1, parseInt(sp.page || '1', 10) || 1)
   const { items, total, pageSize } = await queryAdminSubscriptions(normalizeQuery(SUBSCRIPTIONS_ENTITY, sp), page, { get: k => sp[k] ?? null })
+  async function loadPage(p: number) {
+    'use server'
+    await requireListAccess('/admin/subscriptions')
+    const res = await queryAdminSubscriptions(normalizeQuery(SUBSCRIPTIONS_ENTITY, sp), p, { get: k => sp[k] ?? null })
+    return { rows: res.items, total: res.total }
+  }
   return (
     <SubscriptionsTable
+      loadPage={loadPage}
       items={items}
       total={total}
       page={page}
