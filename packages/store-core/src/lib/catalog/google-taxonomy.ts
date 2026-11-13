@@ -84,7 +84,7 @@ export interface CategoryHints {
   parentName?: string | null
   /** The parent category's stored google_product_category, used to prefer its subtree. */
   parentGoogleCategory?: string | null
-  /** false = keyword match only (caller lacks AI access). */
+  /** true = also ask AI (the caller holds AI access for categories); keyword match only otherwise. */
   ai?: boolean
 }
 
@@ -106,7 +106,7 @@ function describe(h: CategoryHints): string {
 
 /** Taxonomy-style search terms for trade names the taxonomy words differently ("V belts" → power transmission). */
 async function expandTerms(h: CategoryHints): Promise<string | null> {
-  if (h.ai === false) return null
+  if (h.ai !== true) return null
   try {
     const r = await withTimeout(aiChat({
       feature: 'enrichment',

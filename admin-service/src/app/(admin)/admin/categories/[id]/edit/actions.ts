@@ -12,6 +12,7 @@ import { DraftConflictError, discardDraftRow, getDraftRow, saveDraftContent } fr
 import { suggestIcon } from '@/lib/shared/icon-suggest'
 import { resolveCategoryGoogleCategory } from '@/lib/catalog/google-taxonomy'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import { canUseAi } from '@/lib/auth/ai-scope'
 import { findOpenSession, resnapshotSession } from '@/lib/admin/editor-sessions'
 import { closeAfter, guardDraftAction } from '@/lib/admin/draft-locks'
 
@@ -49,10 +50,12 @@ export async function updateCategory(categoryId: string, draftId: string | null,
   const replacementWindowDays = policyOverride
     ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
     : null
+  const session = await getAdminSession().catch(() => null)
   const googleProductCategory = await resolveCategoryGoogleCategory(formData.get('google_product_category') as string, {
     name,
     description,
     parentId: parentCategoryId,
+    ai: !!session?.role && canUseAi(session.role, session.scopes ?? [], 'categories:write'),
   })
   const imageUrl = ((formData.get('image_url') as string) || '').trim().slice(0, 500) || null
   const heroMobile = ((formData.get('hero_image_mobile') as string) || '').trim() || null
