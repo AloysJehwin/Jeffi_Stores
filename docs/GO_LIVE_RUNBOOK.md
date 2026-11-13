@@ -40,7 +40,7 @@ command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsa
 | `deploy/k8s/db/05-table-owner.sh` | As the master user: the older tables owned by `postgres` go to a new role `jeffi_owner` (members `postgres` and `app_user`), so `app_user` can alter them. Writes a rollback file |
 | `deploy/k8s/db/20-merge-control-plane.sh` | Creates the control-plane tables in `jeffi_stores`, copies the rows, validates the foreign keys, seeds plans |
 | `deploy/k8s/db/30-secrets.sh` | Patches only the DB keys, the bucket, `SERVICE_AUTH_SECRET` and (public-api only) `ADMIN_GATEWAY_SECRET`; creates the bucket; writes a rollback file |
-| `deploy/k8s/bootstrap/release.sh` | Builds and pushes the eight images, then `rollout.sh`: platform, tenant schema fan-out (`db/40-tenant-fanout.sh`), every store (moving each off the old all-in-one app), smoke test |
+| `deploy/k8s/bootstrap/release.sh` | Builds and pushes the eight images, then `rollout.sh`: platform, every store (moving each off the old all-in-one app), smoke test. Since 2026-11-13 the tenant schema fan-out (`db/40-tenant-fanout.sh`) runs in `db/release-db.sh --tenants`, between `--build-only` and `--rollout-only` (`deploy/k8s/README.md`, Releasing) |
 | `deploy/k8s/db/50-seeds.sh` | Seeds the platform's message-template catalog (existing templates are skipped), brings unedited emails up to the catalog and moves stored WhatsApp bodies to `{{brand_name}}` (idempotent; every release runs it after the rollout) |
 | `deploy/k8s/bootstrap/doc-hosts-dns.sh` | Points the three document hosts at the cluster; writes a rollback change batch |
 | `deploy/k8s/db/verify.sql` | Post-release checks |

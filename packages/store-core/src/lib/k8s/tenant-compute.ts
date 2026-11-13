@@ -6,8 +6,11 @@ import {
   tenantAppName,
   tenantRoleName,
   tenantWorkloadNames,
+  tenantPartName,
   TENANT_ROUTE_NAMES,
+  STORE_PARTS,
   legacyAppNames,
+  type StorePart,
   type TenantService,
   type TenantWorkloadInput,
 } from './tenant-workload'
@@ -420,11 +423,19 @@ export async function releaseImages(): Promise<Partial<Record<TenantService, str
   return Object.fromEntries(keys.map(k => [k, pick(d[k])])) as Partial<Record<TenantService, string>>
 }
 
+const PART_KINDS = new Set(['Deployment', 'Service', 'HorizontalPodAutoscaler', 'PodDisruptionBudget'])
+
 /**
  * Apply (create or reconcile) the tenant's whole namespace. Safe to call on plan change.
  * `keepApps` leaves the app pods this render no longer has running (a layout switch drains them first).
+ * `part` applies one slice, as a release rolls each service on its own: 'shared' is everything but the store
+ * services' own objects; a service is just its Deployment, Service, HPA and PDB. Returns whether the render
+ * has any Deployment in that slice (a store whose plan has no business pods has none for 'business').
  */
-export async function applyTenantWorkload(input: TenantWorkloadInput, opts: { keepApps?: boolean } = {}): Promise<void> {
+export async function applyTenantWorkload(
+  input: TenantWorkloadInput,
+  opts: { keepApps?: boolean; part?: 'shared' | StorePart } = {}
+): Promise<boolean> {
   const ns = tenantNamespace(input.slug)
   const app = tenantAppName(input.slug)
   // The release's controller is control plane only: the old all-in-one app keeps the image it runs until
@@ -438,20 +449,29 @@ export async function applyTenantWorkload(input: TenantWorkloadInput, opts: { ke
   if (!running && !input.images?.controller && objs.some(o => o.kind === 'Deployment' && o.metadata.name === app))
     throw new Error(`${input.slug} runs no all-in-one app to keep; it can only run its own services`)
   const [nsObj, ...rest] = objs
-  await apply(nsObj)
-  await seedNamespace(ns)
-  for (const o of rest) await apply(o)
+  const { part } = opts
+  const partOf = (o: K8sObject) => (PART_KINDS.has(o.kind) ? STORE_PARTS.find(p => o.metadata.name === tenantPartName(input.slug, p)) : undefined)
+  const mine = part ? rest.filter(o => (part === 'shared' ? !partOf(o) : partOf(o) === part)) : rest
+  if (!part || part === 'shared') {
+    await apply(nsObj)
+    await seedNamespace(ns)
+  }
+  for (const o of mine) await apply(o)
   // Drop what this render no longer has: HPA/PDBs a smaller size doesn't need, and the app pods and
   // routes of the layout the store has just left (only once traffic is on the new one, see reconcileLayout).
   const rendered = new Set(rest.map(o => `${o.kind}/${o.metadata.name}`))
+  const names = !part ? tenantWorkloadNames(input.slug) : part === 'shared' ? [app] : [tenantPartName(input.slug, part)]
   for (const kind of opts.keepApps ? ['HorizontalPodAutoscaler', 'PodDisruptionBudget'] : ['HorizontalPodAutoscaler', 'PodDisruptionBudget', 'Deployment', 'Service']) {
-    for (const name of tenantWorkloadNames(input.slug)) {
+    for (const name of names) {
       if (!rendered.has(`${kind}/${name}`)) await remove(kind, name, ns)
     }
   }
-  for (const name of TENANT_ROUTE_NAMES) if (!rendered.has(`IngressRoute/${name}`)) await remove('IngressRoute', name, ns)
-  await pruneCustomDomains(ns, rendered)
-  await retireLegacyApp(input.slug)
+  if (!part || part === 'shared') {
+    for (const name of TENANT_ROUTE_NAMES) if (!rendered.has(`IngressRoute/${name}`)) await remove('IngressRoute', name, ns)
+    await pruneCustomDomains(ns, rendered)
+    await retireLegacyApp(input.slug)
+  }
+  return mine.some(o => o.kind === 'Deployment')
 }
 
 /** Drop the route, certificate and TLS secret of every custom domain the store no longer has. */

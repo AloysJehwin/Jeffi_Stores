@@ -35,7 +35,3 @@ CREATE UNIQUE INDEX uq_delhivery_pickup_locations_tenant_name ON public.delhiver
 --
 
 CREATE INDEX idx_delhivery_pickup_locations_tenant ON public.delhivery_pickup_locations USING btree (tenant_id);
-
-CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON public.platform_invoices (tenant_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_tenant_service_approvals_pending ON public.tenant_service_approvals (status, requested_at) WHERE status = 'pending';

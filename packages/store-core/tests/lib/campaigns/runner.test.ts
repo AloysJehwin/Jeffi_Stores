@@ -227,8 +227,20 @@ describe('duration params are honored verbatim (no inflation)', () => {
     expect(resolved.sendCooldown).toBe(1)
   })
 
+  it('runScenario reports a lookback no longer than the delay instead of matching nobody', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign({ parameters: { lookbackDays: 45 }, delay_hours: 12 }))
+    const scenario = makeScenario({
+      defaultParams: { lookbackDays: 43200 },
+      paramSchema: { lookbackDays: { type: 'duration', min: 1, recommendedUnit: 'days', label: 'x' } },
+    })
+    const r = await runScenario(scenario, 'abandoned_cart')
+    expect(r.error).toMatch(/must be longer than the delay/)
+    expect(scenario.findEligible).not.toHaveBeenCalled()
+  })
+
   it('runScenario hands the scenario its params verbatim', async () => {
-    mockGetCampaign.mockResolvedValue(makeCampaign({ parameters: { lookbackDays: 30 } }))
+    // No delay, so a 30-minute lookback is a valid window (the empty-window guard has its own test).
+    mockGetCampaign.mockResolvedValue(makeCampaign({ parameters: { lookbackDays: 30 }, delay_hours: 0 }))
     const scenario = makeScenario({
       defaultParams: { lookbackDays: 43200 },
       paramSchema: { lookbackDays: { type: 'duration', min: 1, recommendedUnit: 'days', label: 'x' } },

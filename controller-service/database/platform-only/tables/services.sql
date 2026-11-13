@@ -1,4 +1,4 @@
--- controller-service: tables. Load order comes from scripts/db-files.mjs.
+-- controller-service: platform-only tables (flagship DB only, never a store tenant's). Load order comes from scripts/db-files.mjs.
 
 -- Admin approval per service for Messaging/Documents ("API") workspaces. A service is usable through
 -- the API only while its row is 'approved'. Applied by the schema pipeline. LOCAL ONLY (never RDS).
