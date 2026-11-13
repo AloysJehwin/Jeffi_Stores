@@ -3,6 +3,7 @@ import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import SubdomainList from '../SubdomainList'
 import CustomDomains from '../CustomDomains'
+import DomainPurchase from '../DomainPurchase'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default async function DomainsPage() {
             rdsReady={!!tenant.rds_endpoint}
           />
         </Card>
+        <DomainPurchase tenantId={tenant.id} tenantSlug={tenant.slug} />
         <CustomDomains tenantId={tenant.id} slug={tenant.slug} maxDomains={tenant.max_custom_domains ?? 0} />
       </div>
     </>
