@@ -28,3 +28,9 @@ indexes do not go here: put them in the schema files (`<service>/database/tables
 
 Delete the file once it is applied everywhere: its basename is in `schema_migrations` on the flagship and on every
 tenant database, and the schema files already describe what it left behind. An empty folder is fine.
+
+## Held
+
+`held/` is never loaded. A destructive migration that should wait for a person (after a live inventory and a
+backup) sits there until it is moved into this folder in the release that should carry it. Today:
+`2026-11-13_drop_platform_tables_from_stores.sql` (`docs/SAAS_MULTITENANT_STATUS.md`, Converging existing store databases).

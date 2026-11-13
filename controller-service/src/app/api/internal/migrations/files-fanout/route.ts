@@ -17,9 +17,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json().catch(() => ({}) as { gitSha?: string })
+  const body = await request.json().catch(() => ({}) as { gitSha?: string; slug?: string })
   const gitSha = body.gitSha || process.env.GIT_SHA || `manual-${Date.now()}`
 
-  const result = await runMigrationFilesFanout(gitSha)
+  // slug limits it to one store (a retry, or a check before the whole fleet).
+  const result = await runMigrationFilesFanout(gitSha, { slug: body.slug || undefined })
   return NextResponse.json({ ok: result.failed === 0, result }, { status: result.failed === 0 ? 200 : 500 })
 }

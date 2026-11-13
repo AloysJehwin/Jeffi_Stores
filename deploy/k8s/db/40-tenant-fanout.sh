@@ -3,18 +3,20 @@
 # tenant-set migration files (scripts/db-files.mjs tenant / migrations tenant). Runs in a one-off Job from the
 # release's controller image (local-<sha>, pushed before the approval), so the stores' databases change in the
 # database stage, before any service rolls, beside the flagship's. A tenant already at <sha> is skipped, so
-# re-running is safe. --schema or --migrations runs just that half; neither = both. --dry-run renders the Job,
-# has the API server validate it and runs nothing.
-# Usage: bash deploy/k8s/db/40-tenant-fanout.sh <sha> [--schema|--migrations] [--dry-run]
+# re-running is safe. --schema or --migrations runs just that half; neither = both. --report changes nothing: each
+# store database's tables beyond the tenant set (row counts) and tenant tables it lacks; `live` as <sha> runs it in
+# the live controller's image. --slug=<slug> limits any of them to one store. --dry-run renders the Job, has the
+# API server validate it and runs nothing.
+# Usage: bash deploy/k8s/db/40-tenant-fanout.sh <sha|live> [--schema|--migrations|--report] [--slug=<slug>] [--dry-run]
 source "$(dirname "$0")/lib.sh"
-SHA=${1:?image sha of the release (its controller image local-<sha> must be in ECR)}
-SCHEMA=true; FILES=true
-for a in "${@:2}"; do case $a in --schema) FILES=false ;; --migrations) SCHEMA=false ;; esac; done
+SHA=${1:?image sha of the release (its controller image local-<sha> must be in ECR), or live}
+SCHEMA=true; FILES=true; REPORT=false; SLUG=
+for a in "${@:2}"; do case $a in --schema) FILES=false ;; --migrations) SCHEMA=false ;; --report) REPORT=true ;; --slug=*) SLUG=${a#--slug=} ;; esac; done
 CALLS=; HALF=all
 $SCHEMA && CALLS="tenant_schema_fanout:/api/internal/migrations/fanout"
 $FILES && CALLS="$CALLS tenant_migration_files:/api/internal/migrations/files-fanout"
 $SCHEMA || HALF=migrations; $FILES || HALF=schema
-JOB=tenant-db-$SHA-$HALF
+if $REPORT; then CALLS="tenant_schema_report:/api/internal/migrations/report"; HALF=report; fi
 
 # In the pod: the release's controller on :3000 (load-secrets.mjs starts it, as in the Deployment), then each
 # fan-out route called on it, with CRON_SECRET from the same secrets.
@@ -29,18 +31,24 @@ rc=0
 for c in $FANOUT_CALLS; do
   echo "== ${c%%:*}"
   SPAWN_APP=1 APP_ENTRY=deploy/k8s-cron.mjs APP_CWD=. APP_ARGS="${c%%:*} POST ${c#*:}" CRON_TARGET=http://127.0.0.1:3000 \
-    CRON_BODY="{\"gitSha\":\"$FANOUT_SHA\"}" CRON_VERBOSE=1 CRON_TIMEOUT_MS=3000000 node deploy/load-secrets.mjs || { rc=1; break; }
+    CRON_BODY="{\"gitSha\":\"$FANOUT_SHA\",\"slug\":\"$FANOUT_SLUG\"}" CRON_VERBOSE=1 CRON_TIMEOUT_MS=3000000 node deploy/load-secrets.mjs || { rc=1; break; }
 done
 kill $srv 2>/dev/null
 exit $rc
 EOF
 job() {
   platform_manifests "local-$SHA" | kubectl create --dry-run=client -f - -o json |
-    python3 -I "$REPO/deploy/k8s/bootstrap/release-job.py" "$CTRL" "$JOB" "$SCRIPT" "FANOUT_CALLS=$CALLS" "FANOUT_SHA=$SHA"
+    python3 -I "$REPO/deploy/k8s/bootstrap/release-job.py" "$CTRL" "$JOB" "$SCRIPT" "FANOUT_CALLS=$CALLS" "FANOUT_SHA=$SHA" "FANOUT_SLUG=$SLUG"
 }
 
 k8s_tunnel
-say "Store tenant databases ($HALF) from the release's controller, local-$SHA"
+if [ "$SHA" = live ]; then
+  img=$(kubectl -n jeffi get deploy/$CTRL -o jsonpath='{.spec.template.spec.containers[0].image}')
+  SHA=${img##*:local-}
+  [ "$SHA" != "$img" ] || { echo "the live controller runs $img, not a local-<sha> tag" >&2; exit 1; }
+fi
+JOB=tenant-db-$SHA-$HALF
+say "Store tenant databases ($HALF${SLUG:+, $SLUG only}) from the controller image local-$SHA"
 if $DRY_RUN; then
   echo "live controller: $(kubectl -n jeffi get deploy/$CTRL -o jsonpath='{.spec.template.spec.containers[0].image}')"
   job | kubectl create --dry-run=server -f - -o name | sed 's/$/ validated by the API server, not created/'
