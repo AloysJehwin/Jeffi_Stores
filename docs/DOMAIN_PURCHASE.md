@@ -57,8 +57,8 @@ The fake: an operation finishes `DOMAIN_FAKE_OP_SECONDS` (20) after it starts; a
 
 ## Production needs
 
-1. **Env** on the controller: `DOMAIN_REGISTRAR=route53`. `CLUSTER_INGRESS_IP` is already set for bring-your-own domains.
-2. **IAM** for the controller's AWS identity:
+1. **Env** on the controller: `DOMAIN_REGISTRAR=route53` (`scripts/set-secret.sh DOMAIN_REGISTRAR --only production`). `CLUSTER_INGRESS_IP` is already set for bring-your-own domains.
+2. **IAM** for the controller's AWS identity (the `Jeffi_Stores` user): the inline policy `JeffiDomainPurchase` in [`deploy/aws/domain-purchase-iam-policy.json`](../deploy/aws/domain-purchase-iam-policy.json), applied with `aws iam put-user-policy --user-name Jeffi_Stores --policy-name JeffiDomainPurchase --policy-document file://deploy/aws/domain-purchase-iam-policy.json` (applied 2026-11-13):
    - `route53domains:CheckDomainAvailability`, `GetDomainSuggestions`, `ListPrices`, `RegisterDomain`, `GetOperationDetail`, `ListOperations`, `GetDomainDetail`, `RenewDomain`, `GetContactReachabilityStatus` on `*` (domain actions can't be resource-scoped).
    - `route53:CreateHostedZone` on `*` (RegisterDomain creates the zone).
    - `route53:ListHostedZonesByName` on `*`, `route53:ChangeResourceRecordSets` on `arn:aws:route53:::hostedzone/*`.
