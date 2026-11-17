@@ -13,7 +13,7 @@ export default function ConfirmationSkeleton() {
               <path d="M8.5 12.5l2.5 2.5 5-5" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Order Confirmed!</h1>
+          <h1 className="ui-heading text-3xl font-bold text-foreground mb-2">Order Confirmed!</h1>
           <p className="text-foreground-secondary mb-4">
             Thank you for your purchase. Your order has been successfully placed.
           </p>
@@ -26,7 +26,7 @@ export default function ConfirmationSkeleton() {
         <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
           <div className="lg:col-span-2">
             <div className={`${CARD}`}>
-              <h2 className="text-xl font-bold text-foreground mb-4">Order Summary</h2>
+              <h2 className="ui-heading text-xl font-bold text-foreground mb-4">Order Summary</h2>
               <div className="space-y-4 mb-6">
                 {[0, 1].map(i => (
                   <div key={i} className="flex justify-between items-center gap-4 pb-4 border-b border-border-default last:border-b-0">
@@ -50,7 +50,7 @@ export default function ConfirmationSkeleton() {
 
           <div className="space-y-6">
             <div className={`${CARD}`}>
-              <h2 className="text-xl font-bold text-foreground mb-4">Shipping Address</h2>
+              <h2 className="ui-heading text-xl font-bold text-foreground mb-4">Shipping Address</h2>
               <div className="space-y-2">
                 <Sk className="h-4 w-3/5" />
                 <Sk className="h-4 w-1/2" />
@@ -59,7 +59,7 @@ export default function ConfirmationSkeleton() {
             </div>
 
             <div className={`${CARD}`}>
-              <h2 className="text-xl font-bold text-foreground mb-4">Order Status</h2>
+              <h2 className="ui-heading text-xl font-bold text-foreground mb-4">Order Status</h2>
               <div className="flex flex-wrap items-center gap-3">
                 <Sk className="h-10 w-28 rounded-full" />
                 <span className="flex items-center gap-1 text-foreground-secondary">
@@ -76,7 +76,7 @@ export default function ConfirmationSkeleton() {
 
             <div className="flex flex-col gap-3">
               <span className="bg-accent-600 text-white px-6 py-3 rounded-lg text-center font-semibold">View All Orders</span>
-              <span className="bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary text-center font-semibold">
+              <span className="ui-btn bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary text-center font-semibold">
                 Continue Shopping
               </span>
             </div>

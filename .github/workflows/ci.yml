@@ -2,12 +2,12 @@ name: Jeffi Stores Pipeline
 
 # One pipeline, one card per stage. Per-app stages are matrices (one job per app inside the card).
 #
-#   Init ─┬→ Lint (12) ───────┬→ Build (9) ───────┐
-#         ├→ Type check (12) ─┘                    │
+#   Init ─┬→ Lint (13) ───────┬→ Build (10) ──────┐
+#         ├→ Type check (13) ─┘                    │
 #         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
-#         ├→ Unit tests (11) → Coverage ───────────┤
+#         ├→ Unit tests (12) → Coverage ───────────┤
 #         ├→ Integration tests ────────────────────┘
-#         └→ Images (8, release only, after Lint and Type check)
+#         └→ Images (9, release only, after Lint and Type check)
 #
 # Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
 #
@@ -19,6 +19,7 @@ name: Jeffi Stores Pipeline
 #                                                          Release · documents    │
 #                                                          Release · public-api   │
 #                                                          Release · mobile       │
+#                                                          Release · showcase     │
 #                                                          Release · ai-gateway ──┘
 #   Mobile · Android (when the merge touched mobile-service/client) beside the DB card, after the approval.
 #
@@ -134,6 +135,7 @@ jobs:
           - { app: storefront, run: npx next lint storefront-service }
           - { app: admin, run: npx next lint admin-service }
           - { app: business, run: npx next lint business-service }
+          - { app: showcase, run: npx next lint showcase-service }
           - { app: store-core, run: npx next lint controller-service --dir ../packages/store-core/src }
           - { app: messaging, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts messaging-service/src }
           - { app: documents, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts document-service/src }
@@ -161,6 +163,7 @@ jobs:
           - { app: storefront, run: npx tsc --noEmit -p storefront-service/tsconfig.typecheck.json }
           - { app: admin, run: npx tsc --noEmit -p admin-service/tsconfig.typecheck.json }
           - { app: business, run: npx tsc --noEmit -p business-service/tsconfig.typecheck.json }
+          - { app: showcase, run: npx tsc --noEmit -p showcase-service/tsconfig.typecheck.json }
           - { app: store-core, run: npx tsc --noEmit -p packages/store-core/tsconfig.typecheck.json }
           - { app: messaging, run: npm --prefix messaging-service run typecheck }
           - { app: documents, run: npm --prefix document-service run typecheck }
@@ -207,6 +210,7 @@ jobs:
           - { app: storefront, part: storefront }
           - { app: admin, part: admin }
           - { app: business, part: business }
+          - { app: showcase, part: showcase }
           - { app: store-core, part: store-core }
           - { app: cli, part: cli }
           - { app: messaging, run: npm --prefix messaging-service test }
@@ -263,6 +267,80 @@ jobs:
       - uses: ./.github/actions/node-setup
       - run: npm run test:integration
 
+  responsive:
+    name: Responsive sweep (advisory)
+    runs-on: ubuntu-latest
+    needs: init
+    # Advisory: not in `checks`' needs and continue-on-error, so it never blocks a merge. Skipped on a release run (its
+    # PR already ran it, and Post fails a release on any failed job). Promote it once it has proven reliable.
+    # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5).
+    if: needs.init.outputs.release != 'true'
+    continue-on-error: true
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16 # database/extensions.sql needs vector
+        env:
+          POSTGRES_USER: jeffi
+          POSTGRES_PASSWORD: jeffi
+          POSTGRES_DB: jeffi_production_ready
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://jeffi:jeffi@localhost:5432/jeffi_production_ready
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
+      CRON_SECRET: test-cron-secret
+      SERVICE_AUTH_SECRET: test-service-auth-secret
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_BASE_URL: http://localhost:3000
+      SKIP_DB_CHECK: true
+      SWEEP_BASE_URL: http://localhost:3000
+      SWEEP_WORKERS: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/node-setup
+      - name: Schema into the job's Postgres (platform and control-plane sets, manifest order)
+        run: |
+          set -uo pipefail
+          for f in $(node scripts/db-files.mjs platform) $(node scripts/db-files.mjs control-plane); do
+            psql "$DATABASE_URL" -q -f "$f" >/dev/null 2>"$RUNNER_TEMP/psql.err" || echo "::warning::$f: $(head -c 300 "$RUNNER_TEMP/psql.err")"
+          done
+          psql "$DATABASE_URL" -Atc "SELECT 1 FROM site_drafts, site_pages, site_settings, products LIMIT 1" >/dev/null
+      - run: npx playwright install --with-deps chromium
+      - name: Build storefront and business
+        run: npm run build:storefront && npm run build:business
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Start the apps behind the dev router
+        run: |
+          npx next start storefront-service -p 3010 > storefront.log 2>&1 &
+          npx next start business-service -p 3012 > business.log 2>&1 &
+          npx tsx scripts/dev-router.ts > router.log 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && break; sleep 2; done
+          curl -fsS -o /dev/null http://localhost:3000/ || { tail -50 storefront.log router.log; exit 1; }
+      - run: npm run sweep:responsive
+      - name: Summary
+        if: always()
+        run: |
+          [ -f tests/responsive/output/summary.md ] && cat tests/responsive/output/summary.md >> "$GITHUB_STEP_SUMMARY"
+          tail -30 storefront.log business.log 2>/dev/null || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-sweep
+          path: |
+            tests/responsive/output/summary.md
+            tests/responsive/output/summary.json
+            tests/responsive/output/findings.jsonl
+            tests/responsive/output/screenshots
+            tests/responsive/output/report
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
     name: Build · ${{ matrix.app }}
     runs-on: ${{ matrix.runner }}
@@ -277,6 +355,7 @@ jobs:
           - { app: storefront, runner: ubuntu-latest, kind: next }
           - { app: admin, runner: ubuntu-latest, kind: next }
           - { app: business, runner: ubuntu-latest, kind: next }
+          - { app: showcase, runner: ubuntu-latest, kind: next }
           - { app: messaging, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target messaging . }
           - { app: documents, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target documents . }
           - { app: public-api, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target public-api . }
@@ -320,7 +399,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile]
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase]
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -425,6 +504,7 @@ jobs:
           - { service: documents, kind: store }
           - { service: public-api, kind: platform }
           - { service: mobile, kind: platform }
+          - { service: showcase, kind: platform }
           - { service: ai-gateway, kind: razer }
     steps:
       - uses: actions/checkout@v4

@@ -6,11 +6,13 @@ import { QueryClient, QueryClientProvider, dehydrate, hydrate, type DehydratedSt
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
-import { useColorScheme } from 'nativewind'
+import { useColorScheme, vars } from 'nativewind'
+import { View } from 'react-native'
 import { sessionUsable, useAuthStore } from '../src/stores/authStore'
 import { useCartStore } from '../src/stores/cartStore'
 import { useThemeStore } from '../src/stores/themeStore'
 import { useHomeLayoutStore } from '../src/stores/homeLayoutStore'
+import { useSiteThemeStore } from '../src/stores/siteThemeStore'
 import { getStoredToken, loadAuthPortal } from '../src/api/client'
 import { getMe } from '../src/api/auth'
 import { getCart } from '../src/api/cart'
@@ -122,8 +124,16 @@ function ThemeRehydrator() {
   useEffect(() => {
     useThemeStore.getState().hydrate()
     useHomeLayoutStore.getState().hydrate()
+    useSiteThemeStore.getState().hydrate()
   }, [])
   return null
+}
+
+// The store's Site Builder theme: its colour variables cascade to every className below (NativeWind resolves var()
+// at runtime), so brand colours follow the store without a new build.
+function SiteThemeRoot({ children }: { children: React.ReactNode }) {
+  const themeVars = useSiteThemeStore(s => s.vars)
+  return <View style={[{ flex: 1 }, themeVars ? vars(themeVars) : null]}>{children}</View>
 }
 
 // A UPI payment the app was killed in the middle of (browser or UPI app open) picks up where it left off.
@@ -161,6 +171,7 @@ export default function RootLayout() {
           <PushBootstrap />
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           {/* The scene background matches the theme, so a push never flashes white in dark mode. */}
+          <SiteThemeRoot>
           <HeaderMenuContext.Provider value={MenuButton}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.surface } }}>
             <Stack.Screen name="(tabs)" />
@@ -186,6 +197,7 @@ export default function RootLayout() {
           <UpdatePrompt />
           <ConfirmHost />
           <Toast />
+          </SiteThemeRoot>
         </QueryClientProvider>
       </SafeAreaProvider>
       </KeyboardProvider>

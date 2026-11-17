@@ -186,9 +186,9 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-surface-elevated rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="ui-raised relative w-full sm:max-w-lg bg-surface-elevated rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-surface-elevated border-b border-border-default px-5 py-4 flex items-center justify-between rounded-t-2xl sm:rounded-t-2xl z-10">
-          <h2 className="text-base font-bold text-foreground">
+          <h2 className="ui-heading text-base font-bold text-foreground">
             {allAlreadyReviewed ? 'Edit Your Reviews' : 'Rate Your Order'}
           </h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-surface-secondary text-foreground-muted">
@@ -250,7 +250,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                         key={tag}
                         type="button"
                         onClick={() => toggleTag(i, tag)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        className={`ui-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                           s.selectedTags.includes(tag)
                             ? 'bg-accent-500 text-white border-accent-500'
                             : 'bg-surface-secondary text-foreground-secondary border-border-default hover:border-accent-400'
@@ -268,7 +268,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                     type="button"
                     onClick={() => handleGenerate(i)}
                     disabled={!s.rating || s.isGenerating}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-accent-400 text-accent-600 dark:text-accent-400 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-900/20 disabled:opacity-40 transition-colors mb-4"
+                    className="ui-btn w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-accent-400 text-accent-600 dark:text-accent-400 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-900/20 disabled:opacity-40 transition-colors mb-4"
                   >
                     {s.isGenerating ? (
                       <>
@@ -305,7 +305,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                     onChange={e => update(i, { title: e.target.value })}
                     maxLength={120}
                     placeholder="Summarise your experience"
-                    className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+                    className="ui-input w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
                   />
                 </div>
 
@@ -320,7 +320,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                     maxLength={2000}
                     rows={3}
                     placeholder="Tell others about your experience…"
-                    className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 resize-none"
+                    className="ui-input w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 resize-none"
                   />
                 </div>
 
@@ -398,7 +398,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="ui-btn flex-1 py-2.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Cancel
             </button>
@@ -406,7 +406,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
               type="button"
               onClick={handleSubmitAll}
               disabled={isSubmitting}
-              className="flex-1 py-2.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+              className="ui-btn flex-1 py-2.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
             >
               {isSubmitting ? 'Submitting…' : allAlreadyReviewed ? 'Update Reviews' : 'Submit Reviews'}
             </button>

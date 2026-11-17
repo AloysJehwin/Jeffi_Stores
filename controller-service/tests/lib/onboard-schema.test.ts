@@ -16,6 +16,8 @@ const base = {
   pan: 'ABCDE1234F',
   gstNumber: '29ABCDE1234F1Z5',
   businessAddress: '42 Main Rd, Chennai, Tamil Nadu, 600001',
+  // The licence questions every store answers (lib/catalog/compliance.ts).
+  compliance: { answers: { restricted: false, import: false } },
 }
 
 describe('OnboardSchema — pincode gate', () => {
@@ -54,5 +56,28 @@ describe('OnboardSchema — pincode gate', () => {
   it('does not mistake a longer number for a pincode', () => {
     const r = OnboardSchema.safeParse({ ...base, businessAddress: 'Plot 1234567890, Chennai' })
     expect(r.success).toBe(false)
+  })
+})
+
+describe('OnboardSchema — GSTIN and licences', () => {
+  it('accepts a blank GSTIN, as the wizard allows, but not a partial one', () => {
+    expect(OnboardSchema.safeParse({ ...base, gstNumber: '' }).success).toBe(true)
+    expect(OnboardSchema.safeParse({ ...base, gstNumber: '29ABCDE' }).success).toBe(false)
+  })
+
+  it('requires the licences a category needs, complete and in date', () => {
+    const food = { ...base, productCategories: 'Food & Groceries', compliance: { answers: { restricted: false, import: false, 'do-you-pack-or-import-packaged-food': false, 'do-you-label-products-as-organic': false } } }
+    const r = OnboardSchema.safeParse(food)
+    expect(r.success).toBe(false)
+    expect(JSON.stringify(r.error!.issues)).toMatch(/FSSAI/)
+    const fssai = { s3Key: 'kyc/o-1/fssai/x.pdf', number: '12345678901234', expiresOn: '2099-01-01' }
+    expect(OnboardSchema.safeParse({ ...food, compliance: { ...food.compliance, docs: { fssai } } }).success).toBe(true)
+    expect(OnboardSchema.safeParse({ ...food, compliance: { ...food.compliance, docs: { fssai: { ...fssai, number: '123' } } } }).success).toBe(false)
+    expect(OnboardSchema.safeParse({ ...food, compliance: { ...food.compliance, docs: { fssai: { ...fssai, expiresOn: '2020-01-01' } } } }).success).toBe(false)
+  })
+
+  it('refuses restricted goods and unanswered questions', () => {
+    expect(OnboardSchema.safeParse({ ...base, compliance: { answers: { restricted: true, import: false } } }).success).toBe(false)
+    expect(OnboardSchema.safeParse({ ...base, compliance: { answers: { import: false } } }).success).toBe(false)
   })
 })

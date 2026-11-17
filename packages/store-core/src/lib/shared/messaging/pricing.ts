@@ -1,4 +1,5 @@
 import type { WalletCategory } from '@/lib/payments/wallet'
+import { messagePricing, usdInr } from '@jeffi/pricing'
 
 export type MessagingChannel = 'sms' | 'whatsapp' | 'email'
 
@@ -11,15 +12,16 @@ export const MESSAGING_ESTIMATE_INR: Record<MessagingChannel, number> = {
   email: 0.05,
 }
 
-// Twilio prices are USD; the wallet is INR. Hardcoded rate (a live FX fetch is a future enhancement).
-export const USD_INR_RATE = 88
-
+/** Twilio prices are USD; the wallet is INR. Converts at the live rate (loaded with loadMessagePricing). */
 export function usdToInr(usd: number): number {
-  return Math.round(Math.abs(usd) * USD_INR_RATE * 10000) / 10000
+  return Math.round(Math.abs(usd) * usdInr() * 10000) / 10000
 }
 
-export function estimateFor(channel: MessagingChannel): number {
-  return MESSAGING_ESTIMATE_INR[channel]
+/** Send-time estimate at cost from the pricing sheet (provider defaults to Twilio); load it with loadMessagePricing. */
+export function estimateFor(channel: MessagingChannel, provider?: string | null): number {
+  const rates = messagePricing().rates
+  const r = channel === 'email' ? rates['ses:email'] : rates[`${provider || 'twilio'}:${channel}`] ?? rates[`twilio:${channel}`]
+  return r?.costInr ?? MESSAGING_ESTIMATE_INR[channel]
 }
 
 export function channelCategory(channel: MessagingChannel): WalletCategory {

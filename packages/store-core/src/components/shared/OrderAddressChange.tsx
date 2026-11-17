@@ -200,10 +200,10 @@ export default function OrderAddressChange({
 
       {open && !showAddForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30 animate-fade-in">
-          <div className="bg-surface-elevated rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+          <div className="ui-raised bg-surface-elevated rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
             <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-lg font-bold text-foreground">Change Delivery Address</h3>
+                <h3 className="ui-heading text-lg font-bold text-foreground">Change Delivery Address</h3>
                 <button
                   onClick={() => setOpen(false)}
                   aria-label="Close"
@@ -287,7 +287,7 @@ export default function OrderAddressChange({
                   type="button"
                   onClick={submit}
                   disabled={!selectedId || busy}
-                  className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="ui-btn flex-1 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {busy ? 'Submitting...' : 'Request Change'}
                 </button>
@@ -295,7 +295,7 @@ export default function OrderAddressChange({
                   type="button"
                   onClick={() => setOpen(false)}
                   disabled={busy}
-                  className="px-4 py-2 rounded-lg font-medium border border-border-secondary text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                  className="ui-btn px-4 py-2 rounded-lg font-medium border border-border-secondary text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
                 >
                   Cancel
                 </button>

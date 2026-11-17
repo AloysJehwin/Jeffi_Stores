@@ -127,7 +127,7 @@ export function BusinessAccountNavBar() {
   return (
     <div className="hidden lg:block sticky top-0 z-20 bg-surface shadow-sm pt-4">
       <div className="container mx-auto px-4 py-2">
-        <div className="bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
+        <div className="ui-card bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
           <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">
             {activeLabel}
           </span>
@@ -139,7 +139,7 @@ export function BusinessAccountNavBar() {
                 <Link
                   key={item.href}
                   href={bp(item.href)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                  className={`ui-btn flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                     isActive
                       ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
                       : 'text-foreground-secondary hover:bg-surface-secondary hover:text-foreground'
@@ -154,7 +154,7 @@ export function BusinessAccountNavBar() {
           {backLink && (
             <Link
               href={bp(backLink.href)}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors whitespace-nowrap"
+              className="ui-btn flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors whitespace-nowrap"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -173,7 +173,7 @@ export default function BusinessAccountSidebar() {
   const items = useBusinessNavItems()
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
+    <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
       <nav className="space-y-2">
         {items.map(item => {
           const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
@@ -182,7 +182,7 @@ export default function BusinessAccountSidebar() {
             <Link
               key={item.href}
               href={bp(item.href)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              className={`ui-btn flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive
                   ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-400'
                   : 'text-foreground-secondary hover:bg-surface-secondary'

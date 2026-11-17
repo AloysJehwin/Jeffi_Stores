@@ -1,0 +1,548 @@
+{
+ "store": {
+  "name": ""
+ },
+ "categories": [
+  {
+   "slug": "cookware",
+   "name": "Cookware",
+   "description": "Pans, kadais, pressure cookers and everyday cooking essentials for Indian kitchens.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "dinner-sets",
+   "name": "Dinner Sets",
+   "description": "Serveware and dinner sets for family meals and festive gatherings.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "storage-jars",
+   "name": "Storage Jars",
+   "description": "Airtight jars and containers that keep staples fresh and the counter tidy.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "bed-bath",
+   "name": "Bed & Bath",
+   "description": "Bedsheets, bath towels and soft essentials for restful nights and fresh mornings.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "home-de-cor",
+   "name": "Home Décor",
+   "description": "Cushion covers, table lamps and accents that bring warmth to every room.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "kitchen-appliances",
+   "name": "Kitchen Appliances",
+   "description": "Electric kettles and small appliances that make daily routines quicker.",
+   "parent": null,
+   "image": null
+  }
+ ],
+ "brands": [
+  {
+   "slug": "sample-home",
+   "name": "Sample Home",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "hearth-ember",
+   "name": "Hearth & Ember",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "gharana-crafts",
+   "name": "Gharana Crafts",
+   "featured": true,
+   "logo": null
+  }
+ ],
+ "products": [
+  {
+   "slug": "non-stick-kadai-with-glass-lid-3-l",
+   "name": "Non-Stick Kadai with Glass Lid, 3 L",
+   "price": 1499,
+   "mrp": 1899,
+   "category": "cookware",
+   "brand": "sample-home",
+   "description": "A deep kadai with a PFOA-free non-stick coating for shallow frying and curries with less oil. The tempered glass lid keeps steam locked in.",
+   "attributes": {
+    "Material": "Hard-anodised aluminium",
+    "Capacity": "3 L",
+    "Diameter": "26 cm",
+    "Weight": "1.4 kg",
+    "Care": "Hand wash recommended",
+    "Origin": "India"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933563102-ai-homepage_image-1794933563102-0.webp"
+   ],
+   "imagePrompt": "Deep black non-stick kadai with a clear glass lid on a marble kitchen counter, soft natural light"
+  },
+  {
+   "slug": "stainless-steel-pressure-cooker-5-l",
+   "name": "Stainless Steel Pressure Cooker, 5 L",
+   "price": 2299,
+   "mrp": null,
+   "category": "cookware",
+   "brand": "hearth-ember",
+   "description": "A sturdy induction-compatible pressure cooker with a three-safety-valve design. Ideal for dals, rice and quick weekday meals.",
+   "attributes": {
+    "Material": "Food-grade stainless steel 304",
+    "Capacity": "5 L",
+    "Compatibility": "Gas and induction",
+    "Weight": "2.1 kg",
+    "Care": "Dishwasher safe",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933576819-ai-homepage_image-1794933576818-0.webp"
+   ],
+   "imagePrompt": "Brushed stainless steel pressure cooker with black handle on a wooden kitchen shelf"
+  },
+  {
+   "slug": "cast-iron-dosa-tawa-28-cm",
+   "name": "Cast Iron Dosa Tawa, 28 cm",
+   "price": 899,
+   "mrp": 1149,
+   "category": "cookware",
+   "brand": "gharana-crafts",
+   "description": "Pre-seasoned cast iron tawa that gets better with every use. Gives crisp dosas and golden rotis with a natural non-stick finish.",
+   "attributes": {
+    "Material": "Pre-seasoned cast iron",
+    "Diameter": "28 cm",
+    "Weight": "2.6 kg",
+    "Care": "Wipe clean, oil lightly after use",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933589744-ai-homepage_image-1794933589744-0.webp"
+   ],
+   "imagePrompt": "Round dark cast iron dosa tawa with a crisp golden dosa on a rustic stove top"
+  },
+  {
+   "slug": "stainless-steel-dinner-set-24-pieces",
+   "name": "Stainless Steel Dinner Set, 24 Pieces",
+   "price": 3499,
+   "mrp": 4299,
+   "category": "dinner-sets",
+   "brand": "sample-home",
+   "description": "A complete set for six with dinner plates, bowls, katoris and serving spoons. Mirror-polished finish that is easy to clean.",
+   "attributes": {
+    "Material": "Stainless steel 430",
+    "Pieces": "24 (serves 6)",
+    "Dishwasher safe": "Yes",
+    "Weight": "3.8 kg",
+    "Care": "Dishwasher safe",
+    "Origin": "India"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933604386-ai-homepage_image-1794933604386-0.webp"
+   ],
+   "imagePrompt": "Neatly arranged stainless steel dinner set with plates, katoris and spoons on a dining table"
+  },
+  {
+   "slug": "melamine-thali-set-set-of-4",
+   "name": "Melamine Thali Set, Set of 4",
+   "price": 849,
+   "mrp": null,
+   "category": "dinner-sets",
+   "brand": "hearth-ember",
+   "description": "Lightweight, unbreakable thalis with multi-compartment bowls, perfect for family meals and picnics. Hand-glazed with a soft matte finish.",
+   "attributes": {
+    "Material": "Food-grade melamine",
+    "Pieces": "4 thalis",
+    "Diameter": "30 cm",
+    "Weight": "0.9 kg",
+    "Care": "Hand wash",
+    "Origin": "India"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933618453-ai-homepage_image-1794933618453-0.webp"
+   ],
+   "imagePrompt": "Four melamine thalis with small colourful bowls arranged on a woven placemat"
+  },
+  {
+   "slug": "borosilicate-glass-storage-jar-set-6-pieces",
+   "name": "Borosilicate Glass Storage Jar Set, 6 Pieces",
+   "price": 1199,
+   "mrp": 1499,
+   "category": "storage-jars",
+   "brand": "sample-home",
+   "description": "Airtight glass jars with bamboo lids for dals, spices and sugar. Clear design lets you see contents at a glance.",
+   "attributes": {
+    "Material": "Borosilicate glass, bamboo lid",
+    "Capacity": "500 ml to 1.5 L (assorted)",
+    "Pieces": "6",
+    "Care": "Dishwasher safe, lid hand wash",
+    "Origin": "India"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933632675-ai-homepage_image-1794933632673-0.webp"
+   ],
+   "imagePrompt": "Six clear glass jars with bamboo lids filled with dals and spices on a kitchen shelf"
+  },
+  {
+   "slug": "airtight-steel-canister-set-3-pieces",
+   "name": "Airtight Steel Canister Set, 3 Pieces",
+   "price": 1049,
+   "mrp": 1299,
+   "category": "storage-jars",
+   "brand": "hearth-ember",
+   "description": "Stackable stainless steel canisters with clip-lock lids to keep rice, atta and sooji fresh. Built for busy Indian kitchens.",
+   "attributes": {
+    "Material": "Stainless steel with silicone seal",
+    "Capacity": "2 L, 3 L, 5 L",
+    "Pieces": "3",
+    "Care": "Hand wash",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Three stainless steel canisters with clip lids lined up on a kitchen counter"
+  },
+  {
+   "slug": "cotton-percale-bedsheet-set-double-bed",
+   "name": "Cotton Percale Bedsheet Set, Double Bed",
+   "price": 1799,
+   "mrp": 2299,
+   "category": "bed-bath",
+   "brand": "sample-home",
+   "description": "A crisp 180 thread count bedsheet with two pillow covers. Breathable cotton that softens with every wash.",
+   "attributes": {
+    "Material": "100% cotton",
+    "Thread count": "180",
+    "Size": "Double bed, 90 x 100 in",
+    "Pieces": "1 fitted sheet, 1 flat sheet, 2 pillow covers",
+    "Care": "Machine wash cold",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "White cotton bedsheet with pillow covers neatly made on a bed with soft morning light"
+  },
+  {
+   "slug": "jaipur-print-bedsheet-set-queen",
+   "name": "Jaipur Print Bedsheet Set, Queen",
+   "price": 1399,
+   "mrp": null,
+   "category": "bed-bath",
+   "brand": "gharana-crafts",
+   "description": "A hand block-printed cotton bedsheet in a classic Jaipur motif, with two pillow covers. Each piece is slightly unique.",
+   "attributes": {
+    "Material": "100% cotton",
+    "Size": "Queen bed, 90 x 108 in",
+    "Pieces": "1 flat sheet, 2 pillow covers",
+    "Care": "Wash separately in cold water",
+    "Origin": "Jaipur, Rajasthan"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Indigo block-printed cotton bedsheet with floral motifs on a bed with plump pillows"
+  },
+  {
+   "slug": "cotton-bath-towel-set-of-2",
+   "name": "Cotton Bath Towel, Set of 2",
+   "price": 999,
+   "mrp": 1249,
+   "category": "bed-bath",
+   "brand": "sample-home",
+   "description": "Plush, absorbent towels with a soft loop pile that dries quickly. A comfortable everyday essential.",
+   "attributes": {
+    "Material": "100% combed cotton",
+    "GSM": "500",
+    "Size": "70 x 140 cm",
+    "Pieces": "2",
+    "Care": "Machine wash warm",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Two folded cream bath towels stacked on a wooden stool in a bright bathroom"
+  },
+  {
+   "slug": "cotton-bath-towel-set-of-4-with-hand-towels",
+   "name": "Cotton Bath Towel, Set of 4 with Hand Towels",
+   "price": 1599,
+   "mrp": null,
+   "category": "bed-bath",
+   "brand": "gharana-crafts",
+   "description": "A family set of bath and hand towels in soft earthy tones. Handloom-woven for a gentle, textured feel.",
+   "attributes": {
+    "Material": "100% cotton",
+    "GSM": "450",
+    "Size": "Bath 70 x 140 cm, hand 40 x 60 cm",
+    "Pieces": "2 bath, 2 hand",
+    "Care": "Machine wash warm",
+    "Origin": "Tamil Nadu"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Folded earthy-toned handloom cotton towels arranged on a linen-covered shelf"
+  },
+  {
+   "slug": "embroidered-cushion-cover-set-set-of-5",
+   "name": "Embroidered Cushion Cover Set, Set of 5",
+   "price": 749,
+   "mrp": 999,
+   "category": "home-de-cor",
+   "brand": "gharana-crafts",
+   "description": "Five 16 x 16 inch cushion covers with hand-embroidered motifs in warm tones. Zipper closure for easy washing.",
+   "attributes": {
+    "Material": "Cotton blend with embroidery",
+    "Size": "16 x 16 in",
+    "Pieces": "5",
+    "Closure": "Concealed zip",
+    "Care": "Hand wash cold",
+    "Origin": "India"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Five embroidered cushion covers in mustard and maroon on a cream sofa"
+  },
+  {
+   "slug": "velvet-cushion-cover-set-of-2",
+   "name": "Velvet Cushion Cover, Set of 2",
+   "price": 549,
+   "mrp": null,
+   "category": "home-de-cor",
+   "brand": "sample-home",
+   "description": "Soft velvet covers in a deep teal shade that add richness to any sofa. Concealed zipper for easy changing.",
+   "attributes": {
+    "Material": "Polyester velvet",
+    "Size": "18 x 18 in",
+    "Pieces": "2",
+    "Closure": "Concealed zip",
+    "Care": "Dry clean or gentle hand wash",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Two teal velvet cushion covers leaning against a grey sofa in a living room"
+  },
+  {
+   "slug": "brass-finish-table-lamp-with-linen-shade",
+   "name": "Brass Finish Table Lamp with Linen Shade",
+   "price": 2199,
+   "mrp": 2699,
+   "category": "home-de-cor",
+   "brand": "hearth-ember",
+   "description": "A warm bedside lamp with a hand-finished brass base and a natural linen shade. Soft diffused light for reading corners.",
+   "attributes": {
+    "Material": "Metal base, linen shade",
+    "Height": "45 cm",
+    "Bulb": "E27, not included",
+    "Cord": "1.5 m with inline switch",
+    "Care": "Dust with dry cloth",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Brass table lamp with a cream linen shade glowing on a wooden bedside table"
+  },
+  {
+   "slug": "terracotta-table-lamp-handcrafted",
+   "name": "Terracotta Table Lamp, Handcrafted",
+   "price": 1649,
+   "mrp": null,
+   "category": "home-de-cor",
+   "brand": "gharana-crafts",
+   "description": "A handcrafted terracotta base with a cotton drum shade, bringing earthy warmth to living rooms. Each base carries natural variations.",
+   "attributes": {
+    "Material": "Terracotta, cotton shade",
+    "Height": "38 cm",
+    "Bulb": "E27, not included",
+    "Cord": "1.8 m",
+    "Care": "Wipe with dry cloth",
+    "Origin": "Khurja, Uttar Pradesh"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Handcrafted terracotta table lamp with a cotton drum shade on a low console"
+  },
+  {
+   "slug": "electric-kettle-1-7-l-stainless-steel",
+   "name": "Electric Kettle, 1.7 L Stainless Steel",
+   "price": 1299,
+   "mrp": 1599,
+   "category": "kitchen-appliances",
+   "brand": "hearth-ember",
+   "description": "Fast 1500 W kettle with auto shut-off and dry-boil protection. The cool-touch handle makes pouring chai easy.",
+   "attributes": {
+    "Material": "Stainless steel body, plastic handle",
+    "Capacity": "1.7 L",
+    "Power": "1500 W",
+    "Warranty": "1 year",
+    "Care": "Wipe exterior, descale regularly",
+    "Origin": "India"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Silver stainless steel electric kettle on a kitchen counter beside a cup of chai"
+  },
+  {
+   "slug": "electric-kettle-1-2-l-glass",
+   "name": "Electric Kettle, 1.2 L Glass",
+   "price": 1849,
+   "mrp": 2199,
+   "category": "kitchen-appliances",
+   "brand": "sample-home",
+   "description": "A sleek glass kettle with a blue LED indicator and quick boil. Shows the water level clearly while it heats.",
+   "attributes": {
+    "Material": "Borosilicate glass, stainless steel base",
+    "Capacity": "1.2 L",
+    "Power": "1500 W",
+    "Warranty": "1 year",
+    "Care": "Wipe exterior, do not immerse",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Clear glass electric kettle with blue light glowing, on a minimal white kitchen counter"
+  },
+  {
+   "slug": "insulated-steel-tea-flask-1-l",
+   "name": "Insulated Steel Tea Flask, 1 L",
+   "price": 699,
+   "mrp": null,
+   "category": "kitchen-appliances",
+   "brand": "hearth-ember",
+   "description": "A double-wall vacuum flask that keeps chai hot for hours. Leak-proof lid with a push-button pour.",
+   "attributes": {
+    "Material": "Stainless steel 304",
+    "Capacity": "1 L",
+    "Heat retention": "Up to 12 hours",
+    "Care": "Hand wash",
+    "Origin": "India"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Silver insulated flask with a push-button lid on a wooden tray beside two cups"
+  },
+  {
+   "slug": "copper-bottom-tope-2-l",
+   "name": "Copper Bottom Tope, 2 L",
+   "price": 1199,
+   "mrp": 1450,
+   "category": "cookware",
+   "brand": "gharana-crafts",
+   "description": "Traditional tope with a tin-lined copper bottom that heats evenly. Ideal for slow-cooked dals and kheer.",
+   "attributes": {
+    "Material": "Stainless steel with copper base",
+    "Capacity": "2 L",
+    "Diameter": "20 cm",
+    "Weight": "1.1 kg",
+    "Care": "Hand wash",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Stainless steel tope with a copper base sitting on a stove with simmering dal"
+  },
+  {
+   "slug": "ceramic-serving-bowl-set-3-pieces",
+   "name": "Ceramic Serving Bowl Set, 3 Pieces",
+   "price": 1349,
+   "mrp": 1649,
+   "category": "dinner-sets",
+   "brand": "sample-home",
+   "description": "Three nesting ceramic bowls with a glossy finish, perfect for curries, salads and desserts. Microwave and dishwasher safe.",
+   "attributes": {
+    "Material": "Stoneware",
+    "Pieces": "3",
+    "Sizes": "500 ml, 900 ml, 1.4 L",
+    "Care": "Microwave and dishwasher safe",
+    "Origin": "India"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Three glossy ceramic nesting bowls in cream and blue on a dining table"
+  }
+ ],
+ "reviews": [
+  {
+   "productSlug": "copper-bottom-tope-2-l",
+   "rating": 5,
+   "title": null,
+   "comment": "Lovely copper bottom tope, 2 l, just as described and well packed.",
+   "author": "Ananya S."
+  },
+  {
+   "productSlug": "electric-kettle-1-7-l-stainless-steel",
+   "rating": 5,
+   "title": null,
+   "comment": "Lovely electric kettle, 1.7 l stainless steel, just as described and well packed.",
+   "author": "Rohit K."
+  },
+  {
+   "productSlug": "non-stick-kadai-with-glass-lid-3-l",
+   "rating": 5,
+   "title": null,
+   "comment": "Lovely non-stick kadai with glass lid, 3 l, just as described and well packed.",
+   "author": "Meera P."
+  },
+  {
+   "productSlug": "airtight-steel-canister-set-3-pieces",
+   "rating": 4,
+   "title": null,
+   "comment": "Lovely airtight steel canister set, 3 pieces, just as described and well packed.",
+   "author": "Arjun N."
+  }
+ ],
+ "offers": []
+}

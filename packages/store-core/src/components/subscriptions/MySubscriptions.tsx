@@ -150,7 +150,7 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
             <SubscriptionCardSkeleton />
           </>
         ) : subs.length === 0 ? (
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center">
+          <div className="ui-card bg-surface-elevated rounded-lg border border-border-default p-8 text-center">
             <p className="text-foreground-secondary mb-3">You have no subscriptions yet.</p>
             <Link href={isBusiness ? bp('/business') : '/'} className="text-accent-600 font-medium">
               Browse products
@@ -171,7 +171,7 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
               <article
                 key={s.id}
                 data-testid={`subscription-${s.id}`}
-                className="bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3"
+                className="ui-card bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3"
               >
                 <div className="flex gap-3 items-start">
                   {s.imageUrl && <img src={s.imageUrl} alt="" className="w-16 h-16 rounded object-cover" />}
@@ -181,7 +181,7 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
                         {s.productName}
                       </Link>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        className={`ui-badge px-2 py-0.5 rounded-full text-xs font-semibold ${
                           STATUS_TONE[s.status] ?? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                         }`}
                       >

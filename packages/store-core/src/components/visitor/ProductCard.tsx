@@ -45,7 +45,7 @@ interface ProductCardProps {
 
 // Two columns on phones, two or three beside the filters on wider screens.
 const CARD_SIZES = '(min-width: 1280px) 30vw, (min-width: 768px) 40vw, 50vw'
-const IMAGE_BOX = 'border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3'
+const IMAGE_BOX = 'ui-media border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3'
 
 export default function ProductCard({
   id,
@@ -183,7 +183,7 @@ export default function ProductCard({
     >
       {/* Phones mirror the app's card (mobile-service ProductCard): 20px radius, soft shadow, border only in dark. */}
       <div
-        className="relative bg-surface-elevated rounded-[20px] sm:rounded-lg shadow sm:shadow-sm border border-transparent dark:border-border-default sm:border-border-default overflow-hidden transition-all duration-300 ease-out max-sm:active:scale-[0.98] hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col"
+        className="ui-card relative bg-surface-elevated rounded-[20px] sm:rounded-lg shadow sm:shadow-sm border border-transparent dark:border-border-default sm:border-border-default overflow-hidden transition-all duration-300 ease-out max-sm:active:scale-[0.98] hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col"
         style={{ WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
       >
         {/* Image */}
@@ -244,25 +244,25 @@ export default function ProductCard({
             <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
               {/* A business offer is the only offer label; phones get it here instead of the ribbon. */}
               {bizDiscountPct > 0 ? (
-                <div className="sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                <div className="ui-badge sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                   Business offer
                 </div>
               ) : shownMrpDiscount > 0 ? (
-                <div className="bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                <div className="ui-badge bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                   {shownMrpDiscount}% off
                 </div>
               ) : (
                 discountPct > 0 && (
-                  <div className="sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                  <div className="ui-badge sm:hidden bg-gradient-to-r from-rose-500 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                     Sale
                   </div>
                 )
               )}
               {digital && (
-                <div className="bg-violet-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Digital</div>
+                <div className="ui-badge bg-violet-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Digital</div>
               )}
               {badge && (
-                <div className="bg-primary-500 dark:bg-primary-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                <div className="ui-badge bg-primary-500 dark:bg-primary-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                   {badge}
                 </div>
               )}
@@ -278,14 +278,14 @@ export default function ProductCard({
         {/* Info */}
         <div className="p-2.5 sm:p-5 flex flex-col flex-grow">
           <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
-            <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
+            <h3 className="ui-heading font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
               {/* Stretched link: the whole card opens the product; the buttons sit above it. */}
               <Link
                 href={productHref}
                 prefetch={deferred ? false : undefined}
                 onPointerEnter={deferred ? () => router.prefetch(productHref) : undefined}
                 onFocus={deferred ? () => router.prefetch(productHref) : undefined}
-                className="after:absolute after:inset-0 after:rounded-[20px] sm:after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-500"
+                className="ui-card-link after:absolute after:inset-0 after:rounded-[20px] sm:after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-500"
               >
                 {name}
               </Link>
@@ -313,7 +313,7 @@ export default function ProductCard({
                     onClick={handleWishlist}
                     disabled={wishlistLoading}
                     aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-                    className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
+                    className="ui-btn w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
                   >
                     {wishlistIcon}
                   </button>
@@ -321,7 +321,7 @@ export default function ProductCard({
                 <button
                   onClick={handleShare}
                   aria-label="Share product"
-                  className="hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                  className="ui-btn hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path

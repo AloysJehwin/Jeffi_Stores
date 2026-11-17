@@ -1,5 +1,7 @@
 import { PhoneMock } from '../Shapes'
 import DemoStage from '../_demo/DemoStage'
+import { FilmRow, FilmSound, HeroFilm } from '../_demo/DemoVideos'
+import { DEMO_VIDEOS_READY, FEATURE_FILMS, HERO_FILM } from '../_demo/demo-videos'
 import LandingFeatures from '../_demo/LandingFeatures'
 import HowItWorks from '../_sections/HowItWorks'
 import Faq from '../_sections/Faq'
@@ -10,32 +12,52 @@ import { Eyebrow, Display, Pill, SandCard } from '../_ui'
 
 export const dynamic = 'force-dynamic'
 
+function HeroCopy({ beside }: { beside?: boolean }) {
+  return (
+    <div>
+      <Display as="h1" className={beside ? 'text-5xl sm:text-7xl lg:text-7xl xl:text-8xl max-w-4xl' : 'text-5xl sm:text-7xl lg:text-8xl max-w-4xl'}>
+        Sell anything.
+        <br />
+        <span className="ecom-accent-text">We run the store.</span>
+      </Display>
+      <p className="mt-5 sm:mt-8 text-lg sm:text-xl text-foreground-secondary max-w-2xl leading-relaxed">
+        A complete online store on your own subdomain — storefront, admin, payments, delivery and GST, managed for
+        you.
+      </p>
+      <div className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+        <Pill href="/signup" className="w-full sm:w-auto px-8 py-4 text-base">Start your store</Pill>
+        <a
+          href="#demo-stage"
+          className="font-display font-bold text-base ecom-accent-text hover:underline max-sm:flex max-sm:min-h-12 max-sm:items-center max-sm:justify-center max-sm:rounded-full max-sm:bg-[var(--org-sand)]"
+        >
+          {beside ? 'Try the live demo' : 'See the demo'}
+        </a>
+      </div>
+    </div>
+  )
+}
+
 export default function EcomLandingPage() {
   return (
     <div className="bg-surface text-foreground relative isolate overflow-hidden">
       {/* ── Hero ── */}
       <section className="relative">
         <div aria-hidden className="org-sage absolute -top-24 -right-36 w-[300px] h-[300px] rounded-full opacity-80 sm:-top-40 sm:-right-24 sm:w-[560px] sm:h-[560px]" />
-        <div className="relative w-full px-4 sm:px-6 lg:px-12 pt-10 pb-10 sm:pt-28 sm:pb-12">
-          <Display as="h1" className="text-5xl sm:text-7xl lg:text-8xl max-w-4xl">
-            Sell anything.
-            <br />
-            <span className="ecom-accent-text">We run the store.</span>
-          </Display>
-          <p className="mt-5 sm:mt-8 text-lg sm:text-xl text-foreground-secondary max-w-2xl leading-relaxed">
-            A complete online store on your own subdomain — storefront, admin, payments, delivery and GST, managed for
-            you.
-          </p>
-          <div className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
-            <Pill href="/signup" className="w-full sm:w-auto px-8 py-4 text-base">Start your store</Pill>
-            <a
-              href="#demo-stage"
-              className="font-display font-bold text-base ecom-accent-text hover:underline max-sm:flex max-sm:min-h-12 max-sm:items-center max-sm:justify-center max-sm:rounded-full max-sm:bg-[var(--org-sand)]"
-            >
-              See the demo
-            </a>
+        {DEMO_VIDEOS_READY ? (
+          <FilmSound>
+            <div className="relative w-full px-4 sm:px-6 lg:px-12 pt-10 pb-8 sm:pt-24 sm:pb-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:items-center">
+              <HeroCopy beside />
+              <HeroFilm film={HERO_FILM} />
+            </div>
+            <div className="relative w-full px-4 sm:px-6 lg:px-12 pb-12 sm:pb-16">
+              <FilmRow films={FEATURE_FILMS} />
+            </div>
+          </FilmSound>
+        ) : (
+          <div className="relative w-full px-4 sm:px-6 lg:px-12 pt-10 pb-10 sm:pt-28 sm:pb-12">
+            <HeroCopy />
           </div>
-        </div>
+        )}
 
         <div id="demo-stage" className="relative w-full px-4 sm:px-6 lg:px-12 pb-14 sm:pb-20 scroll-mt-24">
           <DemoStage />

@@ -96,9 +96,9 @@ export type ProductSource = 'featured' | 'new_arrivals' | 'best_sellers' | 'on_s
 export type SectionLayout = 'grid' | 'carousel'
 
 /**
- * Where a page shows: the desktop website, phone browsers or the app. Sections live in one layout
- * and carry a per-surface visibility toggle (sectionSurfaces); hero slides still have a layout per
- * surface (slidesForSurface), phones and the app falling back to the website's.
+ * Where a page shows: the desktop website, phone browsers or the app. Each surface has a layout of its
+ * own (sections and hero slides): a row belongs to exactly one surface, so nothing set on one changes
+ * another. Copying a layout between surfaces is an explicit action (copySurfaceLayout).
  */
 export type HomepageSurface = 'web' | 'web_mobile' | 'app'
 
@@ -152,44 +152,15 @@ export function rowAudience(row: { audience?: string | null }): HomepageAudience
 
 export const isListingPage = (page: HomepagePage) => page !== 'home'
 
-/**
- * Hero slides that belong to a surface. Phone browsers and the app mirror the desktop website's
- * slides until they have slides of their own (any, active or not).
- */
+/** Hero slides of one surface (its own only: no surface borrows another's). */
 export function slidesForSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
-  const own = rows.filter(r => rowSurface(r) === surface)
-  if (own.length > 0 || surface === 'web') return own
-  return rows.filter(r => rowSurface(r) === 'web')
+  return rows.filter(r => rowSurface(r) === surface)
 }
 
-export type SectionSurfaces = Record<HomepageSurface, boolean>
+export const onSurface = (section: { surface?: string | null }, surface: HomepageSurface): boolean => rowSurface(section) === surface
 
-/**
- * Which surfaces a section shows on: `config.surfaces` ({ web, web_mobile, app }), a missing key
- * meaning shown. A row from before the single layout (surface column web_mobile / app, no
- * `config.surfaces`) shows only on its own surface, which is what the migration writes.
- */
-export function sectionSurfaces(section: { config?: Record<string, unknown> | null; surface?: string | null }): SectionSurfaces {
-  const raw = section.config?.surfaces
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    const o = raw as Record<string, unknown>
-    return { web: o.web !== false, web_mobile: o.web_mobile !== false, app: o.app !== false }
-  }
-  const legacy = rowSurface(section)
-  if (legacy !== 'web') return { web: false, web_mobile: legacy === 'web_mobile', app: legacy === 'app' }
-  return { web: true, web_mobile: true, app: true }
-}
-
-export const onSurface = (
-  section: { config?: Record<string, unknown> | null; surface?: string | null },
-  surface: HomepageSurface
-): boolean => sectionSurfaces(section)[surface]
-
-/** The sections shown on a surface (pass one page's rows). */
-export function forSurface<T extends { config?: Record<string, unknown> | null; surface?: string | null }>(
-  rows: T[],
-  surface: HomepageSurface
-): T[] {
+/** One surface's sections (pass one page's rows). */
+export function forSurface<T extends { surface?: string | null }>(rows: T[], surface: HomepageSurface): T[] {
   return rows.filter(r => onSurface(r, surface))
 }
 
@@ -608,8 +579,9 @@ export const SECTION_TILE_DEFAULTS = {
   ],
 } satisfies Partial<Record<SectionType, Record<string, string>[]>>
 
-/** The About stats from the store's stats JSON setting, else the built-in tiles. */
-export function resolveAboutStats(statsJson: string): { value: string; label: string }[] {
+/** The About stats from the store's stats JSON setting, else the built-in tiles (`fallback: false` = none: the built-in
+ *  figures are the flagship's, never another store's claims). */
+export function resolveAboutStats(statsJson: string, fallback = true): { value: string; label: string }[] {
   if (statsJson.trim()) {
     try {
       const parsed = JSON.parse(statsJson)
@@ -624,7 +596,7 @@ export function resolveAboutStats(statsJson: string): { value: string; label: st
       /* fall through to the built-in tiles */
     }
   }
-  return SECTION_TILE_DEFAULTS.about
+  return fallback ? SECTION_TILE_DEFAULTS.about : []
 }
 
 /** The About story when the section has none: the store's own about copy, else a line naming the store. */

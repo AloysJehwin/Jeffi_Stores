@@ -56,7 +56,7 @@ export default function MyQuotesPage() {
         <AccountMobileHeader />
         <div className="grid grid-cols-1 gap-6">
           <div>
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-6 py-4 border-b border-border-default">
                 <p className="text-sm text-foreground-secondary">
                   Track your RFQ submissions. Our team will review and respond.
@@ -99,7 +99,7 @@ export default function MyQuotesPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-foreground font-mono text-sm">{rfq.rfq_number}</span>
                           <span
-                            className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}
+                            className={`ui-badge px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}
                           >
                             {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
                           </span>

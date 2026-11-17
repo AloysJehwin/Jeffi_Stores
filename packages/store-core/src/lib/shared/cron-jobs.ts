@@ -211,6 +211,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job: Showcase hosting (lib/showcase/billing.ts): reminders, renewals from the wallet, unpaid sites paused.
+    id: 'showcase_renew',
+    name: 'Renew Showcase sites',
+    path: '/api/cron/showcase-renew',
+    method: 'POST',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 260 * SEC,
+    lockTtlMs: HOUR,
+    tenantScope: null,
+  },
+  {
     id: 'publish_social_posts',
     name: 'Publish social posts',
     path: '/api/cron/publish-social-posts',
@@ -634,6 +646,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job: settles paid AI generations' wallet holds their run never settled (lib/ai/paid-generation.ts).
+    id: 'ai_hold_sweep',
+    name: 'Settle stuck AI wallet holds',
+    path: '/api/cron/ai-hold-sweep',
+    method: 'POST',
+    intervalMs: 15 * MIN,
+    intervalLabel: 'every 15 min',
+    startDelayMs: 315 * SEC,
+    lockTtlMs: 15 * MIN - 30 * SEC,
+    tenantScope: null,
+  },
+  {
     // Platform job: nightly sum of every tenant's S3 bucket, drives the storage.s3Gb cap guard.
     id: 's3_usage',
     name: 'Tenant S3 bucket usage',
@@ -656,6 +680,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     lockTtlMs: 5 * MIN - 30 * SEC,
     tenantScope: null,
   },
+  {
+    // Platform job: store licences (lib/catalog/compliance-expiry.ts): lapsed ones marked expired, owners emailed 30 and 7 days before and once lapsed.
+    id: 'compliance_expiry',
+    name: 'Licence expiry reminders',
+    path: '/api/cron/compliance-expiry',
+    method: 'POST',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 275 * SEC,
+    lockTtlMs: HOUR,
+    tenantScope: null,
+  },
 ]
 
 export const CRON_JOB_IDS: readonly string[] = CRON_JOBS.map(j => j.id)
@@ -674,6 +710,8 @@ export const CRON_ADMIN_PATHS: readonly string[] = CRON_JOBS.filter(j => j.tenan
 
 /** Reachability check on a store's admin service (connect_crons). */
 export const CRON_PING_PATH = '/api/cron/ping'
+/** A new store's AI-built first site (the controller's build_site provisioning step). */
+export const SITE_BUILD_PATH = '/api/cron/site-build'
 
 // IN_PROCESS_CRON=false hands scheduling to Kubernetes CronJobs (deploy/k8s), so pods never self-schedule.
 export function inProcessCronEnabled(env: Record<string, string | undefined> = process.env): boolean {
@@ -691,11 +729,14 @@ const DAILY_AT_IST: Record<string, string> = {
   ad_free_renew: '0 5',
   messaging_addon_renew: '10 5',
   domain_renew: '20 5',
+  showcase_renew: '30 5',
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
   s3_usage: '30 2',
   merchant_sync: '15 23',
   amazon_sync: '45 23',
+  // Morning IST, so owners read licence reminders in working hours.
+  compliance_expiry: '0 9',
 }
 
 // Weekly jobs: minute hour * * day-of-week (IST).

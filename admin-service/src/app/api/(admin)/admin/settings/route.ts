@@ -8,6 +8,7 @@ import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-setting
 import { getSiteControls, invalidateSiteControlsCache, MESSAGING_LOCK_HINT } from '@/lib/catalog/site-controls'
 import { isGoogleTagSettingKey, validateGoogleTagSetting } from '@/lib/analytics/google-tag'
 import { OPS_EMAIL_KEY, parseOpsEmailInput } from '@/lib/shared/ops-email-config'
+import { STORE_SOCIAL_KEYS, STORE_SOCIAL_LABELS, STORE_SOCIAL_NETWORKS, STORE_WHATSAPP_KEY, socialUrl, whatsappDigits } from '@/lib/catalog/store-socials'
 
 // All keys editable via this endpoint. Grouped for readability.
 const EDITABLE_KEYS = [
@@ -27,6 +28,14 @@ const EDITABLE_KEYS = [
   'business_email',
   'business_phone',
   'business_hours',
+  // WhatsApp and social profiles shown on the site (lib/catalog/store-socials.ts; normalised below)
+  'business_whatsapp',
+  'social_instagram',
+  'social_facebook',
+  'social_youtube',
+  'social_x',
+  'social_linkedin',
+  'social_pinterest',
   // Invoice / legal / bank identity (previously DB-seeded, now editable)
   'business_gstin',
   'business_legal_name',
@@ -87,6 +96,7 @@ const EDITABLE_KEYS = [
   'storefront_new_arrivals_limit',
   'storefront_stats_json',
   'storefront_about_copy',
+  'meta_tagline',
   // Google tag & Ads (validated below)
   'google_tag_id',
   'google_ads_conversion_id',
@@ -217,6 +227,26 @@ function normaliseTagSettings(updates: Array<{ key: string; value: unknown }>): 
   return null
 }
 
+// Normalises the WhatsApp number (digits with the country code) and social links (absolute https URLs) in place;
+// returns the first validation error. Empty clears the setting.
+const SOCIAL_BY_KEY = new Map(STORE_SOCIAL_NETWORKS.map(n => [STORE_SOCIAL_KEYS[n], n]))
+function normaliseStoreLinks(updates: Array<{ key: string; value: unknown }>): string | null {
+  for (const u of updates) {
+    if (u.key === STORE_WHATSAPP_KEY) {
+      const d = whatsappDigits(u.value)
+      if (d === null) return 'Enter the WhatsApp number with its country code, e.g. +91 98765 43210.'
+      u.value = d
+      continue
+    }
+    const network = SOCIAL_BY_KEY.get(u.key)
+    if (!network) continue
+    const url = socialUrl(network, u.value)
+    if (url === null) return `Enter your ${STORE_SOCIAL_LABELS[network]} profile link or handle.`
+    u.value = url
+  }
+  return null
+}
+
 // Validates JSON settings in place and stamps who saved them; returns the first validation error.
 function normaliseJsonSettings(updates: Array<{ key: string; value: unknown }>, adminId: string): string | null {
   for (const u of updates) {
@@ -257,7 +287,7 @@ export async function PATCH(request: NextRequest) {
       if (appIdError) return NextResponse.json({ error: appIdError }, { status: 400 })
       const batchLock = (await lockedChannelHint(updates)) ?? (await lockedPushHint(updates))
       if (batchLock) return NextResponse.json({ error: batchLock }, { status: 409 })
-      const tagError = normaliseTagSettings(updates) ?? normaliseJsonSettings(updates, admin.adminId)
+      const tagError = normaliseTagSettings(updates) ?? normaliseJsonSettings(updates, admin.adminId) ?? normaliseStoreLinks(updates)
       if (tagError) return NextResponse.json({ error: tagError }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
       invalidateFor(updates.map(u => u.key))
@@ -293,6 +323,12 @@ export async function PATCH(request: NextRequest) {
     if (key === OPS_EMAIL_KEY) {
       const single = [{ key, value }]
       const err = normaliseJsonSettings(single, admin.adminId)
+      if (err) return NextResponse.json({ error: err }, { status: 400 })
+      value = single[0].value
+    }
+    if (key === STORE_WHATSAPP_KEY || SOCIAL_BY_KEY.has(key)) {
+      const single = [{ key, value }]
+      const err = normaliseStoreLinks(single)
       if (err) return NextResponse.json({ error: err }, { status: 400 })
       value = single[0].value
     }

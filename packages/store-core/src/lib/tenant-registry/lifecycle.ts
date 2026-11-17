@@ -246,6 +246,8 @@ const UNCASCADED_TABLES = [
   'tenant_integration_credentials',
   'razorpay_subscription_index',
   'ai_provider_identities',
+  // Its Showcase sites (their enquiries cascade).
+  'showcase_sites',
 ]
 
 /**

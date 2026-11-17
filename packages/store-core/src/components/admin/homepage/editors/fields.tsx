@@ -14,7 +14,7 @@ import {
   SECTION_META,
   businessVisitorView,
   sectionAspectValue,
-  sectionSurfaces,
+  rowSurface,
   sectionLayout,
   sectionLimit,
   sectionCopyDefaults,
@@ -27,24 +27,8 @@ import {
 } from '@/lib/catalog/homepage-sections'
 
 /** Live catalogue data loaded server-side, so an editor never shows an empty picker. */
-export interface SectionOptions {
-  categories: { value: string; label: string }[]
-  brands: { value: string; label: string }[]
-  /** Top-level categories by id, for sections that pick whole departments (category tabs). */
-  topCategories?: { value: string; label: string }[]
-  counts: {
-    featured: number
-    newArrivals: number
-    bestSellers: number
-    onSale: number
-    bundles?: number
-    approvedReviews?: number
-  }
-  /** Store-specific storefront defaults, e.g. the About story from the store settings. */
-  copyDefaults?: Partial<Record<SectionType, SectionCopy>>
-  /** Store-specific built-in tiles, e.g. the About stats from the store settings. */
-  tileDefaults?: Partial<Record<SectionType, Record<string, string>[]>>
-}
+export type { SectionOptions } from '@/lib/catalog/homepage-editor-options'
+import type { SectionOptions } from '@/lib/catalog/homepage-editor-options'
 
 export interface EditorProps {
   section: HomepageSection
@@ -686,8 +670,7 @@ const SIDES_LABELS: Record<string, string> = {
 export function SidesField({ props }: { props: EditorProps }) {
   const b = useSectionBinding(props)
   const options = sideOptions(props.section.type)
-  const on = sectionSurfaces(props.section)
-  if (!options.length || sectionAspectValue(props.section) === 'auto' || (!on.web && !on.web_mobile)) return null
+  if (!options.length || sectionAspectValue(props.section) === 'auto' || rowSurface(props.section) === 'app') return null
   const peek = options.includes('peek')
   return (
     <Select

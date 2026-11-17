@@ -1,9 +1,13 @@
+import type { CSSProperties } from 'react'
 import { MessagesSquare } from 'lucide-react'
 import { Sk } from '@/components/admin/kit/skeleton'
 
 // Server-safe placeholders for the support inbox; labels mirror SupportInbox's filters.
 const FILTERS = ['Needs a person', 'Needs approval', 'Mine', 'Assistant', 'All open', 'Closed']
 const CHANNELS = ['All channels', 'Website', 'App', 'WhatsApp', 'Email']
+
+/** Desktop: the inbox fills the screen below the page header (title + description). */
+export const INBOX_SPLIT = { '--admin-split-offset': '12rem' } as CSSProperties
 
 /** Conversation rows while the list loads. */
 export function SessionRowsLoading({ rows = 7 }: { rows?: number }) {
@@ -56,7 +60,7 @@ export function ConversationLoading() {
 /** The whole inbox (filters, list and the empty conversation pane) for the page's loading screen. */
 export default function SupportInboxLoading() {
   return (
-    <div className="grid h-[calc(100dvh-15rem)] min-h-[520px] grid-cols-1 overflow-hidden rounded-xl border border-border-default bg-surface-elevated lg:grid-cols-[minmax(300px,360px)_1fr]">
+    <div className="admin-split grid h-[calc(100dvh-15rem)] min-h-[520px] grid-cols-1 overflow-hidden rounded-xl border border-border-default bg-surface-elevated lg:grid-cols-[minmax(300px,360px)_1fr]" style={INBOX_SPLIT}>
       <aside className="flex min-h-0 flex-col border-r border-border-default">
         <div className="space-y-2 border-b border-border-default p-3">
           <Sk className="h-9 w-full rounded-lg" />

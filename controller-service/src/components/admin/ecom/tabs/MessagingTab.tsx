@@ -299,7 +299,8 @@ function TemplatesPanel({ base, storeName, onChanged }: { base: string; storeNam
   const paged = usePagedRows(shown, undefined, `${channel}|${q}`)
   return (
     <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <div className={box}>
+      {/* From lg the list stays in view while the editor scrolls with the page (the tenant header above is tall). */}
+      <div className={`${box} admin-sticky-pane lg:self-start`}>
         <div className="flex flex-wrap gap-1 border-b border-border-default p-2">{CHANNELS.map(c => <button key={c} className={tabCls(channel === c)} onClick={() => { setChannel(c); setSelected(null) }}>{LABEL[c]}</button>)}</div>
         <div className="flex items-center gap-2 border-b border-border-default p-2">
           <Search className="ml-1 w-4 h-4 shrink-0 text-foreground-muted" /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter" aria-label="Filter templates" className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none" />

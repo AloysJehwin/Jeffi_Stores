@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { SEED_CATALOGS, SEED_PROFILES, catalogFor } from '@controller/lib/provisioning/seed-catalog'
+import { SELLING_CATEGORIES } from '@controller/lib/catalog/compliance'
 
-// The onboarding wizard's category list — every option must have a starter catalogue.
+// The onboarding wizard's category list (the Store step reads it from lib/catalog/compliance.ts).
 const ONBOARDING_CATEGORIES = [
   'Electronics & Gadgets',
   'Fashion & Apparel',
@@ -12,10 +13,18 @@ const ONBOARDING_CATEGORIES = [
   'Toys & Games',
   'Industrial & B2B',
   'Food & Groceries',
+  'Jewellery & Watches',
+  'Pet Supplies',
+  'Automotive',
+  'Agriculture & Gardening',
   'Other',
 ]
 
 describe('seed catalogues', () => {
+  it('keeps every onboarding category label as it was (they key the catalogues and KYC)', () => {
+    expect([...SELLING_CATEGORIES].sort()).toEqual([...ONBOARDING_CATEGORIES].sort())
+  })
+
   it('covers every onboarding category', () => {
     for (const c of ONBOARDING_CATEGORIES) {
       expect(SEED_PROFILES, `missing catalogue for ${c}`).toContain(c)

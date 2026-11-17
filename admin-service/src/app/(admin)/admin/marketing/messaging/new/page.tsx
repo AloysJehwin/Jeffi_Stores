@@ -32,7 +32,7 @@ import { useEditSession } from '@/hooks/useEditSession'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import { BackLink, DraftLockBanner, FormButton, FormFooter, LockedFieldset, fieldInputCls } from '@/components/admin/kit'
+import { BackLink, DraftLockBanner, FormButton, FormFooter, LockedFieldset, fieldInputCls, stickyAboveFooter } from '@/components/admin/kit'
 import { assertDraftResponse, isDraftLockedError, lockHeaders } from '@/lib/client/draft-lock-client'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
@@ -1247,7 +1247,7 @@ export default function NewMessagePage() {
 
             </LockedFieldset>
 
-            <div className="sticky top-6">
+            <div className="sticky top-6 admin-sticky-pane max-xl:!max-h-none max-xl:!overflow-visible" style={stickyAboveFooter}>
               <div className="flex gap-1 mb-2">
                 {active.map(k => (
                   <button
@@ -1436,7 +1436,7 @@ export default function NewMessagePage() {
               )}
             </LockedFieldset>
 
-            <div className="sticky top-6">
+            <div className="sticky top-6 admin-sticky-pane max-xl:!max-h-none max-xl:!overflow-visible" style={stickyAboveFooter}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide">Recipients</p>
                 {audienceCount !== null && !audienceLoading && (

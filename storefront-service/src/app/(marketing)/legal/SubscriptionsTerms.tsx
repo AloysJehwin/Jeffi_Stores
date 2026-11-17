@@ -5,9 +5,9 @@ export default function SubscriptionsTerms() {
   return (
     <section
       id="subscriptions"
-      className="bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-24"
+      className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-24"
     >
-      <h2 className="font-bold text-foreground text-base mb-2">Subscriptions &amp; auto-debit</h2>
+      <h2 className="ui-heading font-bold text-foreground text-base mb-2">Subscriptions &amp; auto-debit</h2>
       <ul className="list-disc pl-5 space-y-1.5 text-sm text-foreground-secondary">
         <li>
           Subscriptions renew automatically each cycle through a Razorpay payment mandate (UPI Autopay, card or

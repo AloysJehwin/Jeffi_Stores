@@ -59,9 +59,9 @@ export async function getAudienceSections(
       const business = visibleSections(forSurface(onPage.filter(r => rowAudience(r) === 'business'), surface))
       if (business.length > 0) return { audience: 'business', sections: business }
     }
-    // Defaults before the surface filter: a layout hidden on this surface is still a layout.
-    const own = onPage.filter(r => rowAudience(r) === 'store')
-    return { audience: 'store', sections: visibleSections(forSurface(home ? withDefaults(own) : own, surface)) }
+    // A surface with no sections of its own shows the built-in homepage, never another surface's layout.
+    const own = forSurface(onPage.filter(r => rowAudience(r) === 'store'), surface)
+    return { audience: 'store', sections: visibleSections(home ? withDefaults(own) : own) }
   } catch {
     // Table missing or unreachable — fall back to the built-in layout rather than an empty page.
     return { audience: 'store', sections: visibleSections(home ? withDefaults([]) : []) }
@@ -82,7 +82,7 @@ function sourceClause(source: ProductSource, categorySlug: string | null): Sourc
     case 'best_sellers':
       return { where: 'p.is_active = true', orderBy: 'total_sold DESC, p.created_at DESC' }
     case 'on_sale':
-      return { where: 'p.is_active = true AND p.mrp > p.price', orderBy: '(p.mrp - p.price) DESC' }
+      return { where: 'p.is_active = true AND p.mrp > p.base_price', orderBy: '(p.mrp - p.base_price) DESC' }
     case 'category':
       return {
         where: categorySlug ? 'p.is_active = true AND c.slug = $2' : 'p.is_active = true',

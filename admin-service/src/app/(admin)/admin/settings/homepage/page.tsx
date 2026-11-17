@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { queryOne, queryMany } from '@/lib/shared/db'
+import { queryOne } from '@/lib/shared/db'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -17,13 +17,10 @@ import MergeOnLoad from '@/components/admin/drafts/MergeOnLoad'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import { HOMEPAGE_ENTITY_ID, initialDraftLock } from '@/lib/admin/draft-locks'
 import { draftBehind, draftsForView } from '@/lib/admin/draft-branches'
-import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
 import {
   HOMEPAGE_AUDIENCES,
   HOMEPAGE_PAGES,
   HOMEPAGE_SURFACES,
-  defaultAboutCopy,
-  resolveAboutStats,
   rowAudience,
   rowPage,
   type HomepageAudience,
@@ -34,7 +31,10 @@ import {
 import { getHomepagePlan, planName } from '@/lib/catalog/homepage-plan'
 import { signHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
 import { getEditableHomepage, getHomepageDraftSummary, homepageDrafts, type DraftDiff } from '@/lib/catalog/homepage-draft'
-import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
+import { loadHeroData, loadSectionOptions } from '@/lib/catalog/homepage-editor-options'
+import { siteBuilderEnabled } from '@/lib/site/store'
+import SiteBuilderTabs from '@/components/admin/site-builder/SiteBuilderTabs'
+import SiteBuilderSwitch from '@/components/admin/site-builder/SiteBuilderSwitch'
 import { Badge, PageHeader, TabStrip } from '@/components/admin/kit'
 import { resnapshotHomepageSession, startHomepageDraft } from './actions'
 
@@ -42,7 +42,7 @@ const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
   home: {
     tab: 'Home',
     description:
-      'Everything on the homepage, row by row: a row is one full-width section or two side by side. Drag to reorder or pair sections, pick which devices each one shows on, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
+      'Everything on the homepage, row by row: a row is one full-width section or two side by side. Desktop web, mobile web and the app each have a layout of their own, so a change on one never touches the others. Drag to reorder or pair sections, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.',
   },
   products: {
     tab: 'All products',
@@ -62,7 +62,7 @@ const PAGE_COPY: Record<HomepagePage, { tab: string; description: string }> = {
 }
 
 const BUSINESS_DESCRIPTION =
-  'The homepage business accounts see at /business and on the business store in the app. Drag to reorder or pair sections, pick which devices each one shows on, and expand a section to edit it. Until it has sections of its own it shows the store homepage. Changes are saved as a draft and go live only when you publish.'
+  'The homepage business accounts see at /business and on the business store in the app. Each device has a layout of its own. Drag to reorder or pair sections, and expand a section to edit it. Until a device has sections of its own it shows the store homepage there. Changes are saved as a draft and go live only when you publish.'
 
 const AUDIENCE_TAB: Record<HomepageAudience, string> = { store: 'Store', business: 'Business' }
 // The kit's tabCls is client-only; same classes, usable from this server page.
@@ -76,74 +76,6 @@ const changed = (d: DraftDiff) => d.added + d.removed + d.edited + (d.reordered 
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-async function loadHeroData() {
-  const [cats, brands, grades, materials] = await Promise.all([
-    queryMany<{ slug: string; name: string }>(
-      `SELECT slug, name FROM categories WHERE is_active = true AND slug IS NOT NULL ORDER BY name`
-    ),
-    queryMany<{ id: string; name: string }>(`SELECT id, name FROM brands WHERE is_active = true ORDER BY name`),
-    queryMany<{ grade: string }>(
-      `SELECT DISTINCT grade FROM products WHERE grade IS NOT NULL AND grade != '' AND is_active = true ORDER BY grade`
-    ),
-    queryMany<{ material: string }>(
-      `SELECT DISTINCT material FROM products WHERE material IS NOT NULL AND material != '' AND is_active = true ORDER BY material`
-    ),
-  ])
-  return {
-    categoryOptions: cats.map(c => ({ value: c.slug, label: c.name })),
-    brandOptions: brands.map(b => ({ value: b.id, label: b.name })),
-    gradeOptions: grades.map(g => ({ value: g.grade, label: g.grade })),
-    materialOptions: materials.map(m => ({ value: m.material, label: m.material })),
-  }
-}
-
-async function loadSectionOptions(
-  categories: { value: string; label: string }[],
-  brands: { value: string; label: string }[]
-): Promise<SectionOptions> {
-  const [storefront, identity] = await Promise.all([getStorefrontContent(), getStoreIdentity()])
-  const counts = await queryOne<{
-    featured: string
-    new_arrivals: string
-    best_sellers: string
-    on_sale: string
-    bundles: string
-    approved_reviews: string
-  }>(
-    `SELECT
-       count(*) FILTER (WHERE is_featured = true)          AS featured,
-       count(*)                                            AS new_arrivals,
-       count(*)                                            AS best_sellers,
-       count(*) FILTER (WHERE mrp IS NOT NULL AND mrp > base_price) AS on_sale,
-       count(*) FILTER (WHERE is_bundle = true)            AS bundles,
-       (SELECT count(*) FROM product_reviews WHERE is_approved = true) AS approved_reviews
-     FROM products WHERE is_active = true`
-  ).catch(() => null)
-  const topCategories = await queryMany<{ id: string; name: string }>(
-    `SELECT id, name FROM categories WHERE parent_category_id IS NULL AND is_active = true ORDER BY display_order ASC, name ASC`
-  ).catch(() => [] as { id: string; name: string }[])
-
-  return {
-    categories,
-    brands,
-    topCategories: topCategories.map(c => ({ value: c.id, label: c.name })),
-    counts: {
-      featured: Number(counts?.featured ?? 0),
-      newArrivals: Number(counts?.new_arrivals ?? 0),
-      bestSellers: Number(counts?.best_sellers ?? 0),
-      onSale: Number(counts?.on_sale ?? 0),
-      bundles: Number(counts?.bundles ?? 0),
-      approvedReviews: Number(counts?.approved_reviews ?? 0),
-    },
-    copyDefaults: {
-      about: { subtitle: defaultAboutCopy(storefront.aboutCopy, identity.name) },
-    },
-    tileDefaults: {
-      about: resolveAboutStats(storefront.statsJson),
-    },
-  }
-}
 
 export default async function HomepagePage({
   searchParams,
@@ -182,11 +114,11 @@ export default async function HomepagePage({
   const audience: HomepageAudience = params.audience === 'business' && plan.business ? 'business' : 'store'
   const business = audience === 'business'
   const page = business ? 'home' : rowPage({ page: params.page })
-  // The device the selector highlights: each card's switch shows / hides the section there.
+  // The device whose layout is edited: every device has its own.
   const surface: HomepageSurface = HOMEPAGE_SURFACES.includes(params.surface as HomepageSurface) ? (params.surface as HomepageSurface) : 'web'
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
   const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
-  // One layout per page: every surface's sections, each with its own show/hide toggles.
+  // The manager keeps the edited device's rows.
   const sections = editable.sections.filter(s => rowAudience(s) === audience && rowPage(s) === page)
   const heroSlides = editable.heroSlides.filter(s => rowAudience(s) === audience)
   // The preview iframe opens the store on its own host with a signed token naming the draft.
@@ -198,6 +130,7 @@ export default async function HomepagePage({
   }
   const businessNeeds = planName(plan.businessUpgrade)
   const base = ap('/admin/settings/homepage', host)
+  const siteBuilderOn = await siteBuilderEnabled()
   const hrefFor = (p: HomepagePage, a: HomepageAudience = audience, s: HomepageSurface = surface) => {
     const q = new URLSearchParams()
     if (a === 'business') q.set('audience', a)
@@ -287,6 +220,13 @@ export default async function HomepagePage({
               <Badge tone="amber">{drafts.length === 1 ? '1 open draft' : `${drafts.length} open drafts`}</Badge>
             ) : null
           }
+          actions={<SiteBuilderSwitch target="homepage" live={!siteBuilderOn} />}
+        />
+        <SiteBuilderTabs
+          active="homepage"
+          live={siteBuilderOn ? 'site' : 'homepage'}
+          siteHref={ap('/admin/settings/site-builder', host)}
+          homepageHref={base}
         />
 
         {/* One tab line: Editor / Drafts, then the page tabs; Store / Business and Preview on the right. */}
@@ -372,11 +312,20 @@ export default async function HomepagePage({
         {draftId && <DraftBehindBanner info={behind} siblings={drafts.length - 1} noun="homepage" />}
 
         <HomepageLockBanner />
+        {siteBuilderOn && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+            Site Builder is live, so customers see the pages built there, not these layouts. Edit the site in{' '}
+            <Link href={ap('/admin/settings/site-builder', host)} className="font-medium underline">
+              Site Builder
+            </Link>
+            , or make the Homepage builder live again.
+          </div>
+        )}
 
 
-        {/* Keyed by homepage and page: both managers seed their state from props once. */}
+        {/* Keyed by homepage, page and device: both managers seed their state from props once. */}
         <HomepageSectionManager
-          key={`${audience}:${page}`}
+          key={`${audience}:${page}:${surface}`}
           audience={audience}
           page={page}
           surface={surface}
@@ -386,8 +335,9 @@ export default async function HomepagePage({
           upgrade={upgrade}
           heroEditor={
             <HeroSlidesBySurface
-              key={`hero-editor-${audience}`}
+              key={`hero-editor-${audience}-${surface}`}
               audience={audience}
+              surface={surface}
               initialSlides={heroSlides}
               categoryOptions={hero.categoryOptions}
               brandOptions={hero.brandOptions}

@@ -78,7 +78,8 @@ export function EntityPage({ header, tabs, notices, kpis, attention, main, aside
       {aside ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 xl:grid-cols-4">
           <div className="min-w-0 space-y-4 lg:col-span-2 xl:col-span-3">{main}</div>
-          <div className="min-w-0 space-y-4">{aside}</div>
+          {/* Desktop: the side cards stay in view (scrolling on their own) while main scrolls. */}
+          <div className="admin-sticky-pane min-w-0 space-y-4">{aside}</div>
         </div>
       ) : (
         <div className="space-y-4">{main}</div>

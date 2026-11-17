@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "f7e5987aedb2399f7e576852dd444a8a70cd7b33f2c46729de6ff05c1af090a1",
+ "manifestHash": "19bb41445f8868c8ef8e903c677577fa580f0b79b7e378e9a08950c958600129",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -37749,6 +37749,191 @@
    "command": "settings update"
   },
   {
+   "id": "admin GET /api/admin/settings/messaging-numbers/{channel}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/settings/messaging-numbers/{channel}",
+   "gatewayPath": "/v1/admin/settings/messaging-numbers/{channel}",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/messaging-numbers/[channel]/route.ts",
+   "pathParams": [
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin",
+       "ecom"
+      ],
+      "default": "customer"
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get a messaging number (settings)",
+   "command": "settings-messaging-numbers get"
+  },
+  {
+   "id": "admin PUT /api/admin/settings/messaging-numbers/{channel}",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/settings/messaging-numbers/{channel}",
+   "gatewayPath": "/v1/admin/settings/messaging-numbers/{channel}",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/messaging-numbers/[channel]/route.ts",
+   "pathParams": [
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin",
+       "ecom"
+      ],
+      "default": "customer"
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "twilio",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "account_sid": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "auth_token": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "api_key_sid": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "api_key_secret": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "messaging_service_sid": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     },
+     {}
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update a messaging number (settings)",
+   "command": "settings-messaging-numbers update"
+  },
+  {
+   "id": "admin DELETE /api/admin/settings/messaging-numbers/{channel}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/settings/messaging-numbers/{channel}",
+   "gatewayPath": "/v1/admin/settings/messaging-numbers/{channel}",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/messaging-numbers/[channel]/route.ts",
+   "pathParams": [
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin",
+       "ecom"
+      ],
+      "default": "customer"
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "string",
+    "enum": [
+     "sms",
+     "whatsapp"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Delete a messaging number (settings)",
+   "command": "settings-messaging-numbers delete"
+  },
+  {
    "id": "admin GET /api/admin/settings/providers",
    "host": "admin",
    "method": "GET",
@@ -38668,6 +38853,1532 @@
    "noBody": true,
    "summary": "Remove the store's own app for this method.",
    "command": "sign-in-methods delete"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder",
+   "gatewayPath": "/v1/admin/site-builder",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/route.ts",
+   "pathParams": [],
+   "query": [
+    "key",
+    "sample",
+    "theme"
+   ],
+   "queryParams": [
+    {
+     "name": "key",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "sample",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "theme",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "business"
+      ]
+     }
+    }
+   ],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET: whether Site Builder renders the store, its published pages and open drafts; with ?key=<audience:surface:page:slug>, that page's published document; with ?theme=store|business, the published theme tokens.",
+   "command": "site-builder get"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder",
+   "gatewayPath": "/v1/admin/site-builder",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "enabled": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "enabled"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "setup": {
+        "const": true,
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "setup"
+      ]
+     }
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submit site builder",
+   "command": "site-builder create"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/ai",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai",
+   "gatewayPath": "/v1/admin/site-builder/ai",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "ref": {
+      "type": "object",
+      "properties": {
+       "audience": {
+        "type": "string",
+        "enum": [
+         "store",
+         "business"
+        ]
+       },
+       "surface": {
+        "type": "string",
+        "enum": [
+         "web",
+         "web_mobile",
+         "app"
+        ]
+       },
+       "page": {
+        "type": "string",
+        "enum": [
+         "home",
+         "products",
+         "category",
+         "brand",
+         "categories",
+         "brands",
+         "product",
+         "cart",
+         "checkout",
+         "wishlist",
+         "compare",
+         "account",
+         "login",
+         "signup",
+         "about",
+         "contact",
+         "support",
+         "returns",
+         "legal",
+         "search",
+         "track",
+         "not_found",
+         "custom",
+         "quotes",
+         "orders",
+         "catalog",
+         "header",
+         "footer",
+         "announcement",
+         "card",
+         "showcase"
+        ]
+       }
+      },
+      "required": [
+       "audience",
+       "surface",
+       "page"
+      ]
+     },
+     "doc": {
+      "type": "object",
+      "properties": {
+       "blocks": {
+        "type": "object",
+        "additionalProperties": {}
+       },
+       "order": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "blocks",
+       "order"
+      ]
+     },
+     "prompt": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 2000
+     },
+     "blockId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 80
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "hint": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "ref",
+     "doc",
+     "prompt"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: an AI proposal for the page being edited: with blockId, that block corrected; without, the page built from the request. Returns the proposed document; the editor applies it as an undoable edit (nothing is saved here).",
+   "command": "site-builder ai"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/ai/code",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai/code",
+   "gatewayPath": "/v1/admin/site-builder/ai/code",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/code/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "ref": {
+      "type": "object",
+      "properties": {
+       "audience": {
+        "type": "string",
+        "enum": [
+         "store",
+         "business"
+        ]
+       },
+       "page": {
+        "type": "string",
+        "enum": [
+         "home",
+         "products",
+         "category",
+         "brand",
+         "categories",
+         "brands",
+         "product",
+         "cart",
+         "checkout",
+         "wishlist",
+         "compare",
+         "account",
+         "login",
+         "signup",
+         "about",
+         "contact",
+         "support",
+         "returns",
+         "legal",
+         "search",
+         "track",
+         "not_found",
+         "custom",
+         "quotes",
+         "orders",
+         "catalog",
+         "header",
+         "footer",
+         "announcement",
+         "card",
+         "showcase"
+        ]
+       }
+      },
+      "required": [
+       "audience",
+       "page"
+      ]
+     },
+     "block": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "maxLength": 80
+       },
+       "label": {
+        "type": "string",
+        "maxLength": 200
+       },
+       "source": {
+        "type": "string",
+        "minLength": 1
+       }
+      },
+      "required": [
+       "id",
+       "source"
+      ]
+     },
+     "instruction": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 1000
+     },
+     "hint": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "draftId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "ref",
+     "block",
+     "instruction"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: one code section changed as the owner asks, the way the AI Site Studio changes it (its brief, plan and design direction: a redesign draft's own, else those kept with the site at install; the store's own name and theme otherwise).",
+   "command": "site-builder-ai code"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/ai/compose",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai/compose",
+   "gatewayPath": "/v1/admin/site-builder/ai/compose",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/compose/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "page": {
+      "type": "string",
+      "enum": [
+       "home",
+       "products",
+       "category",
+       "brand",
+       "categories",
+       "brands",
+       "product",
+       "cart",
+       "checkout",
+       "wishlist",
+       "compare",
+       "account",
+       "login",
+       "signup",
+       "about",
+       "contact",
+       "support",
+       "returns",
+       "legal",
+       "search",
+       "track",
+       "not_found",
+       "custom",
+       "quotes",
+       "orders",
+       "catalog",
+       "header",
+       "footer",
+       "announcement",
+       "card",
+       "showcase"
+      ]
+     },
+     "prompt": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 2000
+     },
+     "current": {
+      "anyOf": [
+       {
+        "type": "object",
+        "properties": {
+         "label": {
+          "type": "string",
+          "maxLength": 80
+         },
+         "tree": {}
+        },
+        "required": [
+         "tree"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "hint": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "page",
+     "prompt"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: a custom block the AI composes from safe primitives and the store's own data (read-only tools), or the given block changed. Returns the block's settings; the editor adds it as an undoable edit (nothing is saved here).",
+   "command": "site-builder-ai compose"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/ai/page",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/ai/page",
+   "gatewayPath": "/v1/admin/site-builder/ai/page",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/page/route.ts",
+   "pathParams": [],
+   "query": [
+    "draft"
+   ],
+   "queryParams": [
+    {
+     "name": "draft",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get page (site builder AI)",
+   "command": "site-builder-ai page"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/ai/page",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai/page",
+   "gatewayPath": "/v1/admin/site-builder/ai/page",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/page/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "draftId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "ref": {
+      "type": "object",
+      "properties": {
+       "audience": {
+        "type": "string",
+        "enum": [
+         "store",
+         "business"
+        ]
+       },
+       "page": {
+        "type": "string",
+        "enum": [
+         "home",
+         "products",
+         "category",
+         "brand",
+         "categories",
+         "brands",
+         "product",
+         "cart",
+         "checkout",
+         "wishlist",
+         "compare",
+         "account",
+         "login",
+         "signup",
+         "about",
+         "contact",
+         "support",
+         "returns",
+         "legal",
+         "search",
+         "track",
+         "not_found",
+         "custom",
+         "quotes",
+         "orders",
+         "catalog",
+         "header",
+         "footer",
+         "announcement",
+         "card",
+         "showcase"
+        ]
+       }
+      },
+      "required": [
+       "audience",
+       "page"
+      ]
+     },
+     "surfaces": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "enum": [
+        "web",
+        "web_mobile"
+       ]
+      },
+      "minItems": 1,
+      "maxItems": 2
+     }
+    },
+    "required": [
+     "draftId",
+     "ref"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: one page of a draft (or its product card) designed again the AI Site Studio way, planned afresh and written section by section in the background into the draft (lib/site/studio/redesign.ts startPageRedo).",
+   "command": "site-builder-ai page-create"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/ai/site",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/ai/site",
+   "gatewayPath": "/v1/admin/site-builder/ai/site",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/site/route.ts",
+   "pathParams": [],
+   "query": [
+    "draft",
+    "fresh"
+   ],
+   "queryParams": [
+    {
+     "name": "draft",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "fresh",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get site (site builder AI)",
+   "command": "site-builder-ai site"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/ai/site",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai/site",
+   "gatewayPath": "/v1/admin/site-builder/ai/site",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/site/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "design": {
+      "type": "string",
+      "default": "keep"
+     },
+     "reference": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500,
+        "format": "uri"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "colours": {
+      "type": "string",
+      "enum": [
+       "keep",
+       "new"
+      ],
+      "default": "keep"
+     },
+     "expect": {
+      "type": "string",
+      "enum": [
+       "free",
+       "paid"
+      ]
+     },
+     "resume": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: starts the AI redesigning the whole site the AI Site Studio way into a new draft and returns its id at once; the build runs in the background (every page, so a while) and records its progress per page, then its charge, on the draft.",
+   "command": "site-builder-ai site-create"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/code",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/code",
+   "gatewayPath": "/v1/admin/site-builder/code",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/code/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "source": {
+      "type": "string"
+     },
+     "page": {
+      "type": "string",
+      "enum": [
+       "home",
+       "products",
+       "category",
+       "brand",
+       "categories",
+       "brands",
+       "product",
+       "cart",
+       "checkout",
+       "wishlist",
+       "compare",
+       "account",
+       "login",
+       "signup",
+       "about",
+       "contact",
+       "support",
+       "returns",
+       "legal",
+       "search",
+       "track",
+       "not_found",
+       "custom",
+       "quotes",
+       "orders",
+       "catalog",
+       "header",
+       "footer",
+       "announcement",
+       "card",
+       "showcase"
+      ]
+     },
+     "edits": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "maxLength": 12
+        },
+        "from": {
+         "type": "string",
+         "maxLength": 4000
+        },
+        "to": {
+         "type": "string",
+         "maxLength": 4000
+        }
+       },
+       "required": [
+        "id",
+        "from",
+        "to"
+       ]
+      },
+      "maxItems": 50
+     }
+    },
+    "required": [
+     "source",
+     "page"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { source, page }: a code section's editable words, links and pictures. With `edits`, the source with them written in (checked by the compiler) and its new list.",
+   "command": "site-builder code"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/critique",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/critique",
+   "gatewayPath": "/v1/admin/site-builder/critique",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/critique/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "ref": {
+      "type": "object",
+      "properties": {
+       "audience": {
+        "type": "string",
+        "enum": [
+         "store",
+         "business"
+        ]
+       },
+       "surface": {
+        "type": "string",
+        "enum": [
+         "web",
+         "web_mobile",
+         "app"
+        ]
+       },
+       "page": {
+        "type": "string",
+        "enum": [
+         "home",
+         "products",
+         "category",
+         "brand",
+         "categories",
+         "brands",
+         "product",
+         "cart",
+         "checkout",
+         "wishlist",
+         "compare",
+         "account",
+         "login",
+         "signup",
+         "about",
+         "contact",
+         "support",
+         "returns",
+         "legal",
+         "search",
+         "track",
+         "not_found",
+         "custom",
+         "quotes",
+         "orders",
+         "catalog",
+         "header",
+         "footer",
+         "announcement",
+         "card",
+         "showcase"
+        ]
+       }
+      },
+      "required": [
+       "audience",
+       "surface",
+       "page"
+      ]
+     },
+     "doc": {
+      "type": "object",
+      "properties": {
+       "blocks": {
+        "type": "object",
+        "additionalProperties": {}
+       },
+       "order": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "blocks",
+       "order"
+      ]
+     },
+     "theme": {
+      "anyOf": [
+       {
+        "type": "object",
+        "additionalProperties": {}
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "fix": {
+      "type": "boolean",
+      "default": false
+     }
+    },
+    "required": [
+     "ref",
+     "doc"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: the critique pass on the page being edited: what would look broken or empty to customers, and with `fix`, the page (and theme) with everything fixable fixed. Nothing is saved; the editor applies the result as an undoable edit.",
+   "command": "site-builder critique"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/drafts",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/drafts",
+   "gatewayPath": "/v1/admin/site-builder/drafts",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "List drafts (site builder)",
+   "command": "site-builder-drafts list"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/drafts",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/drafts",
+   "gatewayPath": "/v1/admin/site-builder/drafts",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "title": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 120
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Create a draft (site builder)",
+   "command": "site-builder-drafts create"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/drafts/{id}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/drafts/{id}",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get a draft (site builder)",
+   "command": "site-builder-drafts get"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/drafts/{id}",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/drafts/{id}",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Publishes the draft.",
+   "command": "site-builder-drafts post"
+  },
+  {
+   "id": "admin PUT /api/admin/site-builder/drafts/{id}",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/site-builder/drafts/{id}",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "page": {
+      "type": "object",
+      "properties": {
+       "ref": {
+        "type": "object",
+        "properties": {
+         "audience": {
+          "type": "string",
+          "enum": [
+           "store",
+           "business"
+          ]
+         },
+         "surface": {
+          "type": "string",
+          "enum": [
+           "web",
+           "web_mobile",
+           "app"
+          ]
+         },
+         "page": {
+          "type": "string",
+          "enum": [
+           "home",
+           "products",
+           "category",
+           "brand",
+           "categories",
+           "brands",
+           "product",
+           "cart",
+           "checkout",
+           "wishlist",
+           "compare",
+           "account",
+           "login",
+           "signup",
+           "about",
+           "contact",
+           "support",
+           "returns",
+           "legal",
+           "search",
+           "track",
+           "not_found",
+           "custom",
+           "quotes",
+           "orders",
+           "catalog",
+           "header",
+           "footer",
+           "announcement",
+           "card",
+           "showcase"
+          ]
+         },
+         "slug": {
+          "type": "string",
+          "maxLength": 120,
+          "pattern": "^[a-z0-9-]*$"
+         }
+        },
+        "required": [
+         "audience",
+         "surface",
+         "page"
+        ]
+       },
+       "doc": {}
+      },
+      "required": [
+       "ref",
+       "doc"
+      ]
+     },
+     "theme": {
+      "type": "object",
+      "properties": {
+       "audience": {
+        "type": "string",
+        "enum": [
+         "store",
+         "business"
+        ]
+       },
+       "tokens": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      },
+      "required": [
+       "audience",
+       "tokens"
+      ]
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Saves one page's document and/or a theme into the draft.",
+   "command": "site-builder-drafts update"
+  },
+  {
+   "id": "admin DELETE /api/admin/site-builder/drafts/{id}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/site-builder/drafts/{id}",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete a draft (site builder)",
+   "command": "site-builder-drafts delete"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/drafts/{id}/pack",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/drafts/{id}/pack",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}/pack",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/pack/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "packId": {
+      "type": "string",
+      "maxLength": 80
+     }
+    },
+    "required": [
+     "packId"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { packId }: apply a site pack to the draft: every page it has (desktop and phone) and its theme. Live only on publish. A ready-made theme comes as `theme:<style>.<palette>` (lib/site/themes): its pages and palette, the same way.",
+   "command": "site-builder-drafts pack"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/drafts/{id}/preview",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/drafts/{id}/preview",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}/preview",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/preview/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "business"
+      ]
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET ?audience=store|business: a short-lived token the store's own host accepts to render this draft (the canvas).",
+   "command": "site-builder-drafts preview"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/templates",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/templates",
+   "gatewayPath": "/v1/admin/site-builder/templates",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/templates/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET: built-in templates and the ones this store saved, and the ready-made themes whose pages are ready (lib/site/themes; applied through drafts/[id]/pack). POST: \"save as my template\". DELETE ?id=: remove a saved one.",
+   "command": "site-builder templates"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/templates",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/templates",
+   "gatewayPath": "/v1/admin/site-builder/templates",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/templates/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 120
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "kind": {
+      "const": "block",
+      "type": "string"
+     },
+     "pages": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "audience": {
+         "type": "string",
+         "enum": [
+          "store",
+          "business"
+         ]
+        },
+        "surface": {
+         "type": "string",
+         "enum": [
+          "web",
+          "web_mobile",
+          "app"
+         ]
+        },
+        "page": {
+         "type": "string",
+         "enum": [
+          "home",
+          "products",
+          "category",
+          "brand",
+          "categories",
+          "brands",
+          "product",
+          "cart",
+          "checkout",
+          "wishlist",
+          "compare",
+          "account",
+          "login",
+          "signup",
+          "about",
+          "contact",
+          "support",
+          "returns",
+          "legal",
+          "search",
+          "track",
+          "not_found",
+          "custom",
+          "quotes",
+          "orders",
+          "catalog",
+          "header",
+          "footer",
+          "announcement",
+          "card",
+          "showcase"
+         ]
+        },
+        "doc": {
+         "type": "object",
+         "properties": {
+          "blocks": {
+           "type": "object",
+           "additionalProperties": {}
+          },
+          "order": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         },
+         "required": [
+          "blocks",
+          "order"
+         ]
+        }
+       },
+       "required": [
+        "audience",
+        "surface",
+        "page",
+        "doc"
+       ]
+      },
+      "minItems": 1,
+      "maxItems": 40
+     }
+    },
+    "required": [
+     "name",
+     "pages"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Create a template (site builder)",
+   "command": "site-builder templates-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/site-builder/templates",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/site-builder/templates",
+   "gatewayPath": "/v1/admin/site-builder/templates",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/templates/route.ts",
+   "pathParams": [],
+   "query": [
+    "id"
+   ],
+   "queryParams": [
+    {
+     "name": "id",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete templates (site builder)",
+   "command": "site-builder templates-delete"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/versions",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/versions",
+   "gatewayPath": "/v1/admin/site-builder/versions",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/versions/route.ts",
+   "pathParams": [],
+   "query": [
+    "key"
+   ],
+   "queryParams": [
+    {
+     "name": "key",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "GET ?key=<audience:surface:page:slug>: a page's published versions. POST { key, version }: republish one.",
+   "command": "site-builder versions"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/versions",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/versions",
+   "gatewayPath": "/v1/admin/site-builder/versions",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/versions/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "key": {
+      "type": "string"
+     },
+     "version": {
+      "type": "integer",
+      "exclusiveMinimum": 0
+     }
+    },
+    "required": [
+     "key",
+     "version"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Create a version (site builder)",
+   "command": "site-builder versions-create"
   },
   {
    "id": "admin POST /api/admin/site-controls/logo",
@@ -42569,8 +44280,23 @@
      "optional": false
     }
    ],
-   "query": [],
-   "queryParams": [],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin",
+       "ecom"
+      ],
+      "default": "customer"
+     }
+    }
+   ],
    "scope": null,
    "scopeSource": null,
    "scopes": [],
@@ -42599,8 +44325,23 @@
      "optional": false
     }
    ],
-   "query": [],
-   "queryParams": [],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin",
+       "ecom"
+      ],
+      "default": "customer"
+     }
+    }
+   ],
    "scope": null,
    "scopeSource": null,
    "scopes": [],
@@ -42750,8 +44491,23 @@
      "optional": false
     }
    ],
-   "query": [],
-   "queryParams": [],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin",
+       "ecom"
+      ],
+      "default": "customer"
+     }
+    }
+   ],
    "scope": null,
    "scopeSource": null,
    "scopes": [],
@@ -42768,6 +44524,176 @@
    "bodyContentType": "application/json",
    "summary": "Delete a messaging sender",
    "command": "platform messaging-senders delete"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/{tenantId}/numbers",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/{tenantId}/numbers",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/numbers",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/numbers/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "List numbers",
+   "command": "platform numbers get"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/{tenantId}/numbers",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/{tenantId}/numbers",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/numbers",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/numbers/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "audience": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin"
+      ]
+     },
+     "number": {
+      "type": "string",
+      "pattern": "^\\+\\d{8,15}$"
+     },
+     "displayName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100
+     }
+    },
+    "required": [
+     "audience",
+     "number",
+     "displayName"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Create a number",
+   "command": "platform numbers create"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/{tenantId}/numbers",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/{tenantId}/numbers",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/numbers",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/numbers/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "audience": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin"
+      ]
+     },
+     "displayName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100
+     }
+    },
+    "required": [
+     "audience",
+     "displayName"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update numbers",
+   "command": "platform numbers update"
+  },
+  {
+   "id": "platform DELETE /api/admin/ecom/{tenantId}/numbers",
+   "host": "platform",
+   "method": "DELETE",
+   "path": "/api/admin/ecom/{tenantId}/numbers",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/numbers",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/numbers/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "audience"
+   ],
+   "queryParams": [
+    {
+     "name": "audience",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "customer",
+       "admin"
+      ]
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "string",
+    "enum": [
+     "customer",
+     "admin"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Delete numbers",
+   "command": "platform numbers delete"
   },
   {
    "id": "platform POST /api/admin/ecom/{tenantId}/reconcile-settlements",
@@ -44248,6 +46174,90 @@
    "command": "platform kyc cert"
   },
   {
+   "id": "platform GET /api/admin/ecom/kyc/{tenantId}/doc/{docId}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/kyc/{tenantId}/doc/{docId}",
+   "gatewayPath": "/v1/platform/ecom/kyc/{tenantId}/doc/{docId}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/kyc/[tenantId]/doc/[docId]/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    },
+    {
+     "name": "docId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "One licence or certificate a store submitted with its application (tenant_compliance_documents), for the KYC review.",
+   "command": "platform kyc-doc get"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/kyc/{tenantId}/doc/{docId}/review",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/kyc/{tenantId}/doc/{docId}/review",
+   "gatewayPath": "/v1/platform/ecom/kyc/{tenantId}/doc/{docId}/review",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/kyc/[tenantId]/doc/[docId]/review/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    },
+    {
+     "name": "docId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "decision": {
+      "type": "string",
+      "enum": [
+       "approved",
+       "rejected"
+      ]
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 1000
+     },
+     "version": {
+      "type": "string",
+      "maxLength": 512
+     }
+    },
+    "required": [
+     "decision"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Approve or reject one licence or certificate (tenant_compliance_documents), with an optional note the owner sees on the console's Licences & certificates page. Who and when are kept on the row.",
+   "command": "platform kyc-doc review"
+  },
+  {
    "id": "platform POST /api/admin/ecom/kyc/{tenantId}/reject",
    "host": "platform",
    "method": "POST",
@@ -44284,6 +46294,95 @@
    "bodyContentType": "application/json",
    "summary": "Reject a KYC",
    "command": "platform kyc reject"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/message-pricing",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/message-pricing",
+   "gatewayPath": "/v1/platform/ecom/message-pricing",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/message-pricing/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_billing:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:read"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get message pricing",
+   "command": "platform message-pricing get"
+  },
+  {
+   "id": "platform PUT /api/admin/ecom/message-pricing",
+   "host": "platform",
+   "method": "PUT",
+   "path": "/api/admin/ecom/message-pricing",
+   "gatewayPath": "/v1/platform/ecom/message-pricing",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/message-pricing/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_billing:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "marginPct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 500
+     },
+     "mediaInr": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+     },
+     "rates": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "object",
+       "properties": {
+        "costInr": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 1000
+        },
+        "feeInr": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 100
+        },
+        "exact": {
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "costInr",
+        "feeInr",
+        "exact"
+       ]
+      }
+     }
+    },
+    "required": [
+     "marginPct",
+     "mediaInr",
+     "rates"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Update message pricing",
+   "command": "platform message-pricing update"
   },
   {
    "id": "platform GET /api/admin/ecom/messaging-addon-pricing",
@@ -44414,6 +46513,42 @@
    "bodyContentType": "application/json",
    "summary": "Run (migrations)",
    "command": "platform migrations run-create"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/numbers/available",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/numbers/available",
+   "gatewayPath": "/v1/platform/ecom/numbers/available",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/numbers/available/route.ts",
+   "pathParams": [],
+   "query": [
+    "areaCode",
+    "country"
+   ],
+   "queryParams": [
+    {
+     "name": "areaCode",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "country",
+     "schema": {
+      "type": "string",
+      "default": "US"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Numbers the platform could buy for a store (Twilio, its own account): ?country=US&areaCode=872. Platform admins only.",
+   "command": "platform numbers available"
   },
   {
    "id": "platform GET /api/admin/ecom/store-status/overview",

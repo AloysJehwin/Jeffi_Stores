@@ -6,6 +6,7 @@ import { TabLinks } from '@/components/admin/kit/core'
 import ProvidersCard from '@/components/admin/site-controls/ProvidersCard'
 import ServerPricingClient from './ServerPricingClient'
 import MessagingAddonPricingClient from './MessagingAddonPricingClient'
+import MessagePricingClient from './MessagePricingClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'pricing', label: 'Server pricing', href: '/admin/ecom/configuration' },
   { id: 'providers', label: 'Providers', href: '/admin/ecom/configuration?tab=providers' },
   { id: 'messaging', label: 'SMS & WhatsApp add-on', href: '/admin/ecom/configuration?tab=messaging' },
+  { id: 'message-pricing', label: 'Message pricing', href: '/admin/ecom/configuration?tab=message-pricing' },
 ] as const
 type Tab = (typeof TABS)[number]['id']
 
@@ -21,7 +23,7 @@ export default async function ConfigurationPage({ searchParams }: { searchParams
   if (h.get('x-tenant-id')) notFound()
   if (!isPlatformAdmin(h.get('x-user-role') || '')) redirect('/admin')
   const { tab: raw } = await searchParams
-  const tab: Tab = raw === 'providers' || raw === 'messaging' ? raw : 'pricing'
+  const tab: Tab = raw === 'providers' || raw === 'messaging' || raw === 'message-pricing' ? raw : 'pricing'
   return (
     <PageBody>
       <PageHeader
@@ -29,7 +31,7 @@ export default async function ConfigurationPage({ searchParams }: { searchParams
         description="Server pricing and margins, the SMS & WhatsApp add-on fee, and which providers send messages and serve AI for every store."
       />
       <TabLinks tabs={TABS} value={tab} replace />
-      {tab === 'pricing' ? <ServerPricingClient /> : tab === 'messaging' ? <MessagingAddonPricingClient /> : <ProvidersCard />}
+      {tab === 'pricing' ? <ServerPricingClient /> : tab === 'messaging' ? <MessagingAddonPricingClient /> : tab === 'message-pricing' ? <MessagePricingClient /> : <ProvidersCard />}
     </PageBody>
   )
 }

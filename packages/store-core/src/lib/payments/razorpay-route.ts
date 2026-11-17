@@ -545,5 +545,11 @@ export function inferProfileCategory(productCategories: string | null): { catego
   if (cats.includes('food') || cats.includes('groceri'))
     return { category: 'food', subcategory: 'online_food_ordering' }
   if (cats.includes('health') || cats.includes('beauty')) return { category: 'healthcare', subcategory: 'pharmacy' }
+  // Razorpay's own ecommerce subcategories, spelling included ("equipements").
+  if (cats.includes('jewellery') || cats.includes('watches'))
+    return { category: 'ecommerce', subcategory: 'jewellery_and_watch_stores' }
+  if (cats.includes('pet supplies')) return { category: 'ecommerce', subcategory: 'pet_products' }
+  if (cats.includes('automotive')) return { category: 'ecommerce', subcategory: 'automobile_parts_and_equipements' }
+  if (cats.includes('agricultur') || cats.includes('gardening')) return { category: 'ecommerce', subcategory: 'agriculture' }
   return { category: 'ecommerce', subcategory: 'ecommerce_marketplace' }
 }

@@ -263,6 +263,13 @@ export default async function SiteControlsPage() {
                         type="color"
                         initial={c.identity.emailAccent || '#2563eb'}
                       />
+                      <TextControl
+                        settingKey="meta_tagline"
+                        label="Tagline"
+                        hint="Under your logo and in the browser tab."
+                        initial={c.storefront.metaTagline}
+                        placeholder="Handwoven silk from Kanchipuram"
+                      />
                       <FullSpan>
                         <TextAreaControl
                           settingKey="business_hours"
@@ -272,6 +279,27 @@ export default async function SiteControlsPage() {
                           rows={3}
                         />
                       </FullSpan>
+                    </SectionCard>
+                  </div>
+                  <div>
+                    <SectionCard
+                      title="WhatsApp & social links"
+                      description="Shown on your site so customers can message and follow you. Paste a profile link or type the handle; leave a field empty to hide it."
+                      columns
+                    >
+                      <TextControl
+                        settingKey="business_whatsapp"
+                        label="WhatsApp number"
+                        hint="With the country code."
+                        initial={c.identity.whatsapp ? `+${c.identity.whatsapp}` : ''}
+                        placeholder="+91 98765 43210"
+                      />
+                      <TextControl settingKey="social_instagram" label="Instagram" initial={c.identity.socials.instagram ?? ''} placeholder="@yourstore" />
+                      <TextControl settingKey="social_facebook" label="Facebook" initial={c.identity.socials.facebook ?? ''} placeholder="facebook.com/yourstore" />
+                      <TextControl settingKey="social_youtube" label="YouTube" initial={c.identity.socials.youtube ?? ''} placeholder="@yourstore" />
+                      <TextControl settingKey="social_x" label="X" initial={c.identity.socials.x ?? ''} placeholder="@yourstore" />
+                      <TextControl settingKey="social_linkedin" label="LinkedIn" initial={c.identity.socials.linkedin ?? ''} placeholder="linkedin.com/company/yourstore" />
+                      <TextControl settingKey="social_pinterest" label="Pinterest" initial={c.identity.socials.pinterest ?? ''} placeholder="pinterest.com/yourstore" />
                     </SectionCard>
                   </div>
                   <div>

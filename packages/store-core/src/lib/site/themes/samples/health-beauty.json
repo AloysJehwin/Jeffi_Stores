@@ -1,0 +1,479 @@
+{
+ "store": {
+  "name": ""
+ },
+ "categories": [
+  {
+   "slug": "face-care",
+   "name": "Face Care",
+   "description": "Serums, moisturisers, face washes and sunscreens for every skin type.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "hair-care",
+   "name": "Hair Care",
+   "description": "Hair oils, shampoos and treatments to nourish from root to tip.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "body-care",
+   "name": "Body Care",
+   "description": "Lotions and balms that keep skin soft through dry and humid seasons.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "lip-care",
+   "name": "Lip Care",
+   "description": "Lip balms and tints that protect and hydrate through the day.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "sun-protection",
+   "name": "Sun Protection",
+   "description": "Broad-spectrum sunscreens made for Indian sunshine and sweat.",
+   "parent": null,
+   "image": null
+  }
+ ],
+ "brands": [
+  {
+   "slug": "sample-store-essentials",
+   "name": "Sample Store Essentials",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "neem-glow",
+   "name": "Neem & Glow",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "himalaya-roots",
+   "name": "Himalaya Roots",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "dew-botanics",
+   "name": "Dew Botanics",
+   "featured": false,
+   "logo": null
+  }
+ ],
+ "products": [
+  {
+   "slug": "vitamin-c-brightening-face-serum",
+   "name": "Vitamin C Brightening Face Serum",
+   "price": 649,
+   "mrp": 799,
+   "category": "face-care",
+   "brand": "sample-store-essentials",
+   "description": "A lightweight serum with stabilised vitamin C to even out tone and add a healthy glow. Absorbs quickly under moisturiser.",
+   "attributes": {
+    "Material": "Water-based serum",
+    "Volume": "30 ml",
+    "Skin Type": "All skin types",
+    "Origin": "Made in India",
+    "Shelf Life": "12 months after opening 6 months"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Amber glass dropper bottle with a white label on a soft beige background, a few citrus slices beside it, bright natural light."
+  },
+  {
+   "slug": "niacinamide-oil-control-moisturiser",
+   "name": "Niacinamide Oil-Control Moisturiser",
+   "price": 449,
+   "mrp": null,
+   "category": "face-care",
+   "brand": "sample-store-essentials",
+   "description": "A gel-cream moisturiser that hydrates without heaviness and helps control shine through the day.",
+   "attributes": {
+    "Material": "Gel-cream",
+    "Volume": "50 g",
+    "Skin Type": "Oily and combination",
+    "Origin": "Made in India",
+    "Fragrance": "Fragrance-free"
+   },
+   "badge": null,
+   "featured": true,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "White squeeze tube with a minimal teal label, a smooth swatch of gel cream on a pale grey surface."
+  },
+  {
+   "slug": "gentle-foaming-face-wash",
+   "name": "Gentle Foaming Face Wash",
+   "price": 299,
+   "mrp": 350,
+   "category": "face-care",
+   "brand": "neem-glow",
+   "description": "A mild foaming wash with neem extract that cleans away oil and pollution without stripping the skin.",
+   "attributes": {
+    "Material": "Foaming gel",
+    "Volume": "100 ml",
+    "Skin Type": "Normal to oily",
+    "Origin": "Made in India",
+    "Key Ingredient": "Neem leaf extract"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Green pump bottle beside fresh neem leaves on a wooden tray, with soft white foam on a wet stone."
+  },
+  {
+   "slug": "ultra-light-matte-sunscreen-spf-50",
+   "name": "Ultra Light Matte Sunscreen SPF 50",
+   "price": 525,
+   "mrp": 650,
+   "category": "sun-protection",
+   "brand": "sample-store-essentials",
+   "description": "A fast-absorbing sunscreen with broad-spectrum protection and a non-greasy matte finish, made for Indian sun and sweat.",
+   "attributes": {
+    "Material": "Lightweight fluid",
+    "Volume": "50 g",
+    "SPF": "50 PA++++",
+    "Skin Type": "All skin types",
+    "Water Resistance": "Up to 80 minutes"
+   },
+   "badge": "New",
+   "featured": true,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Slim white tube with orange cap and a sunny yellow backdrop, a bead of sunscreen on a palm."
+  },
+  {
+   "slug": "mineral-tinted-sunscreen-spf-30",
+   "name": "Mineral Tinted Sunscreen SPF 30",
+   "price": 595,
+   "mrp": null,
+   "category": "sun-protection",
+   "brand": "dew-botanics",
+   "description": "A sheer tinted sunscreen that blends with Indian skin tones and evens out the complexion while protecting from UVA and UVB.",
+   "attributes": {
+    "Material": "Mineral tinted cream",
+    "Volume": "40 g",
+    "SPF": "30 PA+++",
+    "Skin Type": "Sensitive",
+    "Shade": "Light to medium"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Frosted glass jar with a rose gold lid, a small swatch of tinted cream on a marble tile."
+  },
+  {
+   "slug": "onion-bhringraj-hair-oil",
+   "name": "Onion & Bhringraj Hair Oil",
+   "price": 375,
+   "mrp": 425,
+   "category": "hair-care",
+   "brand": "himalaya-roots",
+   "description": "A nourishing blend of cold-pressed sesame oil, onion extract and bhringraj to support strong, shiny hair.",
+   "attributes": {
+    "Material": "Herbal hair oil",
+    "Volume": "200 ml",
+    "Base Oil": "Cold-pressed sesame",
+    "Origin": "Made in India",
+    "Hair Type": "All hair types"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Brown glass bottle with a cream label, a sprig of bhringraj leaves and a small brass bowl of oil."
+  },
+  {
+   "slug": "argan-amla-shampoo",
+   "name": "Argan & Amla Shampoo",
+   "price": 425,
+   "mrp": null,
+   "category": "hair-care",
+   "brand": "dew-botanics",
+   "description": "A sulphate-free shampoo with argan oil and amla to cleanse gently and leave hair soft and manageable.",
+   "attributes": {
+    "Material": "Creamy liquid",
+    "Volume": "250 ml",
+    "Hair Type": "Dry and frizzy",
+    "Sulphate Free": "Yes",
+    "Fragrance": "Light floral"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Frosted white bottle with a sage green label, halved amla fruit and a few argan kernels beside it."
+  },
+  {
+   "slug": "rosemary-scalp-serum",
+   "name": "Rosemary Scalp Serum",
+   "price": 549,
+   "mrp": 699,
+   "category": "hair-care",
+   "brand": "neem-glow",
+   "description": "A leave-on scalp serum with rosemary and caffeine to support a healthy scalp and reduce breakage.",
+   "attributes": {
+    "Material": "Leave-on serum",
+    "Volume": "50 ml",
+    "Hair Type": "All hair types",
+    "Key Ingredient": "Rosemary oil, caffeine",
+    "Application": "Apply to scalp, massage"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Slender dropper bottle with a dark green label, fresh rosemary sprigs tied with twine on a linen cloth."
+  },
+  {
+   "slug": "coconut-honey-body-lotion",
+   "name": "Coconut & Honey Body Lotion",
+   "price": 349,
+   "mrp": 399,
+   "category": "body-care",
+   "brand": "sample-store-essentials",
+   "description": "A rich yet quick-absorbing lotion with coconut oil and honey to keep skin soft for up to 24 hours.",
+   "attributes": {
+    "Material": "Lotion",
+    "Volume": "400 ml",
+    "Skin Type": "Dry skin",
+    "Origin": "Made in India",
+    "Fragrance": "Mild coconut"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Tall pump bottle with a warm cream label, a honeycomb piece and half a coconut on a wooden surface."
+  },
+  {
+   "slug": "shea-butter-body-lotion",
+   "name": "Shea Butter Body Lotion",
+   "price": 499,
+   "mrp": null,
+   "category": "body-care",
+   "brand": "dew-botanics",
+   "description": "A deeply hydrating body lotion with shea butter and vitamin E for skin that feels cushioned all day.",
+   "attributes": {
+    "Material": "Whipped lotion",
+    "Volume": "250 ml",
+    "Skin Type": "Very dry skin",
+    "Fragrance": "Unscented",
+    "Key Ingredient": "Shea butter, vitamin E"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Soft pink tub with a cream label, a scoop of whipped lotion resting on a ceramic dish."
+  },
+  {
+   "slug": "kokum-butter-lip-balm",
+   "name": "Kokum Butter Lip Balm",
+   "price": 149,
+   "mrp": 180,
+   "category": "lip-care",
+   "brand": "himalaya-roots",
+   "description": "A nourishing lip balm with kokum butter and beeswax that softens and protects chapped lips.",
+   "attributes": {
+    "Material": "Balm stick",
+    "Weight": "4.5 g",
+    "Flavour": "Unflavoured",
+    "Origin": "Made in India",
+    "Key Ingredient": "Kokum butter, beeswax"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Round tin with a natural kraft label beside a lip balm stick, a kokum fruit cut in half."
+  },
+  {
+   "slug": "rose-tinted-lip-balm",
+   "name": "Rose Tinted Lip Balm",
+   "price": 199,
+   "mrp": null,
+   "category": "lip-care",
+   "brand": "dew-botanics",
+   "description": "A sheer rose-tinted balm with jojoba oil for a soft, natural colour and lasting moisture.",
+   "attributes": {
+    "Material": "Tinted balm stick",
+    "Weight": "4 g",
+    "Flavour": "Rose",
+    "Shade": "Sheer rose",
+    "Key Ingredient": "Jojoba oil"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Slim rose-gold balm stick with the cap off, a few dried rose petals on a white background."
+  },
+  {
+   "slug": "everyday-sample-store-face-mist",
+   "name": "Everyday Sample Store Face Mist",
+   "price": 275,
+   "mrp": null,
+   "category": "face-care",
+   "brand": "sample-store-essentials",
+   "description": "A cooling mist with rose water and aloe to refresh skin at any time of day.",
+   "attributes": {
+    "Material": "Aqueous mist",
+    "Volume": "100 ml",
+    "Skin Type": "All skin types",
+    "Origin": "Made in India",
+    "Fragrance": "Light rose"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Clear spray bottle with a white cap and a pale pink label, dewy droplets on a pale green leaf."
+  },
+  {
+   "slug": "aloe-vera-hydrating-gel",
+   "name": "Aloe Vera Hydrating Gel",
+   "price": 225,
+   "mrp": 275,
+   "category": "body-care",
+   "brand": "neem-glow",
+   "description": "A pure aloe gel that soothes, cools and hydrates skin, suitable for face and body.",
+   "attributes": {
+    "Material": "Gel",
+    "Volume": "150 g",
+    "Skin Type": "All skin types",
+    "Origin": "Made in India",
+    "Aloe Content": "90%"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Clear jar of aloe gel with a green lid, a cut aloe leaf beside it on a sunlit windowsill."
+  },
+  {
+   "slug": "tea-tree-balancing-toner",
+   "name": "Tea Tree Balancing Toner",
+   "price": 355,
+   "mrp": null,
+   "category": "face-care",
+   "brand": "neem-glow",
+   "description": "An alcohol-free toner with tea tree and witch hazel to refine pores and calm blemish-prone skin.",
+   "attributes": {
+    "Material": "Liquid toner",
+    "Volume": "150 ml",
+    "Skin Type": "Oily and acne-prone",
+    "Alcohol Free": "Yes",
+    "Key Ingredient": "Tea tree, witch hazel"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Amber dropper bottle with a green label, a tea tree sprig and a cotton pad on a light wood tray."
+  },
+  {
+   "slug": "brightening-under-eye-cream",
+   "name": "Brightening Under-Eye Cream",
+   "price": 479,
+   "mrp": 549,
+   "category": "face-care",
+   "brand": "sample-store-essentials",
+   "description": "A gentle eye cream with caffeine and peptides to help reduce the look of dark circles and puffiness.",
+   "attributes": {
+    "Material": "Cream",
+    "Volume": "15 g",
+    "Skin Type": "All skin types",
+    "Key Ingredient": "Caffeine, peptides",
+    "Application": "Pat gently around eye area"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Small airless pump tube in matte white, a soft cotton ball on a cream-coloured silk backdrop."
+  },
+  {
+   "slug": "hibiscus-strengthening-conditioner",
+   "name": "Hibiscus Strengthening Conditioner",
+   "price": 395,
+   "mrp": null,
+   "category": "hair-care",
+   "brand": "himalaya-roots",
+   "description": "A conditioner with hibiscus and hydrolysed protein that detangles and reinforces hair from root to tip.",
+   "attributes": {
+    "Material": "Creamy conditioner",
+    "Volume": "200 ml",
+    "Hair Type": "Damaged and colour-treated",
+    "Origin": "Made in India",
+    "Key Ingredient": "Hibiscus, hydrolysed protein"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Deep red-pink bottle with a cream label, fresh hibiscus flowers scattered around its base."
+  },
+  {
+   "slug": "sample-store-lip-scrub",
+   "name": "Sample Store Lip Scrub",
+   "price": 249,
+   "mrp": 299,
+   "category": "lip-care",
+   "brand": "sample-store-essentials",
+   "description": "A gentle sugar lip scrub with coconut oil that buffs away dry flakes for smoother lips.",
+   "attributes": {
+    "Material": "Sugar scrub",
+    "Weight": "15 g",
+    "Flavour": "Vanilla",
+    "Origin": "Made in India",
+    "Key Ingredient": "Raw sugar, coconut oil"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Small white jar with a vanilla-coloured label, a spoonful of golden sugar scrub on a wooden spoon."
+  }
+ ],
+ "reviews": [
+  {
+   "productSlug": "shea-butter-body-lotion",
+   "rating": 5,
+   "title": null,
+   "comment": "Lovely shea butter body lotion, just as described and well packed.",
+   "author": "Ananya S."
+  },
+  {
+   "productSlug": "ultra-light-matte-sunscreen-spf-50",
+   "rating": 5,
+   "title": null,
+   "comment": "Lovely ultra light matte sunscreen spf 50, just as described and well packed.",
+   "author": "Rohit K."
+  },
+  {
+   "productSlug": "tea-tree-balancing-toner",
+   "rating": 5,
+   "title": null,
+   "comment": "Lovely tea tree balancing toner, just as described and well packed.",
+   "author": "Meera P."
+  },
+  {
+   "productSlug": "vitamin-c-brightening-face-serum",
+   "rating": 4,
+   "title": null,
+   "comment": "Lovely vitamin c brightening face serum, just as described and well packed.",
+   "author": "Arjun N."
+  }
+ ],
+ "offers": []
+}

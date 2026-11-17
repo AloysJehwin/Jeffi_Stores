@@ -7,6 +7,8 @@ import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { handleInboundWhatsApp } from '@controller/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
 import { routeAdminWhatsApp } from '@controller/lib/admin-agent/whatsapp'
+import { resolveInbound } from '@controller/lib/messaging/inbound-number'
+import type { TenantContext } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -45,8 +47,7 @@ export async function POST(request: NextRequest) {
   const ctx = tenantId ? await lookupTenantContextById(tenantId).catch(() => null) : null
   if (tenantId && !ctx) return new NextResponse(null, { status: 204 })
   try {
-    const run = () => handle(env.Message)
-    await (ctx ? runWithTenantContext(ctx, run) : run())
+    await handle(env.Message, ctx, tenantId || null)
     return new NextResponse(null, { status: 204 })
   } catch (err) {
     console.error('[aws-messaging] event failed', err instanceof Error ? err.message : err)
@@ -55,7 +56,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handle(raw: string): Promise<void> {
+const inCtx = <T>(ctx: TenantContext | null, fn: () => Promise<T>) => (ctx ? runWithTenantContext(ctx, fn) : fn())
+
+/** Statuses run in the `?t=` store's context; each inbound message in the context of the store that owns the number
+ *  it was sent to (tenant_messaging_senders), falling back to the hint. */
+async function handle(raw: string, hintCtx: TenantContext | null, hint: string | null): Promise<void> {
   let event: any
   try {
     event = JSON.parse(raw)
@@ -64,7 +69,7 @@ async function handle(raw: string): Promise<void> {
   }
 
   if (event?.eventType && SMS_STATUS[event.eventType] && event.messageId) {
-    await applyDeliveryStatus({ providerSid: event.messageId, status: SMS_STATUS[event.eventType], provider: 'aws', error: event.messageStatusDescription ?? null })
+    await inCtx(hintCtx, () => applyDeliveryStatus({ providerSid: event.messageId, status: SMS_STATUS[event.eventType], provider: 'aws', error: event.messageStatusDescription ?? null }))
     return
   }
   if (!event?.whatsAppWebhookEntry) return
@@ -73,24 +78,41 @@ async function handle(raw: string): Promise<void> {
     const ours = value.metadata?.display_phone_number ? `+${value.metadata.display_phone_number.replace(/\D/g, '')}` : ''
     for (const st of value.statuses ?? []) {
       const error = st.errors?.[0] ? st.errors[0].title || st.errors[0].message || `Error ${st.errors[0].code}` : null
-      await applyDeliveryStatus({ providerSid: st.id, status: st.status, provider: 'aws', error })
+      await inCtx(hintCtx, () => applyDeliveryStatus({ providerSid: st.id, status: st.status, provider: 'aws', error }))
     }
-    for (const m of value.messages ?? []) {
+    if (!value.messages?.length) continue
+    const target = await resolveInbound(ours, 'whatsapp', hint)
+    const ctx = target.tenantId ? await lookupTenantContextById(target.tenantId).catch(() => null) : null
+    if (target.tenantId && !ctx) continue
+    for (const m of value.messages) {
       if (m.type === 'reaction' || m.type === 'system' || m.type === 'unsupported') continue
       const media = cloudInboundMedia(m)
       const profile = value.contacts?.find(c => c.wa_id === m.from)?.profile?.name ?? null
       const from = `+${m.from.replace(/\D/g, '')}`
-      if (await routeAdminWhatsApp({ providerSid: m.id, from, to: ours, text: cloudInboundText(m), hasMedia: !!media, repliedToSid: m.context?.id ?? null })) continue
-      const r = await handleInboundWhatsApp({
-        provider: 'aws',
+      const repliedToSid = m.context?.id ?? null
+      const inbound = {
+        provider: 'aws' as const,
         providerSid: m.id,
         from,
         to: ours,
         text: cloudInboundText(m),
         profileName: profile,
         media: media ? [{ ref: media.id, mime: media.mime, filename: media.filename ?? null }] : [],
+      }
+      await inCtx(ctx, async () => {
+        // Same rules as the Twilio webhook: the admin number serves staff only, the ecom number goes to the team.
+        if (target.audience === 'admin') {
+          await routeAdminWhatsApp({ providerSid: m.id, from, to: ours, text: inbound.text, hasMedia: !!media, repliedToSid, receivedOn: 'admin' })
+          return
+        }
+        if (target.audience === 'ecom') {
+          await handleInboundWhatsApp({ ...inbound, audience: 'ecom' })
+          return
+        }
+        if (await routeAdminWhatsApp({ providerSid: m.id, from, to: ours, text: inbound.text, hasMedia: !!media, repliedToSid, receivedOn: 'customer', separateAdminNumber: target.separateAdminNumber })) return
+        const r = await handleInboundWhatsApp(inbound)
+        if (r) await onCustomerMessage(r.session, r.message, { repliedToSid, phone: m.from })
       })
-      if (r) await onCustomerMessage(r.session, r.message, { repliedToSid: m.context?.id ?? null, phone: m.from })
     }
   }
 }

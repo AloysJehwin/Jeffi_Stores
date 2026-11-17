@@ -133,7 +133,7 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
     'Your application is under review',
     `
     <p style="margin:0 0 14px;">Hi ${name},</p>
-    <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details and GST certificate, and our team has started the verification.</p>
+    <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details, licences and certificates, and our team has started the verification.</p>
     ${notice(
       ecomPaymentsEnabled()
         ? 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.'
@@ -172,7 +172,7 @@ export async function sendKycApprovedEmail(
       'Your application has been approved',
       `
     <p style="margin:0 0 14px;">Hi ${name},</p>
-    <p style="margin:0 0 14px;">Your GST certificate has been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
+    <p style="margin:0 0 14px;">Your business details and licences have been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
     ${detailTable([
       { label: 'Store name', value: tenant.display_name },
       { label: 'Store address', value: `${tenant.slug}.jeffistores.in` },
@@ -190,7 +190,7 @@ export async function sendKycApprovedEmail(
     'Your application has been approved',
     `
     <p style="margin:0 0 14px;">Hi ${name},</p>
-    <p style="margin:0 0 14px;">Your GST certificate has been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
+    <p style="margin:0 0 14px;">Your business details and licences have been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
     ${detailTable([
       { label: 'Store name', value: tenant.display_name },
       { label: 'Store address', value: `${tenant.slug}.jeffistores.in` },
@@ -425,3 +425,9 @@ export async function sendDomainEmail(
   )
   await send(owner.email, mail.subject, html)
 }
+
+/** A notice about the owner's Showcase site (renewal, short wallet, paused, a new enquiry). Lines and rows are HTML. */
+export const sendShowcaseEmail = sendDomainEmail
+
+/** A notice about one of the store's licences (not accepted, expiring, expired). Lines and rows are HTML. */
+export const sendComplianceEmail = sendDomainEmail

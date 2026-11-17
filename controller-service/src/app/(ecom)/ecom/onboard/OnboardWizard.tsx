@@ -3,8 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
-import { FileText } from 'lucide-react'
-import { ChoiceCards, ChoiceChips, Segmented } from '../_ui'
+import { ChoiceCards, Segmented } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
 import { PhoneInput } from '../_ui/phone'
 import { trackStoreApplication } from '@controller/lib/client/ecom-analytics'
@@ -12,11 +11,15 @@ import { ComputeConfigurator, type ComputeChoice } from '../_compute/ComputeConf
 import PageHeader from '../dashboard/_components/PageHeader'
 import { Card, Row } from '../dashboard/_components/Card'
 import OnboardShell from './OnboardShell'
-import { WIZARD_STEPS } from './steps'
+import { WIZARD_STEPS, resumeStep, stepIndex, type WizardStepKey } from './steps'
 import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
 import { ADDON_INFO, cleanAddonIds, type AddonId, type AddonPrice } from '@/lib/billing/addons'
-import DomainSearch from '../_domains/DomainSearch'
 import ContactFields from '../_domains/ContactFields'
+import SiteStudio, { type StudioSummary } from './_studio/SiteStudio'
+import GiftCard, { FreeChip } from './_studio/GiftCard'
+import StoreStep, { type DomainPick } from './StoreStep'
+import { initialStoreDetails, storeDetailsPayload, storeDetailsProblem, type StoreDetails } from './store-details'
+import { DOCS, complianceProblem, compliancePlan, planQuestions, requiredDocs, type ComplianceState } from '@controller/lib/catalog/compliance'
 import { contactProblem, EMPTY_CONTACT, type DomainContact } from '../_domains/types'
 import { defaultContact } from '@controller/lib/domains/contact'
 
@@ -31,31 +34,22 @@ type Interval = 'monthly' | 'yearly'
 
 const STEPS = WIZARD_STEPS
 
-const HEAD: Record<StepIdx, { title: string; description: string }> = {
-  0: { title: 'Choose your plan', description: 'All plans include the full storefront. One subscription — plan and servers together. Cancel anytime.' },
-  1: { title: 'Name your store', description: 'This is what your customers will see.' },
-  2: { title: 'Business details', description: 'Legal information for compliance and invoicing.' },
-  3: { title: 'GST details', description: 'Only if your business is GST-registered. Leave blank if it is not.' },
-  4: { title: 'Pickup warehouse', description: 'Where Delhivery will pick up your orders. You can edit this later.' },
-  5: { title: 'Payout bank account', description: 'Where your sales will be settled. We verify instantly via a ₹1 bank check.' },
-  6: { title: 'Branding & legals', description: 'Your logo and seal appear on your storefront and legal documents.' },
-  7: { title: 'Review & submit', description: 'We’ll review your GST certificate and notify you when your store is approved.' },
+const HEAD: Record<WizardStepKey, { title: string; description: string }> = {
+  plan: { title: 'Choose your plan', description: 'All plans include the full storefront. One subscription — plan and servers together. Cancel anytime.' },
+  store: { title: 'Your store', description: 'What your customers see on your site, what you sell, and the licences it needs.' },
+  site: { title: 'Your site', description: 'Describe your store and watch the AI design every page, on desktop and phone. It goes live with your store.' },
+  business: { title: 'Business details', description: 'Legal information for compliance and invoicing.' },
+  gst: { title: 'GST details', description: 'Only if your business is GST-registered. Leave blank if it is not.' },
+  warehouse: { title: 'Pickup warehouse', description: 'Where Delhivery will pick up your orders. You can edit this later.' },
+  bank: { title: 'Payout bank account', description: 'Where your sales will be settled. We verify instantly via a ₹1 bank check.' },
+  branding: { title: 'Branding & legals', description: 'Your seal goes on invoices and legal documents; your name and mobile are for your account.' },
+  review: { title: 'Review & submit', description: 'We’ll review your licences and certificates and notify you when your store is approved.' },
 }
 
-type StepIdx = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+const S = Object.fromEntries(WIZARD_STEPS.map(s => [s.key, s.id])) as Record<WizardStepKey, number>
+const REVIEW = stepIndex('review')
 
-const PRODUCT_CATEGORIES = [
-  'Electronics & Gadgets',
-  'Fashion & Apparel',
-  'Home & Kitchen',
-  'Health & Beauty',
-  'Books & Stationery',
-  'Sports & Fitness',
-  'Toys & Games',
-  'Industrial & B2B',
-  'Food & Groceries',
-  'Other',
-]
+const HTTPS_URL = /^https:\/\/[^\s/$.?#][^\s]*$/i
 
 const BUSINESS_TYPES = [
   { value: 'proprietor', label: 'Sole Proprietorship' },
@@ -133,11 +127,15 @@ export default function OnboardWizard({
   const { showToast } = useToast()
   const init = initialDraft?.data ?? {}
 
-  const [step, setStep] = useState<StepIdx>((initialDraft?.current_step as StepIdx) ?? 0)
+  // A draft resumes at its step's key; one saved before the reorder by what its position meant then.
+  const [step, setStep] = useState<number>(() => resumeStep(initialDraft?.current_step, init.stepId))
+  // The furthest step reached this visit: the rail links back and forward up to it.
+  const [furthest, setFurthest] = useState<number>(step)
+  const key: WizardStepKey = WIZARD_STEPS[step].key
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  // Step 0 — Plan
+  // Plan
   // A draft may name a plan that has since been retired (Starter): start from Basic instead.
   const [planSlug, setPlanSlug] = useState<string>(
     plans.some(p => p.slug === init.planSlug) ? init.planSlug : (plans.find(p => p.slug === 'basic') ?? plans[0])?.slug ?? 'basic'
@@ -148,26 +146,33 @@ export default function OnboardWizard({
   const [addonIds, setAddonIds] = useState<AddonId[]>(() => cleanAddonIds(init.addons).filter(id => addons.some(a => a.id === id)))
   const addonsMonth = addons.filter(a => addonIds.includes(a.id)).reduce((sum, a) => sum + a.priceInr, 0)
 
-  // Step 1 — Store
+  // Store: what the site shows, what it sells and the licences that needs (StoreStep).
   const [displayName, setDisplayName] = useState(init.displayName ?? '')
   const [slug, setSlug] = useState(init.slug ?? '')
   const [slugEdited, setSlugEdited] = useState(!!init.slug)
   const [productCats, setProductCats] = useState<string[]>(init.productCats ?? [])
+  const [details, setDetails] = useState<StoreDetails>(() => initialStoreDetails(init, owner.email))
+  const [compliance, setCompliance] = useState<ComplianceState>(() => ({
+    answers: { ...(init.compliance?.answers ?? {}) },
+    docs: { ...(init.compliance?.docs ?? {}) },
+  }))
 
-  // Step 2 — Business
+  // Business
   const [bizName, setBizName] = useState(init.bizName ?? '')
   const [bizType, setBizType] = useState(init.bizType ?? '')
   const [pan, setPan] = useState(init.pan ?? '')
   const [bizAddress, setBizAddress] = useState(init.bizAddress ?? '')
 
-  // Step 3 — GST
+  // GST: the number here; the certificate is uploaded with the licences in the Store step.
   const [gstNumber, setGstNumber] = useState(init.gstNumber ?? '')
   const [gstS3Key, setGstS3Key] = useState(init.gstS3Key ?? '')
   const [gstFilename, setGstFilename] = useState(init.gstFilename ?? '')
-  const [uploadingGst, setUploadingGst] = useState(false)
-  const [gstErr, setGstErr] = useState<string | null>(null)
+  const onGst = useCallback((s3Key: string, fileName: string) => {
+    setGstS3Key(s3Key)
+    setGstFilename(fileName)
+  }, [])
 
-  // Step 4 — Warehouse
+  // Warehouse
   const [dailyPayout, setDailyPayout] = useState(init.dailyPayout ?? false)
   const [ownDelhivery, setOwnDelhivery] = useState(init.ownDelhivery ?? false)
   // The Delhivery token is a secret like the Razorpay key secret: it lives only in local state and is
@@ -181,7 +186,7 @@ export default function OnboardWizard({
     msg: '',
   })
 
-  // Step 5 — Bank
+  // Bank
   const [bank, setBank] = useState({ accountNumber: '', ifsc: '', holderName: '', upiId: '', ...(init.bank ?? {}) })
   const upiIdOk = !bank.upiId || UPI_ID_RE.test(bank.upiId)
   const [ownRazorpay, setOwnRazorpay] = useState(init.ownRazorpay ?? false)
@@ -197,19 +202,34 @@ export default function OnboardWizard({
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [bankOnFile, setBankOnFile] = useState(!!upgrade && !!init.bankVerified)
 
-  // Step 6 — Branding & Legals
+  // Branding & legals (the logo is uploaded in the Store step; the AI studio and the site use it)
   const [ownerFullName, setOwnerFullName] = useState<string>(init.ownerName ?? ownerName ?? '')
   const [mobile, setMobile] = useState(init.mobile ?? '')
   const [logoS3Key, setLogoS3Key] = useState(init.logoS3Key ?? '')
   const [logoUrl, setLogoUrl] = useState(init.logoUrl ?? '')
   const [sealS3Key, setSealS3Key] = useState(init.sealS3Key ?? '')
   const [sealUrl, setSealUrl] = useState(init.sealUrl ?? '')
-  const [uploadingBrand, setUploadingBrand] = useState<'logo' | 'seal' | null>(null)
+  const [uploadingSeal, setUploadingSeal] = useState(false)
   const [brandErr, setBrandErr] = useState<string | null>(null)
   const [legalsAccepted, setLegalsAccepted] = useState(init.legalsAccepted ?? false)
 
+  // Your site: designed live in the AI Site Studio (site_studio_sessions) and installed after go-live. The brief is
+  // kept on the draft too: without a built site, the store's AI builds one from it once live. A site already built
+  // stays on the draft (site.studio), so the Review row reads it before the studio is opened again.
+  const initSite = (init.site ?? {}) as { skip?: boolean; description?: string; references?: string[]; studio?: { pages?: number; style?: string | null } }
+  const [siteSkip, setSiteSkip] = useState<boolean>(initSite.skip ?? false)
+  const [studio, setStudio] = useState<StudioSummary>({
+    free: null,
+    ready: !!initSite.studio,
+    pages: Number(initSite.studio?.pages) || 0,
+    style: initSite.studio?.style ?? null,
+    description: initSite.description ?? '',
+    references: (initSite.references ?? []).filter(r => HTTPS_URL.test(r)),
+  })
+  const [giftSeen, setGiftSeen] = useState<boolean>(!!init.studioGiftSeen)
+
   // Optional own domain (Store step), bought from the wallet once the store is approved.
-  const [domainPick, setDomainPick] = useState<{ name: string; priceInr: number; renewalPriceInr: number } | null>(init.domainPick ?? null)
+  const [domainPick, setDomainPick] = useState<DomainPick | null>(init.domainPick ?? null)
   const [domainContact, setDomainContact] = useState<DomainContact>({ ...EMPTY_CONTACT, ...(init.domainContact ?? {}) })
 
   // Restore-on-re-onboard — detect a backup from a previously deprovisioned store.
@@ -264,9 +284,10 @@ export default function OnboardWizard({
 
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(
-    async (nextStep: StepIdx) => {
+    async (nextStep: number) => {
       setSaving(true)
       const data = {
+        stepId: WIZARD_STEPS[nextStep].key,
         planSlug,
         interval,
         computeSpec: chosenSpec,
@@ -275,6 +296,11 @@ export default function OnboardWizard({
         displayName,
         slug: effectiveSlug,
         productCats,
+        tagline: details.tagline,
+        about: details.about,
+        contact: details.contact,
+        socials: details.socials,
+        compliance,
         bizName,
         bizType,
         pan,
@@ -296,6 +322,15 @@ export default function OnboardWizard({
         sealS3Key,
         sealUrl,
         legalsAccepted,
+        site: {
+          skip: siteSkip,
+          description: studio.description.trim(),
+          style: 'auto',
+          references: studio.references.filter(r => HTTPS_URL.test(r)).slice(0, 3),
+          images: true,
+          ...(studio.ready ? { studio: { pages: studio.pages, style: studio.style } } : {}),
+        },
+        studioGiftSeen: giftSeen,
         restorePreviousData: restoreBackup && !restoreBackup.archive ? restoreOptIn : false,
         restore: restoreChoice,
         domainPick,
@@ -317,6 +352,8 @@ export default function OnboardWizard({
       displayName,
       effectiveSlug,
       productCats,
+      details,
+      compliance,
       bizName,
       bizType,
       pan,
@@ -338,6 +375,9 @@ export default function OnboardWizard({
       sealS3Key,
       sealUrl,
       legalsAccepted,
+      siteSkip,
+      studio,
+      giftSeen,
       restoreBackup,
       restoreOptIn,
       restoreChoice,
@@ -346,58 +386,40 @@ export default function OnboardWizard({
     ]
   )
 
-  async function goTo(next: StepIdx) {
+  const onStudioSummary = useCallback((x: StudioSummary) => setStudio(x), [])
+  const onGiftSeen = useCallback(() => setGiftSeen(true), [])
+
+  async function goTo(next: number) {
     await autosave(next)
     setStep(next)
+    setFurthest(f => Math.max(f, next))
   }
 
-  // ── GST cert upload ──────────────────────────────────────────────────────────
-  async function uploadGstCert(file: File) {
-    setUploadingGst(true)
-    setGstErr(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/ecom/onboard/kyc-upload', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) {
-        setGstErr(data.error || 'Upload failed')
-        return
-      }
-      setGstS3Key(data.s3Key)
-      setGstFilename(file.name)
-    } catch {
-      setGstErr('Network error')
-    } finally {
-      setUploadingGst(false)
-    }
-  }
+  const onLogo = useCallback((l: { s3Key: string; url: string }) => {
+    setLogoS3Key(l.s3Key)
+    setLogoUrl(l.url)
+  }, [])
 
-  // ── Logo / seal upload (owner-scoped branding assets, public) ────────────────
-  async function uploadBrand(kind: 'logo' | 'seal', file: File) {
-    setUploadingBrand(kind)
+  // ── Seal upload (owner-scoped branding asset, public) ────────────────────────
+  async function uploadSeal(file: File) {
+    setUploadingSeal(true)
     setBrandErr(null)
     try {
       const fd = new FormData()
       fd.append('file', file)
-      fd.append('kind', kind)
+      fd.append('kind', 'seal')
       const res = await fetch('/api/ecom/onboard/brand-upload', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) {
         setBrandErr(data.error || 'Upload failed')
         return
       }
-      if (kind === 'logo') {
-        setLogoS3Key(data.s3Key)
-        setLogoUrl(data.url)
-      } else {
-        setSealS3Key(data.s3Key)
-        setSealUrl(data.url)
-      }
+      setSealS3Key(data.s3Key)
+      setSealUrl(data.url)
     } catch {
       setBrandErr('Network error')
     } finally {
-      setUploadingBrand(null)
+      setUploadingSeal(false)
     }
   }
 
@@ -435,6 +457,28 @@ export default function OnboardWizard({
     }
   }
 
+  // ── Licences: what submit sends — the answers to the questions asked now and each required document ──
+  const licencePlan = useMemo(() => compliancePlan(productCats), [productCats])
+  const licences = useMemo(() => requiredDocs(licencePlan, compliance.answers), [licencePlan, compliance.answers])
+  const compliancePayload = useMemo(() => {
+    const answers = Object.fromEntries(
+      planQuestions(licencePlan)
+        .filter(q => typeof compliance.answers[q.id] === 'boolean')
+        .map(q => [q.id, compliance.answers[q.id]])
+    )
+    const docs = Object.fromEntries(licences.map(({ doc }) => [doc, compliance.docs[doc]] as const).filter(([, u]) => !!u?.s3Key))
+    return { answers, docs }
+  }, [licencePlan, licences, compliance])
+
+  // The first thing keeping the Store step from complete, in the order it shows them.
+  const storeIssue = useMemo(() => {
+    if (!displayName.trim()) return 'Enter your store name.'
+    if (effectiveSlug.length < 3) return 'The subdomain needs at least 3 characters.'
+    if (!logoS3Key) return 'Upload your store logo.'
+    if (!productCats.length) return 'Pick what you sell.'
+    return complianceProblem(productCats, compliance) ?? storeDetailsProblem(details)
+  }, [displayName, effectiveSlug, logoS3Key, productCats, compliance, details])
+
   // ── Final submit ─────────────────────────────────────────────────────────────
   async function submit() {
     const domainIssue = domainPick ? contactProblem(domainContact) : null
@@ -456,6 +500,8 @@ export default function OnboardWizard({
           displayName,
           slug: effectiveSlug,
           productCategories: productCats.join(', '),
+          ...storeDetailsPayload(details),
+          compliance: compliancePayload,
           businessName: bizName,
           businessType: bizType,
           pan,
@@ -500,7 +546,7 @@ export default function OnboardWizard({
 
   // Prefill the domain's registrant contact from what the wizard collected, once.
   useEffect(() => {
-    if (step !== 7 || !domainPick || domainContact.email) return
+    if (step !== REVIEW || !domainPick || domainContact.email) return
     setDomainContact({
       ...EMPTY_CONTACT,
       ...defaultContact({ ownerName: ownerFullName, email: owner.email, mobile, businessName: bizName, businessType: bizType, businessAddress: bizAddress, warehouse: wh }),
@@ -544,35 +590,43 @@ export default function OnboardWizard({
     }
   }, [wh.originPincode])
 
-  function canNext(): boolean {
-    if (step === 0) return !!planSlug && !!compute?.valid
-    if (step === 1) return displayName.trim().length > 0 && effectiveSlug.length >= 3 && productCats.length > 0
-    if (step === 2)
-      return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
-    // Optional: registration is not required below the turnover threshold, and Razorpay does
-    // not need a GSTIN to create a linked account. Forcing it made the one tenant who had none
-    // paste the platform's own GSTIN to get past this step.
-    if (step === 3) return gstNumber.trim().length === 0 || gstNumber.trim().length === 15
-    if (step === 4) {
-      return (
-        /^\d{6}$/.test(wh.originPincode.replace(/\D/g, '')) &&
-        /^[6-9]\d{9}$/.test(wh.sellerPhone.replace(/\D/g, '').slice(-10)) &&
-        wh.sellerAddress.trim().length > 5 &&
-        pinCheck.state !== 'bad'
-      )
+  /** Whether a step has what it needs; Continue follows the current one, Review checks them all. */
+  function stepDone(k: WizardStepKey): boolean {
+    switch (k) {
+      // The configurator reports on the Plan step; resumed past it, the server checks the size at submit.
+      case 'plan':
+        return !!planSlug && (compute ? compute.valid : step !== S.plan)
+      case 'store':
+        return !storeIssue
+      case 'site':
+        return siteSkip || studio.ready || studio.description.trim().length >= 10
+      case 'business':
+        return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
+      // Optional: registration is not required below the turnover threshold, and Razorpay does
+      // not need a GSTIN to create a linked account. Forcing it made the one tenant who had none
+      // paste the platform's own GSTIN to get past this step.
+      case 'gst':
+        return gstNumber.trim().length === 0 || gstNumber.trim().length === 15
+      case 'warehouse':
+        return (
+          /^\d{6}$/.test(wh.originPincode.replace(/\D/g, '')) &&
+          /^[6-9]\d{9}$/.test(wh.sellerPhone.replace(/\D/g, '').slice(-10)) &&
+          wh.sellerAddress.trim().length > 5 &&
+          pinCheck.state !== 'bad'
+        )
+      case 'bank':
+        return bankVerified
+      case 'branding':
+        return ownerFullName.trim().length >= 2 && /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) && legalsAccepted
+      default:
+        return true
     }
-    if (step === 5) return bankVerified
-    if (step === 6)
-      return (
-        ownerFullName.trim().length >= 2 &&
-        /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) &&
-        !!logoS3Key &&
-        legalsAccepted
-      )
-    return true
   }
+  const canNext = () => stepDone(key)
 
-  const isLast = step === 7
+  const isLast = step === REVIEW
+  // At Review: earlier steps still missing something (a draft from before the Store step asked for licences, say).
+  const unfinished = isLast ? WIZARD_STEPS.filter(s => s.id < REVIEW && !stepDone(s.key)) : []
 
   return (
     <OnboardShell
@@ -581,14 +635,21 @@ export default function OnboardWizard({
       subheading={`Go live in ${STEPS.length} steps`}
       steps={STEPS}
       current={step}
-      onSelect={i => goTo(i as StepIdx)}
+      reachable={furthest}
+      onSelect={i => goTo(i)}
       saving={saving}
     >
       <div className="w-full">
-        <PageHeader eyebrow={`Step ${step + 1} of ${STEPS.length}`} title={HEAD[step].title} description={HEAD[step].description} />
+        <PageHeader
+          eyebrow={`Step ${step + 1} of ${STEPS.length}`}
+          title={HEAD[key].title}
+          description={HEAD[key].description}
+          actions={key === 'site' && !siteSkip ? <FreeChip free={studio.free} /> : undefined}
+        />
+        <GiftCard seen={giftSeen} onSeen={onGiftSeen} />
 
           {/* ── Restore banner (returning owner with a prior backup) ── */}
-          {restoreBackup?.archive && step <= 1 && (
+          {restoreBackup?.archive && step <= S.store && (
             <div className={`${noteCls} org-peach mb-6`}>
               <div className="font-semibold text-foreground">We kept data from your previous store</div>
               <p className="text-foreground-secondary mt-1">
@@ -615,7 +676,7 @@ export default function OnboardWizard({
               </div>
             </div>
           )}
-          {restoreBackup && !restoreBackup.archive && step <= 1 && (
+          {restoreBackup && !restoreBackup.archive && step <= S.store && (
             <div className={`${noteCls} org-peach mb-6`}>
               <div className="font-semibold text-foreground">We found a backup of your previous store</div>
               <p className="text-foreground-secondary mt-1">
@@ -634,8 +695,8 @@ export default function OnboardWizard({
             </div>
           )}
 
-          {/* ── Step 0: Plan ── */}
-          {step === 0 && (
+          {/* ── Plan ── */}
+          {key === 'plan' && (
             <div>
               {reusingPreviousDetails && (
                 <div className="mb-6 rounded-2xl border border-border-default bg-surface-elevated px-5 py-3">
@@ -698,88 +759,34 @@ export default function OnboardWizard({
             </div>
           )}
 
-          {/* ── Step 1: Store ── */}
-          {step === 1 && (
-            <Card>
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div>
-                  <label className={lbl}>Store name</label>
-                  <input
-                    className={inp}
-                    value={displayName}
-                    onChange={e => setDisplayName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={lbl}>Subdomain</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      className={`${inp} min-w-0 ${upgrade ? 'opacity-70 cursor-not-allowed' : ''}`}
-                      value={effectiveSlug}
-                      readOnly={!!upgrade}
-                      onChange={e => {
-                        setSlugEdited(true)
-                        setSlug(slugify(e.target.value))
-                      }}
-                    />
-                    <span className="shrink-0 text-sm text-foreground-muted whitespace-nowrap font-mono">.jeffistores.in</span>
-                  </div>
-                  {upgrade && (
-                    <p className="text-xs text-foreground-muted mt-1">Your workspace&apos;s subdomain — already reserved for your store.</p>
-                  )}
-                </div>
-                </div>
-                <div>
-                  <label className={lbl}>
-                    What will you sell? <span className="text-foreground-muted font-normal">(pick all that apply)</span>
-                  </label>
-                  <ChoiceChips multiple size="md" ariaLabel="Product categories" className="mt-2" value={productCats} onChange={setProductCats}
-                    options={PRODUCT_CATEGORIES.map(c => ({ value: c, label: c }))} />
-                  {productCats.length === 0 && (
-                    <p className="text-xs text-foreground-muted mt-2">Select at least one category.</p>
-                  )}
-                  {(productCats.includes('Food & Groceries') || productCats.includes('Health & Beauty')) && (
-                    <p className="text-xs org-brown mt-2">
-                      Selling food requires a valid FSSAI certificate, and medicine/pharma requires a drug licence —
-                      you&apos;ll need to submit these with your documents. See the{' '}
-                      <a
-                        href="/legal/merchant-agreement#6-restricted-categories-licences-certificates-required"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline"
-                      >
-                        Merchant Agreement
-                      </a>
-                      .
-                    </p>
-                  )}
-                </div>
-                <div className="border-t border-border-default pt-5">
-                  <label className={lbl}>
-                    Your own domain <span className="text-foreground-muted font-normal">(optional)</span>
-                  </label>
-                  <p className="text-xs text-foreground-muted mb-3">
-                    Get a domain like yourbrand.in for your store. We buy it from your wallet once your store is approved, renew it yearly, and set it up for you.
-                  </p>
-                  {domainPick ? (
-                    <div className="flex flex-wrap items-center gap-3 rounded-xl org-sand px-4 py-3">
-                      <span className="min-w-0 flex-1 break-all font-mono text-sm text-foreground">{domainPick.name}</span>
-                      <span className="text-sm text-foreground">₹{domainPick.priceInr.toLocaleString('en-IN')}/year</span>
-                      <button type="button" onClick={() => setDomainPick(null)} className={ghostBtn}>
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <DomainSearch onPick={r => setDomainPick({ name: r.domain, priceInr: r.priceInr, renewalPriceInr: r.renewalPriceInr })} />
-                  )}
-                </div>
-              </div>
-            </Card>
+          {/* ── Store ── */}
+          {key === 'store' && (
+            <StoreStep
+              upgrade={!!upgrade}
+              displayName={displayName}
+              onDisplayName={setDisplayName}
+              slug={effectiveSlug}
+              onSlug={v => {
+                setSlugEdited(true)
+                setSlug(slugify(v))
+              }}
+              categories={productCats}
+              onCategories={setProductCats}
+              logo={{ s3Key: logoS3Key, url: logoUrl }}
+              onLogo={onLogo}
+              details={details}
+              onDetails={setDetails}
+              compliance={compliance}
+              onCompliance={setCompliance}
+              gst={{ s3Key: gstS3Key, fileName: gstFilename }}
+              onGst={onGst}
+              domainPick={domainPick}
+              onDomainPick={setDomainPick}
+            />
           )}
 
-          {/* ── Step 2: Business ── */}
-          {step === 2 && (
+          {/* ── Business ── */}
+          {key === 'business' && (
             <Card>
               <div className="space-y-5">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -818,8 +825,8 @@ export default function OnboardWizard({
             </Card>
           )}
 
-          {/* ── Step 3: GST ── */}
-          {step === 3 && (
+          {/* ── GST ── */}
+          {key === 'gst' && (
             <Card>
               <div className="space-y-5">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -839,59 +846,36 @@ export default function OnboardWizard({
                   </p>
                 </div>
                 <div>
-                  <label className={lbl}>
-                    GST registration certificate{' '}
-                    <span className="text-foreground-muted font-normal">(optional — PDF, JPG or PNG, max 5 MB)</span>
-                  </label>
+                  <span className={lbl}>GST registration certificate</span>
                   {gstS3Key ? (
-                    <div className="flex items-center gap-3 p-4 rounded-xl border border-[var(--org-sage-deep)]/40 org-sage">
+                    <div className="flex items-center gap-3 rounded-xl border border-[var(--org-sage-deep)]/40 org-sage p-4">
                       <CheckMark className="w-5 h-5 org-sage-text flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium org-sage-text">Uploaded</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium org-sage-text">Uploaded with your licences</div>
                         <div className="text-xs org-sage-text truncate">{gstFilename}</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGstS3Key('')
-                          setGstFilename('')
-                        }}
-                        className="shrink-0 min-h-11 px-2 sm:min-h-0 sm:px-0 text-xs text-foreground-muted hover:text-foreground"
-                      >
-                        Remove
-                      </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-border-default hover:border-accent-400 bg-surface cursor-pointer transition-colors">
-                      <FileText className="w-8 h-8 text-foreground-muted mb-2" />
-                      <span className="text-sm text-foreground-muted">
-                        {uploadingGst ? 'Uploading…' : 'Click to upload certificate'}
-                      </span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp"
-                        disabled={uploadingGst}
-                        onChange={e => {
-                          const f = e.target.files?.[0]
-                          if (f) uploadGstCert(f)
-                        }}
-                      />
-                    </label>
+                    <div className="rounded-xl border border-border-default bg-surface p-4 text-sm text-foreground-secondary">
+                      Not uploaded. It is optional; add it under Licences &amp; certificates in the{' '}
+                      <button type="button" onClick={() => goTo(S.store)} className="font-medium text-foreground underline">
+                        Store step
+                      </button>
+                      .
+                    </div>
                   )}
-                  {gstErr && <p className="text-xs text-[#8a2e1f] mt-1">{gstErr}</p>}
                 </div>
                 </div>
                 <div className={`${noteCls} org-peach`}>
-                  Your GST certificate will be reviewed by the Jeffi Commerce team before your store goes live. This
+                  Your licences and certificates are reviewed by the Jeffi Commerce team before your store goes live. This
                   usually takes 1–2 business days.
                 </div>
               </div>
             </Card>
           )}
 
-          {/* ── Step 4: Warehouse ── */}
-          {step === 4 && (
+          {/* ── Warehouse ── */}
+          {key === 'warehouse' && (
             <Card>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -995,8 +979,8 @@ export default function OnboardWizard({
             </Card>
           )}
 
-          {/* ── Step 5: Bank ── */}
-          {step === 5 && (
+          {/* ── Bank ── */}
+          {key === 'bank' && (
             <Card>
               <div className="space-y-4">
                 {bankOnFile ? (
@@ -1184,8 +1168,8 @@ export default function OnboardWizard({
             </Card>
           )}
 
-          {/* ── Step 6: Review ── */}
-          {step === 6 && (
+          {/* ── Branding & legals ── */}
+          {key === 'branding' && (
             <Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
@@ -1211,38 +1195,30 @@ export default function OnboardWizard({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {(
-                  [
-                    ['logo', 'Store logo', logoS3Key, logoUrl],
-                    ['seal', 'Store seal', sealS3Key, sealUrl],
-                  ] as const
-                ).map(([kind, label, key, url]) => (
-                  <div key={kind}>
-                    <label className={lbl}>
-                      {label}
-                      {kind === 'logo' ? ' *' : ' (optional)'}
-                    </label>
-                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface p-4 cursor-pointer hover:border-accent-500 transition-colors min-h-[112px]">
-                      {url ? (
-                        <img src={url} alt={label} className="max-h-16 object-contain" />
-                      ) : (
-                        <span className="text-xs text-foreground-muted text-center">
-                          {uploadingBrand === kind ? 'Uploading…' : `Upload ${label.toLowerCase()}`}
-                        </span>
-                      )}
-                      <input
-                        type="file"
-                        accept=".png,.jpg,.jpeg,.webp"
-                        className="hidden"
-                        onChange={e => {
-                          const f = e.target.files?.[0]
-                          if (f) uploadBrand(kind, f)
-                        }}
-                      />
-                    </label>
-                    {key && <p className="text-[10px] org-sage-text mt-1">✓ uploaded</p>}
-                  </div>
-                ))}
+                <div>
+                  <label className={lbl}>Store seal (optional)</label>
+                  <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface p-4 cursor-pointer hover:border-accent-500 transition-colors min-h-[112px]">
+                    {sealUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={sealUrl} alt="Store seal" className="max-h-16 object-contain" />
+                    ) : (
+                      <span className="text-xs text-foreground-muted text-center">{uploadingSeal ? 'Uploading…' : 'Upload store seal'}</span>
+                    )}
+                    <input
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp"
+                      className="hidden"
+                      onChange={e => {
+                        const f = e.target.files?.[0]
+                        if (f) uploadSeal(f)
+                      }}
+                    />
+                  </label>
+                  {sealS3Key && <p className="text-[10px] org-sage-text mt-1">✓ uploaded</p>}
+                </div>
+                <p className="self-center text-xs text-foreground-muted">
+                  Printed in the Authorised Signatory box on your invoices and policy documents. Your logo is in the Store step.
+                </p>
               </div>
               {brandErr && <p className="text-sm text-[#8a2e1f] mb-4">{brandErr}</p>}
 
@@ -1288,8 +1264,32 @@ export default function OnboardWizard({
             </Card>
           )}
 
-          {step === 7 && (
+          {key === 'site' && (
+            <SiteStudio
+              skip={siteSkip}
+              onSkipChange={setSiteSkip}
+              storeName={displayName}
+              logoUrl={logoUrl || null}
+              categories={productCats}
+              onSummary={onStudioSummary}
+            />
+          )}
+
+          {key === 'review' && (
             <div className="space-y-4">
+              {unfinished.length > 0 && (
+                <div role="alert" className={`${noteCls} org-peach`}>
+                  <div className="font-semibold text-foreground">Finish these steps before you submit</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {unfinished.map(s => (
+                      <button key={s.key} type="button" onClick={() => goTo(s.id)} className="rounded-full org-sand org-sand-hover px-3 py-1.5 text-xs font-semibold text-foreground">
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  {unfinished.some(s => s.key === 'store') && storeIssue && <p className="mt-2 text-xs text-foreground-secondary">Store: {storeIssue}</p>}
+                </div>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:items-start gap-4">
               <Card title="Your application">
               <div className="space-y-2.5">
@@ -1311,10 +1311,14 @@ export default function OnboardWizard({
                     ? [['Domain', `${domainPick.name} · ₹${domainPick.priceInr.toLocaleString('en-IN')}/year from your wallet once approved`] as [string, string]]
                     : []),
                   ['Products', productCats.join(', ') || '—'],
+                  ['Contact', [details.contact.phone, details.contact.email.trim()].filter(Boolean).join(' · ') || '—'],
+                  [
+                    'Licences & certificates',
+                    [gstS3Key ? 'GST certificate' : '', ...licences.map(l => DOCS[l.doc]?.name ?? l.doc)].filter(Boolean).join(', ') || 'None needed',
+                  ],
                   ['Business', `${bizName} · ${bizType}`],
                   ['PAN', pan],
-                  ['GSTIN', gstNumber],
-                  ['GST cert', gstFilename || 'Not uploaded'],
+                  ['GSTIN', gstNumber || 'Not registered'],
                   ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not added'],
                   ['UPI ID', bankVerified && bank.upiId ? bank.upiId : '—'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
@@ -1325,6 +1329,14 @@ export default function OnboardWizard({
                   ['Logo', logoS3Key ? 'Uploaded' : 'Not uploaded'],
                   ['Seal', sealS3Key ? 'Uploaded' : 'Not uploaded'],
                   ['Legal terms', legalsAccepted ? 'Accepted' : 'Not accepted'],
+                  [
+                    'Your site',
+                    siteSkip
+                      ? 'You design it in Site Builder'
+                      : studio.ready
+                        ? `Designed in the AI Site Studio · ${studio.pages} pages${studio.style ? ` · ${studio.style}` : ''}`
+                        : 'Built by AI from your answers once live',
+                  ],
                   ...(restoreBackup
                     ? [
                         [
@@ -1398,7 +1410,7 @@ export default function OnboardWizard({
                 </Card>
               )}
               <div className={`${noteCls} org-peach`}>
-                After submitting, our team will review your GST certificate (1–2 business days).{' '}
+                After submitting, our team will review your licences and certificates (1–2 business days).{' '}
                 {paymentsEnabled
                   ? "You'll receive an email when approved — then you'll complete payment and your store goes live."
                   : "Once we approve your details, we'll set up your store right away. Billing starts later."}
@@ -1407,23 +1419,28 @@ export default function OnboardWizard({
           )}
 
           {/* ── Navigation ── */}
-          <div className="mt-6 flex items-center justify-between gap-3">
+          {key === 'store' && storeIssue && (
+            <p className="mt-6 text-right text-xs text-foreground-muted" aria-live="polite">
+              To continue: {storeIssue}
+            </p>
+          )}
+          <div className={`${key === 'store' && storeIssue ? 'mt-2' : 'mt-6'} flex items-center justify-between gap-3`}>
             <button
               type="button"
-              onClick={() => goTo((step - 1) as StepIdx)}
+              onClick={() => goTo(step - 1)}
               disabled={step === 0}
               className={ghostBtn}
             >
               ← Back
             </button>
             {isLast ? (
-              <button onClick={submit} disabled={busy} className={`${primaryBtn} flex-1 sm:flex-none px-6`}>
+              <button onClick={submit} disabled={busy || unfinished.length > 0} className={`${primaryBtn} flex-1 sm:flex-none px-6`}>
                 {busy ? 'Submitting…' : 'Submit for approval'}
               </button>
             ) : (
               <button
                 type="button"
-                onClick={() => canNext() && goTo((step + 1) as StepIdx)}
+                onClick={() => canNext() && goTo(step + 1)}
                 disabled={!canNext()}
                 className={`${primaryBtn} flex-1 sm:flex-none px-6`}
               >

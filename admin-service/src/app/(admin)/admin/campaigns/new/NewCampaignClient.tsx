@@ -14,7 +14,7 @@ import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-v
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { ap } from '@/lib/shared/admin-path'
-import { FormButton, FormFooter } from '@/components/admin/kit/form'
+import { FormButton, FormFooter, stickyAboveFooter } from '@/components/admin/kit/form'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 interface CouponOption {
@@ -404,7 +404,7 @@ export default function NewCampaignClient() {
           </div>
         </div>
 
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-5 lg:self-start admin-sticky-pane" style={stickyAboveFooter}>
           <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
           <div className="border border-border-default rounded-lg overflow-hidden">
             <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">

@@ -1,0 +1,137 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { SHOWCASE_SLUG_RE } from '@/lib/showcase/host'
+import type { ClientSite } from '@controller/lib/showcase-builder/site'
+import { businessFromForm, canSave, formFromSite, type DetailsForm } from './model'
+
+// The builder's form with autosave: changes are saved a moment after the owner stops typing (the first save with a
+// name and a free address creates the draft site), one save at a time; saveNow() flushes before moving on.
+
+const BASE = '/api/ecom/onboard/showcase'
+const DELAY_MS = 1200
+
+export type SlugState = { state: 'idle' | 'checking' | 'ok' } | { state: 'taken'; error: string }
+
+export async function uploadShowcaseImage(file: File, kind: 'logo' | 'service' | 'work' | 'avatar'): Promise<string> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('kind', kind)
+  const res = await fetch(`${BASE}/upload`, { method: 'POST', body: fd })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || typeof data.url !== 'string') throw new Error(data.error || 'That picture could not be uploaded.')
+  return data.url
+}
+
+export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = '') {
+  const [form, setFormState] = useState<DetailsForm>(() => formFromSite(initialSite, ownerEmail))
+  const [site, setSite] = useState<ClientSite | null>(initialSite)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<{ error: string; field?: string } | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const [slug, setSlug] = useState<SlugState>({ state: initialSite ? 'ok' : 'idle' })
+  const latest = useRef(form)
+  latest.current = form
+  const current = useRef({ site, slug })
+  current.current = { site, slug }
+  const running = useRef<Promise<boolean> | null>(null)
+  const again = useRef(false)
+  const ownSlug = site?.slug ?? null
+
+  const setForm = useCallback((next: DetailsForm | ((f: DetailsForm) => DetailsForm)) => {
+    setFormState(f => (typeof next === 'function' ? next(f) : next))
+    setDirty(true)
+  }, [])
+
+  const saveOnce = useCallback(async (): Promise<boolean> => {
+    const f = latest.current
+    if (!canSave(f)) return false
+    // A new site needs its address to be free; an existing one keeps its own until a free one is chosen.
+    const slugOk = current.current.slug.state === 'ok'
+    if (!current.current.site && !slugOk) return false
+    setSaving(true)
+    try {
+      const res = await fetch(BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), content: f.content }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSaveError({ error: data.error || 'Your changes could not be saved.', field: data.field })
+        if (data.field === 'slug') setSlug({ state: 'taken', error: data.error || 'That address is taken.' })
+        return false
+      }
+      setSite(data.site)
+      setSaveError(null)
+      if (latest.current === f) setDirty(false)
+      return true
+    } catch {
+      setSaveError({ error: 'Your changes could not be saved: check your connection.' })
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
+  /** Saves now (a save in flight saves once more when it ends); true when the form as it stands is saved. */
+  const saveNow = useCallback(async (): Promise<boolean> => {
+    if (running.current) {
+      again.current = true
+      return running.current
+    }
+    const run = (async () => {
+      let ok = await saveOnce()
+      while (again.current) {
+        again.current = false
+        ok = await saveOnce()
+      }
+      return ok
+    })()
+    running.current = run
+    try {
+      return await run
+    } finally {
+      running.current = null
+    }
+  }, [saveOnce])
+
+  // The address being checked holds a new site's first save back; its answer lets it go.
+  useEffect(() => {
+    if (!dirty) return
+    const t = setTimeout(() => void saveNow(), DELAY_MS)
+    return () => clearTimeout(t)
+  }, [form, dirty, slug.state, saveNow])
+
+  // The address: free, or the owner's own.
+  useEffect(() => {
+    const s = form.slug
+    if (!s) return setSlug({ state: 'idle' })
+    if (s === ownSlug) return setSlug({ state: 'ok' })
+    if (!SHOWCASE_SLUG_RE.test(s)) return setSlug({ state: 'taken', error: 'Use 3–58 lowercase letters, numbers or hyphens, not starting or ending with a hyphen.' })
+    setSlug({ state: 'checking' })
+    let stop = false
+    const t = setTimeout(async () => {
+      const data = await fetch(`${BASE}/slug?${new URLSearchParams({ slug: s })}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .catch(() => null)
+      if (stop) return
+      setSlug(data?.ok ? { state: 'ok' } : { state: 'taken', error: data?.error || 'That address could not be checked. Try again.' })
+    }, 400)
+    return () => {
+      stop = true
+      clearTimeout(t)
+    }
+  }, [form.slug, ownSlug])
+
+  // Unsaved changes when the tab closes.
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (dirty && canSave(latest.current)) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  return { form, setForm, site, setSite, saving, saveError, dirty, saveNow, slug }
+}

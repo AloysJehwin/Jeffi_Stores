@@ -160,7 +160,7 @@ export default async function OnboardPage({
           <PageHeader eyebrow="Store application" title="Application rejected" actions={<Badge tone="red">Rejected</Badge>} />
           <Card>
             <p className="text-sm text-foreground-secondary">
-              Your GST certificate or business details could not be verified. Please contact support.
+              Your licences, certificates or business details could not be verified. Please contact support.
             </p>
             <a href="mailto:support@jeffistores.in" className={`${primaryBtn} mt-5 w-full sm:w-auto`}>
               Contact support
@@ -214,7 +214,7 @@ export default async function OnboardPage({
           </Card>
           <Card title="What happens next">
             <p className="text-sm text-foreground-secondary break-words">
-              We&apos;re verifying your GST certificate for <span className="font-semibold text-foreground">{t.display_name}</span>.{' '}
+              We&apos;re verifying your licences and certificates for <span className="font-semibold text-foreground">{t.display_name}</span>.{' '}
               {paymentsEnabled()
                 ? "Once approved, you'll complete payment and your store goes live."
                 : 'Once approved, we set up your store right away. Billing starts later.'}
@@ -334,7 +334,8 @@ async function UpgradeWizard({
       addons={addons}
       computeEnabled={computeSpecEnabled()}
       paymentsEnabled={paymentsEnabled()}
-      initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data }}
+      // A reopened application starts over at Plan, whatever step its draft was submitted from.
+      initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data: reopened ? { ...data, stepId: undefined } : data }}
       ownerName={ownerName}
       upgrade={{ tenantId: tenant.id, slug: tenant.slug, displayName: tenant.display_name }}
     />

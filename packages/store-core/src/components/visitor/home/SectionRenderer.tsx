@@ -1,4 +1,10 @@
 import HeroCarousel from '@/components/visitor/HeroCarousel'
+import { ContentBlock } from '@/components/visitor/site/ContentBlocks'
+import ComposedBlock from '@/components/visitor/site/ComposedBlock'
+import CodeSection from '@/components/visitor/site/code/CodeSection'
+import type { CompiledSection } from '@/lib/site/code/compile'
+import type { ComposedData } from '@/lib/site/composed-data'
+import { isContentBlock } from '@/lib/site/blocks'
 import OfferSlider from '@/components/visitor/OfferSlider'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import TrustStrip, { type TrustStripItem } from './TrustStrip'
@@ -427,6 +433,11 @@ export default function SectionRenderer({
       return <BusinessAccount section={toBusinessSection(section)} />
 
     default:
-      return null
+      // Site Builder content blocks (text, image banner, questions…) on a home page.
+      if (section.type === ('composed' as typeof section.type))
+        return <ComposedBlock props={(section.config ?? {}) as Record<string, unknown>} data={extra as ComposedData | undefined} />
+      if (section.type === ('code_section' as typeof section.type))
+        return <CodeSection section={(section.config as { compiled?: CompiledSection | null } | null)?.compiled} page="home" />
+      return isContentBlock(section.type) ? <ContentBlock block={{ id: section.id, type: section.type, v: 1, props: (section.config ?? {}) as Record<string, unknown> }} /> : null
   }
 }

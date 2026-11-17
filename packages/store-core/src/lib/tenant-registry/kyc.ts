@@ -48,6 +48,22 @@ export interface TenantWarehouse {
   sellerPhone?: string
 }
 
+/** What the onboarding Store step said the store's site shows; seeded into its site_settings at provisioning. */
+export interface StoreProfile {
+  tagline?: string
+  about?: string
+  phone?: string
+  /** Digits with the country code. */
+  whatsapp?: string
+  email?: string
+  address?: string
+  city?: string
+  state?: string
+  pincode?: string
+  /** Network → absolute https profile URL. */
+  socials?: Record<string, string>
+}
+
 export interface TenantKyc {
   id: string
   tenant_id: string
@@ -63,6 +79,7 @@ export interface TenantKyc {
   logo_s3_key: string | null
   seal_s3_key: string | null
   warehouse: TenantWarehouse | null
+  store_profile: StoreProfile | null
   legals_accepted_version: string | null
   legals_accepted_at: string | null
   status: string
@@ -87,6 +104,7 @@ export async function saveKyc(
     logo_s3_key?: string | null
     seal_s3_key?: string | null
     warehouse?: TenantWarehouse | null
+    store_profile?: StoreProfile | null
     legals_accepted?: boolean
     /** Re-submission on an existing tenant: back to the review queue. */
     review_again?: boolean
@@ -94,9 +112,10 @@ export async function saveKyc(
 ): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories, mobile, logo_s3_key, seal_s3_key, legals_accepted_version, legals_accepted_at, warehouse)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$16)
+    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories, mobile, logo_s3_key, seal_s3_key, legals_accepted_version, legals_accepted_at, warehouse, store_profile)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$16,$17)
      ON CONFLICT (tenant_id) DO UPDATE SET
+       store_profile=COALESCE(EXCLUDED.store_profile, tenant_kyc.store_profile),
        gst_number=EXCLUDED.gst_number, gst_cert_s3_key=COALESCE(EXCLUDED.gst_cert_s3_key, tenant_kyc.gst_cert_s3_key),
        pan=EXCLUDED.pan, business_name=EXCLUDED.business_name, business_type=EXCLUDED.business_type,
        business_address=EXCLUDED.business_address, product_categories=EXCLUDED.product_categories,
@@ -128,6 +147,7 @@ export async function saveKyc(
       kyc.legals_accepted ? new Date().toISOString() : null,
       !!kyc.review_again,
       cleanWarehouse(kyc.warehouse),
+      kyc.store_profile && Object.keys(kyc.store_profile).length ? JSON.stringify(kyc.store_profile) : null,
     ]
   )
 }

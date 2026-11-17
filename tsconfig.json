@@ -23,7 +23,8 @@
       "@controller/*": ["./controller-service/src/*"],
       "@storefront/*": ["./storefront-service/src/*"],
       "@admin/*": ["./admin-service/src/*"],
-      "@business/*": ["./business-service/src/*"]
+      "@business/*": ["./business-service/src/*"],
+      "@showcase/*": ["./showcase-service/src/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts"],

@@ -115,7 +115,7 @@ export function PipelineView({ tenantId }: { tenantId: string }) {
           </div>
 
           <div className="hidden lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] gap-5 items-start">
-            <nav aria-label="Pipeline jobs" className="rounded-xl border border-border-default bg-surface-elevated p-2 space-y-0.5">
+            <nav aria-label="Pipeline jobs" className="admin-sticky-pane rounded-xl border border-border-default bg-surface-elevated p-2 space-y-0.5">
               {pipeline.jobs.map(j => {
                 const { icon: Icon, cls } = STEP_ICON[j.status]
                 const on = j.id === shown?.id

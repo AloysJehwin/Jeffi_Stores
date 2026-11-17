@@ -457,7 +457,7 @@ interface LightboxProps {
   onClose: () => void
 }
 
-function Lightbox({ images, index, productName, onIndex, onClose }: LightboxProps) {
+export function Lightbox({ images, index, productName, onIndex, onClose }: LightboxProps) {
   const count = images.length
   const many = count > 1
   const image = images[index]

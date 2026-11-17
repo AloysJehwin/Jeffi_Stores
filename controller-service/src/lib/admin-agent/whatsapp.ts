@@ -18,11 +18,16 @@ import { runTurn } from '@/lib/admin-agent/turn'
 import { AGENT_USER_AGENT, loadAdminActor, withInternalAdminSession, type AdminActor } from '@controller/lib/admin-agent/internal-session'
 import { approveAgentAction, rejectAgentAction } from '@/lib/admin-agent/actions/approve'
 import { storeTarget, withApproveTarget } from '@/lib/admin-agent/actions/shared'
+import { whatsappAdminGate } from '@controller/lib/admin-agent/whatsapp-auth'
+import { getTenantSender, PLATFORM_TENANT_ID } from '@/lib/messaging/tenant-senders'
 
 // The admin assistant on WhatsApp. A message from a number an admin verified (admin_mobiles in the
 // control plane) goes to the assistant of that admin's store when the store switched it on, its plan
-// has the assistant and the admin may use it; anything else, and quoted replies to our customer
-// messages, stays on the customer path. Changes are approved by replying YES / NO.
+// has the assistant and the admin may use it. Which number received it matters: the store's admin number
+// only ever serves staff (anyone else gets a pointer to the customer number); once a store has an admin
+// number, its customer number never reaches the assistant; a store still on one shared number keeps the old
+// behaviour (admins in, everyone else and quoted replies to our customer messages on the customer path).
+// Every admin also needs a signed-in session (whatsapp-auth.ts). Changes are approved by replying YES / NO.
 
 const PROPOSAL_TTL_MIN = 30
 const TURNS_PER_HOUR = 40
@@ -55,6 +60,10 @@ export interface AdminWhatsAppMessage {
   hasMedia: boolean
   /** The message this one quotes, if any. */
   repliedToSid?: string | null
+  /** Which of the store's numbers received it: admin (staff only) or customer (the shared / shopper number). */
+  receivedOn?: 'admin' | 'customer'
+  /** The store has a separate admin number, so its customer number never reaches the assistant. */
+  separateAdminNumber?: boolean
 }
 
 interface Store {
@@ -71,23 +80,25 @@ const inStore = <T>(ctx: TenantContext | null, fn: () => Promise<T>) => (ctx ? r
  * it down the customer path. Runs in the context of the number that received it.
  */
 export async function routeAdminWhatsApp(m: AdminWhatsAppMessage): Promise<boolean> {
+  const onAdmin = m.receivedOn === 'admin'
+  if (!onAdmin && m.separateAdminNumber) return false
   try {
     const phone = normalizeAdminMobile(m.from.replace(/^whatsapp:/i, ''))
-    if (!phone || STOP_START.has(m.text.trim().toUpperCase())) return false
+    if (!phone || STOP_START.has(m.text.trim().toUpperCase())) return onAdmin
     const rows = await controlPlanePool()
       .query<{ tenant_id: string | null; admin_id: string }>(`SELECT tenant_id::text, admin_id::text FROM admin_mobiles WHERE phone = $1`, [phone])
       .then(r => r.rows)
       .catch(() => [])
-    if (!rows.length) return false
+    if (!rows.length) return onAdmin ? staffOnly(m) : false
 
     // A store's own number only reaches that store.
     const receiving = getCurrentTenant()
     const mine = receiving ? rows.filter(r => r.tenant_id === receiving.tenantId) : rows
-    if (!mine.length) return false
-    if (m.repliedToSid && (await contextBySend({ providerSid: m.repliedToSid }).catch(() => null))) return false
+    if (!mine.length) return onAdmin ? staffOnly(m) : false
+    if (!onAdmin && m.repliedToSid && (await contextBySend({ providerSid: m.repliedToSid }).catch(() => null))) return false
 
     const stores = (await Promise.all(mine.map(r => eligibleStore(r.tenant_id, r.admin_id, phone)))).filter((s): s is Store => !!s)
-    if (!stores.length) return false
+    if (!stores.length) return onAdmin ? staffOnly(m) : false
 
     const job = () => handle(m, phone, stores).catch(err => console.error('[admin-whatsapp]', err))
     const run = () => (receiving ? runWithTenantContext(receiving, job) : job())
@@ -99,8 +110,22 @@ export async function routeAdminWhatsApp(m: AdminWhatsAppMessage): Promise<boole
     return true
   } catch (err) {
     console.error('[admin-whatsapp] route', err)
-    return false
+    return onAdmin
   }
+}
+
+/** Someone who isn't an eligible admin wrote to the staff number: point them at the customer number, once a day. */
+async function staffOnly(m: AdminWhatsAppMessage): Promise<true> {
+  const from = m.from.replace(/^whatsapp:/i, '')
+  const once = await redis.set(`adminwa:staffonly:${from.replace(/\D/g, '')}`, '1', 'EX', 86400, 'NX').catch(() => null)
+  if (!once) return true
+  const brand = await currentBrandNameAsync().catch(() => 'the store')
+  const tenantId = getCurrentTenant()?.tenantId ?? PLATFORM_TENANT_ID
+  const customer = (await getTenantSender(tenantId, 'whatsapp', 'customer').catch(() => null))?.sender ?? (tenantId === PLATFORM_TENANT_ID ? process.env.TWILIO_WHATSAPP_FROM : '') ?? ''
+  const digits = customer.replace(/\D/g, '')
+  const where = digits ? `https://wa.me/${digits}` : 'the number on our website'
+  await sendWhatsAppDirect({ phone: from, text: `This number is for ${brand} staff only. For orders and help, message us at ${where}.`, kind: 'admin_agent', audience: 'admin' })
+  return true
 }
 
 async function eligibleStore(tenantId: string | null, adminId: string, phone: string): Promise<Store | null> {
@@ -118,16 +143,22 @@ async function eligibleStore(tenantId: string | null, adminId: string, phone: st
 }
 
 async function handle(m: AdminWhatsAppMessage, phone: string, stores: Store[]) {
-  if (m.providerSid) void markWhatsAppRead(m.providerSid)
+  if (m.providerSid) void markWhatsAppRead(m.providerSid, m.receivedOn === 'admin' ? 'admin' : 'customer')
   logMessage({ channel: 'whatsapp', direction: 'inbound', to: m.to.replace(/^whatsapp:/i, ''), from: phone, body: m.text || '[attachment]', kind: 'admin_agent', status: 'received', providerSid: m.providerSid })
   const send = async (texts: string[]) => {
-    for (const text of texts) await sendWhatsAppDirect({ phone, text, kind: 'admin_agent' })
+    for (const text of texts) await sendWhatsAppDirect({ phone, text, kind: 'admin_agent', audience: 'admin' })
   }
 
   const text = m.text.trim()
   const picked = await pickStore(phone, text, stores)
   if ('reply' in picked) return send([picked.reply])
-  const { store, message } = picked
+  const { store } = picked
+
+  const gate = await whatsappAdminGate({ storeKey: store.key, storeName: store.name, adminId: store.actor.adminId, phone, text: picked.message })
+  if (!gate.pass) return send([gate.reply])
+  if (gate.notice) await send([gate.notice])
+  const message = gate.resume ?? (gate.notice ? null : picked.message)
+  if (message === null) return
 
   const lock = `adminwa:lock:${phone}`
   if (!(await redis.set(lock, '1', 'EX', 300, 'NX'))) return send(['Still working on your last message. Send this again in a moment.'])

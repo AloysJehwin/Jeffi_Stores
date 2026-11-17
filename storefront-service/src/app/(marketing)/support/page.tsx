@@ -1,4 +1,5 @@
 import SupportChat from '@/components/visitor/SupportChat'
+import { renderUtilityPage } from '@/components/visitor/site/code/parts/utility/site-page'
 import { cookies } from 'next/headers'
 import { verifyUserToken } from '@/lib/auth/jwt'
 import { getStoreIdentity, getStorefrontContent } from '@/lib/catalog/site-controls'
@@ -36,7 +37,16 @@ function parseHours(text: string): Array<{ label: string; value: string }> {
     })
 }
 
-export default async function SupportPage() {
+// Help and support. An AI-designed support page places the help itself (<SupportContent />, under its own heading); a
+// Site Builder support page is made of the store's own blocks; otherwise it is the page.
+export default async function SupportPage({ searchParams }: { searchParams: Promise<{ preview?: string; layout?: string }> }) {
+  const site = await renderUtilityPage({ audience: 'store', page: 'support' }, await searchParams, { part: 'SupportContent', core: <SupportBody bare /> })
+  if (site) return site
+  return <SupportBody />
+}
+
+/** The contact details, quick links, policies and support chat; `bare` (an AI design writes the heading) without it. */
+async function SupportBody({ bare = false }: { bare?: boolean }) {
   const [storeIdentity, content, address, user] = await Promise.all([
     getStoreIdentity(),
     getStorefrontContent(),
@@ -46,14 +56,16 @@ export default async function SupportPage() {
   const hours = parseHours(content.businessHours || '')
 
   return (
-    <div className="bg-surface min-h-screen">
+    <div className={bare ? 'bg-surface' : 'bg-surface min-h-screen'}>
       <div className="container mx-auto px-4 py-8 md:py-12">
         {/* Header */}
+        {!bare && (
         <div className="mb-6 md:mb-8">
           <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Help &amp; Support</p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">How can we help?</h1>
           <p className="text-foreground-secondary mt-1.5 text-sm">Chat with our support bot or reach us directly.</p>
         </div>
+        )}
 
         {/* Info strip — 3 columns */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 md:mb-10">

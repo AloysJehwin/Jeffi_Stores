@@ -116,21 +116,21 @@ function ShareCard({ data, storeName }: { data: ReferralsData; storeName: string
   return (
     <div className="rounded-xl border border-border-default shadow-sm bg-gradient-to-br from-accent-100 to-accent-50 dark:from-accent-900/40 dark:to-accent-800/20 p-4 sm:p-6">
       <p className="text-xs font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">Refer &amp; Earn</p>
-      <h1 className="mt-1 text-lg sm:text-2xl font-bold leading-snug text-foreground">
+      <h1 className="ui-heading mt-1 text-lg sm:text-2xl font-bold leading-snug text-foreground">
         Invite friends, earn {points} points each
       </h1>
       <p className="mt-1 text-sm text-foreground-secondary">
         When a friend signs up with your link and their first order is delivered, the points are yours.
       </p>
 
-      <div className="mt-4 flex items-center gap-2 rounded-lg bg-surface-elevated border border-border-default pl-3 pr-1.5 py-1.5">
+      <div className="ui-card mt-4 flex items-center gap-2 rounded-lg bg-surface-elevated border border-border-default pl-3 pr-1.5 py-1.5">
         <span className="flex-1 min-w-0 truncate font-mono text-xs sm:text-sm text-foreground">{link || '…'}</span>
         <button
           type="button"
           onClick={copy}
           disabled={!link}
           aria-label="Copy link"
-          className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-default text-xs sm:text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+          className="ui-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border-default text-xs sm:text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
         >
           <CopyIcon />
           <span>Copy</span>
@@ -142,7 +142,7 @@ function ShareCard({ data, storeName }: { data: ReferralsData; storeName: string
           href={link ? `https://wa.me/?text=${encodeURIComponent(message)}` : undefined}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+          className="ui-btn inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700"
         >
           <WhatsAppIcon />
           WhatsApp
@@ -151,7 +151,7 @@ function ShareCard({ data, storeName }: { data: ReferralsData; storeName: string
           type="button"
           onClick={share}
           disabled={!link}
-          className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 disabled:opacity-50"
+          className="ui-btn inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 disabled:opacity-50"
         >
           <ShareIcon />
           Share
@@ -193,7 +193,7 @@ function Friends({ friendsList }: { friendsList: ReturnType<typeof useFriendsLis
   const { rows, total } = friendsList
   return (
     <div className={CARD}>
-      <h2 className="font-semibold text-foreground">Your friends</h2>
+      <h2 className="ui-heading font-semibold text-foreground">Your friends</h2>
       {total === 0 && !friendsList.loading ? (
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-surface-secondary p-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
@@ -214,7 +214,7 @@ function Friends({ friendsList }: { friendsList: ReturnType<typeof useFriendsLis
                     <p className="text-sm font-medium text-foreground truncate">{friend.name}</p>
                     <p className="text-xs text-foreground-muted">Joined {formatDate(friend.signedUpAt)}</p>
                   </div>
-                  <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${chip.className}`}>
+                  <span className={`ui-badge shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${chip.className}`}>
                     {chip.label}
                   </span>
                 </li>
@@ -242,7 +242,7 @@ function HowItWorks({ program }: { program: ReferralsData['program'] }) {
   ]
   return (
     <div className={CARD}>
-      <h2 className="font-semibold text-foreground">How it works</h2>
+      <h2 className="ui-heading font-semibold text-foreground">How it works</h2>
       <ol className="mt-3 space-y-3">
         {steps.map((step, i) => (
           <li key={i} className="flex gap-3 text-sm text-foreground-secondary">

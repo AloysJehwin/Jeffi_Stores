@@ -674,6 +674,7 @@ INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_i
   ('image', 'razer',     '*',                              'image',         0.3000,  2.0000),
   ('image', 'google',    'gemini-3.1-flash-image',         'image',         3.3000,  6.0000),
   ('image', 'google',    'gemini-3-pro-image',             'image',        11.4000, 20.0000),
+  ('image', 'google',    'gemini-3.1-flash-lite-image',    'image',         2.8200,  5.0000),
   ('image', 'google',    '*',                              'image',         3.3000,  6.0000),
   ('image', 'replicate', 'black-forest-labs/flux-schnell', 'image',         0.2600,  2.0000),
   ('image', 'replicate', 'black-forest-labs/flux-dev',     'image',         2.1300,  4.0000),

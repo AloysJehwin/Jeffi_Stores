@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# One image per Next app: docker buildx build -f deploy/next-app.Dockerfile --build-arg APP=<controller|storefront|admin|business> .
+# One image per Next app: docker buildx build -f deploy/next-app.Dockerfile --build-arg APP=<controller|storefront|admin|business|showcase>-service .
 # Build context: the repo root (the app imports packages/store-core and the workspace packages under packages/).
 FROM node:20-alpine AS base
 # Gentler installs: fewer sockets + retries survive flaky links (Docker Desktop NAT drops bursts).

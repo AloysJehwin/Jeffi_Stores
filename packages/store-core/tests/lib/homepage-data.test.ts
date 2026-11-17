@@ -126,7 +126,7 @@ describe('buildProductRowSql', () => {
   })
 
   it('filters on-sale rows to discounted products', () => {
-    expect(buildProductRowSql('on_sale', null, deps)).toContain('p.mrp > p.price')
+    expect(buildProductRowSql('on_sale', null, deps)).toContain('p.mrp > p.base_price')
   })
 
   it('parameterises the category slug rather than interpolating it', () => {

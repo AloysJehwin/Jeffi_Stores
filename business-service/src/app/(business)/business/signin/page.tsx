@@ -444,7 +444,7 @@ function BusinessSignInPage() {
           </span>
           <Link
             href={bp('/business/signup')}
-            className="inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors shadow-sm"
+            className="ui-btn inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors shadow-sm"
           >
             Sign up
           </Link>
@@ -458,7 +458,7 @@ function BusinessSignInPage() {
               >
                 ← Back to store
               </Link>
-              <h1 className="text-3xl font-bold text-foreground">Business Sign In</h1>
+              <h1 className="ui-heading text-3xl font-bold text-foreground">Business Sign In</h1>
               <p className="text-sm text-foreground-secondary mt-2">
                 Access your {config.identity.name} business partner account
               </p>
@@ -508,7 +508,7 @@ function BusinessSignInPage() {
                     required
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    className="ui-input w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                     placeholder="you@company.com"
                   />
                 </div>
@@ -571,7 +571,7 @@ function BusinessSignInPage() {
                 <button
                   type="submit"
                   disabled={formBusy}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {formBusy ? (
                     <>
@@ -618,7 +618,7 @@ function BusinessSignInPage() {
                     value={otp}
                     ref={otpInputRef}
                     onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                    className={`w-full px-4 py-3 border rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest ${
+                    className={`ui-input w-full px-4 py-3 border rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest ${
                       otp.length === 6
                         ? 'border-green-500 ring-2 ring-green-200 dark:ring-green-900/40'
                         : 'border-border-secondary'
@@ -684,7 +684,7 @@ function BusinessSignInPage() {
                 <button
                   type="submit"
                   disabled={otp.length !== 6 || formBusy || (requiresPolicy && !policyAccepted)}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center"
+                  className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center"
                 >
                   {formBusy ? (
                     <>
@@ -711,8 +711,8 @@ function BusinessSignInPage() {
 
       {showPhoneModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-1">
+          <div className="ui-raised bg-surface rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="ui-heading text-lg font-semibold text-foreground mb-1">
               {phoneRequiresPolicy ? 'Almost there' : 'One last step'}
             </h2>
             <p className="text-sm text-foreground-secondary mb-5">
@@ -779,7 +779,7 @@ function BusinessSignInPage() {
               <button
                 type="submit"
                 disabled={phoneSaving || phone.length !== 10 || (phoneRequiresPolicy && !phonePolicyAccepted)}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center text-sm"
+                className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center text-sm"
               >
                 {phoneSaving ? (
                   <>

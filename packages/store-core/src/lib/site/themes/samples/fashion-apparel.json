@@ -1,0 +1,497 @@
+{
+ "store": {
+  "name": ""
+ },
+ "categories": [
+  {
+   "slug": "kurtas-ethnic-wear",
+   "name": "Kurtas & Ethnic Wear",
+   "description": "Everyday kurtas and dupattas in breathable cotton and block prints.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "t-shirts-tops",
+   "name": "T-Shirts & Tops",
+   "description": "Soft cotton tees and relaxed tops for daily wear.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "shirts-outerwear",
+   "name": "Shirts & Outerwear",
+   "description": "Linen shirts and denim jackets for layering through the seasons.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "co-ord-sets",
+   "name": "Co-ord Sets",
+   "description": "Matching sets that pair well and dress up or down with ease.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "footwear-accessories",
+   "name": "Footwear & Accessories",
+   "description": "Sneakers, totes, and finishing touches for every outfit.",
+   "parent": null,
+   "image": null
+  }
+ ],
+ "brands": [
+  {
+   "slug": "sample-store-essentials",
+   "name": "Sample Store Essentials",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "patna-weave-co",
+   "name": "Patna Weave Co.",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "urban-thread",
+   "name": "Urban Thread",
+   "featured": true,
+   "logo": null
+  }
+ ],
+ "products": [
+  {
+   "slug": "block-print-cotton-kurta",
+   "name": "Block Print Cotton Kurta",
+   "price": 1299,
+   "mrp": 1699,
+   "category": "kurtas-ethnic-wear",
+   "brand": "patna-weave-co",
+   "description": "A relaxed A-line kurta with hand block print motifs in indigo and rust. Ideal for festive days and everyday comfort alike.",
+   "attributes": {
+    "Material": "100% Cotton",
+    "Fit": "Regular A-line",
+    "Length": "44 inches",
+    "Care": "Hand wash cold, dry in shade",
+    "Origin": "Jaipur, Rajasthan"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933452228-ai-homepage_image-1794933452228-0.webp"
+   ],
+   "imagePrompt": "Flat lay of an indigo block print cotton kurta on a light wooden surface, soft natural daylight."
+  },
+  {
+   "slug": "chikankari-straight-kurta",
+   "name": "Chikankari Straight Kurta",
+   "price": 1899,
+   "mrp": null,
+   "category": "kurtas-ethnic-wear",
+   "brand": "sample-store-essentials",
+   "description": "Delicate white thread embroidery on a soft cotton base. A versatile kurta for work and occasions.",
+   "attributes": {
+    "Material": "Cotton voile",
+    "Fit": "Straight",
+    "Length": "46 inches",
+    "Care": "Gentle wash, iron on reverse",
+    "Origin": "Lucknow, Uttar Pradesh"
+   },
+   "badge": "New",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933468034-ai-homepage_image-1794933468033-0.webp"
+   ],
+   "imagePrompt": "Model wearing a white chikankari kurta against a plain cream backdrop, close detail of embroidery."
+  },
+  {
+   "slug": "printed-cotton-dupatta",
+   "name": "Printed Cotton Dupatta",
+   "price": 499,
+   "mrp": 699,
+   "category": "kurtas-ethnic-wear",
+   "brand": "patna-weave-co",
+   "description": "A lightweight dupatta with a fine floral border that drapes beautifully over any kurta.",
+   "attributes": {
+    "Material": "Cotton blend",
+    "Size": "2.25 m x 1 m",
+    "Weight": "120 g",
+    "Care": "Machine wash gentle",
+    "Origin": "Patna, Bihar"
+   },
+   "badge": null,
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933482647-ai-homepage_image-1794933482645-0.webp"
+   ],
+   "imagePrompt": "Folded cotton dupatta with floral border draped over a wooden chair."
+  },
+  {
+   "slug": "everyday-cotton-crew-tee",
+   "name": "Everyday Cotton Crew Tee",
+   "price": 599,
+   "mrp": null,
+   "category": "t-shirts-tops",
+   "brand": "sample-store-essentials",
+   "description": "A heavyweight crew neck tee that holds its shape wash after wash. A wardrobe staple in classic colours.",
+   "attributes": {
+    "Material": "180 GSM 100% Cotton",
+    "Fit": "Regular",
+    "Neck": "Crew",
+    "Care": "Machine wash cold",
+    "Origin": "Tiruppur, Tamil Nadu"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933497388-ai-homepage_image-1794933497387-0.webp"
+   ],
+   "imagePrompt": "Folded navy cotton crew neck tee on a neutral background, studio light."
+  },
+  {
+   "slug": "oversized-graphic-tee",
+   "name": "Oversized Graphic Tee",
+   "price": 749,
+   "mrp": 999,
+   "category": "t-shirts-tops",
+   "brand": "urban-thread",
+   "description": "A boxy, drop-shoulder tee with a subtle chest print. Easy to style with jeans or joggers.",
+   "attributes": {
+    "Material": "240 GSM Cotton Jersey",
+    "Fit": "Oversized",
+    "Neck": "Round",
+    "Care": "Machine wash cold, do not bleach",
+    "Origin": "Bengaluru, Karnataka"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933511764-ai-homepage_image-1794933511763-0.webp"
+   ],
+   "imagePrompt": "Model in an oversized off-white graphic tee, street style setting in soft daylight."
+  },
+  {
+   "slug": "relaxed-linen-shirt",
+   "name": "Relaxed Linen Shirt",
+   "price": 1499,
+   "mrp": 1999,
+   "category": "shirts-outerwear",
+   "brand": "sample-store-essentials",
+   "description": "A breezy button-up in pure linen with a relaxed collar. Lightweight enough for warm afternoons.",
+   "attributes": {
+    "Material": "100% Linen",
+    "Fit": "Relaxed",
+    "Sleeve": "Long, with cuff",
+    "Care": "Machine wash gentle, line dry",
+    "Origin": "Kolkata, West Bengal"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933525514-ai-homepage_image-1794933525513-0.webp"
+   ],
+   "imagePrompt": "Linen shirt in sand colour hung on a hook against a white wall, soft window light."
+  },
+  {
+   "slug": "classic-denim-jacket",
+   "name": "Classic Denim Jacket",
+   "price": 2199,
+   "mrp": null,
+   "category": "shirts-outerwear",
+   "brand": "urban-thread",
+   "description": "A structured trucker-style denim jacket in mid wash. Layers easily over tees and kurtas.",
+   "attributes": {
+    "Material": "12 oz Cotton Denim",
+    "Fit": "Regular",
+    "Closure": "Button front",
+    "Care": "Wash inside out, cold water",
+    "Origin": "Bengaluru, Karnataka"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Mid wash denim jacket on a mannequin, shot against a grey backdrop."
+  },
+  {
+   "slug": "cotton-co-ord-set-printed",
+   "name": "Cotton Co-ord Set, Printed",
+   "price": 1799,
+   "mrp": 2299,
+   "category": "co-ord-sets",
+   "brand": "sample-store-essentials",
+   "description": "A matching shirt and shorts set in a soft cotton print. Wear together or mix with other pieces.",
+   "attributes": {
+    "Material": "100% Cotton",
+    "Set includes": "Shirt and shorts",
+    "Fit": "Relaxed",
+    "Care": "Machine wash cold",
+    "Origin": "Jaipur, Rajasthan"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Model in a matching printed cotton shirt and shorts set, full length, outdoor garden."
+  },
+  {
+   "slug": "solid-co-ord-trouser-set",
+   "name": "Solid Co-ord Trouser Set",
+   "price": 2499,
+   "mrp": null,
+   "category": "co-ord-sets",
+   "brand": "urban-thread",
+   "description": "A tailored top and wide-leg trouser set in a crisp solid colour. Smart enough for the office.",
+   "attributes": {
+    "Material": "Cotton blend with stretch",
+    "Set includes": "Top and trousers",
+    "Fit": "Wide leg",
+    "Care": "Machine wash gentle",
+    "Origin": "Bengaluru, Karnataka"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Model in a sage green co-ord trouser set, standing against a plain wall."
+  },
+  {
+   "slug": "canvas-sneakers-low-top",
+   "name": "Canvas Sneakers, Low Top",
+   "price": 1699,
+   "mrp": 2199,
+   "category": "footwear-accessories",
+   "brand": "urban-thread",
+   "description": "Low-top canvas sneakers with a cushioned insole and rubber sole. Easy on and off for daily wear.",
+   "attributes": {
+    "Material": "Canvas upper, rubber sole",
+    "Closure": "Lace-up",
+    "Sole": "Rubber, cushioned insole",
+    "Care": "Spot clean with a damp cloth",
+    "Origin": "Agra, Uttar Pradesh"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Pair of white canvas low-top sneakers on a concrete step, three-quarter angle."
+  },
+  {
+   "slug": "woven-cotton-tote-bag",
+   "name": "Woven Cotton Tote Bag",
+   "price": 699,
+   "mrp": null,
+   "category": "footwear-accessories",
+   "brand": "patna-weave-co",
+   "description": "A sturdy handwoven tote with reinforced handles and an inner zip pocket. Fits a laptop and daily essentials.",
+   "attributes": {
+    "Material": "Handloom cotton",
+    "Size": "38 cm x 34 cm x 12 cm",
+    "Closure": "Open top with inner zip",
+    "Care": "Spot clean",
+    "Origin": "Patna, Bihar"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Natural handwoven cotton tote bag on a wooden bench, plants in background."
+  },
+  {
+   "slug": "slim-fit-stretch-denim-jeans",
+   "name": "Slim Fit Stretch Denim Jeans",
+   "price": 1599,
+   "mrp": 2099,
+   "category": "shirts-outerwear",
+   "brand": "urban-thread",
+   "description": "Slim fit jeans with a touch of stretch for all-day comfort. A dark wash that suits most occasions.",
+   "attributes": {
+    "Material": "98% Cotton, 2% Elastane",
+    "Fit": "Slim",
+    "Rise": "Mid",
+    "Care": "Wash inside out, cold water",
+    "Origin": "Bengaluru, Karnataka"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Dark wash slim jeans folded neatly on a wooden stool, studio lighting."
+  },
+  {
+   "slug": "cotton-pleated-palazzo-pants",
+   "name": "Cotton Pleated Palazzo Pants",
+   "price": 1099,
+   "mrp": 1399,
+   "category": "co-ord-sets",
+   "brand": "sample-store-essentials",
+   "description": "Flowy palazzos with an elasticated waist and soft pleats. Pair with a kurta or a tee.",
+   "attributes": {
+    "Material": "100% Cotton",
+    "Fit": "Wide leg",
+    "Waist": "Elasticated",
+    "Care": "Machine wash cold",
+    "Origin": "Surat, Gujarat"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Model in cream palazzo pants with a plain tucked tee, full length shot."
+  },
+  {
+   "slug": "handloom-silk-blend-dupatta",
+   "name": "Handloom Silk Blend Dupatta",
+   "price": 899,
+   "mrp": null,
+   "category": "kurtas-ethnic-wear",
+   "brand": "patna-weave-co",
+   "description": "A handloom dupatta with a silk sheen and a subtle zari border for special occasions.",
+   "attributes": {
+    "Material": "Silk blend",
+    "Size": "2.5 m x 1 m",
+    "Weight": "150 g",
+    "Care": "Dry clean recommended",
+    "Origin": "Varanasi, Uttar Pradesh"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Silk dupatta with gold zari border draped over a brass tray."
+  },
+  {
+   "slug": "cropped-ribbed-tank-top",
+   "name": "Cropped Ribbed Tank Top",
+   "price": 399,
+   "mrp": 549,
+   "category": "t-shirts-tops",
+   "brand": "urban-thread",
+   "description": "A fitted ribbed tank with a cropped length. Layers under shirts or wears alone.",
+   "attributes": {
+    "Material": "Cotton rib knit with elastane",
+    "Fit": "Slim, cropped",
+    "Neck": "Scoop",
+    "Care": "Machine wash cold",
+    "Origin": "Tiruppur, Tamil Nadu"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Cream ribbed cropped tank top on a hanger, plain background."
+  },
+  {
+   "slug": "printed-short-kurta-set",
+   "name": "Printed Short Kurta Set",
+   "price": 1599,
+   "mrp": null,
+   "category": "co-ord-sets",
+   "brand": "patna-weave-co",
+   "description": "A kurta and straight pants set with a light floral print, ready to wear for daytime.",
+   "attributes": {
+    "Material": "Cotton",
+    "Set includes": "Kurta and pants",
+    "Fit": "Straight",
+    "Care": "Hand wash cold",
+    "Origin": "Jaipur, Rajasthan"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Flat lay of a floral printed kurta and pants set on a linen cloth."
+  },
+  {
+   "slug": "canvas-everyday-backpack",
+   "name": "Canvas Everyday Backpack",
+   "price": 1299,
+   "mrp": 1599,
+   "category": "footwear-accessories",
+   "brand": "urban-thread",
+   "description": "A roomy canvas backpack with padded laptop sleeve and two front pockets.",
+   "attributes": {
+    "Material": "Waxed canvas, faux leather trim",
+    "Size": "44 cm x 30 cm x 14 cm",
+    "Capacity": "22 litres",
+    "Care": "Wipe clean",
+    "Origin": "Agra, Uttar Pradesh"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Olive canvas backpack leaning against a brick wall, daylight."
+  }
+ ],
+ "reviews": [
+  {
+   "productSlug": "block-print-cotton-kurta",
+   "rating": 5,
+   "title": "Soft and lovely print",
+   "comment": "The fabric feels light and breathable, and the indigo print is even. Wore it to a family lunch and got compliments.",
+   "author": "Priya S."
+  },
+  {
+   "productSlug": "everyday-cotton-crew-tee",
+   "rating": 4,
+   "title": "Good weight, holds shape",
+   "comment": "Thick cotton that does not turn wavy after washing. Fit is true to size.",
+   "author": "Arjun M."
+  },
+  {
+   "productSlug": "relaxed-linen-shirt",
+   "rating": 5,
+   "title": "Perfect for summer",
+   "comment": "Breathable linen that softens nicely. The relaxed cut is comfortable through a full workday.",
+   "author": "Neha K."
+  },
+  {
+   "productSlug": "classic-denim-jacket",
+   "rating": 4,
+   "title": "Solid layering piece",
+   "comment": "Sturdy denim with good structure. The mid wash goes with almost everything I own.",
+   "author": "Rohan D."
+  },
+  {
+   "productSlug": "canvas-sneakers-low-top",
+   "rating": 5,
+   "title": "Comfortable for long days",
+   "comment": "The insole is cushioned enough for walking around the city all day. Clean and simple look.",
+   "author": "Ananya R."
+  },
+  {
+   "productSlug": "woven-cotton-tote-bag",
+   "rating": 4,
+   "title": "Sturdy and roomy",
+   "comment": "Handles feel strong and the inner zip pocket is handy for keys and phone. Lovely handloom texture.",
+   "author": "Vikram P."
+  }
+ ],
+ "offers": [
+  {
+   "slug": "offer-1",
+   "title": "Festive Edit: Up to 30% off kurtas",
+   "subtitle": "Handpicked block prints and chikankari for every celebration.",
+   "badge": "Limited Time",
+   "cta": "Shop Kurtas",
+   "image": null,
+   "endsAt": "2026-11-20T16:37:19.942Z"
+  },
+  {
+   "slug": "offer-2",
+   "title": "Free shipping on orders above ₹999",
+   "subtitle": "Delivered across India in 4 to 7 working days.",
+   "badge": "New Customers",
+   "cta": "Start Shopping",
+   "image": null,
+   "endsAt": "2026-11-24T16:37:19.943Z"
+  }
+ ]
+}

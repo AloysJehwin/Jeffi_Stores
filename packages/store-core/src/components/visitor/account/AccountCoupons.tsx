@@ -46,9 +46,9 @@ export default function AccountCoupons({ coupons }: { coupons: AccountCoupon[] }
     <div
       id="coupons"
       ref={ref}
-      className="scroll-mt-24 bg-surface-elevated rounded-xl shadow-sm border border-border-default p-5 sm:p-6"
+      className="ui-card scroll-mt-24 bg-surface-elevated rounded-xl shadow-sm border border-border-default p-5 sm:p-6"
     >
-      <h2 className="font-semibold text-foreground">Your coupons</h2>
+      <h2 className="ui-heading font-semibold text-foreground">Your coupons</h2>
       <p className="mt-1 text-sm text-foreground-secondary">
         Apply one in your cart, or enter the code in the coupon box at checkout.
       </p>
@@ -66,7 +66,7 @@ export default function AccountCoupons({ coupons }: { coupons: AccountCoupon[] }
                     >
                       {coupon.code}
                     </p>
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
+                    <span className={`ui-badge inline-block rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
                       {status.label}
                     </span>
                   </div>
@@ -84,13 +84,13 @@ export default function AccountCoupons({ coupons }: { coupons: AccountCoupon[] }
                       type="button"
                       onClick={() => copy(coupon.code)}
                       aria-label={`Copy coupon ${coupon.code}`}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary"
+                      className="ui-btn px-3 py-1.5 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary"
                     >
                       Copy
                     </button>
                     <Link
                       href={cartCouponHref(coupon.code)}
-                      className="px-3 py-1.5 rounded-lg bg-accent-500 text-sm font-medium text-white hover:bg-accent-600"
+                      className="ui-btn px-3 py-1.5 rounded-lg bg-accent-500 text-sm font-medium text-white hover:bg-accent-600"
                     >
                       Apply in cart
                     </Link>

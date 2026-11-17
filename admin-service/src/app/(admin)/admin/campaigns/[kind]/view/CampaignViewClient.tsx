@@ -235,8 +235,8 @@ export default function CampaignViewClient({
           />
         </div>
 
-        {/* Right: previews */}
-        <div className="space-y-5">
+        {/* Right: previews; stays in view beside the summary once the columns sit side by side (xl). */}
+        <div className="space-y-5 xl:self-start admin-sticky-pane max-xl:!static max-xl:!max-h-none max-xl:!overflow-visible">
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Email</h3>
             <div className="border border-border-default rounded-lg overflow-hidden">

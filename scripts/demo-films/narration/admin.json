@@ -1,0 +1,30 @@
+{
+  "voice": "Sulafat",
+  "lines": [
+    {
+      "id": "a1",
+      "text": "One admin for your whole business."
+    },
+    {
+      "id": "a2",
+      "text": "Add products, track your stock, and see every order the moment it's placed."
+    },
+    {
+      "id": "a3",
+      "text": "Ship with built-in delivery partners, collect payments, and get settled to your bank."
+    },
+    {
+      "id": "a4",
+      "text": "GST invoices are made for you, and your reports are always up to date."
+    },
+    {
+      "id": "a5",
+      "text": "And your website is a drag and drop away, in the site builder."
+    }
+  ],
+  "model": "gemini-3.8-flash-tts",
+  "language": "en-IN",
+  "gap": 0.55,
+  "leadIn": 0.8,
+  "tail": 2.4
+}

@@ -14,7 +14,7 @@ vi.mock('motion/react', () => ({
   motion: { div: ({ children, initial, animate, transition, ...rest }: any) => <div {...rest}>{children}</div> },
   useReducedMotion: () => true,
 }))
-vi.mock('@/contexts/CartContext', () => ({ useCart: () => ({ addToCart, cartItems }) }))
+vi.mock('@/contexts/CartContext', () => ({ useCart: () => ({ addToCart, cartItems }), useCartOptional: () => ({ addToCart, cartItems }) }))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user }) }))
 vi.mock('@/contexts/ToastContext', () => ({ useToast: () => ({ showToast: vi.fn(), showConfirm }) }))
 vi.mock('@/contexts/WishlistContext', () => ({ useWishlist: () => ({ has: () => wished, toggle }) }))

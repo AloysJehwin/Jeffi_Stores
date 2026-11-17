@@ -459,12 +459,12 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
         <BusinessAccountMobileHeader />
         <div className="container mx-auto px-4">
           <div className="py-4">
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-              <h3 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+              <h3 className="ui-heading text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
               <p className="text-foreground-secondary mb-6">{error || 'Unable to load order details'}</p>
               <Link
                 href={bp('/business/account/orders')}
-                className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+                className="ui-btn inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
               >
                 View All Orders
               </Link>
@@ -481,10 +481,10 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
       <div className="container mx-auto px-4 pb-8">
         <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
           {/* Order Header */}
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+          <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-foreground">Order #{order.orderNumber}</h2>
+                <h2 className="ui-heading text-xl font-bold text-foreground">Order #{order.orderNumber}</h2>
                 {order.originalOrderId && order.originalOrderNumber && (
                   <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
                     Replacement for{' '}
@@ -513,12 +513,12 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span
-                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                  className={`ui-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
                 >
                   {statusLabel(order.status)}
                 </span>
                 <span
-                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}
+                  className={`ui-badge inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}
                 >
                   Payment: {order.paymentStatus}
                 </span>
@@ -542,7 +542,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                     href={order.vaultUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors"
+                    className="ui-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors"
                   >
                     Open my vault
                   </a>
@@ -552,7 +552,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                     href={documentUrlForLocation('invoice', window.location, order.viewToken)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
+                    className="ui-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -607,7 +607,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
               if (!edd) return null
               const { label, sub, color } = getEddDisplay(order, edd)
               return (
-                <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-4 sm:px-6 py-4 flex items-center gap-3">
+                <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default px-4 sm:px-6 py-4 flex items-center gap-3">
                   <svg
                     className="w-5 h-5 text-accent-500 shrink-0"
                     fill="none"
@@ -629,7 +629,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
               )
             })()}
           {order.awbNumber && !order.isAllDigital && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                 <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -639,7 +639,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                     d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                   />
                 </svg>
-                <h3 className="text-base font-semibold text-foreground">Shipment Tracking</h3>
+                <h3 className="ui-heading text-base font-semibold text-foreground">Shipment Tracking</h3>
               </div>
               <div className="p-4 sm:p-6">
                 <DelhiveryTracking orderId={order.id} apiBase="/api/orders" headers={{ 'x-auth-portal': 'business' }} />
@@ -648,8 +648,8 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
           )}
 
           {/* Order Items */}
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-            <h3 className="text-lg font-bold text-foreground mb-4">
+          <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+            <h3 className="ui-heading text-lg font-bold text-foreground mb-4">
               Order Items ({order.items.length} {order.items.length === 1 ? 'item' : 'items'})
             </h3>
             <div className="space-y-4">
@@ -695,12 +695,12 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                         <p className="font-medium text-foreground">{item.productName}</p>
                       )}
                       {item.variantName && (
-                        <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                        <span className="ui-badge inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
                           {item.variantName}
                         </span>
                       )}
                       {item.subVariantName && (
-                        <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                        <span className="ui-badge inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
                           {item.subVariantName}
                         </span>
                       )}
@@ -800,8 +800,8 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
 
           {/* Shipping Address */}
           {order.shippingAddress && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-              <h3 className="text-lg font-bold text-foreground mb-4">
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+              <h3 className="ui-heading text-lg font-bold text-foreground mb-4">
                 {order.isAllDigital ? 'Billing Address' : 'Shipping Address'}
               </h3>
               <div className="text-foreground-secondary">
@@ -829,8 +829,8 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
 
           {/* Order Notes */}
           {order.notes && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-              <h3 className="text-lg font-bold text-foreground mb-2">Order Notes</h3>
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+              <h3 className="ui-heading text-lg font-bold text-foreground mb-2">Order Notes</h3>
               <p className="text-foreground-secondary">{order.notes}</p>
             </div>
           )}
@@ -906,7 +906,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                       type="button"
                       onClick={handlePayNow}
                       disabled={isPayingNow}
-                      className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
+                      className="ui-btn flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
                     >
                       {isPayingNow ? (
                         <>
@@ -993,7 +993,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                       type="button"
                       onClick={handlePayNow}
                       disabled={isPayingNow}
-                      className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
+                      className="ui-btn flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
                     >
                       {isPayingNow ? (
                         <>
@@ -1029,13 +1029,13 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               href={bp('/business/account/orders')}
-              className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors text-center"
+              className="ui-btn flex-1 bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors text-center"
             >
               View All Orders
             </Link>
             <Link
               href={bp('/business/products')}
-              className="flex-1 bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary hover:bg-surface-secondary transition-colors text-center font-semibold"
+              className="ui-btn flex-1 bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary hover:bg-surface-secondary transition-colors text-center font-semibold"
             >
               Continue Shopping
             </Link>

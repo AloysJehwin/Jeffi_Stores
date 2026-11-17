@@ -2,7 +2,7 @@
 
 import { useState, useCallback, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Badge, DetailHeader, DraftLockBanner, FormFooter, LockedFieldset, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
+import { Badge, DetailHeader, DraftLockBanner, FormFooter, LockedFieldset, PageBody, StatusBadge, fieldInputCls, stickyAboveFooter } from '@/components/admin/kit'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
@@ -196,7 +196,11 @@ export default function OfferDetailClient({
       {draftId && <DraftLockBanner lock={lock} scope="coupons:write" />}
       <LockedFieldset readOnly={readOnly} className="contents">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
-          <div className="space-y-4 min-w-0">
+          {/* Stays in view beside the product picker; the columns only sit side by side from xl. */}
+          <div
+            className="space-y-4 min-w-0 admin-sticky-pane max-xl:!static max-xl:!max-h-none max-xl:!overflow-visible"
+            style={canWrite && draftId ? stickyAboveFooter : undefined}
+          >
             <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>
 

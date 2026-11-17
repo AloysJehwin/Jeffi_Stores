@@ -5,7 +5,7 @@ shared (everything else: namespaces, edge, Redis, RBAC, config)."""
 import json
 import sys
 
-SERVICES = ("controller", "storefront", "admin", "business", "messaging", "documents", "public-api", "mobile")
+SERVICES = ("controller", "storefront", "admin", "business", "messaging", "documents", "public-api", "mobile", "showcase")
 NAMES = {f"jeffi-stores-{'document' if s == 'documents' else s}-service": s for s in SERVICES}
 
 
