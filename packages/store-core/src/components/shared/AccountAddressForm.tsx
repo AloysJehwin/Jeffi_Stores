@@ -42,8 +42,8 @@ export default function AccountAddressForm({
   const pinLookupDone = pinLookupState === 'found'
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-6">
-      <h2 className="text-xl font-bold text-foreground mb-6">{editing ? 'Edit Address' : 'Add New Address'}</h2>
+    <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-6">
+      <h2 className="ui-heading text-xl font-bold text-foreground mb-6">{editing ? 'Edit Address' : 'Add New Address'}</h2>
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CustomSelect
@@ -67,7 +67,7 @@ export default function AccountAddressForm({
               type="text"
               value={formData.full_name}
               onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="ui-input w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               required
             />
           </div>
@@ -78,7 +78,7 @@ export default function AccountAddressForm({
             Phone Number *
           </label>
           <div className="flex">
-            <span className="inline-flex items-center px-4 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-sm font-medium">
+            <span className="ui-addon inline-flex items-center px-4 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-sm font-medium">
               +91
             </span>
             <input
@@ -88,7 +88,7 @@ export default function AccountAddressForm({
               maxLength={10}
               value={formData.phone}
               onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-              className="w-full px-4 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="ui-input w-full px-4 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               placeholder="00000 00000"
               required
             />
@@ -107,7 +107,7 @@ export default function AccountAddressForm({
             type="text"
             value={formData.address_line1}
             onChange={e => setFormData({ ...formData, address_line1: e.target.value })}
-            className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="ui-input w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
             placeholder="House/Flat No., Street, Area"
             required
           />
@@ -125,7 +125,7 @@ export default function AccountAddressForm({
               maxLength={6}
               value={formData.postal_code}
               onChange={e => onPincodeChange(e.target.value)}
-              className="w-full px-4 py-2 pr-10 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="ui-input w-full px-4 py-2 pr-10 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               placeholder="6-digit PIN code"
               required
             />
@@ -214,7 +214,7 @@ export default function AccountAddressForm({
               type="text"
               value={formData.address_line2}
               onChange={e => setFormData({ ...formData, address_line2: e.target.value })}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="ui-input w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               placeholder="Area, Colony, Village"
             />
           </div>
@@ -229,7 +229,7 @@ export default function AccountAddressForm({
             type="text"
             value={formData.landmark}
             onChange={e => setFormData({ ...formData, landmark: e.target.value })}
-            className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="ui-input w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
             placeholder="Nearby landmark"
           />
         </div>
@@ -251,7 +251,7 @@ export default function AccountAddressForm({
           <button
             type="submit"
             disabled={isSaving}
-            className="px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
+            className="ui-btn px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
           >
             {isSaving ? (
               <>

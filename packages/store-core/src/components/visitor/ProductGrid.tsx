@@ -80,6 +80,8 @@ interface Props {
   basePath?: string
   /** Overrides the product grid's column classes. */
   gridClassName?: string
+  /** The control bar (filters slot, group, view mode, sort); off when a page places those itself. */
+  controls?: boolean
 }
 
 const DEFAULT_GRID = 'grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6'
@@ -337,6 +339,7 @@ export default function ProductGrid({
   total,
   basePath = '/products',
   gridClassName = DEFAULT_GRID,
+  controls = true,
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const router = useRouter()
@@ -400,11 +403,16 @@ export default function ProductGrid({
       })()
     : [{ name: '', slug: '', items: products }]
 
+  // A store with a site card: the grouped view shows the cards the server drew for this page, not ProductCard.
+  const siteCards = pagedItems?.some(i => (i as PagedNode & { card?: boolean }).card)
+    ? new Map(pagedItems.filter(i => (i as PagedNode & { card?: boolean }).card).map(i => [i.key, i.node]))
+    : null
+
   return (
     <ListingViewContext.Provider value={viewMode}>
     <div>
       {/* Single control bar: filters · group · view mode · sort. Sticks under the header on phones and tablets. */}
-      <div className="sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-20 -mx-4 px-4 py-2 mb-4 bg-surface border-b border-border-default flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:static lg:mx-0 lg:px-0 lg:py-0 lg:mb-6 lg:bg-transparent lg:border-0 lg:overflow-visible lg:flex-wrap">
+      {controls && <div className="sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-20 -mx-4 px-4 py-2 mb-4 bg-surface border-b border-border-default flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:static lg:mx-0 lg:px-0 lg:py-0 lg:mb-6 lg:bg-transparent lg:border-0 lg:overflow-visible lg:flex-wrap">
         {filterSlot}
         <button
           type="button"
@@ -472,7 +480,7 @@ export default function ProductGrid({
             <SortDropdown basePath={basePath} />
           </div>
         )}
-      </div>
+      </div>}
 
       {viewMode === 'table' ? (
         <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
@@ -541,6 +549,8 @@ export default function ProductGrid({
                     ...categoryBanners.slice(bannerStart),
                     ...categoryBanners.slice(0, bannerStart),
                   ].slice(0, 4)
+                  const drawn = siteCards?.get(String(product.id))
+                  if (drawn) return <Fragment key={product.id}>{drawn}</Fragment>
 
                   return (
                     <Fragment key={product.id}>

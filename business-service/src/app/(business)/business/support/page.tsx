@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import SupportChat from '@/components/visitor/SupportChat'
+import { renderSitePage } from '@/components/visitor/site/SitePage'
 import { cookies, headers } from 'next/headers'
 import { verifyBusinessToken } from '@/lib/auth/jwt'
 import { bp } from '@/lib/shared/business-path'
@@ -25,7 +26,10 @@ async function getAuthUser() {
   }
 }
 
-export default async function BusinessSupportPage() {
+export default async function BusinessSupportPage({ searchParams }: { searchParams: Promise<{ preview?: string; layout?: string }> }) {
+  // The business portal's Site Builder support page when it has one (or its preview); else the built-in one below.
+  const site = await renderSitePage({ audience: 'business', page: 'support' }, await searchParams)
+  if (site) return site
   const storeIdentity = await getStoreIdentity()
   const user = await getAuthUser()
   const hdrs = await headers()

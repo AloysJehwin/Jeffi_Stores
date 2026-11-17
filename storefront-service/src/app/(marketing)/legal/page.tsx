@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { renderUtilityPage } from '@/components/visitor/site/code/parts/utility/site-page'
 import { getStorePolicies, getStoreLegalContext, policyPdfName } from '@/lib/legals/store-policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import type { Metadata } from 'next'
@@ -71,14 +72,17 @@ const icons: Record<string, React.ReactNode> = {
   ),
 }
 
-export default async function LegalIndexPage() {
+// The policy list. An AI-designed legal page places it itself (<LegalContent />); a Site Builder legal page holds it in
+// its `legal_main` block with the store's own blocks around it (the same layout wraps every policy); otherwise it is
+// the page.
+export default async function LegalIndexPage({ searchParams }: { searchParams: Promise<{ preview?: string; layout?: string }> }) {
   const [policies, { slug: storeSlug }] = await Promise.all([getStorePolicies(), getStoreLegalContext()])
   const listed = policies.filter(p => !p.unlisted)
-  return (
+  const main = (
     <div className="bg-surface min-h-screen">
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
+          <h1 className="ui-heading text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
             Policies &amp; Legal
           </h1>
           <p className="text-foreground-secondary text-sm">
@@ -93,7 +97,7 @@ export default async function LegalIndexPage() {
             {listed.map(policy => (
               <div
                 key={policy.slug}
-                className="group bg-surface-elevated rounded-xl border border-border-default hover:border-primary-400 hover:shadow-md transition-all duration-200 flex gap-3 items-start"
+                className="ui-card group bg-surface-elevated rounded-xl border border-border-default hover:border-primary-400 hover:shadow-md transition-all duration-200 flex gap-3 items-start"
               >
                 <Link href={`/legal/${policy.slug}`} className="flex-1 flex gap-4 items-start p-5 min-w-0">
                   <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
@@ -114,7 +118,7 @@ export default async function LegalIndexPage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="font-bold text-foreground text-sm group-hover:text-primary-600 transition-colors">
+                    <h2 className="ui-heading font-bold text-foreground text-sm group-hover:text-primary-600 transition-colors">
                       {policy.title}
                     </h2>
                     <p className="text-xs text-foreground-secondary mt-0.5 leading-relaxed line-clamp-2">
@@ -144,13 +148,13 @@ export default async function LegalIndexPage() {
 
           <SubscriptionsTerms />
 
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
+          <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
             <p className="text-sm text-foreground-secondary mb-3">
               Can&apos;t find what you&apos;re looking for? Our support team can help.
             </p>
             <Link
               href="/support"
-              className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
+              className="ui-btn inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
             >
               Contact Support
             </Link>
@@ -159,4 +163,6 @@ export default async function LegalIndexPage() {
       </div>
     </div>
   )
+  const site = await renderUtilityPage({ audience: 'store', page: 'legal' }, await searchParams, { part: 'LegalContent', core: main, block: { legal_main: main } })
+  return site ?? main
 }

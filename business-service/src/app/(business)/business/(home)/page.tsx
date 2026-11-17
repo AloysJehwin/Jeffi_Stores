@@ -5,13 +5,11 @@ import { bp } from '@/lib/shared/business-path'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import { getPageSections, loadSectionData } from '@/lib/catalog/homepage-model'
 import { rowAudience } from '@/lib/catalog/homepage-sections'
-import { getWebSurface } from '@/lib/catalog/web-surface'
 import { CartProvider } from '@/contexts/CartContext'
 import BusinessHeader from '@/components/business/Header'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
 import HomeSections from '@/components/visitor/home/HomeSections'
-import { verifyHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
-import { getEditableHomepage } from '@/lib/catalog/homepage-draft'
+import { previewRows } from '@/lib/site/preview'
 import BusinessHomeProvider from '@/components/visitor/home/business/BusinessHomeProvider'
 import { businessHomeQuery } from '@/components/visitor/home/business/business-home'
 import BusinessLanding, { getBusinessAuthState } from '../_components/BusinessLanding'
@@ -31,11 +29,8 @@ export default async function BusinessHomePage({ searchParams }: { searchParams:
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
   const authState = await getBusinessAuthState()
   const params = await searchParams
-  // Admin preview: a signed token names the draft to render (Settings → Homepage → Preview).
-  const preview = await verifyHomepagePreviewToken(params.preview)
-  const editable = preview ? await getEditableHomepage(preview.draftId) : null
-  const draft = editable?.draft ? editable : null
-  const surface = await getWebSurface(params.layout, !!draft)
+  // Admin preview: a signed token names the draft to render (a homepage or Site Builder draft).
+  const { surface, draft, selectable } = await previewRows(params.preview, params.layout)
 
   // The business homepage when one is published and the plan has it; otherwise the store's rows
   // come back, and the landing (or, for a signed-in business, the catalog) stands in.
@@ -56,7 +51,7 @@ export default async function BusinessHomePage({ searchParams }: { searchParams:
 
         <main className="pt-16 lg:pt-20">
           <BusinessHomeProvider query={businessHomeQuery(sections)} approved={approved} host={host}>
-            <HomeSections sections={sections} data={data} portal={portal} />
+            <HomeSections sections={sections} data={data} portal={portal} selectable={selectable} />
           </BusinessHomeProvider>
         </main>
       </div>

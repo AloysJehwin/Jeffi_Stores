@@ -17,11 +17,12 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 
 | Owner | Store tables | Control-plane tables |
 | --- | ---: | ---: |
-| admin-service | 196 | 0 |
+| admin-service | 202 | 0 |
 | business-service | 3 | 0 |
 | controller-service | 4 | 48 |
 | document-service | 23 | 0 |
 | messaging-service | 27 | 0 |
+| showcase-service | 2 | 0 |
 | storefront-service | 33 | 0 |
 
 ## admin-service
@@ -210,7 +211,13 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `shelf_stock` | `tables/inventory.sql` | writes: admin 30, document 16, storefront 1 |
 | `shipping_zones` | `tables/settings.sql` | no writes found; follows settings.sql |
 | `site_control_drafts` | `tables/settings.sql` | writes: admin 2 |
+| `site_assets` | `tables/site-builder.sql` | Site Builder (docs/SITE_BUILDER_PLAN.md) |
+| `site_drafts` | `tables/site-builder.sql` | Site Builder (docs/SITE_BUILDER_PLAN.md) |
+| `site_pages` | `tables/site-builder.sql` | Site Builder (docs/SITE_BUILDER_PLAN.md) |
 | `site_settings` | `tables/settings.sql` | writes: admin 16, controller 2 |
+| `site_templates` | `tables/site-builder.sql` | Site Builder (docs/SITE_BUILDER_PLAN.md) |
+| `site_theme` | `tables/site-builder.sql` | Site Builder (docs/SITE_BUILDER_PLAN.md) |
+| `site_versions` | `tables/site-builder.sql` | Site Builder (docs/SITE_BUILDER_PLAN.md) |
 | `supplier_drafts` | `tables/catalog.sql` | writes: admin 2 |
 | `suppliers` | `tables/settings.sql` | writes: admin 3 |
 | `support_ai_actions` | `tables/support.sql` | writes: controller 8, admin 4 |
@@ -242,6 +249,7 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `admin_mobiles` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `ai_price_list` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `ai_provider_identities` | `control-plane/tables/control-plane.sql` | control-plane set |
+| `ai_wallet_holds` | `control-plane/tables/ai-wallet-holds.sql` | control-plane set |
 | `api_key_usage_daily` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `api_keys` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `compute_prices` | `control-plane/tables/control-plane.sql` | control-plane set |
@@ -274,6 +282,7 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `tenant_admin_certs` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_bank_accounts` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_ca` | `control-plane/tables/control-plane.sql` | control-plane set |
+| `tenant_compliance_documents` | `control-plane/tables/compliance.sql` | control-plane set |
 | `tenant_compute` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_compute_periods` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `tenant_custom_domains` | `control-plane/tables/control-plane.sql` | control-plane set |
@@ -349,6 +358,13 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `template_version` | `tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: messaging 4) |
 | `wa_pricing` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
 | `waba_capacity` | `platform-only/tables/messaging.sql` | messaging.sql belongs to messaging-service (writes: no writes found) |
+
+## showcase-service
+
+| Table | File | Evidence |
+| --- | --- | --- |
+| `showcase_leads` | `platform-only/tables/showcase.sql` | Showcase product tables (written by showcase-service's lead form; read in the controller's console) |
+| `showcase_sites` | `platform-only/tables/showcase.sql` | Showcase product tables (written by the controller's console and showcase_renew cron; served by showcase-service) |
 
 ## storefront-service
 

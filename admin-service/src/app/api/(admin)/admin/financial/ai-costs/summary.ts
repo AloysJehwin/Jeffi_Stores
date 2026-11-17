@@ -7,6 +7,9 @@ import { fillSeries } from '@admin/app/(admin)/admin/financial/_components/overv
 
 const IST = `'Asia/Kolkata'`
 const inPeriod = `created_at >= ($1::date::timestamp AT TIME ZONE ${IST}) AND created_at < (($2::date + 1)::timestamp AT TIME ZONE ${IST})`
+// Charged to the wallet: calls the platform paid for (wallet_ref platform:<label>, a free site build) keep their list
+// price_inr for the platform's books and still count in cost_inr, but cost the owner nothing.
+const charged = `status IN ('ok', 'pending') AND COALESCE(wallet_ref, '') NOT LIKE 'platform:%'`
 const n = (v: unknown) => (v == null ? 0 : Number(v) || 0)
 
 export interface AiTotals {
@@ -19,7 +22,7 @@ export interface AiTotals {
 
 export async function aiTotals(p: Period): Promise<AiTotals> {
   const row = await queryOne<Record<string, string>>(
-    `SELECT COUNT(*) AS calls, COALESCE(SUM(cost_inr), 0) AS cost_inr, COALESCE(SUM(price_inr) FILTER (WHERE status IN ('ok', 'pending')), 0) AS price_inr,
+    `SELECT COUNT(*) AS calls, COALESCE(SUM(cost_inr), 0) AS cost_inr, COALESCE(SUM(price_inr) FILTER (WHERE ${charged}), 0) AS price_inr,
        COUNT(*) FILTER (WHERE status = 'failed') AS failed, COUNT(*) FILTER (WHERE status = 'unpaid') AS unpaid
      FROM ai_usage WHERE ${inPeriod}`,
     [p.from, p.to]
@@ -32,7 +35,7 @@ type Grouped = { key: string; calls: number; cost_inr: number; price_inr: number
 async function groupBy(col: 'capability' | 'provider' | 'feature', p: Period): Promise<Grouped[]> {
   const rows = await queryMany<Record<string, string>>(
     `SELECT ${col} AS key, COUNT(*) AS calls, COALESCE(SUM(cost_inr), 0) AS cost_inr,
-       COALESCE(SUM(price_inr) FILTER (WHERE status IN ('ok', 'pending')), 0) AS price_inr, COUNT(*) FILTER (WHERE status = 'failed') AS failed
+       COALESCE(SUM(price_inr) FILTER (WHERE ${charged}), 0) AS price_inr, COUNT(*) FILTER (WHERE status = 'failed') AS failed
      FROM ai_usage WHERE ${inPeriod} GROUP BY 1 ORDER BY 3 DESC, 2 DESC`,
     [p.from, p.to]
   ).catch(() => [])
@@ -42,7 +45,7 @@ async function groupBy(col: 'capability' | 'provider' | 'feature', p: Period): P
 export async function getAiCosts(p: Period, opts: { flagship: boolean }) {
   const prev = previousPeriod(p)
   const bucket = bucketFor(p)
-  const amount = opts.flagship ? 'cost_inr' : `CASE WHEN status IN ('ok', 'pending') THEN price_inr ELSE 0 END`
+  const amount = opts.flagship ? 'cost_inr' : `CASE WHEN ${charged} THEN price_inr ELSE 0 END`
   const [current, previous, byCapability, byProvider, byFeature, seriesRows, topRefs] = await Promise.all([
     aiTotals(p),
     aiTotals(prev),
@@ -56,7 +59,7 @@ export async function getAiCosts(p: Period, opts: { flagship: boolean }) {
     ).catch(() => []),
     queryMany<Record<string, string>>(
       `SELECT ref, MIN(feature) AS feature, COUNT(*) AS calls, COALESCE(SUM(cost_inr), 0) AS cost_inr,
-         COALESCE(SUM(price_inr) FILTER (WHERE status IN ('ok', 'pending')), 0) AS price_inr
+         COALESCE(SUM(price_inr) FILTER (WHERE ${charged}), 0) AS price_inr
        FROM ai_usage WHERE ${inPeriod} AND ref IS NOT NULL GROUP BY ref ORDER BY ${opts.flagship ? 4 : 5} DESC, 3 DESC LIMIT 10`,
       [p.from, p.to]
     ).catch(() => []),

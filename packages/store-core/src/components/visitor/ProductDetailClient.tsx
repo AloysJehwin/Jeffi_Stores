@@ -1,188 +1,30 @@
 'use client'
 
 import { updateChannelsLabel, useMessagingChannels } from '@/hooks/useStoreFlags'
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 import dynamic from 'next/dynamic'
 import { DocumentList } from '@/components/media/MediaItemView'
-import { resolveMedia, type MediaScope, type ProductMediaItem } from '@/lib/catalog/product-media-shared'
 
 import ProductActions from './ProductActions'
 import BusinessPriceBadge from './BusinessPriceBadge'
 import RazorpayOffers from './RazorpayOffers'
-import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
-import { useWishlist } from '@/contexts/WishlistContext'
-import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { digitalActive } from '@/lib/catalog/digital'
-import { pickUnitPrice } from '@/lib/catalog/pricing'
-import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewSummaryLink from './pdp/ReviewSummaryLink'
-import type { ReviewSummary } from '@/lib/shared/review-summary-types'
-import { round2 } from '@/lib/catalog/gst'
-import { resolveReturnPolicy } from '@/lib/catalog/return-policy-rules'
+import {
+  ProductPageProvider,
+  useProductPage,
+  type PolicyProps,
+  type ProductPageInput,
+  type ProductPageState,
+} from './pdp/ProductPageProvider'
 
 // Players and 3D load only when a product has such media.
 const ProductMediaGallery = dynamic(() => import('@/components/media/ProductMediaGallery'), { ssr: false })
 
-interface ProductImage {
-  id: string
-  image_url: string
-  thumbnail_url: string
-  is_primary: boolean
-  display_order?: number
-}
-
-interface SubVariant {
-  id: string
-  sub_variant_name: string
-  sku?: string | null
-  price: number | null
-  mrp: number | null
-  price_ex_gst: number | null
-  stock_status: string
-  is_active: boolean
-}
-
-interface Variant {
-  id: string
-  variant_name: string
-  sku: string
-  price: number | null
-  mrp: number | null
-  mrp_ex_gst: number | null
-  price_ex_gst: number | null
-  stock_status: string
-  pricing_type?: string
-  unit?: string
-  numeric_value?: number | null
-  sub_variant_type?: string | null
-  sell_unit_id?: string | null
-  variant_images?: ProductImage[]
-  sub_variants?: SubVariant[]
-}
-
-interface ProductDetailClientProps {
-  product: {
-    id: string
-    name: string
-    sku: string
-    slug: string
-    description?: string | null
-    base_price: number
-    mrp?: number | null
-    price_ex_gst?: number | null
-    gst_percentage?: number | null
-    stock_status: string
-    has_variants: boolean
-    variant_type?: string | null
-    discount_pct?: number | null
-    extra_delivery_days?: number | null
-    handling_days?: number | null
-    weight?: number | null
-    dimensions?: string | null
-    material?: string | null
-    finish?: string | null
-    size?: string | null
-    hsn_code?: string | null
-    return_window_days?: number | null
-    mpn?: string | null
-    gtin?: string | null
-    weight_grams?: number | null
-    length_cm?: number | null
-    breadth_cm?: number | null
-    height_cm?: number | null
-    package_type?: string | null
-    brands?: {
-      id: string
-      name: string
-      slug: string
-      return_allowed?: boolean
-      return_window_days?: number
-      replacement_allowed?: boolean
-      replacement_window_days?: number
-    } | null
-    categories?: {
-      id: string
-      name: string
-      slug: string
-      return_allowed?: boolean
-      return_window_days?: number
-      replacement_allowed?: boolean
-      replacement_window_days?: number
-    } | null
-    product_images: ProductImage[]
-    product_variants: Variant[]
-    /** product_media (every scope); when present it drives the gallery, variant switching included. */
-    media?: ProductMediaItem[]
-    product_units?: Array<{
-      id: string
-      variant_id: string | null
-      sub_variant_id: string | null
-      unit: string
-      factor: number
-      is_base: boolean
-      is_purchase_default: boolean
-      display_label: string | null
-      dimension: string
-      min_qty?: number | null
-      max_qty?: number | null
-      qty_step?: number | null
-    }>
-    sell_unit_id?: string | null
-    // Identification & Compliance
-    barcode?: string | null
-    isbn?: string | null
-    asin?: string | null
-    brand_part_number?: string | null
-    country_of_origin?: string | null
-    // Physical Attributes
-    color?: string | null
-    color_hex?: string | null
-    volume_ml?: number | null
-    net_weight_grams?: number | null
-    fragile?: boolean | null
-    hazardous?: boolean | null
-    flammable?: boolean | null
-    // Certifications & Standards
-    certifications?: string[] | null
-    compliance_standard?: string | null
-    safety_rating?: string | null
-    warranty_months?: number | null
-    warranty_type?: string | null
-    // Condition & Lifecycle
-    condition?: string | null
-    launch_date?: string | null
-    discontinue_date?: string | null
-    // Age & Audience
-    age_min?: number | null
-    age_max?: number | null
-    target_gender?: string | null
-    target_audience?: string[] | null
-    is_cod_allowed?: boolean | null
-    is_digital?: boolean | null
-    is_subscription?: boolean | null
-    subscription_intervals?: string[] | null
-    owned_in_vault?: boolean | null
-  }
-  initialSkuParam?: string
-  freeShippingThreshold?: number
-  reviewSummary?: ReviewSummary | null
-}
-
-interface PolicyProps {
-  returnAllowed: boolean
-  returnDays: number
-  replacementAllowed: boolean
-  replacementDays: number
-  isCodAllowed?: boolean
-  freeShippingThreshold?: number
-}
-
-const DeliveryInfo = ({
+export const DeliveryInfo = ({
   returnAllowed,
   returnDays,
   replacementAllowed,
@@ -496,7 +338,7 @@ interface PincodeCheckerProps {
   pincodeRef: React.RefObject<HTMLInputElement>
 }
 
-const PincodeChecker = ({
+export const PincodeChecker = ({
   pincode,
   setPincode,
   pincodeResult,
@@ -543,218 +385,157 @@ const PincodeChecker = ({
   </div>
 )
 
-export default function ProductDetailClient({
-  product,
-  initialSkuParam,
-  freeShippingThreshold = 500,
-  reviewSummary,
-}: ProductDetailClientProps) {
-  const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
-  const [mediaSel, setMediaSel] = useState<MediaScope>({})
-  const media = useMemo(() => product.media ?? [], [product.media])
-  const asImage = (m: ProductMediaItem): ProductImage & { blurhash?: string | null } => ({
-    id: m.id,
-    image_url: m.url,
-    thumbnail_url: m.thumbnail_url || m.url,
-    is_primary: m.is_primary,
-    blurhash: m.metadata?.blurhash ?? null,
-  })
-  // Product-scope images, and the selection's own (sub-variant → variant) when it has any.
-  const mediaImages = useMemo(() => resolveMedia(media, {}).filter(m => m.kind === 'image').map(asImage), [media])
-  const selected = useMemo(() => resolveMedia(media, mediaSel), [media, mediaSel])
-  const selImageKey = selected.filter(m => m.kind === 'image').map(m => m.id).join(',')
-  const selImages = useMemo(
-    () => (mediaSel.variantId && selImageKey !== mediaImages.map(i => i.id).join(',') ? selected.filter(m => m.kind === 'image').map(asImage) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selImageKey]
+/** The picture gallery, then the product's videos/3D and documents. */
+export function PdpGallery({ page }: { page: ProductPageState }) {
+  const { product } = page
+  return (
+    <>
+      <ProductImageGallery
+        images={page.images}
+        productName={product.name}
+        variantImages={page.variantImages}
+        discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
+      />
+
+      <PdpMediaExtras page={page} />
+    </>
   )
-  const extras = selected.filter(m => m.kind !== 'image' && m.kind !== 'document')
-  const docs = selected.filter(m => m.kind === 'document')
-  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
-  const isInWishlist = inWishlist(product.id)
-  const [wishlistLoading, setWishlistLoading] = useState(false)
-  const [selectedUnit, setSelectedUnit] = useState<{
-    key: string
-    label: string | null
-    min: number
-    max: number | null
-    step: number
-    factor: number
-    dimension: string
-  }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
-  const [pincode, setPincode] = useState('')
-  const [pincodeResult, setPincodeResult] = useState<{ ok: boolean; message: string } | null>(null)
-  const [pincodeChecking, setPincodeChecking] = useState(false)
-  const [notifyEmail, setNotifyEmail] = useState('')
-  const [notifySubmitted, setNotifySubmitted] = useState(false)
-  const pincodeRef = useRef<HTMLInputElement>(null)
-  const { user } = useAuth()
-  const { showToast, showConfirm } = useToast()
-  const gstEnabled = useStoreConfig().flags.gstEnabled
-  const digitalMaster = useStoreConfig().flags.digitalProductsEnabled
-  const isDigital = digitalActive(digitalMaster, product.is_digital ?? false)
-  const router = useRouter()
-  const [vaultOwned, setVaultOwned] = useState<{ owned: boolean; url: string | null }>({
-    owned: product.owned_in_vault ?? false,
-    url: null,
-  })
+}
 
-  useEffect(() => {
-    if (!isDigital || !user) return
-    let cancelled = false
-    fetch(`/api/vault/owned?productId=${encodeURIComponent(product.id)}`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => {
-        if (!cancelled && d) setVaultOwned({ owned: !!d.owned, url: d.url ?? null })
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [isDigital, user, product.id])
+/** The selection's videos, 3D models and documents. */
+export function PdpMediaExtras({ page }: { page: ProductPageState }) {
+  const { extras, docs } = page
+  return (
+    <>
+      {extras.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Videos, 3D &amp; more</p>
+          <ProductMediaGallery items={extras} ar aspect="aspect-video" />
+        </div>
+      )}
+      {docs.length > 0 && (
+        <div className="mt-4">
+          <DocumentList items={docs} title="Documents & downloads" />
+        </div>
+      )}
+    </>
+  )
+}
 
-  useEffect(() => {
-    if (user?.email) setNotifyEmail(user.email)
-  }, [user])
+/** The pincode check, wired to the page's state. */
+export function PdpPincodeChecker({ page }: { page: ProductPageState }) {
+  return (
+    <PincodeChecker
+      pincode={page.pincode}
+      setPincode={page.setPincode}
+      pincodeResult={page.pincodeResult}
+      setPincodeResult={page.setPincodeResult}
+      pincodeChecking={page.pincodeChecking}
+      checkPincode={page.checkPincode}
+      pincodeRef={page.pincodeRef}
+    />
+  )
+}
 
-  const checkPincode = useCallback(async () => {
-    const p = pincode.trim()
-    if (!/^\d{6}$/.test(p)) {
-      setPincodeResult({ ok: false, message: 'Enter a valid 6-digit pincode' })
-      return
-    }
-    setPincodeChecking(true)
-    setPincodeResult(null)
-    try {
-      const res = await fetch(`/api/delivery-check?pincode=${p}`)
-      const data = await res.json()
-      setPincodeResult({ ok: data.serviceable, message: data.message })
-    } catch {
-      setPincodeResult({ ok: false, message: 'Could not check delivery. Try again.' })
-    } finally {
-      setPincodeChecking(false)
-    }
-  }, [pincode])
+export function PdpWishlistButton({ page }: { page: ProductPageState }) {
+  const { isInWishlist } = page
+  return (
+    <button
+      onClick={page.handleWishlist}
+      disabled={page.wishlistLoading}
+      aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+      className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
+    >
+      <svg
+        className={`w-5 h-5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
+        fill={isInWishlist ? 'currentColor' : 'none'}
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+        style={{ color: isInWishlist ? '#ef4444' : undefined }}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+        />
+      </svg>
+    </button>
+  )
+}
 
-  const handleNotifyMe = useCallback(async () => {
-    const email = notifyEmail.trim()
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      showToast('Enter a valid email address', 'error')
-      return
-    }
-    try {
-      await fetch('/api/notify-back-in-stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: product.id, email }),
-        credentials: 'include',
-      })
-      setNotifySubmitted(true)
-    } catch {
-      showToast('Failed to save. Try again.', 'error')
-    }
-  }, [notifyEmail, product.id])
+export function PdpShareButton({ page }: { page: ProductPageState }) {
+  return (
+    <button
+      onClick={page.handleShare}
+      aria-label="Share product"
+      className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
+    >
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+        />
+      </svg>
+    </button>
+  )
+}
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [product.slug])
+/** Low-stock urgency, and the back-in-stock form for an out-of-stock product. */
+export function PdpStockNotice({ page }: { page: ProductPageState }) {
+  const { product } = page
+  return (
+    <div className="mb-4">
+      {product.stock_status === 'Low Stock' && (
+        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded-full">
+          Only a few left — order soon
+        </span>
+      )}
+      {product.stock_status === 'Out of Stock' && (
+        <div className="space-y-3">
+          {page.notifySubmitted ? (
+            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-3 py-2 rounded-lg">
+              <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              We&apos;ll email you when this is back in stock.
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={page.notifyEmail}
+                onChange={e => page.setNotifyEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <button
+                onClick={page.handleNotifyMe}
+                className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+              >
+                Notify Me
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
-  useEffect(() => {
-    fetch(`/api/products/${product.id}/view`, { method: 'POST', credentials: 'include' }).catch(() => {})
-  }, [product.id])
-
-  const hasVariants = product.has_variants && product.product_variants?.length > 0
-  const primaryImage = product.product_images?.find(img => img.is_primary) ?? product.product_images?.[0]
-  const displayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
-  // Keep the MRP on the same basis as the shown price so the discount % is honest.
-  const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
-  const rawMrp = product.mrp ? Number(product.mrp) : null
-  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? round2(rawMrp / (1 + gstRatePdp / 100)) : rawMrp
-  const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
-
-  // Same rule as order-time returns (lib/catalog/return-policy.ts); the category arrives already
-  // falling back to its parent.
-  const resolved = resolveReturnPolicy({
-    productReturnWindowDays: product.return_window_days,
-    brand: product.brands,
-    category: product.categories,
-  })
-  const returnAllowed = resolved.return_allowed
-  const returnDays = returnAllowed ? resolved.return_window_days : 0
-  const replacementAllowed = resolved.replacement_allowed
-  const replacementDays = replacementAllowed ? resolved.replacement_window_days : 0
-  const policy: PolicyProps = {
-    returnAllowed,
-    returnDays,
-    replacementAllowed,
-    replacementDays,
-    isCodAllowed: product.is_cod_allowed ?? false,
-    freeShippingThreshold,
-  }
-
-  const handleWishlist = useCallback(async () => {
-    if (!user) {
-      showConfirm({
-        title: 'Sign In Required',
-        message: 'Please sign in to save items to your wishlist.',
-        confirmText: 'Sign In',
-        cancelText: 'Maybe Later',
-        type: 'info',
-        onConfirm: () => router.push(`/login?redirect=/products/${product.slug}`),
-      })
-      return
-    }
-    setWishlistLoading(true)
-    const result = await toggleWishlist(product.id)
-    setWishlistLoading(false)
-    if (result === 'added') showToast('Added to wishlist!', 'success')
-    else if (result === 'removed') showToast('Removed from wishlist', 'success')
-    else showToast('Failed to update wishlist', 'error')
-  }, [user, product.id, product.slug, toggleWishlist])
-
-  const handleShare = useCallback(async () => {
-    const url = window.location.href
-    const shareData = { title: product.name, text: `Check out ${product.name}`, url }
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData)
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(url)
-      showToast('Link copied to clipboard!', 'success')
-    }
-  }, [product.name])
-
-  const handleVariantChange = (variant: Variant | null) => {
-    if (variant?.variant_images && variant.variant_images.length > 0) {
-      setVariantImages(variant.variant_images)
-    } else {
-      setVariantImages(undefined)
-    }
-  }
-
+/** The built-in product details: gallery and delivery on one side, title, price and the buy buttons on the other. */
+function ProductDetailBody({ page }: { page: ProductPageState }) {
+  const { product, reviewSummary, isDigital, policy } = page
   return (
     <>
       {/* Image column — order-1 on mobile, natural on desktop */}
       <div className="order-1 lg:order-none">
-        <ProductImageGallery
-          images={mediaImages.length > 0 ? mediaImages : product.product_images || []}
-          productName={product.name}
-          variantImages={mediaImages.length > 0 ? selImages : variantImages}
-          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
-        />
-
-        {extras.length > 0 && (
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Videos, 3D &amp; more</p>
-            <ProductMediaGallery items={extras} ar aspect="aspect-video" />
-          </div>
-        )}
-        {docs.length > 0 && (
-          <div className="mt-4">
-            <DocumentList items={docs} title="Documents & downloads" />
-          </div>
-        )}
+        <PdpGallery page={page} />
 
         <div className="hidden lg:block mt-4">
           {isDigital ? (
@@ -764,15 +545,7 @@ export default function ProductDetailClient({
           ) : (
             <>
               <DeliveryInfo {...policy} />
-              <PincodeChecker
-                pincode={pincode}
-                setPincode={setPincode}
-                pincodeResult={pincodeResult}
-                setPincodeResult={setPincodeResult}
-                pincodeChecking={pincodeChecking}
-                checkPincode={checkPincode}
-                pincodeRef={pincodeRef}
-              />
+              <PdpPincodeChecker page={page} />
             </>
           )}
         </div>
@@ -784,40 +557,8 @@ export default function ProductDetailClient({
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">{product.name}</h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">
             {' '}
-            <button
-              onClick={handleWishlist}
-              disabled={wishlistLoading}
-              aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
-            >
-              <svg
-                className={`w-5 h-5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
-                fill={isInWishlist ? 'currentColor' : 'none'}
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                style={{ color: isInWishlist ? '#ef4444' : undefined }}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-            </button>
-            <button
-              onClick={handleShare}
-              aria-label="Share product"
-              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                />
-              </svg>
-            </button>
+            <PdpWishlistButton page={page} />
+            <PdpShareButton page={page} />
           </div>
         </div>
 
@@ -826,81 +567,11 @@ export default function ProductDetailClient({
         <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
 
         {/* Low stock urgency + notify me for out-of-stock */}
-        <div className="mb-4">
-          {product.stock_status === 'Low Stock' && (
-            <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded-full">
-              Only a few left — order soon
-            </span>
-          )}
-          {product.stock_status === 'Out of Stock' && (
-            <div className="space-y-3">
-              {notifySubmitted ? (
-                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-3 py-2 rounded-lg">
-                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  We&apos;ll email you when this is back in stock.
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={notifyEmail}
-                    onChange={e => setNotifyEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleNotifyMe}
-                    className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
-                  >
-                    Notify Me
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <PdpStockNotice page={page} />
 
-        {!hasVariants && <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />}
+        {!page.hasVariants && <BusinessPriceBadge price={page.displayPrice} categoryId={product.categories?.id} />}
 
-        <ProductActions
-          productId={product.id}
-          productName={product.name}
-          sku={product.sku}
-          stockStatus={product.stock_status}
-          basePrice={displayPrice}
-          basePriceExGst={product.price_ex_gst ?? null}
-          salePrice={null}
-          mrp={rawMrp}
-          gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
-          variants={hasVariants ? product.product_variants : []}
-          variantType={product.variant_type || 'Variant'}
-          initialSkuParam={initialSkuParam}
-          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
-          extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-          handlingDays={Number(product.handling_days ?? 2)}
-          isCodAllowed={product.is_cod_allowed ?? false}
-          onVariantChange={handleVariantChange}
-          onSelectionChange={(variantId, subVariantId) =>
-            setMediaSel(cur => (cur.variantId === variantId && cur.subVariantId === subVariantId ? cur : { variantId, subVariantId }))
-          }
-          onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
-          productUnits={product.product_units ?? []}
-          sellUnitId={product.sell_unit_id ?? null}
-          launchDate={product.launch_date ?? null}
-          discontinueDate={product.discontinue_date ?? null}
-          stickyImage={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
-          digital={isDigital}
-          alreadyOwned={vaultOwned.owned}
-          vaultUrl={vaultOwned.url}
-          isSubscription={product.is_subscription ?? false}
-          subscriptionIntervals={product.subscription_intervals ?? null}
-        />
+        <ProductActions s={page.purchase} />
 
         <RazorpayOffers />
 
@@ -909,16 +580,27 @@ export default function ProductDetailClient({
 
       <div className="order-3 lg:hidden">
         <DeliveryInfo {...policy} />
-        <PincodeChecker
-          pincode={pincode}
-          setPincode={setPincode}
-          pincodeResult={pincodeResult}
-          setPincodeResult={setPincodeResult}
-          pincodeChecking={pincodeChecking}
-          checkPincode={checkPincode}
-          pincodeRef={pincodeRef}
-        />
+        <PdpPincodeChecker page={page} />
       </div>
     </>
+  )
+}
+
+function MountedProductDetail() {
+  const page = useProductPage()
+  return page ? <ProductDetailBody page={page} /> : null
+}
+
+/**
+ * The product details. Inside a page's ProductPageProvider it reads that; on its own it mounts one from `product`.
+ */
+export default function ProductDetailClient(props: Partial<ProductPageInput>) {
+  const mounted = useProductPage()
+  if (mounted) return <ProductDetailBody page={mounted} />
+  if (!props.product) return null
+  return (
+    <ProductPageProvider {...(props as ProductPageInput)}>
+      <MountedProductDetail />
+    </ProductPageProvider>
   )
 }

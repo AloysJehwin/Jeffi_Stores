@@ -20,7 +20,8 @@ type LedgerEntry = {
   occurred_at: string
 }
 type Wallet = { balance: number; minBalance: number; currency: string }
-export type AiSpendRow = { feature: string; calls: number; spent: number; unpaid: number }
+/** paidBy: the platform's name on calls it paid for (spent is then 0 to the store). */
+export type AiSpendRow = { feature: string; calls: number; spent: number; unpaid: number; paidBy?: string }
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -41,6 +42,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   messaging_addon: 'SMS & WhatsApp add-on',
   domain: 'Domain',
   infra: 'Servers',
+  showcase: 'Showcase site',
   adjustment: 'Adjustment',
 }
 const catOf = (e: LedgerEntry) => e.category || e.entry_type
@@ -264,7 +266,7 @@ function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
   const total = rows.reduce((a, r) => a + r.spent, 0)
   const unpaid = rows.reduce((a, r) => a + r.unpaid, 0)
   const cols: DataCol<AiSpendRow>[] = [
-    { key: 'feature', label: 'Feature', sort: r => aiFeatureLabel(r.feature).toLowerCase(), render: r => <span className="text-foreground">{aiFeatureLabel(r.feature)}</span> },
+    { key: 'feature', label: 'Feature', sort: r => aiFeatureLabel(r.feature).toLowerCase(), render: r => <span className="text-foreground">{aiFeatureLabel(r.feature)}{r.paidBy && <span className={`ml-2 ${badgeCls('green')}`}>Free (paid by {r.paidBy})</span>}</span> },
     { key: 'calls', label: 'Calls', num: true, sort: r => r.calls, render: r => <span className="text-foreground-secondary">{r.calls.toLocaleString('en-IN')}</span> },
     { key: 'spent', label: 'Spent', num: true, sort: r => r.spent, render: r => <span className="font-semibold text-foreground">{inr(r.spent)}</span> },
   ]
@@ -279,7 +281,7 @@ function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
         </p>
       }
     >
-      <DataTable<AiSpendRow> bare paged sortNs="ai" rows={rows} cols={cols} rowKey={r => r.feature} />
+      <DataTable<AiSpendRow> bare paged sortNs="ai" rows={rows} cols={cols} rowKey={r => `${r.feature}${r.paidBy ? ':free' : ''}`} />
     </Card>
   )
 }

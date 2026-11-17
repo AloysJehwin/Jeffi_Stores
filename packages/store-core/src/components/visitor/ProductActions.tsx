@@ -107,6 +107,8 @@ interface ProductActionsProps {
   subscriptionIntervals?: string[] | null
 }
 
+const VARIANT_COLLAPSE_LIMIT = 12
+
 const MODE_LABELS: Record<string, string> = {
   unit: 'By Piece',
 }
@@ -135,7 +137,7 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
   return `₹${rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${label}`
 }
 
-export default function ProductActions({
+export function useProductPurchase({
   productId,
   productName,
   sku,
@@ -282,7 +284,6 @@ export default function ProductActions({
 
   const [showAllVariants, setShowAllVariants] = useState(false)
   const [showAllSubVariants, setShowAllSubVariants] = useState(false)
-  const VARIANT_COLLAPSE_LIMIT = 12
 
   const hasVariants = variants.length > 0
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
@@ -620,665 +621,661 @@ export default function ProductActions({
     }
   }
 
-  return (
-    <div className="space-y-4">
-      {hasVariants && (
-        <div id={PDP_OPTIONS_ID} className="space-y-3">
-          {hasMultipleModes && (
-            <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">Buy by</label>
-              <div className="flex flex-wrap gap-2">
-                {pricingTypes.map(pt => (
-                  <button
-                    key={pt}
-                    type="button"
-                    onClick={() => setSelectedMode(pt)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
-                      selectedMode === pt
-                        ? 'bg-primary-600 text-white border-primary-600'
-                        : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'
-                    }`}
-                  >
-                    {MODE_LABELS[pt] || pt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+  return {
+    productId,
+    productName,
+    variants,
+    variantType,
+    hasVariants,
+    hasMultipleModes,
+    pricingTypes,
+    selectedMode,
+    setSelectedMode,
+    modeVariants,
+    selectedVariantId,
+    setSelectedVariantId,
+    selectedSubVariantId,
+    setSelectedSubVariantId,
+    selectedVariant,
+    selectedSubVariant,
+    showAllVariants,
+    setShowAllVariants,
+    showAllSubVariants,
+    setShowAllSubVariants,
+    gstEnabled,
+    gstPercentage,
+    effectivePrice,
+    effectiveMrp,
+    effectiveStock,
+    mrpDiscount,
+    showPerUnit,
+    perUnitLabel,
+    showPerBasePrice,
+    unitFactor,
+    effectiveUnitKey,
+    effectiveUnitLabel,
+    baseUnitLabel,
+    sellUnit,
+    quantity,
+    quantityRaw,
+    setQuantity,
+    setQuantityRaw,
+    qtyStep,
+    qtyMin,
+    qtyMax,
+    cartCap,
+    addBlocked,
+    edd,
+    user,
+    selectedPin,
+    addresses,
+    showAddressPicker,
+    setShowAddressPicker,
+    addressPickerRef,
+    pickAddress,
+    isCodAllowed,
+    digital,
+    alreadyOwned,
+    vaultUrl,
+    isSubscription,
+    subscriptionIntervals,
+    purchaseMode,
+    setPurchaseMode,
+    subscribing,
+    is_active,
+    launchDate,
+    isPreLaunch,
+    isDiscontinued,
+    inCart,
+    isAddingToCart,
+    isBuyingNow,
+    handleAddToCart,
+    handleBuyNow,
+    stickyImage,
+  }
+}
 
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-2">
-              {hasMultipleModes
-                ? selectedMode === 'unit'
-                  ? `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`
-                  : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`
-                : `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`}
-            </label>
-            {(() => {
-              const selectedHiddenIndex = modeVariants.findIndex(v => v.id === selectedVariantId)
-              const mustExpand = !showAllVariants && selectedHiddenIndex >= VARIANT_COLLAPSE_LIMIT
-              const collapsed = !showAllVariants && !mustExpand && modeVariants.length > VARIANT_COLLAPSE_LIMIT
-              const visible = collapsed ? modeVariants.slice(0, VARIANT_COLLAPSE_LIMIT) : modeVariants
-              const hiddenCount = modeVariants.length - visible.length
-              return (
-                <>
-                  <div className="flex flex-wrap gap-2">
-                    {visible.map(variant => (
+export type ProductPurchase = ReturnType<typeof useProductPurchase>
+export type VariantPickerStyle = 'buttons' | 'swatches' | 'dropdown'
+
+const OPTION_CLS = (selected: boolean, inStock: boolean) =>
+  `px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+    selected
+      ? 'bg-accent-500 text-white border-accent-500'
+      : inStock
+        ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
+        : 'bg-surface-secondary text-foreground-muted border-dashed border-border-default hover:border-accent-400'
+  }`
+
+const SWATCH_CLS = (selected: boolean, inStock: boolean) =>
+  `inline-flex items-center gap-2 min-h-[44px] pl-1 pr-3 py-1 rounded-full text-sm font-medium border-2 transition-colors ${
+    selected ? 'border-accent-500 text-foreground' : 'border-border-default text-foreground-secondary hover:border-accent-400'
+  } ${inStock ? '' : 'opacity-60'}`
+
+const SELECT_CLS =
+  'w-full sm:w-auto min-w-[12rem] min-h-[44px] px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary-500'
+
+interface OptionItem {
+  id: string
+  name: string
+  inStock: boolean
+  image?: string | null
+}
+
+/** One row of choices (variants or sub-variants) in the chosen style. */
+function OptionChoices({
+  items,
+  selectedId,
+  onSelect,
+  style,
+  label,
+  showAll,
+  setShowAll,
+}: {
+  items: OptionItem[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+  style: VariantPickerStyle
+  label: string
+  showAll: boolean
+  setShowAll: (fn: (s: boolean) => boolean) => void
+}) {
+  if (style === 'dropdown') {
+    return (
+      <select aria-label={label} value={selectedId ?? ''} onChange={e => onSelect(e.target.value)} className={SELECT_CLS}>
+        {items.map(o => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+            {!o.inStock && ' (Out of Stock)'}
+          </option>
+        ))}
+      </select>
+    )
+  }
+  const selectedHiddenIndex = items.findIndex(o => o.id === selectedId)
+  const mustExpand = !showAll && selectedHiddenIndex >= VARIANT_COLLAPSE_LIMIT
+  const collapsed = !showAll && !mustExpand && items.length > VARIANT_COLLAPSE_LIMIT
+  const visible = collapsed ? items.slice(0, VARIANT_COLLAPSE_LIMIT) : items
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {visible.map(o =>
+          style === 'swatches' ? (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onSelect(o.id)}
+              aria-pressed={selectedId === o.id}
+              className={SWATCH_CLS(selectedId === o.id, o.inStock)}
+            >
+              {o.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={o.image} alt="" className="w-8 h-8 rounded-full object-cover border border-border-default" />
+              ) : (
+                <span className="w-8 h-8 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-xs font-semibold">
+                  {o.name.slice(0, 2)}
+                </span>
+              )}
+              {o.name}
+              {!o.inStock && <span className="sr-only"> (Out of Stock)</span>}
+            </button>
+          ) : (
+            <button key={o.id} type="button" onClick={() => onSelect(o.id)} className={OPTION_CLS(selectedId === o.id, o.inStock)}>
+              {o.name}
+              {!o.inStock && ' (Out of Stock)'}
+            </button>
+          )
+        )}
+      </div>
+      {items.length > VARIANT_COLLAPSE_LIMIT && (
+        <button
+          type="button"
+          onClick={() => setShowAll(s => !s)}
+          className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
+        >
+          {showAll ? 'Show fewer' : `Show all ${items.length} options`}
+          <svg
+            className={`w-4 h-4 transition-transform ${showAll ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
+    </>
+  )
+}
+
+/** The buy-by modes, variants and sub-variants; nothing for a product without variants. */
+export function PurchaseOptions({ s, style = 'buttons' }: { s: ProductPurchase; style?: VariantPickerStyle }) {
+  if (!s.hasVariants) return null
+  const { variants, variantType, selectedMode, selectedVariant } = s
+  const typeLabel = variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'
+  const label = s.hasMultipleModes
+    ? selectedMode === 'unit'
+      ? `Select ${typeLabel}`
+      : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`
+    : `Select ${typeLabel}`
+  const subs = selectedVariant?.sub_variants ?? []
+  return (
+    <div id={PDP_OPTIONS_ID} className="space-y-3">
+      {s.hasMultipleModes && (
+        <div>
+          <label className="block text-sm font-medium text-foreground-secondary mb-2">Buy by</label>
+          <div className="flex flex-wrap gap-2">
+            {s.pricingTypes.map(pt => (
+              <button
+                key={pt}
+                type="button"
+                onClick={() => s.setSelectedMode(pt)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                  selectedMode === pt
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'
+                }`}
+              >
+                {MODE_LABELS[pt] || pt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">{label}</label>
+        <OptionChoices
+          items={s.modeVariants.map(v => ({
+            id: v.id,
+            name: v.variant_name,
+            inStock: v.stock_status !== 'Out of Stock',
+            image: v.variant_images?.[0]?.thumbnail_url || v.variant_images?.[0]?.image_url || null,
+          }))}
+          selectedId={s.selectedVariantId}
+          onSelect={s.setSelectedVariantId}
+          style={style}
+          label={label}
+          showAll={s.showAllVariants}
+          setShowAll={s.setShowAllVariants}
+        />
+      </div>
+
+      {subs.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-foreground-secondary mb-2">
+            Select {selectedVariant!.sub_variant_type || 'Sub-Variant'}
+          </label>
+          <OptionChoices
+            items={subs.map(sv => ({ id: sv.id, name: sv.sub_variant_name, inStock: sv.stock_status !== 'Out of Stock' }))}
+            selectedId={s.selectedSubVariantId}
+            onSelect={s.setSelectedSubVariantId}
+            style={style}
+            label={`Select ${selectedVariant!.sub_variant_type || 'Sub-Variant'}`}
+            showAll={s.showAllSubVariants}
+            setShowAll={s.setShowAllSubVariants}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+const rs = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** The live price for the selection; `compact` is the price line alone, without the total and savings. */
+export function PurchasePrice({ s, compact = false }: { s: ProductPurchase; compact?: boolean }) {
+  const { effectivePrice, effectiveMrp, effectiveUnitLabel, unitFactor, quantity, mrpDiscount } = s
+  const priceLine = (
+    <div className={compact ? 'flex items-baseline gap-2 flex-wrap' : 'flex items-baseline gap-2 flex-wrap mb-1'}>
+      <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">Rs. {rs(effectivePrice)}</span>
+      {s.showPerUnit && (
+        <span className="text-sm text-foreground-secondary">
+          / <UnitLabel label={s.perUnitLabel} />
+        </span>
+      )}
+      {effectiveMrp && effectiveMrp > effectivePrice && (
+        <span className="text-xl text-foreground-muted line-through">Rs. {rs(effectiveMrp)}</span>
+      )}
+      {compact && mrpDiscount > 0 && (
+        <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+          {mrpDiscount}% off
+        </span>
+      )}
+    </div>
+  )
+  if (compact) return priceLine
+  return (
+    <div className="bg-surface rounded-lg p-6">
+      {/* Big orange = base unit price (per m, per kg, per pc etc.) */}
+      {priceLine}
+      {/* Selling unit price (e.g. per pair/box) on its own line */}
+      {s.showPerBasePrice && (
+        <div className="mb-1">
+          <span className="text-base font-semibold text-foreground">
+            Rs.{' '}
+            {(effectivePrice * unitFactor).toLocaleString('en-IN', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}{' '}
+            / <UnitLabel label={effectiveUnitLabel} />
+          </span>
+          <span className="text-xs text-foreground-muted ml-2">
+            (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
+            <UnitLabel label={s.baseUnitLabel ?? effectiveUnitLabel} /> × Rs.{' '}
+            {rs(effectivePrice)})
+          </span>
+        </div>
+      )}
+
+      {/* Total = selling unit price × qty */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm text-foreground-secondary">
+          Total ({quantity} <UnitLabel label={effectiveUnitLabel} />
+          ):
+        </span>
+        <span className="text-base font-semibold text-foreground">
+          Rs.{' '}
+          {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      </div>
+
+      {mrpDiscount > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+            {mrpDiscount}% off
+          </span>
+          <span className="text-sm text-foreground-secondary">
+            You save Rs.{' '}
+            {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        </div>
+      )}
+      {s.gstEnabled && (
+        <p className="text-xs text-foreground-muted">
+          Inclusive of all taxes{s.gstPercentage ? ` (${s.gstPercentage}% GST)` : ''}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Stock, delivery date and the quantity input for the selection. */
+export function PurchaseQuantity({ s, stock = true }: { s: ProductPurchase; stock?: boolean }) {
+  const { effectiveStock, effectiveUnitLabel, effectiveUnitKey, edd, user, selectedPin, addresses } = s
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 mb-2">
+        <label className="text-sm font-medium text-foreground-secondary">
+          Quantity
+          {effectiveUnitLabel && effectiveUnitKey !== 'unit' ? (
+            <>
+              {' '}
+              (<UnitLabel label={effectiveUnitLabel} />)
+            </>
+          ) : (
+            ''
+          )}
+        </label>
+        {stock && (
+          <div className="text-right">
+            {effectiveStock > 0 ? (
+              <div className="flex items-center justify-end gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                </div>
+                {s.isCodAllowed && (
+                  <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                    COD
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-2">
+                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+              </div>
+            )}
+            {edd && effectiveStock > 0 && (
+              <div className="relative">
+                <p className="text-xs text-foreground-secondary whitespace-nowrap">
+                  Deliver by{' '}
+                  <span className="font-medium text-foreground">
+                    {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                  </span>
+                  {user && selectedPin && (
+                    <>
+                      {' '}
+                      · <span className="font-medium">{selectedPin}</span>
+                      {addresses.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => s.setShowAddressPicker(v => !v)}
+                          className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
+                        >
+                          Change
+                        </button>
+                      )}
+                    </>
+                  )}
+                </p>
+                {s.showAddressPicker && (
+                  <div
+                    ref={s.addressPickerRef}
+                    className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1"
+                  >
+                    {addresses.map((a, i) => (
                       <button
-                        key={variant.id}
+                        key={i}
                         type="button"
-                        onClick={() => setSelectedVariantId(variant.id)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                          selectedVariantId === variant.id
-                            ? 'bg-accent-500 text-white border-accent-500'
-                            : variant.stock_status !== 'Out of Stock'
-                              ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                              : 'bg-surface-secondary text-foreground-muted border-dashed border-border-default hover:border-accent-400'
-                        }`}
+                        onClick={() => s.pickAddress(a.postal_code)}
+                        className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
                       >
-                        {variant.variant_name}
-                        {variant.stock_status === 'Out of Stock' && ' (Out of Stock)'}
+                        <span className="font-medium block">{a.full_name}</span>
+                        <span className="text-foreground-secondary">
+                          {a.city}, {a.state} – {a.postal_code}
+                        </span>
                       </button>
                     ))}
                   </div>
-                  {modeVariants.length > VARIANT_COLLAPSE_LIMIT && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllVariants(s => !s)}
-                      className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
-                    >
-                      {showAllVariants ? 'Show fewer' : `Show all ${modeVariants.length} options`}
-                      <svg
-                        className={`w-4 h-4 transition-transform ${showAllVariants ? 'rotate-180' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  )}
-                </>
-              )
-            })()}
+                )}
+              </div>
+            )}
           </div>
-
-          {selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                Select {selectedVariant.sub_variant_type || 'Sub-Variant'}
-              </label>
-              {(() => {
-                const subs = selectedVariant.sub_variants!
-                const selectedHiddenIndex = subs.findIndex(s => s.id === selectedSubVariantId)
-                const mustExpand = !showAllSubVariants && selectedHiddenIndex >= VARIANT_COLLAPSE_LIMIT
-                const collapsed = !showAllSubVariants && !mustExpand && subs.length > VARIANT_COLLAPSE_LIMIT
-                const visible = collapsed ? subs.slice(0, VARIANT_COLLAPSE_LIMIT) : subs
-                return (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      {visible.map(sv => (
-                        <button
-                          key={sv.id}
-                          type="button"
-                          onClick={() => setSelectedSubVariantId(sv.id)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                            selectedSubVariantId === sv.id
-                              ? 'bg-accent-500 text-white border-accent-500'
-                              : sv.stock_status !== 'Out of Stock'
-                                ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                                : 'bg-surface-secondary text-foreground-muted border-dashed border-border-default hover:border-accent-400'
-                          }`}
-                        >
-                          {sv.sub_variant_name}
-                          {sv.stock_status === 'Out of Stock' && ' (Out of Stock)'}
-                        </button>
-                      ))}
-                    </div>
-                    {subs.length > VARIANT_COLLAPSE_LIMIT && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllSubVariants(s => !s)}
-                        className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
-                      >
-                        {showAllSubVariants ? 'Show fewer' : `Show all ${subs.length} options`}
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showAllSubVariants ? 'rotate-180' : ''}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          )}
-        </div>
+        )}
+      </div>
+      {!s.subscribing && !s.digital && (
+        <QuantityInput
+          dimension={s.sellUnit?.dimension ?? 'count'}
+          quantity={s.quantity}
+          quantityRaw={s.quantityRaw}
+          unitLabel={effectiveUnitLabel}
+          unitKey={effectiveUnitKey}
+          effectiveStock={effectiveStock}
+          qtyStep={s.qtyStep}
+          qtyMin={s.qtyMin}
+          qtyMax={s.qtyMax}
+          onChange={(qty, raw) => {
+            s.setQuantity(qty)
+            s.setQuantityRaw(raw)
+          }}
+        />
       )}
+      {!s.subscribing && !s.digital && <InCartQtyHint cap={s.cartCap} unitLabel={effectiveUnitLabel} adding={s.quantity} />}
+    </div>
+  )
+}
 
-      {hasVariants && (
-        <>
-          <div className="bg-surface rounded-lg p-6">
-            {/* Big orange = base unit price (per m, per kg, per pc etc.) */}
-            <div className="flex items-baseline gap-2 flex-wrap mb-1">
-              <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              {showPerUnit && (
-                <span className="text-sm text-foreground-secondary">
-                  / <UnitLabel label={perUnitLabel} />
-                </span>
-              )}
-              {effectiveMrp && effectiveMrp > effectivePrice && (
-                <span className="text-xl text-foreground-muted line-through">
-                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              )}
-            </div>
-            {/* Selling unit price (e.g. per pair/box) on its own line */}
-            {showPerBasePrice && (
-              <div className="mb-1">
-                <span className="text-base font-semibold text-foreground">
-                  Rs.{' '}
-                  {(effectivePrice * unitFactor).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  / <UnitLabel label={effectiveUnitLabel} />
-                </span>
-                <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
-                  <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.{' '}
-                  {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                </span>
-              </div>
-            )}
-
-            {/* Total = selling unit price × qty */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />
-                ):
-              </span>
-              <span className="text-base font-semibold text-foreground">
-                Rs.{' '}
-                {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-
-            {mrpDiscount > 0 && (
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                  {mrpDiscount}% off
-                </span>
-                <span className="text-sm text-foreground-secondary">
-                  You save Rs.{' '}
-                  {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            )}
-            {gstEnabled && (
-              <p className="text-xs text-foreground-muted">
-                Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="text-sm font-medium text-foreground-secondary">
-                Quantity
-                {effectiveUnitLabel && effectiveUnitKey !== 'unit' ? (
-                  <>
-                    {' '}
-                    (<UnitLabel label={effectiveUnitLabel} />)
-                  </>
-                ) : (
-                  ''
-                )}
-              </label>
-              <div className="text-right">
-                {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <svg
-                        className="w-5 h-5 text-green-600 dark:text-green-400"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
-                    </div>
-                    {isCodAllowed && (
-                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                        COD
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-                  </div>
-                )}
-                {edd && effectiveStock > 0 && (
-                  <div className="relative">
-                    <p className="text-xs text-foreground-secondary whitespace-nowrap">
-                      Deliver by{' '}
-                      <span className="font-medium text-foreground">
-                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                      {user && selectedPin && (
-                        <>
-                          {' '}
-                          · <span className="font-medium">{selectedPin}</span>
-                          {addresses.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAddressPicker(v => !v)}
-                              className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
-                            >
-                              Change
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </p>
-                    {showAddressPicker && (
-                      <div
-                        ref={addressPickerRef}
-                        className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1"
-                      >
-                        {addresses.map((a, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => pickAddress(a.postal_code)}
-                            className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
-                          >
-                            <span className="font-medium block">{a.full_name}</span>
-                            <span className="text-foreground-secondary">
-                              {a.city}, {a.state} – {a.postal_code}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            {!subscribing && !digital && (
-              <QuantityInput
-                dimension={sellUnit?.dimension ?? 'count'}
-                quantity={quantity}
-                quantityRaw={quantityRaw}
-                unitLabel={effectiveUnitLabel}
-                unitKey={effectiveUnitKey}
-                effectiveStock={effectiveStock}
-                qtyStep={qtyStep}
-                qtyMin={qtyMin}
-                qtyMax={qtyMax}
-                onChange={(qty, raw) => {
-                  setQuantity(qty)
-                  setQuantityRaw(raw)
-                }}
-              />
-            )}
-            {!subscribing && !digital && (
-              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
-            )}
-          </div>
-        </>
-      )}
-
-      {!hasVariants && (
-        <>
-          <div className="bg-surface rounded-lg p-6">
-            <div className="flex items-baseline gap-2 flex-wrap mb-1">
-              <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              {showPerUnit && (
-                <span className="text-sm text-foreground-secondary">
-                  / <UnitLabel label={perUnitLabel} />
-                </span>
-              )}
-              {effectiveMrp && effectiveMrp > effectivePrice && (
-                <span className="text-xl text-foreground-muted line-through">
-                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              )}
-            </div>
-            {/* Selling unit price (e.g. per pair/box) on its own line */}
-            {showPerBasePrice && (
-              <div className="mb-1">
-                <span className="text-base font-semibold text-foreground">
-                  Rs.{' '}
-                  {(effectivePrice * unitFactor).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  / <UnitLabel label={effectiveUnitLabel} />
-                </span>
-                <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
-                  <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.{' '}
-                  {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                </span>
-              </div>
-            )}
-
-            {/* Total = selling unit price × qty */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />
-                ):
-              </span>
-              <span className="text-base font-semibold text-foreground">
-                Rs.{' '}
-                {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-
-            {mrpDiscount > 0 && (
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                  {mrpDiscount}% off
-                </span>
-                <span className="text-sm text-foreground-secondary">
-                  You save Rs.{' '}
-                  {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            )}
-            {gstEnabled && (
-              <p className="text-xs text-foreground-muted">
-                Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="text-sm font-medium text-foreground-secondary">
-                Quantity
-                {effectiveUnitLabel && effectiveUnitKey !== 'unit' ? (
-                  <>
-                    {' '}
-                    (<UnitLabel label={effectiveUnitLabel} />)
-                  </>
-                ) : (
-                  ''
-                )}
-              </label>
-              <div className="text-right">
-                {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <svg
-                        className="w-5 h-5 text-green-600 dark:text-green-400"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
-                    </div>
-                    {isCodAllowed && (
-                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                        COD
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-                  </div>
-                )}
-                {edd && effectiveStock > 0 && (
-                  <div className="relative">
-                    <p className="text-xs text-foreground-secondary whitespace-nowrap">
-                      Deliver by{' '}
-                      <span className="font-medium text-foreground">
-                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                      {user && selectedPin && (
-                        <>
-                          {' '}
-                          · <span className="font-medium">{selectedPin}</span>
-                          {addresses.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAddressPicker(v => !v)}
-                              className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
-                            >
-                              Change
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </p>
-                    {showAddressPicker && (
-                      <div
-                        ref={addressPickerRef}
-                        className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1"
-                      >
-                        {addresses.map((a, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => pickAddress(a.postal_code)}
-                            className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
-                          >
-                            <span className="font-medium block">{a.full_name}</span>
-                            <span className="text-foreground-secondary">
-                              {a.city}, {a.state} – {a.postal_code}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            {!subscribing && !digital && (
-              <QuantityInput
-                dimension={sellUnit?.dimension ?? 'count'}
-                quantity={quantity}
-                quantityRaw={quantityRaw}
-                unitLabel={effectiveUnitLabel}
-                unitKey={effectiveUnitKey}
-                effectiveStock={effectiveStock}
-                qtyStep={qtyStep}
-                qtyMin={qtyMin}
-                qtyMax={qtyMax}
-                onChange={(qty, raw) => {
-                  setQuantity(qty)
-                  setQuantityRaw(raw)
-                }}
-              />
-            )}
-            {!subscribing && !digital && (
-              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
-            )}
-          </div>
-        </>
-      )}
-
-      {isPreLaunch && launchDate && (
+/** Coming-soon and discontinued notices. */
+export function PurchaseNotices({ s }: { s: ProductPurchase }) {
+  return (
+    <>
+      {s.isPreLaunch && s.launchDate && (
         <div className="text-sm text-amber-600 dark:text-amber-400 font-medium py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
           Coming Soon — Available from{' '}
-          {new Date(launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          {new Date(s.launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
         </div>
       )}
-      {isDiscontinued && (
+      {s.isDiscontinued && (
         <div className="text-sm text-gray-500 dark:text-gray-400 font-medium py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
           This product has been discontinued
         </div>
       )}
+    </>
+  )
+}
 
-      {!alreadyOwned && (
-        <SubscribeOption
-          productId={productId}
-          variantId={selectedVariantId}
-          subVariantId={selectedSubVariantId}
-          isSubscription={isSubscription}
-          intervals={subscriptionIntervals}
-          digital={digital}
-          mode={purchaseMode}
-          onModeChange={setPurchaseMode}
-          disabled={!is_active || isPreLaunch || isDiscontinued}
-          needsChoice={
-            hasVariants && !selectedVariant
-              ? 'Select an option to see the subscription price.'
-              : !!selectedVariant?.sub_variants?.length && !selectedSubVariantId
-                ? `Select a ${selectedVariant.sub_variant_type || 'sub-variant'} to see the subscription price.`
-                : null
-          }
-        />
+/** Buy once / subscribe, for subscription products. */
+export function PurchaseSubscribe({ s }: { s: ProductPurchase }) {
+  if (s.alreadyOwned) return null
+  const { selectedVariant } = s
+  return (
+    <SubscribeOption
+      productId={s.productId}
+      variantId={s.selectedVariantId}
+      subVariantId={s.selectedSubVariantId}
+      isSubscription={s.isSubscription}
+      intervals={s.subscriptionIntervals}
+      digital={s.digital}
+      mode={s.purchaseMode}
+      onModeChange={s.setPurchaseMode}
+      disabled={!s.is_active || s.isPreLaunch || s.isDiscontinued}
+      needsChoice={
+        s.hasVariants && !selectedVariant
+          ? 'Select an option to see the subscription price.'
+          : !!selectedVariant?.sub_variants?.length && !s.selectedSubVariantId
+            ? `Select a ${selectedVariant.sub_variant_type || 'sub-variant'} to see the subscription price.`
+            : null
+      }
+    />
+  )
+}
+
+const BUY_CLS =
+  'w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg'
+const ADD_CLS =
+  'w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg'
+const CART_PATH =
+  'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z'
+
+export function BuyNowButton({ s, label = 'Buy Now' }: { s: ProductPurchase; label?: string }) {
+  return (
+    <button
+      onClick={s.handleBuyNow}
+      disabled={!s.is_active || s.effectiveStock === 0 || s.isBuyingNow || s.isPreLaunch || s.isDiscontinued}
+      className={BUY_CLS}
+    >
+      {s.isBuyingNow ? (
+        <>
+          <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+          Processing...
+        </>
+      ) : (
+        <>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          {label}
+        </>
       )}
+    </button>
+  )
+}
 
-      <div id={PDP_BUY_BUTTONS_ID} className="space-y-3">
-        {subscribing && !alreadyOwned ? null : alreadyOwned ? (
-          <a
-            href={vaultUrl || '/api/vault/handoff'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-          >
-            Open in vault
-          </a>
-        ) : (
-          <>
-            <button
-              onClick={handleBuyNow}
-              disabled={!is_active || effectiveStock === 0 || isBuyingNow || isPreLaunch || isDiscontinued}
-              className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-            >
-              {isBuyingNow ? (
-                <>
-                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Buy Now
-                </>
-              )}
-            </button>
+export function AddToCartButton({ s, label = 'Add to Cart' }: { s: ProductPurchase; label?: string }) {
+  return (
+    <button
+      onClick={s.handleAddToCart}
+      disabled={!s.is_active || s.effectiveStock === 0 || s.isAddingToCart || s.isPreLaunch || s.isDiscontinued || s.addBlocked}
+      className={ADD_CLS}
+    >
+      {s.isAddingToCart ? (
+        <>
+          <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+          Adding...
+        </>
+      ) : (
+        <>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={CART_PATH} />
+          </svg>
+          {s.cartCap.full ? 'Max quantity already in cart' : label}
+        </>
+      )}
+    </button>
+  )
+}
 
-            {!digital && (
-              <button
-                onClick={handleAddToCart}
-                disabled={
-                  !is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued || addBlocked
-                }
-                className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-              >
-                {isAddingToCart ? (
-                  <>
-                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                    {cartCap.full ? 'Max quantity already in cart' : 'Add to Cart'}
-                  </>
-                )}
-              </button>
-            )}
+export function ViewCartLink() {
+  return (
+    <a
+      href="/cart"
+      className="w-full border border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+    >
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={CART_PATH} />
+      </svg>
+      View cart
+    </a>
+  )
+}
 
-            {inCart && !digital && (
-              <a
-                href="/cart"
-                className="w-full border border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                View cart
-              </a>
-            )}
-          </>
-        )}
-      </div>
+/**
+ * The buy buttons (the sticky bar watches this box). `buyNow: 'digital'` shows Buy Now only for digital products,
+ * where it replaces Add to Cart; a separate Buy Now part covers the rest.
+ */
+export function PurchaseButtons({
+  s,
+  buyNow = true,
+  viewCart = true,
+  addLabel,
+  buyLabel,
+}: {
+  s: ProductPurchase
+  buyNow?: boolean | 'digital'
+  viewCart?: boolean
+  addLabel?: string
+  buyLabel?: string
+}) {
+  const showBuy = buyNow === 'digital' ? s.digital : buyNow
+  return (
+    <div id={PDP_BUY_BUTTONS_ID} className="space-y-3">
+      {s.subscribing && !s.alreadyOwned ? null : s.alreadyOwned ? (
+        <a
+          href={s.vaultUrl || '/api/vault/handoff'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+        >
+          Open in vault
+        </a>
+      ) : (
+        <>
+          {showBuy && <BuyNowButton s={s} label={buyLabel} />}
+          {!s.digital && <AddToCartButton s={s} label={addLabel} />}
+          {viewCart && s.inCart && !s.digital && <ViewCartLink />}
+        </>
+      )}
+    </div>
+  )
+}
 
-      <StickyAddToCartBar
-        name={productName}
-        image={selectedVariant?.variant_images?.[0]?.thumbnail_url || stickyImage}
-        quantity={quantity}
-        adding={digital ? isBuyingNow : isAddingToCart}
-        onAdd={digital ? handleBuyNow : handleAddToCart}
-        buyNow={digital}
-        price={effectivePrice}
-        mrp={effectiveMrp}
-        unitLabel={showPerUnit ? perUnitLabel : null}
-        action={stickyBarAction({
-          purchasable: is_active && !isPreLaunch && !isDiscontinued && !(digital && alreadyOwned),
-          hasVariants,
-          variants,
-          selectionInStock: effectiveStock > 0,
-          needsChoice: !selectedVariant || (!!selectedVariant.sub_variants?.length && !selectedSubVariantId),
-        })}
-      />
+/** The slim bottom bar shown once the buy buttons scroll away. */
+export function PurchaseStickyBar({ s }: { s: ProductPurchase }) {
+  const { selectedVariant, digital } = s
+  return (
+    <StickyAddToCartBar
+      name={s.productName}
+      image={selectedVariant?.variant_images?.[0]?.thumbnail_url || s.stickyImage}
+      quantity={s.quantity}
+      adding={digital ? s.isBuyingNow : s.isAddingToCart}
+      onAdd={digital ? s.handleBuyNow : s.handleAddToCart}
+      buyNow={digital}
+      price={s.effectivePrice}
+      mrp={s.effectiveMrp}
+      unitLabel={s.showPerUnit ? s.perUnitLabel : null}
+      action={stickyBarAction({
+        purchasable: s.is_active && !s.isPreLaunch && !s.isDiscontinued && !(digital && s.alreadyOwned),
+        hasVariants: s.hasVariants,
+        variants: s.variants,
+        selectionInStock: s.effectiveStock > 0,
+        needsChoice: !selectedVariant || (!!selectedVariant.sub_variants?.length && !s.selectedSubVariantId),
+      })}
+    />
+  )
+}
+
+/** The product page's purchase column: options, price, quantity and the buy buttons. */
+export default function ProductActions({ s }: { s: ProductPurchase }) {
+  return (
+    <div className="space-y-4">
+      <PurchaseOptions s={s} />
+      <PurchasePrice s={s} />
+      <PurchaseQuantity s={s} />
+      <PurchaseNotices s={s} />
+      <PurchaseSubscribe s={s} />
+      <PurchaseButtons s={s} />
+      <PurchaseStickyBar s={s} />
     </div>
   )
 }

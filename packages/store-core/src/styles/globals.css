@@ -8,12 +8,20 @@
 
   /* White label text on the solid amber and green brand fills fails WCAG AA
      contrast; near-black text passes. Scoped to the brand-fill plus text-white
-     pairing so tinted backgrounds and ghost styles keep their own text color. */
-  .bg-primary-500.text-white,
-  .bg-primary-600.text-white,
-  .bg-accent-500.text-white,
+     pairing so tinted backgrounds and ghost styles keep their own text color.
+     A Site Builder theme sets --on-<fill> (themeCssVars): white on a dark brand
+     colour, near-black on a light one. */
+  .bg-primary-500.text-white {
+    color: var(--on-primary-500, #111827) !important;
+  }
+  .bg-primary-600.text-white {
+    color: var(--on-primary-600, #111827) !important;
+  }
+  .bg-accent-500.text-white {
+    color: var(--on-accent-500, #111827) !important;
+  }
   .bg-accent-600.text-white {
-    color: #111827 !important;
+    color: var(--on-accent-600, #111827) !important;
   }
 
   /* Remap brand utility classes to CSS vars so they shift with theme */
@@ -467,4 +475,75 @@ body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-botto
   .sk::after {
     animation: none;
   }
+}
+
+/* Theme style hooks for the pages that take the theme instead of an AI design (account, orders, sign-in/up, legal,
+   business portal). Each hook reads a --ui-* variable that a Site Builder theme sets only when it has that style token
+   (styleCssVars in packages/site-blocks theme.ts); unset, it falls back to the utility it is keyed on, so the page
+   looks as built. Plain CSS after the utilities with :where(), so hover/focus/dark variants still win.
+   Tag only elements whose matching utilities have no sm:/md:/lg: variants. */
+.ui-card:where(.rounded-md) { border-radius: var(--ui-card-radius, 0.375rem); }
+.ui-card:where(.rounded-lg) { border-radius: var(--ui-card-radius, 0.5rem); }
+.ui-card:where(.rounded-xl) { border-radius: var(--ui-card-radius, 0.75rem); }
+.ui-card:where(.rounded-2xl) { border-radius: var(--ui-card-radius, 1rem); }
+.ui-card { border-width: var(--ui-card-border-width, 0px); }
+.ui-card:where(.border) { border-width: var(--ui-card-border-width, 1px); }
+.ui-card:where(.bg-surface-elevated) { background-color: var(--ui-card-bg, var(--color-surface-elevated)); }
+:root .ui-card { box-shadow: var(--ui-card-shadow, var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)); }
+:root .ui-card:where(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl) {
+  box-shadow: var(--ui-card-shadow, var(--ui-shadow, var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)));
+}
+.ui-raised:where(.rounded-lg) { border-radius: var(--ui-card-radius, 0.5rem); }
+.ui-raised:where(.rounded-xl) { border-radius: var(--ui-card-radius, 0.75rem); }
+.ui-raised:where(.rounded-2xl) { border-radius: var(--ui-card-radius, 1rem); }
+:root .ui-raised { box-shadow: var(--ui-shadow-raised, var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)); }
+.ui-btn:where(.rounded) { border-radius: var(--ui-btn-radius, 0.25rem); }
+.ui-btn:where(.rounded-md) { border-radius: var(--ui-btn-radius, 0.375rem); }
+.ui-btn:where(.rounded-lg) { border-radius: var(--ui-btn-radius, 0.5rem); }
+.ui-btn:where(.rounded-xl) { border-radius: var(--ui-btn-radius, 0.75rem); }
+.ui-btn:where(.rounded-full) { border-radius: var(--ui-btn-radius, 9999px); }
+.ui-badge:where(.rounded) { border-radius: var(--ui-badge-radius, 0.25rem); }
+.ui-badge:where(.rounded-md) { border-radius: var(--ui-badge-radius, 0.375rem); }
+.ui-badge:where(.rounded-full) { border-radius: var(--ui-badge-radius, 9999px); }
+.ui-input:where(.rounded-md) { border-radius: var(--ui-input-radius, 0.375rem); }
+.ui-input:where(.rounded-lg) { border-radius: var(--ui-input-radius, 0.5rem); }
+.ui-input:where(.rounded-xl) { border-radius: var(--ui-input-radius, 0.75rem); }
+.ui-input:where(.border) { border-width: var(--ui-input-border-width, 1px); }
+.ui-input:where(.border-border-secondary) { border-color: var(--ui-input-border, var(--color-border-secondary)); }
+.ui-input:where(.border-border-default) { border-color: var(--ui-input-border, var(--color-border)); }
+.ui-input:where(.bg-surface) { background-color: var(--ui-input-bg, var(--color-surface)); }
+.ui-input:where(.bg-surface-elevated) { background-color: var(--ui-input-bg, var(--color-surface-elevated)); }
+/* No fallback: an unset variable leaves these inherited properties inheriting, which is what an untouched heading does. */
+.ui-heading { font-family: var(--ui-heading-font); text-transform: var(--ui-heading-case); letter-spacing: var(--ui-heading-tracking); font-weight: var(--ui-heading-weight); }
+.ui-heading:where(.font-medium) { font-weight: var(--ui-heading-weight, 500); }
+.ui-heading:where(.font-semibold) { font-weight: var(--ui-heading-weight, 600); }
+.ui-heading:where(.font-bold) { font-weight: var(--ui-heading-weight, 700); }
+.ui-heading:where(.font-extrabold) { font-weight: var(--ui-heading-weight, 800); }
+.ui-heading:where(.font-black) { font-weight: var(--ui-heading-weight, 900); }
+.ui-input:where(.rounded-r-lg) { border-top-right-radius: var(--ui-input-radius, 0.5rem); border-bottom-right-radius: var(--ui-input-radius, 0.5rem); }
+.ui-addon:where(.rounded-l-lg) { border-top-left-radius: var(--ui-input-radius, 0.5rem); border-bottom-left-radius: var(--ui-input-radius, 0.5rem); }
+.ui-addon:where(.border.border-r-0) { border-width: var(--ui-addon-border-width, 1px 0 1px 1px); }
+.ui-addon:where(.border-border-secondary) { border-color: var(--ui-input-border, var(--color-border-secondary)); }
+/* The store's product card (ProductCard), whose corners change at sm: 20px on phones and 0.5rem from sm up (the card,
+   and its stretched link's focus ring), each breakpoint restated so an unset token keeps it; its picture frame; and a
+   phone border that stays transparent unless the theme's cards are outlined. */
+.ui-card:where(.rounded-\[20px\]) { border-radius: var(--ui-card-radius, 20px); }
+.ui-card-link:where(.after\:rounded-\[20px\])::after { border-radius: var(--ui-card-radius, 20px); }
+.ui-media:where(.rounded-lg) { border-radius: var(--ui-card-radius, 0.5rem); }
+@media (min-width: 640px) {
+  .ui-card:where(.sm\:rounded-lg) { border-radius: var(--ui-card-radius, 0.5rem); }
+  .ui-card-link:where(.sm\:after\:rounded-lg)::after { border-radius: var(--ui-card-radius, 0.5rem); }
+}
+@media (max-width: 639.98px) {
+  .ui-card:where(.border-transparent) { border-color: var(--ui-card-border, transparent); }
+}
+
+/* Admin split layouts (desktop): each pane of a side-by-side layout scrolls on its own inside the screen.
+   .admin-split  — the row of panes; fills the screen below the page header (override --admin-split-offset).
+   .admin-pane   — a pane inside it; scrolls on its own.
+   .admin-sticky-pane — a side pane next to a long page: stays in view and scrolls on its own. */
+@media (min-width: 1024px) {
+  .admin-split { height: calc(100dvh - var(--admin-split-offset, 9rem)); min-height: 28rem; }
+  .admin-split > .admin-pane, .admin-pane { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .admin-sticky-pane { position: sticky; top: var(--admin-sticky-top, 1rem); max-height: calc(100dvh - var(--admin-sticky-offset, 6rem)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 }

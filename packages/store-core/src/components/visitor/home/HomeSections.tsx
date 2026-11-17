@@ -3,6 +3,7 @@ import Reveal from '@/components/visitor/home/Reveal'
 import { groupRows, type HomepageSection } from '@/lib/catalog/homepage-sections'
 import type { SectionData } from '@/lib/catalog/homepage-model'
 import { HALF_CELL, HALF_ROW } from './layout-classes'
+import SitePreviewBridge from './SitePreviewBridge'
 
 export { HALF_CELL, HALF_ROW }
 
@@ -13,10 +14,13 @@ export default function HomeSections({
   sections,
   data,
   portal,
+  selectable = false,
 }: {
   sections: HomepageSection[]
   data: SectionData
   portal?: 'storefront' | 'business'
+  /** Site Builder canvas: each section is a selectable block. */
+  selectable?: boolean
 }) {
   let rowIndex = 0
   let seen = 0
@@ -31,15 +35,24 @@ export default function HomeSections({
       />
     )
     const i = seen++
-    if (noReveal(section.type)) return node
-    return (
-      <Reveal key={section.id} disabled={i <= 1}>
+    const shown = noReveal(section.type) ? (
+      node
+    ) : (
+      <Reveal key={section.id} disabled={i <= 1 || selectable}>
         {node}
       </Reveal>
+    )
+    return selectable ? (
+      <div key={section.id} data-block-id={section.id}>
+        {shown}
+      </div>
+    ) : (
+      shown
     )
   }
   return (
     <>
+      {selectable && <SitePreviewBridge />}
       {groupRows(sections).map(row =>
         row.length === 2 ? (
           <div key={row[0].id} className={HALF_ROW}>

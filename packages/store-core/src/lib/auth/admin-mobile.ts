@@ -96,7 +96,7 @@ async function deliver(phone: string, code: string, storeName: string): Promise<
     ['sms', { code, ttl_minutes: 10, store_name: storeName }],
   ]
   for (const [channel, variables] of attempts) {
-    const r = await sendByTemplate({ channel, slug: 'otp/verify', to: phone, variables, asPlatform: true })
+    const r = await sendByTemplate({ channel, slug: 'otp/verify', to: phone, variables, asPlatform: true, audience: 'admin' })
     const ok = r.status !== 'failed' && r.status !== 'skipped'
     logMessage({ channel, to: phone, from: 'messaging-service', body: r.body ?? '[otp/verify]', kind: 'otp', status: ok ? 'sent' : 'failed', error: r.error, providerSid: r.providerSid ?? null, provider: 'messaging-service', entityType: 'admin_mobile' })
     if (ok) return channel

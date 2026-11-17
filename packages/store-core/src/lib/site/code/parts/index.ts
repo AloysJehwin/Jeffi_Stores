@@ -1,0 +1,11 @@
+// The library's part modules; each registers its components when it loads.
+import './common'
+import './product'
+import './listing'
+import './cart'
+import './checkout'
+import './chrome'
+import './taxonomy'
+import './card'
+import './showcase'
+import './utility'

@@ -41,6 +41,8 @@ export const RESERVED_LABELS = new Set([
   'platform',
   // public-api-service: public.<root> and public-{slug}.<root>.
   'public',
+  // showcase-service: site-{slug}.<root>.
+  'site',
 ])
 
 export { TENANT_HOST_PREFIXES } from './host-prefixes'

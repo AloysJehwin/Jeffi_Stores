@@ -133,7 +133,7 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
                 <button
                   key={s}
                   onClick={() => setFilterStatus(s)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  className={`ui-btn px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                     filterStatus === s
                       ? 'bg-accent-500 text-white'
                       : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
@@ -162,7 +162,7 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
 
         <div>
           {transactions.length === 0 && !list.loading ? (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg
                 className="w-16 h-16 text-foreground-muted mx-auto mb-4"
                 fill="none"
@@ -176,13 +176,13 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
                   d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
                 />
               </svg>
-              <h3 className="text-xl font-semibold text-foreground mb-2">No transactions yet</h3>
+              <h3 className="ui-heading text-xl font-semibold text-foreground mb-2">No transactions yet</h3>
               <p className="text-foreground-secondary mb-6">
                 Your payment transactions will appear here once you place an order.
               </p>
               <Link
                 href={browsePath}
-                className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+                className="ui-btn inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
               >
                 Browse Products
               </Link>
@@ -192,18 +192,18 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
               {filteredTransactions.map(txn => (
                 <div
                   key={txn.id}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
+                  className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     {/* Left side */}
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(txn.status)}`}
+                          className={`ui-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(txn.status)}`}
                         >
                           {getStatusLabel(txn.status)}
                         </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary">
+                        <span className="ui-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary">
                           {getMethodLabel(txn.paymentMethod, txn.paymentGateway)}
                         </span>
                       </div>

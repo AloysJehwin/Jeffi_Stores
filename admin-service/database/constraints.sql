@@ -1797,3 +1797,47 @@ ALTER TABLE public.categories ADD CONSTRAINT categories_default_gst_rate_check C
 ALTER TABLE ONLY public.entity_ai_enrichment_log ADD CONSTRAINT entity_ai_enrichment_log_pkey PRIMARY KEY (id);
 ALTER TABLE public.entity_ai_enrichment_log ADD CONSTRAINT entity_ai_enrichment_log_type_check CHECK (entity_type IN ('brand','category'));
 ALTER TABLE public.entity_ai_enrichment_log ADD CONSTRAINT entity_ai_enrichment_log_status_check CHECK (status IN ('proposed','approved','rejected','failed'));
+
+
+--
+-- Site Builder (tables/site-builder.sql).
+--
+
+ALTER TABLE ONLY public.site_pages
+    ADD CONSTRAINT site_pages_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.site_pages
+    ADD CONSTRAINT site_pages_layout_key UNIQUE (audience, surface, page_key, slug);
+
+ALTER TABLE ONLY public.site_pages
+    ADD CONSTRAINT site_pages_audience_check CHECK (((audience)::text = ANY (ARRAY['store'::text, 'business'::text])));
+
+ALTER TABLE ONLY public.site_pages
+    ADD CONSTRAINT site_pages_surface_check CHECK (((surface)::text = ANY (ARRAY['web'::text, 'web_mobile'::text, 'app'::text])));
+
+ALTER TABLE ONLY public.site_theme
+    ADD CONSTRAINT site_theme_pkey PRIMARY KEY (audience);
+
+ALTER TABLE ONLY public.site_drafts
+    ADD CONSTRAINT site_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.site_versions
+    ADD CONSTRAINT site_versions_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.site_versions
+    ADD CONSTRAINT site_versions_target_version_key UNIQUE (target, target_key, version);
+
+ALTER TABLE ONLY public.site_versions
+    ADD CONSTRAINT site_versions_target_check CHECK (((target)::text = ANY (ARRAY['page'::text, 'theme'::text])));
+
+ALTER TABLE ONLY public.site_assets
+    ADD CONSTRAINT site_assets_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.site_assets
+    ADD CONSTRAINT site_assets_source_check CHECK (((source)::text = ANY (ARRAY['upload'::text, 'product'::text, 'ai'::text])));
+
+ALTER TABLE ONLY public.site_templates
+    ADD CONSTRAINT site_templates_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.site_templates
+    ADD CONSTRAINT site_templates_kind_check CHECK (((kind)::text = ANY (ARRAY['page'::text, 'site'::text, 'block'::text])));

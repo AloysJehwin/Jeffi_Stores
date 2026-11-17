@@ -76,6 +76,8 @@ export interface GenerateImageOpts {
   actor?: string | null
   /** @deprecated gallery insert is now unconditional; kept for client compat. */
   saveToGallery?: boolean
+  /** Preview-only pictures (the onboarding studio's sample products): uploaded, never listed in the gallery. */
+  skipGallery?: boolean
   /** Also add each image to this product's images (Google Ads assets are product_images rows). */
   attachToProductId?: string
   /** Pre-resolved tenant id; routes thread it so persistImage never has to re-resolve. */
@@ -212,9 +214,9 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
     thumbnailUrl: up.thumbnailUrl,
     blurhash: up.blurhash,
   }
-  // Always land the generation in the tenant gallery with provenance; a gallery write failure
+  // Land the generation in the tenant gallery with provenance (not preview-only pictures); a gallery write failure
   // must not fail the generation (the caller already has the asset URL).
-  try {
+  if (!opts.skipGallery) try {
     const tenantId = opts.tenantId ?? (await resolveTenantIdSafe())
     const row = await queryOne<{ id: string }>(
       `INSERT INTO gallery_images (image_url, thumbnail_url, s3_key, s3_thumbnail_key, s3_bucket, file_name, file_size, mime_type, width, height, blurhash, custom_name, tenant_id, source, prompt_text, model_name, media_kind)

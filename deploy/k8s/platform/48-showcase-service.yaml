@@ -1,0 +1,91 @@
+# showcase-service: every Showcase site (site-{slug}.jeffistores.in), the one-page business sites owners publish from
+# the ecom console. One Deployment for all of them, on the core; never provisioned per tenant. The sites live in the
+# control plane (jeffi_stores); a publish or pause shows within a minute (the per-host cache).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-showcase-service
+  namespace: jeffi
+  labels: { app: showcase-service, jeffi.io/service: showcase, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: showcase-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: showcase-service, jeffi.io/service: showcase, jeffi.io/tenant: jeffi-stores }
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-showcase-service:latest
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            # The store apps' secret: the database and control plane, SES for the owner's lead emails.
+            - { name: SM_SECRET_ID, value: jeffi/store }
+            - { name: SM_SECRET_FALLBACK_ID, value: jeffi/production }
+            - { name: WEB_CONCURRENCY, value: '1' }
+            - { name: IN_PROCESS_CRON, value: 'false' }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: OTEL_SERVICE_NAME, value: jeffi-stores-showcase-service }
+            - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=384 }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+          resources:
+            requests: { cpu: 25m, memory: 256Mi }
+            limits: { cpu: 1000m, memory: 512Mi }
+          startupProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /api/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-showcase-service, namespace: jeffi }
+spec:
+  selector: { app: showcase-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3000, targetPort: http }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-showcase-service, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    # Every Showcase site, above the platform's store catch-all (49-routes.yaml). No store slug starts with site-
+    # (PRODUCT_HOST_PREFIXES), so no store IngressRoute claims these hosts. The wildcard certificate covers them.
+    - match: HostRegexp(`^site-[a-z0-9-]+\.jeffistores\.in$`)
+      priority: 100
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }, { name: compress, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-showcase-service, port: 3000 }]
+  tls: {}

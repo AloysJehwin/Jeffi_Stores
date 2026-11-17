@@ -199,7 +199,7 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
         )}
       </div>
 
-      <div className="md:col-span-2 space-y-4">
+      <div className="md:col-span-2 space-y-4 lg:self-start admin-sticky-pane">
         <Section title="Actions">
           {!canWrite ? (
             <p className="text-sm text-foreground-muted">Read-only: you need products write access to connect or sync a sheet.</p>

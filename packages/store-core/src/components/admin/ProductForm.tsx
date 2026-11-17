@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Badge, Dialog, DraftLockBanner, FormFooter, LockedFieldset, Tabs } from '@/components/admin/kit'
+import { Badge, Dialog, DraftLockBanner, FormFooter, LockedFieldset, Tabs, stickyAboveFooter } from '@/components/admin/kit'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { Star, X } from 'lucide-react'
@@ -4473,7 +4473,7 @@ export default function ProductForm({
           <div data-pf-tab="details" role="tabpanel" hidden={activeTab !== 'details'}>
             <section className="rounded-xl border border-border-default bg-surface-elevated p-5">
               <div className="flex flex-col gap-5 md:flex-row">
-              <nav aria-label="Details sections" className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-48 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+              <nav aria-label="Details sections" className="admin-sticky-pane -mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-48 md:flex-col md:overflow-visible md:px-0 md:pb-0 lg:self-start" style={stickyAboveFooter}>
                 {DETAILS_TABS.map(d => (
                   <button
                     key={d.id}

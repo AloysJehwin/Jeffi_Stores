@@ -26,9 +26,9 @@ export default function BuyAgainRow() {
   if (products.length === 0) return null
 
   return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+    <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-foreground">Buy again</h2>
+        <h2 className="ui-heading text-sm font-semibold text-foreground">Buy again</h2>
         <Link
           href="/account/orders"
           className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium"

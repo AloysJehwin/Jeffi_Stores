@@ -1,0 +1,431 @@
+{
+ "store": {
+  "name": ""
+ },
+ "categories": [
+  {
+   "slug": "audio",
+   "name": "Audio",
+   "description": "Earbuds and Bluetooth speakers for commutes, calls and quiet evenings.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "power-charging",
+   "name": "Power & Charging",
+   "description": "Power banks and fast chargers that keep your devices going through long days.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "wearables",
+   "name": "Wearables",
+   "description": "Smartwatches that track your fitness, sleep and notifications at a glance.",
+   "parent": null,
+   "image": null
+  },
+  {
+   "slug": "desk-productivity",
+   "name": "Desk & Productivity",
+   "description": "USB-C hubs, mechanical keyboards and webcams for a better workspace.",
+   "parent": null,
+   "image": null
+  }
+ ],
+ "brands": [
+  {
+   "slug": "sample-store",
+   "name": "Sample Store",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "zentra",
+   "name": "Zentra",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "boltwave",
+   "name": "BoltWave",
+   "featured": true,
+   "logo": null
+  },
+  {
+   "slug": "nimbus-labs",
+   "name": "Nimbus Labs",
+   "featured": false,
+   "logo": null
+  }
+ ],
+ "products": [
+  {
+   "slug": "pulse-pro-true-wireless-earbuds",
+   "name": "Pulse Pro True Wireless Earbuds",
+   "price": 2499,
+   "mrp": 3499,
+   "category": "audio",
+   "brand": "zentra",
+   "description": "Compact earbuds with clear calls and deep bass for daily commutes. Charging case gives up to 30 hours of total playback.",
+   "attributes": {
+    "Battery Life": "6 hours (30 hours with case)",
+    "Connectivity": "Bluetooth 5.3",
+    "Water Resistance": "IPX4",
+    "Weight": "4.8 g per earbud",
+    "Warranty": "1 year"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933346309-ai-homepage_image-1794933346307-0.webp"
+   ],
+   "imagePrompt": "Pair of white true wireless earbuds beside an open charging case on a light wooden surface, soft natural light"
+  },
+  {
+   "slug": "echo-mini-bluetooth-speaker",
+   "name": "Echo Mini Bluetooth Speaker",
+   "price": 1799,
+   "mrp": null,
+   "category": "audio",
+   "brand": "boltwave",
+   "description": "Pocket-sized speaker with 360-degree sound and a rugged fabric finish. Perfect for picnics and small gatherings.",
+   "attributes": {
+    "Output": "10 W",
+    "Battery Life": "12 hours",
+    "Water Resistance": "IP67",
+    "Connectivity": "Bluetooth 5.0",
+    "Weight": "380 g"
+   },
+   "badge": null,
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933360410-ai-homepage_image-1794933360408-0.webp"
+   ],
+   "imagePrompt": "Small cylindrical fabric-covered Bluetooth speaker in teal on a stone ledge with greenery behind"
+  },
+  {
+   "slug": "boom-max-portable-speaker",
+   "name": "Boom Max Portable Speaker",
+   "price": 3999,
+   "mrp": 4999,
+   "category": "audio",
+   "brand": "boltwave",
+   "description": "Full, room-filling sound in a sturdy body with a handle. Built for balcony parties and family get-togethers.",
+   "attributes": {
+    "Output": "30 W",
+    "Battery Life": "15 hours",
+    "Water Resistance": "IPX6",
+    "Connectivity": "Bluetooth 5.2",
+    "Weight": "1.1 kg"
+   },
+   "badge": null,
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933375643-ai-homepage_image-1794933375643-0.webp"
+   ],
+   "imagePrompt": "Black rectangular portable speaker with a carry handle and orange accent grille on a living room table"
+  },
+  {
+   "slug": "chargecore-20000mah-power-bank",
+   "name": "ChargeCore 20000mAh Power Bank",
+   "price": 1999,
+   "mrp": 2499,
+   "category": "power-charging",
+   "brand": "nimbus-labs",
+   "description": "Slim power bank with dual outputs and USB-C Power Delivery. Keeps phone and earbuds charged for several days of travel.",
+   "attributes": {
+    "Capacity": "20000 mAh",
+    "Output": "22.5 W USB-C PD, 18 W USB-A",
+    "Ports": "2 x USB-A, 1 x USB-C",
+    "Weight": "350 g",
+    "Warranty": "1 year"
+   },
+   "badge": "Bestseller",
+   "featured": true,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933389584-ai-homepage_image-1794933389583-0.webp"
+   ],
+   "imagePrompt": "Slim graphite power bank with a USB-C cable plugged in, placed beside a smartphone on a desk"
+  },
+  {
+   "slug": "voltdash-65w-gan-fast-charger",
+   "name": "VoltDash 65W GaN Fast Charger",
+   "price": 1499,
+   "mrp": 1999,
+   "category": "power-charging",
+   "brand": "nimbus-labs",
+   "description": "Compact GaN charger that powers laptops, tablets and phones together. Runs cool even under heavy load.",
+   "attributes": {
+    "Output": "65 W total, USB-C PD 3.0",
+    "Ports": "2 x USB-C, 1 x USB-A",
+    "Input": "100-240 V",
+    "Weight": "120 g",
+    "Warranty": "1 year"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933403757-ai-homepage_image-1794933403756-0.webp"
+   ],
+   "imagePrompt": "Small white cube-shaped charger with two USB-C ports and one USB-A port, cable coiled beside it"
+  },
+  {
+   "slug": "qi2-wireless-charging-pad",
+   "name": "Qi2 Wireless Charging Pad",
+   "price": 999,
+   "mrp": null,
+   "category": "power-charging",
+   "brand": "zentra",
+   "description": "Slim wireless pad with magnetic alignment for a snug fit every time. Works with most Qi-enabled phones and earbud cases.",
+   "attributes": {
+    "Output": "15 W",
+    "Input": "USB-C, 20 W adapter recommended",
+    "Finish": "Matte",
+    "Weight": "85 g"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794933417398-ai-homepage_image-1794933417398-0.webp"
+   ],
+   "imagePrompt": "Round matte black wireless charging pad with a smartphone resting on it on a white desk"
+  },
+  {
+   "slug": "pulsefit-smartwatch",
+   "name": "PulseFit Smartwatch",
+   "price": 3299,
+   "mrp": 3999,
+   "category": "wearables",
+   "brand": "boltwave",
+   "description": "Bright AMOLED display with heart-rate, sleep and SpO2 tracking. Gets notifications from your phone and lasts up to a week.",
+   "attributes": {
+    "Display": "1.43-inch AMOLED",
+    "Battery Life": "Up to 7 days",
+    "Water Resistance": "5 ATM",
+    "Sensors": "Heart rate, SpO2, accelerometer",
+    "Strap": "Silicone, interchangeable"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Black smartwatch with a silicone strap and glowing circular display showing step count, on a wrist"
+  },
+  {
+   "slug": "stride-lite-fitness-band",
+   "name": "Stride Lite Fitness Band",
+   "price": 1299,
+   "mrp": null,
+   "category": "wearables",
+   "brand": "zentra",
+   "description": "Lightweight band that tracks steps, calories and sleep through the night. A simple, comfortable pick for everyday movement.",
+   "attributes": {
+    "Display": "1.1-inch AMOLED",
+    "Battery Life": "Up to 10 days",
+    "Water Resistance": "5 ATM",
+    "Weight": "22 g",
+    "Strap": "TPU"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Slim fitness band with a small rectangular screen and a blue strap, worn on a wrist during a morning walk"
+  },
+  {
+   "slug": "orbit-round-smartwatch",
+   "name": "Orbit Round Smartwatch",
+   "price": 5499,
+   "mrp": 6499,
+   "category": "wearables",
+   "brand": "nimbus-labs",
+   "description": "Classic round case with a stainless steel bezel and built-in GPS. Tracks runs, rides and workouts with confidence.",
+   "attributes": {
+    "Display": "1.39-inch AMOLED",
+    "Battery Life": "Up to 14 days",
+    "GPS": "Built-in dual-band",
+    "Case Material": "Stainless steel",
+    "Water Resistance": "10 ATM"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Round stainless steel smartwatch with a dark display and metal link strap on a runner's wrist"
+  },
+  {
+   "slug": "aero-mini-usb-c-hub-7-in-1",
+   "name": "Aero Mini USB-C Hub 7-in-1",
+   "price": 2199,
+   "mrp": 2799,
+   "category": "desk-productivity",
+   "brand": "sample-store",
+   "description": "Aluminium hub that adds HDMI, USB-A, SD card and Ethernet to your laptop. Compact enough to slip into a backpack.",
+   "attributes": {
+    "Ports": "2 x USB-A 3.0, 1 x HDMI 4K@60Hz, 1 x USB-C PD pass-through, SD/microSD, Gigabit ",
+    "Material": "Anodised aluminium",
+    "Weight": "90 g",
+    "Warranty": "1 year"
+   },
+   "badge": "Bestseller",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Slim silver aluminium USB-C hub with ports facing forward, connected to a laptop on a desk"
+  },
+  {
+   "slug": "keystone-tkl-mechanical-keyboard",
+   "name": "Keystone TKL Mechanical Keyboard",
+   "price": 4499,
+   "mrp": 5299,
+   "category": "desk-productivity",
+   "brand": "zentra",
+   "description": "Tenkeyless layout with hot-swappable switches and a clean PBT keycap set. Solid, quiet typing for long work sessions.",
+   "attributes": {
+    "Layout": "87-key tenkeyless",
+    "Switches": "Hot-swappable linear (tactile optional)",
+    "Keycaps": "PBT double-shot",
+    "Connectivity": "USB-C wired, Bluetooth 5.1",
+    "Backlight": "RGB per-key"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Dark grey tenkeyless mechanical keyboard with subtle RGB glow on a wooden desk beside a mug"
+  },
+  {
+   "slug": "lumen-1080p-webcam",
+   "name": "Lumen 1080p Webcam",
+   "price": 1899,
+   "mrp": null,
+   "category": "desk-productivity",
+   "brand": "sample-store",
+   "description": "Sharp full HD webcam with dual mics and auto light correction. Clear video for meetings, classes and content.",
+   "attributes": {
+    "Resolution": "1920 x 1080 at 30 fps",
+    "Microphone": "Dual noise-reducing",
+    "Field of View": "78 degrees",
+    "Connectivity": "USB-A, plug and play",
+    "Privacy Cover": "Sliding"
+   },
+   "badge": "New",
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Compact black webcam clipped on top of a monitor showing a smiling person in a home office"
+  },
+  {
+   "slug": "nimbus-wireless-keyboard-and-mouse-combo",
+   "name": "Nimbus Wireless Keyboard and Mouse Combo",
+   "price": 1699,
+   "mrp": 2199,
+   "category": "desk-productivity",
+   "brand": "nimbus-labs",
+   "description": "Quiet, matching keyboard and mouse with a 2.4 GHz receiver. A tidy setup for home and small offices.",
+   "attributes": {
+    "Connectivity": "2.4 GHz USB receiver",
+    "Battery": "AA batteries, up to 18 months",
+    "Keyboard Layout": "Full size, 104 keys",
+    "Mouse DPI": "1600"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Matching slim wireless keyboard and mouse in charcoal on a clean desk with a notebook"
+  },
+  {
+   "slug": "breeze-anc-earbuds",
+   "name": "Breeze ANC Earbuds",
+   "price": 3499,
+   "mrp": 4499,
+   "category": "audio",
+   "brand": "zentra",
+   "description": "Active noise cancellation cuts out train and traffic noise. Comfortable fit with three ear tip sizes for all-day wear.",
+   "attributes": {
+    "Noise Cancellation": "Active, up to 35 dB",
+    "Battery Life": "7 hours (28 hours with case)",
+    "Connectivity": "Bluetooth 5.3",
+    "Water Resistance": "IPX5",
+    "Weight": "5.2 g per earbud"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Matte charcoal in-ear earbuds with a small charging case, shown next to a train window"
+  },
+  {
+   "slug": "sample-store-braided-usb-c-cable-1-5m",
+   "name": "Sample Store Braided USB-C Cable 1.5m",
+   "price": 399,
+   "mrp": null,
+   "category": "power-charging",
+   "brand": "sample-store",
+   "description": "Tough nylon-braided cable that supports 100 W charging and fast data transfer. Tangle-resistant and built to last.",
+   "attributes": {
+    "Length": "1.5 m",
+    "Charging": "Up to 100 W",
+    "Data Transfer": "480 Mbps",
+    "Material": "Nylon braid, aluminium connectors"
+   },
+   "badge": null,
+   "featured": false,
+   "inStock": true,
+   "images": [],
+   "imagePrompt": "Coiled grey braided USB-C cable with a neat Velcro tie on a white background"
+  }
+ ],
+ "reviews": [
+  {
+   "productSlug": "pulse-pro-true-wireless-earbuds",
+   "rating": 5,
+   "title": "Great value for daily use",
+   "comment": "Clear calls even on a busy road, and the case lasts for days. Fits my ears well during long workouts.",
+   "author": "Priya S."
+  },
+  {
+   "productSlug": "chargecore-20000mah-power-bank",
+   "rating": 4,
+   "title": "Reliable on train journeys",
+   "comment": "Charged my phone twice on an overnight trip without any heating. Slightly heavier than I expected but worth it.",
+   "author": "Rahul M."
+  },
+  {
+   "productSlug": "aero-mini-usb-c-hub-7-in-1",
+   "rating": 5,
+   "title": "Exactly what my laptop needed",
+   "comment": "HDMI and SD card slot work instantly with my work laptop. Aluminium body feels premium and stays cool.",
+   "author": "Ananya K."
+  },
+  {
+   "productSlug": "pulsefit-smartwatch",
+   "rating": 4,
+   "title": "Lovely display, solid tracking",
+   "comment": "Bright screen is easy to read outdoors and sleep tracking matches my routine. Battery comfortably lasts the week.",
+   "author": "Vikram D."
+  },
+  {
+   "productSlug": "keystone-tkl-mechanical-keyboard",
+   "rating": 5,
+   "title": "Typing feels wonderful",
+   "comment": "The switches are smooth and the PBT keycaps feel great. Compact layout frees up space on my desk.",
+   "author": "Meera J."
+  },
+  {
+   "productSlug": "lumen-1080p-webcam",
+   "rating": 4,
+   "title": "Crisp video for meetings",
+   "comment": "Image is sharp in my home office and the privacy cover is a nice touch. Mics are clear enough for calls.",
+   "author": "Arjun P."
+  }
+ ],
+ "offers": []
+}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import type { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import {
@@ -30,6 +31,11 @@ import { saveDesiredCompute } from '@controller/lib/compute/store'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { setRequestedAddons } from '@/lib/billing/requested-addons'
 import { requestDomain } from '@controller/lib/domains/orders'
+import { categoryList, cleanDocNumber, compliancePlan, requiredDocs } from '@controller/lib/catalog/compliance'
+import { saveComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
+import { kycKeyPrefix } from '@controller/lib/catalog/kyc-upload'
+import { cleanSocials, whatsappDigits } from '@/lib/catalog/store-socials'
+import { REVIEW_STEP } from '@controller/app/(ecom)/ecom/onboard/steps'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +65,16 @@ export async function POST(request: NextRequest) {
   // Legal consent is required to generate the tenant's legal pages.
   if (!d.legalsAccepted) {
     return NextResponse.json({ error: 'Please accept the legal terms to continue.' }, { status: 400 })
+  }
+
+  // The licences the categories need (the schema checked each is complete), each uploaded by this owner as that type.
+  const licences = requiredDocs(compliancePlan(categoryList(d.productCategories)), d.compliance?.answers ?? {}).map(({ doc, category }) => ({
+    doc,
+    category,
+    upload: d.compliance?.docs?.[doc],
+  }))
+  if (licences.some(l => !l.upload?.s3Key.startsWith(kycKeyPrefix(owner.id, l.doc)))) {
+    return NextResponse.json({ error: 'Upload your licences again in the Store step, then submit.' }, { status: 400 })
   }
 
   // A mistyped Delhivery token would otherwise only surface at the store's first shipment. Only a
@@ -157,7 +173,7 @@ export async function POST(request: NextRequest) {
 
   // 3. Save KYC details for admin review (an upgrade's auto-approved services KYC goes back to review).
   await saveKyc(result.tenantId, owner.id, {
-    gst_number: d.gstNumber,
+    gst_number: d.gstNumber || null,
     gst_cert_s3_key: d.gstCertS3Key ?? null,
     pan: d.pan,
     business_name: d.businessName,
@@ -168,9 +184,24 @@ export async function POST(request: NextRequest) {
     logo_s3_key: d.logoS3Key ?? null,
     seal_s3_key: d.sealS3Key ?? null,
     warehouse: d.warehouse ?? (await getDraft(owner.id))?.data?.wh ?? null,
+    store_profile: storeProfile(d),
     legals_accepted: !!d.legalsAccepted,
     review_again: !!upgrade,
   })
+
+  // 3b. The licences, for review with the KYC. A failed save must not lose the application: the draft keeps them.
+  await saveComplianceDocuments(
+    result.tenantId,
+    owner.id,
+    licences.map(l => ({
+      docType: l.doc,
+      category: l.category,
+      number: cleanDocNumber(l.upload!.number ?? '') || null,
+      expiresOn: l.upload!.expiresOn || null,
+      s3Key: l.upload!.s3Key,
+      fileName: l.upload!.fileName ?? null,
+    }))
+  ).catch(e => console.error('[onboard] licences not saved', e?.message || e))
 
   // 3a. The domain the owner chose: bought from the wallet once the store is approved. Never blocks the application.
   let domainError: string | undefined
@@ -188,8 +219,9 @@ export async function POST(request: NextRequest) {
   {
     // Always rewritten: a restore choice left on the draft by an earlier application must not apply to this one.
     const { restore: _oldRestore, restorePreviousData: _oldFlag, ...existing } = ((await getDraft(owner.id))?.data ?? {}) as Record<string, any>
-    await saveDraft(owner.id, 6, {
+    await saveDraft(owner.id, REVIEW_STEP, {
       ...existing,
+      stepId: 'review',
       ...(d.restorePreviousData ? { restorePreviousData: true } : {}),
       ...(restore ? { restore } : {}),
       ...(upgrade && d.warehouse ? { wh: { ...existing.wh, ...d.warehouse } } : {}),
@@ -207,4 +239,24 @@ export async function POST(request: NextRequest) {
     status: 'pending_approval',
     ...(domainError ? { domainError } : {}),
   })
+}
+
+/** The Store step's site details as tenant_kyc.store_profile keeps them (the schema checked each); null when none. */
+function storeProfile(d: Pick<z.infer<typeof OnboardSchema>, 'tagline' | 'about' | 'contact' | 'socials'>) {
+  const c = d.contact ?? {}
+  const socials = cleanSocials(d.socials)
+  const profile = Object.fromEntries(
+    Object.entries({
+      tagline: d.tagline,
+      about: d.about,
+      phone: c.phone,
+      whatsapp: whatsappDigits(c.whatsapp) || undefined,
+      email: c.email,
+      address: c.address,
+      city: c.city,
+      state: c.state,
+      pincode: c.pincode,
+    }).filter(([, v]) => !!v)
+  ) as Record<string, string>
+  return Object.keys(socials).length ? { ...profile, socials } : Object.keys(profile).length ? profile : null
 }

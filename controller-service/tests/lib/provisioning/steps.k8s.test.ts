@@ -164,15 +164,16 @@ describe('connect_crons (k8s)', () => {
     delete process.env.CRON_STORE_BASE
   })
 
-  it('runs last on k8s, after go-live', async () => {
+  it('runs on k8s after go-live, before the AI site build', async () => {
     const { flatSteps } = await import('@controller/lib/provisioning/pipeline')
-    expect(flatSteps(await pinned()).slice(-2)).toEqual(['activate', 'connect_crons'])
+    expect(flatSteps(await pinned()).slice(-3)).toEqual(['activate', 'connect_crons', 'build_site'])
   })
 
-  it('pings the store admin where the fan-out will, records its jobs and finishes the run', async () => {
+  it('pings the store admin where the fan-out will, records its jobs and moves on to the site build', async () => {
     answer(200, healthy)
     const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-    expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('done')
+    expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('pending')
+    expect(reg.updateProvisioningJob.mock.calls.some(c => c[1].step === 'build_site')).toBe(true)
     expect(http.internalRequest).toHaveBeenCalledWith('http://acme-admin-service.tenant-acme.svc.cluster.local:3000/api/cron/ping', {
       host: 'acme.jeffistores.in',
       headers: { Authorization: 'Bearer s3cret' },
@@ -190,7 +191,7 @@ describe('connect_crons (k8s)', () => {
     expect(lastResources().stepDetail).toMatch(/HTTP 401.*CRON_SECRET/)
     // Past the step's timeout, on its last attempt: a warning and an alert, never a rollback.
     const late = await cronJob({ step_started_at: new Date(Date.now() - 6 * 60_000).toISOString(), created_resources: { computeMode: 'k8s', stepErrors: 3 } })
-    expect(await advanceProvisioningJob(late as any, null as any)).toBe('done')
+    expect(await advanceProvisioningJob(late as any, null as any)).toBe('pending')
     expect(alerts.alertProvisioningFailure).toHaveBeenCalledWith('acme', 'cron_connect', expect.stringContaining('HTTP 401'), 't-1')
     expect(k8s.remove).not.toHaveBeenCalled()
     expect(reg.updateProvisioningJob.mock.calls.some(c => c[1].status === 'failed')).toBe(false)
@@ -208,9 +209,9 @@ describe('connect_crons (k8s)', () => {
       query: vi.fn(async (sql: string) => ({ rows: sql.includes("applied->>'layout'") ? [{ tenant_id: 't-1', layout: null }] : [] })),
     })
     const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
-    expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('done')
+    expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('pending')
     delete process.env.PROVISIONING_PROVIDER
-    expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('done')
+    expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('pending')
     expect(http.internalRequest).not.toHaveBeenCalled()
   })
 })

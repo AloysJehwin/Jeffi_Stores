@@ -24,6 +24,7 @@ export type StepId =
   | 'issue_owner_certificate'
   | 'activate'
   | 'connect_crons'
+  | 'build_site'
 
 export interface PipelineStep {
   id: StepId
@@ -90,6 +91,8 @@ export const STEP_CATALOG: Record<StepId, StepPolicy> = {
   activate: { outputs: [] },
   // Unreachable within the timeout: a few backed-off retries, then a warning and an alert; never a rollback.
   connect_crons: { timeoutMs: 5 * MIN, continueOnError: true, maxAttempts: 4, alertAs: 'cron_connect', outputs: ['cronJobs', 'cronPing'] },
+  // The store is already live: a build that fails or runs long ends as a warning, never a rollback.
+  build_site: { timeoutMs: 15 * MIN, continueOnError: true, maxAttempts: 3, alertAs: 'site_build', outputs: ['siteBuild'] },
 }
 
 const step = (id: StepId, label: string): PipelineStep => ({ id, label })
@@ -224,6 +227,10 @@ export function buildPipeline(spec: { db: { mode: DbMode } }, plan: string | nul
   // The platform's cron fan-out reaches the store's pods: checked once it is live (a store host answers only then).
   if (opts.engine === 'k8s' && opts.provider === 'aws')
     jobs.push({ id: 'crons', label: 'Scheduled jobs', steps: [step('connect_crons', 'Connect scheduled jobs')] })
+  // The AI builds the store's first site from the owner's onboarding brief, once its admin answers. A restored
+  // store keeps the site its backup holds.
+  if (opts.engine === 'k8s' && opts.provider === 'aws' && !opts.restore)
+    jobs.push({ id: 'site', label: 'Your site', steps: [step('build_site', 'Build your site with AI')] })
   return { v: 2, jobs }
 }
 

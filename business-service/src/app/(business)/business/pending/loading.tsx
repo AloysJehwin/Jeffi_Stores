@@ -16,14 +16,14 @@ export default function Loading() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-foreground mb-3">Application Under Review</h1>
+        <h1 className="ui-heading text-2xl font-bold text-foreground mb-3">Application Under Review</h1>
         <p className="text-foreground-secondary leading-relaxed mb-6">
           Thank you for applying to the <Sk className="inline-block h-4 w-24 align-middle" /> Business Partner program. Our
           team is reviewing your application and will get back to you within <strong>24–48 hours</strong>.
         </p>
 
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-5 mb-8 text-left">
-          <h2 className="text-sm font-semibold text-foreground mb-3">What happens next?</h2>
+        <div className="ui-card bg-surface-elevated rounded-lg border border-border-default p-5 mb-8 text-left">
+          <h2 className="ui-heading text-sm font-semibold text-foreground mb-3">What happens next?</h2>
           <ol className="space-y-3">
             {STEPS.map((item, i) => (
               <li key={i} className="flex items-start gap-3 text-sm text-foreground-secondary">

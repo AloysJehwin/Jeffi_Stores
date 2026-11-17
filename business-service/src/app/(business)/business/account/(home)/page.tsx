@@ -373,7 +373,7 @@ export default function AccountPage() {
         <div className="py-4 sm:py-6 space-y-4 max-w-3xl lg:max-w-none">
           {/* Desktop stats row */}
           <div className="hidden lg:grid grid-cols-3 gap-3">
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 flex items-center gap-3">
+            <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-accent-500/10 flex items-center justify-center flex-shrink-0">
                 <svg
                   className="w-4 h-4 text-accent-500"
@@ -392,7 +392,7 @@ export default function AccountPage() {
                 <p className="text-xs text-foreground-muted mt-0.5">Total Orders</p>
               </div>
             </div>
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 flex items-center gap-3">
+            <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
                 <svg
                   className="w-4 h-4 text-green-500"
@@ -419,7 +419,7 @@ export default function AccountPage() {
                 <p className="text-xs text-foreground-muted mt-0.5">Total Spent</p>
               </div>
             </div>
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 flex items-center gap-3">
+            <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                 <svg
                   className="w-4 h-4 text-blue-500"
@@ -446,9 +446,9 @@ export default function AccountPage() {
 
           {/* Recent Searches */}
           {searchHistory.length > 0 && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+            <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-foreground">Recent Searches</h2>
+                <h2 className="ui-heading text-sm font-semibold text-foreground">Recent Searches</h2>
                 <button
                   onClick={() => {
                     fetch('/api/user/search-history', { method: 'DELETE', credentials: 'include', headers: PH }).catch(
@@ -466,7 +466,7 @@ export default function AccountPage() {
                   <Link
                     key={q}
                     href={bp(`/business/products?search=${encodeURIComponent(q)}`)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-secondary text-xs text-foreground-secondary hover:text-accent-600 hover:border-accent-300 dark:hover:text-accent-400 dark:hover:border-accent-700 transition-colors"
+                    className="ui-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-secondary text-xs text-foreground-secondary hover:text-accent-600 hover:border-accent-300 dark:hover:text-accent-400 dark:hover:border-accent-700 transition-colors"
                   >
                     <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -485,13 +485,13 @@ export default function AccountPage() {
 
           {/* Profile + Default Address row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+            <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-foreground">Profile</h2>
+                <h2 className="ui-heading text-sm font-semibold text-foreground">Profile</h2>
                 {!isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors"
+                    className="ui-btn text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors"
                   >
                     Edit
                   </button>
@@ -575,7 +575,7 @@ export default function AccountPage() {
                         required
                         value={formData.firstName}
                         onChange={e => setFormData({ ...formData, firstName: e.target.value })}
-                        className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                        className="ui-input w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                       />
                     </div>
                     <div>
@@ -584,14 +584,14 @@ export default function AccountPage() {
                         type="text"
                         value={formData.lastName}
                         onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                        className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                        className="ui-input w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                       />
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-foreground-secondary mb-1">Phone</label>
                     <div className="flex">
-                      <span className="inline-flex items-center px-2.5 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-xs font-medium">
+                      <span className="ui-addon inline-flex items-center px-2.5 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-xs font-medium">
                         +91
                       </span>
                       <input
@@ -600,7 +600,7 @@ export default function AccountPage() {
                         maxLength={10}
                         value={formData.phone}
                         onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                        className="w-full px-3 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                        className="ui-input w-full px-3 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                         placeholder="00000 00000"
                       />
                     </div>
@@ -609,7 +609,7 @@ export default function AccountPage() {
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="flex-1 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-xs transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
+                      className="ui-btn flex-1 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-xs transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       {isSaving ? (
                         <>
@@ -641,12 +641,12 @@ export default function AccountPage() {
             </div>
 
             {/* Default address */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+            <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-foreground">Default Address</h2>
+                <h2 className="ui-heading text-sm font-semibold text-foreground">Default Address</h2>
                 <Link
                   href={bp('/business/account/addresses')}
-                  className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors"
+                  className="ui-btn text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors"
                 >
                   Manage
                 </Link>
@@ -684,9 +684,9 @@ export default function AccountPage() {
           </div>
 
           {/* Recent Orders */}
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+          <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-foreground">Recent Orders</h2>
+              <h2 className="ui-heading text-sm font-semibold text-foreground">Recent Orders</h2>
               <Link
                 href={bp('/business/account/orders')}
                 className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium"
@@ -765,7 +765,7 @@ export default function AccountPage() {
                         ₹{Number(order.total_amount).toLocaleString('en-IN')}
                       </span>
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(order.status)}`}
+                        className={`ui-badge inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(order.status)}`}
                       >
                         {getStatusLabel(order.status)}
                       </span>
@@ -805,7 +805,7 @@ export default function AccountPage() {
 
       {cropSrc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-sm flex flex-col overflow-hidden">
+          <div className="ui-raised bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-sm flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
               <button
                 onClick={() => {
@@ -823,7 +823,7 @@ export default function AccountPage() {
               <button
                 onClick={handleCropConfirm}
                 disabled={avatarUploading}
-                className="bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                className="ui-btn bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
               >
                 {avatarUploading ? (
                   <>

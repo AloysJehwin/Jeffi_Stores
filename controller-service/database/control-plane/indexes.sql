@@ -86,6 +86,8 @@ CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_admin ON public.admin_api_tokens
 CREATE INDEX IF NOT EXISTS idx_admin_api_tokens_service_account ON public.admin_api_tokens USING btree (tenant_id, service_account_id) WHERE (service_account_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_platform_setup_progress_state ON public.platform_setup_progress USING btree (state);
 CREATE INDEX IF NOT EXISTS idx_tenant_messaging_senders_tenant ON public.tenant_messaging_senders USING btree (tenant_id);
+-- Inbound routing: which store and audience owns the number a message was sent to (digits only).
+CREATE INDEX IF NOT EXISTS idx_tenant_messaging_senders_number ON public.tenant_messaging_senders USING btree ((regexp_replace(sender, '\D', '', 'g')), channel);
 CREATE INDEX IF NOT EXISTS idx_tenant_archives_owner ON public.tenant_archives USING btree (owner_id, created_at DESC) WHERE (status = 'available');
 CREATE INDEX IF NOT EXISTS idx_tenant_archives_expiry ON public.tenant_archives USING btree (expires_at) WHERE (status <> 'expired');
 -- One live order per domain; failed, cancelled and expired ones free the name.
@@ -94,3 +96,9 @@ CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_tenant ON public.tenant_doma
 CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_inflight ON public.tenant_domain_orders USING btree (next_at) WHERE (status IN ('requested','registering','configuring'));
 CREATE INDEX IF NOT EXISTS idx_tenant_domain_renewals_open ON public.tenant_domain_renewals USING btree (next_at) WHERE (status IN ('due','renewing'));
 CREATE INDEX IF NOT EXISTS idx_tcd_order ON public.tenant_custom_domains USING btree (order_id) WHERE (order_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_site_studio_sessions_tenant ON public.site_studio_sessions USING btree (tenant_id) WHERE (tenant_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tenant_compliance_documents_owner ON public.tenant_compliance_documents USING btree (owner_id);
+-- The daily compliance_expiry job's scan.
+CREATE INDEX IF NOT EXISTS idx_tenant_compliance_documents_expiry ON public.tenant_compliance_documents USING btree (expires_on) WHERE (expires_on IS NOT NULL);
+-- The ai_hold_sweep cron's scan: open holds by age.
+CREATE INDEX IF NOT EXISTS idx_ai_wallet_holds_open ON public.ai_wallet_holds USING btree (started_at) WHERE (settled_at IS NULL);

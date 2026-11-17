@@ -4,6 +4,8 @@ import { queryMany } from '@/lib/shared/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import { categoryProductCounts } from '@/lib/catalog/storefront-counts'
 import { listingMetadata } from '@/lib/catalog/listing-seo'
+import { loadPartsPage } from '@/components/visitor/site/code/parts/taxonomy/site-page'
+import { setIndexPage } from '@/components/visitor/site/code/parts/taxonomy/context'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +21,8 @@ async function getAllCategories() {
   return queryMany('SELECT * FROM categories WHERE is_active = true ORDER BY display_order ASC')
 }
 
-export default async function CategoriesPage() {
+/** The built-in page: every top-level category with its subcategories and product counts. */
+async function CategoriesIndex() {
   const categories = await getAllCategories()
   const productCounts = await categoryProductCounts()
 
@@ -27,7 +30,7 @@ export default async function CategoriesPage() {
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
 
   return (
-    <div className="bg-surface min-h-screen">
+    <>
       {/* Page Header */}
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
@@ -120,6 +123,15 @@ export default async function CategoriesPage() {
           })}
         </div>
       </div>
-    </div>
+    </>
   )
+}
+
+export default async function CategoriesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const sp = await searchParams
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
+  // The store's Site Builder page when it has one (an AI design lists the categories itself), else the built-in page.
+  const sitePage = await loadPartsPage({ audience: 'store', page: 'categories' }, { preview: one(sp.preview), layout: one(sp.layout) }, 'categories_main', ['AllCategories'])
+  setIndexPage('categories')
+  return <div className="bg-surface min-h-screen">{sitePage.site(sitePage.builtIn ? <CategoriesIndex /> : null) ?? <CategoriesIndex />}</div>
 }

@@ -1,13 +1,17 @@
+import Link from 'next/link'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import ConsoleShell from './ConsoleShell'
-import { listServiceApprovals } from '@/lib/tenant-registry'
+import { hasService, listServiceApprovals } from '@/lib/tenant-registry'
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
+import { complianceAttention } from '@controller/lib/catalog/compliance-docs'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { owner, tenants, tenant } = await loadOwnerContext()
   const review = (await listServiceApprovals(tenant.id).catch(() => [])).filter(a => a.status !== 'approved')
+  // A rejected or expired licence puts the store's compliance in need of action (dashboard/licences).
+  const licences = hasService(tenant, 'store') ? await complianceAttention(tenant.id).catch(() => null) : null
   const label = (s: string) => (s === 'messaging' ? 'Messaging' : 'Documents')
   const lite = (t: typeof tenant) => ({ slug: t.slug, display_name: t.display_name, status: t.status, service_types: t.service_types ?? ['store'] })
   return (
@@ -18,6 +22,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {review.map(r => r.status === 'pending'
               ? <p key={r.service}><strong>{label(r.service)} API is under review.</strong> Explore the console, set up templates and create API keys — sending starts once we approve it (usually the same business day).</p>
               : <p key={r.service}><strong>{label(r.service)} API was not approved.</strong> {r.note ? `${r.note} — ` : ''}reply to our email or write to support@jeffistores.in.</p>)}
+          </div>
+        )}
+        {licences === 'action' && (
+          <div className="mb-6 rounded-2xl px-5 py-3 text-sm bg-[#f6d5cc]/60 text-[#8a2e1f]">
+            <strong>A licence needs your attention.</strong> One was not accepted or has expired.{' '}
+            <Link href="/dashboard/licences" className="font-semibold underline underline-offset-2">
+              Send a new copy
+            </Link>
           </div>
         )}
         {children}

@@ -29,7 +29,8 @@ async function assertPublic(url: URL): Promise<void> {
   if (addrs.some(a => privateAddress(a.address))) throw new UnsafeFetchError('That link points at a private address')
 }
 
-export async function fetchPublic(raw: string, maxBytes: number): Promise<{ bytes: Buffer; type: string }> {
+/** `opts.truncate`: past maxBytes, keep the first maxBytes instead of failing (reading a page's head and structure). */
+export async function fetchPublic(raw: string, maxBytes: number, opts: { truncate?: boolean } = {}): Promise<{ bytes: Buffer; type: string }> {
   let url: URL
   try {
     url = new URL(raw)
@@ -47,12 +48,17 @@ export async function fetchPublic(raw: string, maxBytes: number): Promise<{ byte
     }
     if (!res.ok || !res.body) throw new UnsafeFetchError(`Downloading the link returned HTTP ${res.status}`)
     const tooBig = () => new UnsafeFetchError(`The file is larger than ${Math.round(maxBytes / 1048576)} MB`, 413)
-    if (Number(res.headers.get('content-length') ?? 0) > maxBytes) throw tooBig()
+    if (!opts.truncate && Number(res.headers.get('content-length') ?? 0) > maxBytes) throw tooBig()
     const chunks: Buffer[] = []
     let size = 0
     for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
       size += chunk.length
-      if (size > maxBytes) throw tooBig()
+      if (size > maxBytes) {
+        if (!opts.truncate) throw tooBig()
+        // Leaving the loop releases and cancels the rest of the download.
+        chunks.push(Buffer.from(chunk).subarray(0, chunk.length - (size - maxBytes)))
+        break
+      }
       chunks.push(Buffer.from(chunk))
     }
     return { bytes: Buffer.concat(chunks), type: (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() }

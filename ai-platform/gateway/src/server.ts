@@ -3,6 +3,7 @@ import IORedis from 'ioredis'
 import pg from 'pg'
 import { CONFIG, modelForHint, claudeModelForHint } from './config'
 import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
+import { startUsdInrRefresh } from './fx'
 import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicVision } from './providers/anthropic'
 import { runVision } from './providers/paddleocr'
 import { runJob, startWorker, queueHealth, pendingWaiters, type JobData } from './queue'
@@ -81,6 +82,7 @@ async function processJob(data: JobData): Promise<unknown> {
 
 startWorker(processJob)
 ollamaPool.start()
+startUsdInrRefresh()
 
 class HttpError extends Error {
   constructor(readonly status: number, message: string) { super(message) }

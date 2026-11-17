@@ -1,4 +1,4 @@
-import { CRON_JOBS, CRON_PING_PATH } from '@/lib/shared/cron-jobs'
+import { CRON_JOBS, CRON_PING_PATH, SITE_BUILD_PATH } from '@/lib/shared/cron-jobs'
 import { storeHostForSlug } from '@/lib/tenancy/forms-host'
 import { appFromHost } from '@/lib/tenant-registry/host-resolution'
 import { isCustomAdminHost } from '@/lib/tenancy/admin-host'
@@ -58,7 +58,7 @@ export interface RouteRule {
   strip?: string // prefix the ingress removes before the app sees the path
 }
 
-const STORE_CRON_PATHS = [...CRON_JOBS.filter(j => j.tenantScope !== null && j.path.startsWith('/api/cron/')).map(j => j.path), CRON_PING_PATH]
+const STORE_CRON_PATHS = [...CRON_JOBS.filter(j => j.tenantScope !== null && j.path.startsWith('/api/cron/')).map(j => j.path), CRON_PING_PATH, SITE_BUILD_PATH]
 const PLATFORM_WEBHOOKS = ['/api/webhooks/ses-inbound', '/api/webhooks/aws-messaging', '/api/webhooks/twilio']
 // Platform admin pages, served at the admin host's root (admin.x/ecom → /admin/ecom). /settings/compute-pricing
 // only redirects to /ecom/configuration now.

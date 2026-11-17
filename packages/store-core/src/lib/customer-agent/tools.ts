@@ -2,6 +2,7 @@ import { queryMany, queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { findSimilarProductIds } from '@/lib/shared/rag'
 import { buildProductSearchClause } from '@/lib/catalog/search'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 
 function vec(arr: number[]) {
   return '[' + arr.join(',') + ']'
@@ -388,6 +389,21 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   },
 ]
 
+/** Every product a tool returns carries `url`, its page on this store, so the assistant can send the link. */
+async function withProductLinks(out: unknown): Promise<unknown> {
+  if (!out || typeof out !== 'object') return out
+  const o = out as Record<string, any>
+  const list = Array.isArray(o.products) && o.products.some((p: any) => typeof p?.slug === 'string')
+  const single = typeof o.slug === 'string'
+  if (!list && !single) return out
+  const base = (await storeBaseUrlAsync().catch(() => '')).replace(/\/$/, '')
+  if (!base) return out
+  const link = (slug: string) => `${base}/products/${encodeURIComponent(slug)}`
+  return single ? { ...o, url: link(o.slug) } : { ...o, products: o.products.map((p: any) => (typeof p?.slug === 'string' ? { ...p, url: link(p.slug) } : p)) }
+}
+
 export function getCustomerTool(name: string): CustomerToolDef | null {
-  return CUSTOMER_TOOLS.find(t => t.name === name) || null
+  const t = CUSTOMER_TOOLS.find(t => t.name === name)
+  if (!t) return null
+  return { ...t, handler: async (input, ctx) => withProductLinks(await t.handler(input, ctx)) }
 }

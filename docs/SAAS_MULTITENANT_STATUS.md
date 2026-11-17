@@ -188,6 +188,8 @@ classified retryable (backoff, stays `pending`) or terminal (fail + auto-rollbac
 | 14 | `verify_serving` | HTTPS-probes `https://{slug}.jeffistores.in`; any HTTP response proves the app tier answers. 6 attempts, then fail. **Skipped under the stub provider** (no real infra to serve) |
 | 15 | `activate` | Guarded: refuses if `rds_endpoint` isn't persisted (else `getPool` would silently fall back to the platform DB). Sets tenant `active`, job `done` |
 
+**After go-live on k8s (2026-11-15, not deployed):** `connect_crons`, then `build_site`. `build_site` builds the store's first site with the AI from the owner's onboarding "Your site" step (draft `data.site`). It calls the store admin's `POST /api/cron/site-build` with `CRON_SECRET` on every tick: the first call starts the build and later calls report progress until the site is published and Site Builder is live. The AI cost is platform-funded, capped by `SITE_BUILD_BUDGET_INR` (default 200), and never charged to the store's wallet (`ai_usage.wallet_ref = 'platform:site-build'`). The step is non-fatal (`continueOnError`, 15-minute wait). It is skipped when the owner chose to design the site themselves, when the store was restored from a backup, and under the stub provider.
+
 **Hostnames by plan tier** (`tenantHostnames`) — Basic: `{slug}`, `admin-{slug}`, `invoice-{slug}`;
 growth+ adds `quotation-{slug}`, `purchaseorder-{slug}`; pro+ adds `forms-{slug}`, `{slug}.business`.
 

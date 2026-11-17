@@ -1,5 +1,5 @@
 import { catalogFor, SEED_PROFILES } from './seed-catalog'
-import { DEFAULT_SECTIONS } from '@/lib/catalog/homepage-sections'
+import { DEFAULT_SECTIONS, HOMEPAGE_SURFACES } from '@/lib/catalog/homepage-sections'
 import { dbTarget, tenantAdminPool, type DbAuth } from './tenant-admin-pool'
 
 /**
@@ -71,24 +71,27 @@ export async function seedTenantData(endpoint: string, dbName: string, profile: 
       )
     }
 
-    for (const [i, h] of cat.hero.entries()) {
-      const exists = await client.query('SELECT 1 FROM hero_slides WHERE title = $1 LIMIT 1', [h.title])
-      if (exists.rowCount) continue
-      await client.query(
-        `INSERT INTO hero_slides (title, subtitle, badge_text, cta_label, cta_url, filter_category, display_order, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
-        [h.title, h.subtitle, h.badge, h.cta, `/products?category=${cat.categorySlug}`, cat.category, i]
-      )
-    }
-
-    const hasSections = await client.query('SELECT 1 FROM homepage_sections LIMIT 1')
-    if (!hasSections.rowCount) {
-      for (const [i, s] of DEFAULT_SECTIONS.entries()) {
+    // Every surface (desktop web, phone web, app) gets a layout of its own, so editing one never changes another.
+    for (const surface of HOMEPAGE_SURFACES) {
+      for (const [i, h] of cat.hero.entries()) {
+        const exists = await client.query('SELECT 1 FROM hero_slides WHERE title = $1 AND surface = $2 LIMIT 1', [h.title, surface])
+        if (exists.rowCount) continue
         await client.query(
-          `INSERT INTO homepage_sections (type, title, subtitle, eyebrow, config, display_order, is_active)
-           VALUES ($1,$2,$3,$4,$5,$6,true)`,
-          [s.type, s.title, s.subtitle, s.eyebrow, JSON.stringify(s.config), i]
+          `INSERT INTO hero_slides (title, subtitle, badge_text, cta_label, cta_url, filter_category, display_order, is_active, surface)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+          [h.title, h.subtitle, h.badge, h.cta, `/products?category=${cat.categorySlug}`, cat.category, i, surface]
         )
+      }
+
+      const hasSections = await client.query('SELECT 1 FROM homepage_sections WHERE surface = $1 LIMIT 1', [surface])
+      if (!hasSections.rowCount) {
+        for (const [i, s] of DEFAULT_SECTIONS.entries()) {
+          await client.query(
+            `INSERT INTO homepage_sections (type, title, subtitle, eyebrow, config, display_order, is_active, surface)
+             VALUES ($1,$2,$3,$4,$5,$6,true,$7)`,
+            [s.type, s.title, s.subtitle, s.eyebrow, JSON.stringify(s.config), i, surface]
+          )
+        }
       }
     }
 

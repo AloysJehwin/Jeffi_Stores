@@ -15,6 +15,7 @@ import { bindingGate } from './lib/auth/session-binding-gate'
 import { currentTraceId } from './lib/shared/otel'
 import { clientCertFromProxy, TRAEFIK_CERT_HEADER, TRAEFIK_CERT_INFO_HEADER } from './lib/tenancy/edge-client-cert'
 import { GATEWAY_HEADER } from '@jeffi/service-auth'
+import type { PageKey } from '@jeffi/site-blocks'
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -101,6 +102,25 @@ function adminWritePathParent(pathname: string): string {
   const idFirst = pathname.replace(/\/([^/]+)\/edit$/i, '/$1/view')
   if (idFirst !== pathname) return idFirst
   return pathname.replace(/\/(add|new|edit(\/[^?]*)?)$/i, '')
+}
+
+// Storefront pages that stand in for a Site Builder page the store has not made (/contact → Support). Sent from here
+// so they arrive as a real 307: the page's own redirect() reaches the browser as a 200 with a client refresh, because
+// the root layout has streamed by the time it throws. The page keeps its redirect() as the fallback.
+const SITE_PAGE_REDIRECTS: Record<string, { page: PageKey; to: string }> = {
+  '/contact': { page: 'contact', to: '/support' },
+  '/return-policy': { page: 'returns', to: '/legal/return-refund-policy' },
+}
+
+/** Whether the store has a published Site Builder page for this browser's layout (what loadSitePage will find). */
+async function hasPublishedSitePage(page: PageKey, ua: string | null): Promise<boolean> {
+  const { siteBuilderEnabled, getPublishedPage } = await import('./lib/site/store')
+  if (!(await siteBuilderEnabled())) return false
+  const { surfaceForUA } = await import('./lib/catalog/web-surface')
+  const surface = surfaceForUA(ua)
+  const ref = { audience: 'store' as const, page, surface: surface === 'web' ? ('web' as const) : ('web_mobile' as const), slug: '' }
+  if (await getPublishedPage(ref)) return true
+  return ref.surface === 'web_mobile' && !!(await getPublishedPage({ ...ref, surface: 'web' }))
 }
 
 // public/ static files (screenshots, logos, fonts …) must be served as-is on EVERY host.
@@ -208,6 +228,15 @@ async function handle(request: NextRequest) {
   stripped.delete('x-client-cert-cn')
   stripped.delete(TRAEFIK_CERT_HEADER)
   stripped.delete(TRAEFIK_CERT_INFO_HEADER)
+  // A Site Builder preview token, handed to the root layout (which never sees search params) so the canvas shows the
+  // draft's theme. Only ever taken from the URL; the layout verifies it before use.
+  stripped.delete('x-site-preview')
+  const previewToken = request.nextUrl.searchParams.get('preview')
+  if (previewToken && previewToken.length < 2048) stripped.set('x-site-preview', previewToken)
+  // With it, the canvas's layout (desktop or phone), so the draft's header and footer are the ones for that layout.
+  stripped.delete('x-site-layout')
+  const previewLayout = request.nextUrl.searchParams.get('layout')
+  if (previewToken && (previewLayout === 'desktop' || previewLayout === 'mobile')) stripped.set('x-site-layout', previewLayout)
   // The edge proxy sets these from the TLS handshake on the platform admin host, so restore its
   // values after the strip — service-account mTLS auth reads them downstream.
   if (isAdminSubdomain && !isTenantAdminSubdomain) {
@@ -680,6 +709,13 @@ async function handle(request: NextRequest) {
         NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url), { request: { headers: stripped } })
       )
     }
+  }
+
+  const sitePageRedirect = SITE_PAGE_REDIRECTS[pathname]
+  if (sitePageRedirect && !isAdminSubdomain && request.method === 'GET' && !previewToken) {
+    // On a lookup failure the page decides, as before.
+    const has = await inTenant(() => hasPublishedSitePage(sitePageRedirect.page, request.headers.get('user-agent'))).catch(() => true)
+    if (!has) return addSecurityHeaders(NextResponse.redirect(buildRedirectUrl(request, sitePageRedirect.to + request.nextUrl.search), 307))
   }
 
   if (isAdminApiPath) {

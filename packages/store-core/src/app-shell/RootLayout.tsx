@@ -4,6 +4,14 @@ import SessionGuard from '@/components/security/SessionGuard'
 import Script from 'next/script'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/catalog/site-controls'
+import { cssVarsRule, googleFontsHref, themeCssVars } from '@jeffi/site-blocks'
+import { getPublishedTheme, getSiteDraft } from '@/lib/site/store'
+import { verifyHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
+import { normalizeTheme } from '@jeffi/site-blocks'
+import { headers } from 'next/headers'
+import { getSiteChrome } from '@/lib/site/chrome'
+import { getWebSurface } from '@/lib/catalog/web-surface'
+import { loadCodeChrome } from '@/components/visitor/site/code/parts/chrome/code-chrome'
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
@@ -93,6 +101,50 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const adClient = isStorefrontHost ? adsenseClient() : null
   const showAds = !!adClient && !(await storeIsAdFree(tenant?.tenantId))
   const cookieConsent = (hasGoogleTag || showAds) && isStorefrontHost
+  // A Site Builder theme recolours and re-fonts the store and business pages (never the staff hosts). Set on the body,
+  // twice-classed, so it wins over the base :root / .dark variables.
+  // In the Site Builder canvas (a preview token): the draft's theme when it has one, and its header, footer and
+  // announcement bar on the layout the canvas asks for.
+  const sitePreview =
+    isStorefrontHost || isBusinessSubdomain
+      ? await verifyHomepagePreviewToken((await headers()).get('x-site-preview'))
+          .then(t => (t?.kind === 'site' ? t : null))
+          .catch(() => null)
+      : null
+  const previewTheme = sitePreview
+    ? await getSiteDraft(sitePreview.draftId)
+        .then(d => {
+          const tokens = d?.docs.theme?.[isBusinessSubdomain ? 'business' : 'store']
+          return tokens ? normalizeTheme(tokens) : null
+        })
+        .catch(() => null)
+    : null
+  const chromeSurface = async () => {
+    const s = await getWebSurface(sitePreview ? (await headers()).get('x-site-layout') : null, !!sitePreview)
+    return s === 'web_mobile' ? 'web_mobile' : 'web'
+  }
+  const siteTheme =
+    previewTheme ??
+    (isStorefrontHost || isBusinessSubdomain
+      ? ((isBusinessSubdomain ? await getPublishedTheme('business').catch(() => null) : null) ??
+        (await getPublishedTheme('store').catch(() => null)))
+      : null)
+  // The header, footer and announcement bar from Site Builder (phones get their own layout).
+  const siteChrome =
+    isStorefrontHost || isBusinessSubdomain
+      ? await chromeSurface()
+          .then(s => getSiteChrome(isBusinessSubdomain ? 'business' : 'store', s, sitePreview?.draftId))
+          .catch(() => null)
+      : null
+  // The AI-written header, footer and announcement bar (AI Site Studio) replace the built-in ones on the storefront.
+  const codeChrome = isStorefrontHost
+    ? await chromeSurface()
+        .then(s => loadCodeChrome('store', s, sitePreview))
+        .catch(() => null)
+    : null
+  const siteThemeCss = siteTheme
+    ? `${cssVarsRule('body.site-theme.site-theme', themeCssVars(siteTheme))}body.site-theme{font-family:var(--font-body),system-ui,sans-serif}`
+    : null
   const consentBootstrap = hasGoogleTag ? googleTag! : showAds ? { tagIds: [], conversionSendTo: null } : null
   const initialStoreConfig: StoreConfig = {
     slug: storeSlug,
@@ -125,6 +177,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       newArrivalsLimit: c.storefront.newArrivalsLimit,
       metaTagline: c.storefront.metaTagline,
     },
+    chrome: siteChrome,
   }
   return (
     // Vault: dark html/body so iOS/macOS overscroll bounce never reveals the light store surface.
@@ -148,9 +201,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         {showAds && <meta name="google-adsense-account" content={adClient!} />}
         {showAds && <script id="adsense-init" dangerouslySetInnerHTML={{ __html: adsenseInitScript() }} />}
+        {siteTheme && <link rel="stylesheet" href={googleFontsHref(siteTheme)} />}
+        {siteThemeCss && <style id="site-theme" dangerouslySetInnerHTML={{ __html: siteThemeCss }} />}
       </head>
       <body
-        className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
+        className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}${siteTheme ? ' site-theme' : ''}`}
       >
         <SessionGuard />
         {/* No third-party analytics on the vault (strict CSP, buyer privacy). */}
@@ -182,6 +237,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           isCertPortalSubdomain={isCertPortalSubdomain}
           isVaultSubdomain={isVaultSubdomain}
           cookieConsent={cookieConsent}
+          codeChrome={codeChrome}
         >
           {children}
         </ConditionalLayout>

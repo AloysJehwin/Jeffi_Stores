@@ -3,7 +3,7 @@ module.exports = {
   extends: 'next/core-web-vitals',
   settings: { next: { rootDir: ['../../controller-service', '../../storefront-service', '../../admin-service', '../../business-service'] } },
   rules: {
-    'no-restricted-imports': ['error', { patterns: [{ group: ['@controller/*', '@storefront/*', '@admin/*', '@business/*'], message: 'packages/store-core must not import an app.' }] }],
+    'no-restricted-imports': ['error', { patterns: [{ group: ['@controller/*', '@storefront/*', '@admin/*', '@business/*', '@showcase/*'], message: 'packages/store-core must not import an app.' }] }],
     'import/no-restricted-paths': [
       'error',
       {
@@ -14,4 +14,6 @@ module.exports = {
       },
     ],
   },
+  // AI Site Studio part registrations map code-section names to the components they render.
+  overrides: [{ files: ['src/lib/site/code/parts/**'], rules: { 'import/no-restricted-paths': 'off' } }],
 }

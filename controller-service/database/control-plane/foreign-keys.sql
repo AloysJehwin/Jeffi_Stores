@@ -73,3 +73,13 @@ ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_rene
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_order_id_fkey
     FOREIGN KEY (order_id) REFERENCES public.tenant_domain_orders(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;

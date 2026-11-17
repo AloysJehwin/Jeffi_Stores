@@ -13,8 +13,8 @@ import {
   SECTION_TYPES,
   rowAudience,
   rowPage,
+  rowSurface,
   sectionTypesFor,
-  type HomepageSurface,
   type SectionType,
 } from '@/lib/catalog/homepage-sections'
 import { getHomepagePlan, homepagePlanRefusal } from '@/lib/catalog/homepage-plan'
@@ -60,7 +60,7 @@ const bodySchema = z.object({
   isActive: z.boolean().optional(),
   startsAt: z.string().datetime().nullish(),
   endsAt: z.string().datetime().nullish(),
-  /** One layout now; a surface here only means "show on this surface alone" (config.surfaces). */
+  /** The surface layout the section joins (each surface has its own). */
   surface: z.enum(HOMEPAGE_SURFACES as [string, ...string[]]).optional(),
   page: z.enum(HOMEPAGE_PAGES as [string, ...string[]]).optional(),
   audience: z.enum(HOMEPAGE_AUDIENCES as [string, ...string[]]).optional(),
@@ -93,9 +93,7 @@ export async function POST(request: NextRequest) {
     page === 'home' || d.config?.placement
       ? { ...(d.config ?? {}) }
       : { ...d.config, placement: { after: PLACEMENT_DEFAULT_AFTER } }
-  if (d.surface && !config.surfaces) {
-    config.surfaces = Object.fromEntries(HOMEPAGE_SURFACES.map(s => [s, s === d.surface])) as Record<HomepageSurface, boolean>
-  }
+  const surface = rowSurface({ surface: d.surface })
   const draftId = homepageDraftIdFrom(request)
   if (!draftId) return noHomepageDraft()
   const section = await withHomepageDraft(draftId, admin.adminId, draft => {
@@ -103,7 +101,7 @@ export async function POST(request: NextRequest) {
     const row: DraftSection = {
       id: randomUUID(),
       type,
-      surface: 'web',
+      surface,
       page,
       audience,
       title: d.title ?? null,
@@ -112,7 +110,7 @@ export async function POST(request: NextRequest) {
       cta_label: d.ctaLabel ?? null,
       cta_url: d.ctaUrl ?? null,
       config,
-      display_order: nextDisplayOrderOn(draft.sections, page, audience),
+      display_order: nextDisplayOrderOn(draft.sections, page, audience, surface),
       is_active: d.isActive ?? true,
       starts_at: d.startsAt ?? null,
       ends_at: d.endsAt ?? null,

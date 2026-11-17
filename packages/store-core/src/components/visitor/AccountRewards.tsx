@@ -113,7 +113,7 @@ function TierCard({ data }: { data: RewardsData }) {
     <div className={`relative overflow-hidden rounded-xl border border-border-default shadow-sm bg-gradient-to-br ${TIER_STYLES[data.tier.key] ?? TIER_STYLES.bronze}`}>
       <div className="p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-white/60 dark:bg-black/30">
+          <span className="ui-badge inline-block px-3 py-1 rounded-full text-xs font-semibold bg-white/60 dark:bg-black/30">
             {data.tier.name} tier
           </span>
           {data.tier.multiplier > 1 && (
@@ -183,7 +183,7 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
 
   return (
     <div className={CARD}>
-      <h2 className="font-semibold text-foreground">Redeem points</h2>
+      <h2 className="ui-heading font-semibold text-foreground">Redeem points</h2>
       <p className="mt-1 text-sm text-foreground-secondary">
         Turn points into a coupon. Each point is worth {formatMoney(pointValue)}, from{' '}
         {minRedeemPoints.toLocaleString('en-IN')} points.
@@ -200,14 +200,14 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
               value={input}
               onChange={e => setInput(e.target.value.replace(/\D/g, '').slice(0, 7))}
               placeholder={String(minRedeemPoints)}
-              className="w-full sm:w-40 px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="ui-input w-full sm:w-40 px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </div>
           <button
             type="button"
             onClick={redeem}
             disabled={!valid || submitting}
-            className="w-full sm:w-auto px-4 py-2 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="ui-btn w-full sm:w-auto px-4 py-2 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Creating coupon' : valid ? `Get ${formatMoney(points * pointValue)} coupon` : 'Get coupon'}
           </button>
@@ -231,7 +231,7 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
 function HowItWorks({ program }: { program: RewardsData['program'] }) {
   return (
     <div className={CARD}>
-      <h2 className="font-semibold text-foreground">How it works</h2>
+      <h2 className="ui-heading font-semibold text-foreground">How it works</h2>
       <ul className="mt-3 space-y-1.5 text-sm text-foreground-secondary list-disc pl-5">
         <li>Earn 1 point for every {formatMoney(program.rupeesPerPoint)} you spend on online orders.</li>
         <li>
@@ -255,7 +255,7 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
             {program.tiers.map(tier => (
               <tr key={tier.key} className="border-t border-border-default text-foreground-secondary">
                 <td className="py-2 pr-4">
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${TIER_BADGE[tier.key] ?? TIER_BADGE.bronze}`}>
+                  <span className={`ui-badge inline-block px-2 py-0.5 rounded-full text-xs font-medium ${TIER_BADGE[tier.key] ?? TIER_BADGE.bronze}`}>
                     {tier.name}
                   </span>
                 </td>
@@ -273,7 +273,7 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
 function History({ list }: { list: InfiniteList<HistoryEntry> }) {
   return (
     <div className={CARD}>
-      <h2 className="font-semibold text-foreground">Points history</h2>
+      <h2 className="ui-heading font-semibold text-foreground">Points history</h2>
       {(list.total ?? 0) === 0 && !list.loading ? (
         <p className="mt-3 text-sm text-foreground-muted">
           No points yet. They appear here after your first delivered order.

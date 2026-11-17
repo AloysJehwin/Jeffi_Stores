@@ -1,0 +1,1182 @@
+{
+ "version": 1,
+ "style": "luxury",
+ "product": "store",
+ "generatedAt": "2026-11-17T16:41:35.313Z",
+ "plan": {
+  "approach": {
+   "id": "gallery",
+   "name": "Gallery",
+   "description": "Image-led, few words; collections as big tiles."
+  },
+  "pages": [
+   {
+    "key": "store:announcement",
+    "audience": "store",
+    "page": "announcement",
+    "label": "Announcement bar",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Store promise line",
+      "intent": "A quiet strip on the dark ground that takes turns between the store's promises: delivery across India, easy returns, and a current offer code. Each store sets its own wording, kept warm and short.",
+      "layout": "a slow marquee of short serif messages, centred, with generous letter-spacing",
+      "parts": [
+       "AnnouncementText",
+       "Marquee",
+       "Link"
+      ],
+      "id": "s1"
+     }
+    ],
+    "required": [
+     "AnnouncementText"
+    ]
+   },
+   {
+    "key": "store:header",
+    "audience": "store",
+    "page": "header",
+    "label": "Header",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Site header",
+      "intent": "Logo, menu, search, account and cart, kept spare so the imagery below leads. It works for any catalogue, from saris to speakers.",
+      "layout": "centred logo over a thin menu row, search, account and cart icons on the right; on phones a slim bar with the menu tucked into a drawer",
+      "parts": [
+       "Logo",
+       "NavLinks",
+       "SearchBox",
+       "AccountLink",
+       "CartIcon"
+      ],
+      "id": "s1"
+     }
+    ],
+    "required": [
+     "Logo",
+     "NavLinks",
+     "CartIcon",
+     "SearchBox",
+     "AccountLink"
+    ]
+   },
+   {
+    "key": "store:home",
+    "audience": "store",
+    "page": "home",
+    "label": "Home",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Opening campaign picture",
+      "intent": "One full-bleed campaign image the store swaps each season, with a single serif line and two calls to action (shop new, explore collections), so the first impression is the picture rather than words.",
+      "layout": "full-bleed image with a dark scrim, words set low on the left",
+      "parts": [
+       "Image",
+       "Link",
+       "Reveal"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Shop by collection",
+      "intent": "The store's main categories as big picture tiles, so any shopper can jump straight to fashion, home, electronics or whatever this store carries.",
+      "layout": "bento grid with one large tile and four smaller ones",
+      "parts": [
+       "Categories",
+       "Image",
+       "Link"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "New this season",
+      "intent": "Latest arrivals as large product pictures with name and price only. The next card peeks in to invite a swipe on phones.",
+      "layout": "horizontal scroller with the next card peeking",
+      "parts": [
+       "Products",
+       "ProductCard",
+       "Carousel",
+       "PriceTag",
+       "WishlistToggle"
+      ],
+      "id": "s3"
+     },
+     {
+      "label": "Our promises",
+      "intent": "Three reassurances Indian shoppers look for: delivery across India, easy returns, and secure payment including cash on delivery. Each is said in one warm sentence.",
+      "layout": "a band in the brand colour with light text, three equal columns with thin dividers",
+      "parts": [
+       "Store",
+       "Icon"
+      ],
+      "id": "s4"
+     },
+     {
+      "label": "The featured edit",
+      "intent": "One styled lifestyle picture of a curated story beside two hero products from it, giving the store an editorial moment without clutter.",
+      "layout": "asymmetric 7/5 grid: big picture left, two stacked product cards right",
+      "parts": [
+       "Image",
+       "Products",
+       "ProductCard",
+       "QuickAdd",
+       "Link"
+      ],
+      "id": "s5"
+     },
+     {
+      "label": "Brands we carry",
+      "intent": "The labels the store stocks, shown as a calm list of names and logos for shoppers who shop by brand.",
+      "layout": "a heading pinned on the left beside a scrolling list of brand logos",
+      "parts": [
+       "Brands",
+       "Image",
+       "Link"
+      ],
+      "id": "s6"
+     },
+     {
+      "label": "Words from shoppers",
+      "intent": "A few real reviews, one at a time, to build trust for a store the shopper may not yet know.",
+      "layout": "a centred card floating over a tinted background, cycling slowly",
+      "parts": [
+       "Reviews",
+       "RatingStars",
+       "Carousel"
+      ],
+      "id": "s7"
+     },
+     {
+      "label": "Letters from us",
+      "intent": "A short, warm invitation to join the store's emails for new arrivals and private offers.",
+      "layout": "centred narrow column with generous space",
+      "parts": [
+       "NewsletterForm"
+      ],
+      "id": "s8"
+     }
+    ],
+    "required": []
+   },
+   {
+    "key": "store:products",
+    "audience": "store",
+    "page": "products",
+    "label": "Product listing",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Listing title",
+      "intent": "A slim serif title with breadcrumbs and the result count, so shoppers know where they are before the pictures take over.",
+      "layout": "slim band under a thin rule",
+      "parts": [
+       "Breadcrumbs",
+       "ResultCount"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "All products",
+      "intent": "The full catalogue as large picture cards, with filters and sort close by for a mixed catalogue of any kind.",
+      "layout": "filters in a column on the left, a roomy three-across grid on the right",
+      "parts": [
+       "Filters",
+       "SortMenu",
+       "ProductResults",
+       "ProductCard",
+       "QuickAdd",
+       "WishlistToggle",
+       "PriceTag"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "Browse by collection",
+      "intent": "Category picture tiles after the results, for shoppers who would rather wander by collection.",
+      "layout": "horizontal scroller with the next tile peeking",
+      "parts": [
+       "Categories",
+       "Image",
+       "Carousel",
+       "Link"
+      ],
+      "id": "s3"
+     }
+    ],
+    "required": [
+     "ProductResults"
+    ]
+   },
+   {
+    "key": "store:category",
+    "audience": "store",
+    "page": "category",
+    "label": "Category pages",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Category opening picture",
+      "intent": "The hero picture of <Category> with its name as the page heading, its tagline and breadcrumbs. Its <SubCategories> appear as quiet chips beneath and hide when there are none.",
+      "layout": "a full-width band with the words over the picture, chips in a row below",
+      "parts": [
+       "Breadcrumbs",
+       "Category",
+       "Image",
+       "SubCategories"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Category products",
+      "intent": "Everything in <Category> as large picture cards under a light toolbar, keeping the images dominant.",
+      "layout": "result count and sort in a slim toolbar over the grid, filters in a slide-out drawer",
+      "parts": [
+       "ResultCount",
+       "SortMenu",
+       "Filters",
+       "ProductResults",
+       "ProductCard",
+       "QuickAdd",
+       "WishlistToggle"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "Questions and notes",
+      "intent": "The questions shoppers ask about <Category> beside its longer copy from <SeoText>, set quiet and readable. Each hides when empty.",
+      "layout": "two columns: accordion of questions left, text right",
+      "parts": [
+       "CategoryFaqs",
+       "Accordion",
+       "AccordionItem",
+       "SeoText"
+      ],
+      "id": "s3"
+     }
+    ],
+    "required": [
+     "Category",
+     "Breadcrumbs",
+     "SubCategories",
+     "ProductResults"
+    ]
+   },
+   {
+    "key": "store:brand",
+    "audience": "store",
+    "page": "brand",
+    "label": "Brand pages",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Brand introduction",
+      "intent": "Breadcrumbs, the logo and name of <Brand> as the heading, with its tagline, short description and website and social links.",
+      "layout": "the logo and words in two columns",
+      "parts": [
+       "Breadcrumbs",
+       "Brand",
+       "Image",
+       "Link"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Brand products",
+      "intent": "Every product from <Brand> in large picture cards, with filters to narrow down.",
+      "layout": "filters in a column on the left, the grid on the right",
+      "parts": [
+       "Filters",
+       "SortMenu",
+       "ResultCount",
+       "ProductResults",
+       "ProductCard",
+       "QuickAdd"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "Brand story",
+      "intent": "The story of <Brand> and its longer copy from <SeoText>, set as a calm read at the end. Each hides when empty.",
+      "layout": "a centred narrow column with generous space",
+      "parts": [
+       "SeoText"
+      ],
+      "id": "s3"
+     }
+    ],
+    "required": [
+     "Brand",
+     "Breadcrumbs",
+     "ProductResults"
+    ]
+   },
+   {
+    "key": "store:search",
+    "audience": "store",
+    "page": "search",
+    "label": "Search results",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Your search",
+      "intent": "The term and result count from <SearchQuery>, with the search box ready to try again.",
+      "layout": "slim band under a thin rule",
+      "parts": [
+       "SearchQuery",
+       "ResultCount",
+       "SearchBox"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Matching pieces",
+      "intent": "Products that match the search as picture cards, with filters and sort to refine it.",
+      "layout": "filters in a column on the left, the grid on the right",
+      "parts": [
+       "Filters",
+       "SortMenu",
+       "ProductResults",
+       "ProductCard",
+       "QuickAdd"
+      ],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "SearchQuery",
+     "ProductResults"
+    ]
+   },
+   {
+    "key": "store:product",
+    "audience": "store",
+    "page": "product",
+    "label": "Product page",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Pictures and buying",
+      "intent": "Large product pictures beside the buy box: title, rating, price, options, quantity, add to cart, buy now, a pincode delivery check and wishlist.",
+      "layout": "gallery left, sticky buy box right",
+      "parts": [
+       "ProductGallery",
+       "ProductTitle",
+       "ProductRating",
+       "ProductPrice",
+       "DiscountBadge",
+       "StockBadge",
+       "VariantPicker",
+       "QuantityPicker",
+       "AddToCart",
+       "BuyNow",
+       "DeliveryCheck",
+       "WishlistButton"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Details and care",
+      "intent": "Description and specifications that suit any product type, folded so the page stays quiet.",
+      "layout": "a centred narrow column of accordion rows",
+      "parts": [
+       "ProductDescription",
+       "ProductSpecs",
+       "Accordion",
+       "AccordionItem"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "What buyers say",
+      "intent": "The average rating beside written reviews, so shoppers can judge quality before buying.",
+      "layout": "a rating summary pinned on the left beside the review list",
+      "parts": [
+       "ProductReviews",
+       "ProductRating",
+       "RatingStars"
+      ],
+      "id": "s3"
+     },
+     {
+      "label": "You may also like",
+      "intent": "Related products as large picture cards to keep browsing.",
+      "layout": "full-width band with a centred heading over a horizontal scroller with the next card peeking",
+      "parts": [
+       "RelatedProducts",
+       "ProductCard",
+       "Carousel",
+       "QuickAdd"
+      ],
+      "id": "s4"
+     }
+    ],
+    "required": [
+     "ProductGallery",
+     "ProductTitle",
+     "ProductPrice",
+     "VariantPicker",
+     "AddToCart"
+    ]
+   },
+   {
+    "key": "store:cart",
+    "audience": "store",
+    "page": "cart",
+    "label": "Cart",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Free delivery progress",
+      "intent": "How much more to add for free delivery, said simply.",
+      "layout": "a slim full-width band",
+      "parts": [
+       "FreeShippingProgress"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Your bag",
+      "intent": "Items with pictures beside the summary, coupon and checkout button, with trust badges for reassurance. A gentle empty state appears when the bag is empty.",
+      "layout": "lines left, a sticky summary card right",
+      "parts": [
+       "CartLines",
+       "CartEmpty",
+       "CartSummary",
+       "CouponBox",
+       "CheckoutButton",
+       "TrustBadges"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "Before you checkout",
+      "intent": "A few small add-ons that pair with what is in the bag.",
+      "layout": "a horizontal scroller of cards",
+      "parts": [
+       "CartUpsell",
+       "ProductCard",
+       "QuickAdd",
+       "Carousel"
+      ],
+      "id": "s3"
+     }
+    ],
+    "required": [
+     "CartLines",
+     "CheckoutButton"
+    ]
+   },
+   {
+    "key": "store:checkout",
+    "audience": "store",
+    "page": "checkout",
+    "label": "Checkout",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Secure checkout",
+      "intent": "Contact, address, delivery choice and payment (UPI, cards, cash on delivery) beside the order summary, with a coupon box.",
+      "layout": "form steps left, a sticky order summary right; the summary first on phones",
+      "parts": [
+       "ContactForm",
+       "AddressForm",
+       "DeliveryOptions",
+       "PaymentStep",
+       "OrderSummary",
+       "CouponBox"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Help and reassurance",
+      "intent": "Secure payment, easy returns and how to reach the store if something goes wrong.",
+      "layout": "a quiet centred band with three columns",
+      "parts": [
+       "TrustBadges",
+       "Icon",
+       "Link"
+      ],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "ContactForm",
+     "AddressForm",
+     "DeliveryOptions",
+     "PaymentStep",
+     "OrderSummary"
+    ]
+   },
+   {
+    "key": "store:about",
+    "audience": "store",
+    "page": "about",
+    "label": "About",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Our opening words",
+      "intent": "The store's own one-line belief, set large over a picture of its world, filled in by each store.",
+      "layout": "a full-bleed picture with a centred serif statement over it",
+      "parts": [
+       "Store",
+       "Image",
+       "Reveal"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "How we began",
+      "intent": "The store's story in a few paragraphs beside pictures of its people, place or products.",
+      "layout": "asymmetric 7/5 grid: words left, stacked pictures right",
+      "parts": [
+       "Store",
+       "Image"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "What shoppers say",
+      "intent": "Customer words that show the store keeps its promises.",
+      "layout": "a centred card floating over a tinted background",
+      "parts": [
+       "Reviews",
+       "RatingStars",
+       "Carousel"
+      ],
+      "id": "s3"
+     },
+     {
+      "label": "Explore the collection",
+      "intent": "An invitation to shop, through the store's collections as picture tiles.",
+      "layout": "bento grid with one large tile",
+      "parts": [
+       "Categories",
+       "Image",
+       "Link"
+      ],
+      "id": "s4"
+     }
+    ],
+    "required": []
+   },
+   {
+    "key": "store:contact",
+    "audience": "store",
+    "page": "contact",
+    "label": "Contact",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Ways to reach us",
+      "intent": "Phone, email, WhatsApp and address, each with its hours, so shoppers can pick what suits them.",
+      "layout": "three equal columns with thin dividers",
+      "parts": [
+       "Store",
+       "Icon",
+       "Link"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Common questions",
+      "intent": "Answers on delivery times, returns, cash on delivery and order tracking.",
+      "layout": "a heading pinned beside the accordion list",
+      "parts": [
+       "Accordion",
+       "AccordionItem"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "Call or write",
+      "intent": "A warm closing nudge to call or message on WhatsApp.",
+      "layout": "a band in the brand colour with light text and one centred call to action",
+      "parts": [
+       "Store",
+       "Link",
+       "Icon"
+      ],
+      "id": "s3"
+     }
+    ],
+    "required": []
+   },
+   {
+    "key": "store:categories",
+    "audience": "store",
+    "page": "categories",
+    "label": "All categories",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Every collection",
+      "intent": "All categories from <AllCategories> as large picture tiles, each with its subcategories and product count beneath, under a big serif heading with breadcrumbs.",
+      "layout": "a centred heading over a mosaic with one large tile",
+      "parts": [
+       "Breadcrumbs",
+       "AllCategories",
+       "Image",
+       "Link"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Browse everything",
+      "intent": "A closing invitation to see every product at once.",
+      "layout": "a slim band under a thin rule with a single link",
+      "parts": [
+       "Link"
+      ],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "AllCategories"
+    ]
+   },
+   {
+    "key": "store:brands",
+    "audience": "store",
+    "page": "brands",
+    "label": "All brands",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "All our brands",
+      "intent": "Every brand from <AllBrands>, featured ones shown large first, then the rest as a calm logo wall with taglines and product counts.",
+      "layout": "a centred heading over a logo wall",
+      "parts": [
+       "Breadcrumbs",
+       "AllBrands",
+       "Image",
+       "Link"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Browse everything",
+      "intent": "A closing invitation to browse the whole catalogue.",
+      "layout": "a band in the brand colour with light text",
+      "parts": [
+       "Link"
+      ],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "AllBrands"
+    ]
+   },
+   {
+    "key": "store:footer",
+    "audience": "store",
+    "page": "footer",
+    "label": "Footer",
+    "optional": false,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Store footer",
+      "intent": "The store's name and one-line promise beside link columns for shopping, help and policies, with social links below.",
+      "layout": "a large brand line beside the link columns, a slim bottom bar beneath",
+      "parts": [
+       "Logo",
+       "Store",
+       "FooterLinks",
+       "SocialLinks"
+      ],
+      "id": "s1"
+     }
+    ],
+    "required": [
+     "FooterLinks"
+    ]
+   },
+   {
+    "key": "store:login",
+    "audience": "store",
+    "page": "login",
+    "label": "Sign in",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Centred sign-in",
+      "intent": "Centred sign-in: a short welcome line in the store voice over <SignInForm /> on a softly tinted band, the store name small under it",
+      "layout": "on a softly tinted surface with generous space",
+      "parts": [
+       "SignInForm"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Reassurance strip",
+      "intent": "Reassurance strip: a secure sign-in with a one-time code, orders and returns in one place, saved addresses, as three short notes with icons",
+      "layout": "on a softly tinted surface with generous space",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "SignInForm"
+    ]
+   },
+   {
+    "key": "store:signup",
+    "audience": "store",
+    "page": "signup",
+    "label": "Sign up",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Centred join",
+      "intent": "Centred join: a short invitation in the store voice over <SignUpForm /> on a softly tinted band",
+      "layout": "on a band in the brand colour with light text",
+      "parts": [
+       "SignUpForm"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "What an account gives",
+      "intent": "What an account gives: orders in one place, saved addresses, a wishlist, as three short notes with icons",
+      "layout": "on a band in the brand colour with light text",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "SignUpForm"
+    ]
+   },
+   {
+    "key": "store:account",
+    "audience": "store",
+    "page": "account",
+    "label": "Account pages",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Account frame",
+      "intent": "Account frame: a quiet heading strip with a short line about the shopper’s corner of the store, then <AccountPage /> full width",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [
+       "AccountPage"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Help band",
+      "intent": "Help band: where to get help with an order, returns and the policies, as a few quiet links (/support, /return-policy, /legal)",
+      "layout": "type-led, with one accent colour",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "AccountPage"
+    ]
+   },
+   {
+    "key": "store:track",
+    "audience": "store",
+    "page": "track",
+    "label": "Order details",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Order page",
+      "intent": "Order page: a slim band with a link back to all orders (/account/orders), then <OrderDetail /> full width",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [
+       "OrderDetail"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Help with this order",
+      "intent": "Help with this order: contact options from <Store> and links to returns (/return-policy) and support (/support)",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "OrderDetail"
+    ]
+   },
+   {
+    "key": "store:wishlist",
+    "audience": "store",
+    "page": "wishlist",
+    "label": "Wishlist",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Wishlist",
+      "intent": "Wishlist: a heading band in the store voice for saved favourites (the page’s h1), then <WishlistGrid /> full width",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [
+       "WishlistGrid"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "More to love",
+      "intent": "More to love: best sellers from <Products> as the site’s product cards, under a short heading",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [
+       "Products"
+      ],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "WishlistGrid"
+    ]
+   },
+   {
+    "key": "store:compare",
+    "audience": "store",
+    "page": "compare",
+    "label": "Compare",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Compare",
+      "intent": "Compare: a short heading band (the page’s h1) with a line on choosing well, then <CompareTable /> full width",
+      "layout": "on a softly tinted surface",
+      "parts": [
+       "CompareTable"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Help choosing",
+      "intent": "Help choosing: a quiet band pointing to support (/support) and contact options from <Store>",
+      "layout": "calm, with generous side space",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "CompareTable"
+    ]
+   },
+   {
+    "key": "store:legal",
+    "audience": "store",
+    "page": "legal",
+    "label": "Policies",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Policies",
+      "intent": "Policies: <LegalContent /> full width on a calm surface under a thin rule",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [
+       "LegalContent"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Questions",
+      "intent": "Questions: a quiet band pointing to support (/support) and contact options from <Store>",
+      "layout": "type-led, with one accent colour",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "LegalContent"
+    ]
+   },
+   {
+    "key": "store:returns",
+    "audience": "store",
+    "page": "returns",
+    "label": "Returns",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Returns",
+      "intent": "Returns: a quiet title strip with the h1, then <ReturnsContent /> full width",
+      "layout": "on a softly tinted surface",
+      "parts": [
+       "ReturnsContent"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Still need help",
+      "intent": "Still need help: contact options from <Store> and a link to support (/support)",
+      "layout": "type-led, with one accent colour",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "ReturnsContent"
+    ]
+   },
+   {
+    "key": "store:support",
+    "audience": "store",
+    "page": "support",
+    "label": "Help and support",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Help centre",
+      "intent": "Help centre: a tinted band with the h1 and a short line, then <SupportContent /> full width",
+      "layout": "on a softly tinted surface",
+      "parts": [
+       "SupportContent"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Call or message",
+      "intent": "Call or message: a closing band inviting a call or a WhatsApp message through <Store>",
+      "layout": "quiet, with thin rules between the parts",
+      "parts": [],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "SupportContent"
+    ]
+   },
+   {
+    "key": "store:not_found",
+    "audience": "store",
+    "page": "not_found",
+    "label": "Page not found",
+    "optional": true,
+    "enabled": true,
+    "approach": "Image-led, few words; collections as big tiles.",
+    "sections": [
+     {
+      "label": "Lost page",
+      "intent": "Lost page: a big 404 beside a playful line on a tinted band, then <NotFoundContent />",
+      "layout": "on a softly tinted surface",
+      "parts": [
+       "NotFoundContent"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "New in",
+      "intent": "New in: the newest products from <Products> as the site’s product cards, under a short heading",
+      "layout": "centred, with generous space",
+      "parts": [
+       "Products"
+      ],
+      "id": "s2"
+     }
+    ],
+    "required": [
+     "NotFoundContent"
+    ]
+   }
+  ],
+  "themed": []
+ },
+ "pages": {
+  "store:home": {
+   "label": "Home",
+   "sections": [
+    {
+     "label": "Opening campaign picture",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-label=\"This season\"\n      className=\"relative isolate flex min-h-[88svh] w-full flex-col justify-end overflow-hidden bg-secondary-900 text-white md:min-h-[92vh]\"\n    >\n      {/* Backdrop: newest product picture, replaced by the live campaign picture when the store sets one */}\n      <div className=\"absolute inset-0 -z-20\" aria-hidden=\"true\">\n        <Products query={{ sort: \"new\", limit: 1 }} className=\"absolute inset-0 grid\">\n          {p =>\n            p.image && (\n              <div className=\"relative h-full w-full\">\n                <Image\n                  src={p.image}\n                  alt=\"\"\n                  aspect=\"auto\"\n                  fit=\"cover\"\n                  sizes=\"100vw\"\n                  priority\n                  className=\"h-full w-full object-cover\"\n                />\n              </div>\n            )\n          }\n        </Products>\n        <Offers limit={1} className=\"absolute inset-0 grid\">\n          {o =>\n            o.image && (\n              <div className=\"relative h-full w-full\">\n                <div className=\"h-full w-full md:hidden\">\n                  <Image\n                    src={o.mobileImage || o.image}\n                    alt=\"\"\n                    aspect=\"auto\"\n                    fit=\"cover\"\n                    sizes=\"100vw\"\n                    priority\n                    className=\"h-full w-full object-cover\"\n                  />\n                </div>\n                <div className=\"hidden h-full w-full md:block\">\n                  <Image\n                    src={o.image}\n                    alt=\"\"\n                    aspect=\"auto\"\n                    fit=\"cover\"\n                    sizes=\"100vw\"\n                    priority\n                    className=\"h-full w-full object-cover\"\n                  />\n                </div>\n              </div>\n            )\n          }\n        </Offers>\n      </div>\n\n      {/* Scrims: deep from below, softer from the left on wide screens */}\n      <div\n        aria-hidden=\"true\"\n        className=\"absolute inset-0 -z-10 bg-gradient-to-t from-secondary-900 via-secondary-900/60 to-secondary-900/20\"\n      />\n      <div\n        aria-hidden=\"true\"\n        className=\"absolute inset-0 -z-10 hidden bg-gradient-to-r from-secondary-900/80 via-secondary-900/30 to-transparent md:block\"\n      />\n\n      {/* Thin gold frame line */}\n      <div\n        aria-hidden=\"true\"\n        className=\"pointer-events-none absolute inset-4 border border-primary-300/20 sm:inset-6 lg:inset-10\"\n      />\n\n      <div className=\"relative mx-auto w-full max-w-7xl px-8 pb-16 pt-32 sm:px-12 md:pb-24 lg:px-20 lg:pb-28\">\n        <div className=\"flex items-stretch gap-6 md:gap-10\">\n          <div aria-hidden=\"true\" className=\"hidden w-px shrink-0 bg-primary-300/50 sm:block\" />\n\n          <div className=\"max-w-2xl\">\n            <Reveal effect=\"fade\" delay={0.2}>\n              <Store>\n                {s => (\n                  <p className=\"text-xs uppercase tracking-[0.35em] text-primary-300 sm:text-sm\">\n                    {s.name}\n                  </p>\n                )}\n              </Store>\n            </Reveal>\n\n            <Reveal effect=\"fade-up\" delay={0.5}>\n              <h1 className=\"mt-6 font-display text-4xl font-light uppercase leading-tight tracking-widest text-white sm:text-5xl lg:text-7xl\">\n                The new season,\n                <span className=\"block text-accent-300\">quietly here</span>\n              </h1>\n            </Reveal>\n\n            <Reveal effect=\"fade\" delay={0.9}>\n              <div className=\"mt-6 h-px w-16 bg-primary-300/60\" aria-hidden=\"true\" />\n              <p className=\"mt-6 max-w-md text-base leading-relaxed text-white/70\">\n                Pieces chosen slowly, made to be kept.\n              </p>\n            </Reveal>\n\n            <Reveal effect=\"fade-up\" delay={1.2}>\n              <div className=\"mt-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap\">\n                <Link\n                  href=\"/products?sort=new\"\n                  className=\"inline-flex min-h-12 items-center justify-center gap-3 rounded-none bg-primary-700 px-8 py-3 text-sm uppercase tracking-[0.25em] text-white transition-colors hover:bg-primary-800\"\n                >\n                  Shop new\n                  <Icon name=\"arrow-right\" size=\"sm\" strokeWidth={1.25} />\n                </Link>\n                <Link\n                  href=\"/categories\"\n                  className=\"inline-flex min-h-12 items-center justify-center rounded-none border border-primary-300 px-8 py-3 text-sm uppercase tracking-[0.25em] text-primary-300 transition-colors hover:bg-primary-300/10\"\n                >\n                  Explore collections\n                </Link>\n              </div>\n            </Reveal>\n          </div>\n        </div>\n      </div>\n\n      {/* Scroll cue */}\n      <div\n        aria-hidden=\"true\"\n        className=\"absolute bottom-8 right-8 hidden flex-col items-center gap-3 text-primary-300/80 md:flex lg:bottom-14 lg:right-16\"\n      >\n        <span className=\"text-xs uppercase tracking-[0.4em]\">Scroll</span>\n        <span className=\"h-12 w-px bg-primary-300/50\" />\n        <Icon name=\"chevron-down\" size=\"sm\" strokeWidth={1} />\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Shop by collection",
+     "source": "export default function Section() {\n  return (\n    <section className=\"bg-surface text-secondary-900 py-16 md:py-28\">\n      <div className=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-10\">\n        <Reveal effect=\"fade-up\">\n          <header className=\"mx-auto max-w-2xl text-center\">\n            <p className=\"text-sm uppercase tracking-widest text-primary-700\">\n              The collections\n            </p>\n            <div className=\"mx-auto mt-5 flex items-center justify-center gap-4\">\n              <span className=\"h-px w-10 bg-primary-700/40 sm:w-16\" aria-hidden=\"true\"></span>\n              <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} className=\"text-primary-700\" />\n              <span className=\"h-px w-10 bg-primary-700/40 sm:w-16\" aria-hidden=\"true\"></span>\n            </div>\n            <h2 className=\"mt-6 font-display text-3xl font-light uppercase tracking-widest text-secondary-900 sm:text-4xl md:text-5xl\">\n              Shop by collection\n            </h2>\n            <p className=\"mt-5 text-base leading-relaxed text-foreground-secondary\">\n              Each one gathered with care. Step inside and find what speaks to you.\n            </p>\n          </header>\n        </Reveal>\n\n        <Reveal effect=\"fade\" delay={0.3}>\n          <Categories\n            limit={5}\n            layout=\"grid\"\n            className=\"mt-12 grid grid-cols-2 gap-3 sm:gap-4 md:mt-16 lg:grid-cols-4 lg:gap-5\"\n          >\n            {(c) => (\n              <Link\n                href={c.url}\n                className=\"group relative block overflow-hidden rounded-none bg-secondary-900 first:col-span-2 first:row-span-2\"\n              >\n                <div className=\"h-full w-full transition-transform duration-1000 ease-out group-hover:scale-105\">\n                  <Image\n                    src={c.image}\n                    alt={c.name}\n                    aspect=\"1:1\"\n                    fit=\"cover\"\n                    sizes=\"(min-width: 1024px) 50vw, 100vw\"\n                  />\n                </div>\n                <div\n                  className=\"pointer-events-none absolute inset-0 bg-gradient-to-t from-secondary-900/85 via-secondary-900/20 to-transparent\"\n                  aria-hidden=\"true\"\n                ></div>\n                <div\n                  className=\"pointer-events-none absolute inset-3 border border-primary-300/0 transition-colors duration-700 group-hover:border-primary-300/50 sm:inset-4\"\n                  aria-hidden=\"true\"\n                ></div>\n                <div className=\"absolute inset-x-0 bottom-0 flex flex-col items-center px-3 pb-5 text-center sm:pb-7\">\n                  <h3 className=\"font-display text-lg font-light uppercase tracking-widest text-white sm:text-xl md:text-2xl\">\n                    {c.name}\n                  </h3>\n                  <span className=\"mt-3 h-px w-8 bg-primary-300/60 transition-all duration-700 group-hover:w-16\" aria-hidden=\"true\"></span>\n                  <span className=\"mt-3 hidden items-center gap-2 text-xs uppercase tracking-widest text-primary-300 sm:inline-flex\">\n                    Explore\n                    <Icon name=\"arrow-right\" size=\"xs\" strokeWidth={1.25} className=\"text-primary-300\" />\n                  </span>\n                </div>\n              </Link>\n            )}\n          </Categories>\n        </Reveal>\n\n        <div className=\"mt-12 flex justify-center md:mt-16\">\n          <Link\n            href=\"/categories\"\n            className=\"inline-flex min-h-[44px] items-center gap-3 rounded-none border border-secondary-900 px-8 py-3 text-sm uppercase tracking-widest text-secondary-900 transition-colors duration-500 hover:bg-secondary-900 hover:text-white\"\n          >\n            View every collection\n            <Icon name=\"arrow-right\" size=\"sm\" strokeWidth={1.25} />\n          </Link>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "New this season",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-labelledby=\"new-season-heading\"\n      className=\"bg-secondary-900 text-white py-16 md:py-28 overflow-hidden\"\n    >\n      <div className=\"mx-auto max-w-7xl px-5 sm:px-8\">\n        <Reveal effect=\"fade\" delay={0.1}>\n          <header className=\"flex flex-col items-center text-center\">\n            <span className=\"block h-10 w-px bg-primary-300/40\" aria-hidden=\"true\" />\n            <p className=\"mt-6 text-sm uppercase tracking-widest text-accent-300\">\n              Just arrived\n            </p>\n            <h2\n              id=\"new-season-heading\"\n              className=\"mt-4 font-display text-3xl sm:text-4xl md:text-5xl uppercase tracking-widest text-primary-300 font-light\"\n            >\n              New this season\n            </h2>\n            <p className=\"mt-5 max-w-md text-base text-white/70\">\n              A quiet first look at what has come in. Swipe through, take your time.\n            </p>\n          </header>\n        </Reveal>\n\n        <div className=\"mt-12 md:mt-20 grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-10 lg:items-start\">\n          <Reveal effect=\"fade-up\" delay={0.2}>\n            <div className=\"lg:col-span-5\">\n              <Products query={{ sort: \"new\", limit: 1 }}>\n                {p => (\n                  <article className=\"relative\">\n                    <div className=\"relative\">\n                      <Link href={p.url} className=\"block rounded-none\">\n                        <Image\n                          src={p.image}\n                          hoverSrc={p.hoverImage}\n                          alt={p.name}\n                          aspect=\"4:5\"\n                          fit=\"cover\"\n                          sizes=\"(min-width: 1024px) 40vw, 100vw\"\n                        />\n                      </Link>\n                      <WishlistToggle\n                        product={p}\n                        className=\"absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-none border border-primary-300/40 bg-secondary-900/70 text-primary-300 aria-pressed:bg-primary-700 aria-pressed:text-white\"\n                      />\n                    </div>\n                    <div className=\"mt-6 flex flex-col items-center text-center\">\n                      <span className=\"text-sm uppercase tracking-widest text-accent-300\">\n                        The newest piece\n                      </span>\n                      <h3 className=\"mt-3 font-display text-2xl md:text-3xl uppercase tracking-widest text-white font-light\">\n                        <Link href={p.url} className=\"hover:text-primary-300\">\n                          {p.name}\n                        </Link>\n                      </h3>\n                      <span className=\"mt-4 block h-px w-12 bg-primary-300/40\" aria-hidden=\"true\" />\n                      <PriceTag product={p} className=\"mt-4 text-base text-white/70\" />\n                    </div>\n                  </article>\n                )}\n              </Products>\n            </div>\n          </Reveal>\n\n          <div className=\"lg:col-span-7 min-w-0\">\n            <Reveal effect=\"fade\" delay={0.35}>\n              <div className=\"flex items-center justify-between gap-4 border-b border-primary-300/40 pb-4\">\n                <p className=\"text-sm uppercase tracking-widest text-primary-300\">\n                  More new arrivals\n                </p>\n                <span className=\"flex items-center gap-2 text-sm text-white/70 lg:hidden\">\n                  Swipe\n                  <Icon name=\"arrow-right\" size=\"sm\" className=\"text-primary-300\" strokeWidth={1} />\n                </span>\n              </div>\n              <div className=\"mt-8\">\n                <Products\n                  query={{ sort: \"new\", limit: 9 }}\n                  layout=\"carousel\"\n                  itemClassName=\"w-[80%] sm:w-[46%] lg:w-[47%]\"\n                >\n                  {p => <ProductCard product={p} aspect=\"3:4\" />}\n                </Products>\n              </div>\n              <div className=\"mt-12 flex justify-center lg:justify-start\">\n                <Link\n                  href=\"/products?sort=new\"\n                  className=\"inline-flex min-h-11 items-center gap-3 rounded-none border border-primary-300 px-8 py-3 text-sm uppercase tracking-widest text-primary-300 hover:bg-primary-700 hover:text-white\"\n                >\n                  See all new arrivals\n                  <Icon name=\"arrow-right\" size=\"sm\" strokeWidth={1} />\n                </Link>\n              </div>\n            </Reveal>\n          </div>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Our promises",
+     "source": "const PROMISES = [\n  {\n    icon: 'truck',\n    numeral: 'I',\n    title: 'Delivered with care',\n    text: 'Every order is packed by hand and sent on its way to your door, wherever you call home.',\n  },\n  {\n    icon: 'rotate-ccw',\n    numeral: 'II',\n    title: 'Returns, kept simple',\n    text: 'If something is not quite right, write to us and we will gladly help you set it right.',\n  },\n  {\n    icon: 'shield-check',\n    numeral: 'III',\n    title: 'Pay as you prefer',\n    text: 'A secure checkout, with the freedom to choose the way of paying that suits you best.',\n  },\n] as const\n\nexport default function Section() {\n  return (\n    <section\n      aria-labelledby=\"promises-heading\"\n      className=\"relative overflow-hidden bg-primary-800 text-white py-16 md:py-28\"\n    >\n      <div aria-hidden=\"true\" className=\"absolute inset-x-0 top-0 h-px bg-primary-300/40\" />\n      <div aria-hidden=\"true\" className=\"absolute inset-x-0 bottom-0 h-px bg-primary-300/40\" />\n\n      <div className=\"mx-auto max-w-6xl px-5 sm:px-8\">\n        <Reveal effect=\"fade\" delay={0.1}>\n          <header className=\"mx-auto max-w-xl text-center\">\n            <div className=\"flex items-center justify-center gap-4\">\n              <span aria-hidden=\"true\" className=\"h-px w-10 bg-accent-200/60\" />\n              <p className=\"text-sm uppercase tracking-widest text-accent-200\">\n                Our promise to you\n              </p>\n              <span aria-hidden=\"true\" className=\"h-px w-10 bg-accent-200/60\" />\n            </div>\n            <h2\n              id=\"promises-heading\"\n              className=\"mt-6 font-display text-3xl font-light uppercase tracking-widest text-white sm:text-4xl md:text-5xl\"\n            >\n              Shop with ease\n            </h2>\n          </header>\n        </Reveal>\n\n        <ul className=\"mt-14 grid grid-cols-1 divide-y divide-primary-300/40 border-y border-primary-300/40 md:mt-20 md:grid-cols-3 md:divide-x md:divide-y-0\">\n          {PROMISES.map((item, i) => (\n            <li key={item.numeral} className=\"px-2 py-10 text-center md:px-10 md:py-14\">\n              <Reveal effect=\"fade-up\" delay={i === 0 ? 0.1 : i === 1 ? 0.3 : 0.5}>\n                <div className=\"flex flex-col items-center\">\n                  <span className=\"font-display text-sm uppercase tracking-widest text-accent-200\">\n                    {item.numeral}\n                  </span>\n                  <span className=\"mt-5 flex h-16 w-16 items-center justify-center border border-accent-200/50\">\n                    <Icon name={item.icon} size=\"lg\" strokeWidth={1} className=\"text-accent-100\" />\n                  </span>\n                  <h3 className=\"mt-7 font-display text-xl uppercase tracking-widest text-white md:text-2xl\">\n                    {item.title}\n                  </h3>\n                  <p className=\"mt-4 max-w-xs text-base leading-relaxed text-white/80\">\n                    {item.text}\n                  </p>\n                </div>\n              </Reveal>\n            </li>\n          ))}\n        </ul>\n\n        <Store>\n          {s => (\n            <Reveal effect=\"fade\" delay={0.6}>\n              <div className=\"mt-12 flex flex-col items-center gap-4 text-center md:mt-16\">\n                <p className=\"text-base text-white/80\">Questions? We are here to help.</p>\n                <div className=\"flex flex-wrap items-center justify-center gap-3\">\n                  {s.phone && (\n                    <Link\n                      href={`tel:${s.phone}`}\n                      className=\"inline-flex min-h-11 items-center gap-2 border border-accent-200 px-5 text-sm uppercase tracking-widest text-accent-100 transition-colors hover:bg-accent-200 hover:text-secondary-900\"\n                    >\n                      <Icon name=\"phone\" size=\"sm\" strokeWidth={1.25} />\n                      <span>Call us</span>\n                    </Link>\n                  )}\n                  {s.whatsapp && (\n                    <Link\n                      href={`https://wa.me/${s.whatsapp}`}\n                      target=\"_blank\"\n                      className=\"inline-flex min-h-11 items-center gap-2 border border-accent-200 px-5 text-sm uppercase tracking-widest text-accent-100 transition-colors hover:bg-accent-200 hover:text-secondary-900\"\n                    >\n                      <Icon name=\"message-circle\" size=\"sm\" strokeWidth={1.25} />\n                      <span>WhatsApp</span>\n                    </Link>\n                  )}\n                  {s.email && (\n                    <Link\n                      href={`mailto:${s.email}`}\n                      className=\"inline-flex min-h-11 items-center gap-2 border border-accent-200 px-5 text-sm uppercase tracking-widest text-accent-100 transition-colors hover:bg-accent-200 hover:text-secondary-900\"\n                    >\n                      <Icon name=\"mail\" size=\"sm\" strokeWidth={1.25} />\n                      <span>Write to us</span>\n                    </Link>\n                  )}\n                </div>\n              </div>\n            </Reveal>\n          )}\n        </Store>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "The featured edit",
+     "source": "export default function Section() {\n  return (\n    <section className=\"bg-surface text-secondary-900 py-16 md:py-28\" aria-labelledby=\"featured-edit-heading\">\n      <div className=\"mx-auto max-w-7xl px-5 sm:px-8\">\n        <Reveal effect=\"fade\" delay={0.1}>\n          <header className=\"mx-auto mb-12 flex max-w-xl flex-col items-center text-center md:mb-20\">\n            <span className=\"text-sm uppercase tracking-widest text-primary-700\">The edit</span>\n            <h2\n              id=\"featured-edit-heading\"\n              className=\"mt-4 font-display text-3xl font-light uppercase tracking-widest text-secondary-900 sm:text-4xl md:text-5xl\"\n            >\n              Chosen with care\n            </h2>\n            <span className=\"mt-6 block h-px w-16 bg-primary-700\" aria-hidden=\"true\" />\n          </header>\n        </Reveal>\n\n        <div className=\"grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16\">\n          <div className=\"lg:col-span-7\">\n            <Reveal effect=\"fade-up\" delay={0.2}>\n              <Products query={{ featured: true, sort: \"featured\", limit: 1 }} className=\"block\">\n                {(p) => (\n                  <figure className=\"relative\">\n                    <Link href={p.url} className=\"group block overflow-hidden\">\n                      <Image\n                        src={p.hoverImage || p.image}\n                        alt={p.name}\n                        aspect=\"4:5\"\n                        fit=\"cover\"\n                        sizes=\"(min-width: 1024px) 58vw, 100vw\"\n                      />\n                    </Link>\n                    <figcaption className=\"mt-6 flex flex-col gap-6 border-t border-border-default pt-6 sm:flex-row sm:items-end sm:justify-between\">\n                      <div className=\"min-w-0\">\n                        <span className=\"text-sm uppercase tracking-widest text-foreground-muted\">\n                          {p.brand || p.category || \"In focus\"}\n                        </span>\n                        <h3 className=\"mt-2 font-display text-2xl font-light uppercase tracking-widest text-secondary-900 md:text-3xl\">\n                          {p.name}\n                        </h3>\n                      </div>\n                      <div className=\"flex flex-wrap items-center gap-4\">\n                        <Link\n                          href={p.url}\n                          className=\"inline-flex min-h-[44px] items-center gap-2 text-base uppercase tracking-widest text-primary-700 underline-offset-8 hover:underline\"\n                        >\n                          View the piece\n                          <Icon name=\"arrow-right\" size=\"sm\" className=\"text-primary-700\" />\n                        </Link>\n                        <QuickAdd\n                          product={p}\n                          className=\"inline-flex min-h-[44px] items-center justify-center rounded-none border border-secondary-900 px-6 text-sm uppercase tracking-widest text-secondary-900 transition-colors hover:bg-secondary-900 hover:text-white\"\n                        />\n                      </div>\n                    </figcaption>\n                  </figure>\n                )}\n              </Products>\n            </Reveal>\n          </div>\n\n          <aside className=\"flex flex-col lg:col-span-5\">\n            <Reveal effect=\"fade\" delay={0.35}>\n              <div className=\"mb-10 flex items-start gap-5\">\n                <span className=\"mt-3 block h-px w-10 shrink-0 bg-primary-700\" aria-hidden=\"true\" />\n                <p className=\"text-base leading-relaxed text-foreground-secondary md:text-lg\">\n                  A few pieces we keep returning to, gathered together and made to be used every day.\n                </p>\n              </div>\n            </Reveal>\n\n            <Reveal effect=\"fade-up\" delay={0.5}>\n              <Products\n                query={{ featured: true, sort: \"featured\", limit: 2 }}\n                className=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-1 lg:gap-12\"\n              >\n                {(p) => (\n                  <article className=\"min-w-0\">\n                    <ProductCard product={p} aspect=\"4:3\" />\n                  </article>\n                )}\n              </Products>\n            </Reveal>\n\n            <div className=\"mt-12 flex justify-center lg:mt-auto lg:justify-start lg:pt-12\">\n              <Link\n                href=\"/products\"\n                className=\"inline-flex min-h-[44px] items-center justify-center rounded-none bg-primary-700 px-8 text-sm uppercase tracking-widest text-white transition-colors hover:bg-primary-800\"\n              >\n                Explore the edit\n              </Link>\n            </div>\n          </aside>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Brands we carry",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-labelledby=\"brands-heading\"\n      className=\"bg-secondary-900 text-white py-16 md:py-28\"\n    >\n      <div className=\"mx-auto max-w-6xl px-5 sm:px-8 grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16\">\n        <div className=\"lg:col-span-4 lg:sticky lg:top-24 lg:self-start\">\n          <Reveal effect=\"fade\" delay={0}>\n            <div className=\"flex items-center gap-4\">\n              <span className=\"h-px w-10 bg-primary-300/60\" aria-hidden=\"true\"></span>\n              <span className=\"text-xs uppercase tracking-widest text-primary-300\">\n                The labels\n              </span>\n            </div>\n            <h2\n              id=\"brands-heading\"\n              className=\"mt-6 font-display text-3xl sm:text-4xl lg:text-5xl font-light uppercase tracking-widest text-primary-300 leading-tight\"\n            >\n              Brands we carry\n            </h2>\n            <p className=\"mt-6 text-base leading-relaxed text-white/70 max-w-sm\">\n              A quiet roll of the names on our shelves. Choose a label you love and see everything we hold from it.\n            </p>\n            <div className=\"mt-10 hidden lg:block h-px w-full bg-primary-300/30\" aria-hidden=\"true\"></div>\n            <Link\n              href=\"/products\"\n              className=\"mt-8 inline-flex min-h-[44px] items-center gap-3 border border-primary-300 px-6 py-3 text-xs uppercase tracking-widest text-primary-300 transition-colors hover:bg-primary-300 hover:text-secondary-900\"\n            >\n              Browse everything\n              <Icon name=\"arrow-right\" size=\"sm\" />\n            </Link>\n          </Reveal>\n        </div>\n\n        <div className=\"lg:col-span-8\">\n          <Reveal effect=\"fade-up\" delay={0.2}>\n            <Brands\n              limit={12}\n              layout=\"list\"\n              className=\"flex flex-col border-t border-primary-300/30 divide-y divide-primary-300/20\"\n            >\n              {(b) => (\n                <Link\n                  href={b.url}\n                  className=\"group flex min-h-[44px] items-center gap-4 py-5 sm:gap-8 sm:py-6\"\n                >\n                  <div className=\"flex h-16 w-16 shrink-0 items-center justify-center bg-accent-50 p-2 sm:h-20 sm:w-20 sm:p-3\">\n                    {b.logo ? (\n                      <div className=\"w-full\">\n                        <Image\n                          src={b.logo}\n                          alt={b.name}\n                          aspect=\"1:1\"\n                          fit=\"contain\"\n                          sizes=\"80px\"\n                        />\n                      </div>\n                    ) : (\n                      <span className=\"text-primary-700\">\n                        <Icon name=\"gem\" size=\"md\" strokeWidth={1} />\n                      </span>\n                    )}\n                  </div>\n                  <span className=\"min-w-0 flex-1 break-words font-display text-xl font-light uppercase tracking-widest text-white transition-colors group-hover:text-primary-300 sm:text-2xl lg:text-3xl\">\n                    {b.name}\n                  </span>\n                  <span className=\"flex h-11 w-11 shrink-0 items-center justify-center border border-primary-300/40 text-primary-300 transition-colors group-hover:border-primary-300 group-hover:bg-primary-300 group-hover:text-secondary-900\">\n                    <Icon name=\"arrow-up-right\" size=\"sm\" strokeWidth={1.25} />\n                  </span>\n                </Link>\n              )}\n            </Brands>\n          </Reveal>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Words from shoppers",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-labelledby=\"shopper-words-heading\"\n      className=\"relative overflow-hidden bg-surface-secondary text-secondary-900 py-16 md:py-28\"\n    >\n      <div aria-hidden=\"true\" className=\"pointer-events-none absolute inset-x-0 top-1/2 hidden h-px bg-primary-700/20 md:block\" />\n\n      <div className=\"relative mx-auto max-w-6xl px-5 sm:px-8\">\n        <header className=\"mx-auto max-w-xl text-center\">\n          <p className=\"text-xs uppercase tracking-widest text-primary-700\">In their words</p>\n          <h2\n            id=\"shopper-words-heading\"\n            className=\"mt-4 font-display text-3xl uppercase tracking-widest text-secondary-900 sm:text-4xl md:text-5xl\"\n          >\n            Words from shoppers\n          </h2>\n          <div className=\"mx-auto mt-6 flex items-center justify-center gap-3\">\n            <span className=\"h-px w-10 bg-primary-700/40\" />\n            <Icon name=\"sparkle\" size=\"sm\" strokeWidth={1} className=\"text-primary-700\" />\n            <span className=\"h-px w-10 bg-primary-700/40\" />\n          </div>\n        </header>\n\n        <div className=\"relative mx-auto mt-12 max-w-3xl md:mt-16\">\n          <div\n            aria-hidden=\"true\"\n            className=\"absolute inset-0 translate-x-2 translate-y-2 border border-primary-700/30 sm:translate-x-4 sm:translate-y-4\"\n          />\n          <div className=\"relative bg-surface px-6 py-12 sm:px-12 md:px-20 md:py-16\">\n            <div className=\"flex justify-center\">\n              <Icon name=\"quote\" size=\"lg\" strokeWidth={1} className=\"text-primary-700\" />\n            </div>\n\n            <Reviews limit={6} minRating={4} layout=\"carousel\" itemClassName=\"w-full\">\n              {r => (\n                <figure className=\"flex flex-col items-center px-1 pt-8 text-center sm:px-4\">\n                  <p aria-label={`Rated ${r.rating} out of 5`} className=\"text-base tracking-widest text-primary-700\">\n                    {r.stars}\n                  </p>\n                  {r.title && (\n                    <p className=\"mt-5 font-display text-lg uppercase tracking-widest text-secondary-900 sm:text-xl\">\n                      {r.title}\n                    </p>\n                  )}\n                  <blockquote className=\"mt-5\">\n                    <p className=\"font-display text-xl italic leading-relaxed text-secondary-900 sm:text-2xl md:text-3xl md:leading-snug\">\n                      {r.comment}\n                    </p>\n                  </blockquote>\n                  <figcaption className=\"mt-8 flex flex-col items-center gap-3\">\n                    <span className=\"h-px w-12 bg-primary-700/40\" />\n                    <cite className=\"text-sm not-italic uppercase tracking-widest text-secondary-900\">\n                      {r.author}\n                    </cite>\n                    <Link\n                      href={r.productUrl}\n                      className=\"inline-flex min-h-11 items-center gap-2 text-sm text-foreground-secondary underline-offset-4 hover:text-primary-700 hover:underline\"\n                    >\n                      <span>{r.productName}</span>\n                      <Icon name=\"arrow-up-right\" size=\"xs\" />\n                    </Link>\n                  </figcaption>\n                </figure>\n              )}\n            </Reviews>\n          </div>\n        </div>\n\n        <div className=\"mx-auto mt-16 max-w-4xl md:mt-24\">\n          <p className=\"text-center text-xs uppercase tracking-widest text-primary-700\">Shoppers' favourites</p>\n          <Products\n            query={{ sort: \"best_sellers\", limit: 3 }}\n            layout=\"list\"\n            className=\"mt-8 grid grid-cols-1 border-t border-primary-700/20 sm:grid-cols-3 sm:border-t-0\"\n          >\n            {p => (\n              <article className=\"flex flex-col items-center gap-2 border-b border-primary-700/20 px-4 py-6 text-center sm:border-b-0 sm:border-l sm:first:border-l-0\">\n                <Link\n                  href={p.url}\n                  className=\"flex min-h-11 items-center font-display text-lg uppercase tracking-widest text-secondary-900 hover:text-primary-700\"\n                >\n                  {p.name}\n                </Link>\n                <RatingStars product={p} count className=\"text-sm text-primary-700\" />\n              </article>\n            )}\n          </Products>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Letters from us",
+     "source": "export default function Section() {\n  return (\n    <section\n      id=\"letters\"\n      aria-labelledby=\"letters-heading\"\n      className=\"bg-secondary-900 text-white py-20 md:py-32 px-5 sm:px-8\"\n    >\n      <div className=\"mx-auto max-w-2xl\">\n        <Reveal effect=\"fade\" delay={0.1}>\n          <div className=\"relative border border-primary-300/40 px-5 py-14 sm:px-12 md:px-16 md:py-20\">\n            <div className=\"absolute inset-2 sm:inset-3 border border-primary-300/20 pointer-events-none\" aria-hidden=\"true\"></div>\n\n            <div className=\"relative flex flex-col items-center text-center\">\n              <div className=\"flex items-center justify-center gap-4 w-full\" aria-hidden=\"true\">\n                <span className=\"h-px w-10 sm:w-16 bg-primary-300/40\"></span>\n                <span className=\"flex h-12 w-12 items-center justify-center border border-primary-300/40 text-primary-300\">\n                  <Icon name=\"mail\" size=\"sm\" strokeWidth={1} />\n                </span>\n                <span className=\"h-px w-10 sm:w-16 bg-primary-300/40\"></span>\n              </div>\n\n              <Store>\n                {s => (\n                  <p className=\"mt-8 text-xs sm:text-sm uppercase tracking-widest text-accent-300\">\n                    From the desk of {s.name}\n                  </p>\n                )}\n              </Store>\n\n              <h2\n                id=\"letters-heading\"\n                className=\"mt-5 font-display uppercase tracking-widest text-3xl sm:text-4xl md:text-5xl font-light leading-tight text-primary-300\"\n              >\n                Letters from us\n              </h2>\n\n              <p className=\"mt-6 max-w-md text-base md:text-lg leading-relaxed text-white/70\">\n                A quiet note now and then: new arrivals as they come in, and the occasional private offer kept for our readers.\n              </p>\n\n              <div className=\"mt-10 w-full max-w-md\">\n                <NewsletterForm\n                  placeholder=\"Your email address\"\n                  button=\"Subscribe\"\n                  className=\"flex w-full flex-col gap-3 sm:flex-row sm:gap-0\"\n                  inputClassName=\"min-h-12 w-full flex-1 rounded-none border border-primary-300/40 bg-transparent px-4 py-3 text-base text-white placeholder:text-white/50 focus:border-primary-300 focus:outline-none sm:border-r-0\"\n                  buttonClassName=\"min-h-12 rounded-none border border-primary-300 bg-transparent px-8 py-3 text-xs sm:text-sm uppercase tracking-widest text-primary-300 transition-colors duration-500 hover:bg-primary-700 hover:text-white\"\n                />\n              </div>\n\n              <p className=\"mt-6 text-sm text-white/50\">\n                Unsubscribe whenever you like, with one tap.\n              </p>\n            </div>\n          </div>\n        </Reveal>\n      </div>\n    </section>\n  )\n}"
+    }
+   ]
+  },
+  "store:header": {
+   "label": "Header",
+   "sections": [
+    {
+     "label": "Site header",
+     "source": "export default function Section() {\n  return (\n    <header className=\"w-full bg-secondary-900 text-white\">\n      <div className=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-10\">\n        <div className=\"grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-3 md:py-8\">\n          <div className=\"flex min-w-0 items-center justify-start\">\n            <div className=\"flex min-h-11 min-w-11 items-center justify-center text-primary-300 md:hidden\">\n              <NavLinks mobile=\"menu\" className=\"flex flex-col gap-4 text-base uppercase tracking-widest\" />\n            </div>\n            <div className=\"hidden min-w-0 items-center gap-3 md:flex\">\n              <span className=\"block h-px w-10 bg-primary-300/60\" aria-hidden=\"true\"></span>\n              <Store>\n                {s => (\n                  <span className=\"truncate text-xs uppercase tracking-widest text-white/60\">\n                    {s.tagline || 'Welcome'}\n                  </span>\n                )}\n              </Store>\n            </div>\n          </div>\n\n          <div className=\"flex flex-col items-center justify-center px-1 text-center\">\n            <div className=\"font-display text-lg uppercase tracking-widest text-primary-300 sm:text-xl md:text-3xl\">\n              <Logo showName color=\"inherit\" />\n            </div>\n            <span className=\"mt-3 hidden items-center gap-3 text-primary-300/70 md:flex\" aria-hidden=\"true\">\n              <span className=\"block h-px w-8 bg-primary-300/40\"></span>\n              <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} />\n              <span className=\"block h-px w-8 bg-primary-300/40\"></span>\n            </span>\n          </div>\n\n          <div className=\"flex items-center justify-end gap-0 text-white/80 sm:gap-1 md:gap-2\">\n            <div className=\"flex min-h-11 min-w-11 items-center justify-center hover:text-primary-300\">\n              <SearchBox variant=\"icon\" placeholder=\"Search the store\" />\n            </div>\n            <div className=\"hidden min-h-11 min-w-11 items-center justify-center hover:text-primary-300 sm:flex\">\n              <AccountLink label=\"\" />\n            </div>\n            <div className=\"flex min-h-11 min-w-11 items-center justify-center hover:text-primary-300\">\n              <CartIcon showCount />\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <nav\n        aria-label=\"Main menu\"\n        className=\"hidden border-y border-primary-300/20 md:block\"\n      >\n        <div className=\"mx-auto max-w-7xl px-6 lg:px-10\">\n          <NavLinks\n            mobile=\"hide\"\n            className=\"flex flex-wrap items-center justify-center gap-x-10 gap-y-2 py-1 lg:gap-x-14\"\n          >\n            {l => (\n              <Link\n                href={l.href}\n                className=\"inline-flex min-h-11 items-center border-b border-transparent text-xs uppercase tracking-widest text-white/70 transition-colors duration-500 hover:border-primary-300/60 hover:text-primary-300\"\n              >\n                {l.label}\n              </Link>\n            )}\n          </NavLinks>\n        </div>\n      </nav>\n      <div className=\"h-px w-full bg-primary-300/20 md:hidden\" aria-hidden=\"true\"></div>\n    </header>\n  )\n}"
+    }
+   ]
+  },
+  "store:footer": {
+   "label": "Footer",
+   "sections": [
+    {
+     "label": "Store footer",
+     "source": "export default function Section() {\n  return (\n    <footer className=\"bg-secondary-900 text-white\">\n      <div className=\"mx-auto max-w-7xl px-5 pt-16 pb-10 sm:px-8 md:pt-28 md:pb-16\">\n        <div className=\"flex items-center justify-center gap-4 lg:justify-start\">\n          <span className=\"h-px w-10 bg-primary-300/40\" aria-hidden=\"true\" />\n          <span className=\"text-xs uppercase tracking-[0.4em] text-primary-300\">Until next time</span>\n          <span className=\"h-px w-10 bg-primary-300/40 lg:hidden\" aria-hidden=\"true\" />\n        </div>\n\n        <div className=\"mt-10 grid grid-cols-1 gap-14 lg:mt-14 lg:grid-cols-12 lg:gap-12\">\n          <div className=\"flex flex-col items-center text-center lg:col-span-5 lg:items-start lg:text-left\">\n            <div className=\"text-primary-300\">\n              <Logo showName={false} color=\"inherit\" />\n            </div>\n            <Store>\n              {s => (\n                <div className=\"mt-8 flex flex-col items-center lg:items-start\">\n                  <h2 className=\"font-display text-4xl font-light uppercase leading-tight tracking-widest text-white break-words sm:text-5xl xl:text-6xl\">\n                    {s.name}\n                  </h2>\n                  {s.tagline && (\n                    <p className=\"mt-6 max-w-sm font-display text-xl italic leading-relaxed text-accent-300\">\n                      {s.tagline}\n                    </p>\n                  )}\n                  <div className=\"mt-10 flex w-full max-w-sm flex-col gap-1 border-t border-primary-300/40 pt-6\">\n                    {s.email && (\n                      <Link href={`mailto:${s.email}`} className=\"flex min-h-11 items-center justify-center gap-3 text-base text-white/70 transition-colors hover:text-primary-300 lg:justify-start\">\n                        <Icon name=\"mail\" size=\"sm\" className=\"text-primary-300\" />\n                        <span className=\"break-all\">{s.email}</span>\n                      </Link>\n                    )}\n                    {s.phone && (\n                      <Link href={`tel:${s.phone}`} className=\"flex min-h-11 items-center justify-center gap-3 text-base text-white/70 transition-colors hover:text-primary-300 lg:justify-start\">\n                        <Icon name=\"phone\" size=\"sm\" className=\"text-primary-300\" />\n                        <span>{s.phone}</span>\n                      </Link>\n                    )}\n                    {s.whatsapp && (\n                      <Link href={`https://wa.me/${s.whatsapp}`} target=\"_blank\" className=\"flex min-h-11 items-center justify-center gap-3 text-base text-white/70 transition-colors hover:text-primary-300 lg:justify-start\">\n                        <Icon name=\"message-circle\" size=\"sm\" className=\"text-primary-300\" />\n                        <span>Write to us on WhatsApp</span>\n                      </Link>\n                    )}\n                    {s.address && (\n                      <p className=\"flex items-start justify-center gap-3 py-3 text-base text-white/70 lg:justify-start\">\n                        <Icon name=\"map-pin\" size=\"sm\" className=\"mt-1 shrink-0 text-primary-300\" />\n                        <span>{s.address}</span>\n                      </p>\n                    )}\n                  </div>\n                </div>\n              )}\n            </Store>\n          </div>\n\n          <div className=\"lg:col-span-7 lg:border-l lg:border-primary-300/40 lg:pl-12\">\n            <FooterLinks className=\"grid grid-cols-1 gap-12 text-center sm:grid-cols-3 sm:gap-8 sm:text-left\">\n              {col => (\n                <div className=\"flex flex-col items-center sm:items-start\">\n                  <h3 className=\"font-display text-sm uppercase tracking-[0.3em] text-primary-300\">\n                    {col.title}\n                  </h3>\n                  <span className=\"mt-4 h-px w-8 bg-primary-300/40\" aria-hidden=\"true\" />\n                  <ul className=\"mt-4 flex flex-col\">\n                    {col.links.map((l, i) => (\n                      <li key={i}>\n                        <Link href={l.href} className=\"flex min-h-11 items-center justify-center text-base text-white/70 transition-colors hover:text-white sm:justify-start\">\n                          {l.label}\n                        </Link>\n                      </li>\n                    ))}\n                  </ul>\n                </div>\n              )}\n            </FooterLinks>\n\n            <div className=\"mt-16 flex flex-col items-center gap-5 border-t border-primary-300/40 pt-10 sm:flex-row sm:justify-between\">\n              <p className=\"font-display text-lg italic text-accent-300\">Follow along</p>\n              <div className=\"text-primary-300\">\n                <SocialLinks />\n              </div>\n            </div>\n          </div>\n        </div>\n      </div>\n\n      <div className=\"border-t border-primary-300/40\">\n        <Store>\n          {s => (\n            <div className=\"mx-auto flex max-w-7xl flex-col items-center gap-2 px-5 py-6 text-center sm:flex-row sm:justify-between sm:px-8 sm:text-left\">\n              <p className=\"text-sm uppercase tracking-[0.25em] text-white/70\">\n                © {s.year} {s.name}\n              </p>\n              <p className=\"text-sm uppercase tracking-[0.25em] text-primary-300\">\n                With thanks for shopping with us\n              </p>\n            </div>\n          )}\n        </Store>\n      </div>\n    </footer>\n  )\n}"
+    }
+   ]
+  },
+  "store:announcement": {
+   "label": "Announcement bar",
+   "sections": [
+    {
+     "label": "Store promise line",
+     "source": "const WORDS = [\n  \"New this week\",\n  \"Chosen with care\",\n  \"Made to be used every day\",\n  \"Shop by category\",\n  \"Questions? We're here to help\",\n  \"Explore at your own pace\",\n]\n\nexport default function Section() {\n  return (\n    <section\n      aria-label=\"Store announcements\"\n      className=\"bg-secondary-900 text-white border-b border-primary-300/40\"\n    >\n      <div className=\"border-b border-primary-300/20 py-2\">\n        <Marquee speed=\"slow\" direction=\"left\" pauseOnHover>\n          {WORDS.map((w, i) => (\n            <span\n              key={i}\n              className=\"inline-flex items-center gap-6 px-6 font-display text-sm uppercase tracking-widest text-primary-300/70 whitespace-nowrap\"\n            >\n              <span>{w}</span>\n              <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} className=\"text-accent-300/60\" />\n            </span>\n          ))}\n        </Marquee>\n      </div>\n\n      <div className=\"mx-auto flex max-w-6xl flex-col items-center justify-center gap-3 px-4 py-4 sm:flex-row sm:gap-8 md:py-5\">\n        <div className=\"flex w-full min-w-0 items-center justify-center gap-4 sm:w-auto\">\n          <span aria-hidden=\"true\" className=\"hidden h-px w-10 shrink-0 bg-primary-300/40 sm:block md:w-16\" />\n          <Icon name=\"sparkle\" size=\"sm\" strokeWidth={1} className=\"hidden shrink-0 text-primary-300 sm:block\" />\n          <div className=\"min-w-0 text-center font-display text-base italic tracking-wider text-accent-300 sm:text-lg md:text-xl\">\n            <AnnouncementText\n              messages={[\n                \"Welcome. Discover what is new this season\",\n                \"Thoughtfully chosen, made to be used every day\",\n                \"Questions? We are always here to help\",\n              ]}\n              href=\"/products\"\n              interval={6}\n            />\n          </div>\n          <Icon name=\"sparkle\" size=\"sm\" strokeWidth={1} className=\"hidden shrink-0 text-primary-300 sm:block\" />\n          <span aria-hidden=\"true\" className=\"hidden h-px w-10 shrink-0 bg-primary-300/40 sm:block md:w-16\" />\n        </div>\n\n        <Link\n          href=\"/products\"\n          className=\"inline-flex min-h-11 shrink-0 items-center gap-2 rounded-none border border-primary-300 px-6 text-xs uppercase tracking-widest text-primary-300 transition-colors duration-500 hover:bg-primary-300 hover:text-secondary-900\"\n        >\n          Explore\n          <Icon name=\"arrow-right\" size=\"xs\" strokeWidth={1.25} />\n        </Link>\n      </div>\n    </section>\n  )\n}"
+    }
+   ]
+  },
+  "store:products": {
+   "label": "Product listing",
+   "sections": [
+    {
+     "label": "Listing title",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-label=\"Listing title\"\n      className=\"bg-secondary-900 text-white border-t border-primary-300/40\"\n    >\n      <div className=\"mx-auto max-w-6xl px-5 sm:px-8 pt-10 pb-10 md:pt-14 md:pb-12\">\n        <nav\n          aria-label=\"Breadcrumb\"\n          className=\"flex justify-center\"\n        >\n          <Breadcrumbs className=\"flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs sm:text-sm uppercase tracking-widest text-white/70 text-center\" />\n        </nav>\n\n        <div className=\"mt-6 md:mt-8 flex items-center justify-center gap-4 sm:gap-6\">\n          <span aria-hidden=\"true\" className=\"hidden sm:block h-px w-16 md:w-24 bg-primary-300/40\" />\n          <Breadcrumbs className=\"flex justify-center text-center\">\n            {b =>\n              b.current && (\n                <h1 className=\"font-display font-light uppercase tracking-widest text-primary-300 text-3xl sm:text-4xl md:text-5xl leading-tight break-words\">\n                  {b.name}\n                </h1>\n              )\n            }\n          </Breadcrumbs>\n          <span aria-hidden=\"true\" className=\"hidden sm:block h-px w-16 md:w-24 bg-primary-300/40\" />\n        </div>\n\n        <div className=\"mt-6 md:mt-8 flex flex-col items-center gap-4\">\n          <div className=\"flex items-center gap-3 text-accent-300\">\n            <span aria-hidden=\"true\" className=\"h-px w-8 bg-primary-300/40\" />\n            <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} className=\"text-primary-300\" />\n            <span aria-hidden=\"true\" className=\"h-px w-8 bg-primary-300/40\" />\n          </div>\n          <p className=\"text-base text-white/70 text-center\">\n            Chosen with care, shown in full\n          </p>\n          <ResultCount className=\"text-xs sm:text-sm uppercase tracking-widest text-accent-300\" />\n        </div>\n      </div>\n      <div aria-hidden=\"true\" className=\"mx-auto max-w-6xl px-5 sm:px-8\">\n        <div className=\"h-px w-full bg-primary-300/40\" />\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "All products",
+     "source": "export default function Section() {\n  return (\n    <section\n      id=\"all-products\"\n      aria-label=\"All products\"\n      className=\"bg-surface text-secondary-900 py-16 md:py-24\"\n    >\n      <div className=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-10\">\n        <div className=\"grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-14\">\n          {/* Left column: refine + quiet spotlight */}\n          <aside className=\"lg:col-span-3 lg:sticky lg:top-24 lg:self-start\">\n            <div className=\"flex items-center gap-4\">\n              <span className=\"h-px w-8 bg-primary-700\" aria-hidden=\"true\" />\n              <h2 className=\"font-display text-sm uppercase tracking-widest text-primary-700\">\n                Refine\n              </h2>\n            </div>\n            <p className=\"mt-3 text-base text-foreground-secondary\">\n              Narrow the collection to what suits you.\n            </p>\n            <div className=\"mt-6 border-t border-border-default pt-6\">\n              <Filters layout=\"sidebar\" />\n            </div>\n\n            <div className=\"mt-12 hidden bg-secondary-900 p-6 text-white lg:block\">\n              <div className=\"flex items-center justify-between border-b border-primary-300/40 pb-4\">\n                <h3 className=\"font-display text-sm uppercase tracking-widest text-primary-300\">\n                  Of note\n                </h3>\n                <Icon name=\"sparkle\" size=\"sm\" className=\"text-primary-300\" strokeWidth={1} />\n              </div>\n              <Products query={{ featured: true, limit: 1 }} className=\"mt-6 block\">\n                {(p) => (\n                  <article className=\"flex flex-col\">\n                    <Link href={p.url} className=\"group block\">\n                      <Image\n                        src={p.image}\n                        hoverSrc={p.hoverImage}\n                        alt={p.name}\n                        aspect=\"4:5\"\n                        fit=\"cover\"\n                        sizes=\"(min-width: 1024px) 22vw, 100vw\"\n                      />\n                      <h4 className=\"mt-5 font-display text-lg uppercase tracking-widest text-white group-hover:text-primary-300\">\n                        {p.name}\n                      </h4>\n                    </Link>\n                    <PriceTag product={p} className=\"mt-2 text-base text-white/70\" />\n                    <div className=\"mt-5 flex items-stretch gap-2\">\n                      <QuickAdd\n                        product={p}\n                        className=\"min-h-11 flex-1 rounded-none border border-primary-300 px-4 text-xs uppercase tracking-widest text-primary-300 hover:bg-primary-700 hover:text-white\"\n                      />\n                      <WishlistToggle\n                        product={p}\n                        className=\"flex h-11 w-11 items-center justify-center rounded-none border border-primary-300/40 text-primary-300 aria-pressed:bg-primary-700 aria-pressed:text-white\"\n                      />\n                    </div>\n                  </article>\n                )}\n              </Products>\n            </div>\n\n            <div className=\"mt-12 hidden lg:block\">\n              <div className=\"flex items-center gap-4 border-b border-border-default pb-4\">\n                <h3 className=\"font-display text-sm uppercase tracking-widest text-primary-700\">\n                  Lately added\n                </h3>\n              </div>\n              <Products query={{ sort: 'new', limit: 2 }} className=\"mt-6 grid grid-cols-1 gap-8\">\n                {(p) => <ProductCard product={p} aspect=\"4:5\" />}\n              </Products>\n            </div>\n          </aside>\n\n          {/* Right column: the collection */}\n          <div className=\"lg:col-span-9\">\n            <header className=\"flex flex-col gap-5 border-b border-border-default pb-6 sm:flex-row sm:items-end sm:justify-between\">\n              <div>\n                <p className=\"text-xs uppercase tracking-widest text-foreground-muted\">\n                  <ResultCount noun=\"pieces\" />\n                </p>\n                <h2 className=\"mt-2 font-display text-2xl uppercase tracking-widest text-secondary-900 md:text-3xl\">\n                  The collection\n                </h2>\n              </div>\n              <div className=\"flex min-h-11 items-center gap-3\">\n                <span className=\"text-xs uppercase tracking-widest text-foreground-muted\">\n                  Order by\n                </span>\n                <SortMenu />\n              </div>\n            </header>\n\n            <Reveal effect=\"fade\" delay={0.2}>\n              <div className=\"mt-10 md:mt-14\">\n                <ProductResults\n                  columns={3}\n                  emptyText=\"Nothing matches just yet. Try clearing a filter or two.\"\n                />\n              </div>\n            </Reveal>\n\n            <div className=\"mt-16 flex flex-col items-center gap-4 border-t border-border-default pt-10 text-center\">\n              <span className=\"h-px w-10 bg-primary-700\" aria-hidden=\"true\" />\n              <p className=\"max-w-md text-base text-foreground-secondary\">\n                Would rather wander? Browse by collection just below.\n              </p>\n              <Link\n                href=\"#collections\"\n                className=\"inline-flex min-h-11 items-center gap-3 rounded-none border border-secondary-900 px-6 text-xs uppercase tracking-widest text-secondary-900 hover:bg-secondary-900 hover:text-white\"\n              >\n                See collections\n                <Icon name=\"arrow-right\" size=\"sm\" strokeWidth={1} />\n              </Link>\n            </div>\n          </div>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Browse by collection",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-labelledby=\"browse-collections-title\"\n      className=\"bg-secondary-900 text-white py-16 md:py-28 overflow-hidden\"\n    >\n      <div className=\"mx-auto max-w-7xl px-5 sm:px-8\">\n        <Reveal effect=\"fade-up\">\n          <header className=\"mx-auto flex max-w-2xl flex-col items-center text-center\">\n            <span className=\"flex items-center gap-4 text-primary-300\">\n              <span className=\"h-px w-10 bg-primary-300/40 sm:w-16\" aria-hidden=\"true\"></span>\n              <Icon name=\"sparkle\" size=\"sm\" strokeWidth={1} className=\"text-primary-300\" />\n              <span className=\"h-px w-10 bg-primary-300/40 sm:w-16\" aria-hidden=\"true\"></span>\n            </span>\n            <p className=\"mt-6 text-xs uppercase tracking-widest text-accent-300\">\n              Beyond the grid\n            </p>\n            <h2\n              id=\"browse-collections-title\"\n              className=\"mt-4 font-display text-3xl font-light uppercase tracking-widest text-primary-300 sm:text-4xl md:text-5xl\"\n            >\n              Wander by collection\n            </h2>\n            <p className=\"mt-6 text-base leading-relaxed text-white/70\">\n              Set the filters aside and browse at your own pace, one collection at a time.\n            </p>\n          </header>\n        </Reveal>\n      </div>\n\n      <Reveal effect=\"fade\" delay={0.3}>\n        <div className=\"mt-12 pl-5 sm:pl-8 md:mt-16 lg:mx-auto lg:max-w-7xl lg:px-8\">\n          <Categories\n            limit={12}\n            layout=\"carousel\"\n            itemClassName=\"w-[78%] sm:w-[44%] lg:w-[30%]\"\n          >\n            {c => (\n              <Link\n                href={c.url}\n                className=\"group block focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-primary-300\"\n              >\n                <figure className=\"flex flex-col\">\n                  <div className=\"relative overflow-hidden rounded-none\">\n                    {c.image ? (\n                      <div className=\"transition-transform duration-1000 ease-out group-hover:scale-105\">\n                        <Image\n                          src={c.image}\n                          alt={c.name}\n                          aspect=\"3:4\"\n                          fit=\"cover\"\n                          sizes=\"(min-width: 1024px) 30vw, (min-width: 640px) 44vw, 78vw\"\n                        />\n                      </div>\n                    ) : (\n                      <div className=\"flex aspect-[3/4] w-full items-center justify-center bg-secondary-800\">\n                        <span className=\"flex h-20 w-20 items-center justify-center border border-primary-300/40\">\n                          <Icon name=\"gem\" size=\"lg\" strokeWidth={1} className=\"text-primary-300\" />\n                        </span>\n                      </div>\n                    )}\n                    <span\n                      className=\"pointer-events-none absolute inset-3 border border-primary-300/40 opacity-0 transition-opacity duration-700 group-hover:opacity-100\"\n                      aria-hidden=\"true\"\n                    ></span>\n                  </div>\n                  <figcaption className=\"mt-6 flex min-h-11 items-center justify-between gap-4 border-t border-primary-300/40 pt-5\">\n                    <span className=\"font-display text-xl font-light uppercase tracking-widest text-white transition-colors duration-500 group-hover:text-primary-300 sm:text-2xl\">\n                      {c.name}\n                    </span>\n                    <Icon\n                      name=\"arrow-right\"\n                      size=\"sm\"\n                      strokeWidth={1}\n                      className=\"shrink-0 text-primary-300 transition-transform duration-500 group-hover:translate-x-1\"\n                    />\n                  </figcaption>\n                </figure>\n              </Link>\n            )}\n          </Categories>\n        </div>\n      </Reveal>\n\n      <div className=\"mx-auto mt-14 flex max-w-7xl justify-center px-5 sm:px-8 md:mt-20\">\n        <Link\n          href=\"/categories\"\n          className=\"inline-flex min-h-11 items-center gap-3 rounded-none border border-primary-300 px-8 py-3 text-xs uppercase tracking-widest text-primary-300 transition-colors duration-500 hover:bg-primary-300 hover:text-secondary-900\"\n        >\n          All collections\n          <Icon name=\"arrow-up-right\" size=\"xs\" strokeWidth={1.25} />\n        </Link>\n      </div>\n    </section>\n  )\n}"
+    }
+   ]
+  },
+  "store:category": {
+   "label": "Category pages",
+   "sections": [
+    {
+     "label": "Category opening picture",
+     "source": "export default function Section() {\n  return (\n    <Category>\n      {c => (\n        <section className=\"bg-secondary-900 text-white\" aria-label={c.name}>\n          <div className=\"grid\">\n            {c.image && (\n              <div className=\"col-start-1 row-start-1 md:hidden\">\n                <Image\n                  src={c.mobileImage || c.image}\n                  alt={c.name}\n                  aspect=\"4:5\"\n                  fit=\"cover\"\n                  sizes=\"100vw\"\n                  priority={true}\n                />\n              </div>\n            )}\n            {c.image && (\n              <div className=\"col-start-1 row-start-1 hidden md:block\">\n                <Image\n                  src={c.image}\n                  alt={c.name}\n                  aspect=\"21:9\"\n                  fit=\"cover\"\n                  sizes=\"100vw\"\n                  priority={true}\n                />\n              </div>\n            )}\n            {c.image && (\n              <div\n                className=\"col-start-1 row-start-1 bg-gradient-to-t from-secondary-900 via-secondary-900/50 to-secondary-900/30\"\n                aria-hidden=\"true\"\n              />\n            )}\n            <div\n              className=\"col-start-1 row-start-1 m-3 sm:m-5 md:m-8 border border-primary-300/30 pointer-events-none\"\n              aria-hidden=\"true\"\n            />\n            <div\n              className={`col-start-1 row-start-1 relative flex flex-col items-center justify-between gap-10 px-6 pt-10 pb-12 sm:px-10 md:pt-14 md:pb-20 text-center ${c.image ? '' : 'min-h-96 md:min-h-[32rem]'}`}\n            >\n              <nav aria-label=\"Breadcrumb\" className=\"w-full\">\n                <Breadcrumbs>\n                  {b => (\n                    <span className=\"inline-flex items-center text-xs uppercase tracking-widest\">\n                      {b.current ? (\n                        <span aria-current=\"page\" className=\"py-3 text-primary-300\">\n                          {b.name}\n                        </span>\n                      ) : (\n                        <Link\n                          href={b.url || '/'}\n                          className=\"inline-flex min-h-11 items-center text-white/70 hover:text-primary-300 transition-colors duration-500\"\n                        >\n                          {b.name}\n                        </Link>\n                      )}\n                      {!b.current && (\n                        <span className=\"mx-3 text-primary-300/60\" aria-hidden=\"true\">\n                          /\n                        </span>\n                      )}\n                    </span>\n                  )}\n                </Breadcrumbs>\n              </nav>\n\n              <Reveal effect=\"fade\" delay={0.2}>\n                <div className=\"flex max-w-3xl flex-col items-center\">\n                  <div className=\"flex items-center gap-4 text-primary-300\" aria-hidden=\"true\">\n                    <span className=\"h-px w-10 sm:w-16 bg-primary-300/50\" />\n                    <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} />\n                    <span className=\"h-px w-10 sm:w-16 bg-primary-300/50\" />\n                  </div>\n                  <h1 className=\"mt-6 font-display text-3xl font-light uppercase leading-tight tracking-widest text-white sm:text-5xl lg:text-7xl\">\n                    {c.name}\n                  </h1>\n                  {c.tagline && (\n                    <p className=\"mt-5 font-display text-lg italic text-accent-300 sm:text-2xl\">\n                      {c.tagline}\n                    </p>\n                  )}\n                  {c.productCount > 0 && (\n                    <p className=\"mt-8 text-xs uppercase tracking-widest text-white/70\">\n                      {c.productCount} products\n                    </p>\n                  )}\n                </div>\n              </Reveal>\n            </div>\n          </div>\n\n          <Reveal effect=\"fade-up\" delay={0.4}>\n            <SubCategories\n              layout=\"list\"\n              className=\"mx-auto flex max-w-5xl flex-wrap justify-center gap-3 px-5 py-10 md:py-14\"\n            >\n              {s => (\n                <Link\n                  href={s.url}\n                  className=\"inline-flex min-h-11 items-center rounded-none border border-primary-300/40 px-5 text-sm uppercase tracking-widest text-white/80 transition-colors duration-500 hover:border-primary-300 hover:text-primary-300\"\n                >\n                  {s.name}\n                </Link>\n              )}\n            </SubCategories>\n          </Reveal>\n        </section>\n      )}\n    </Category>\n  )\n}"
+    },
+    {
+     "label": "Category products",
+     "source": "export default function Section() {\n  return (\n    <section\n      id=\"category-products\"\n      aria-label=\"Products in this category\"\n      className=\"bg-surface text-secondary-900 py-16 md:py-28\"\n    >\n      <div className=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-10\">\n        <Category>\n          {c => (\n            <div>\n              <Reveal effect=\"fade\">\n                <header className=\"mx-auto max-w-2xl text-center\">\n                  <p className=\"text-xs uppercase tracking-[0.4em] text-primary-700\">\n                    The collection\n                  </p>\n                  <h2 className=\"mt-4 font-display text-3xl font-light uppercase tracking-widest text-secondary-900 sm:text-4xl md:text-5xl\">\n                    {c.name}\n                  </h2>\n                  <div className=\"mx-auto mt-6 flex items-center justify-center gap-3\" aria-hidden=\"true\">\n                    <span className=\"h-px w-10 bg-primary-700/40\" />\n                    <Icon name=\"diamond\" size=\"xs\" className=\"text-primary-700\" strokeWidth={1} />\n                    <span className=\"h-px w-10 bg-primary-700/40\" />\n                  </div>\n                  <p className=\"mt-6 text-base leading-relaxed text-foreground-secondary\">\n                    Chosen with care, made to be kept. Take your time.\n                  </p>\n                </header>\n              </Reveal>\n\n              <div className=\"mt-14 grid grid-cols-1 gap-10 md:mt-20 lg:grid-cols-12 lg:gap-12\">\n                <div className=\"lg:col-span-8\">\n                  <Products query={{ category: c.slug, featured: true, limit: 1 }}>\n                    {p => (\n                      <Reveal effect=\"fade-up\">\n                        <article className=\"grid grid-cols-1 bg-secondary-900 text-white md:grid-cols-5\">\n                          <div className=\"md:col-span-3\">\n                            <Link href={p.url} className=\"block\">\n                              <Image\n                                src={p.image}\n                                hoverSrc={p.hoverImage}\n                                alt={p.name}\n                                aspect=\"4:5\"\n                                fit=\"cover\"\n                                sizes=\"(min-width: 1024px) 40vw, (min-width: 768px) 60vw, 100vw\"\n                              />\n                            </Link>\n                          </div>\n                          <div className=\"flex flex-col justify-between gap-10 p-6 sm:p-10 md:col-span-2\">\n                            <div>\n                              <p className=\"text-xs uppercase tracking-[0.35em] text-primary-300\">\n                                In the spotlight\n                              </p>\n                              <span className=\"mt-5 block h-px w-12 bg-primary-300/40\" aria-hidden=\"true\" />\n                              <h3 className=\"mt-6 font-display text-2xl font-light uppercase tracking-widest text-white sm:text-3xl\">\n                                <Link href={p.url} className=\"hover:text-primary-300\">\n                                  {p.name}\n                                </Link>\n                              </h3>\n                              {p.brand && (\n                                <p className=\"mt-3 text-sm uppercase tracking-[0.25em] text-white/70\">\n                                  {p.brand}\n                                </p>\n                              )}\n                              <PriceTag\n                                product={p}\n                                className=\"mt-6 block font-display text-xl tracking-wide text-accent-300\"\n                              />\n                            </div>\n                            <div className=\"flex flex-wrap items-center gap-3\">\n                              <QuickAdd\n                                product={p}\n                                className=\"inline-flex min-h-12 flex-1 items-center justify-center rounded-none border border-primary-300 px-6 text-xs uppercase tracking-[0.3em] text-primary-300 transition-colors duration-500 hover:bg-primary-300 hover:text-secondary-900\"\n                              />\n                              <WishlistToggle\n                                product={p}\n                                className=\"inline-flex h-12 w-12 items-center justify-center rounded-none border border-primary-300/40 text-primary-300 transition-colors duration-500 hover:border-primary-300 aria-pressed:bg-primary-300 aria-pressed:text-secondary-900\"\n                              />\n                            </div>\n                          </div>\n                        </article>\n                      </Reveal>\n                    )}\n                  </Products>\n                </div>\n\n                <aside className=\"lg:col-span-4\">\n                  <Reveal effect=\"fade-up\" delay={0.3}>\n                    <div className=\"flex items-baseline justify-between gap-4 border-b border-border-default pb-4\">\n                      <h3 className=\"font-display text-lg uppercase tracking-widest text-secondary-900\">\n                        Newly arrived\n                      </h3>\n                      <Icon name=\"sparkle\" size=\"sm\" className=\"text-primary-700\" strokeWidth={1} />\n                    </div>\n                    <Products\n                      query={{ category: c.slug, sort: 'new', limit: 2 }}\n                      className=\"mt-6 grid grid-cols-2 gap-4 lg:gap-6\"\n                    >\n                      {p => <ProductCard product={p} aspect=\"3:4\" />}\n                    </Products>\n                  </Reveal>\n                </aside>\n              </div>\n            </div>\n          )}\n        </Category>\n\n        <div className=\"mt-16 md:mt-24\">\n          <div className=\"flex flex-wrap items-center justify-between gap-4 border-y border-border-default py-3\">\n            <div className=\"flex flex-wrap items-center gap-4 sm:gap-6\">\n              <Filters layout=\"drawer\" />\n              <span className=\"hidden h-5 w-px bg-border-default sm:block\" aria-hidden=\"true\" />\n              <ResultCount\n                noun=\"pieces\"\n                className=\"text-sm uppercase tracking-[0.25em] text-foreground-muted\"\n              />\n            </div>\n            <div className=\"flex items-center gap-3\">\n              <span className=\"hidden text-xs uppercase tracking-[0.3em] text-foreground-muted md:inline\">\n                Order by\n              </span>\n              <SortMenu />\n            </div>\n          </div>\n\n          <div className=\"mt-10 md:mt-14\">\n            <ProductResults\n              columns={3}\n              emptyText=\"Nothing here just yet. Please do look again soon.\"\n            />\n          </div>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Questions and notes",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-label=\"Questions and notes\"\n      className=\"bg-secondary-900 text-white py-16 md:py-28\"\n    >\n      <div className=\"mx-auto max-w-6xl px-5 sm:px-8\">\n        <Reveal effect=\"fade\">\n          <header className=\"flex flex-col items-center text-center\">\n            <span className=\"text-xs uppercase tracking-widest text-primary-300\">\n              Notes &amp; questions\n            </span>\n            <span aria-hidden=\"true\" className=\"mt-5 flex items-center gap-3\">\n              <span className=\"h-px w-10 bg-primary-300/40\" />\n              <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} className=\"text-primary-300\" />\n              <span className=\"h-px w-10 bg-primary-300/40\" />\n            </span>\n            <Category>\n              {c => (\n                <h2 className=\"mt-5 font-display uppercase tracking-widest text-2xl sm:text-3xl md:text-4xl font-light text-accent-300 break-words\">\n                  On {c.name}\n                </h2>\n              )}\n            </Category>\n            <p className=\"mt-4 max-w-md text-base text-white/70\">\n              A little more to help you choose with care.\n            </p>\n          </header>\n        </Reveal>\n\n        <div className=\"mt-12 md:mt-20 grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-16\">\n          <Reveal effect=\"fade-up\" delay={0.1}>\n            <div className=\"lg:col-span-7 [&_button]:min-h-11 [&_button]:text-left\">\n              <div className=\"border-t border-primary-300/40 text-white\">\n                <Accordion>\n                  <CategoryFaqs>\n                    {f => (\n                      <AccordionItem title={f.question}>\n                        <p className=\"whitespace-pre-line pb-6 text-base leading-relaxed text-white/70\">\n                          {f.answer}\n                        </p>\n                      </AccordionItem>\n                    )}\n                  </CategoryFaqs>\n                </Accordion>\n              </div>\n            </div>\n          </Reveal>\n\n          <Reveal effect=\"fade-up\" delay={0.25}>\n            <aside className=\"lg:col-span-5\">\n              <SeoText>\n                {s => (\n                  <div className=\"border-l border-primary-300/40 pl-6 sm:pl-8\">\n                    <h3 className=\"font-display uppercase tracking-widest text-sm text-primary-300\">\n                      The longer story\n                    </h3>\n                    <div className=\"mt-6 flex flex-col gap-5\">\n                      {s.paragraphs.map((t, i) => (\n                        <p\n                          className={\n                            i === 0\n                              ? \"text-base leading-loose text-white/70 first-letter:float-left first-letter:mr-3 first-letter:font-display first-letter:text-5xl first-letter:leading-none first-letter:text-primary-300\"\n                              : \"text-base leading-loose text-white/70\"\n                          }\n                        >\n                          {t}\n                        </p>\n                      ))}\n                    </div>\n                  </div>\n                )}\n              </SeoText>\n            </aside>\n          </Reveal>\n        </div>\n\n        <Store>\n          {s => (\n            <footer className=\"mt-16 md:mt-24 flex flex-col items-center gap-6 border-t border-primary-300/40 pt-10 text-center\">\n              <p className=\"font-display uppercase tracking-widest text-base text-accent-300\">\n                Questions? We're here to help\n              </p>\n              <div className=\"flex flex-wrap items-center justify-center gap-3\">\n                {s.phone && (\n                  <Link\n                    href={`tel:${s.phone}`}\n                    className=\"inline-flex min-h-11 items-center gap-2 border border-primary-300 px-5 text-sm uppercase tracking-widest text-primary-300 transition-colors hover:bg-primary-300/10\"\n                  >\n                    <Icon name=\"phone\" size=\"sm\" strokeWidth={1.25} />\n                    Call us\n                  </Link>\n                )}\n                {s.email && (\n                  <Link\n                    href={`mailto:${s.email}`}\n                    className=\"inline-flex min-h-11 items-center gap-2 border border-primary-300 px-5 text-sm uppercase tracking-widest text-primary-300 transition-colors hover:bg-primary-300/10\"\n                  >\n                    <Icon name=\"mail\" size=\"sm\" strokeWidth={1.25} />\n                    Write to us\n                  </Link>\n                )}\n                {s.whatsapp && (\n                  <Link\n                    href={`https://wa.me/${s.whatsapp}`}\n                    target=\"_blank\"\n                    className=\"inline-flex min-h-11 items-center gap-2 border border-primary-300 px-5 text-sm uppercase tracking-widest text-primary-300 transition-colors hover:bg-primary-300/10\"\n                  >\n                    <Icon name=\"message-circle\" size=\"sm\" strokeWidth={1.25} />\n                    WhatsApp\n                  </Link>\n                )}\n              </div>\n            </footer>\n          )}\n        </Store>\n      </div>\n    </section>\n  )\n}"
+    }
+   ]
+  },
+  "store:brand": {
+   "label": "Brand pages",
+   "sections": [
+    {
+     "label": "Brand introduction",
+     "source": "export default function Section() {\n  return (\n    <section className=\"relative bg-secondary-900 text-white overflow-hidden\">\n      <div className=\"absolute inset-x-0 top-0 h-px bg-primary-300/40\" aria-hidden=\"true\" />\n      <div className=\"mx-auto max-w-6xl px-5 sm:px-8 pt-8 md:pt-10 pb-16 md:pb-28\">\n        <nav aria-label=\"Breadcrumb\" className=\"flex justify-center md:justify-start\">\n          <div className=\"flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-xs uppercase tracking-widest text-white/60\">\n            <Breadcrumbs>\n              {c =>\n                c.url && !c.current ? (\n                  <span className=\"inline-flex items-center gap-3\">\n                    <Link\n                      href={c.url}\n                      className=\"inline-flex min-h-11 items-center hover:text-primary-300 transition-colors duration-500\"\n                    >\n                      {c.name}\n                    </Link>\n                    <span className=\"text-primary-300/60\" aria-hidden=\"true\">/</span>\n                  </span>\n                ) : (\n                  <span aria-current=\"page\" className=\"inline-flex min-h-11 items-center text-primary-300\">\n                    {c.name}\n                  </span>\n                )\n              }\n            </Breadcrumbs>\n          </div>\n        </nav>\n\n        <Brand>\n          {b => (\n            <div className=\"mt-10 md:mt-16 grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-16 lg:gap-24 items-center\">\n              <figure className=\"md:col-span-5 w-full max-w-sm mx-auto md:max-w-none\">\n                <div className=\"relative border border-primary-300/40 p-3 sm:p-4\">\n                  <span className=\"absolute -top-px -left-px h-6 w-6 border-t border-l border-primary-300\" aria-hidden=\"true\" />\n                  <span className=\"absolute -bottom-px -right-px h-6 w-6 border-b border-r border-primary-300\" aria-hidden=\"true\" />\n                  {b.image ? (\n                    <div className=\"relative\">\n                      <Image\n                        src={b.image}\n                        alt={b.name}\n                        aspect=\"4:5\"\n                        fit=\"cover\"\n                        priority={true}\n                        sizes=\"(min-width: 768px) 40vw, 90vw\"\n                        className=\"rounded-none\"\n                      />\n                      <div className=\"absolute inset-0 bg-secondary-900/30\" aria-hidden=\"true\" />\n                      <div className=\"absolute inset-x-5 bottom-5 sm:inset-x-8 sm:bottom-8 bg-surface px-6 py-6 sm:px-8 flex items-center justify-center\">\n                        {b.logo ? (\n                          <div className=\"w-full max-w-48\">\n                            <Image src={b.logo} alt={`${b.name} logo`} aspect=\"3:2\" fit=\"contain\" />\n                          </div>\n                        ) : (\n                          <span className=\"font-display uppercase tracking-widest text-xl text-secondary-900 text-center\">\n                            {b.name}\n                          </span>\n                        )}\n                      </div>\n                    </div>\n                  ) : (\n                    <div className=\"bg-surface aspect-square flex flex-col items-center justify-center gap-6 px-8\">\n                      {b.logo ? (\n                        <div className=\"w-full max-w-56\">\n                          <Image src={b.logo} alt={`${b.name} logo`} aspect=\"3:2\" fit=\"contain\" priority={true} />\n                        </div>\n                      ) : (\n                        <>\n                          <Icon name=\"diamond\" size=\"lg\" strokeWidth={1} className=\"text-primary-700\" />\n                          <span className=\"font-display uppercase tracking-widest text-2xl text-secondary-900 text-center\">\n                            {b.name}\n                          </span>\n                        </>\n                      )}\n                    </div>\n                  )}\n                </div>\n                {b.productCount > 0 && (\n                  <figcaption className=\"mt-5 flex items-center justify-center gap-4 text-xs uppercase tracking-widest text-white/60\">\n                    <span className=\"h-px w-8 bg-primary-300/40\" aria-hidden=\"true\" />\n                    <span>\n                      <span className=\"text-primary-300\">{b.productCount}</span> pieces in the collection\n                    </span>\n                    <span className=\"h-px w-8 bg-primary-300/40\" aria-hidden=\"true\" />\n                  </figcaption>\n                )}\n              </figure>\n\n              <div className=\"md:col-span-7 text-center md:text-left\">\n                <p className=\"text-xs uppercase tracking-widest text-primary-300\">The house of</p>\n                <h1 className=\"mt-5 font-display font-light uppercase tracking-widest text-4xl sm:text-5xl lg:text-7xl leading-tight text-white break-words\">\n                  {b.name}\n                </h1>\n                <div className=\"mt-8 flex items-center justify-center md:justify-start gap-3\" aria-hidden=\"true\">\n                  <span className=\"h-px w-12 bg-primary-300/60\" />\n                  <span className=\"h-1.5 w-1.5 rotate-45 border border-primary-300\" />\n                  <span className=\"h-px w-12 bg-primary-300/60\" />\n                </div>\n\n                {b.tagline && (\n                  <p className=\"mt-8 font-display italic text-xl sm:text-2xl lg:text-3xl text-accent-300 leading-snug\">\n                    {b.tagline}\n                  </p>\n                )}\n                {b.description && (\n                  <p className=\"mt-6 text-base md:text-lg leading-relaxed text-white/70 max-w-xl mx-auto md:mx-0\">\n                    {b.description}\n                  </p>\n                )}\n\n                {(b.founded || b.origin || b.headquarters) && (\n                  <dl className=\"mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6 border-y border-primary-300/30 py-6 max-w-xl mx-auto md:mx-0\">\n                    {b.founded && (\n                      <div>\n                        <dt className=\"text-xs uppercase tracking-widest text-primary-300\">Since</dt>\n                        <dd className=\"mt-2 font-display text-xl text-white\">{b.founded}</dd>\n                      </div>\n                    )}\n                    {b.origin && (\n                      <div>\n                        <dt className=\"text-xs uppercase tracking-widest text-primary-300\">Origin</dt>\n                        <dd className=\"mt-2 font-display text-xl text-white\">{b.origin}</dd>\n                      </div>\n                    )}\n                    {b.headquarters && (\n                      <div>\n                        <dt className=\"text-xs uppercase tracking-widest text-primary-300\">Based in</dt>\n                        <dd className=\"mt-2 font-display text-xl text-white\">{b.headquarters}</dd>\n                      </div>\n                    )}\n                  </dl>\n                )}\n\n                <div className=\"mt-10 flex flex-col sm:flex-row flex-wrap items-center md:items-start justify-center md:justify-start gap-6 sm:gap-8\">\n                  {b.website && (\n                    <Link\n                      href={b.website}\n                      target=\"_blank\"\n                      className=\"inline-flex min-h-12 items-center gap-3 rounded-none border border-primary-300 px-7 text-xs uppercase tracking-widest text-primary-300 transition-colors duration-500 hover:bg-primary-300 hover:text-secondary-900\"\n                    >\n                      Visit the website\n                      <Icon name=\"arrow-up-right\" size=\"sm\" strokeWidth={1.25} />\n                    </Link>\n                  )}\n                  {b.socials.length > 0 && (\n                    <ul className=\"flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-1\" aria-label=\"Follow the brand\">\n                      {b.socials.map(s => (\n                        <li key={s.href}>\n                          <Link\n                            href={s.href}\n                            target=\"_blank\"\n                            className=\"inline-flex min-h-11 items-center border-b border-transparent text-sm uppercase tracking-widest text-white/70 transition-colors duration-500 hover:text-primary-300 hover:border-primary-300/60\"\n                          >\n                            {s.label}\n                          </Link>\n                        </li>\n                      ))}\n                    </ul>\n                  )}\n                </div>\n              </div>\n            </div>\n          )}\n        </Brand>\n      </div>\n      <div className=\"absolute inset-x-0 bottom-0 h-px bg-primary-300/40\" aria-hidden=\"true\" />\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Brand products",
+     "source": "export default function Section() {\n  return (\n    <section\n      id=\"brand-collection\"\n      aria-labelledby=\"brand-collection-heading\"\n      className=\"bg-surface text-secondary-900 py-16 md:py-28\"\n    >\n      <div className=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-10\">\n        <Reveal effect=\"fade\">\n          <header className=\"mx-auto flex max-w-2xl flex-col items-center text-center\">\n            <span className=\"flex items-center gap-3 text-xs uppercase tracking-widest text-primary-700\">\n              <span className=\"h-px w-8 bg-primary-700\" aria-hidden=\"true\" />\n              The collection\n              <span className=\"h-px w-8 bg-primary-700\" aria-hidden=\"true\" />\n            </span>\n            <h2\n              id=\"brand-collection-heading\"\n              className=\"mt-5 font-display text-3xl font-light uppercase tracking-widest text-secondary-900 sm:text-4xl md:text-5xl\"\n            >\n              Every piece, in one place\n            </h2>\n            <p className=\"mt-5 text-base leading-relaxed text-foreground-secondary\">\n              Take your time. Narrow it down at your own pace and find the one that feels right.\n            </p>\n          </header>\n        </Reveal>\n\n        <div className=\"mt-12 grid grid-cols-1 gap-10 md:mt-20 lg:grid-cols-12 lg:gap-14\">\n          <aside className=\"lg:col-span-3\" aria-label=\"Refine the collection\">\n            <div className=\"lg:sticky lg:top-24\">\n              <div className=\"hidden items-center gap-3 border-b border-border-default pb-4 lg:flex\">\n                <Icon name=\"layers\" size=\"sm\" strokeWidth={1} className=\"text-primary-700\" />\n                <h3 className=\"font-display text-sm uppercase tracking-widest text-secondary-900\">\n                  Refine\n                </h3>\n              </div>\n              <div className=\"lg:pt-6\">\n                <Filters layout=\"sidebar\" />\n              </div>\n\n              <Brand>\n                {b => (\n                  <div className=\"mt-12 hidden lg:block\">\n                    <p className=\"border-t border-border-default pt-6 text-xs uppercase tracking-widest text-primary-700\">\n                      A quiet favourite\n                    </p>\n                    <Products query={{ brand: b.slug, sort: 'best_sellers', limit: 1 }}>\n                      {p => (\n                        <div className=\"mt-5\">\n                          <ProductCard product={p} aspect=\"4:5\" />\n                          <div className=\"mt-4 flex flex-col gap-3\">\n                            <PriceTag product={p} className=\"text-base text-secondary-900\" />\n                            <QuickAdd\n                              product={p}\n                              icon=\"bag\"\n                              className=\"inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-none border border-secondary-900 px-5 text-xs uppercase tracking-widest text-secondary-900 transition-colors hover:bg-secondary-900 hover:text-white\"\n                            />\n                          </div>\n                        </div>\n                      )}\n                    </Products>\n                  </div>\n                )}\n              </Brand>\n            </div>\n          </aside>\n\n          <div className=\"lg:col-span-9\">\n            <div className=\"flex flex-wrap items-center justify-between gap-4 border-y border-border-default py-4\">\n              <div className=\"flex items-center gap-3\">\n                <span className=\"h-2 w-2 rotate-45 bg-primary-700\" aria-hidden=\"true\" />\n                <ResultCount\n                  noun=\"pieces\"\n                  className=\"text-xs uppercase tracking-widest text-foreground-secondary\"\n                />\n              </div>\n              <div className=\"flex min-h-11 items-center\">\n                <SortMenu />\n              </div>\n            </div>\n\n            <div className=\"mt-10 md:mt-12\">\n              <ProductResults\n                columns={3}\n                emptyText=\"Nothing matches just yet. Try loosening a filter or two.\"\n              />\n            </div>\n\n            <div className=\"mt-16 flex items-center justify-center gap-4 md:mt-24\" aria-hidden=\"true\">\n              <span className=\"h-px w-16 bg-border-default\" />\n              <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} className=\"text-primary-700\" />\n              <span className=\"h-px w-16 bg-border-default\" />\n            </div>\n          </div>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Brand story",
+     "source": "export default function Section() {\n  return (\n    <section\n      aria-label=\"Brand story\"\n      className=\"bg-secondary-900 text-white px-5 py-16 sm:px-8 md:py-28\"\n    >\n      <Brand>\n        {b => (\n          <div className=\"mx-auto w-full max-w-2xl\">\n            <header className=\"flex flex-col items-center text-center\">\n              <div className=\"flex w-full items-center justify-center gap-4\">\n                <span className=\"h-px w-12 bg-primary-300/40 sm:w-20\" />\n                <Icon name=\"diamond\" size=\"sm\" strokeWidth={1} className=\"text-primary-300\" />\n                <span className=\"h-px w-12 bg-primary-300/40 sm:w-20\" />\n              </div>\n              <p className=\"mt-8 text-xs uppercase tracking-widest text-accent-300\">\n                The story so far\n              </p>\n              <h2 className=\"mt-4 font-display text-3xl font-light uppercase tracking-widest text-primary-300 sm:text-4xl md:text-5xl\">\n                {b.name}\n              </h2>\n\n              {(b.founded || b.origin || b.headquarters) && (\n                <dl className=\"mt-10 flex flex-wrap items-start justify-center gap-x-10 gap-y-6 border-y border-primary-300/40 py-6\">\n                  {b.founded && (\n                    <div className=\"flex flex-col items-center gap-1\">\n                      <dt className=\"text-xs uppercase tracking-widest text-white/70\">Since</dt>\n                      <dd className=\"font-display text-xl tracking-widest text-accent-300\">{b.founded}</dd>\n                    </div>\n                  )}\n                  {b.origin && (\n                    <div className=\"flex flex-col items-center gap-1\">\n                      <dt className=\"text-xs uppercase tracking-widest text-white/70\">From</dt>\n                      <dd className=\"font-display text-xl tracking-widest text-accent-300\">{b.origin}</dd>\n                    </div>\n                  )}\n                  {b.headquarters && (\n                    <div className=\"flex flex-col items-center gap-1\">\n                      <dt className=\"text-xs uppercase tracking-widest text-white/70\">Based in</dt>\n                      <dd className=\"font-display text-xl tracking-widest text-accent-300\">{b.headquarters}</dd>\n                    </div>\n                  )}\n                </dl>\n              )}\n            </header>\n\n            {b.story && (\n              <article className=\"mt-12 md:mt-16\">\n                <div className=\"whitespace-pre-line text-base leading-loose text-white/70 sm:text-lg first-letter:float-left first-letter:mr-3 first-letter:font-display first-letter:text-6xl first-letter:leading-none first-letter:text-primary-300\">\n                  {b.story}\n                </div>\n              </article>\n            )}\n\n            <SeoText>\n              {s =>\n                s.text && (\n                  <aside className=\"mt-16 md:mt-20\">\n                    <div className=\"flex items-center justify-center gap-4\">\n                      <span className=\"h-px flex-1 bg-primary-300/40\" />\n                      <h3 className=\"font-display text-sm uppercase tracking-widest text-primary-300\">\n                        A closer look\n                      </h3>\n                      <span className=\"h-px flex-1 bg-primary-300/40\" />\n                    </div>\n                    <div className=\"mt-10 flex flex-col gap-6\">\n                      {s.paragraphs.map((t, i) => (\n                        <p\n                          className={\n                            i === 0\n                              ? 'font-display text-xl leading-relaxed text-accent-300 sm:text-2xl'\n                              : 'text-base leading-loose text-white/70'\n                          }\n                        >\n                          {t}\n                        </p>\n                      ))}\n                    </div>\n                  </aside>\n                )\n              }\n            </SeoText>\n\n            <footer className=\"mt-16 flex flex-col items-center gap-4 text-center md:mt-20\">\n              <Icon name=\"feather\" size=\"md\" strokeWidth={1} className=\"text-primary-300\" />\n              <p className=\"font-display text-base uppercase tracking-widest text-white/70\">\n                With care, from {b.name}\n              </p>\n            </footer>\n          </div>\n        )}\n      </Brand>\n    </section>\n  )\n}"
+    }
+   ]
+  },
+  "store:search": {
+   "label": "Search results",
+   "sections": [
+    {
+     "label": "Your search",
+     "source": "export default function Section() {\n  return (\n    <section className=\"bg-secondary-900 text-white\">\n      <div className=\"mx-auto max-w-6xl px-5 sm:px-8\">\n        <div className=\"h-px w-full bg-primary-300/40\" />\n      </div>\n\n      <div className=\"mx-auto max-w-3xl px-5 py-12 text-center sm:px-8 md:py-16\">\n        <div className=\"flex items-center justify-center gap-4\">\n          <span className=\"h-px w-8 bg-primary-300/40 sm:w-12\" />\n          <Icon name=\"search\" size=\"sm\" strokeWidth={1} className=\"text-primary-300\" />\n          <span className=\"h-px w-8 bg-primary-300/40 sm:w-12\" />\n        </div>\n\n        <SearchQuery>\n          {q => (\n            <div className=\"mt-6\">\n              <p className=\"text-sm uppercase tracking-widest text-accent-300\">\n                You searched for\n              </p>\n              <h1 className=\"mt-3 break-words font-display text-3xl font-light uppercase tracking-widest text-primary-300 sm:text-4xl md:text-5xl\">\n                <span className=\"text-primary-300/60\">&ldquo;</span>\n                {q.term}\n                <span className=\"text-primary-300/60\">&rdquo;</span>\n              </h1>\n              <p className=\"mx-auto mt-4 max-w-md text-base leading-relaxed text-white/70\">\n                {q.total === 0\n                  ? \"Nothing matched just yet. Try a different word, or something a little broader.\"\n                  : \"A quiet edit of what we found. Refine it below, or search again.\"}\n              </p>\n            </div>\n          )}\n        </SearchQuery>\n\n        <div className=\"mt-6 flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-white/70\">\n          <span className=\"h-px w-6 bg-primary-300/40\" />\n          <ResultCount noun=\"pieces\" />\n          <span className=\"h-px w-6 bg-primary-300/40\" />\n        </div>\n\n        <div className=\"mx-auto mt-10 w-full max-w-xl border-t border-primary-300/40 pt-8\">\n          <p className=\"mb-4 text-xs uppercase tracking-widest text-primary-300\">\n            Search again\n          </p>\n          <div className=\"w-full text-secondary-900\">\n            <SearchBox variant=\"bar\" placeholder=\"Search the collection\" />\n          </div>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "Matching pieces",
+     "source": "export default function Section() {\n  return (\n    <section className=\"bg-surface text-secondary-900 py-16 md:py-28\">\n      <div className=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\">\n        <Reveal effect=\"fade\">\n          <header className=\"flex flex-col items-center text-center\">\n            <span className=\"text-sm uppercase tracking-widest text-primary-700\">\n              Refine your search\n            </span>\n            <h2 className=\"mt-4 font-display text-3xl font-light uppercase tracking-widest sm:text-4xl md:text-5xl\">\n              Matching pieces\n            </h2>\n            <span className=\"mt-6 block h-px w-16 bg-primary-700\" aria-hidden=\"true\" />\n          </header>\n        </Reveal>\n\n        <div className=\"mt-12 grid grid-cols-1 gap-10 md:mt-20 lg:grid-cols-12 lg:gap-12\">\n          <aside className=\"lg:col-span-3\" aria-label=\"Refine results\">\n            <div className=\"lg:sticky lg:top-24\">\n              <div className=\"border-t border-secondary-900 pt-6\">\n                <h3 className=\"font-display text-lg font-light uppercase tracking-widest\">\n                  Filter\n                </h3>\n                <p className=\"mt-2 text-base text-foreground-secondary\">\n                  Narrow it down, quietly.\n                </p>\n                <div className=\"mt-6\">\n                  <Filters layout=\"sidebar\" />\n                </div>\n              </div>\n\n              <div className=\"mt-12 hidden border-t border-border-default pt-6 lg:block\">\n                <h3 className=\"font-display text-lg font-light uppercase tracking-widest\">\n                  Often chosen\n                </h3>\n                <Products\n                  query={{ sort: 'best_sellers', limit: 3 }}\n                  className=\"mt-6 flex flex-col gap-6\"\n                >\n                  {(p) => (\n                    <article className=\"flex items-start gap-4\">\n                      <Link href={p.url} className=\"block w-16 shrink-0\">\n                        <Image\n                          src={p.image}\n                          alt={p.name}\n                          aspect=\"4:5\"\n                          fit=\"cover\"\n                          sizes=\"64px\"\n                          className=\"rounded-none\"\n                        />\n                      </Link>\n                      <div className=\"flex min-w-0 flex-1 flex-col gap-2\">\n                        <Link\n                          href={p.url}\n                          className=\"text-base leading-snug text-secondary-900 hover:text-primary-700\"\n                        >\n                          {p.name}\n                        </Link>\n                        <div className=\"flex items-center justify-between gap-2\">\n                          <PriceTag product={p} className=\"text-sm text-foreground-secondary\" />\n                          <QuickAdd\n                            product={p}\n                            label=\"\"\n                            icon=\"plus\"\n                            className=\"inline-flex min-h-11 min-w-11 items-center justify-center rounded-none border border-secondary-900 text-secondary-900 hover:bg-secondary-900 hover:text-white\"\n                          />\n                        </div>\n                      </div>\n                    </article>\n                  )}\n                </Products>\n              </div>\n            </div>\n          </aside>\n\n          <div className=\"min-w-0 lg:col-span-9\">\n            <div className=\"flex flex-wrap items-center justify-between gap-4 border-y border-border-default py-4\">\n              <div className=\"flex items-center gap-3 text-base text-foreground-secondary\">\n                <Icon name=\"layers\" size=\"sm\" className=\"text-primary-700\" strokeWidth={1} />\n                <ResultCount noun=\"pieces\" />\n              </div>\n              <div className=\"flex items-center gap-3\">\n                <span className=\"text-sm uppercase tracking-widest text-foreground-muted\">\n                  Sort\n                </span>\n                <SortMenu />\n              </div>\n            </div>\n\n            <div className=\"mt-10\">\n              <ProductResults\n                columns={3}\n                emptyText=\"Nothing matched this time. Try a softer word, or browse what's new below.\"\n              />\n            </div>\n          </div>\n        </div>\n\n        <div className=\"mt-20 border-t border-border-default pt-16 md:mt-28 md:pt-24\">\n          <div className=\"flex flex-col items-center text-center\">\n            <span className=\"text-sm uppercase tracking-widest text-primary-700\">\n              Before you go\n            </span>\n            <h3 className=\"mt-4 font-display text-2xl font-light uppercase tracking-widest sm:text-3xl\">\n              Newly arrived\n            </h3>\n            <span className=\"mt-6 block h-px w-12 bg-primary-700\" aria-hidden=\"true\" />\n          </div>\n\n          <Products\n            query={{ sort: 'new', limit: 4 }}\n            className=\"mt-12 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-4 md:gap-x-8\"\n          >\n            {(p) => (\n              <Reveal effect=\"fade-up\" delay={0.2}>\n                <div className=\"flex flex-col gap-3\">\n                  <ProductCard product={p} aspect=\"3:4\" />\n                  {p.category && (\n                    <span className=\"text-xs uppercase tracking-widest text-foreground-muted\">\n                      {p.category}\n                    </span>\n                  )}\n                </div>\n              </Reveal>\n            )}\n          </Products>\n\n          <div className=\"mt-14 flex justify-center\">\n            <Link\n              href=\"/products\"\n              className=\"inline-flex min-h-11 items-center gap-3 rounded-none border border-secondary-900 px-8 py-3 text-sm uppercase tracking-widest text-secondary-900 hover:bg-secondary-900 hover:text-white\"\n            >\n              See everything\n              <Icon name=\"arrow-right\" size=\"sm\" strokeWidth={1} />\n            </Link>\n          </div>\n        </div>\n      </div>\n    </section>\n  )\n}"
+    }
+   ]
+  },
+  "store:product": {
+   "label": "Product page",
+   "sections": [
+    {
+     "label": "Details and care",
+     "source": "export default function Section() {\n  return (\n    <section\n      id=\"details\"\n      aria-labelledby=\"details-heading\"\n      className=\"bg-secondary-900 text-white px-5 py-16 sm:px-8 md:py-28\"\n    >\n      <div className=\"mx-auto w-full max-w-2xl\">\n        <Reveal effect=\"fade\" delay={0}>\n          <header className=\"text-center\">\n            <p className=\"text-sm uppercase tracking-widest text-primary-300\">\n              Details &amp; care\n            </p>\n            <div className=\"mt-5 flex items-center justify-center gap-4\" aria-hidden=\"true\">\n              <span className=\"h-px w-12 bg-primary-300/40 sm:w-20\" />\n              <Icon name=\"diamond\" size=\"xs\" strokeWidth={1} className=\"text-primary-300\" />\n              <span className=\"h-px w-12 bg-primary-300/40 sm:w-20\" />\n            </div>\n            <h2\n              id=\"details-heading\"\n              className=\"mt-6 font-display text-3xl font-light uppercase tracking-widest text-white sm:text-4xl md:text-5xl\"\n            >\n              Know it closely\n            </h2>\n            <p className=\"mx-auto mt-5 max-w-md text-base leading-relaxed text-white/70\">\n              Everything worth knowing, folded away quietly until you wish to read it.\n            </p>\n            <Product>\n              {p =>\n                p.shortDescription && (\n                  <p className=\"mx-auto mt-8 max-w-lg font-display text-xl italic leading-snug text-accent-300 sm:text-2xl\">\n                    {p.shortDescription}\n                  </p>\n                )\n              }\n            </Product>\n          </header>\n        </Reveal>\n\n        <Reveal effect=\"fade-up\" delay={0.3}>\n          <div className=\"mt-12 border-t border-b border-primary-300/40 text-left md:mt-16\">\n            <Accordion defaultOpen>\n              <AccordionItem title=\"The description\" first>\n                <div className=\"pb-8 pt-2\">\n                  <ProductDescription\n                    card={false}\n                    className=\"text-base leading-loose text-white/70\"\n                  />\n                </div>\n              </AccordionItem>\n\n              <AccordionItem title=\"Specifications & care\">\n                <div className=\"pb-8 pt-2\">\n                  <div className=\"bg-surface p-5 text-secondary-900 sm:p-8\">\n                    <ProductSpecs features info />\n                  </div>\n                </div>\n              </AccordionItem>\n\n              <AccordionItem title=\"Questions? We're here to help\">\n                <div className=\"pb-8 pt-2\">\n                  <p className=\"text-base leading-relaxed text-white/70\">\n                    If something here is unclear, write to us or call. We are glad to help you choose well.\n                  </p>\n                  <Store>\n                    {s => (\n                      <div className=\"mt-6 flex flex-wrap gap-3\">\n                        {s.phone && (\n                          <Link\n                            href={`tel:${s.phone}`}\n                            className=\"inline-flex min-h-11 items-center gap-2 rounded-none border border-primary-300 px-5 text-sm uppercase tracking-widest text-primary-300\"\n                          >\n                            <Icon name=\"phone\" size=\"sm\" strokeWidth={1.25} />\n                            Call\n                          </Link>\n                        )}\n                        {s.email && (\n                          <Link\n                            href={`mailto:${s.email}`}\n                            className=\"inline-flex min-h-11 items-center gap-2 rounded-none border border-primary-300 px-5 text-sm uppercase tracking-widest text-primary-300\"\n                          >\n                            <Icon name=\"mail\" size=\"sm\" strokeWidth={1.25} />\n                            Write\n                          </Link>\n                        )}\n                        {s.whatsapp && (\n                          <Link\n                            href={`https://wa.me/${s.whatsapp}`}\n                            target=\"_blank\"\n                            className=\"inline-flex min-h-11 items-center gap-2 rounded-none bg-primary-700 px-5 text-sm uppercase tracking-widest text-white\"\n                          >\n                            <Icon name=\"message-circle\" size=\"sm\" strokeWidth={1.25} />\n                            WhatsApp\n                          </Link>\n                        )}\n                      </div>\n                    )}\n                  </Store>\n                </div>\n              </AccordionItem>\n            </Accordion>\n          </div>\n        </Reveal>\n\n        <div className=\"mt-12 flex justify-center md:mt-16\" aria-hidden=\"true\">\n          <span className=\"h-10 w-px bg-primary-300/40\" />\n        </div>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "What buyers say",
+     "source": "export default function Section() {\n  return (\n    <section id=\"reviews\" aria-labelledby=\"reviews-heading\" className=\"bg-surface text-secondary-900 py-16 md:py-28\">\n      <div className=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\">\n        <Reveal effect=\"fade\" delay={0.1}>\n          <div className=\"grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-16 lg:items-start\">\n            <aside className=\"lg:col-span-4 lg:sticky lg:top-24\">\n              <Product>\n                {p => (\n                  <div className=\"bg-secondary-900 text-white px-6 py-12 sm:px-10 sm:py-14 text-center\">\n                    <div className=\"flex items-center justify-center gap-3\">\n                      <span className=\"h-px w-8 bg-primary-300/40\" aria-hidden=\"true\"></span>\n                      <span className=\"text-xs uppercase tracking-widest text-primary-300\">In their words</span>\n                      <span className=\"h-px w-8 bg-primary-300/40\" aria-hidden=\"true\"></span>\n                    </div>\n                    <h2 id=\"reviews-heading\" className=\"mt-6 font-display text-3xl sm:text-4xl uppercase tracking-widest font-light text-primary-300\">\n                      What buyers say\n                    </h2>\n                    <p className=\"mt-4 text-base text-white/70 break-words\">{p.name}</p>\n\n                    {p.rating && (\n                      <p className=\"mt-10 font-display text-6xl sm:text-7xl font-light text-white leading-none\">\n                        {p.rating}\n                      </p>\n                    )}\n                    <div className=\"mt-5 flex justify-center\">\n                      <RatingStars product={p} count className=\"text-primary-300 text-base\" />\n                    </div>\n                    <div className=\"mt-4 flex justify-center text-white/70 text-sm\">\n                      <ProductRating />\n                    </div>\n\n                    {p.reviewCount === 0 && (\n                      <div className=\"mt-10 flex flex-col items-center gap-4\">\n                        <Icon name=\"feather\" size=\"lg\" strokeWidth={1} className=\"text-primary-300\" />\n                        <p className=\"text-base text-white/70 max-w-xs\">\n                          No reviews yet. Yours could be the first to guide others.\n                        </p>\n                      </div>\n                    )}\n\n                    <hr className=\"mt-10 border-0 border-t border-primary-300/40\" />\n                    <ul className=\"mt-8 flex flex-col gap-4 text-left\">\n                      <li className=\"flex items-start gap-3\">\n                        <Icon name=\"check\" size=\"sm\" strokeWidth={1.25} className=\"mt-1 text-primary-300 shrink-0\" />\n                        <span className=\"text-base text-white/70\">Shared by people who chose this piece</span>\n                      </li>\n                      <li className=\"flex items-start gap-3\">\n                        <Icon name=\"eye\" size=\"sm\" strokeWidth={1.25} className=\"mt-1 text-primary-300 shrink-0\" />\n                        <span className=\"text-base text-white/70\">Read freely before you decide</span>\n                      </li>\n                    </ul>\n                  </div>\n                )}\n              </Product>\n            </aside>\n\n            <div className=\"lg:col-span-8 min-w-0\">\n              <div className=\"flex flex-col items-center text-center lg:items-start lg:text-left border-b border-border-default pb-8\">\n                <Icon name=\"quote\" size=\"md\" strokeWidth={1} className=\"text-primary-700\" />\n                <p className=\"mt-4 font-display text-xl sm:text-2xl uppercase tracking-widest text-secondary-900\">\n                  Honest notes, in full\n                </p>\n                <p className=\"mt-3 text-base text-foreground-secondary max-w-xl\">\n                  Take your time with every word. When it is yours, we would love to hear how it suits your days.\n                </p>\n              </div>\n              <div className=\"mt-10\">\n                <ProductReviews />\n              </div>\n            </div>\n          </div>\n        </Reveal>\n      </div>\n    </section>\n  )\n}"
+    },
+    {
+     "label": "ProductGallery, ProductTitle, ProductPrice, VariantPicker, AddToCart",
+     "source": "export default function Section() {\n  return (\n    <section className=\"mx-auto w-full max-w-6xl px-4 py-8 md:py-12\">\n      <div className=\"flex flex-col gap-6\">\n        <ProductGallery />\n        <ProductTitle />\n        <ProductPrice />\n        <VariantPicker />\n        <AddToCart />\n      </div>\n    </section>\n  )\n}"
+    }
+   ]
+  }
+ }
+}

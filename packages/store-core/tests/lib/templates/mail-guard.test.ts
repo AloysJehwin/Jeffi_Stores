@@ -27,6 +27,8 @@ describe('sendAuditedMail token guard', () => {
       logoUrl: '',
       faviconUrl: '',
       emailAccent: '',
+      whatsapp: '',
+      socials: {},
     })
   })
   afterEach(() => vi.restoreAllMocks())

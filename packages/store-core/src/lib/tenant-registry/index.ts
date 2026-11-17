@@ -127,6 +127,7 @@ export {
   type OnboardingDraft,
   type TenantKyc,
   type TenantWarehouse,
+  type StoreProfile,
 } from './kyc'
 export {
   saveTenantSocialAccount,

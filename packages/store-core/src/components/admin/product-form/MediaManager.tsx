@@ -7,6 +7,7 @@ import GalleryPicker, { type GalleryImage, type GalleryVideo } from '../GalleryP
 import AiMediaButton from '../ai/AiMediaButton'
 import AiVideoButton from '../ai/AiVideoButton'
 import AdminSelect from '../AdminSelect'
+import { stickyAboveFooter } from '../kit/form'
 import AIEnrichButton from '../AIEnrichButton'
 import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import { galleryUpload, readVideoFile, uploadGalleryVideo } from '../media/media-upload'
@@ -436,8 +437,8 @@ export default function MediaManager({
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[15rem_1fr]">
       {touched && <input type="hidden" name="_media" value={JSON.stringify({ items, own_sub: ownSub } satisfies StagedMedia)} readOnly />}
 
-      {/* Scope picker */}
-      <nav aria-label="Media scope" className="space-y-1 rounded-xl border border-border-default bg-surface p-2 text-sm">
+      {/* Scope picker; desktop: stays in view while the media scrolls. */}
+      <nav aria-label="Media scope" className="admin-sticky-pane space-y-1 rounded-xl border border-border-default bg-surface p-2 text-sm" style={stickyAboveFooter}>
         <ScopeButton label="Product" count={countFor('product')} active={key === 'product'} own onClick={() => onScope({})} />
         {variants.map(v => (
           <div key={v.id}>

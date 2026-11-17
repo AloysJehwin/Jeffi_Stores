@@ -2,8 +2,12 @@ import Link from 'next/link'
 import { queryMany } from '@/lib/shared/db'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import CategoryOffer, { type OfferCategory } from '@/components/visitor/CategoryOffer'
+import { renderSitePage } from '@/components/visitor/site/SitePage'
 
-export default async function AboutPage() {
+export default async function AboutPage({ searchParams }: { searchParams: Promise<{ preview?: string; layout?: string }> }) {
+  // The store's Site Builder About page when it has one (or its preview); else the built-in one below.
+  const site = await renderSitePage({ audience: 'store', page: 'about' }, await searchParams)
+  if (site) return site
   const [identity, rows] = await Promise.all([
     getStoreIdentity(),
     queryMany<{

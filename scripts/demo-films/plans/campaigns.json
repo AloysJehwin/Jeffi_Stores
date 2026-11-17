@@ -1,0 +1,131 @@
+{
+  "music": "music/lyria-3-clip-preview-1.mp3",
+  "musicVolume": 0.26,
+  "poster": 7.0,
+  "scenes": [
+    {
+      "line": "c1",
+      "type": "title",
+      "kicker": "Campaigns",
+      "lines": [
+        "Campaigns that sell",
+        "on autopilot."
+      ],
+      "accentLine": 1,
+      "size": 118
+    },
+    {
+      "line": "c2",
+      "type": "screen",
+      "clip": {
+        "name": "camp-scenarios",
+        "cuts": [
+          [
+            2.6,
+            12.6
+          ]
+        ],
+        "rate": 1.47
+      },
+      "url": "admin.jeffistores.in/campaigns",
+      "lower": {
+        "kicker": "Who to reach",
+        "title": "Carts, checkouts, win-backs"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.45
+        }
+      ]
+    },
+    {
+      "line": "c3",
+      "type": "screen",
+      "clip": {
+        "name": "camp-detail",
+        "cuts": [
+          [
+            1.0,
+            6.4
+          ],
+          [
+            12.0,
+            15.6
+          ]
+        ],
+        "rate": 1.43
+      },
+      "url": "admin.jeffistores.in/campaigns/abandoned-cart",
+      "lower": {
+        "kicker": "Every channel",
+        "title": "Email, WhatsApp, SMS and push"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.15,
+          "cx": 0.6,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.15,
+          "cx": 0.6,
+          "cy": 0.45
+        }
+      ]
+    },
+    {
+      "line": "c4",
+      "type": "screen",
+      "clip": {
+        "name": "camp-results",
+        "cuts": [
+          [
+            10.9,
+            17.2
+          ]
+        ],
+        "rate": 0.98
+      },
+      "url": "admin.jeffistores.in/campaigns",
+      "lower": {
+        "kicker": "Results",
+        "title": "Opens, clicks and orders"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.4
+        }
+      ]
+    },
+    {
+      "line": "c5",
+      "type": "outro",
+      "lines": [
+        "Turn first-time buyers",
+        "into regulars."
+      ],
+      "cta": "Start free",
+      "url": "ecom.jeffistores.in"
+    }
+  ]
+}

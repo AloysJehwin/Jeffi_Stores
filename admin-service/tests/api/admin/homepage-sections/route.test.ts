@@ -114,14 +114,14 @@ describe('POST', () => {
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
   })
 
-  it('adds an app-only section to the single layout, shown on that surface alone', async () => {
+  it('adds a section to one surface\'s own layout', async () => {
     const res = await POST(req('POST', { type: 'product_row', surface: 'app' }))
     expect(res.status).toBe(200)
     const { section } = await res.json()
-    expect(section).toMatchObject({ surface: 'web', display_order: 3, config: { surfaces: { web: false, web_mobile: false, app: true } } })
+    expect(section).toMatchObject({ surface: 'app', display_order: 0 })
+    expect(section.config.surfaces).toBeUndefined()
     const web = (await (await POST(req('POST', { type: 'trust_strip' }))).json()).section
-    expect(web).toMatchObject({ surface: 'web', display_order: 4 })
-    expect(web.config.surfaces).toBeUndefined()
+    expect(web).toMatchObject({ surface: 'web', display_order: 3 })
     expect(fake.state.draft!.sections).toHaveLength(5)
   })
 

@@ -1,0 +1,11 @@
+# Local only: .local/ holds the mask dictionary (real customer names) and the film admin's two-factor secret.
+.local/
+# Recordings and renders (large; the admin clips show masked but real store screens).
+clips/
+stills/
+timelines/
+out/
+qa/
+logs/
+narration/*/
+__pycache__/

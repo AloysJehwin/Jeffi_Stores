@@ -225,7 +225,7 @@ function AccountAddresses({ isBusiness }: { isBusiness: boolean }) {
                 <button
                   key={t}
                   onClick={() => setFilterType(t)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                  className={`ui-btn px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
                     filterType === t
                       ? 'bg-accent-500 text-white'
                       : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
@@ -246,7 +246,7 @@ function AccountAddresses({ isBusiness }: { isBusiness: boolean }) {
                 setLocalities([])
                 setShowForm(!showForm)
               }}
-              className="px-5 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold text-sm"
+              className="ui-btn px-5 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold text-sm"
             >
               {showForm ? 'Cancel' : '+ Add New Address'}
             </button>
@@ -270,7 +270,7 @@ function AccountAddresses({ isBusiness }: { isBusiness: boolean }) {
           )}
 
           {addresses.length === 0 ? (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg
                 className="w-16 h-16 text-foreground-muted mx-auto mb-4"
                 fill="none"
@@ -284,7 +284,7 @@ function AccountAddresses({ isBusiness }: { isBusiness: boolean }) {
                   d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              <h3 className="text-xl font-semibold text-foreground mb-2">No addresses saved</h3>
+              <h3 className="ui-heading text-xl font-semibold text-foreground mb-2">No addresses saved</h3>
               <p className="text-foreground-secondary">Add an address to make checkout faster.</p>
             </div>
           ) : (
@@ -292,10 +292,10 @@ function AccountAddresses({ isBusiness }: { isBusiness: boolean }) {
               {filteredAddresses.map(address => (
                 <div
                   key={address.id}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative"
+                  className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative"
                 >
                   {address.is_default && (
-                    <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
+                    <span className="ui-badge absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
                       Default
                     </span>
                   )}

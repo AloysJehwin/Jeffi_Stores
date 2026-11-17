@@ -6,10 +6,12 @@ import {
   getTenantBankAccount,
   getTenantWarehouse,
   controlPlanePool,
+  type StoreProfile,
   type TenantWarehouse,
 } from '@/lib/tenant-registry'
 import { getStateCode, stateNameFromCode } from '@/lib/catalog/gst'
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
+import { STORE_SOCIAL_KEYS, STORE_SOCIAL_NETWORKS, cleanSocials, whatsappDigits } from '@/lib/catalog/store-socials'
 import { withTenantAdminPool, type TenantDbTarget } from './tenant-admin-pool'
 
 /**
@@ -166,10 +168,23 @@ export async function buildSeedSettings(tenantId: string, ownerIdIn?: string | n
     kyc?.seal_s3_key ? copyAssetToTenantBucket(kyc.seal_s3_key, tenant.s3_bucket) : Promise.resolve(''),
   ])
 
+  // What the Store step said the site shows. Its address replaces the KYC one only with a street line.
+  const p: StoreProfile = kyc?.store_profile ?? {}
+  const t = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+  const storeAddress = t(p.address)
+    ? [t(p.address), t(p.city), [t(p.state), t(p.pincode)].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+    : ''
+  const storePin = /^\d{6}$/.test(t(p.pincode)) ? t(p.pincode) : ''
+  const socials = cleanSocials(p.socials)
+
   const settings: Record<string, string> = {
     business_name: businessName,
-    business_email: owner?.email || '',
-    business_phone: businessPhone,
+    business_email: t(p.email) || owner?.email || '',
+    business_phone: t(p.phone) || businessPhone,
+    business_whatsapp: whatsappDigits(p.whatsapp) || '',
+    ...Object.fromEntries(STORE_SOCIAL_NETWORKS.map(n => [STORE_SOCIAL_KEYS[n], socials[n] ?? ''])),
+    meta_tagline: t(p.tagline),
+    storefront_about_copy: t(p.about),
     business_web: businessWeb,
     business_logo_url: logoUrl,
     business_favicon_url: logoUrl,
@@ -178,10 +193,10 @@ export async function buildSeedSettings(tenantId: string, ownerIdIn?: string | n
     business_legal_name: legalName,
     business_trade_name: displayName,
     business_gstin: kyc?.gst_number || '',
-    business_address: businessAddress,
-    business_state: stateNameFromCode(stateCode),
-    business_city: city,
-    business_pincode: pincode,
+    business_address: storeAddress || businessAddress,
+    business_state: (storeAddress && t(p.state)) || stateNameFromCode(stateCode),
+    business_city: (storeAddress && t(p.city)) || city,
+    business_pincode: (storeAddress && storePin) || pincode,
     invoice_prefix: invoicePrefixFor(displayName, tenant.slug),
     bank_account: bank?.account_number || '',
     bank_ifsc: (bank?.ifsc || '').toUpperCase(),

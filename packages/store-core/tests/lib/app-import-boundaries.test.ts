@@ -8,8 +8,8 @@ import { join, relative } from 'node:path'
 // ESLint enforces this on src; this also covers tests and integration-tests, which next lint skips.
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
-const APPS = ['controller', 'storefront', 'admin', 'business'] as const
-const SPEC_RE = /(['"`])@(controller|storefront|admin|business)\/[^'"`]*\1/g
+const APPS = ['controller', 'storefront', 'admin', 'business', 'showcase'] as const
+const SPEC_RE = /(['"`])@(controller|storefront|admin|business|showcase)\/[^'"`]*\1/g
 
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return []

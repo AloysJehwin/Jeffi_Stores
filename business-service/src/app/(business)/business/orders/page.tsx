@@ -1,12 +1,11 @@
-'use client'
+export const dynamic = 'force-dynamic'
 
-export default function BusinessOrdersPage() {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold text-foreground">My Orders</h1>
-      <div className="bg-surface-elevated border border-border-default rounded-xl p-8 text-center">
-        <p className="text-foreground-muted">Your orders will appear here once you place one.</p>
-      </div>
-    </div>
-  )
+import { renderSitePage } from '@/components/visitor/site/SitePage'
+import BusinessOrdersClient from './BusinessOrdersClient'
+
+// The business orders list. With a Site Builder orders page, it is that page's `orders_main` block with the store's own
+// blocks around it; otherwise it is the page.
+export default async function BusinessOrdersPage({ searchParams }: { searchParams: Promise<{ preview?: string; layout?: string }> }) {
+  const site = await renderSitePage({ audience: 'business', page: 'orders' }, await searchParams, { orders_main: <BusinessOrdersClient /> })
+  return site ?? <BusinessOrdersClient />
 }

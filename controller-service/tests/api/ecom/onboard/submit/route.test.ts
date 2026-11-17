@@ -14,6 +14,7 @@ const m = vi.hoisted(() => ({
   planCompute: vi.fn(),
   flag: vi.fn(() => false),
   quote: vi.fn(),
+  docs: vi.fn(),
 }))
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'sid' }) }) }))
@@ -42,6 +43,7 @@ vi.mock('@/lib/shipping/delhivery', () => ({ verifyDelhiveryToken: vi.fn() }))
 vi.mock('@controller/lib/compute/catalog', () => ({ computeSpecEnabled: m.flag, getCatalog: vi.fn(), planCompute: m.planCompute }))
 vi.mock('@controller/lib/compute/quote', () => ({ quoteForPlan: m.quote }))
 vi.mock('@controller/lib/compute/store', () => ({ saveDesiredCompute: m.saveCompute }))
+vi.mock('@controller/lib/catalog/compliance-docs', () => ({ saveComplianceDocuments: m.docs }))
 
 import { POST } from '@controller/app/api/(ecom)/ecom/onboard/submit/route'
 import { presetSpec, withDedicatedDb } from '@/lib/compute/presets'
@@ -59,6 +61,7 @@ const BODY = {
   gstNumber: '29ABCDE1234F1Z5',
   warehouse: { originPincode: '560001', sellerPhone: '9876543210', sellerAddress: '1 MG Road' },
   legalsAccepted: true,
+  compliance: { answers: { restricted: false, import: false } },
 }
 const req = (body: unknown) =>
   new NextRequest('https://ecom.jeffistores.in/api/ecom/onboard/submit', { method: 'POST', body: JSON.stringify(body) })
@@ -72,6 +75,7 @@ describe('onboard submit — store upgrade on a services workspace', () => {
     m.tenants.mockResolvedValue([SERVICES])
     m.bank.mockResolvedValue(true)
     m.apply.mockResolvedValue({ ok: true })
+    m.docs.mockResolvedValue(undefined)
     m.planCompute.mockImplementation(async (slug: string) =>
       ({ basic: { slug, minPreset: 'basic', defaultPreset: 'basic' }, growth: { slug, minPreset: 'small', defaultPreset: 'small' } } as any)[slug] ?? null
     )
@@ -120,6 +124,19 @@ describe('onboard submit — store upgrade on a services workspace', () => {
   it('rejects without the legal terms', async () => {
     const res = await POST(req({ ...BODY, legalsAccepted: false }))
     expect(res.status).toBe(400)
+    expect(m.apply).not.toHaveBeenCalled()
+  })
+
+  it("files the licences under their category, and refuses another owner's upload", async () => {
+    const iec = { s3Key: 'kyc/o-1/iec/a.pdf', fileName: 'iec.pdf', number: 'abcde12345' }
+    const body = { ...BODY, compliance: { answers: { restricted: false, import: true }, docs: { iec } } }
+    expect((await POST(req(body))).status).toBe(200)
+    expect(m.docs).toHaveBeenCalledWith('t-1', 'o-1', [
+      { docType: 'iec', category: 'General', number: 'ABCDE12345', expiresOn: null, s3Key: 'kyc/o-1/iec/a.pdf', fileName: 'iec.pdf' },
+    ])
+    m.apply.mockClear()
+    const theirs = { ...body, compliance: { ...body.compliance, docs: { iec: { ...iec, s3Key: 'kyc/o-2/iec/a.pdf' } } } }
+    expect((await POST(req(theirs))).status).toBe(400)
     expect(m.apply).not.toHaveBeenCalled()
   })
 

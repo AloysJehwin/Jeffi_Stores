@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { renderPartsPage } from '@/components/visitor/site/code/parts/product/site-page'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -12,6 +13,7 @@ import {
 import { getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductDetailClient from '@/components/visitor/ProductDetailClient'
+import ProductPageParts from '@/components/visitor/site/code/parts/product/ProductPageParts'
 import ProductSpecifications from '@/components/visitor/pdp/ProductSpecifications'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/visitor/ProductCard'
@@ -19,7 +21,8 @@ import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
-import ProductPitchLine from '@/components/on-device/ProductPitchLine'
+import ProductFeatures from '@/components/visitor/pdp/ProductFeatures'
+import ProductDescriptionCard from '@/components/visitor/pdp/ProductDescriptionCard'
 import { cardPropsFor } from '@/lib/catalog/product-cards'
 import FrequentlyBoughtTogether from '@/components/visitor/pdp/FrequentlyBoughtTogether'
 import CustomersAlsoViewed from '@/components/visitor/pdp/CustomersAlsoViewed'
@@ -389,6 +392,216 @@ export default async function ProductDetailPage({
   const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
   const mrpDiscount = mrp && mrp > Number(displayPrice) ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100) : 0
 
+  // The product's working part. With a Site Builder product page it is the page's `product_main` block, with the
+  // store's own blocks around it; otherwise it is the page.
+  const main = (
+        <div className="container mx-auto px-4 pt-4 sm:pt-6 lg:pt-8 pb-20">
+          {/* Product Details */}
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
+              <ProductDetailClient />
+            </div>
+          </div>
+
+          <FrequentlyBoughtTogether
+            current={cardPropsFor([product], gstEnabled)[0]}
+            launchDate={product.launch_date}
+            discontinueDate={product.discontinue_date}
+          />
+
+          <ProductSpecifications product={product} />
+
+          <ProductInfoSections product={product} faqs={product.faqs} />
+          {faqLd && (
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, '\\u003c') }} />
+          )}
+
+          {/* Features & Use Cases (AI-enriched) */}
+          <ProductFeatures product={product} />
+
+          {/* Inline Compare Section */}
+          {relatedProducts.length >= 1 &&
+            (() => {
+              const primaryImage =
+                product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+              const displayPrice =
+                product.has_variants && product.variant_min_price
+                  ? Number(product.variant_min_price)
+                  : Number(pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled))
+              const rawMrp = product.mrp
+                ? Number(product.mrp)
+                : product.variant_min_mrp
+                  ? Number(product.variant_min_mrp)
+                  : null
+              // When GST is off, displayPrice is ex-GST — rebase the inclusive MRP to match.
+              const gstRate = Number(product.gst_percentage ?? 0)
+              const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
+              return (
+                <PdpCompareSection
+                  currentProduct={{
+                    id: product.id,
+                    name: product.name,
+                    slug: product.slug,
+                    price: displayPrice,
+                    mrp,
+                    image: primaryImage?.thumbnail_url || primaryImage?.image_url || null,
+                    brandName: product.brands?.name || null,
+                    categoryId: product.category_id || null,
+                    material: product.material ?? null,
+                    finish: product.finish ?? null,
+                    variant_type: product.variant_type ?? null,
+                    condition: product.condition ?? null,
+                    color: product.color ?? null,
+                    weight: product.weight ?? null,
+                    weight_unit: product.weight_unit ?? null,
+                    net_weight_grams: product.net_weight_grams ?? null,
+                    volume_ml: product.volume_ml ?? null,
+                    country_of_origin: product.country_of_origin ?? null,
+                    warranty_months: product.warranty_months ?? null,
+                    warranty_type: product.warranty_type ?? null,
+                    compliance_standard: product.compliance_standard ?? null,
+                    safety_rating: product.safety_rating ?? null,
+                    certifications: (product.certifications as string[] | null) ?? null,
+                    fragile: product.fragile ?? null,
+                    hazardous: product.hazardous ?? null,
+                    flammable: product.flammable ?? null,
+                    hsn_code: product.hsn_code ?? null,
+                    gst_percentage: product.gst_percentage ?? null,
+                  }}
+                  relatedProducts={relatedProducts.slice(0, 2).map((rp: any) => {
+                    const rImg = rp.product_images?.find((img: any) => img.is_primary) || rp.product_images?.[0]
+                    const rPrice =
+                      rp.has_variants && rp.variant_min_price
+                        ? Number(rp.variant_min_price)
+                        : Number(pickUnitPrice({ inclusive: rp.base_price, exGst: rp.price_ex_gst }, gstEnabled))
+                    const rRawMrp = rp.mrp ? Number(rp.mrp) : rp.variant_min_mrp ? Number(rp.variant_min_mrp) : null
+                    // When GST is off, rPrice is ex-GST — rebase the inclusive MRP to match.
+                    const rGstRate = Number(rp.gst_percentage ?? 0)
+                    const rMrp =
+                      !gstEnabled && rRawMrp != null && rGstRate > 0 ? round2(rRawMrp / (1 + rGstRate / 100)) : rRawMrp
+                    return {
+                      id: rp.id,
+                      name: rp.name,
+                      slug: rp.slug,
+                      price: rPrice,
+                      mrp: rMrp,
+                      image: rImg?.thumbnail_url || rImg?.image_url || null,
+                      brandName: rp.brands?.name || null,
+                      categoryId: rp.category_id || null,
+                      material: rp.material ?? null,
+                      finish: rp.finish ?? null,
+                      variant_type: rp.variant_type ?? null,
+                      condition: rp.condition ?? null,
+                      color: rp.color ?? null,
+                      weight: rp.weight ?? null,
+                      weight_unit: rp.weight_unit ?? null,
+                      net_weight_grams: rp.net_weight_grams ?? null,
+                      volume_ml: rp.volume_ml ?? null,
+                      country_of_origin: rp.country_of_origin ?? null,
+                      warranty_months: rp.warranty_months ?? null,
+                      warranty_type: rp.warranty_type ?? null,
+                      compliance_standard: rp.compliance_standard ?? null,
+                      safety_rating: rp.safety_rating ?? null,
+                      certifications: (rp.certifications as string[] | null) ?? null,
+                      fragile: rp.fragile ?? null,
+                      hazardous: rp.hazardous ?? null,
+                      flammable: rp.flammable ?? null,
+                      hsn_code: rp.hsn_code ?? null,
+                      gst_percentage: rp.gst_percentage ?? null,
+                    }
+                  })}
+                />
+              )
+            })()}
+
+          {/* Description */}
+          <ProductDescriptionCard product={product} />
+
+          {/* Product Reviews */}
+          <div id={PDP_REVIEWS_ID} className="scroll-mt-16 lg:scroll-mt-20">
+            <ProductReviews productId={product.id} productName={product.name} />
+          </div>
+
+          <CustomersAlsoViewed productId={product.id} />
+
+          {/* Recently Viewed */}
+          <RecentlyViewed excludeId={product.id} minItems={2} />
+
+          {/* Personalised picks */}
+          <FeaturedForYou />
+
+          {/* Related Products */}
+          {relatedProducts.length >= 4 && (
+            <div className="mt-10">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Related Products</h2>
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {relatedProducts.map((relatedProduct: any) => {
+                  const relatedPrimaryImage =
+                    relatedProduct.product_images?.find((img: any) => img.is_primary) ||
+                    relatedProduct.product_images?.[0]
+                  const relatedHasVariants = relatedProduct.has_variants
+                  const relatedDisplayPrice =
+                    relatedHasVariants && relatedProduct.variant_min_price
+                      ? Number(relatedProduct.variant_min_price)
+                      : Number(
+                          pickUnitPrice(
+                            { inclusive: relatedProduct.base_price, exGst: relatedProduct.price_ex_gst },
+                            gstEnabled
+                          )
+                        )
+                  const relatedRawMrp = relatedProduct.mrp
+                    ? Number(relatedProduct.mrp)
+                    : relatedProduct.variant_min_mrp
+                      ? Number(relatedProduct.variant_min_mrp)
+                      : null
+                  // When GST is off, displayPrice is ex-GST. Rebase the (inclusive) MRP to the
+                  // same ex-GST basis before computing the discount so the % and struck-through
+                  // MRP stay consistent with the shown price.
+                  const relatedGstRate = Number(relatedProduct.gst_percentage ?? 0)
+                  const relatedMrp =
+                    !gstEnabled && relatedRawMrp != null && relatedGstRate > 0
+                      ? round2(relatedRawMrp / (1 + relatedGstRate / 100))
+                      : relatedRawMrp
+                  const relatedMrpDiscount =
+                    relatedMrp && relatedMrp > relatedDisplayPrice
+                      ? Math.round(((relatedMrp - relatedDisplayPrice) / relatedMrp) * 100)
+                      : 0
+                  const relatedStock = relatedHasVariants
+                    ? Number(relatedProduct.variant_stock_total ?? 0)
+                    : relatedProduct.stock_status !== 'Out of Stock'
+                      ? 1
+                      : 0
+
+                  return (
+                    <ProductCard
+                      key={relatedProduct.id}
+                      id={relatedProduct.id}
+                      name={relatedProduct.name}
+                      slug={relatedProduct.slug}
+                      hasVariants={relatedHasVariants}
+                      displayPrice={relatedDisplayPrice}
+                      mrp={relatedMrp}
+                      mrpDiscount={relatedMrpDiscount}
+                      effectiveStock={relatedStock}
+                      isDigital={!!relatedProduct.is_digital}
+                      primaryImage={relatedPrimaryImage || null}
+                      brandName={relatedProduct.brands?.name || null}
+                      categoryName={relatedProduct.categories?.name || null}
+                      discountPct={Number(relatedProduct.discount_pct ?? 0)}
+                      extraDeliveryDays={Number(relatedProduct.extra_delivery_days ?? 0)}
+                      handlingDays={Number(relatedProduct.handling_days ?? 2)}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+  )
+  const param = (k: string) => (typeof resolvedSearchParams[k] === 'string' ? (resolvedSearchParams[k] as string) : undefined)
+  // An AI product page that places AddToCart works from the parts alone; otherwise the details render as its core block.
+  const { site } = await renderPartsPage({ audience: 'store', page: 'product' }, { preview: param('preview'), layout: param('layout') }, 'product_main', main, ['AddToCart'])
+
   return (
     <div className="bg-surface min-h-screen">
       <script
@@ -448,287 +661,17 @@ export default async function ProductDetailPage({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 pt-4 sm:pt-6 lg:pt-8 pb-20">
-        {/* Product Details */}
-        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
-            <ProductDetailClient
-              product={product}
-              initialSkuParam={skuParam}
-              freeShippingThreshold={freeShippingThreshold}
-              reviewSummary={reviewSummary}
-            />
-          </div>
-        </div>
-
-        <FrequentlyBoughtTogether
-          current={cardPropsFor([product], gstEnabled)[0]}
-          launchDate={product.launch_date}
-          discontinueDate={product.discontinue_date}
-        />
-
-        <ProductSpecifications product={product} />
-
-        <ProductInfoSections product={product} faqs={product.faqs} />
-        {faqLd && (
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, '\\u003c') }} />
-        )}
-
-        {/* Features & Use Cases (AI-enriched) */}
-        {(() => {
-          const p = product as any
-          const hasFeatures = p.ai_features?.length > 0
-          const hasUseCases = p.ai_use_cases?.length > 0
-          const hasWhoUses = p.ai_who_uses_it
-          const hasApplication = p.ai_application
-
-          if (!hasFeatures && !hasUseCases && !hasWhoUses && !hasApplication) return null
-
-          return (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
-              <h2 className="text-xl font-bold text-foreground mb-6">Features &amp; Use Cases</h2>
-              <div className="space-y-6">
-                {hasFeatures && (
-                  <div>
-                    <p className="text-xs text-foreground-muted mb-2 uppercase tracking-wide">Key Features</p>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1.5">
-                      {(p.ai_features as string[]).map((f: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {hasUseCases && (
-                  <>
-                    {hasFeatures && <div className="border-t border-border-default" />}
-                    <div>
-                      <p className="text-xs text-foreground-muted mb-2 uppercase tracking-wide">Use Cases</p>
-                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1.5">
-                        {(p.ai_use_cases as string[]).map((u: string, i: number) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
-                            {u}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </>
-                )}
-                {(hasWhoUses || hasApplication) && (
-                  <>
-                    {(hasFeatures || hasUseCases) && <div className="border-t border-border-default" />}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
-                      {hasWhoUses && (
-                        <div>
-                          <p className="text-xs text-foreground-muted mb-0.5">Who Uses It</p>
-                          <p className="font-semibold text-foreground text-sm">{p.ai_who_uses_it}</p>
-                        </div>
-                      )}
-                      {hasApplication && (
-                        <div>
-                          <p className="text-xs text-foreground-muted mb-0.5">Application</p>
-                          <p className="font-semibold text-foreground text-sm">{p.ai_application}</p>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* Inline Compare Section */}
-        {relatedProducts.length >= 1 &&
-          (() => {
-            const primaryImage =
-              product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-            const displayPrice =
-              product.has_variants && product.variant_min_price
-                ? Number(product.variant_min_price)
-                : Number(pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled))
-            const rawMrp = product.mrp
-              ? Number(product.mrp)
-              : product.variant_min_mrp
-                ? Number(product.variant_min_mrp)
-                : null
-            // When GST is off, displayPrice is ex-GST — rebase the inclusive MRP to match.
-            const gstRate = Number(product.gst_percentage ?? 0)
-            const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
-            return (
-              <PdpCompareSection
-                currentProduct={{
-                  id: product.id,
-                  name: product.name,
-                  slug: product.slug,
-                  price: displayPrice,
-                  mrp,
-                  image: primaryImage?.thumbnail_url || primaryImage?.image_url || null,
-                  brandName: product.brands?.name || null,
-                  categoryId: product.category_id || null,
-                  material: product.material ?? null,
-                  finish: product.finish ?? null,
-                  variant_type: product.variant_type ?? null,
-                  condition: product.condition ?? null,
-                  color: product.color ?? null,
-                  weight: product.weight ?? null,
-                  weight_unit: product.weight_unit ?? null,
-                  net_weight_grams: product.net_weight_grams ?? null,
-                  volume_ml: product.volume_ml ?? null,
-                  country_of_origin: product.country_of_origin ?? null,
-                  warranty_months: product.warranty_months ?? null,
-                  warranty_type: product.warranty_type ?? null,
-                  compliance_standard: product.compliance_standard ?? null,
-                  safety_rating: product.safety_rating ?? null,
-                  certifications: (product.certifications as string[] | null) ?? null,
-                  fragile: product.fragile ?? null,
-                  hazardous: product.hazardous ?? null,
-                  flammable: product.flammable ?? null,
-                  hsn_code: product.hsn_code ?? null,
-                  gst_percentage: product.gst_percentage ?? null,
-                }}
-                relatedProducts={relatedProducts.slice(0, 2).map((rp: any) => {
-                  const rImg = rp.product_images?.find((img: any) => img.is_primary) || rp.product_images?.[0]
-                  const rPrice =
-                    rp.has_variants && rp.variant_min_price
-                      ? Number(rp.variant_min_price)
-                      : Number(pickUnitPrice({ inclusive: rp.base_price, exGst: rp.price_ex_gst }, gstEnabled))
-                  const rRawMrp = rp.mrp ? Number(rp.mrp) : rp.variant_min_mrp ? Number(rp.variant_min_mrp) : null
-                  // When GST is off, rPrice is ex-GST — rebase the inclusive MRP to match.
-                  const rGstRate = Number(rp.gst_percentage ?? 0)
-                  const rMrp =
-                    !gstEnabled && rRawMrp != null && rGstRate > 0 ? round2(rRawMrp / (1 + rGstRate / 100)) : rRawMrp
-                  return {
-                    id: rp.id,
-                    name: rp.name,
-                    slug: rp.slug,
-                    price: rPrice,
-                    mrp: rMrp,
-                    image: rImg?.thumbnail_url || rImg?.image_url || null,
-                    brandName: rp.brands?.name || null,
-                    categoryId: rp.category_id || null,
-                    material: rp.material ?? null,
-                    finish: rp.finish ?? null,
-                    variant_type: rp.variant_type ?? null,
-                    condition: rp.condition ?? null,
-                    color: rp.color ?? null,
-                    weight: rp.weight ?? null,
-                    weight_unit: rp.weight_unit ?? null,
-                    net_weight_grams: rp.net_weight_grams ?? null,
-                    volume_ml: rp.volume_ml ?? null,
-                    country_of_origin: rp.country_of_origin ?? null,
-                    warranty_months: rp.warranty_months ?? null,
-                    warranty_type: rp.warranty_type ?? null,
-                    compliance_standard: rp.compliance_standard ?? null,
-                    safety_rating: rp.safety_rating ?? null,
-                    certifications: (rp.certifications as string[] | null) ?? null,
-                    fragile: rp.fragile ?? null,
-                    hazardous: rp.hazardous ?? null,
-                    flammable: rp.flammable ?? null,
-                    hsn_code: rp.hsn_code ?? null,
-                    gst_percentage: rp.gst_percentage ?? null,
-                  }
-                })}
-              />
-            )
-          })()}
-
-        {/* Description */}
-        {product.description && (
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
-            <h2 className="text-2xl font-bold text-foreground mb-4">Product Description</h2>
-            <p className="text-foreground-secondary leading-relaxed whitespace-pre-line">{product.description}</p>
-            <ProductPitchLine
-              productName={product.name}
-              brand={product.brands?.name || null}
-              category={product.categories?.name || null}
-            />
-          </div>
-        )}
-
-        {/* Product Reviews */}
-        <div id={PDP_REVIEWS_ID} className="scroll-mt-16 lg:scroll-mt-20">
-          <ProductReviews productId={product.id} productName={product.name} />
-        </div>
-
-        <CustomersAlsoViewed productId={product.id} />
-
-        {/* Recently Viewed */}
-        <RecentlyViewed excludeId={product.id} minItems={2} />
-
-        {/* Personalised picks */}
-        <FeaturedForYou />
-
-        {/* Related Products */}
-        {relatedProducts.length >= 4 && (
-          <div className="mt-10">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Related Products</h2>
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {relatedProducts.map((relatedProduct: any) => {
-                const relatedPrimaryImage =
-                  relatedProduct.product_images?.find((img: any) => img.is_primary) ||
-                  relatedProduct.product_images?.[0]
-                const relatedHasVariants = relatedProduct.has_variants
-                const relatedDisplayPrice =
-                  relatedHasVariants && relatedProduct.variant_min_price
-                    ? Number(relatedProduct.variant_min_price)
-                    : Number(
-                        pickUnitPrice(
-                          { inclusive: relatedProduct.base_price, exGst: relatedProduct.price_ex_gst },
-                          gstEnabled
-                        )
-                      )
-                const relatedRawMrp = relatedProduct.mrp
-                  ? Number(relatedProduct.mrp)
-                  : relatedProduct.variant_min_mrp
-                    ? Number(relatedProduct.variant_min_mrp)
-                    : null
-                // When GST is off, displayPrice is ex-GST. Rebase the (inclusive) MRP to the
-                // same ex-GST basis before computing the discount so the % and struck-through
-                // MRP stay consistent with the shown price.
-                const relatedGstRate = Number(relatedProduct.gst_percentage ?? 0)
-                const relatedMrp =
-                  !gstEnabled && relatedRawMrp != null && relatedGstRate > 0
-                    ? round2(relatedRawMrp / (1 + relatedGstRate / 100))
-                    : relatedRawMrp
-                const relatedMrpDiscount =
-                  relatedMrp && relatedMrp > relatedDisplayPrice
-                    ? Math.round(((relatedMrp - relatedDisplayPrice) / relatedMrp) * 100)
-                    : 0
-                const relatedStock = relatedHasVariants
-                  ? Number(relatedProduct.variant_stock_total ?? 0)
-                  : relatedProduct.stock_status !== 'Out of Stock'
-                    ? 1
-                    : 0
-
-                return (
-                  <ProductCard
-                    key={relatedProduct.id}
-                    id={relatedProduct.id}
-                    name={relatedProduct.name}
-                    slug={relatedProduct.slug}
-                    hasVariants={relatedHasVariants}
-                    displayPrice={relatedDisplayPrice}
-                    mrp={relatedMrp}
-                    mrpDiscount={relatedMrpDiscount}
-                    effectiveStock={relatedStock}
-                    isDigital={!!relatedProduct.is_digital}
-                    primaryImage={relatedPrimaryImage || null}
-                    brandName={relatedProduct.brands?.name || null}
-                    categoryName={relatedProduct.categories?.name || null}
-                    discountPct={Number(relatedProduct.discount_pct ?? 0)}
-                    extraDeliveryDays={Number(relatedProduct.extra_delivery_days ?? 0)}
-                    handlingDays={Number(relatedProduct.handling_days ?? 2)}
-                  />
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* One provider for the page: the built-in details and a Site Builder page's product parts share its state. */}
+      <ProductPageParts
+        product={product}
+        initialSkuParam={skuParam}
+        freeShippingThreshold={freeShippingThreshold}
+        reviewSummary={reviewSummary}
+        related={relatedProducts}
+        gstEnabled={gstEnabled}
+      >
+        {site ?? main}
+      </ProductPageParts>
     </div>
   )
 }

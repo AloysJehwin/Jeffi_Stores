@@ -1,0 +1,30 @@
+{
+  "voice": "Sulafat",
+  "lines": [
+    {
+      "id": "s1",
+      "text": "Your storefront, designed for you."
+    },
+    {
+      "id": "s2",
+      "text": "Choose a style, and the AI designs every page: home, categories, brands, products, cart and checkout."
+    },
+    {
+      "id": "s3",
+      "text": "Even the product card matches your style, and everything works out of the box: search, filters, wishlist and one-tap add to cart."
+    },
+    {
+      "id": "s4",
+      "text": "It's just as fast on a phone, so your customers can shop anywhere."
+    },
+    {
+      "id": "s5",
+      "text": "And you can change anything later, with drag and drop."
+    }
+  ],
+  "model": "gemini-3.8-flash-tts",
+  "language": "en-IN",
+  "gap": 0.55,
+  "leadIn": 0.8,
+  "tail": 2.4
+}

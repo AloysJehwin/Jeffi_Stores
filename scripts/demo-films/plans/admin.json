@@ -1,0 +1,166 @@
+{
+  "music": "music/lyria-3-clip-preview-1.mp3",
+  "musicVolume": 0.26,
+  "poster": 6.0,
+  "scenes": [
+    {
+      "line": "a1",
+      "type": "title",
+      "kicker": "Jeffi Stores admin",
+      "lines": [
+        "One admin for",
+        "your whole business."
+      ],
+      "accentLine": 1,
+      "size": 118
+    },
+    {
+      "line": "a2",
+      "type": "screen",
+      "clip": {
+        "name": "admin-products",
+        "cuts": [
+          [
+            0.4,
+            4.4
+          ],
+          [
+            7.4,
+            11.0
+          ]
+        ],
+        "rate": 1.3
+      },
+      "url": "admin.jeffistores.in/products",
+      "lower": {
+        "kicker": "Catalogue and stock",
+        "title": "Every product, every unit"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.55
+        }
+      ]
+    },
+    {
+      "line": "a3",
+      "type": "screen",
+      "clip": {
+        "name": "admin-ship-pay",
+        "cuts": [
+          [
+            0.4,
+            7.2
+          ]
+        ],
+        "rate": 1.15
+      },
+      "url": "admin.jeffistores.in/delivery",
+      "lower": {
+        "kicker": "Delivery and payments",
+        "title": "Ship, collect, get settled"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.42
+        }
+      ]
+    },
+    {
+      "line": "a4",
+      "type": "screen",
+      "clip": {
+        "name": "admin-gst",
+        "cuts": [
+          [
+            0.4,
+            3.6
+          ],
+          [
+            7.2,
+            9.6
+          ],
+          [
+            11.6,
+            14.4
+          ]
+        ],
+        "rate": 1.45
+      },
+      "url": "admin.jeffistores.in/gst",
+      "lower": {
+        "kicker": "GST",
+        "title": "Invoices and returns, always current"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.55
+        }
+      ]
+    },
+    {
+      "line": "a5",
+      "type": "screen",
+      "clip": {
+        "name": "admin-sitebuilder",
+        "cuts": [
+          [
+            0.5,
+            6.0
+          ],
+          [
+            9.5,
+            12.5
+          ]
+        ],
+        "rate": 1.35
+      },
+      "url": "admin.jeffistores.in/site-builder",
+      "lower": {
+        "kicker": "Site builder",
+        "title": "Your website, your way"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.25,
+          "cx": 0.573,
+          "cy": 0.45
+        },
+        {
+          "k": 1,
+          "z": 1.28,
+          "cx": 0.573,
+          "cy": 0.48
+        }
+      ]
+    }
+  ]
+}

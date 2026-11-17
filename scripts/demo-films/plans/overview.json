@@ -1,0 +1,344 @@
+{
+  "music": "music/lyria-3-pro-preview-1.mp3",
+  "musicVolume": 0.24,
+  "poster": 3.6,
+  "scenes": [
+    {
+      "line": "o1",
+      "type": "title",
+      "kicker": "Jeffi Stores",
+      "lines": [
+        "Sell online in India,",
+        "the easy way."
+      ],
+      "accentLine": 1,
+      "size": 124,
+      "subtitle": "Your store, your site, your admin and your campaigns, in one place."
+    },
+    {
+      "line": "o2",
+      "type": "screen",
+      "clip": {
+        "name": "store-step",
+        "from": 0.3,
+        "rate": 1.45,
+        "cuts": [
+          [
+            4.6,
+            11.4
+          ],
+          [
+            12.4,
+            17.6
+          ]
+        ]
+      },
+      "url": "ecom.jeffistores.in/onboard",
+      "lower": {
+        "kicker": "Tell us once",
+        "title": "Your details and licences",
+        "text": "Contacts, social pages and the certificates your category needs."
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.55
+        }
+      ]
+    },
+    {
+      "line": "o3",
+      "type": "screen",
+      "clip": {
+        "name": "studio-look-build",
+        "from": 0.3,
+        "rate": 1.25,
+        "cuts": [
+          [
+            2.6,
+            9.4
+          ],
+          [
+            15.9,
+            17.6
+          ],
+          [
+            19.0,
+            20.2
+          ],
+          [
+            21.9,
+            23.1
+          ],
+          [
+            24.0,
+            25.6
+          ]
+        ]
+      },
+      "url": "ecom.jeffistores.in/onboard",
+      "lower": {
+        "kicker": "AI site studio",
+        "title": "Pick a look. AI designs every page."
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.45
+        },
+        {
+          "k": 0.55,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.5
+        },
+        {
+          "k": 1,
+          "z": 1.26,
+          "cx": 0.6,
+          "cy": 0.62
+        }
+      ]
+    },
+    {
+      "line": "o4",
+      "type": "screen",
+      "clip": {
+        "name": "theme-gallery",
+        "cuts": [
+          [
+            2.3,
+            3.4
+          ],
+          [
+            8.6,
+            12.3
+          ],
+          [
+            14.9,
+            16.0
+          ]
+        ],
+        "rate": 1.25
+      },
+      "url": "ecom.jeffistores.in/onboard",
+      "lower": {
+        "kicker": "Ready-made themes",
+        "title": "Filled with your store, instantly"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.42
+        },
+        {
+          "k": 0.62,
+          "z": 1.2,
+          "cx": 0.59,
+          "cy": 0.5
+        },
+        {
+          "k": 1,
+          "z": 1.42,
+          "cx": 0.6,
+          "cy": 0.66
+        }
+      ]
+    },
+    {
+      "line": "o5",
+      "type": "screen",
+      "clip": {
+        "name": "studio-dnd",
+        "from": 0.3,
+        "rate": 1.3,
+        "cuts": [
+          [
+            2.4,
+            7.4
+          ],
+          [
+            11.4,
+            17.0
+          ]
+        ]
+      },
+      "url": "ecom.jeffistores.in/onboard",
+      "lower": {
+        "kicker": "Drag and drop",
+        "title": "Make it yours"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.15,
+          "cx": 0.66,
+          "cy": 0.42
+        },
+        {
+          "k": 0.5,
+          "z": 1.15,
+          "cx": 0.66,
+          "cy": 0.42
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.6,
+          "cy": 0.7
+        }
+      ]
+    },
+    {
+      "line": "o6",
+      "type": "duo",
+      "clip": {
+        "name": "paws-home",
+        "from": 0.6,
+        "rate": 1.6
+      },
+      "url": "pawsandco.jeffistores.in",
+      "phone": {
+        "clip": {
+          "name": "paws-phone",
+          "from": 0.5,
+          "rate": 1.4
+        }
+      },
+      "lower": {
+        "kicker": "Your storefront",
+        "title": "Beautiful on every device"
+      }
+    },
+    {
+      "line": "o7",
+      "type": "screen",
+      "clip": {
+        "name": "admin-orders",
+        "cuts": [
+          [
+            0.4,
+            12.4
+          ]
+        ],
+        "rate": 1.43
+      },
+      "url": "admin.jeffistores.in/orders",
+      "lower": {
+        "kicker": "One admin",
+        "title": "Orders, stock, delivery, payments, GST"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.578,
+          "cy": 0.4
+        }
+      ]
+    },
+    {
+      "line": "o8",
+      "type": "screen",
+      "clip": {
+        "name": "camp-detail",
+        "cuts": [
+          [
+            0.4,
+            10.6
+          ]
+        ],
+        "rate": 1.35
+      },
+      "url": "admin.jeffistores.in/campaigns/abandoned-cart",
+      "lower": {
+        "kicker": "Campaigns",
+        "title": "Email, WhatsApp and SMS"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.15,
+          "cx": 0.6,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.15,
+          "cx": 0.6,
+          "cy": 0.4
+        }
+      ]
+    },
+    {
+      "line": "o9",
+      "type": "screen",
+      "clip": {
+        "name": "showcase",
+        "from": 0.3,
+        "rate": 1.45,
+        "cuts": [
+          [
+            0.4,
+            2.0
+          ],
+          [
+            5.0,
+            9.0
+          ],
+          [
+            10.8,
+            16.4
+          ]
+        ]
+      },
+      "url": "ecom.jeffistores.in/onboard/showcase",
+      "lower": {
+        "kicker": "Showcase",
+        "title": "A one-page site, free for a month"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.4
+        },
+        {
+          "k": 1,
+          "z": 1.2,
+          "cx": 0.585,
+          "cy": 0.62
+        }
+      ]
+    },
+    {
+      "line": "o10",
+      "type": "outro",
+      "lines": [
+        "Sell anything.",
+        "We run the store."
+      ],
+      "cta": "Start free",
+      "url": "ecom.jeffistores.in"
+    }
+  ]
+}
