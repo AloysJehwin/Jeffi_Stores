@@ -47,12 +47,12 @@ export class GoogleProvider implements MediaProvider {
     // Same as the deploy config: the -preview models are not served to new projects.
     private readonly imageModel = process.env.GOOGLE_IMAGE_MODEL || 'gemini-3.1-flash-image',
     private readonly premiumImageModel = process.env.GOOGLE_IMAGE_PREMIUM_MODEL || 'gemini-3-pro-image',
-    // The cheapest image model a new project is served (half the standard one's price).
-    private readonly draftImageModel = process.env.GOOGLE_IMAGE_DRAFT_MODEL || 'gemini-3.1-flash-lite-image',
     private readonly imagenModel = process.env.GOOGLE_IMAGEN_MODEL || '',
     private readonly veoModel = process.env.GOOGLE_VEO_MODEL || 'veo-3.1-fast-generate-preview',
     private readonly veoFallback = process.env.GOOGLE_VEO_FALLBACK || 'veo-3.0-generate-001',
     private readonly timeoutMs = Number(process.env.GOOGLE_TIMEOUT_MS) || 120_000,
+    // The cheapest image model a new project is served (half the standard one's price).
+    private readonly draftImageModel = process.env.GOOGLE_IMAGE_DRAFT_MODEL || 'gemini-3.1-flash-lite-image',
   ) {}
 
   configured(): boolean { return !!this.apiKey }
