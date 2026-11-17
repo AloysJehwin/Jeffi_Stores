@@ -177,7 +177,10 @@ jobs:
       - uses: ./.github/actions/node-setup
         with:
           install: ${{ matrix.install }}
+      # The apps' checks load store-core's site themes and blocks; tsc outgrows Node's default heap.
       - run: ${{ matrix.run }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
   security:
     name: Security
