@@ -5,7 +5,8 @@ import type { CompiledSection } from '@/lib/site/code/compile'
 import { evalValue } from '@/lib/site/code/evaluate'
 import { codeLibrary } from '@/lib/site/code/library'
 import { siteData, type SiteData } from '@/lib/site/data'
-import { makeEnv, renderNode, scanData, type Taxonomy } from './interpret'
+import { placeholderRows } from '@/lib/site/code/placeholders'
+import { introduces, makeEnv, renderNode, scanData, scanIds, type Anchors, type Taxonomy } from './interpret'
 import { CardSamples } from './common/SiteCard'
 
 /** One answer per distinct call while the section renders, so counting the data first costs no extra queries. */
@@ -42,6 +43,53 @@ async function countOf(node: CmpNode, data: SiteData): Promise<number> {
   const parsed = def.props.safeParse(raw)
   if (!parsed.success) return 0
   return def.count(parsed.data as Record<string, unknown>, data).catch(() => 1)
+}
+
+type Found = ReturnType<typeof scanData>
+
+/** The data components a section's tree holds that have nothing to show. */
+async function emptyData(found: Found, data: SiteData): Promise<Set<unknown>> {
+  const counts = await Promise.all(found.data.map(n => countOf(n, data)))
+  return new Set<unknown>(found.data.filter((_, i) => counts[i] === 0))
+}
+
+/** A section of only store data that is all empty draws nothing. */
+const hides = (found: Found, empty: Set<unknown>) => found.data.length > 0 && !found.other && empty.size === found.data.length
+
+function hasTag(n: unknown, tag: string, depth = 0): boolean {
+  if (!n || typeof n !== 'object' || depth > 200) return false
+  const node = n as CodeNode
+  if (node.t === 'el') return node.tag === tag || (node.children ?? []).some(c => hasTag(c, tag, depth + 1))
+  if (node.t === 'cmp') return (node.children ?? []).some(c => hasTag(c, tag, depth + 1)) || hasTag(node.render?.body, tag, depth + 1)
+  if (node.t === 'frag') return (node.children ?? []).some(c => hasTag(c, tag, depth + 1))
+  if (node.t === 'cond') return hasTag(node.then, tag, depth + 1) || hasTag(node.else, tag, depth + 1)
+  if (node.t === 'each') return hasTag(node.body, tag, depth + 1)
+  return false
+}
+
+/**
+ * A one-page site's sections, planned together before they draw: the header (the first) and the opening always draw,
+ * even when their data is empty, so a page never loses them; and the ids the page will have, so links to a section
+ * that draws nothing (or to an id no section has) are left out.
+ */
+export async function planSections(sections: (CompiledSection | null | undefined)[], data: SiteData): Promise<{ always: boolean[]; anchors: Anchors }> {
+  const src = once(data)
+  // The opening: the first section after the header (which always draws) that holds the page's h1, else the one
+  // right after the header when it introduces the business.
+  const h1 = sections.findIndex((s, i) => i > 0 && !!s?.ast && hasTag(s.ast, 'h1'))
+  const opening = h1 >= 0 ? h1 : sections[1]?.ast && introduces(sections[1].ast) ? 1 : -1
+  const always = sections.map((_, i) => i === 0 || i === opening)
+  const anchors: Anchors = { ids: new Set(), gone: new Set(), open: false }
+  const plans = await Promise.all(
+    sections.map(async (s, i) => {
+      if (!s || typeof s !== 'object' || !s.ast || typeof s.ast !== 'object') return null
+      const found = scanData(s.ast)
+      const empty = await emptyData(found, src)
+      return { ast: s.ast, empty, shows: always[i] || !hides(found, empty) }
+    })
+  )
+  for (const p of plans) if (p) scanIds(p.ast, p.empty, anchors, p.shows)
+  return { always, anchors }
 }
 
 /** Every link in a prop value: a plain string, or `href` fields in objects and lists (menus, footer columns). */
@@ -94,6 +142,7 @@ export default async function CodeSection({
   data,
   priority = false,
   always = false,
+  anchors = null,
 }: {
   section: CompiledSection | null | undefined
   id?: string
@@ -101,6 +150,8 @@ export default async function CodeSection({
   data?: SiteData
   priority?: boolean
   always?: boolean
+  /** A one-page site's ids (planSections): links to a section the page does not draw are left out. */
+  anchors?: Anchors | null
 }) {
   const s = section as Partial<CompiledSection> | null | undefined
   if (!s || typeof s !== 'object' || !s.ast || typeof s.ast !== 'object') return null
@@ -114,11 +165,11 @@ export default async function CodeSection({
       </div>
     )
   const found = scanData(s.ast)
-  const [counts, taxonomy] = await Promise.all([Promise.all(found.data.map(n => countOf(n, src))), taxonomyFor(s.ast, src)])
-  const empty = new Set<unknown>(found.data.filter((_, i) => counts[i] === 0))
-  if (!always && found.data.length && !found.other && empty.size === found.data.length) return null
+  const [empty, taxonomy] = await Promise.all([emptyData(found, src), taxonomyFor(s.ast, src)])
+  if (!always && hides(found, empty)) return null
   const css = inertCss(s.css)
-  const env = makeEnv({ data: src, page, sectionId: id, priority, empty, taxonomy })
+  const rows = page === 'showcase' ? placeholderRows(s.ast) : null
+  const env = makeEnv({ data: src, page, sectionId: id, priority, empty, taxonomy, anchors, rows })
   return (
     <div data-code-section={id} id={blockId && /^[A-Za-z0-9_-]{1,64}$/.test(blockId) ? blockId : undefined}>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}

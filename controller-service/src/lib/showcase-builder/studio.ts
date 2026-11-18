@@ -29,9 +29,9 @@ export function detailsAnswers(site: Pick<ShowcaseSiteRow, 'business'>): Record<
   }
 }
 
-/** "What do you do?" to start from: the profession and the services. */
+/** "What do you do?" to start from: the profession and the services the owner wrote (not the AI's suggestions). */
 export function whatTheyDo(site: Pick<ShowcaseSiteRow, 'business' | 'content'>): string {
-  const services = (site.content.services ?? []).map(s => s.title).filter(Boolean).slice(0, 8)
+  const services = (site.content.services ?? []).filter(s => !s.ai).map(s => s.title).filter(Boolean).slice(0, 8)
   const what = (site.business.profession ?? '').trim()
   return [what, services.length ? `${what ? 'Services' : 'We offer'}: ${services.join(', ')}` : ''].filter(Boolean).join('. ').slice(0, 1200)
 }

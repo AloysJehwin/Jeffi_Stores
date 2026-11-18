@@ -213,4 +213,14 @@ describe('sendAuditedMail', () => {
     expect(errorArg).toBeDefined()
     expect(errorArg!.length).toBeLessThanOrEqual(2000)
   })
+
+  it('leaves out the "you can reply" line when replies go to someone else (replyHint: false)', async () => {
+    const { mailShell, REPLY_HINT } = await import('@/lib/shared/mail-template')
+    const html = mailShell({ brand: 'Jeffi Commerce', content: '<p>New enquiry</p>' })
+    await sendAuditedMail({ to: 'owner@example.com', subject: 'Enquiry', html, kind: 'ecom', replyTo: 'visitor@example.com', replyHint: false })
+    await sendAuditedMail({ to: 'owner@example.com', subject: 'Notice', html, kind: 'ecom', replyTo: 'support@example.com' })
+    expect(mockSendMail.mock.calls[0][0].replyTo).toBe('visitor@example.com')
+    expect(mockSendMail.mock.calls[0][0].html).not.toContain(REPLY_HINT)
+    expect(mockSendMail.mock.calls[1][0].html).toContain(REPLY_HINT)
+  })
 })

@@ -9,7 +9,7 @@ import { useToast } from '@/contexts/ToastContext'
 import CodeContentFields from '@/components/admin/site-builder/CodeContentFields'
 import type { CodeLiteral, LiteralEdit } from '@/lib/site/code/literals'
 import { fieldInput, ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../ui'
-import { AI_UNAVAILABLE, isAiDown, isWalletLow, StudioError, studioGet, studioPost, studioStream, studioUrl, WALLET_LOW, type StudioView } from './api'
+import { AI_UNAVAILABLE, isAiDown, isPriceChanged, isWalletLow, StudioError, studioGet, studioPost, studioStream, studioUrl, WALLET_LOW, type StudioView } from './api'
 import StudioPreview, { DeviceToggle, type Device, type PickedSection } from './StudioPreview'
 import type { StudioEvent } from '@/lib/site/studio/types'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
@@ -180,16 +180,30 @@ export default function BuildStep({
   aiDown?: boolean
 }) {
   const { showToast } = useToast()
+  const refresh = useCallback(async () => {
+    const v = await studioGet().catch(() => null)
+    if (v) onView(v)
+    return v
+  }, [onView])
   const report = useCallback(
-    (e: unknown) => (isWalletLow(e) && onWalletLow ? onWalletLow(e) : isAiDown(e) && onAiDown ? onAiDown() : showToast((e as Error).message, 'error')),
-    [onAiDown, onWalletLow, showToast]
+    (e: unknown) => {
+      if (isWalletLow(e) && onWalletLow) return onWalletLow(e)
+      if (isAiDown(e) && onAiDown) return onAiDown()
+      showToast((e as Error).message, 'error')
+      // The price shown was out of date: load the current one, so the next try asks with it.
+      if (isPriceChanged(e)) void refresh()
+    },
+    [onAiDown, onWalletLow, showToast, refresh]
   )
   const s = view.session!
   const plan = s.plan!
-  // A Showcase has one page; its generations after the free one are charged to the wallet (`paid` is the price).
+  // A Showcase has one page; each design after the free one is a redesign for `paid.priceInr` from the wallet.
   const showcase = s.product === 'showcase'
   const home = showcase ? SHOWCASE_PAGE_KEY : 'store:home'
   const paid = view.allowance.paid
+  const charged = useCallback((inr: unknown) => {
+    if (Number(inr) > 0) showToast(`Your new page is ready. ₹${Number(inr)} was charged to your wallet.`, 'success')
+  }, [showToast])
   const [live, setLive] = useState<Record<string, PageState>>({})
   const [section, setSection] = useState<Record<string, { index: number; total: number; label: string }>>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -232,12 +246,6 @@ export default function BuildStep({
   const retryable = failedPages.filter(p => retriesOf(p.key) < FREE_RETRIES)
   const resumable = s.status === 'failed' && view.allowance.free === 'resume'
 
-  const refresh = useCallback(async () => {
-    const v = await studioGet().catch(() => null)
-    if (v) onView(v)
-    return v
-  }, [onView])
-
   const show = (key: string) => {
     setCurrent(key)
     setPicked(null)
@@ -257,6 +265,7 @@ export default function BuildStep({
         setLive(l => ({ ...l, [data.key]: 'done' }))
         setVersion(n => n + 1)
         if (!CHROME.has(data.key) && follow.current) setCurrent(data.key)
+        charged(data.chargedInr)
       } else if (event === 'page-failed') {
         setLive(l => ({ ...l, [data.key]: 'failed' }))
         if (data.error) setMessage(data.error)
@@ -268,15 +277,15 @@ export default function BuildStep({
         else showToast(data.error || 'The build stopped', 'error')
       }
     },
-    [onView, showToast, onAiDown, onWalletLow]
+    [onView, showToast, onAiDown, onWalletLow, charged]
   )
 
-  const paidGeneration = !!paid
+  const priceInr = paid?.priceInr ?? null
   const startBuild = useCallback(async () => {
     setStreaming(true)
     setMessage('Getting started')
     try {
-      await studioStream('generate', paidGeneration ? { expect: 'paid' } : {}, onEvent)
+      await studioStream('generate', priceInr !== null ? { expect: 'paid', priceInr } : {}, onEvent)
     } catch (e) {
       report(e)
     } finally {
@@ -285,7 +294,7 @@ export default function BuildStep({
       setVersion(n => n + 1)
       await refresh()
     }
-  }, [onEvent, refresh, report, paidGeneration])
+  }, [onEvent, refresh, report, priceInr])
 
   useEffect(() => {
     if (autoStart && !started.current) {
@@ -326,14 +335,17 @@ export default function BuildStep({
   async function rebuild() {
     if (!currentPage || currentPage.themed) return
     const ask = paid
-      ? `Design your page again? It is charged to your wallet: usually ₹${paid.lowInr}–₹${paid.highInr}, never more than ₹${paid.capInr}. Your current page stays until the new one is ready.`
-      : `Design the ${currentPage.label} page again? It counts as ${5} of today’s free changes.`
+      ? `Design your page again for ₹${paid.priceInr} from your wallet? If the new page can’t be made, you aren’t charged. Your current page stays until the new one is ready.`
+      : showcase
+        ? 'Design your page with AI? This is your free design. Your current page stays until the new one is ready.'
+        : `Design the ${currentPage.label} page again? It counts as ${5} of today’s free changes.`
     if (!window.confirm(ask)) return
     setWorking('rebuild')
     setPicked(null)
     try {
-      await studioStream('regenerate-page', { page: current, ...(paid ? { expect: 'paid' } : {}) }, (event, data) => {
+      await studioStream('regenerate-page', { page: current, ...(paid ? { expect: 'paid', priceInr: paid.priceInr } : {}) }, (event, data) => {
         if (event === 'progress' && data.type === 'section') setMessage(`Writing ${data.label} (${data.index + 1} of ${data.total})`)
+        else if (event === 'page-done') charged(data.chargedInr)
         else if (event === 'page-failed') showToast(data.error || 'That page could not be designed again', 'error')
         else if (event === 'error') onEvent(event, data)
         else if (event === 'done') onView(data as StudioView)
@@ -617,8 +629,9 @@ export default function BuildStep({
               <button type="button" onClick={() => { setPicking(p => !p); setPicked(null) }} disabled={!canTweak || !!working} aria-pressed={picking} className={picking ? `${primaryBtn} px-4 py-2` : `${secondaryBtn} px-4 py-2`}>
                 <MousePointerClick className="h-4 w-4" /> {picking ? 'Click a section…' : 'Change a section'}
               </button>
-              <button type="button" onClick={rebuild} disabled={!canTweak || !!working || (!paid && tweaksLeft < 5)} className={`${ghostBtn} px-3 py-2`}>
-                <RefreshCw className="h-4 w-4" /> Design this page again
+              {/* A Showcase's design is free once, then a redesign from the wallet: neither spends the day's changes. */}
+              <button type="button" onClick={rebuild} disabled={!canTweak || !!working || (!showcase && tweaksLeft < 5)} className={`${ghostBtn} px-3 py-2`}>
+                <RefreshCw className="h-4 w-4" /> {paid ? `Design this page again · ₹${paid.priceInr}` : showcase ? 'Design this page again · Free' : 'Design this page again'}
               </button>
               {currentPage?.themed && <span className="text-xs text-foreground-muted">Themed page: it takes your look; the AI designs the main pages.</span>}
             </div>

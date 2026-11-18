@@ -108,6 +108,22 @@ ${parts.map(p => `        <${p} />`).join('\n')}
 }`
 }
 
+// A Showcase's sections in the order they are written: what the page cannot do without first (header, opening,
+// contact, footer), then those the business has content for, and last those that stay hidden until it adds work,
+// reviews or numbers, so a budget that runs out leaves out what would not show yet. Other pages go in plan order.
+const LATER: Record<string, number> = { Services: 1, Faqs: 1, Work: 2, Testimonials: 2, Stats: 2 }
+export function writeOrder(p: Pick<PlannedPage, 'page' | 'sections'>): number[] {
+  const all = p.sections.map((_, i) => i)
+  if (p.page !== 'showcase') return all
+  const last = p.sections.length - 1
+  const rank = (i: number) => {
+    const parts = p.sections[i].parts ?? []
+    if (i === 0 || i === 1 || i === last || parts.includes('LeadForm')) return 0
+    return Math.max(0, ...parts.map(x => LATER[x] ?? 0)) + 1
+  }
+  return all.sort((a, b) => rank(a) - rank(b) || a - b)
+}
+
 async function runLimited<T>(items: T[], limit: number, fn: (item: T, i: number) => Promise<void>) {
   let next = 0
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -127,7 +143,8 @@ export async function generatePage(ctx: StudioCtx, page: PlannedPage | string, o
   const skipped: { label: string; reason: string }[] = []
   let budgetOut = false
   try {
-    await runLimited(p.sections, CONCURRENCY, async (s: PlannedSection, index) => {
+    await runLimited(writeOrder(p), CONCURRENCY, async (index: number) => {
+      const s: PlannedSection = p.sections[index]
       if (budgetOut) {
         skipped.push({ label: s.label, reason: 'The free generation budget is spent' })
         onEvent({ type: 'section', page: p.key, index, total, label: s.label, status: 'skipped', issues: ['budget'] })

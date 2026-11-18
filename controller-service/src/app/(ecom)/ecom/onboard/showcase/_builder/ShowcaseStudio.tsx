@@ -14,8 +14,8 @@ import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 
 // The AI Site Studio for a Showcase (product 'showcase'): the store's studio steps (brief, plan, look, build with
 // preview, drag-and-drop arranging, content editing and AI changes) worded for a business's one page. The first design
-// is free; another (after starting over, or "Design this page again") is charged to the wallet, shown before it starts.
-// The studio's API calls carry ?product=showcase (onboard/_studio/api.ts studioProduct).
+// is free; another (after starting over, or "Design this page again") is a redesign for a flat price from the wallet,
+// shown before it starts. The studio's API calls carry ?product=showcase (onboard/_studio/api.ts studioProduct).
 
 type Phase = 'intro' | 'brief' | 'plan' | 'direction' | 'build'
 const PHASES: { id: Phase; label: string }[] = [
@@ -42,7 +42,7 @@ function phaseOf(v: StudioView | null): Phase {
   return 'brief'
 }
 
-const priceText = (p: NonNullable<StudioView['allowance']['paid']>) => `usually ₹${p.lowInr}–₹${p.highInr}, never more than ₹${p.capInr}`
+const priceText = (p: NonNullable<StudioView['allowance']['paid']>) => `₹${p.priceInr} from your wallet`
 
 export default function ShowcaseStudio({
   businessName,
@@ -68,6 +68,7 @@ export default function ShowcaseStudio({
   // A paid generation the owner confirmed: the build step starts it once, then this is cleared.
   const [paidStart, setPaidStart] = useState(false)
   const top = useRef<HTMLDivElement>(null)
+  const low = useRef<HTMLDivElement>(null)
   const report = useRef(onView)
   report.current = onView
 
@@ -94,6 +95,11 @@ export default function ShowcaseStudio({
     const t = setTimeout(() => setPaidStart(false), 0)
     return () => clearTimeout(t)
   }, [phase, paidStart])
+
+  // The top-up note sits above the studio: bring it into view from the button that asked.
+  useEffect(() => {
+    if (walletLow) low.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [walletLow])
 
   const go = (p: Phase) => {
     setPhase(p)
@@ -135,7 +141,7 @@ export default function ShowcaseStudio({
 
   const startOver = async () => {
     const msg = paid || view?.allowance.free === 'used'
-      ? `Start over? Your answers, sections and look are cleared, and so is the page in the studio (your live site stays as it is until you publish again). Designing a new page is charged to your wallet: ${paid ? priceText(paid) : 'see the price before it starts'}.`
+      ? `Start over? Your answers, sections and look are cleared, and so is the page in the studio (your live site stays as it is until you publish again). Designing a new page costs ${paid ? priceText(paid) : 'a redesign from your wallet'}.`
       : 'Start over? Your answers, sections and look are cleared.'
     if (!window.confirm(msg)) return
     await call('restart', 'start', { restart: true }, () => go('brief'))
@@ -173,15 +179,15 @@ export default function ShowcaseStudio({
             className={primaryBtn}
             title={s.direction ? undefined : 'Pick a look first'}
             onClick={() => {
-              if (!window.confirm(`Design your page in this look? It is charged to your wallet: ${priceText(paid)}.`)) return
+              if (!window.confirm(`Design your page in this look for ${priceText(paid)}? If the page can’t be made, you aren’t charged.`)) return
               setWalletLow(null)
               setPaidStart(true)
               go('build')
             }}
           >
-            <Sparkles className="h-4 w-4" /> Design my page
+            <Sparkles className="h-4 w-4" /> Design my page · ₹{paid.priceInr}
           </button>
-          <span className="text-xs text-foreground-muted">Charged to your wallet: {priceText(paid)}.</span>
+          <span className="text-xs text-foreground-muted">A redesign costs {priceText(paid)}; you aren’t charged if the page can’t be made.</span>
         </div>
       )
     return (
@@ -212,7 +218,7 @@ export default function ShowcaseStudio({
         </div>
       )}
       {walletLow && (
-        <div role="alert" className={`${noteCls} org-peach flex flex-col gap-3 sm:flex-row sm:items-center`}>
+        <div ref={low} role="alert" className={`${noteCls} org-peach flex flex-col gap-3 sm:flex-row sm:items-center`}>
           <Wallet className="h-5 w-5 shrink-0 org-brown" aria-hidden />
           <p className="min-w-0 flex-1 text-foreground">{walletLow.message}</p>
           {walletLow.topUpUrl && (

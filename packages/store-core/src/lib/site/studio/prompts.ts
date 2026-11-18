@@ -173,8 +173,11 @@ const SHOWCASE_RULES = [
   'This site sells nothing online: there are no products, prices to buy at, cart, checkout or shop parts (Products, Categories, Brands, Reviews, Offers, Store, ProductCard are not available). Use only the Showcase parts below and the decoration parts (Image, Link, Icon, Carousel, Tabs, Accordion, Marquee, Reveal).',
   "The business's details and content come only from its parts, so the page follows when the owner edits them: name, tagline, logo, about, phone, WhatsApp, email, address, hours and map from <Business>{b => …}</Business>; services and their prices from <Services>, work pictures from <Work>, client quotes from <Testimonials>, numbers from <Stats>, questions from <Faqs>, enquiries through <LeadForm />, social profiles with <SocialLinks />. Never type a name, phone number, email, address, hours, service, price, number, quote or question yourself.",
   'Contact links only from <Business>: href={b.whatsappUrl}, href={b.phoneUrl}, href={b.emailUrl}, href={b.mapUrl}. The business may not have given each one: guard it, e.g. {b.whatsappUrl && <Link href={b.whatsappUrl} className="…">Chat on WhatsApp</Link>}.',
-  'One page, linked by anchors: give a section an id from top, about, services, work, reviews, faq, contact (<section id="services">) and link to it with <Link href="#services">. The header links only to the sections the plan has.',
-  'Pictures only from data (s.image, w.image, t.avatar, b.logo). Never an <Image> without a src: where there is no picture, design with colour, type and icons (b.initial makes a mark when there is no logo).',
+  'A detail the business did not give has no row at all: show hours, address, phone, WhatsApp and email only when given, guarding each row (b.hours && …) or drawing the rows from b.facts. Never write a stand-in for a missing one ("Call for today\'s hours", "Message us for timings", "In your neighbourhood", "Address on request", "Coming soon").',
+  'One page, linked by anchors: give a section an id from top, about, services, work, reviews, faq, contact (<section id="services">) and link to it with <Link href="#services">. The header links only to the sections the plan has; a section that draws nothing takes its links with it, so never link to an id no section has.',
+  'The opening section (the one holding the page\'s h1) always shows a picture through <BusinessPicture> (the owner\'s work photo, else a picture made for this page, else a designed fill); a later section may show <BusinessPicture index={1}>. Other pictures only from data (s.image, w.image, t.avatar, b.logo); never an <Image> without a src (b.initial makes a mark when there is no logo).',
+  'Never present a picture as the owner\'s work unless it is: a gallery of their work is <Work> alone (their own uploads), and a <BusinessPicture> is captioned as their work only when p.kind === "work".',
+  'Client quotes, names and ratings come only from <Testimonials>: never type a quote, a review, a client\'s name or a star rating. A reviews section shows real reviews or nothing.',
   'The business may have no services, work, testimonials, numbers or questions yet: a section built only on them stays hidden until they exist, so the header, hero and contact sections must not depend on them.',
 ].join(' ')
 
@@ -188,7 +191,7 @@ ${RESPONSIVE}
 
 ${themeRules(d)}
 
-Copy: Indian English, specific to this business and its clients, short headings, no emoji, no prices, numbers (clients served, years, projects, ratings) or claims you were not given. Never invent quotes, testimonials, people, awards, certifications, guarantees or promises the brief does not give. The section labels in the plan are notes for you, not headings: write real headings.
+Copy: Indian English, specific to this business and its clients, short headings, no emoji, no prices, opening hours, addresses, numbers (clients served, years, projects, ratings) or claims you were not given. Never invent quotes, testimonials, people, a founding story, awards, certifications, guarantees or promises the brief does not give. The section labels in the plan are notes for you, not headings: write real headings.
 
 Reply with one \`\`\`tsx code block and nothing else.
 

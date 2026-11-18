@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Star, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Sparkles, Star, Trash2 } from 'lucide-react'
 import { Card } from '../../../dashboard/_components/Card'
 import { fieldInput, fieldLabel, secondaryBtn } from '../../ui'
 import { SHOWCASE_LIMITS } from '@/lib/showcase/clean'
-import type { ShowcaseContent, ShowcaseFaq, ShowcaseReview, ShowcaseService, ShowcaseStat, ShowcaseWork } from '@/lib/showcase/types'
+import type { ShowcaseContent, ShowcaseFaq, ShowcasePagePicture, ShowcaseReview, ShowcaseService, ShowcaseStat, ShowcaseWork } from '@/lib/showcase/types'
 import ImageField from './ImageField'
 import { uploadShowcaseImage } from './useShowcaseDetails'
 import type { DetailsForm } from './model'
@@ -16,7 +16,15 @@ import type { DetailsForm } from './model'
 const inp = fieldInput
 const lbl = fieldLabel
 
-type ListKey = keyof ShowcaseContent
+type ListKey = Exclude<keyof ShowcaseContent, 'pictures'>
+
+/** An item the owner changed is theirs: the AI's mark goes. */
+function edited<T>(item: T, patch: Partial<T>): T {
+  const { ai: _ai, ...rest } = { ...item, ...patch } as T & { ai?: boolean }
+  return rest as T
+}
+
+const SUGGESTED = 'Suggested by AI. Check it, then edit or remove it.'
 
 function ListCard<T>({
   title,
@@ -28,6 +36,7 @@ function ListCard<T>({
   addLabel,
   render,
   extra,
+  aiNote = SUGGESTED,
 }: {
   title: string
   hint: string
@@ -39,6 +48,8 @@ function ListCard<T>({
   addLabel: string
   render: (item: T, set: (patch: Partial<T>) => void, i: number) => ReactNode
   extra?: ReactNode
+  /** What an item the AI suggested or made says until the owner edits it. */
+  aiNote?: string
 }) {
   const move = (i: number, by: number) =>
     update(list => {
@@ -54,7 +65,14 @@ function ListCard<T>({
         {items.map((item, i) => (
           <li key={i} className="rounded-xl border border-border-default bg-surface p-3 sm:p-4">
             <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">{render(item, patch => update(list => list.map((x, j) => (j === i ? { ...x, ...patch } : x))), i)}</div>
+              <div className="min-w-0 flex-1">
+                {(item as { ai?: boolean }).ai && (
+                  <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-surface-secondary px-2.5 py-1 text-xs text-foreground-secondary">
+                    <Sparkles className="h-3.5 w-3.5" /> {aiNote}
+                  </p>
+                )}
+                {render(item, patch => update(list => list.map((x, j) => (j === i ? edited(x, patch) : x))), i)}
+              </div>
               <div className="flex shrink-0 flex-col gap-1">
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="ecom-focus rounded-lg p-1.5 text-foreground-muted ecom-hover hover:text-foreground disabled:opacity-30">
                   <ArrowUp className="h-4 w-4" />
@@ -229,6 +247,28 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
                 <input id={`wk-desc-${i}`} className={inp} maxLength={600} value={w.description ?? ''} onChange={e => set({ description: e.target.value })} />
               </div>
               {!w.image && <p className="text-xs text-[#8a2e1f] sm:col-span-2">Add the picture: a work sample shows only with one.</p>}
+            </div>
+          </div>
+        )}
+      />
+
+      <ListCard<ShowcasePagePicture>
+        title="Pictures for your page"
+        hint="Pictures that set the mood, shown after your work photos (never as your work). When you have few work photos, designing your page adds some made by AI."
+        items={c.pictures ?? []}
+        limit={SHOWCASE_LIMITS.pictures}
+        update={fn => setForm(f => ({ ...f, content: { ...f.content, pictures: fn(f.content.pictures ?? []) } }))}
+        blank={() => ({ image: '', alt: '' })}
+        addLabel="Add a picture"
+        aiNote="Made by AI for your page. Replace it with your own photo whenever you like."
+        render={(p, set, i) => (
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <ImageField value={p.image} onChange={image => set({ image: image ?? '' })} kind="work" label="Picture" className="h-24 w-24" />
+            <div className="min-w-0 flex-1">
+              <label htmlFor={`pc-alt-${i}`} className={lbl}>
+                What it shows
+              </label>
+              <input id={`pc-alt-${i}`} className={inp} maxLength={120} placeholder="e.g. Our counter in the morning" value={p.alt ?? ''} onChange={e => set({ alt: e.target.value })} />
             </div>
           </div>
         )}

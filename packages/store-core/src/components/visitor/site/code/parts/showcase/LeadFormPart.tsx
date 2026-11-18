@@ -1,12 +1,12 @@
 'use client'
 
-import { useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import type { ShowcaseLeadInput } from '@/lib/showcase/types'
 
 // The Showcase lead form (the LeadForm part): name, and phone and/or email and a message, posted as JSON
-// (ShowcaseLeadInput) to the site's lead endpoint. Without an endpoint (the studio preview) it is inert: it checks what
-// was typed and says so.
+// (ShowcaseLeadInput) to the site's lead endpoint. A problem with a field shows under it (the endpoint names the field);
+// others above the button. Without an endpoint (the studio preview) it is inert: it checks what was typed and says so.
 
 export type LeadField = 'name' | 'phone' | 'email' | 'message'
 
@@ -31,28 +31,42 @@ export default function LeadFormPart({
   className?: string
 }) {
   const id = useId()
+  const form = useRef<HTMLFormElement>(null)
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ field: LeadField | null; text: string } | null>(null)
+
+  // Focus the field once it is marked, so a screen reader reads its error with it.
+  useEffect(() => {
+    if (error?.field) form.current?.querySelector<HTMLElement>(`[name="${error.field}"]`)?.focus()
+  }, [error])
+
+  /** Show the problem under its field (`contact`: the phone, else the email); others above the button. */
+  function fail(text: string, field?: string | null) {
+    const f = field === 'contact' ? (fields.includes('phone') ? 'phone' : 'email') : field
+    setError({ field: fields.find(k => k === f) ?? null, text })
+  }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const f = new FormData(e.currentTarget)
     const get = (k: string) => String(f.get(k) ?? '').trim()
     const body: ShowcaseLeadInput = { name: get('name'), phone: get('phone') || undefined, email: get('email') || undefined, message: get('message') || undefined, website: get('website') || undefined }
-    if (body.name.length < 2) return setError('Please tell us your name.')
-    if (body.phone && body.phone.replace(/\D/g, '').length < 10) return setError('Please check your phone number.')
-    if (body.email && !EMAIL.test(body.email)) return setError('Please check your email address.')
-    if (!body.phone && !body.email) return setError(fields.includes('phone') ? 'Please leave a phone number so we can reach you.' : 'Please leave an email address so we can reach you.')
+    if (body.name.length < 2) return fail('Please tell us your name.', 'name')
+    if (body.phone && body.phone.replace(/\D/g, '').length < 10) return fail('Please check your phone number.', 'phone')
+    if (body.email && !EMAIL.test(body.email)) return fail('Please check your email address.', 'email')
+    if (!body.phone && !body.email) return fail(fields.includes('phone') ? 'Please leave a phone number so we can reach you.' : 'Please leave an email address so we can reach you.', 'contact')
     setError(null)
-    if (!endpoint) return setError('This form starts working once your site is live.')
+    if (!endpoint) return fail('This form starts working once your site is live.')
     setState('sending')
     try {
       const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) })
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || 'Could not send')
-      setState('sent')
-    } catch (err) {
+      if (res.ok) return setState('sent')
+      const data = await res.json().catch(() => null)
       setState('idle')
-      setError((err as Error).message === 'Could not send' ? 'Your message could not be sent. Please try again.' : (err as Error).message)
+      fail(data?.error || 'Your message could not be sent. Please try again.', data?.field)
+    } catch {
+      setState('idle')
+      fail('Your message could not be sent. Check your connection and try again.')
     }
   }
 
@@ -66,14 +80,23 @@ export default function LeadFormPart({
       </div>
     )
 
+  const errOf = (k: LeadField) => (error?.field === k ? error.text : null)
+  // The label names a field and its error describes it (inside the label, the error would be read as its name).
+  const aria = (k: LeadField) => ({
+    'aria-labelledby': `${id}-${k}-label`,
+    'aria-invalid': errOf(k) ? true : undefined,
+    'aria-describedby': errOf(k) ? `${id}-${k}-error` : undefined,
+    onChange: () => errOf(k) && setError(null),
+  })
+
   return (
     // Without JavaScript the form posts to the endpoint itself, which sends the visitor back to the page.
-    <form onSubmit={submit} noValidate action={endpoint ?? undefined} method="post" className={className ?? 'flex flex-col gap-4'}>
+    <form ref={form} onSubmit={submit} noValidate action={endpoint ?? undefined} method="post" className={className ?? 'flex flex-col gap-4'}>
       {fields.map(k => (
         <label key={k} htmlFor={`${id}-${k}`} className={`flex flex-col gap-1.5 ${k === 'message' ? 'sm:col-span-2' : ''}`}>
-          <span className="text-sm font-medium text-foreground-secondary">{LABEL[k]}</span>
+          <span id={`${id}-${k}-label`} className="text-sm font-medium text-foreground-secondary">{LABEL[k]}</span>
           {k === 'message' ? (
-            <textarea id={`${id}-${k}`} name={k} rows={4} maxLength={2000} placeholder={messagePlaceholder ?? 'How can we help?'} className={`${input} min-h-[7rem]`} />
+            <textarea id={`${id}-${k}`} name={k} rows={4} maxLength={2000} placeholder={messagePlaceholder ?? 'How can we help?'} className={`${input} min-h-[7rem]`} {...aria(k)} />
           ) : (
             <input
               id={`${id}-${k}`}
@@ -84,15 +107,21 @@ export default function LeadFormPart({
               maxLength={k === 'name' ? 120 : 200}
               required={k === 'name'}
               className={input}
+              {...aria(k)}
             />
+          )}
+          {errOf(k) && (
+            <span id={`${id}-${k}-error`} className="text-sm text-red-600">
+              {errOf(k)}
+            </span>
           )}
         </label>
       ))}
       {/* Hidden from people; a bot fills it. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
-      {error && (
+      {error && !error.field && (
         <p role="alert" className="text-sm text-red-600 sm:col-span-2">
-          {error}
+          {error.text}
         </p>
       )}
       <button

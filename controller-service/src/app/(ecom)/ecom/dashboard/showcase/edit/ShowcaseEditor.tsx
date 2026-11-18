@@ -16,7 +16,7 @@ import ThemesEntry from '../../../onboard/showcase/_builder/ThemesEntry'
 import ShowcaseThemes from '../../../onboard/_studio/ShowcaseThemes'
 import PublishPanel from '../../../onboard/showcase/_builder/PublishPanel'
 import { detailsProblem } from '../../../onboard/showcase/_builder/model'
-import { useShowcaseDetails } from '../../../onboard/showcase/_builder/useShowcaseDetails'
+import { useRefreshAfterBuild, useShowcaseDetails } from '../../../onboard/showcase/_builder/useShowcaseDetails'
 
 // The dashboard's Showcase editor. Design: the studio in Showcase mode (live preview, the section outline to drag,
 // the picked section's words and pictures, AI changes, "Design this page again" charged to the wallet). Details and
@@ -32,6 +32,7 @@ export default function ShowcaseEditor({ owner, initialSite, siteUrl }: { owner:
   // Applying a theme replaces the page: the studio remounts to load it.
   const [studioKey, setStudioKey] = useState(0)
   const site = d.site ?? initialSite
+  useRefreshAfterBuild(studio?.session?.status, d.refresh)
   const problem = detailsProblem(d.form, d.slug.state === 'ok')
   const page = studio?.session?.pages?.[SHOWCASE_PAGE_KEY]
   const ready = (!!page && page.sections.length > 0 && studio?.session?.status !== 'building') || (!studio && site.hasPage)

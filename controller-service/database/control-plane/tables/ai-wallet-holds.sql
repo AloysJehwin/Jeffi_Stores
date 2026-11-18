@@ -3,7 +3,8 @@
 -- The cap's wallet_ledger debit (external_ref aigen:<ref>) and this row are written in one transaction; the run
 -- checkpoints its provider cost here as it spends. Settling claims the row (settled_at IS NULL) and trues the debit up
 -- to min(cap, cost × margin) in one transaction, so it happens once: by the run, or, when the run never did (its process
--- died), by the controller's ai_hold_sweep cron two hours on, on the cost recorded so far.
+-- died), by the controller's ai_hold_sweep cron two hours on, on the cost recorded so far. A flat-priced run (a Showcase
+-- redesign) settles at the whole cap or nothing and records no cost until then, so the sweep refunds it.
 --
 CREATE TABLE IF NOT EXISTS public.ai_wallet_holds (
     id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,

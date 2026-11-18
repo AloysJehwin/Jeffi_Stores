@@ -64,12 +64,16 @@ export function studioUrl(path = '', params: Record<string, string> = {}): strin
 
 export const AI_UNAVAILABLE = 'ai_unavailable'
 export const WALLET_LOW = 'wallet_low'
+export const PRICE_CHANGED = 'price_changed'
 
 /** The server said Claude is unreachable, so studio AI is off for now. */
 export const isAiDown = (e: unknown) => e instanceof StudioError && e.code === AI_UNAVAILABLE
 
 /** A paid generation the wallet can't cover (402); `topUpUrl` says where to add money, when there is a wallet. */
 export const isWalletLow = (e: unknown): e is StudioError => e instanceof StudioError && e.code === WALLET_LOW
+
+/** The price this page showed is out of date (a Showcase's free design was used meanwhile): load it again and ask. */
+export const isPriceChanged = (e: unknown) => e instanceof StudioError && e.code === PRICE_CHANGED
 
 export async function studioGet(opts: { fresh?: boolean } = {}): Promise<StudioView> {
   const res = await fetch(studioUrl('', opts.fresh ? { fresh: '1' } : {}), { cache: 'no-store' })

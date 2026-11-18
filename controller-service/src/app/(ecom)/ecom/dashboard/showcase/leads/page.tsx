@@ -30,7 +30,7 @@ export default async function ShowcaseLeadsPage({ searchParams }: { searchParams
   const first = await listShowcaseLeads(site.id, { limit: PAGE })
   return (
     <>
-      <PageHeader eyebrow="Showcase" title="Enquiries" description={`Messages from the contact form on ${showcaseHost(site.slug)}. Each one is also emailed to you.`} />
+      <PageHeader eyebrow="Showcase" title="Enquiries" description={`Messages from the contact form on ${showcaseHost(site.slug)}. Each one is also emailed to you; mark it handled once you have answered.`} />
       <LeadsClient initial={first} pageSize={PAGE} tenantSlug={tenant.slug} />
     </>
   )

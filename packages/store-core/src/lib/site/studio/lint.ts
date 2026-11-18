@@ -2,6 +2,7 @@ import type { PageKey } from '@jeffi/site-blocks'
 import { CARD_PRODUCT, type CodeNode, type CodeValue } from '../code/ast'
 import { splitClasses, taxonomyOf } from '../code/allow'
 import { gridTrouble, PHONE as PHONE_WIDTH } from '../code/grid'
+import { placeholderRows } from '../code/placeholders'
 
 // What a studio section must not hard-code. It is written against a sample catalogue but goes live on the store's own,
 // which starts empty and later has its own categories, brands and products: names, slugs, prices and contact details
@@ -33,7 +34,19 @@ export const LINT = {
   heading:
     "Every category (or brand) wears this page: its h1 is the page's own name, never typed: <Category>{c => <h1>{c.name}</h1>}</Category> (<Brand>{b => …}</Brand> on a brand page).",
   hero: "The opening section needs a picture that is always there: <HeroPicture> (the first live offer's picture, else a featured product's photo, else a category's, else a designed fill). A store may have no offers or photos yet, so never take the opening's only picture from <Offers>, and never leave it without one.",
+  showcaseHero: "The opening section needs a picture that is always there: <BusinessPicture> (the owner's work photo, else a picture made for this page, else a designed fill). The business may have no work photos yet, so never take the opening's only picture from <Work>.",
+  standIn:
+    'A detail the business did not give has no row at all: drop the typed stand-ins ("Call for today\'s hours", "In your neighbourhood", b.hours || "…", b.hours ? … : "…") and guard the row instead (b.hours && …), or draw the rows from b.facts.',
+  quotes: 'Do not type client quotes, names or star ratings: what clients say comes only from <Testimonials>, so a reviews section shows real reviews or nothing.',
+  anchor: 'Link only to the page\'s own sections: #top, #about, #services, #work, #reviews, #faq or #contact.',
 } as const
+
+/** The ids a Showcase section may take, and so the only in-page links its header and buttons may use. */
+export const SHOWCASE_ANCHORS = new Set(['top', 'about', 'services', 'work', 'reviews', 'faq', 'contact'])
+// Stand-ins for a missing detail, as models write them.
+const STAND_IN = /\b(in your neighbou?rhood|(call|message|whatsapp|ask|ring) (us )?(for|about) (today['’]?s |our |the )?(hours|timings|timing|address|location)|address (available )?on request|hours (vary|on request)|coming soon|lorem ipsum|your (address|city|area) here)\b/i
+const STARS = /★{3,}|\b[45](\.\d)?\s*(\/\s*5|stars?)\b/i
+const QUOTE_KEYS = /^(quote|review|testimonial|rating|stars|said)$/i
 
 const DATA_LISTS = new Set(['Products', 'Categories', 'Brands', 'Reviews', 'Offers', 'SubCategories', 'AllCategories', 'AllBrands', 'Services', 'Work', 'Testimonials', 'Stats'])
 const LIMITS: Record<string, number> = { Reviews: 3, Offers: 3 }
@@ -80,6 +93,8 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
   const found = new Set<string>()
   let h1 = false
   let picture = false
+  let businessPicture = false
+  const showcase = page === 'showcase'
   const walk = (n: unknown, depth = 0) => {
     if (!n || typeof n !== 'object' || depth > 200) return
     const node = n as CodeNode
@@ -87,6 +102,8 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
       case 'cmp': {
         const props = node.props ?? {}
         if (node.name === 'HeroPicture' || (PICTURE_LISTS.has(node.name) && (!node.render || draws(node.render.body)))) picture = true
+        if (node.name === 'BusinessPicture') businessPicture = true
+        if (showcase && node.name === 'Link') anchorHref(lit(props.href))
         const grid = gridNote(node)
         if (grid) found.add(grid)
         for (const key of TAXONOMY_PROPS[node.name] ?? []) if (has(lit(props[key]))) found.add(LINT.taxonomy)
@@ -108,6 +125,8 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
       }
       case 'el':
         if (node.tag === 'a') checkHref(lit(node.props?.href))
+        if (node.tag === 'a' && showcase) anchorHref(lit(node.props?.href))
+        if (showcase && (node.tag === 'blockquote' || node.tag === 'q') && typed(node.children)) found.add(LINT.quotes)
         if (node.tag === 'h1') h1 = true
         // A heading with no data in it reads the same on every category or brand page.
         if (node.tag === 'h1' && (page === 'category' || page === 'brand') && !JSON.stringify(node.children ?? []).includes('"k":"path"')) found.add(LINT.heading)
@@ -126,10 +145,17 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
       case 'each': {
         const items = lit(node.items)
         if (Array.isArray(items)) JSON.stringify(items).match(/"(?:[^"\\]|\\.)*"/g)?.forEach(s => checkText(s))
+        if (showcase && Array.isArray(items) && items.some(x => x && typeof x === 'object' && Object.keys(x).some(k => QUOTE_KEYS.test(k)))) found.add(LINT.quotes)
+        if (showcase && Array.isArray(items)) for (const x of items) if (x && typeof x === 'object') anchorHref((x as { href?: unknown }).href)
         walk(node.body, depth + 1)
         return
       }
     }
+  }
+  const typed = (list: unknown): boolean => Array.isArray(list) && list.length > 0 && list.every(c => c && typeof c === 'object' && ((c as CodeNode).t === 'text' || ((c as CodeNode).t === 'el' && typed((c as { children?: unknown }).children))))
+  const anchorHref = (href: unknown) => {
+    const m = typeof href === 'string' ? /^\/?#(.*)$/.exec(href) : null
+    if (m && !SHOWCASE_ANCHORS.has(m[1])) found.add(LINT.anchor)
   }
   const hrefs = (v: unknown, depth = 0): void => {
     if (typeof v === 'string') return v.startsWith('/') || /^(tel|mailto):|^https:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(v) ? checkHref(v) : undefined
@@ -144,9 +170,14 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
     if (typeof text !== 'string') return
     if (PRICE.test(text)) found.add(LINT.price)
     if (PHONE.test(text) || EMAIL.test(text)) found.add(LINT.contact)
+    if (showcase && STAND_IN.test(text)) found.add(LINT.standIn)
+    if (showcase && STARS.test(text)) found.add(LINT.quotes)
   }
   walk(ast)
   if (page === 'home' && (opts.first || h1) && !picture) found.add(LINT.hero)
+  // A Showcase opens with its header (`first`); the opening is the section holding the page's h1.
+  if (showcase && h1 && !opts.first && !businessPicture) found.add(LINT.showcaseHero)
+  if (showcase && placeholderRows(ast).size) found.add(LINT.standIn)
   return page === 'showcase' ? [...found].map(m => SHOWCASE_LINT[m] ?? m) : [...found]
 }
 
