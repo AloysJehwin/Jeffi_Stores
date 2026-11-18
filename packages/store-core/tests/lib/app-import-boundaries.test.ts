@@ -45,6 +45,6 @@ describe('app import boundaries', () => {
         }
       }
       expect(offenders).toEqual([])
-    })
+    }, 30_000) // reads every file in the tree; slow under the full parallel suite
   }
 })
