@@ -74,17 +74,49 @@ export async function categoryCounts(ids: string[]): Promise<Map<string, number>
   return new Map(rows.map(r => [String(r.id), Number(r.n) || 0]))
 }
 
-const subView = (c: Row, counts: Map<string, number>): SubCategoryView => ({
+/**
+ * A photo for each category that has no picture of its own: its featured (else newest) product's, from it or any
+ * subcategory, so a category tile never stands empty while the category has a photographed product.
+ */
+export async function categoryPhotos(ids: string[]): Promise<Map<string, string>> {
+  if (!ids.length) return new Map()
+  const rows = await queryMany<{ id: string; image_url: string }>(
+    `WITH RECURSIVE tree AS (
+       SELECT id, id AS root FROM categories WHERE id = ANY($1::uuid[])
+       UNION
+       SELECT c.id, t.root FROM categories c JOIN tree t ON c.parent_category_id = t.id WHERE c.is_active = true
+     )
+     SELECT r.root AS id, pic.image_url
+       FROM unnest($1::uuid[]) AS r(root)
+       CROSS JOIN LATERAL (
+         SELECT pi.image_url FROM tree t
+           JOIN products p ON p.category_id = t.id AND p.is_active = true AND p.is_draft IS NOT TRUE
+           JOIN product_images pi ON pi.product_id = p.id
+          WHERE t.root = r.root
+          ORDER BY p.is_featured DESC NULLS LAST, pi.is_primary DESC NULLS LAST, p.created_at DESC, pi.display_order ASC NULLS LAST
+          LIMIT 1
+       ) pic`,
+    [ids]
+  )
+  return new Map(rows.filter(r => safeSrc(r.image_url)).map(r => [String(r.id), r.image_url]))
+}
+
+/** The rows without a picture of their own (`own` reads it) given their products' photo. */
+async function withPhotos<T extends Row>(rows: T[], own: (r: T) => unknown): Promise<Map<string, string>> {
+  return categoryPhotos(rows.filter(r => !pic(own(r))).map(r => String(r.id))).catch(() => new Map())
+}
+
+const subView = (c: Row, counts: Map<string, number>, photos?: Map<string, string>): SubCategoryView => ({
   id: String(c.id),
   slug: String(c.slug),
   name: String(c.name),
   url: `/categories/${c.slug}`,
-  image: pic(c.image_url),
+  image: pic(c.image_url, photos?.get(String(c.id))),
   productCount: counts.get(String(c.id)) ?? 0,
 })
 
 /** The category page's row (with parent_name and parent_slug), its subcategories and FAQs as the `<Category>` view. */
-export function categoryPageView(row: Row, children: Row[], faqs: Faq[], counts: Map<string, number>): CategoryPageView {
+export function categoryPageView(row: Row, children: Row[], faqs: Faq[], counts: Map<string, number>, photos?: Map<string, string>): CategoryPageView {
   const image = pic(row.hero_image_desktop, row.image_url)
   const link = text(row.banner_link_url)
   return {
@@ -100,7 +132,7 @@ export function categoryPageView(row: Row, children: Row[], faqs: Faq[], counts:
     parentName: row.parent_slug ? text(row.parent_name) || null : null,
     parentUrl: row.parent_slug ? `/categories/${row.parent_slug}` : null,
     productCount: counts.get(String(row.id)) ?? 0,
-    children: children.map(c => subView(c, counts)),
+    children: children.map(c => subView(c, counts, photos)),
     faqs: faqs.map(f => ({ id: String(f.id), question: text(f.question), answer: text(f.answer) })).filter(f => f.question && f.answer),
     seoText: text(row.seo_content),
   }
@@ -153,7 +185,8 @@ export const loadCategoryPage = perRequest(async (slug: string): Promise<Categor
     // As the category page lists them (CategoryFaqs' listCategoryFaqs).
     queryMany<Faq>('SELECT id, question, answer FROM category_faqs WHERE category_id = $1 AND published = true ORDER BY sort_order ASC, created_at ASC', [row.id]),
   ])
-  return categoryPageView(row, children, faqs, await categoryCounts([String(row.id), ...children.map(c => String(c.id))]))
+  const [counts, photos] = await Promise.all([categoryCounts([String(row.id), ...children.map(c => String(c.id))]), withPhotos(children, c => c.image_url)])
+  return categoryPageView(row, children, faqs, counts, photos)
 })
 
 export const loadBrandPage = perRequest(async (slug: string): Promise<BrandPageView | null> => {
@@ -167,17 +200,17 @@ export const loadCategoryIndex = perRequest(async (): Promise<CategoryIndexView[
   const rows = await queryMany<Row>(
     'SELECT id, name, slug, description, tagline, image_url, hero_image_desktop, parent_category_id FROM categories WHERE is_active = true ORDER BY display_order ASC, name ASC'
   )
-  const counts = await categoryCounts(rows.map(r => String(r.id)))
+  const [counts, photos] = await Promise.all([categoryCounts(rows.map(r => String(r.id))), withPhotos(rows, r => r.image_url ?? (r.parent_category_id ? null : r.hero_image_desktop))])
   const kids = new Map<string, Row[]>()
   for (const r of rows) if (r.parent_category_id) kids.set(String(r.parent_category_id), [...(kids.get(String(r.parent_category_id)) ?? []), r])
   return rows
     .filter(r => !r.parent_category_id)
     .map(r => ({
-      ...subView(r, counts),
-      image: pic(r.image_url, r.hero_image_desktop),
+      ...subView(r, counts, photos),
+      image: pic(r.image_url, r.hero_image_desktop, photos.get(String(r.id))),
       tagline: text(r.tagline),
       description: text(r.description),
-      children: (kids.get(String(r.id)) ?? []).map(c => subView(c, counts)),
+      children: (kids.get(String(r.id)) ?? []).map(c => subView(c, counts, photos)),
     }))
 })
 

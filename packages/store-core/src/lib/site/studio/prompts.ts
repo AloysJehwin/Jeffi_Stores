@@ -15,7 +15,9 @@ import { utilityRules } from './utility'
 const DATA_RULE = [
   'Never type product names, prices, ratings, reviews or offers yourself: they come from the data components, so the section stays live when real products replace the sample ones.',
   'Never name a category, brand or product by slug or text (no category: "dog-food", no "/categories/cats", no tabs per category): the live store has its own. List them with <Categories>/<Brands> and link with c.url, b.url, p.url; filter <Products> by sort, featured or onSale.',
-  'Pictures only from data (p.image, c.image, o.image, s.logo). Never an <Image> without a src: where there is no picture, design with colour, type and icons.',
+  'Pictures only from data (p.image, c.image, o.image, h.image, s.logo). Never an <Image> without a src: where there is no picture, design with colour, type and icons.',
+  'On the home page the opening section always shows a picture, through <HeroPicture> (the first live offer\'s picture, else a featured product\'s photo, else a category\'s, else a designed fill): most stores have no offer with a picture, so never take its only picture from <Offers>. With {h => …}, h.kind === "offer" is a campaign picture for a full-bleed banner; a product or category photo sits beside the words.',
+  'A grid of store data must suit any number of items: for a mosaic with one large tile use layout="mosaic", which fits any count; a plain grid needs no spans. itemClassName styles each item.',
   'Phone, email, address and WhatsApp only through <Store>{s => …}</Store>; s.whatsapp may be empty, so guard it: {s.whatsapp && <Link href={`https://wa.me/${s.whatsapp}`} className="…">…</Link>}. Social profiles only through <SocialLinks /> with no props: it shows the profiles the owner set, so never type a social link. An email sign-up only through <NewsletterForm />, where the library has it: it signs shoppers up to the store\'s offer emails.',
   'The store may have no products, categories, brands, reviews or offers yet: a section built only on them stays hidden until they exist, so the first section of a page must not depend on them.',
 ].join(' ')

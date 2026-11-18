@@ -131,9 +131,9 @@ const isThenable = (v: unknown): v is Promise<ReactNode> => !!v && typeof (v as 
 // What a link may hold: pictures, icons, text and data read through a render function. Anything else draws its own
 // links or controls (Logo, CartIcon, ProductCard, forms), and a link around it would nest <a> in <a>: invalid HTML and
 // a hydration error. Such a link is drawn as a plain wrapper instead.
-const LINK_SAFE = new Set(['Image', 'Icon', 'ProductTitle', 'ProductPrice', 'ProductRating', 'Countdown', 'Reveal', 'Marquee', 'PriceTag', 'DiscountBadge', 'StockBadge', 'RatingStars'])
+const LINK_SAFE = new Set(['Image', 'HeroPicture', 'Icon', 'ProductTitle', 'ProductPrice', 'ProductRating', 'Countdown', 'Reveal', 'Marquee', 'PriceTag', 'DiscountBadge', 'StockBadge', 'RatingStars'])
 const DATA = new Set([
-  'Store', 'Product', 'Products', 'Categories', 'Brands', 'Reviews', 'Offers', 'Business', 'Services', 'Work', 'Testimonials', 'Stats', 'Faqs',
+  'Store', 'Product', 'Products', 'Categories', 'Brands', 'Reviews', 'Offers', 'HeroPicture', 'Business', 'Services', 'Work', 'Testimonials', 'Stats', 'Faqs',
   // The catalogue pages' records: with a render function they draw only what it returns.
   'Category', 'SubCategories', 'CategoryFaqs', 'SeoText', 'Breadcrumbs', 'Brand', 'SearchQuery', 'AllCategories', 'AllBrands',
 ])

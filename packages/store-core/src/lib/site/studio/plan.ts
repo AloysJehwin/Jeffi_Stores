@@ -42,6 +42,8 @@ const STORE: PageSpec[] = [
       ['A wall of customer reviews', 'A testimonial carousel with ratings'],
       ['A closing call to shop the collection', 'An offer banner for the live offers'],
     ],
+    // The hero's picture is always there (an offer's, else a product's or category's photo, else a designed fill).
+    parts: [['HeroPicture']],
   },
   { page: 'products', label: 'Product listing', sections: [1, 3], must: ['ProductResults'], pool: [['A short title band for the listing with the result count'], ['Filters and sort beside or above the product results'], ['Shop-by-category chips above the results', 'A promise strip under the results']], parts: [[], ['Filters', 'SortMenu', 'ProductResults']] },
   // Every category page wears this design, filled with its own category: never one category's name or picture. A plan

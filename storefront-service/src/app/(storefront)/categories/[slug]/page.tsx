@@ -7,7 +7,7 @@ import { LISTING_PAGE_SIZE, buildListingModel, getListingProducts } from '@/lib/
 import { loadPartsPage } from '@/components/visitor/site/code/parts/taxonomy/site-page'
 import ListingPageParts from '@/components/visitor/site/code/parts/listing/ListingPageParts'
 import { previewRows } from '@/lib/site/preview'
-import { categoryCounts, categoryPageView } from '@/lib/site/data/taxonomy'
+import { categoryCounts, categoryPageView, categoryPhotos } from '@/lib/site/data/taxonomy'
 import { breadcrumbJsonLd, ldJson, listingMetadata } from '@/lib/catalog/listing-seo'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ProductGrid from '@/components/visitor/ProductGrid'
@@ -93,7 +93,15 @@ export default async function CategoryDetailPage({
   // What the AI design places replaces the built-in piece; the rest stays around it, so nothing is lost.
   const own = sitePage.has
   const code = !!sitePage.parts
-  const view = code ? categoryPageView(category, subcategories, faqs, await categoryCounts([String(category.id), ...subcategories.map(sub => String(sub.id))])) : null
+  const view = code
+    ? categoryPageView(
+        category,
+        subcategories,
+        faqs,
+        await categoryCounts([String(category.id), ...subcategories.map(sub => String(sub.id))]),
+        await categoryPhotos(subcategories.filter(sub => !sub.image_url).map(sub => String(sub.id))).catch(() => new Map<string, string>())
+      )
+    : null
   const filtered = Object.entries(sp).some(([k, v]) => !!v && !['page', 'sort', 'dir', 'order', 'layout'].includes(k))
   const { surface, draft } = await previewRows(sp.preview, sp.layout)
   const pagedItems = await productPageItems(products, gstEnabled, { page: 'category', surface, pageNum: page, pageSize: LISTING_PAGE_SIZE, total, draft }, EAGER_CARDS)

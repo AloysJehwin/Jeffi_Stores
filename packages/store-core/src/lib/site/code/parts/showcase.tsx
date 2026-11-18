@@ -6,6 +6,7 @@ import type { SiteData } from '../../data/types'
 import type { ShowcaseView } from '@/lib/showcase/types'
 import { businessView, faqViews, serviceViews, statViews, testimonialViews, workViews } from '@/lib/showcase/views'
 import { ASPECTS, ItemsLayout } from '@/components/visitor/site/code/common/tiles'
+import { layoutProps } from './common'
 import { FaqList, ServiceCard, StatTile, TestimonialCard, WorkTile } from '@/components/visitor/site/code/parts/showcase/tiles'
 import LeadFormPart, { type LeadField } from '@/components/visitor/site/code/parts/showcase/LeadFormPart'
 
@@ -16,10 +17,6 @@ import LeadFormPart, { type LeadField } from '@/components/visitor/site/code/par
 
 const PAGES: ['showcase'] = ['showcase']
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined)
-const layoutProps = {
-  layout: z.enum(['grid', 'carousel', 'list']).default('grid').describe('grid uses className as the grid; carousel swipes'),
-  itemClassName: z.string().max(200).optional().describe('carousel item widths, e.g. "w-[80%] md:w-[32%]"'),
-}
 const view = async (data: SiteData): Promise<ShowcaseView | null> => (data.showcase ? data.showcase().catch(() => null) : null)
 const items = <T,>(list: T[], ctx: RenderCtx, tile: (item: T, i: number) => ReactNode) => list.slice(0, MAX_EACH).map((it, i) => (ctx.renderItem ? ctx.renderItem(it, i) : tile(it, i)))
 

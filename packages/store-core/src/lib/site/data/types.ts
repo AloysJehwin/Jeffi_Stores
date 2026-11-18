@@ -181,7 +181,7 @@ export interface StoreView {
 }
 
 export interface SiteData {
-  /** The onboarding studio's made-up catalogue: missing pictures show as labelled placeholders, not quiet fills. */
+  /** The onboarding studio's made-up catalogue (its buttons draw inert, its links stay in the preview). */
   sample?: boolean
   products(q: ProductQuery): Promise<ProductView[]>
   product(slug: string): Promise<ProductDetailView | null>
