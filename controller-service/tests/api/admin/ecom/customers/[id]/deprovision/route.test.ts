@@ -7,6 +7,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn(() => true) }))
 const query = vi.hoisted(() => vi.fn())
 const reg = vi.hoisted(() => ({
   getTenant: vi.fn(),
+  stopProvisioningJob: vi.fn(),
   controlPlanePool: () => ({ query }),
   KEEP_ALL: { database: true, media: true, config: true },
   archiveRetentionDays: () => 30,
@@ -33,6 +34,7 @@ describe('POST /api/admin/ecom/customers/[id]/deprovision', () => {
     reg.getTenant.mockResolvedValue({ id: 't-1', slug: 'acme', plan: 'basic' })
     query.mockResolvedValue({ rows: [{ owner_id: 'o-1' }] })
     trigger.triggerProvisioning.mockResolvedValue({ ok: true, archiveId: 'arch-1' })
+    reg.stopProvisioningJob.mockResolvedValue(false)
   })
 
   it('needs an explicit confirm', async () => {
@@ -45,7 +47,10 @@ describe('POST /api/admin/ecom/customers/[id]/deprovision', () => {
     const keep = { database: true, media: false, config: true }
     const res = await post({ confirm: true, keep })
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ok: true, kept: keep, archiveId: 'arch-1', retentionDays: 30 })
+    expect(await res.json()).toEqual({ ok: true, stopped: false, kept: keep, archiveId: 'arch-1', retentionDays: 30 })
+    // A build still going is stopped before the teardown.
+    expect(reg.stopProvisioningJob).toHaveBeenCalledWith('t-1', 'stopped by admin@example.com: deprovisioned')
+    expect(reg.stopProvisioningJob.mock.invocationCallOrder[0]).toBeLessThan(trigger.triggerProvisioning.mock.invocationCallOrder[0])
     expect(trigger.triggerProvisioning).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'deprovision', tenantId: 't-1', ownerId: 'o-1', keep, requestedBy: 'admin@example.com' })
     )

@@ -48,7 +48,7 @@ const archives = {
 }
 vi.mock('@/lib/tenant-registry/archives', () => archives)
 
-const seedMod = { seedTenantData: vi.fn().mockResolvedValue(undefined) }
+const seedMod = { seedTenantData: vi.fn().mockResolvedValue(undefined), seedStudioCatalog: vi.fn() }
 vi.mock('@controller/lib/provisioning/seed', () => seedMod)
 
 const sharedDb = vi.hoisted(() => ({

@@ -19,12 +19,15 @@ export default function DeprovisionDialog({
   open,
   slug,
   retentionDays,
+  building = false,
   onClose,
   onConfirm,
 }: {
   open: boolean
   slug: string
   retentionDays: number
+  /** Its build is still going: it is stopped first. */
+  building?: boolean
   onClose: () => void
   onConfirm: (keep: KeepChoice) => Promise<void>
 }) {
@@ -53,8 +56,8 @@ export default function DeprovisionDialog({
     <Dialog
       open={open}
       onClose={close}
-      title={`Deprovision "${slug}"?`}
-      description="The store goes offline immediately. Its database, bucket and servers are deleted, and its API keys and certificates are revoked. This cannot be undone."
+      title={`${building ? 'Stop and deprovision' : 'Deprovision'} "${slug}"?`}
+      description={`${building ? 'Its build stops first. ' : ''}The store goes offline immediately. Its database, bucket and servers are deleted, and its API keys and certificates are revoked. This cannot be undone.`}
       footer={
         <>
           <FormButton type="button" variant="secondary" onClick={close} disabled={pending}>
@@ -65,10 +68,10 @@ export default function DeprovisionDialog({
             onClick={submit}
             disabled={!ready}
             pending={pending}
-            pendingLabel="Deprovisioning…"
+            pendingLabel={building ? 'Stopping…' : 'Deprovisioning…'}
             className="!bg-red-600 hover:!bg-red-700"
           >
-            Deprovision
+            {building ? 'Stop & deprovision' : 'Deprovision'}
           </FormButton>
         </>
       }

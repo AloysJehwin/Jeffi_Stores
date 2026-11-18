@@ -65,6 +65,7 @@ export {
   getProvisioningJobById,
   getProvisioningJob,
   updateProvisioningJob,
+  stopProvisioningJob,
   type ProvisioningJob,
   type ResumeOutcome,
   type ProvisioningJobRow,
