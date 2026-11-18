@@ -214,7 +214,9 @@
    "badge": "New",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794983977506-ai-homepage_image-1794983977504-0.webp"
+   ],
    "imagePrompt": "Black smartwatch with a silicone strap and glowing circular display showing step count, on a wrist"
   },
   {
@@ -235,7 +237,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794983993297-ai-homepage_image-1794983993296-0.webp"
+   ],
    "imagePrompt": "Slim fitness band with a small rectangular screen and a blue strap, worn on a wrist during a morning walk"
   },
   {
@@ -256,7 +260,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984008612-ai-homepage_image-1794984008611-0.webp"
+   ],
    "imagePrompt": "Round stainless steel smartwatch with a dark display and metal link strap on a runner's wrist"
   },
   {
@@ -276,7 +282,9 @@
    "badge": "Bestseller",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984023341-ai-homepage_image-1794984023341-0.webp"
+   ],
    "imagePrompt": "Slim silver aluminium USB-C hub with ports facing forward, connected to a laptop on a desk"
   },
   {
@@ -297,7 +305,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984038458-ai-homepage_image-1794984038455-0.webp"
+   ],
    "imagePrompt": "Dark grey tenkeyless mechanical keyboard with subtle RGB glow on a wooden desk beside a mug"
   },
   {
@@ -318,7 +328,9 @@
    "badge": "New",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984053727-ai-homepage_image-1794984053726-0.webp"
+   ],
    "imagePrompt": "Compact black webcam clipped on top of a monitor showing a smiling person in a home office"
   },
   {
@@ -338,7 +350,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984068756-ai-homepage_image-1794984068755-0.webp"
+   ],
    "imagePrompt": "Matching slim wireless keyboard and mouse in charcoal on a clean desk with a notebook"
   },
   {
@@ -359,7 +373,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984083507-ai-homepage_image-1794984083504-0.webp"
+   ],
    "imagePrompt": "Matte charcoal in-ear earbuds with a small charging case, shown next to a train window"
   },
   {
@@ -379,7 +395,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1794984098712-ai-homepage_image-1794984098711-0.webp"
+   ],
    "imagePrompt": "Coiled grey braided USB-C cable with a neat Velcro tie on a white background"
   }
  ],

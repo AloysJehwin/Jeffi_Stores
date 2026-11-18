@@ -1,6 +1,7 @@
 import type { PageKey } from '@jeffi/site-blocks'
 import { CARD_PRODUCT, type CodeNode, type CodeValue } from '../code/ast'
-import { taxonomyOf } from '../code/allow'
+import { splitClasses, taxonomyOf } from '../code/allow'
+import { gridTrouble, PHONE as PHONE_WIDTH } from '../code/grid'
 
 // What a studio section must not hard-code. It is written against a sample catalogue but goes live on the store's own,
 // which starts empty and later has its own categories, brands and products: names, slugs, prices and contact details
@@ -31,7 +32,36 @@ export const LINT = {
   newsletter: 'The store has no mailing list: no newsletter or sign-up section (NewsletterForm draws nothing). Use SocialLinks or a call to shop instead.',
   heading:
     "Every category (or brand) wears this page: its h1 is the page's own name, never typed: <Category>{c => <h1>{c.name}</h1>}</Category> (<Brand>{b => …}</Brand> on a brand page).",
+  hero: "The opening section needs a picture that is always there: <HeroPicture> (the first live offer's picture, else a featured product's photo, else a category's, else a designed fill). A store may have no offers or photos yet, so never take the opening's only picture from <Offers>, and never leave it without one.",
 } as const
+
+const DATA_LISTS = new Set(['Products', 'Categories', 'Brands', 'Reviews', 'Offers', 'SubCategories', 'AllCategories', 'AllBrands', 'Services', 'Work', 'Testimonials', 'Stats'])
+const LIMITS: Record<string, number> = { Reviews: 3, Offers: 3 }
+// Lists whose items always draw a picture (a photo, else a designed fill), so an opening built on them has one.
+const PICTURE_LISTS = new Set(['Categories', 'Products', 'SubCategories', 'AllCategories'])
+
+/** A literal class string, or null when the value is built at render (a ternary, a template with data). */
+const literalClass = (v: CodeValue | undefined): string | null => (!v ? '' : v.k === 'lit' && typeof v.v === 'string' ? v.v : null)
+
+/** A data list's grid that goes wrong for some number of items (holes, spans past its columns, slivers). */
+function gridNote(node: Extract<CodeNode, { t: 'cmp' }>): string | null {
+  const props = node.props ?? {}
+  const layout = lit(props.layout)
+  if (!DATA_LISTS.has(node.name) || (layout != null && layout !== 'grid')) return null
+  const box = literalClass(props.className)
+  if (!box) return null
+  // Each item: what the render function returns (a default tile has no classes of its own), with itemClassName added.
+  const extra = literalClass(props.itemClassName)
+  const root = node.render?.body
+  const own = !root ? '' : root.t === 'el' || root.t === 'cmp' ? literalClass(root.props?.className) : null
+  if (extra == null || own == null) return null
+  const limit = lit(props.limit)
+  const trouble = gridTrouble(splitClasses(box), splitClasses(`${own} ${extra}`), Math.min(typeof limit === 'number' ? limit : (LIMITS[node.name] ?? 8), 12))
+  if (!trouble) return null
+  const { n, check } = trouble
+  const why = check.overflow ? 'spans more columns than it has' : check.holes ? `leaves ${check.holes} empty ${check.holes === 1 ? 'cell' : 'cells'}` : 'squeezes items into slivers'
+  return `<${node.name}>'s grid ${why} with ${n} ${n === 1 ? 'item' : 'items'} on a ${check.width === PHONE_WIDTH ? 'phone' : 'desktop'}, and a store can have any number: use layout="mosaic" (a picture mosaic that fits any count) or a plain grid without spans.`
+}
 
 /** The same findings on a Showcase page, whose details come from its own parts (code/parts/showcase.tsx). */
 const SHOWCASE_LINT: Partial<Record<string, string>> = {
@@ -41,15 +71,24 @@ const SHOWCASE_LINT: Partial<Record<string, string>> = {
   [LINT.newsletter]: 'There is no mailing list: take enquiries with <LeadForm /> instead.',
 }
 
-/** The hard-coding a studio section has, as repair notes (none = fine), worded for its page. */
-export function studioLint(ast: unknown, page?: PageKey | null): string[] {
+/**
+ * What a studio section gets wrong, as repair notes (none = fine), worded for its page: hard-coded store data, a home
+ * opening (`first`, or the section holding the page's h1) without a picture that is always there, and data grids
+ * that break for some number of items.
+ */
+export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: boolean } = {}): string[] {
   const found = new Set<string>()
+  let h1 = false
+  let picture = false
   const walk = (n: unknown, depth = 0) => {
     if (!n || typeof n !== 'object' || depth > 200) return
     const node = n as CodeNode
     switch (node.t) {
       case 'cmp': {
         const props = node.props ?? {}
+        if (node.name === 'HeroPicture' || (PICTURE_LISTS.has(node.name) && (!node.render || draws(node.render.body)))) picture = true
+        const grid = gridNote(node)
+        if (grid) found.add(grid)
         for (const key of TAXONOMY_PROPS[node.name] ?? []) if (has(lit(props[key]))) found.add(LINT.taxonomy)
         const query = lit(props.query)
         if (node.name === 'Products' && query && typeof query === 'object' && !Array.isArray(query)) {
@@ -69,6 +108,7 @@ export function studioLint(ast: unknown, page?: PageKey | null): string[] {
       }
       case 'el':
         if (node.tag === 'a') checkHref(lit(node.props?.href))
+        if (node.tag === 'h1') h1 = true
         // A heading with no data in it reads the same on every category or brand page.
         if (node.tag === 'h1' && (page === 'category' || page === 'brand') && !JSON.stringify(node.children ?? []).includes('"k":"path"')) found.add(LINT.heading)
         node.children?.forEach(c => walk(c, depth + 1))
@@ -106,7 +146,27 @@ export function studioLint(ast: unknown, page?: PageKey | null): string[] {
     if (PHONE.test(text) || EMAIL.test(text)) found.add(LINT.contact)
   }
   walk(ast)
+  if (page === 'home' && (opts.first || h1) && !picture) found.add(LINT.hero)
   return page === 'showcase' ? [...found].map(m => SHOWCASE_LINT[m] ?? m) : [...found]
+}
+
+/** A render function's items draw a picture (an <Image> or the site's product card). */
+function draws(n: unknown, depth = 0): boolean {
+  if (!n || typeof n !== 'object' || depth > 200) return false
+  const node = n as CodeNode
+  switch (node.t) {
+    case 'cmp':
+      return node.name === 'Image' || node.name === 'ProductCard' || node.children?.some(c => draws(c, depth + 1)) || draws(node.render?.body, depth + 1)
+    case 'el':
+    case 'frag':
+      return node.children?.some(c => draws(c, depth + 1)) ?? false
+    case 'cond':
+      return draws(node.then, depth + 1) || draws(node.else, depth + 1)
+    case 'each':
+      return draws(node.body, depth + 1)
+    default:
+      return false
+  }
 }
 
 const CARD_LINT = {
