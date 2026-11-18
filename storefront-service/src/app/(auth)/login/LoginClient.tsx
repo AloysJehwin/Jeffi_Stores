@@ -414,7 +414,7 @@ function LoginPage({ embedded = false, bare = false }: { embedded?: boolean; bar
               {/* Inline channel selector */}
               <div>
                 <p className="text-sm font-medium text-foreground-secondary mb-2">Send OTP via</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {channelOptions.map(opt => (
                     <button
                       key={opt.id}

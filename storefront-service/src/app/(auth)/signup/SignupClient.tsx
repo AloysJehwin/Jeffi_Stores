@@ -612,6 +612,7 @@ function SignupPage({ embedded = false, bare = false }: { embedded?: boolean; ba
                   max={new Date().toISOString().slice(0, 10)}
                   placeholder="dd/mm/yyyy"
                   className="w-full"
+                  triggerClassName="ui-input min-h-12 px-4 py-3 border border-border-secondary rounded-lg bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 />
                 {dob.length > 0 && !isValidDob(dob) && (
                   <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
@@ -623,7 +624,7 @@ function SignupPage({ embedded = false, bare = false }: { embedded?: boolean; ba
                 <p className="text-sm font-medium text-foreground-secondary mb-2">
                   How would you like to receive your OTP?
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {channelOptions.map(opt => {
                     const needsPhone = opt.id === 'sms' || opt.id === 'whatsapp'
                     const disabled = needsPhone && phone.length !== 10
@@ -756,6 +757,7 @@ function SignupPage({ embedded = false, bare = false }: { embedded?: boolean; ba
                   max={new Date().toISOString().slice(0, 10)}
                   placeholder="dd/mm/yyyy"
                   className="w-full"
+                  triggerClassName="ui-input min-h-12 px-4 py-3 border border-border-secondary rounded-lg bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 />
                 {dob.length > 0 && !isValidDob(dob) && (
                   <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
