@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Records each named shot (retrying twice) into clips/<shot>/, then writes an 8-frame contact sheet clips/sheet-<shot>.jpg.
-# Usage: ./rec.sh paws-home admin-orders ...   (needs python3 with Pillow for the sheets)
+# Usage: ./rec.sh halo-home admin-orders ...   (needs python3 with Pillow for the sheets)
 cd "$(dirname "$0")"
 mkdir -p clips logs
 for s in "$@"; do

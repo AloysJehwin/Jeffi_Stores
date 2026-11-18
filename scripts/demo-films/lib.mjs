@@ -33,14 +33,19 @@ function codeFor(email) {
 }
 const clearOtp = email => execFileSync('redis-cli', ['DEL', `otp:${email}`, `otp:lastSend:${email}`, `otp:sendCount:${email}`, `otp:attempts:${email}`])
 
-/** Owner sign-in through the real API from inside the page. */
+/**
+ * Owner sign-in through the real verify API from inside the page. The code is written to local Redis the way storeOTP
+ * does instead of requested from send-otp, which emails it through SES (local dev sends real mail).
+ */
 export async function ownerLogin(page, email) {
   await page.goto(`${ECOM}/signin`, { waitUntil: 'domcontentloaded', timeout: 120000 })
   await sleep(1500)
-  clearOtp(email)
-  const s = await api(page, '/api/ecom/auth/send-otp', { email })
-  if (s.status !== 200) throw new Error(`send-otp ${s.status} ${s.text}`)
-  const v = await api(page, '/api/ecom/auth/verify-otp', { email, otp: codeFor(email), code: codeFor(email) })
+  const key = email.toLowerCase()
+  clearOtp(key)
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
+  execFileSync('redis-cli', ['SET', `otp:${key}`, code, 'EX', '600'])
+  execFileSync('redis-cli', ['SET', `otp:attempts:${key}`, '0', 'EX', '600'])
+  const v = await api(page, '/api/ecom/auth/verify-otp', { email, otp: code, code })
   if (v.status !== 200) throw new Error(`verify-otp ${v.status} ${v.text}`)
 }
 
