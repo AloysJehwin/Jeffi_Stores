@@ -8,6 +8,8 @@ interface Cert {
   commonName: string
   role: string | null
   storeName: string | null
+  /** The admin panel the certificate opens, e.g. admin-<slug>.jeffistores.in or admin.<store domain>. */
+  adminHost: string | null
   expiresAt: string
   downloadedAt: string | null
   status: 'available' | 'downloaded' | 'revoked' | 'expired'
@@ -88,13 +90,26 @@ export default function CertList() {
   }
 
   return (
-    <div className="mt-6 space-y-3">
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+    <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
+      {error && <p className="text-sm text-red-600 dark:text-red-400 lg:col-span-2">{error}</p>}
       {certs.map(c => (
         <div key={c.serial} className="rounded-lg border border-border-default bg-surface-elevated p-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="font-medium text-foreground">{c.storeName || 'Jeffi Stores'}</p>
+              {c.adminHost && (
+                <p className="text-sm break-all">
+                  <span className="text-foreground-muted">Admin panel: </span>
+                  <a
+                    href={`https://${c.adminHost}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-accent-600 dark:text-accent-400 hover:underline"
+                  >
+                    {c.adminHost}
+                  </a>
+                </p>
+              )}
               <p className="text-sm text-foreground-secondary">
                 {c.commonName}
                 {c.role ? ` · ${c.role}` : ''}
@@ -214,7 +229,7 @@ function MobileStep({ serial, onVerified }: { serial: string; onVerified: () => 
 
 function InstallHelp() {
   return (
-    <details className="mt-6 rounded-lg border border-border-default bg-surface p-4">
+    <details className="mt-2 rounded-lg border border-border-default bg-surface p-4 lg:col-span-2">
       <summary className="cursor-pointer text-sm font-medium text-foreground">How to install the certificate</summary>
       <div className="mt-3 space-y-3 text-sm text-foreground-secondary">
         <div>

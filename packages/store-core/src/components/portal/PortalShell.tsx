@@ -64,8 +64,9 @@ export default async function PortalShell({
             </main>
           </div>
         ) : (
-          <main className="flex-1 w-full px-8 py-10">
-            <div className={`mx-auto w-full ${contentWidth}`}>{children}</div>
+          // Same box and gutter as the top bar, so the content lines up under it.
+          <main className="flex-1 w-full py-10">
+            <div className={`mx-auto w-full px-4 ${contentWidth}`}>{children}</div>
           </main>
         )}
       </div>
