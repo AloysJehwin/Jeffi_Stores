@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build one service image (arm64) and push it to ECR; skipped when the tag is already there.
-# Usage: build-push-ecr.sh <controller|storefront|admin|business|messaging|documents|public-api|mobile> <tag> [context-dir]
+# Usage: build-push-ecr.sh <controller|storefront|admin|business|showcase|messaging|documents|public-api|mobile> <tag> [context-dir]
 #   context-dir defaults to the repo root (release.sh passes a `git archive` copy).
 # Only NEXT_PUBLIC_* values are read from Secrets Manager (they ship in the browser bundle anyway).
 set -euo pipefail
@@ -11,7 +11,7 @@ ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGISTRY=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com
 NEXT=
 case $SERVICE in
-  controller|storefront|admin|business)
+  controller|storefront|admin|business|showcase)
               REPO=jeffi-stores-$SERVICE-service; BUILD=(-f deploy/next-app.Dockerfile --build-arg "APP=$SERVICE-service"); NEXT=1 ;;
   messaging)  REPO=jeffi-stores-messaging-service;  BUILD=(-f deploy/services.Dockerfile --target messaging) ;;
   documents)  REPO=jeffi-stores-document-service;   BUILD=(-f deploy/services.Dockerfile --target documents) ;;

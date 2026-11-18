@@ -669,7 +669,7 @@ export default function BatchSerialLabelPicker({
       </div>
 
       {/* Preview */}
-      <div className={compact ? '' : 'lg:sticky lg:top-4 self-start'}>
+      <div className={compact ? '' : 'admin-sticky-pane self-start'}>
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-foreground">Preview</h3>

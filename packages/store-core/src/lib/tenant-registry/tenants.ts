@@ -1,5 +1,5 @@
 import { controlPlanePool, RESERVED_LABELS } from './shared'
-import { TENANT_HOST_PREFIXES } from './host-prefixes'
+import { PRODUCT_HOST_PREFIXES, TENANT_HOST_PREFIXES } from './host-prefixes'
 import { clearTenantCache } from './host-resolution'
 import { reclaimableTenantId } from './archives'
 import type { ComputeSpec } from '@/lib/compute/spec'
@@ -21,7 +21,7 @@ export interface TenantRow {
   own_delhivery: boolean
   own_razorpay: boolean
   upi_mode: UpiMode
-  service_types: string[] // store | messaging | documents
+  service_types: string[] // store | messaging | documents | showcase
   store_request?: StoreRequest | null
   /** Add-ons picked at signup, not yet bought or declined (getTenant only). */
   requested_addons?: string[]
@@ -75,7 +75,7 @@ export interface TenantListRow extends TenantRow {
 }
 
 /** List tenants (control-plane admin UI). Read-only, optional filters. */
-export async function listTenants(filters?: { status?: string; plan?: string; q?: string; product?: 'store' | 'api' }): Promise<TenantListRow[]> {
+export async function listTenants(filters?: { status?: string; plan?: string; q?: string; product?: 'store' | 'api' | 'showcase' }): Promise<TenantListRow[]> {
   const pool = controlPlanePool()
   const where: string[] = []
   const args: any[] = []
@@ -84,9 +84,10 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
     args.push(filters.status)
     where.push(`t.status = $${args.length}`)
   }
-  // 'store' = has a store; 'api' = Messaging/Documents-only workspace (no store infrastructure).
+  // 'store' = has a store; 'api' = Messaging/Documents without a store; 'showcase' = has a Showcase site.
   if (filters?.product === 'store') where.push(`'store' = ANY(t.service_types)`)
-  if (filters?.product === 'api') where.push(`NOT ('store' = ANY(t.service_types))`)
+  if (filters?.product === 'api') where.push(`NOT ('store' = ANY(t.service_types)) AND t.service_types && ARRAY['messaging','documents']::text[]`)
+  if (filters?.product === 'showcase') where.push(`'showcase' = ANY(t.service_types)`)
   if (filters?.plan) {
     args.push(filters.plan)
     where.push(`p.slug = $${args.length}`)
@@ -189,7 +190,7 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
       error: 'Slug must be 3-63 chars, lowercase letters/numbers/hyphens, no leading/trailing hyphen.',
     }
   }
-  if (RESERVED_LABELS.has(slug) || TENANT_HOST_PREFIXES.some(p => slug.startsWith(`${p}-`))) {
+  if (RESERVED_LABELS.has(slug) || [...TENANT_HOST_PREFIXES, ...PRODUCT_HOST_PREFIXES].some(p => slug.startsWith(`${p}-`))) {
     return { ok: false, error: `"${slug}" is reserved and cannot be used as a store subdomain.` }
   }
   if (!input.displayName?.trim()) return { ok: false, error: 'Store name is required.' }
@@ -452,8 +453,8 @@ export async function billingSummary(): Promise<{
 
 // ── Provisioning data-layer (control-plane) ──────────────────────────────────
 
-export type ServiceType = 'store' | 'messaging' | 'documents'
-export const SERVICE_TYPES: ServiceType[] = ['store', 'messaging', 'documents']
+export type ServiceType = 'store' | 'messaging' | 'documents' | 'showcase'
+export const SERVICE_TYPES: ServiceType[] = ['store', 'messaging', 'documents', 'showcase']
 export const hasService = (t: { service_types?: string[] | null }, s: ServiceType) => (t.service_types ?? ['store']).includes(s)
 
 /** Add service types to an existing tenant (idempotent). */

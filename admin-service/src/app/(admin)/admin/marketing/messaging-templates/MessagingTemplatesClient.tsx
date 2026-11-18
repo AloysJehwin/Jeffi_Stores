@@ -238,8 +238,12 @@ export default function MessagingTemplatesClient() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
-        <aside className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
+      {/* Desktop: the list and the editor scroll separately; the offset is the page header and tabs above. */}
+      <div
+        className="admin-split grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start"
+        style={{ '--admin-split-offset': '15.5rem' } as React.CSSProperties}
+      >
+        <aside className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden lg:flex lg:flex-col lg:max-h-full">
           <div className="p-3 border-b border-border-default">
             <input
               className={INPUT}
@@ -251,7 +255,7 @@ export default function MessagingTemplatesClient() {
               }}
             />
           </div>
-          <div>
+          <div className="admin-pane">
             {loading &&
               Array.from({ length: EMBEDDED_PAGE_SIZE }).map((_, i) => (
                 <div key={i} className="space-y-2 border-b border-border-default px-4 py-3">
@@ -330,7 +334,7 @@ export default function MessagingTemplatesClient() {
           {!loading && <Pager className="px-3 pb-3" control={paged.pager} noun="templates" />}
         </aside>
 
-        <section className="bg-surface-elevated rounded-lg border border-border-default p-6">
+        <section className="admin-pane lg:max-h-full bg-surface-elevated rounded-lg border border-border-default p-6">
           {!selected && (
             <div className="py-16 text-center">
               <p className="text-sm font-medium text-foreground">Select a template to edit</p>

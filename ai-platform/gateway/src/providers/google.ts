@@ -44,21 +44,26 @@ export class GoogleProvider implements MediaProvider {
   readonly name = 'google' as const
   constructor(
     private readonly apiKey = process.env.GOOGLE_AI_API_KEY || '',
-    private readonly imageModel = process.env.GOOGLE_IMAGE_MODEL || 'gemini-2.5-flash-image-preview',
-    private readonly premiumImageModel = process.env.GOOGLE_IMAGE_PREMIUM_MODEL || 'gemini-2.5-flash-image-preview',
+    // Same as the deploy config: the -preview models are not served to new projects.
+    private readonly imageModel = process.env.GOOGLE_IMAGE_MODEL || 'gemini-3.1-flash-image',
+    private readonly premiumImageModel = process.env.GOOGLE_IMAGE_PREMIUM_MODEL || 'gemini-3-pro-image',
     private readonly imagenModel = process.env.GOOGLE_IMAGEN_MODEL || '',
     private readonly veoModel = process.env.GOOGLE_VEO_MODEL || 'veo-3.1-fast-generate-preview',
     private readonly veoFallback = process.env.GOOGLE_VEO_FALLBACK || 'veo-3.0-generate-001',
     private readonly timeoutMs = Number(process.env.GOOGLE_TIMEOUT_MS) || 120_000,
+    // The cheapest image model a new project is served (half the standard one's price).
+    private readonly draftImageModel = process.env.GOOGLE_IMAGE_DRAFT_MODEL || 'gemini-3.1-flash-lite-image',
   ) {}
 
   configured(): boolean { return !!this.apiKey }
 
   async generateImage(req: ImageGenInput): Promise<ImageGenOutput> {
     this.assert()
-    const model = req.quality === 'premium' ? this.premiumImageModel : this.imageModel
+    const model = req.quality === 'premium' ? this.premiumImageModel : req.quality === 'draft' ? this.draftImageModel : this.imageModel
     try { return await this.geminiAt(model, req) }
     catch (err) {
+      // A draft model the project is not served falls back to the standard one.
+      if (model !== this.imageModel && req.quality === 'draft' && /HTTP 404/.test((err as Error)?.message ?? '')) return this.geminiAt(this.imageModel, req)
       if (!this.imagenModel) throw err
       return await this.imagenAt(this.imagenModel, req)
     }

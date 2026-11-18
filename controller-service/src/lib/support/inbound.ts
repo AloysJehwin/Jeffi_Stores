@@ -24,6 +24,8 @@ export interface InboundWhatsApp {
   text: string
   profileName?: string | null
   media: Array<{ ref: string; mime: string; filename?: string | null }>
+  /** The number that received it: customer (shoppers) or ecom (the flagship's store-owner number). */
+  audience?: 'customer' | 'ecom'
 }
 
 const STOP_CMDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'END', 'QUIT'])
@@ -87,6 +89,7 @@ export async function handleInboundWhatsApp(m: InboundWhatsApp): Promise<{ sessi
         ? `${brand}: You have been unsubscribed from promotional messages. Reply START to resubscribe.`
         : `${brand}: You are resubscribed. Reply STOP to opt out anytime.`,
       kind: 'optout',
+      audience: m.audience,
     })
     return null
   }
@@ -107,7 +110,7 @@ export async function handleInboundWhatsApp(m: InboundWhatsApp): Promise<{ sessi
 
   const attachments: AttachmentInput[] = []
   if (m.media.length) {
-    const provider = await getWhatsAppProvider()
+    const provider = await getWhatsAppProvider(m.audience ?? 'customer')
     const folderId = await supportFolder(session.ticket_number, session.id)
     for (const item of m.media.slice(0, 10)) {
       try {

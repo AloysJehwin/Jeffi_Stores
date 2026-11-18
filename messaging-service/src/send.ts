@@ -13,6 +13,7 @@ import { sendSms, sendWhatsApp } from './providers/twilio.js'
 import * as aws from './providers/aws.js'
 import { messagingProvider } from './providers/policy.js'
 import { tenantSender, SenderError } from './providers/senders.js'
+import { ensurePricing } from './pricing-sheet.js'
 import { wrapEmail } from './mail-shell.js'
 import { hostUrl, MediaError } from './media.js'
 
@@ -300,22 +301,25 @@ export async function assertChannelOn(tenantId: string, channel: string, space: 
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
+  await ensurePricing()
   const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
   // The store's own sender (number + credentials) when the platform assigned it one; the platform env otherwise.
   const sender = req.channel === 'email'
     ? null
-    : await tenantSender(ctx.tenantId, req.channel).catch(e => { throw e instanceof SenderError ? new SendError(500, 'sender_unavailable', e.message) : e })
+    : await tenantSender(ctx.tenantId, req.channel, req.audience ?? 'customer').catch(e => { throw e instanceof SenderError ? new SendError(500, 'sender_unavailable', e.message) : e })
 
   const id = randomUUID()
-  const priceInr = messagePriceInr(req.channel, ctx.internal)
+  // Priced by provider and channel from the pricing sheet: the store's own sender's provider, else the policy's.
+  const priceProvider = req.channel === 'email' ? 'ses' : sender?.provider ?? (await messagingProvider(ctx.tenantId, req.channel).catch(() => 'twilio'))
+  const priceInr = messagePriceInr(req.channel, ctx.internal, priceProvider)
   const from =
     req.from ?? (req.channel === 'email' ? `${ctx.tenantSlug ?? 'noreply'}@${PLATFORM_DOMAIN}` : sender?.sender ?? null)
 
   await db.query(
     `INSERT INTO messages (id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, reference, metadata)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-    [id, ctx.tenantId, ctx.apiKeyId ?? null, ctx.batchId ?? null, req.channel, req.to, from, req.template ?? null, subject, body, priceInr, req.reference ?? null, { ...(req.metadata ?? {}), internal: !!ctx.internal }]
+    [id, ctx.tenantId, ctx.apiKeyId ?? null, ctx.batchId ?? null, req.channel, req.to, from, req.template ?? null, subject, body, priceInr, req.reference ?? null, { ...(req.metadata ?? {}), internal: !!ctx.internal, pricing_provider: priceProvider }]
   )
 
   // Wallet gate — debit before the provider call; idempotent on the message id.
@@ -358,12 +362,12 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     // metadata.sender.own marks a send from the store's own account (its token signs the status callback).
     await db.query(
       `UPDATE messages SET status='sent', provider=$2, provider_ref=$3, charged_inr=$4, metadata=COALESCE(metadata,'{}'::jsonb) || $5::jsonb, updated_at=now() WHERE id=$1`,
-      [id, provider, ref, debit.charged ? priceInr : 0, JSON.stringify(sender ? { sender: { own: true, provider: sender.provider } } : {})]
+      [id, provider, ref, debit.charged ? priceInr : 0, JSON.stringify(sender ? { sender: { own: true, provider: sender.provider, audience: sender.audience } } : {})]
     )
     await db.query(`INSERT INTO message_events (message_id, event) VALUES ($1,'sent')`, [id])
   } catch (e: any) {
     // Provider failed: refund the price minus the non-refundable processing fee (P2); media is fully refunded.
-    const fee = processingFeeInr(req.channel, ctx.internal)
+    const fee = processingFeeInr(req.channel, ctx.internal, priceProvider)
     await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: fee, externalRef: `pub:${id}`, note: `refund: ${req.channel} failed` })
     if (mediaHosted) await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a failed send' })
     await db.query(`UPDATE messages SET status='failed', error=$2, charged_inr=$3, updated_at=now() WHERE id=$1`, [id, String(e?.message ?? e).slice(0, 500), debit.charged ? fee : 0])

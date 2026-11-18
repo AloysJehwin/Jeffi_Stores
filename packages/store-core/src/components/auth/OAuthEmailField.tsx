@@ -96,7 +96,7 @@ export default function OAuthEmailField({
             type="button"
             onClick={send}
             disabled={busy || !email.trim()}
-            className="shrink-0 px-4 py-3 rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary text-sm font-medium text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+            className="ui-btn shrink-0 px-4 py-3 rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary text-sm font-medium text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {sent ? 'Resend' : 'Send code'}
           </button>

@@ -116,13 +116,13 @@ function OrderConfirmationPage() {
   if (error || !order) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="bg-surface-elevated p-4 sm:p-6 lg:p-8 rounded-lg shadow-md max-w-md w-full text-center">
+        <div className="ui-card bg-surface-elevated p-4 sm:p-6 lg:p-8 rounded-lg shadow-md max-w-md w-full text-center">
           <div className="text-red-500 text-5xl mb-4">!</div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Order Not Found</h1>
+          <h1 className="ui-heading text-2xl font-bold text-foreground mb-2">Order Not Found</h1>
           <p className="text-foreground-secondary mb-6">{error || 'Unable to load order details'}</p>
           <Link
             href="/account/orders"
-            className="inline-block bg-accent-600 text-white px-6 py-2 rounded-lg hover:bg-accent-700 transition-colors"
+            className="ui-btn inline-block bg-accent-600 text-white px-6 py-2 rounded-lg hover:bg-accent-700 transition-colors"
           >
             View All Orders
           </Link>
@@ -140,8 +140,8 @@ function OrderConfirmationPage() {
         <div className="grid gap-6 lg:grid-cols-3 lg:items-start mb-8">
           <div className="lg:col-span-2">
             {/* Order Summary */}
-            <div className="bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6">
-              <h2 className="text-xl font-bold text-foreground mb-4">Order Summary</h2>
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6">
+              <h2 className="ui-heading text-xl font-bold text-foreground mb-4">Order Summary</h2>
 
               <div className="space-y-4 mb-6">
                 {order.items.map(item => {
@@ -220,8 +220,8 @@ function OrderConfirmationPage() {
 
           <div className="space-y-6">
             {/* Shipping Address */}
-            <div className="bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6">
-              <h2 className="text-xl font-bold text-foreground mb-4">Shipping Address</h2>
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6">
+              <h2 className="ui-heading text-xl font-bold text-foreground mb-4">Shipping Address</h2>
               <div className="text-foreground-secondary">
                 <p>{order.shippingAddress.addressLine1}</p>
                 {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
@@ -233,8 +233,8 @@ function OrderConfirmationPage() {
             </div>
 
             {/* Order Status */}
-            <div className="bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6">
-              <h2 className="text-xl font-bold text-foreground mb-4">Order Status</h2>
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6">
+              <h2 className="ui-heading text-xl font-bold text-foreground mb-4">Order Status</h2>
               <div className="flex flex-wrap items-center gap-3">
                 <span
                   className={`px-4 py-2 rounded-full font-semibold ${
@@ -283,13 +283,13 @@ function OrderConfirmationPage() {
             <div className="flex flex-col gap-3">
               <Link
                 href="/account/orders"
-                className="bg-accent-600 text-white px-6 py-3 rounded-lg hover:bg-accent-700 transition-colors text-center font-semibold"
+                className="ui-btn bg-accent-600 text-white px-6 py-3 rounded-lg hover:bg-accent-700 transition-colors text-center font-semibold"
               >
                 View All Orders
               </Link>
               <Link
                 href="/"
-                className="bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary hover:bg-surface-secondary transition-colors text-center font-semibold"
+                className="ui-btn bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary hover:bg-surface-secondary transition-colors text-center font-semibold"
               >
                 Continue Shopping
               </Link>

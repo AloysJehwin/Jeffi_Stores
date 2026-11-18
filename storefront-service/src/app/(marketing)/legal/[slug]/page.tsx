@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { renderUtilityPage } from '@/components/visitor/site/code/parts/utility/site-page'
 import { getStorePolicyBySlug, getStoreLegalContext, policyPdfName } from '@/lib/legals/store-policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import AccountDeletionPanel from '@/components/visitor/account/AccountDeletionPanel'
@@ -16,12 +17,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-export default async function PolicyPage({ params }: { params: Promise<{ slug: string }> }) {
+// One policy; see the legal index page for the Site Builder wrapping.
+export default async function PolicyPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ preview?: string; layout?: string }> }) {
   const { slug } = await params
   const [policy, { slug: storeSlug }] = await Promise.all([getStorePolicyBySlug(slug), getStoreLegalContext()])
   if (!policy) notFound()
 
-  return (
+  const main = (
     <div className="bg-surface min-h-screen">
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
@@ -36,7 +38,7 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
           </Link>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0 flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
+              <h1 className="ui-heading text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
                 {policy.title}
               </h1>
               <p className="text-foreground-secondary text-sm">{policy.description}</p>
@@ -45,7 +47,7 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
             <a
               href={`/api/legal/${policy.slug}/pdf`}
               download={policyPdfName(storeSlug, policy.slug)}
-              className="shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+              className="ui-btn shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path
@@ -69,9 +71,9 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-|-$/g, '')}
-              className="bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6"
+              className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6"
             >
-              <h2 className="text-base md:text-lg font-bold text-foreground mb-3">{section.heading}</h2>
+              <h2 className="ui-heading text-base md:text-lg font-bold text-foreground mb-3">{section.heading}</h2>
               {Array.isArray(section.body) ? (
                 <ul className="space-y-2">
                   {section.body.map((item, j) => (
@@ -89,11 +91,11 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
 
           {policy.slug === 'account-deletion' && <AccountDeletionPanel />}
 
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
+          <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
             <p className="text-xs text-foreground-muted mb-3">Have questions about our policies?</p>
             <Link
               href="/support"
-              className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
+              className="ui-btn inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
             >
               Contact Support
             </Link>
@@ -102,4 +104,6 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
       </div>
     </div>
   )
+  const site = await renderUtilityPage({ audience: 'store', page: 'legal' }, await searchParams, { part: 'LegalContent', core: main, block: { legal_main: main } })
+  return site ?? main
 }

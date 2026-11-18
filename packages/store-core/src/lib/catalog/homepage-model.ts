@@ -7,6 +7,7 @@ import {
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
 import { getHost } from '@/lib/tenancy/get-host'
+import { isFlagshipTenant } from '@/lib/payments/wallet'
 import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
 import {
   AUDIENCE_COLUMN_SQL,
@@ -40,6 +41,7 @@ import {
   spotlightConfig,
   storyGroups,
   LEGACY_APP_HIDDEN_TYPES,
+  SECTION_TYPES,
   SECTION_TILE_DEFAULTS,
   type HomepageAudience,
   type HomepagePage,
@@ -57,6 +59,7 @@ import type { CategoryTab, CountdownDealData, SpotlightData } from '@/lib/catalo
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 import type { HomepageDraftState } from '@/lib/catalog/homepage-draft'
 import { publicProducts } from '@/lib/catalog/public-product'
+import { siteLayoutState } from '@/lib/site/store'
 
 /** What each home section reads (SectionRenderer's data prop). */
 export interface SectionData {
@@ -262,10 +265,24 @@ export interface PageModelOptions {
 }
 
 /**
+ * With Site Builder on, the published documents stand in for the homepage tables (the same way a preview's rows do);
+ * an explicit draft (a preview) wins.
+ */
+async function withSite<T extends Pick<PageModelOptions, 'surface' | 'draft'>>(opts: T): Promise<T> {
+  if (opts.draft) return opts
+  const site = await siteLayoutState(opts.surface ?? 'web').catch(() => null)
+  return site ? { ...opts, draft: site } : opts
+}
+
+/**
  * The sections a page shows and the homepage they come from, minus the types the tenant's plan
  * doesn't include (the B2B portal's sections and the business homepage itself are Pro+, say).
  */
-export async function resolvePageSections({
+export async function resolvePageSections(opts: PageModelOptions = {}): Promise<{ audience: HomepageAudience; sections: HomepageSection[] }> {
+  return resolveWith(await withSite(opts))
+}
+
+async function resolveWith({
   surface = 'web',
   page = 'home',
   audience = 'store',
@@ -282,7 +299,8 @@ export async function resolvePageSections({
   return {
     audience: served.audience,
     sections: served.sections.filter(
-      s => planAllowsType(plan, s.type) && !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
+      // Plans limit homepage section types; Site Builder content blocks are on every plan.
+      s => (!SECTION_TYPES.includes(s.type) || planAllowsType(plan, s.type)) && !(legacyClient && LEGACY_APP_HIDDEN_TYPES.has(s.type))
     ),
   }
 }
@@ -294,19 +312,22 @@ export async function getPageSections(opts: PageModelOptions = {}): Promise<Home
 
 /** Everything a page's sections render: the sections plus the data each one needs. */
 export async function buildHomeModel(opts: PageModelOptions = {}): Promise<HomeModel> {
-  const { audience, sections } = await resolvePageSections(opts)
-  return { audience, sections, data: await loadSectionData(sections, { ...opts, audience }) }
+  const resolved = await withSite(opts)
+  const { audience, sections } = await resolveWith(resolved)
+  return { audience, sections, data: await loadSectionData(sections, { ...resolved, audience }) }
 }
 
 /** The data the given sections need, and nothing else. */
 export async function loadSectionData(
   sections: HomepageSection[],
-  { surface = 'web', page = 'home', audience = 'store', draft }: Pick<PageModelOptions, 'surface' | 'page' | 'audience' | 'draft'> = {}
+  opts: Pick<PageModelOptions, 'surface' | 'page' | 'audience' | 'draft'> = {}
 ): Promise<SectionData> {
+  const { surface = 'web', page = 'home', audience = 'store', draft } = await withSite(opts)
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
 
-  const stats = resolveAboutStats(storefront.statsJson)
+  const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+  const stats = resolveAboutStats(storefront.statsJson, isFlagshipTenant(await resolveTenantId().catch(() => null)))
   // Flagship copy is withheld from tenants; an unset value means a tenant that hasn't written one.
   const identity = await getStoreIdentity()
   const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
@@ -479,6 +500,20 @@ export function toHomeModelJson({ audience, sections, data }: HomeModel): HomeMo
         const spot = value as SpotlightData | null
         const { headline, callouts } = spotlightConfig(s)
         extras[s.id] = spot ? { product: cards([spot.product])[0], headline, callouts } : null
+        break
+      }
+      case 'composed' as SectionType: {
+        // Data nodes by path: product rows become card props (raw rows carry internal columns).
+        const data = (value ?? {}) as Record<string, unknown>
+        const tree = (s.config as { tree?: { kind?: string } } | null)?.tree
+        const productPaths = new Set<string>()
+        const walk = (n: any, path: string) => {
+          if (!n || typeof n !== 'object') return
+          if (n.kind === 'products') productPaths.add(path)
+          if (Array.isArray(n.children)) n.children.forEach((c: unknown, i: number) => walk(c, `${path}.${i}`))
+        }
+        walk(tree, '0')
+        extras[s.id] = Object.fromEntries(Object.entries(data).map(([path, v]) => [path, productPaths.has(path) ? cards((v as any[]) ?? []) : v]))
         break
       }
       default:

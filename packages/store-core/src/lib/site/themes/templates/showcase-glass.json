@@ -1,0 +1,142 @@
+{
+ "version": 1,
+ "style": "glass",
+ "product": "showcase",
+ "generatedAt": "2026-11-17T16:40:36.482Z",
+ "plan": {
+  "approach": {
+   "id": "practical",
+   "name": "Practical",
+   "description": "Services and how to book up front; getting in touch is never more than a tap away."
+  },
+  "pages": [
+   {
+    "key": "showcase:home",
+    "audience": "store",
+    "page": "showcase",
+    "label": "Your page",
+    "optional": false,
+    "enabled": true,
+    "approach": "Services and how to book up front; getting in touch is never more than a tap away.",
+    "sections": [
+     {
+      "label": "Top bar",
+      "intent": "Shows the business name or logo on a frosted strip, with short links to services, work, questions and contact, plus a WhatsApp button that stays in reach. It collapses to the name and one tap-to-chat button on phones.",
+      "layout": "Sticky frosted-glass bar: name left, links centre, WhatsApp pill right.",
+      "parts": [
+       "Business",
+       "Link",
+       "Icon"
+      ],
+      "id": "s1"
+     },
+     {
+      "label": "Welcome",
+      "intent": "Says in one bold line what this business does and for whom, with the tagline under it. Two clear buttons follow: message on WhatsApp and see what we offer, so any trade can fill it in and be understood in seconds.",
+      "layout": "Split with the picture bleeding off the right edge. The headline and buttons sit on a frosted panel over soft colour on the left.",
+      "parts": [
+       "Business",
+       "Image",
+       "Link",
+       "Icon"
+      ],
+      "id": "s2"
+     },
+     {
+      "label": "What we offer",
+      "intent": "Lists the services with plain prices or a starting from figure, so visitors know what they can book and roughly what it costs before they reach out. This suits a salon, a tutor or a plumber equally.",
+      "layout": "Bento grid of frosted cards with one large tile for the main service and smaller tiles around it.",
+      "parts": [
+       "Services",
+       "Icon",
+       "Link"
+      ],
+      "id": "s3"
+     },
+     {
+      "label": "How to book",
+      "intent": "Three or four simple steps from first message to finished job, which takes away hesitation for first-time clients. It ends with a WhatsApp button so getting in touch is a tap away.",
+      "layout": "Band in the brand colour with light text and the numbered steps in a single row.",
+      "parts": [
+       "Reveal",
+       "Icon",
+       "Link"
+      ],
+      "id": "s4"
+     },
+     {
+      "label": "Recent work",
+      "intent": "Pictures of real jobs, dishes, rooms or results, so the owner's own work does the convincing. Each card carries a one-line caption.",
+      "layout": "Horizontal scroller of large pictures with the next card peeking in from the edge.",
+      "parts": [
+       "Work",
+       "Carousel",
+       "Image"
+      ],
+      "id": "s5"
+     },
+     {
+      "label": "About us",
+      "intent": "The owner's story in a few warm lines: who they are, where they work and how long they have done it. The few numbers they are proud of sit beside it.",
+      "layout": "Asymmetric 7/5 grid: the story on the left, stacked frosted stat tiles on the right.",
+      "parts": [
+       "Business",
+       "Stats",
+       "Image"
+      ],
+      "id": "s6"
+     },
+     {
+      "label": "Kind words",
+      "intent": "Short quotes from local clients with star ratings, so a newcomer can trust a business they found online.",
+      "layout": "Frosted cards that overlap slightly, offset vertically, like notes pinned on glass.",
+      "parts": [
+       "Testimonials",
+       "Reveal"
+      ],
+      "id": "s7"
+     },
+     {
+      "label": "Common questions",
+      "intent": "Answers the questions people ask before booking, such as area served, timings, payment and cancellations. This saves the owner repeat calls.",
+      "layout": "Centered narrow column with generous space and an accordion on one frosted panel.",
+      "parts": [
+       "Faqs",
+       "Accordion",
+       "AccordionItem"
+      ],
+      "id": "s8"
+     },
+     {
+      "label": "Get in touch",
+      "intent": "The enquiry form beside phone, WhatsApp, email, address, hours and a map link, so visitors can reach out in whatever way suits them.",
+      "layout": "Two columns: a wide frosted form panel on the left, contact details with icons on the right over soft colour.",
+      "parts": [
+       "LeadForm",
+       "Business",
+       "Icon",
+       "Link"
+      ],
+      "id": "s9"
+     },
+     {
+      "label": "Footer",
+      "intent": "The name, one warm line, contact details, social links and the year, closing the page simply.",
+      "layout": "Slim full-width frosted strip with three short columns.",
+      "parts": [
+       "Business",
+       "SocialLinks",
+       "Link"
+      ],
+      "id": "s10"
+     }
+    ],
+    "required": [
+     "LeadForm"
+    ]
+   }
+  ],
+  "themed": []
+ },
+ "pages": {}
+}

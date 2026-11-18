@@ -48,35 +48,54 @@ export async function spendSince(tenantId: string, since: Date): Promise<number>
   return Number(r.rows[0]?.s ?? 0)
 }
 
+/** One control-plane transaction: debitIn/trueUpIn moves made in it commit, or roll back, with the caller's own rows. */
+export function walletTx<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+  return tx(fn)
+}
+
+type DebitOpts = { tenantId: string; amountInr: number; category: WalletCategory; externalRef: string; note: string }
+
 /** Debit once per externalRef. Returns ok:false (nothing written) when the balance can't cover it. */
-export async function debit(opts: { tenantId: string; amountInr: number; category: WalletCategory; externalRef: string; note: string }) {
+export async function debit(opts: DebitOpts) {
   if (opts.tenantId === FLAGSHIP_TENANT_ID) return { ok: true as const, charged: false, balance: 0 }
   const amount = round2(opts.amountInr)
   if (!(amount > 0)) return { ok: true as const, charged: false, balance: await getBalance(opts.tenantId) }
-  return tx(async c => {
-    const { balance, floor } = await lock(c, opts.tenantId)
-    const dup = await c.query(`SELECT 1 FROM wallet_ledger WHERE tenant_id=$1 AND external_ref=$2 LIMIT 1`, [opts.tenantId, opts.externalRef])
-    if (dup.rowCount) return { ok: true as const, charged: false, balance }
-    if (balance - amount < floor) return { ok: false as const, error: 'insufficient_balance', balance, needed: round2(amount + floor - balance) }
-    await c.query(`INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note) VALUES ($1,'debit',$2,$3,$4,$5)`,
-      [opts.tenantId, opts.category, -amount, opts.externalRef, opts.note])
-    return { ok: true as const, charged: true, balance: await move(c, opts.tenantId, -amount) }
-  })
+  return tx(c => debitIn(c, opts))
 }
 
+/** debit() inside the caller's walletTx: a positive amount, never the flagship. */
+export async function debitIn(c: pg.PoolClient, opts: DebitOpts) {
+  const amount = round2(opts.amountInr)
+  if (opts.tenantId === FLAGSHIP_TENANT_ID || !(amount > 0)) throw new Error('debitIn needs a positive amount from a paying tenant')
+  const { balance, floor } = await lock(c, opts.tenantId)
+  const dup = await c.query(`SELECT 1 FROM wallet_ledger WHERE tenant_id=$1 AND external_ref=$2 LIMIT 1`, [opts.tenantId, opts.externalRef])
+  if (dup.rowCount) return { ok: true as const, charged: false, balance }
+  if (balance - amount < floor) return { ok: false as const, error: 'insufficient_balance', balance, needed: round2(amount + floor - balance) }
+  await c.query(`INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note) VALUES ($1,'debit',$2,$3,$4,$5)`,
+    [opts.tenantId, opts.category, -amount, opts.externalRef, opts.note])
+  return { ok: true as const, charged: true, balance: await move(c, opts.tenantId, -amount) }
+}
+
+type TrueUpOpts = { tenantId: string; amountInr: number; externalRef: string; note?: string }
+
 /** Adjust an existing debit to the provider's exact price (never blocks; delta may be ±). */
-export async function trueUp(opts: { tenantId: string; amountInr: number; externalRef: string; note: string }) {
+export async function trueUp(opts: TrueUpOpts & { note: string }) {
+  if (opts.tenantId === FLAGSHIP_TENANT_ID) return
+  await tx(c => trueUpIn(c, opts))
+}
+
+/** trueUp() inside the caller's walletTx; without a note the debit keeps its own. */
+export async function trueUpIn(c: pg.PoolClient, opts: TrueUpOpts): Promise<void> {
   if (opts.tenantId === FLAGSHIP_TENANT_ID) return
   const amount = round2(opts.amountInr)
-  await tx(async c => {
-    await lock(c, opts.tenantId)
-    const r = await c.query(`SELECT amount FROM wallet_ledger WHERE tenant_id=$1 AND external_ref=$2 LIMIT 1`, [opts.tenantId, opts.externalRef])
-    if (!r.rowCount) return
-    const delta = round2(amount - Math.abs(Number(r.rows[0].amount)))
-    if (delta === 0) return
-    await c.query(`UPDATE wallet_ledger SET amount=$3, note=$4 WHERE tenant_id=$1 AND external_ref=$2`, [opts.tenantId, opts.externalRef, -amount, opts.note])
-    await move(c, opts.tenantId, -delta)
-  })
+  await lock(c, opts.tenantId)
+  const r = await c.query(`SELECT amount FROM wallet_ledger WHERE tenant_id=$1 AND external_ref=$2 LIMIT 1`, [opts.tenantId, opts.externalRef])
+  if (!r.rowCount) return
+  const delta = round2(amount - Math.abs(Number(r.rows[0].amount)))
+  if (delta === 0) return
+  await c.query(`UPDATE wallet_ledger SET amount=$3, note=COALESCE($4, note) WHERE tenant_id=$1 AND external_ref=$2`,
+    [opts.tenantId, opts.externalRef, -amount, opts.note ?? null])
+  await move(c, opts.tenantId, -delta)
 }
 
 export async function recharge(opts: { tenantId: string; amountInr: number; externalRef: string; note?: string }) {

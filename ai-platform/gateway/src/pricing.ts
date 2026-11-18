@@ -1,7 +1,8 @@
 // Platform cost table (INR). Defaults here; override any cell with AI_PRICES_JSON, e.g.
 //   {"google":{"gemini-3.1-flash-image":{"image":6}},"razer":{"*":{"image":0.4}}}
 // Lookup: exact model -> longest model prefix -> provider '*' -> 0.
-// USD list prices (Oct 2026) converted at AI_USD_INR (default 84).
+// USD list prices (Oct 2026) converted at the live USD→INR rate (src/fx.ts, refreshed every six hours; AI_USD_INR,
+// default 84, until the first fetch or when no source answers). AI_PRICES_JSON cells are INR and stay as given.
 
 import type { TokenUsage } from '../../sdk/types'
 
@@ -9,7 +10,7 @@ export type PriceUnit = 'image' | 'video_second' | 'token_1k_in' | 'token_1k_out
 export type PriceCells = Partial<Record<PriceUnit, number>>
 export type PriceTable = Record<string, Record<string, PriceCells>>
 
-const USD = Number(process.env.AI_USD_INR) || 84
+let USD = Number(process.env.AI_USD_INR) || 84
 const usd = (n: number) => round(n * USD, 6)
 
 // Razer box: ~350 W GPU at ~8 INR/kWh plus hardware amortisation (~1.2 lakh over 3 years).
@@ -23,7 +24,7 @@ const claude = (inp: number, out: number, read: number, write = inp * 1.25): Pri
   token_1k_cache_read: usd(read / 1000), token_1k_cache_write: usd(write / 1000),
 })
 
-export const DEFAULT_PRICES: PriceTable = {
+const buildDefaults = (): PriceTable => ({
   anthropic: {
     'claude-opus-5-5': claude(4, 20, 0.2),
     'claude-sonnet-5-5': claude(2, 10, 0.2),
@@ -70,11 +71,23 @@ export const DEFAULT_PRICES: PriceTable = {
     'wan-video/wan-2.2-i2v-fast': { video_second: usd(0.05) },
     '*': { image: usd(0.03), video_second: usd(0.10) },
   },
-}
+})
+export let DEFAULT_PRICES: PriceTable = buildDefaults()
 
 let table: PriceTable | null = null
+let overrides: string | undefined = process.env.AI_PRICES_JSON
+
+export const usdInr = (): number => USD
+/** Reprice every USD list price at a new USD→INR rate; the next lookup rebuilds the table with the same overrides. */
+export function setUsdInr(rate: number): void {
+  if (!(Number.isFinite(rate) && rate > 40 && rate < 250) || rate === USD) return
+  USD = rate
+  DEFAULT_PRICES = buildDefaults()
+  if (table) loadPrices(overrides)
+}
 
 export function loadPrices(overridesJson: string | undefined = process.env.AI_PRICES_JSON): PriceTable {
+  overrides = overridesJson
   const out: PriceTable = {}
   for (const [p, models] of Object.entries(DEFAULT_PRICES)) out[p] = Object.fromEntries(Object.entries(models).map(([m, c]) => [m, { ...c }]))
   if (overridesJson) {

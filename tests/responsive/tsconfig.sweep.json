@@ -1,0 +1,17 @@
+{
+  // For the sweep's tsx steps (prepare.ts, cleanup.ts): the site modules they import reach server-only code and JSX,
+  // so this adds vitest's server-only stub and the automatic JSX runtime (the root leaves JSX to Next) to the root paths.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["../../packages/store-core/src/*"],
+      "@controller/*": ["../../controller-service/src/*"],
+      "@storefront/*": ["../../storefront-service/src/*"],
+      "@admin/*": ["../../admin-service/src/*"],
+      "@business/*": ["../../business-service/src/*"],
+      "@showcase/*": ["../../showcase-service/src/*"],
+      "server-only": ["../../node_modules/next/dist/compiled/server-only/empty.js"]
+    }
+  }
+}

@@ -7,12 +7,15 @@ import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { handleInboundWhatsApp } from '@controller/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
 import { routeAdminWhatsApp } from '@controller/lib/admin-agent/whatsapp'
+import { resolveInbound, type InboundTarget } from '@controller/lib/messaging/inbound-number'
 
 export const dynamic = 'force-dynamic'
 
-// Inbound Twilio messages. WhatsApp from an admin's verified number goes to the admin assistant, the rest
-// to the customer's support chat (the assistant answers; media lands in the Drive); SMS only carries
-// STOP/START. A store's own number posts with ?t=<tenant>. Always answers with empty TwiML so Twilio doesn't retry.
+// Inbound Twilio messages. The number messaged (To) says which store and audience: a store's admin number goes
+// to the admin assistant (staff only, signed-in sessions), the flagship's ecom number to the team's support inbox,
+// a customer number to the customer's support chat (the assistant answers; media lands in the Drive). A store still
+// on one shared number keeps admins-to-the-assistant by their verified mobile. SMS only carries STOP/START. The
+// legacy ?t=<tenant> hint still works. Always answers with empty TwiML so Twilio doesn't retry.
 
 const EMPTY_TWIML = '<Response></Response>'
 const twiml = () => new NextResponse(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } })
@@ -22,26 +25,29 @@ const START_CMDS = new Set(['START', 'UNSTOP', 'SUBSCRIBE'])
 
 export async function POST(request: NextRequest) {
   try {
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    if (!authToken) return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
-
     const form = await request.formData()
     const params: Record<string, string> = {}
     for (const [key, value] of form.entries()) params[key] = typeof value === 'string' ? value : String(value)
 
+    const hint = new URL(request.url).searchParams.get('t') || ''
+    const channel = /^whatsapp:/i.test(params.From || '') ? 'whatsapp' : 'sms'
+    const target = await resolveInbound(params.To || '', channel, hint || null)
+    // Signed with the platform's token, or the store's own token when its number lives in its own Twilio account.
+    const tokens = [process.env.TWILIO_AUTH_TOKEN, target.authToken].filter((t): t is string => !!t)
+    if (!tokens.length) return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
     // Twilio signs the public URL it was configured with, not the internal one behind CloudFront.
-    const tenantId = new URL(request.url).searchParams.get('t') || ''
     const base = process.env.PUBLIC_WEBHOOK_BASE_URL || process.env.APP_URL || 'https://jeffistores.in'
-    const url = tenantId
-      ? `${base.replace(/\/$/, '')}/api/webhooks/twilio?t=${encodeURIComponent(tenantId)}`
+    const url = hint
+      ? `${base.replace(/\/$/, '')}/api/webhooks/twilio?t=${encodeURIComponent(hint)}`
       : process.env.TWILIO_WEBHOOK_URL || 'https://jeffistores.in/api/webhooks/twilio'
-    if (!twilio.validateRequest(authToken, request.headers.get('x-twilio-signature') || '', url, params)) {
+    const signature = request.headers.get('x-twilio-signature') || ''
+    if (!tokens.some(t => twilio.validateRequest(t, signature, url, params))) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
     }
 
-    const ctx = tenantId ? await lookupTenantContextById(tenantId).catch(() => null) : null
-    if (tenantId && !ctx) return twiml()
-    const run = () => handle(params)
+    const ctx = target.tenantId ? await lookupTenantContextById(target.tenantId).catch(() => null) : null
+    if (target.tenantId && !ctx) return twiml()
+    const run = () => handle(params, target)
     await (ctx ? runWithTenantContext(ctx, run) : run())
     return twiml()
   } catch (err) {
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handle(params: Record<string, string>): Promise<void> {
+async function handle(params: Record<string, string>, target: InboundTarget): Promise<void> {
   const from = params.From || ''
   const to = params.To || ''
   const body = params.Body || ''
@@ -59,15 +65,27 @@ async function handle(params: Record<string, string>): Promise<void> {
   if (/^whatsapp:/i.test(from)) {
     const n = Math.min(Number(params.NumMedia) || 0, 10)
     const media = Array.from({ length: n }, (_, i) => ({ ref: params[`MediaUrl${i}`], mime: params[`MediaContentType${i}`] || '' })).filter(m => m.ref)
-    // An admin's verified number reaches the admin assistant instead, where the store has it on.
-    if (await routeAdminWhatsApp({ providerSid: sid, from, to, text: body, hasMedia: media.length > 0, repliedToSid: params.OriginalRepliedMessageSid || null })) return
+    const repliedToSid = params.OriginalRepliedMessageSid || null
+    // The admin number serves staff only; it never falls through to the customer chat.
+    if (target.audience === 'admin') {
+      await routeAdminWhatsApp({ providerSid: sid, from, to, text: body, hasMedia: media.length > 0, repliedToSid, receivedOn: 'admin' })
+      return
+    }
+    // Store owners on the flagship's ecom number: the team answers from the support inbox, no shopper assistant.
+    if (target.audience === 'ecom') {
+      await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media, audience: 'ecom' })
+      return
+    }
+    // On a shared number an admin's verified mobile still reaches the assistant, where the store has it on.
+    if (await routeAdminWhatsApp({ providerSid: sid, from, to, text: body, hasMedia: media.length > 0, repliedToSid, receivedOn: 'customer', separateAdminNumber: target.separateAdminNumber })) return
     const r = await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media })
     // A swipe-reply quotes the message it answers, which ties it to that order or quotation.
-    if (r) await onCustomerMessage(r.session, r.message, { repliedToSid: params.OriginalRepliedMessageSid || null, phone: from })
+    if (r) await onCustomerMessage(r.session, r.message, { repliedToSid, phone: from })
     return
   }
 
-  // SMS: Twilio answers STOP itself; we only record the preference.
+  // SMS: Twilio answers STOP itself; we only record the preference, for the customer number.
+  if (target.audience !== 'customer') return
   const number = from.trim()
   const last10 = number.replace(/\D/g, '').slice(-10)
   const user = last10

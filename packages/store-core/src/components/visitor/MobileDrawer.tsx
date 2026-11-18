@@ -35,7 +35,9 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
   const { user, logout } = useAuth()
   const { cartCount } = useCart()
   const { count: wishlistCount } = useWishlist()
-  const { identity } = useStoreConfig()
+  const { identity, chrome } = useStoreConfig()
+  // Site Builder's menu links when set; Contact stays reachable in the phone menu.
+  const nav = chrome?.nav?.length ? chrome.nav : NAV
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const [categories, setCategories] = useState<DrawerCategory[] | null>(null)
@@ -146,7 +148,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           </div>
 
           <nav aria-label="Main" className="flex flex-col p-4 gap-1">
-            {NAV.map(link => (
+            {nav.map(link => (
               <Link
                 key={link.href}
                 href={link.href}

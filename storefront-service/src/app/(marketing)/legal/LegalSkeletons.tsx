@@ -13,7 +13,7 @@ function DownloadIcon() {
 
 function ContactSupport({ text, className }: { text: string; className: string }) {
   return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
+    <div className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
       <p className={className}>{text}</p>
       <span className="inline-flex items-center gap-2 bg-primary-500 text-white px-6 py-2.5 rounded-lg font-semibold text-sm">
         Contact Support
@@ -27,7 +27,7 @@ export function LegalIndexSkeleton() {
     <div className="bg-surface min-h-screen" role="status" aria-busy="true" aria-label="Loading policies">
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">Policies &amp; Legal</h1>
+          <h1 className="ui-heading text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">Policies &amp; Legal</h1>
           <p className="text-foreground-secondary text-sm">
             Everything you need to know about how we operate, your rights, and our commitments to you.
           </p>
@@ -37,7 +37,7 @@ export function LegalIndexSkeleton() {
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="bg-surface-elevated rounded-xl border border-border-default flex gap-3 items-start">
+              <div key={i} className="ui-card bg-surface-elevated rounded-xl border border-border-default flex gap-3 items-start">
                 <div className="flex-1 flex gap-4 items-start p-5 min-w-0">
                   <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -95,7 +95,7 @@ export function LegalDocSkeleton() {
       <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-6xl mx-auto space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-6">
+            <div key={i} className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6">
               <Sk className="h-5 md:h-6 w-48 mb-3" />
               <div className="space-y-2">
                 <Sk className="h-4 w-full" />

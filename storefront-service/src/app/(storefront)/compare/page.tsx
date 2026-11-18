@@ -16,6 +16,8 @@ import CompareAddButton from '@/components/visitor/CompareAddButton'
 import CopySku from '@/components/ui/CopySku'
 import { round2 } from '@/lib/catalog/gst'
 import { publicProducts } from '@/lib/catalog/public-product'
+import { renderUtilityPage } from '@/components/visitor/site/code/parts/utility/site-page'
+import { cardNodes, type CardNodes } from '@/components/visitor/site/code/parts/utility/cards'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,9 +129,9 @@ const SPEC_ROWS: { label: string; key: (p: any) => string | null }[] = [
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: Promise<{ ids?: string; seed?: string }>
+  searchParams: Promise<{ ids?: string; seed?: string; preview?: string; layout?: string }>
 }) {
-  const { ids: idsParam, seed } = await searchParams
+  const { ids: idsParam, seed, preview, layout } = await searchParams
   let ids = (idsParam ?? '')
     .split(',')
     .map(s => s.trim())
@@ -139,7 +141,9 @@ export default async function ComparePage({
   if (ids.length < 2) {
     const fallbackIds = await getDefaultCompareIds(seed || undefined)
     if (fallbackIds.length >= 2) {
-      redirect(`/compare?ids=${fallbackIds.join(',')}`)
+      // A Site Builder preview keeps its token (and layout) through the redirect.
+      const keep = preview ? `&preview=${encodeURIComponent(preview)}${layout ? `&layout=${encodeURIComponent(layout)}` : ''}` : ''
+      redirect(`/compare?ids=${fallbackIds.join(',')}${keep}`)
     }
     // No products in DB at all
     return (
@@ -163,9 +167,30 @@ export default async function ComparePage({
 
   const colCount = products.length
 
+  // An AI-designed compare page places the table itself (<CompareTable />), its products drawn as the site's product
+  // cards; a Site Builder compare page holds it in its `compare_main` block; otherwise it is the page.
+  const view = { products, ids, gstEnabled }
+  const site = await renderUtilityPage({ audience: 'store', page: 'compare' }, { preview, layout }, {
+    part: 'CompareTable',
+    core: <CompareCards {...view} />,
+    block: { compare_main: <CompareView {...view} /> },
+  })
+  return site ?? <CompareView {...view} />
+}
+
+type CompareProps = { products: any[]; ids: string[]; gstEnabled: boolean }
+
+/** The table with its products as the site's product cards (the store's ProductCard when it has none). */
+async function CompareCards(props: CompareProps) {
+  return <CompareView {...props} cards={await cardNodes(props.products, props.gstEnabled)} />
+}
+
+/** The comparison under its heading; with `cards` (an AI design, which writes the heading) the table alone. */
+function CompareView({ products, ids, gstEnabled, cards }: CompareProps & { cards?: CardNodes }) {
   return (
-    <div className="bg-surface min-h-screen">
+    <div className={cards ? 'bg-surface' : 'bg-surface min-h-screen'}>
       {/* Breadcrumb */}
+      {!cards && (
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm">
@@ -181,22 +206,44 @@ export default async function ComparePage({
           </nav>
         </div>
       </div>
+      )}
 
       <div className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Product Comparison</h1>
+        {cards?.styles}
+        {(!cards || products.length < 4) && (
+        <div className={`flex items-center mb-6 ${cards ? 'justify-end' : 'justify-between'}`}>
+          {!cards && <h1 className="ui-heading text-2xl font-bold text-foreground">Product Comparison</h1>}
           {products.length < 4 && (
             <CompareAddButton currentIds={ids} categoryId={(products[0] as any)?.category_id ?? null} />
           )}
         </div>
+        )}
 
-        <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-x-auto">
+        <div className="ui-card bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-border-default">
                 {/* Label column */}
                 <th className="w-36 sm:w-44 p-4 text-left text-xs font-semibold text-foreground-muted uppercase tracking-wide bg-surface-secondary" />
                 {products.map((p: any, i: number) => {
+                  const card = cards?.nodes[p.id]
+                  if (card) {
+                    const stocked = p.has_variants ? Number(p.variant_stock_total ?? 0) > 0 : p.stock_status !== 'Out of Stock'
+                    return (
+                      <th key={p.id} className="min-w-[160px] sm:min-w-[190px] p-4 text-left align-top">
+                        <div className="space-y-2">
+                          {card}
+                          <span
+                            className={`ui-badge inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${stocked ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${stocked ? 'bg-green-500' : 'bg-red-500'}`} />
+                            {stocked ? 'In Stock' : 'Out of Stock'}
+                          </span>
+                          <CompareChangeButton productId={p.id} currentIds={ids} categoryId={p.category_id} />
+                        </div>
+                      </th>
+                    )
+                  }
                   const img = p.product_images?.find((x: any) => x.is_primary) || p.product_images?.[0]
                   const price =
                     p.has_variants && p.variant_min_price
@@ -266,7 +313,7 @@ export default async function ComparePage({
                         </div>
                         {/* Stock */}
                         <span
-                          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${inStock ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}
+                          className={`ui-badge inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${inStock ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${inStock ? 'bg-green-500' : 'bg-red-500'}`} />
                           {inStock ? 'In Stock' : 'Out of Stock'}

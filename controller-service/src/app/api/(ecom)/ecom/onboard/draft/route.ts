@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { saveDraft, getDraft } from '@/lib/tenant-registry'
+import { WIZARD_STEPS } from '@controller/app/(ecom)/ecom/onboard/steps'
+import { getStudioSession } from '@controller/lib/site-studio/sessions'
+import { studioStoreContextFrom, syncStudioStore } from '@controller/lib/site-studio/context'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +19,7 @@ export async function GET(request: NextRequest) {
 }
 
 const Schema = z.object({
-  step: z.number().int().min(0).max(7),
+  step: z.number().int().min(0).max(WIZARD_STEPS.length - 1),
   data: z.record(z.string(), z.unknown()),
 })
 
@@ -30,6 +33,11 @@ export async function POST(request: NextRequest) {
   const parsed = Schema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
-  await saveDraft(owner.id, parsed.data.step, parsed.data.data as Record<string, any>)
+  const data = parsed.data.data as Record<string, any>
+  await saveDraft(owner.id, parsed.data.step, data)
+  // The studio's preview shows the Store step's details: bring an existing session up to date (no AI runs).
+  await getStudioSession(owner.id)
+    .then(s => (s ? syncStudioStore(s, studioStoreContextFrom(data)) : null))
+    .catch(err => console.warn('[onboard] studio not synced', (err as Error)?.message))
   return NextResponse.json({ ok: true })
 }

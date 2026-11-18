@@ -34,7 +34,7 @@ import LibraryTemplatePicker from '@/components/admin/messaging-templates/Librar
 import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
 import type { EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import { bridgeVars, campaignCanFill } from '@/lib/templates/var-bridge'
-import { Badge, DraftLockBanner, FormFooter, LockedFieldset } from '@/components/admin/kit'
+import { Badge, DraftLockBanner, FormFooter, LockedFieldset, stickyAboveFooter } from '@/components/admin/kit'
 import { resnapshotCampaignSession } from './edit/actions'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
@@ -861,7 +861,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             )}
           </div>
 
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5 lg:self-start admin-sticky-pane" style={stickyAboveFooter}>
             <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
             {tplWarning && (
               <div className="mb-3 p-2.5 rounded-lg border border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">

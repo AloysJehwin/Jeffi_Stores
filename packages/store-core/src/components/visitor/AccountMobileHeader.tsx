@@ -32,7 +32,7 @@ export function AccountMobileTabBar() {
       : baseItems
   return (
     <div className="lg:hidden mx-3 mt-3 mb-4">
-      <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
+      <div className="ui-card bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
         <div className="flex">
           {items.map(item => {
             const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -70,7 +70,7 @@ export default function AccountMobileHeader() {
   return (
     <>
       <div className="lg:hidden bg-accent-500 pt-8 pb-16 px-4">
-        <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
+        <h1 className="ui-heading text-lg font-semibold text-white/80 mb-4">My Account</h1>
         <div className="flex items-center gap-4">
           <Link href="/account" className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 block">
             {user.avatarUrl ? (
@@ -91,7 +91,7 @@ export default function AccountMobileHeader() {
       </div>
 
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
-        <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
+        <div className="ui-card bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
             {items.map(item => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)

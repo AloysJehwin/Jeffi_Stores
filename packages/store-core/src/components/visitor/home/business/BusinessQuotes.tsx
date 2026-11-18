@@ -47,7 +47,7 @@ export default function BusinessQuotes({ section }: { section: BusinessSection }
               </p>
               <Link
                 href={href(member ? '/business/quotes/new' : '/business/signin')}
-                className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-400 text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-accent-500/25"
+                className="inline-flex min-h-12 items-center gap-2 bg-accent-500 hover:bg-accent-400 text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-accent-500/25"
               >
                 {section.cta_label ?? COPY.ctaLabel}
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

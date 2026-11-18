@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import { responsiveImg } from '@/lib/shared/image-url'
 import { listBrandsWithCounts } from '@/lib/catalog/storefront-counts'
 import { listingMetadata } from '@/lib/catalog/listing-seo'
+import { loadPartsPage } from '@/components/visitor/site/code/parts/taxonomy/site-page'
+import { setIndexPage } from '@/components/visitor/site/code/parts/taxonomy/context'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,11 +16,12 @@ export async function generateMetadata(): Promise<Metadata> {
   })
 }
 
-export default async function BrandsPage() {
+/** The built-in page: every brand with its logo and product count. */
+async function BrandsIndex() {
   const brands = await listBrandsWithCounts()
 
   return (
-    <div className="bg-surface min-h-screen">
+    <>
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">All Brands</h1>
@@ -118,6 +121,15 @@ export default async function BrandsPage() {
           </div>
         )}
       </div>
-    </div>
+    </>
   )
+}
+
+export default async function BrandsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const sp = await searchParams
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
+  // The store's Site Builder page when it has one (an AI design lists the brands itself), else the built-in page.
+  const sitePage = await loadPartsPage({ audience: 'store', page: 'brands' }, { preview: one(sp.preview), layout: one(sp.layout) }, 'brands_main', ['AllBrands'])
+  setIndexPage('brands')
+  return <div className="bg-surface min-h-screen">{sitePage.site(sitePage.builtIn ? <BrandsIndex /> : null) ?? <BrandsIndex />}</div>
 }

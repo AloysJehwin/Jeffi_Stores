@@ -11,7 +11,7 @@ import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
-import { Badge, DraftLockBanner, FormFooter, LockedFieldset } from '@/components/admin/kit'
+import { Badge, DraftLockBanner, FormFooter, LockedFieldset, stickyAboveFooter } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
@@ -599,7 +599,7 @@ export default function ReviewFormForm({
           </div>
         </div>
 
-        <div className="sticky top-6">
+        <div className="sticky top-6 admin-sticky-pane" style={stickyAboveFooter}>
           <p className="text-xs font-medium text-foreground-muted uppercase tracking-wide mb-2">Live Preview</p>
           <FormsPreview
             title={title}

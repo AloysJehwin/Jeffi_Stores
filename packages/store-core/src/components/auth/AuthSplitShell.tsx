@@ -86,7 +86,7 @@ export default function AuthSplitShell({
           <span className="min-w-0 truncate">{brandName}</span>
         </Link>
         <div className="relative max-w-lg">
-          <h2 className="text-4xl font-black leading-[1.1] xl:text-5xl">{headline}</h2>
+          <h2 className="ui-heading text-4xl font-black leading-[1.1] xl:text-5xl">{headline}</h2>
           {sub && <p className="mt-4 text-base leading-relaxed opacity-80">{sub}</p>}
           <ul className="mt-8 space-y-3">
             {points.map(p => (
@@ -109,7 +109,7 @@ export default function AuthSplitShell({
           <span className="min-w-0 truncate">{brandName}</span>
         </Link>
         <div className="mx-auto w-full max-w-sm">{children}</div>
-        <div className="mx-auto mt-10 w-full max-w-sm rounded-2xl border border-border-default bg-surface-elevated p-5 lg:hidden">
+        <div className="ui-card mx-auto mt-10 w-full max-w-sm rounded-2xl border border-border-default bg-surface-elevated p-5 lg:hidden">
           <p className="text-base font-bold leading-snug text-foreground">{headline}</p>
           <ul className="mt-3 space-y-2.5">
             {points.map(p => (

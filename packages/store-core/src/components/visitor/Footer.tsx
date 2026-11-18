@@ -3,39 +3,16 @@
 import Link from 'next/link'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { CookieSettingsLink } from './CookieConsentBanner'
-
-const GROUPS = [
-  {
-    title: 'Shop',
-    links: [
-      { href: '/', label: 'Home' },
-      { href: '/products', label: 'Products' },
-      { href: '/categories', label: 'Categories' },
-    ],
-  },
-  {
-    title: 'Help',
-    links: [
-      { href: '/about', label: 'About Us' },
-      { href: '/contact', label: 'Contact' },
-      { href: '/support', label: 'Support' },
-    ],
-  },
-  {
-    title: 'Policies',
-    links: [
-      { href: '/legal', label: 'Policies' },
-      { href: '/legal/privacy-policy', label: 'Privacy' },
-    ],
-  },
-]
+import { DEFAULT_FOOTER_COLUMNS } from '@/lib/site/chrome-types'
 
 const link =
   'flex items-center min-h-[24px] sm:min-h-0 sm:py-0.5 text-xs sm:text-[13px] text-gray-300 hover:text-accent-400 transition-colors'
 
 /** Storefront footer: links, contact, policies and copyright. Pads itself for the home indicator and any fixed bottom bar. */
 export default function Footer({ cookieConsent = false }: { cookieConsent?: boolean }) {
-  const { identity, storefront } = useStoreConfig()
+  const { identity, storefront, chrome } = useStoreConfig()
+  // Site Builder's footer columns when set; the cookie settings link rides in the last column.
+  const groups = chrome?.footer?.columns.length ? chrome.footer.columns : DEFAULT_FOOTER_COLUMNS
   const initials =
     identity.name
       .split(/\s+/)
@@ -71,19 +48,19 @@ export default function Footer({ cookieConsent = false }: { cookieConsent?: bool
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 sm:gap-12">
-            {GROUPS.map(g => (
-              <nav key={g.title} aria-label={g.title} className="min-w-0">
+          <div className={`grid gap-3 sm:gap-12 ${groups.length >= 4 ? 'grid-cols-2 sm:grid-cols-4' : groups.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {groups.map((g, gi) => (
+              <nav key={`${g.title}:${gi}`} aria-label={g.title || 'Links'} className="min-w-0">
                 <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-400 sm:mb-1">{g.title}</p>
                 <ul>
-                  {g.links.map(l => (
-                    <li key={l.href}>
+                  {g.links.map((l, li) => (
+                    <li key={`${l.href}:${li}`}>
                       <Link href={l.href} className={link}>
                         {l.label}
                       </Link>
                     </li>
                   ))}
-                  {g.title === 'Policies' && cookieConsent && (
+                  {gi === groups.length - 1 && cookieConsent && (
                     <li>
                       <CookieSettingsLink className={`${link} text-left`} />
                     </li>
@@ -96,7 +73,7 @@ export default function Footer({ cookieConsent = false }: { cookieConsent?: bool
 
         <div className="border-t border-gray-700 mt-2 pt-2 sm:mt-5 sm:pt-3">
           <p className="text-gray-400 text-[10px] sm:text-xs text-center lg:text-left">
-            © {new Date().getFullYear()} {identity.name}. All rights reserved.
+            {chrome?.footer?.note ?? `© ${new Date().getFullYear()} ${identity.name}. All rights reserved.`}
           </p>
         </div>
       </div>

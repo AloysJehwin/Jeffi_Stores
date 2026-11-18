@@ -21,14 +21,14 @@ export default function BusinessPendingPage() {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-foreground mb-3">Application Under Review</h1>
+        <h1 className="ui-heading text-2xl font-bold text-foreground mb-3">Application Under Review</h1>
         <p className="text-foreground-secondary leading-relaxed mb-6">
           Thank you for applying to the {config.identity.name} Business Partner program. Our team is reviewing your
           application and will get back to you within <strong>24–48 hours</strong>.
         </p>
 
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-5 mb-8 text-left">
-          <h2 className="text-sm font-semibold text-foreground mb-3">What happens next?</h2>
+        <div className="ui-card bg-surface-elevated rounded-lg border border-border-default p-5 mb-8 text-left">
+          <h2 className="ui-heading text-sm font-semibold text-foreground mb-3">What happens next?</h2>
           <ol className="space-y-3">
             {[
               'Our team reviews your business details and GST number.',
@@ -48,13 +48,13 @@ export default function BusinessPendingPage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/"
-            className="px-6 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 transition-colors text-sm"
+            className="ui-btn px-6 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 transition-colors text-sm"
           >
             Browse Products
           </Link>
           <Link
             href={bp('/business/signin')}
-            className="px-6 py-3 border border-border-default text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors text-sm font-medium"
+            className="ui-btn px-6 py-3 border border-border-default text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors text-sm font-medium"
           >
             Sign In Again
           </Link>

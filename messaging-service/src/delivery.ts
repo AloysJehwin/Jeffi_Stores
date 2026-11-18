@@ -1,5 +1,6 @@
 import { scopeSql, type ServiceScope } from '@jeffi/tenancy'
 import { processingFeeInr, type MessagingChannel } from '@jeffi/pricing'
+import { ensurePricing } from './pricing-sheet.js'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { poolsForTenant } from './pools.js'
@@ -41,7 +42,8 @@ export async function applyStatus(id: string, status: string, o: { code?: string
   // so an unconditional media:${id} refund is a no-op when the row wasn't hosted (closes audit Gap 2).
   if (m && next === 'failed' && Number(m.charged_inr) > 0) {
     const internal = !!(m.metadata && (m.metadata as Record<string, unknown>).internal)
-    const fee = processingFeeInr(m.channel as MessagingChannel, internal)
+    await ensurePricing()
+    const fee = processingFeeInr(m.channel as MessagingChannel, internal, (m.metadata as any)?.pricing_provider)
     await wallet.trueUp({ tenantId: m.tenant_id, amountInr: fee, externalRef: `pub:${id}`, note: `refund: ${m.channel} not delivered` })
     await wallet.trueUp({ tenantId: m.tenant_id, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a non-delivered send' })
     await db.query(`UPDATE messages SET charged_inr=$2 WHERE id=$1`, [id, fee])
@@ -68,7 +70,7 @@ export function startDeliverySync(log: (m: string) => void, scope: ServiceScope)
     for (const r of rows.rows) {
       try {
         // A send from the store's own Twilio account is polled with that account's client.
-        const ov = r.metadata?.sender?.own ? await tenantSender(r.tenant_id, r.channel) : null
+        const ov = r.metadata?.sender?.own ? await tenantSender(r.tenant_id, r.channel, r.metadata.sender.audience ?? 'customer') : null
         const s = await fetchStatus(r.provider_ref, ov ?? undefined)
         await applyStatus(r.id, s.status, { code: s.code, message: s.message, payload: { polled: true, ...s } })
       } catch (e: any) {

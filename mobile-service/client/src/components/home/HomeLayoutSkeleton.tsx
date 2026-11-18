@@ -73,7 +73,18 @@ const CARD = 'rounded-panel border border-transparent bg-surface-elevated p-4 da
 
 type Draw = (ctx: { rowIndex: number }) => ReactNode
 
+const CONTENT_DRAW: Draw = () => (
+  <View className="px-4 py-6">
+    <Skeleton aspectRatio={16 / 9} rounded="rounded-panel" />
+  </View>
+)
+
 const DRAW: Record<SectionType, Draw> = {
+  rich_text: CONTENT_DRAW,
+  image_text: CONTENT_DRAW,
+  image_banner: CONTENT_DRAW,
+  faq: CONTENT_DRAW,
+  contact_details: () => null,
   hero: () => (
     <View className="mb-3 px-4 pt-3">
       <Skeleton aspectRatio={16 / 10} rounded="rounded-sheet" />

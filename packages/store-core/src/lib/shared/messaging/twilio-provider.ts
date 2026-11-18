@@ -18,9 +18,10 @@ const MAX_INBOUND_MEDIA = 25 * 1024 * 1024
 
 export type SenderOverride = Pick<TenantSender, 'sender' | 'config'>
 
+// A sender row without an account (the flagship's numbers, bought in the platform's account) uses the env credentials.
 function creds(ov?: SenderOverride) {
   const c = ov?.config
-  return c
+  return c?.account_sid
     ? { accountSid: c.account_sid, authToken: c.auth_token, apiKeySid: c.api_key_sid, apiKeySecret: c.api_key_secret }
     : { accountSid: ACCOUNT_SID, authToken: AUTH_TOKEN, apiKeySid: API_KEY_SID, apiKeySecret: API_KEY_SECRET }
 }

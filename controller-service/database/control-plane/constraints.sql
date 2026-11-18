@@ -154,9 +154,14 @@ ALTER TABLE ONLY public.tenants ADD CONSTRAINT tenants_messaging_addon_check
 ALTER TABLE ONLY public.tenants ADD CONSTRAINT tenants_requested_addons_check
     CHECK (requested_addons <@ ARRAY['messaging','ad_free']::text[]);
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_tenant_channel_key UNIQUE (tenant_id, channel);
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_tenant_channel_audience_key UNIQUE (tenant_id, channel, audience);
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_channel_check
     CHECK (channel IN ('sms','whatsapp'));
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_audience_check
+    CHECK (audience IN ('customer','admin','ecom'));
+-- Staff are reached on WhatsApp only: no admin-facing SMS sender.
+ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_audience_channel_check
+    CHECK (audience <> 'admin' OR channel = 'whatsapp');
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_provider_check
     CHECK (provider IN ('twilio','aws'));
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_status_check
@@ -173,3 +178,25 @@ ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_rene
 ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_order_term_key UNIQUE (order_id, term_expires_at);
 ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_status_check
     CHECK (status IN ('due','renewing','done','lapsed','off'));
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_owner_product_key UNIQUE (owner_id, product);
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_product_check
+    CHECK (product IN ('store','showcase'));
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_status_check
+    CHECK (status IN ('brief','plan','direction','building','ready','failed'));
+ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_tweaks_today_check
+    CHECK (tweaks_today >= 0);
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_tenant_doc_key UNIQUE (tenant_id, doc_type);
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_status_check
+    CHECK (status IN ('pending','approved','rejected','expired'));
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_expiry_notice_check
+    CHECK (expiry_notice IN (0, 7, 30));
+ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_tenant_ref_key UNIQUE (tenant_id, external_ref);
+ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_amounts_check
+    CHECK (cap_inr > 0 AND margin > 0 AND cost_inr >= 0 AND (charged_inr IS NULL OR charged_inr BETWEEN 0 AND cap_inr));
+ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_usage_db_check CHECK (usage_db IN ('store','platform'));
+-- Settled all at once: when, by whom and for how much.
+ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_settled_check
+    CHECK ((settled_at IS NULL) = (settled_by IS NULL) AND (settled_at IS NULL) = (charged_inr IS NULL) AND (settled_by IS NULL OR settled_by IN ('run','sweep')));

@@ -111,12 +111,15 @@ export default function MobileFilterSheet({
   facets = EMPTY_FACETS,
   basePath = '/products',
   offers = [],
+  always = false,
 }: {
   categories: Category[]
   brands: Brand[]
   facets?: FilterFacets
   basePath?: string
   offers?: { slug: string; title: string }[]
+  /** Show the triggers and the sheet at every width, not just below lg. */
+  always?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -338,7 +341,7 @@ export default function MobileFilterSheet({
         type="button"
         onClick={() => openSheet('filters')}
         aria-haspopup="dialog"
-        className="lg:hidden shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors border-border-default text-foreground-secondary hover:bg-surface-secondary"
+        className={`${always ? '' : 'lg:hidden '}shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors border-border-default text-foreground-secondary hover:bg-surface-secondary`}
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18l-7 8v5l-4 2v-7L3 5z" />
@@ -354,7 +357,7 @@ export default function MobileFilterSheet({
         type="button"
         onClick={() => openSheet('sort')}
         aria-haspopup="dialog"
-        className={`lg:hidden shrink-0 ${tableView ? 'hidden' : 'flex'} items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors ${currentSortId !== 'featured' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+        className={`${always ? '' : 'lg:hidden '}shrink-0 ${tableView ? 'hidden' : 'flex'} items-center gap-1.5 px-3 h-11 rounded-lg text-xs font-medium border transition-colors ${currentSortId !== 'featured' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h13M3 12h9m-9 5h5m9-9v12m0 0l-3-3m3 3l3-3" />
@@ -366,7 +369,7 @@ export default function MobileFilterSheet({
       {open &&
         createPortal(
           <div
-            className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end"
+            className={`${always ? '' : 'lg:hidden '}fixed inset-0 z-50 flex flex-col justify-end`}
             role="dialog"
             aria-modal="true"
             aria-label={tab === 'sort' ? 'Sort by' : 'Filters'}

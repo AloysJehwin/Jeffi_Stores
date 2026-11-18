@@ -68,8 +68,8 @@ describe('buildPipeline', () => {
 
   it('on k8s with real infra, connects the scheduled jobs once the store is live', () => {
     const p = buildPipeline(spec('node'), 'basic', opts())
-    expect(jobIds(p).slice(-2)).toEqual(['golive', 'crons'])
-    expect(flatSteps(p).slice(-2)).toEqual(['activate', 'connect_crons'])
+    expect(jobIds(p).slice(-3)).toEqual(['golive', 'crons', 'site'])
+    expect(flatSteps(p).slice(-3)).toEqual(['activate', 'connect_crons', 'build_site'])
     expect(STEP_CATALOG.connect_crons).toMatchObject({ continueOnError: true, alertAs: 'cron_connect' })
     expect(jobIds(buildPipeline(spec('node'), 'basic', opts({ provider: 'stub' })))).not.toContain('crons')
     expect(jobIds(buildPipeline(spec('dedicated'), 'pro', opts({ engine: 'ec2' })))).not.toContain('crons')

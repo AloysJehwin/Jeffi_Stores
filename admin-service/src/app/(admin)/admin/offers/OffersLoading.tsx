@@ -40,7 +40,10 @@ export function OfferDetailLoading({ footer }: { footer?: boolean }) {
   return (
     <PageLoading back="Offers" actions={footer ? 0 : 1}>
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-4">
+        <div
+          className="admin-sticky-pane min-w-0 space-y-4 max-xl:!static max-xl:!max-h-none max-xl:!overflow-visible"
+          style={footer ? ({ '--admin-sticky-offset': '10rem' } as React.CSSProperties) : undefined}
+        >
           <LoadingForm footer={false} sections={[{ title: 'Offer details', fields: ['Title', 'Launch date', 'End date'], cols: 1 }]} />
           <div className={`p-4 ${card}`}>
             <LoadingLines lines={1} />

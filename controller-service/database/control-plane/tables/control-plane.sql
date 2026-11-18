@@ -389,6 +389,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_kyc (
     logo_s3_key     character varying(512),    -- store logo: branding/{owner_id}/logo.*
     seal_s3_key     character varying(512),    -- store seal (for legal docs): branding/{owner_id}/seal.*
     warehouse       jsonb,                     -- onboarding pickup warehouse {originPincode,pickupLocation,sellerName,sellerAddress,sellerPhone}
+    store_profile   jsonb,                     -- Store step, what the site shows {tagline,about,phone,whatsapp,email,address,city,state,pincode,socials}
     legals_accepted_version character varying(20),   -- POLICY_VERSION the owner agreed to at onboarding
     legals_accepted_at      timestamp with time zone,
     status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
@@ -970,15 +971,19 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon_renew boolea
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS requested_addons text[] NOT NULL DEFAULT '{}'::text[];
 
 --
--- tenant_messaging_senders: the sender Jeffi assigned a tenant for a channel — a DLT-registered SMS header
--- or a WhatsApp number — plus the provider credentials that send through it (lib/messaging/tenant-senders.ts).
--- config_enc is AES-256-GCM of the JSON credential blob (lib/crypto/token-cipher); meta holds masked,
--- non-secret hints for the admin UI. One row per (tenant, channel); the platform tenant never has one.
+-- tenant_messaging_senders: the sender Jeffi assigned a tenant for a channel and audience — a DLT-registered
+-- SMS header or a WhatsApp number — plus the provider credentials that send through it
+-- (lib/messaging/tenant-senders.ts). config_enc is AES-256-GCM of the JSON credential blob
+-- (lib/crypto/token-cipher); meta holds masked, non-secret hints for the admin UI. One row per
+-- (tenant, channel, audience): customer (shoppers), admin (store staff, the admin agent), ecom (flagship
+-- only: store owners on the ecom portal). A missing audience falls back to the customer row, then (the
+-- platform tenant only) the platform env.
 --
 CREATE TABLE IF NOT EXISTS public.tenant_messaging_senders (
     id           uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     tenant_id    uuid NOT NULL,
     channel      character varying(10) NOT NULL,            -- sms | whatsapp
+    audience     character varying(10) NOT NULL DEFAULT 'customer', -- customer | admin | ecom
     provider     character varying(16) NOT NULL,            -- twilio | aws
     sender       character varying(120) NOT NULL,           -- DLT header or WhatsApp number
     config_enc   text NOT NULL,                             -- encrypted JSON credential blob

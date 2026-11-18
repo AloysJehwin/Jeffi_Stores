@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
-import { useCart } from '@/contexts/CartContext'
+import { useCartOptional } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import QuickAddPicker, { QuickAddHeaderActions } from '@/components/visitor/QuickAddPicker'
 import { startBuyNow } from '@/lib/client/buy-now'
@@ -29,9 +29,18 @@ interface QuickAddButtonProps {
   portal?: 'storefront' | 'business'
   /** Extra classes on the trigger's wrapper (e.g. hide it where the card shows its own trigger). The popup still opens. */
   triggerClassName?: string
+  /** A trigger of the caller's own design (a site card's button): its classes and content, in place of the round plus. */
+  buttonClassName?: string
+  buttonContent?: React.ReactNode
+  /** The trigger's accessible name, when its own content says something else. */
+  ariaLabel?: string
+  /** A product with no options goes straight into the cart (one tap) instead of opening the quantity popup. */
+  quick?: boolean
 }
 
 const MAX_QTY = 10
+const TRIGGER = 'ui-btn w-7 h-7 rounded-full bg-accent-500 hover:bg-accent-600 text-white flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm'
+const TRIGGER_OFF = 'ui-btn w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted opacity-60 cursor-not-allowed'
 
 export default function QuickAddButton({
   productId,
@@ -49,8 +58,13 @@ export default function QuickAddButton({
   isDigital = false,
   portal = 'storefront',
   triggerClassName = '',
+  buttonClassName,
+  buttonContent,
+  ariaLabel,
+  quick = false,
 }: QuickAddButtonProps) {
-  const { addToCart } = useCart()
+  // No cart outside the storefront (the AI Site Studio preview): the button shows, adding says it is a preview.
+  const addToCart = useCartOptional()?.addToCart
   const router = useRouter()
   const productHref = portal === 'business' ? bp(`/business/products/${slug}`) : `/products/${slug}`
   const { showToast } = useToast()
@@ -72,6 +86,7 @@ export default function QuickAddButton({
   const addSimple = useCallback(
     async (quantity: number) => {
       if (adding) return
+      if (!addToCart) return showToast('This is a preview: the cart works once your store is live.', 'info')
       setAdding(true)
       try {
         await addToCart(productId, quantity)
@@ -100,10 +115,15 @@ export default function QuickAddButton({
     }
   }, [adding, portal, productId, router, showToast])
 
-  const onButtonClick = useCallback((e: React.MouseEvent) => {
-    stop(e)
-    setOpen(v => !v)
-  }, [])
+  const direct = quick && !hasVariants && !isDigital
+  const onButtonClick = useCallback(
+    (e: React.MouseEvent) => {
+      stop(e)
+      if (direct) addSimple(1)
+      else setOpen(v => !v)
+    },
+    [direct, addSimple]
+  )
 
   useEffect(() => {
     if (!open) return
@@ -132,11 +152,11 @@ export default function QuickAddButton({
       <button
         type="button"
         disabled
-        aria-label="Out of stock"
+        aria-label={ariaLabel ?? 'Out of stock'}
         onClick={stop}
-        className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted opacity-60 cursor-not-allowed"
+        className={buttonClassName ? `${buttonClassName} opacity-60 cursor-not-allowed` : TRIGGER_OFF}
       >
-        <PlusIcon />
+        {buttonContent ?? <PlusIcon />}
       </button>
     )
     return triggerClassName ? <div className={triggerClassName}>{disabledButton}</div> : disabledButton
@@ -153,12 +173,11 @@ export default function QuickAddButton({
       <button
         type="button"
         onClick={onButtonClick}
-        aria-label={label}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        className="w-7 h-7 rounded-full bg-accent-500 hover:bg-accent-600 text-white flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm"
+        aria-label={ariaLabel ?? label}
+        {...(direct ? { 'aria-busy': adding, disabled: adding } : { 'aria-haspopup': 'dialog' as const, 'aria-expanded': open })}
+        className={buttonClassName ?? TRIGGER}
       >
-        <PlusIcon />
+        {buttonContent ?? <PlusIcon />}
       </button>
 
       {open && hasVariants && (

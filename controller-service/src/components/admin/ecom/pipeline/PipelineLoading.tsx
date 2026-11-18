@@ -15,7 +15,7 @@ export function PipelineLoading() {
         <Sk className="mt-3.5 h-1.5 w-full rounded-full" />
       </div>
       <div className="grid gap-5 items-start lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <div className="hidden lg:block rounded-xl border border-border-default bg-surface-elevated p-2 space-y-0.5">
+        <div className="admin-sticky-pane hidden lg:block rounded-xl border border-border-default bg-surface-elevated p-2 space-y-0.5">
           {JOBS.map((w, i) => (
             <div key={i} className="flex items-center gap-2.5 px-2.5 py-2">
               <Sk className="h-4 w-4 shrink-0 rounded-full" />

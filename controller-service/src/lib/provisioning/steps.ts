@@ -722,6 +722,101 @@ const HANDLERS: Record<Step, Handler> = {
     if (problem) return wait(problem)
     return ok(`scheduled jobs reach the store (${res.cronJobs.length} jobs)`)
   },
+
+  async build_site({ job, slug, res }) {
+    // The store's first site. When the owner built it in the onboarding AI Site Studio, the store's admin installs
+    // that session's pages and theme (lib/site/studio installStudioSite); otherwise it builds one from the "Your
+    // site" brief on a platform-funded budget (lib/site/onboarding-build.ts). Each tick asks again (the store starts
+    // it once) until it is live. Non-fatal: the store is already serving its standard pages.
+    if (res.restored) return skip('store restored from a backup: it keeps its own site')
+    const site = await onboardingSite(job.tenant_id)
+    if (!site) return skip('the owner chose to design the site themselves')
+    if (process.env.PROVISIONING_PROVIDER !== 'aws') return skip('stub provider: no store pods to reach')
+    if (!onK8sCompute(res)) return skip('not on k8s: the store has no Site Builder service')
+    if (!site.studio) {
+      const { siteAiAvailable } = await import('@/lib/site/ai-status')
+      if (!(await siteAiAvailable('platform'))) return skip('AI site generation is not available (Claude is not connected): the store keeps its standard pages')
+    }
+    if (!process.env.CRON_SECRET) throw new Error('build_site: missing required env CRON_SECRET on the controller')
+    const { SITE_BUILD_PATH } = await import('@/lib/shared/cron-jobs')
+    const { storeCronHost, storeCronTarget } = await import('@controller/lib/cron/targets')
+    const { storeLayouts } = await import('@controller/lib/compute/store')
+    const layout = (await storeLayouts([job.tenant_id]).catch(() => new Map())).get(job.tenant_id) ?? 'services'
+    const target = storeCronTarget(slug, layout, SITE_BUILD_PATH)
+    if ('skip' in target) return skip(target.skip)
+    const { internalRequest } = await import('@/lib/shared/internal-http')
+    const r = await internalRequest(target.base + SITE_BUILD_PATH, {
+      method: 'POST',
+      host: storeCronHost(slug),
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...(site.studio ? { studio: site.studio.input } : site.brief),
+        budgetInr: Number(process.env.SITE_BUILD_BUDGET_INR || 1000),
+      }),
+      timeoutMs: 20_000,
+    })
+    if (r.status === 404) return skip('the store app has no AI site builder yet')
+    if (!r.ok) throw new Error(`build_site: the store answered HTTP ${r.status}`)
+    const build = (JSON.parse(r.body) as { build?: Record<string, any> }).build ?? {}
+    res.siteBuild = {
+      status: build.status,
+      step: build.step,
+      style: build.style,
+      pages: build.pages,
+      pictures: build.pictures,
+      spentInr: build.spentInr,
+      ...(site.studio ? { studio: site.studio.id } : {}),
+    }
+    if (site.studio && (build.status === 'running' || build.status === 'done'))
+      await site.studio.installed(build.status === 'done').catch(() => {})
+    if (build.status === 'running') return wait(build.step ?? (site.studio ? 'Installing your site' : 'Building your site'))
+    if (build.status !== 'done') return warn(`the AI could not build the site: ${build.error ?? 'unknown error'}`)
+    if (site.studio) return ok(`studio site installed${build.style ? ` (${build.style})` : ''}: ${build.pages ?? 0} pages`)
+    return ok(`site built in the ${build.style} style: ${build.pages} pages, ${build.pictures ?? 0} pictures`)
+  },
+}
+
+/**
+ * What build_site installs: the owner's finished AI Site Studio session, else their "Your site" brief from the
+ * onboarding draft; null when they chose to design the site themselves.
+ */
+async function onboardingSite(tenantId: string) {
+  const { controlPlanePool, getDraft } = await import('@/lib/tenant-registry')
+  const owner = await controlPlanePool()
+    .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
+    .catch(() => null)
+  const ownerId = owner?.rows?.[0]?.owner_id
+  if (!ownerId) return null
+  const site = (await getDraft(ownerId).catch(() => null))?.data?.site as
+    | { skip?: boolean; description?: string; style?: string; references?: unknown[]; images?: boolean }
+    | undefined
+  if (site?.skip) return null
+  const { studioSiteForTenant, markStudioInstalled } = await import('@controller/lib/site-studio/sessions')
+  const studio = await studioSiteForTenant(tenantId).catch(() => null)
+  if (studio) {
+    const style = (studio.direction as { name?: string } | null)?.name
+    return {
+      studio: {
+        id: studio.id,
+        // The brief, plan and direction go along so the store's Site Builder can change sections the studio way.
+        // freeUsed: a ready-made theme's site (no AI) leaves the store's free generation for Site Builder, unless the
+        // owner's free generation was used in the studio before it.
+        input: { pages: studio.pages, theme: studio.theme, ...(style ? { style } : {}), brief: studio.brief, plan: studio.plan, direction: studio.direction, freeUsed: !!studio.free_used_at },
+        installed: (done: boolean) => markStudioInstalled(studio.id, tenantId, done),
+      },
+    }
+  }
+  const description = String(site?.description ?? '').trim()
+  if (!site || description.length < 10) return null
+  const { SITE_STYLE_IDS } = await import('@/lib/site/styles')
+  return {
+    brief: {
+      description: description.slice(0, 2000),
+      style: (SITE_STYLE_IDS as string[]).includes(String(site.style)) ? String(site.style) : 'auto',
+      references: (site.references ?? []).map(String).filter(u => /^https:\/\//i.test(u)).slice(0, 3),
+      images: site.images !== false,
+    },
+  }
 }
 
 /** One ping of the store's cron route; null when every check passes, else what failed. */

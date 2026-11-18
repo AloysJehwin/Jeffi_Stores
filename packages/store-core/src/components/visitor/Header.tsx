@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { DEFAULT_NAV } from '@/lib/site/chrome-types'
+import { useState } from 'react'
 import Link from 'next/link'
 import SearchBar from './SearchBar'
 import UserMenu from './UserMenu'
@@ -10,25 +11,17 @@ import AiAssistantButton from './AiAssistantButton'
 import { useCart } from '@/contexts/CartContext'
 import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { StoreLogoMark } from './site/code/parts/chrome/marks'
+import CartLink from './site/code/parts/chrome/CartLink'
 
 export default function Header() {
   const { cartCount } = useCart()
   const { count: wishlistCount } = useWishlist()
-  const { identity, storefront } = useStoreConfig()
+  const { identity, storefront, chrome } = useStoreConfig()
+  // Site Builder's menu links when set; the first three always show, the rest from xl up so no label wraps.
+  const nav = chrome?.nav?.length ? chrome.nav : DEFAULT_NAV
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [pulseBadge, setPulseBadge] = useState(false)
-  const prevCount = useRef(cartCount)
-
-  useEffect(() => {
-    if (cartCount > prevCount.current) {
-      setPulseBadge(true)
-      const t = setTimeout(() => setPulseBadge(false), 500)
-      prevCount.current = cartCount
-      return () => clearTimeout(t)
-    }
-    prevCount.current = cartCount
-  }, [cartCount])
 
   return (
     <>
@@ -37,32 +30,7 @@ export default function Header() {
           <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-3">
             {/* Logo: the name truncates on phones so the icon row always fits */}
             <Link href="/" className="flex items-center min-w-0 lg:shrink-0">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                {identity.logoUrl ? (
-                  <img
-                    src={identity.logoUrl}
-                    alt={`${identity.name} Logo`}
-                    className="h-8 sm:h-10 lg:h-12 w-auto max-w-[6rem] sm:max-w-none object-contain shrink-0"
-                  />
-                ) : (
-                  <span
-                    aria-hidden
-                    className="inline-flex h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-white text-base sm:text-lg lg:text-xl font-black"
-                  >
-                    {identity.name.trim().charAt(0).toUpperCase() || 'S'}
-                  </span>
-                )}
-                <div className="min-w-0">
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 truncate">
-                    {identity.name}
-                  </div>
-                  {storefront.metaTagline && (
-                    <div className="hidden sm:block text-xs text-foreground-muted truncate">
-                      {storefront.metaTagline}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <StoreLogoMark name={identity.name} logoUrl={identity.logoUrl} tagline={storefront.metaTagline} />
             </Link>
 
             {/* Desktop Navigation: About Us and Support drop out below xl so no label wraps */}
@@ -74,33 +42,15 @@ export default function Header() {
               }`}
               aria-hidden={searchOpen}
             >
-              <Link href="/" className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors">
-                Home
-              </Link>
-              <Link
-                href="/products"
-                className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
-              >
-                Products
-              </Link>
-              <Link
-                href="/categories"
-                className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
-              >
-                Categories
-              </Link>
-              <Link
-                href="/about"
-                className="hidden xl:inline text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
-              >
-                About Us
-              </Link>
-              <Link
-                href="/support"
-                className="hidden xl:inline text-foreground-secondary hover:text-accent-500 font-medium transition-colors"
-              >
-                Support
-              </Link>
+              {nav.map((l, i) => (
+                <Link
+                  key={`${l.href}:${i}`}
+                  href={l.href}
+                  className={`${i >= 3 ? 'hidden xl:inline ' : ''}text-foreground-secondary hover:text-accent-500 font-medium transition-colors`}
+                >
+                  {l.label}
+                </Link>
+              ))}
             </nav>
 
             {/* Right Actions */}
@@ -133,32 +83,7 @@ export default function Header() {
               </Link>
 
               {/* Cart Icon */}
-              <Link
-                href="/cart"
-                aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}
-                className="hidden sm:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group"
-              >
-                <svg
-                  className="w-6 h-6 transition-transform group-hover:scale-110"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                {cartCount > 0 && (
-                  <span
-                    className={`absolute top-0.5 right-0.5 bg-accent-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center transition-transform duration-300 ${pulseBadge ? 'animate-cart-pulse' : ''}`}
-                  >
-                    {cartCount}
-                  </span>
-                )}
-              </Link>
+              <CartLink count={cartCount} />
 
               <div className="hidden sm:block">
                 <UserMenu />

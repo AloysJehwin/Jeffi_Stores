@@ -66,7 +66,7 @@ function DeskStat({ label, tone }: { label: string; tone: string }) {
 function SectionHead({ title, action }: { title: string; action?: string }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+      <h2 className="ui-heading text-sm font-semibold text-foreground">{title}</h2>
       {action && (
         <span className="text-xs text-accent-600 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800">
           {action}
@@ -168,7 +168,7 @@ export function AccountHomeSkeleton({ portal = 'store' }: { portal?: Portal }) {
           </div>
           <div className={`${TILE} p-4 sm:p-5`}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-foreground">Recent Orders</h2>
+              <h2 className="ui-heading text-sm font-semibold text-foreground">Recent Orders</h2>
               <span className="text-xs text-accent-600 dark:text-accent-400 font-medium">View all</span>
             </div>
             <div className="space-y-2">
@@ -258,7 +258,7 @@ export function OrdersListSkeleton({ portal = 'store' }: { portal?: Portal }) {
     <Frame portal={portal} label="Loading orders" className="pt-4 pb-8">
       {portal === 'business' && (
         <div className="mb-4 hidden sm:block max-w-xs">
-          <div className="relative w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-surface-elevated border border-border-default text-foreground-muted">
+          <div className="ui-card relative w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-surface-elevated border border-border-default text-foreground-muted">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -288,7 +288,7 @@ export function OrderDetailSkeleton({ portal = 'store' }: { portal?: Portal }) {
         <div className={`${CARD} p-4 sm:p-6`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="flex items-center gap-1 text-xl font-bold text-foreground">
+              <h2 className="ui-heading flex items-center gap-1 text-xl font-bold text-foreground">
                 Order #<Sk className="inline-block h-6 w-36" />
               </h2>
               <div className="flex items-center gap-1 text-sm text-foreground-secondary mt-1">
@@ -302,7 +302,7 @@ export function OrderDetailSkeleton({ portal = 'store' }: { portal?: Portal }) {
           </div>
         </div>
         <div className={`${CARD} p-4 sm:p-6`}>
-          <h3 className="flex items-center gap-1 text-lg font-bold text-foreground mb-4">
+          <h3 className="ui-heading flex items-center gap-1 text-lg font-bold text-foreground mb-4">
             Order Items (<Sk className="inline-block h-5 w-14" />)
           </h3>
           <div className="space-y-4">
@@ -406,7 +406,7 @@ export function TransactionsSkeleton({ portal = 'store' }: { portal?: Portal }) 
 
 export function SubscriptionCardSkeleton() {
   return (
-    <div className="bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3">
+    <div className="ui-card bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3">
       <div className="flex gap-3 items-start">
         <Sk className="w-16 h-16 rounded" />
         <div className="flex-1 min-w-0 space-y-2">
@@ -476,7 +476,7 @@ export function AccountQuotesSkeleton() {
 function ListCard({ title, rows }: { title: string; rows: number }) {
   return (
     <div className={XCARD}>
-      <h2 className="font-semibold text-foreground">{title}</h2>
+      <h2 className="ui-heading font-semibold text-foreground">{title}</h2>
       <ul className="mt-3 divide-y divide-border-default">
         {Array.from({ length: rows }).map((_, i) => (
           <li key={i} className="flex items-center justify-between gap-4 py-3">
@@ -497,7 +497,7 @@ export function RewardsBodySkeleton() {
   return (
     <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
       <div className="min-w-0 space-y-4 lg:col-span-2">
-        <div className="rounded-xl border border-border-default shadow-sm p-5 sm:p-6 bg-surface-elevated">
+        <div className="ui-card rounded-xl border border-border-default shadow-sm p-5 sm:p-6 bg-surface-elevated">
           <Sk className="h-6 w-28 rounded-full" />
           <Sk className="h-10 w-32 mt-4" />
           <Sk className="h-4 w-56 mt-2" />
@@ -505,7 +505,7 @@ export function RewardsBodySkeleton() {
           <Sk className="h-4 w-64 max-w-full mt-2" />
         </div>
         <div className={XCARD}>
-          <h2 className="font-semibold text-foreground">Redeem points</h2>
+          <h2 className="ui-heading font-semibold text-foreground">Redeem points</h2>
           <Sk className="h-4 w-3/4 mt-2" />
           <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-3">
             <div className="sm:flex-1">
@@ -519,7 +519,7 @@ export function RewardsBodySkeleton() {
       </div>
       <div className="min-w-0 lg:sticky lg:top-4">
         <div className={XCARD}>
-          <h2 className="font-semibold text-foreground">How it works</h2>
+          <h2 className="ui-heading font-semibold text-foreground">How it works</h2>
           <div className="mt-3 space-y-2">
             {['w-11/12', 'w-4/5', 'w-2/3', 'w-full'].map((w, i) => (
               <Sk key={i} className={`h-4 ${w}`} />
@@ -566,7 +566,7 @@ export function ReferralsBodySkeleton() {
           <p className="mt-2 text-sm text-foreground-secondary">
             When a friend signs up with your link and their first order is delivered, the points are yours.
           </p>
-          <div className="mt-4 flex items-center gap-2 rounded-lg bg-surface-elevated border border-border-default pl-3 pr-1.5 py-1.5">
+          <div className="ui-card mt-4 flex items-center gap-2 rounded-lg bg-surface-elevated border border-border-default pl-3 pr-1.5 py-1.5">
             <Sk className="flex-1 h-4" />
             <span className="shrink-0 inline-flex items-center px-2.5 py-1.5 rounded-md border border-border-default text-xs sm:text-sm font-medium text-foreground-secondary">
               Copy
@@ -596,7 +596,7 @@ export function ReferralsBodySkeleton() {
       </div>
       <div className="min-w-0 lg:sticky lg:top-4">
         <div className={XCARD}>
-          <h2 className="font-semibold text-foreground">How it works</h2>
+          <h2 className="ui-heading font-semibold text-foreground">How it works</h2>
           <ol className="mt-3 space-y-3">
             {[1, 2, 3].map(n => (
               <li key={n} className="flex gap-3">

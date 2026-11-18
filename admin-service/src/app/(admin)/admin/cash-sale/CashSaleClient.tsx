@@ -948,7 +948,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
             </div>
 
             <div className="space-y-4">
-              <div className="bg-surface-elevated border border-border-default rounded-xl p-5 sticky top-4">
+              <div className="bg-surface-elevated border border-border-default rounded-xl p-5 sticky top-4 admin-sticky-pane">
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-foreground">Order Summary</h3>
                 <div className="space-y-2 text-sm mb-4">
                   <div className="flex justify-between text-foreground-secondary">

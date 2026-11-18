@@ -20,6 +20,8 @@ export interface SendByTemplateInput {
   locale?: string
   /** Sent and billed as the platform, outside the store's switches (an admin's OTP, which a store with an empty wallet must still get). */
   asPlatform?: boolean
+  /** sms/whatsapp: which of the store's numbers sends it (customer default; admin = staff; ecom = flagship owner portal). */
+  audience?: 'customer' | 'admin' | 'ecom'
 }
 
 export interface SendResult {
@@ -69,6 +71,7 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     subject: i.subject,
     reference: i.reference,
     locale: i.locale,
+    audience: i.channel === 'email' ? undefined : i.audience,
     // Inside a reply scope the customer's email reply comes back to the record that asked.
     reply_to: i.channel === 'email' ? currentReplyScope()?.replyTo : undefined,
     ...extra,

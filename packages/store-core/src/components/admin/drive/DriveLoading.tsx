@@ -1,8 +1,11 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { HardDrive, Images, Trash2 } from 'lucide-react'
 import { LoadingTable, Sk } from '@/components/admin/kit/skeleton'
 
 // Server-safe placeholders shaped like the Drive (DriveBrowser / DriveGrid).
+
+/** Desktop: the Drive fills the screen below the page header (title + description). */
+export const DRIVE_SPLIT = { '--admin-split-offset': '12rem' } as CSSProperties
 
 /** Folder tiles and file cards (or list rows) while a folder loads. */
 export function DriveItemsLoading({ view = 'grid' }: { view?: 'grid' | 'list' }) {
@@ -56,8 +59,8 @@ function Place({ icon, active, children }: { icon: ReactNode; active?: boolean; 
 /** The whole Drive (places, toolbar and My Drive) for the page's loading screen. */
 export default function DriveBrowserLoading() {
   return (
-    <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
-      <nav aria-label="Drive" className="flex gap-1 overflow-x-auto lg:flex-col">
+    <div className="admin-split grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]" style={DRIVE_SPLIT}>
+      <nav aria-label="Drive" className="admin-pane flex gap-1 overflow-x-auto lg:flex-col">
         <Place icon={<HardDrive className="h-4 w-4" />} active>
           My Drive
         </Place>
@@ -67,7 +70,7 @@ export default function DriveBrowserLoading() {
           Files here are private to staff. Links are signed and expire after a few minutes. Gallery items are public.
         </p>
       </nav>
-      <section className="min-w-0 rounded-xl border border-border-default bg-surface-elevated">
+      <section className="min-w-0 rounded-xl border border-border-default bg-surface-elevated lg:flex lg:min-h-0 lg:flex-col">
         <div className="flex flex-wrap items-center gap-2 border-b border-border-default px-4 py-3">
           <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">My Drive</span>
           <Sk className="h-control w-28 rounded-lg" />
@@ -78,7 +81,7 @@ export default function DriveBrowserLoading() {
           <Sk className="h-control w-36 rounded-lg" />
           <Sk className="h-8 w-16 rounded-lg" />
         </div>
-        <div className="min-h-[50vh] p-4">
+        <div className="admin-pane min-h-[50vh] p-4 lg:flex-1">
           <DriveItemsLoading />
         </div>
       </section>

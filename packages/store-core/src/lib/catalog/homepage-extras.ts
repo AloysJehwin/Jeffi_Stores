@@ -384,7 +384,8 @@ export async function getSlides(section: SectionShape, gstEnabled: boolean): Pro
   return { ...settings, slides }
 }
 
-const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean) => Promise<unknown>>> = {
+// Keyed by section type, plus Site Builder's composed block (its data nodes, by node path).
+const LOADERS: Partial<Record<SectionType | 'composed', (s: SectionShape, gstEnabled: boolean) => Promise<unknown>>> = {
   countdown_deal: (s, gst) => getCountdownDeal(s, gst),
   product_spotlight: getSpotlightProduct,
   testimonials: s => getTestimonials(s),
@@ -393,6 +394,10 @@ const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean
   back_in_stock: getBackInStock,
   value_stats: s => getValueStats(s),
   slides: getSlides,
+  composed: async (s, gst) => {
+    const [{ cleanTree }, { loadComposedData }] = await Promise.all([import('@/lib/site/composed'), import('@/lib/site/composed-data')])
+    return loadComposedData(cleanTree(s.config?.tree).tree, gst)
+  },
 }
 
 /** Data for the section types that load their own, keyed by section id. A failing section is skipped. */
@@ -402,7 +407,7 @@ export async function loadSectionExtras(
 ): Promise<Map<string, unknown>> {
   const entries = await Promise.all(
     sections.map(async s => {
-      const load = LOADERS[s.type]
+      const load = LOADERS[s.type as SectionType | 'composed']
       if (!load) return null
       try {
         return [s.id, await load(s, gstEnabled)] as const

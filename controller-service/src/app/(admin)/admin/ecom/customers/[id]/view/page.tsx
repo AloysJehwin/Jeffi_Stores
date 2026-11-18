@@ -21,6 +21,7 @@ import InfrastructureTab from '@controller/components/admin/ecom/tabs/Infrastruc
 import CommerceTab from '@controller/components/admin/ecom/tabs/CommerceTab'
 import ShipmentsTab from '@controller/components/admin/ecom/tabs/ShipmentsTab'
 import KycTab from '@controller/components/admin/ecom/tabs/KycTab'
+import { complianceAttention, listComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
 import AccessTab from '@controller/components/admin/ecom/tabs/AccessTab'
 import CertificatesTab from '@controller/components/admin/ecom/tabs/CertificatesTab'
 import MessagingTab from '@controller/components/admin/ecom/tabs/MessagingTab'
@@ -57,7 +58,7 @@ export default async function TenantObjectPage({ params, searchParams }: { param
         tenantId={t.id}
         active={tab}
         hidden={hiddenTabs}
-        badges={{ kyc: d.kycPending ? <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" /> : null }}
+        badges={{ kyc: kycDot(d.kycPending, d.isStore ? await complianceAttention(id).catch(() => null) : null) }}
       />
 
       <div className="min-w-0">
@@ -68,9 +69,9 @@ export default async function TenantObjectPage({ params, searchParams }: { param
         {tab === 'shipments' && <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />}
         {tab === 'access' && <AccessTab {...await accessData(id)} />}
         {tab === 'certificates' && <CertificatesTab tenant={t} {...await certificatesData(id)} />}
-        {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} />}
+        {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} documents={await listComplianceDocuments(id).catch(() => [])} />}
         {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} storeName={t.display_name} />}
-        {tab === 'numbers' && d.isStore && <NumbersTab tenantId={t.id} />}
+        {tab === 'numbers' && d.isStore && <NumbersTab tenantId={t.id} storeName={t.display_name || t.slug} />}
       </div>
     </div>
   )
@@ -131,4 +132,11 @@ async function shipmentData(id: string): Promise<ShipmentRow[]> {
     ).catch(() => [])
     return rows
   }).catch(() => [])
+}
+
+// The KYC tab's dot: red when a licence is rejected or expired, yellow while the KYC, a service or a licence waits on Jeffi.
+function kycDot(kycPending: boolean, licences: 'action' | 'review' | null) {
+  if (licences === 'action') return <span title="A licence needs the owner" className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block align-middle" />
+  if (kycPending || licences === 'review') return <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" />
+  return null
 }

@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   ListChecks,
   Rocket,
+  Sparkles,
   Store,
   Warehouse,
   type LucideIcon,
@@ -27,6 +28,7 @@ const ICONS: Record<StepIconKey, LucideIcon> = {
   warehouse: Warehouse,
   bank: Landmark,
   branding: ImageIcon,
+  site: Sparkles,
   review: ListChecks,
   payment: CreditCard,
   setup: Rocket,
@@ -35,8 +37,8 @@ const ICONS: Record<StepIconKey, LucideIcon> = {
 }
 
 /**
- * The dashboard's console frame for onboarding: the rail lists the steps (finished ones are links back when
- * `onSelect` is given) and, on mobile, the top bar shows the current step and a progress strip.
+ * The dashboard's console frame for onboarding: the rail lists the steps (finished ones, and any up to `reachable`, are
+ * links when `onSelect` is given) and, on mobile, the top bar shows the current step and a progress strip.
  */
 export default function OnboardShell({
   owner,
@@ -46,6 +48,7 @@ export default function OnboardShell({
   current,
   groupTitle = 'Store setup',
   onSelect,
+  reachable,
   saving = false,
   children,
 }: {
@@ -57,6 +60,8 @@ export default function OnboardShell({
   current: number
   groupTitle?: string
   onSelect?: (index: number) => void
+  /** The furthest step reached: steps up to it link back and forward, past the current one. */
+  reachable?: number
   saving?: boolean
   children: ReactNode
 }) {
@@ -83,12 +88,13 @@ export default function OnboardShell({
         <ol className="space-y-0.5">
           {steps.map((s, i) => {
             const done = i < current
+            const linked = !!onSelect && i !== current && (done || i <= (reachable ?? -1))
             const active = i === current
             const Icon = done ? Check : ICONS[s.icon]
             const cls = `ecom-focus flex w-full items-center gap-3 px-3 py-2 rounded-xl text-left text-sm transition-colors ${
               active
                 ? 'ecom-current font-semibold'
-                : done
+                : done || linked
                   ? 'text-foreground-secondary ecom-hover hover:text-foreground'
                   : 'text-foreground-muted'
             }`
@@ -100,13 +106,13 @@ export default function OnboardShell({
             )
             return (
               <li key={s.label} title={s.desc}>
-                {done && onSelect ? (
+                {linked ? (
                   <button
                     type="button"
                     className={cls}
                     onClick={() => {
                       close()
-                      onSelect(i)
+                      onSelect?.(i)
                     }}
                   >
                     {body}

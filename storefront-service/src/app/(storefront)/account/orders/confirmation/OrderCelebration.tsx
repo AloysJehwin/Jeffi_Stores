@@ -52,7 +52,7 @@ export default function OrderCelebration({ orderId, orderNumber }: OrderCelebrat
       <div className="flex justify-center mb-4">
         <CheckmarkDraw animate={animate} />
       </div>
-      <h1 className="text-3xl font-bold text-foreground mb-2">Order Confirmed!</h1>
+      <h1 className="ui-heading text-3xl font-bold text-foreground mb-2">Order Confirmed!</h1>
       <p className="text-foreground-secondary mb-4">
         Thank you for your purchase. Your order has been successfully placed.
       </p>

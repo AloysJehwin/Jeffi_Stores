@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Check, Menu, Rocket } from 'lucide-react'
 import { Sk } from '@/components/admin/kit/skeleton'
 import { ConsoleBrand } from '../dashboard/_components/ConsoleFrame'
+import { WIZARD_STEPS } from './steps'
 
 /** OnboardShell's frame while the page loads: real step labels when known (`done` of them ticked), else shimmering ones. */
 export default function ShellLoading({ heading, steps, done = 0, groupTitle = 'Store setup', children }: { heading?: string; steps?: readonly { label: string }[]; done?: number; groupTitle?: string; children: ReactNode }) {
@@ -28,7 +29,7 @@ export default function ShellLoading({ heading, steps, done = 0, groupTitle = 'S
                     <span className="min-w-0 flex-1 truncate">{s.label}</span>
                   </li>
                 ))
-              : Array.from({ length: 8 }).map((_, i) => (
+              : Array.from({ length: WIZARD_STEPS.length }).map((_, i) => (
                   <li key={i} className="flex items-center gap-3 px-3 py-2">
                     <Sk className="h-4 w-4 rounded-full" />
                     <Sk className={`h-3.5 ${i % 2 ? 'w-16' : 'w-24'}`} />

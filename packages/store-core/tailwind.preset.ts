@@ -13,15 +13,25 @@ const alpha = (variable: string) =>
       ? `var(${variable})`
       : `color-mix(in srgb, var(${variable}) calc(${opacityValue} * 100%), transparent)`) as unknown) as string
 
+// Brand scales read `--c-<name>-<shade>` channels ("R G B") so a Site Builder theme can recolour a store at runtime;
+// Tailwind's <alpha-value> keeps `/NN` modifiers working. The defaults below come from the design tokens.
+const SCALES = { primary: tokens.primary, secondary: tokens.secondary, accent: tokens.accent } as Record<string, Record<string, string>>
+const channelsOf = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(' ')
+const scale = (name: string) =>
+  Object.fromEntries(Object.keys(SCALES[name]).map(shade => [shade, `rgb(var(--c-${name}-${shade}) / <alpha-value>)`]))
+const scaleDefaults = Object.fromEntries(
+  Object.entries(SCALES).flatMap(([name, shades]) => Object.entries(shades).map(([shade, hex]) => [`--c-${name}-${shade}`, channelsOf(hex)]))
+)
+
 // Shared Tailwind theme; each app's tailwind.config.ts adds its own content globs.
 const preset: Partial<Config> = {
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        primary: tokens.primary,
-        secondary: tokens.secondary,
-        accent: tokens.accent,
+        primary: scale('primary'),
+        secondary: scale('secondary'),
+        accent: scale('accent'),
         surface: 'var(--color-surface)',
         'surface-elevated': 'var(--color-surface-elevated)',
         'surface-secondary': 'var(--color-surface-secondary)',
@@ -105,7 +115,9 @@ const preset: Partial<Config> = {
     },
   },
   plugins: [
-    plugin(({ addBase }) => addBase({ ':root': tokens.cssVars('light'), '.dark': tokens.cssVars('dark'), '.light-scope': tokens.cssVars('light') })),
+    plugin(({ addBase }) =>
+      addBase({ ':root': { ...scaleDefaults, ...tokens.cssVars('light') }, '.dark': tokens.cssVars('dark'), '.light-scope': tokens.cssVars('light') })
+    ),
   ],
 }
 

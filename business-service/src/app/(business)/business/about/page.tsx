@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
+import { renderSitePage } from '@/components/visitor/site/SitePage'
 import { headers } from 'next/headers'
 import { bp } from '@/lib/shared/business-path'
 import { queryMany } from '@/lib/shared/db'
@@ -31,7 +32,10 @@ const CATEGORY_COLORS: Record<string, string> = {
   Valves: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
 }
 
-export default async function BusinessAboutPage() {
+export default async function BusinessAboutPage({ searchParams }: { searchParams: Promise<{ preview?: string; layout?: string }> }) {
+  // The business portal's Site Builder about page when it has one (or its preview); else the built-in one below.
+  const site = await renderSitePage({ audience: 'business', page: 'about' }, await searchParams)
+  if (site) return site
   const [hdrs, identity, categories] = await Promise.all([
     headers(),
     getStoreIdentity(),

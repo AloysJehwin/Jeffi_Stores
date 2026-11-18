@@ -472,7 +472,7 @@ function BusinessSignUpPage() {
           </span>
           <Link
             href={bp('/business/signin')}
-            className="inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors shadow-sm"
+            className="ui-btn inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors shadow-sm"
           >
             Sign in
           </Link>
@@ -486,7 +486,7 @@ function BusinessSignUpPage() {
               >
                 ← Back to store
               </Link>
-              <h1 className="text-3xl font-bold text-foreground">
+              <h1 className="ui-heading text-3xl font-bold text-foreground">
                 {step === 'details' ? 'Business Details' : 'Business Sign Up'}
               </h1>
               <p className="text-sm text-foreground-secondary mt-2">
@@ -529,14 +529,14 @@ function BusinessSignUpPage() {
                       required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                      className="ui-input w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                       placeholder="you@company.com"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={formBusy}
-                    className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     {formBusy ? (
                       <>
@@ -579,7 +579,7 @@ function BusinessSignUpPage() {
                     value={otp}
                     ref={otpInputRef}
                     onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                    className={`w-full px-4 py-3 border rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest ${
+                    className={`ui-input w-full px-4 py-3 border rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest ${
                       otp.length === 6
                         ? 'border-green-500 ring-2 ring-green-200 dark:ring-green-900/40'
                         : 'border-border-secondary'
@@ -643,7 +643,7 @@ function BusinessSignUpPage() {
                 <button
                   type="submit"
                   disabled={otp.length !== 6 || formBusy || !policyAccepted}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center"
+                  className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center"
                 >
                   {formBusy ? (
                     <>
@@ -708,7 +708,7 @@ function BusinessSignUpPage() {
                 <div>
                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Mobile Number *</label>
                   <div className="flex">
-                    <span className="inline-flex items-center px-3 py-2.5 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm">
+                    <span className="ui-addon inline-flex items-center px-3 py-2.5 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm">
                       +91
                     </span>
                     <input
@@ -717,7 +717,7 @@ function BusinessSignUpPage() {
                       maxLength={10}
                       value={phone}
                       onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-3 py-2.5 border border-border-secondary rounded-r-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                      className="ui-input w-full px-3 py-2.5 border border-border-secondary rounded-r-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                       placeholder="00000 00000"
                     />
                   </div>
@@ -885,7 +885,7 @@ function BusinessSignUpPage() {
                 <button
                   type="submit"
                   disabled={formBusy}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center mt-2"
+                  className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center mt-2"
                 >
                   {formBusy ? (
                     <>

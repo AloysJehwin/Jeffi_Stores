@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { buildHomeModel, toHomeModelJson } from '@/lib/catalog/homepage-model'
 import { rowAudience, rowPage } from '@/lib/catalog/homepage-sections'
+import { themeCssVars } from '@jeffi/site-blocks'
+import { getPublishedTheme } from '@/lib/site/store'
 
 // The storefront home as JSON for the mobile app. `?surface=app` serves the app's own layout
 // (Settings → Homepage → App); anything else, including no parameter, is the website's.
@@ -19,7 +21,10 @@ export async function GET(req: NextRequest) {
   const audience = rowAudience({ audience: params.get('audience') })
   // No parameter at all is an app build from before per-surface layouts (see LEGACY_APP_HIDDEN_TYPES).
   const model = toHomeModelJson(await buildHomeModel({ surface, page, audience, legacyClient: requested === null }))
-  return NextResponse.json(model, {
+  // Site Builder's theme as the app applies it (colour channels and corner radius); null keeps the built-in look.
+  const theme = (audience === 'business' ? await getPublishedTheme('business').catch(() => null) : null) ?? (await getPublishedTheme('store').catch(() => null))
+  const vars = theme ? Object.fromEntries(Object.entries(themeCssVars(theme)).filter(([k]) => k.startsWith('--c-') || k.startsWith('--radius-'))) : null
+  return NextResponse.json({ ...model, theme: vars ? { vars } : null }, {
     headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
   })
 }

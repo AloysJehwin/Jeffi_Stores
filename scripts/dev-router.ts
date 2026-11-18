@@ -11,23 +11,29 @@ const PORT = Number(process.env.DEV_ROUTER_PORT || 3000)
 // public.localhost and public-{slug}.localhost are public-api-service's, as Traefik routes them in production.
 const PUBLIC_API_PORT = Number(process.env.DEV_PUBLIC_API_PORT || 3100)
 const isPublicHost = (host = '') => /^public(-[a-z0-9-]+)?\.localhost(:\d+)?$/i.test(host)
+// site-{slug}.localhost is showcase-service's (a Showcase site), as site-{slug}.<root> is in production.
+const SHOWCASE_PORT = Number(process.env.DEV_SHOWCASE_PORT || 3014)
+const isShowcaseHost = (host = '') => /^site-[a-z0-9-]+\.localhost(:\d+)?$/i.test(host)
 
-function target(req: http.IncomingMessage): { app: AppName | 'public-api'; port: number } {
+function target(req: http.IncomingMessage): { app: AppName | 'public-api' | 'showcase'; port: number } {
   if (isPublicHost(req.headers.host)) return { app: 'public-api', port: PUBLIC_API_PORT }
+  if (isShowcaseHost(req.headers.host)) return { app: 'showcase', port: SHOWCASE_PORT }
   const app = routeFor(req.headers.host || 'localhost', (req.url || '/').split('?')[0])
   return { app, port: DEV_PORTS[app] }
 }
 
-const down = (app: AppName | 'public-api', port: number) =>
+const down = (app: AppName | 'public-api' | 'showcase', port: number) =>
   app === 'public-api'
     ? `public-api-service isn't running on :${port}. Start it with npm run dev:services.\n`
-    : `${app} isn't running on :${port}. Start it with npm run dev:${app}, or everything with npm run dev.\n`
+    : app === 'showcase'
+      ? `showcase-service isn't running on :${port}. Start it with npm run dev:app:showcase (or npm run dev:showcase).\n`
+      : `${app} isn't running on :${port}. Start it with npm run dev:${app}, or everything with npm run dev.\n`
 
 // An app's asset prefix (/_controller, /_admin, /_business) is stripped before it reaches the app, as the
 // ingress does in production (Next doesn't serve prefixed paths there, and its middleware would rewrite
 // them). HMR's WebSocket keeps it: Next expects it there.
-function upstreamPath(app: AppName | 'public-api', url = '/') {
-  const prefix = app === 'storefront' || app === 'public-api' ? null : ASSET_PREFIX[app]
+function upstreamPath(app: AppName | 'public-api' | 'showcase', url = '/') {
+  const prefix = app === 'storefront' || app === 'public-api' || app === 'showcase' ? null : ASSET_PREFIX[app]
   return prefix && url.startsWith(prefix + '/') ? url.slice(prefix.length) : url
 }
 

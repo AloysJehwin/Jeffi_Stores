@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { debitMessageCost, refundMessageEstimate } from '@/lib/shared/messaging/billing'
 import { usdToInr } from '@/lib/shared/messaging/pricing'
+import { followsProviderPrice } from '@jeffi/pricing'
+import { loadMessagePricing } from '@/lib/billing/message-pricing'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
-import { getTenantSender } from '@/lib/messaging/tenant-senders'
+import { getTenantSender, audiencesFor } from '@/lib/messaging/tenant-senders'
 import { applyDeliveryStatus } from '@controller/lib/shared/messaging/delivery-status'
 
 export const dynamic = 'force-dynamic'
@@ -26,11 +28,15 @@ export async function POST(request: Request) {
   const url = `${base.replace(/\/$/, '')}/api/webhooks/twilio/status?t=${encodeURIComponent(tenantId)}`
   const sig = request.headers.get('x-twilio-signature') || ''
   const channel = (params.From || params.To || '').startsWith('whatsapp:') ? 'whatsapp' : 'sms'
-  // A send from the store's own Twilio account (tenant_messaging_senders) is signed with that account's token.
-  const ownToken = async () => (await getTenantSender(tenantId, channel).catch(() => null))?.config.auth_token
+  // A send from one of the store's own Twilio accounts (tenant_messaging_senders: its customer or admin number) is
+  // signed with that account's token.
+  const ownTokens = async () =>
+    (await Promise.all(audiencesFor(tenantId).map(a => getTenantSender(tenantId, channel, a).catch(() => null))))
+      .map(s => s?.config.auth_token)
+      .filter((t): t is string => !!t)
   if (!twilio.validateRequest(authToken, sig, url, params)) {
-    const t = tenantId ? await ownToken() : undefined
-    if (!t || !twilio.validateRequest(t, sig, url, params)) return NextResponse.json({ error: 'invalid signature' }, { status: 403 })
+    const tokens = tenantId ? await ownTokens() : []
+    if (!tokens.some(t => twilio.validateRequest(t, sig, url, params))) return NextResponse.json({ error: 'invalid signature' }, { status: 403 })
   }
 
   const sid = params.MessageSid || params.SmsSid
@@ -38,7 +44,9 @@ export async function POST(request: Request) {
   const price = params.Price ? Number(params.Price) : 0
   if (!sid || !tenantId) return new NextResponse(null, { status: 204 })
 
-  const priceInr = price ? usdToInr(price) : 0
+  // The pricing sheet decides the USD rate and whether Twilio's reported price replaces the fixed one (Ecom → Configuration).
+  await loadMessagePricing()
+  const priceInr = price && followsProviderPrice(channel, 'twilio') ? usdToInr(price) : 0
   const terminalFailure = status === 'failed' || status === 'undelivered'
 
   try {

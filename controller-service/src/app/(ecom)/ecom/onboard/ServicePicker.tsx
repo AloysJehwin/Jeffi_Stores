@@ -1,25 +1,35 @@
 'use client'
 
 import { useState } from 'react'
-import { Store, MessageSquare, FileText } from 'lucide-react'
+import { Store, MessageSquare, FileText, PanelsTopLeft } from 'lucide-react'
+import { SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
 import { ChoiceCards } from '../_ui'
 import PageHeader from '../dashboard/_components/PageHeader'
 import { primaryBtn } from './ui'
 
-export type ServiceChoice = 'store' | 'messaging' | 'documents'
+export type ServiceChoice = 'store' | 'messaging' | 'documents' | 'showcase'
 
 const OPTIONS: { id: ServiceChoice; title: string; copy: string; icon: typeof Store; tag?: string }[] = [
   { id: 'store', title: 'Online store', copy: 'Your own storefront + admin on a subdomain — payments, delivery, GST, the lot.', icon: Store, tag: 'Monthly plan' },
+  { id: 'showcase', title: 'Showcase website', copy: 'A one-page website for your business: your work, reviews and contacts, made with AI. Enquiries come straight to you.', icon: PanelsTopLeft, tag: `First month free, then ₹${SHOWCASE_PRICE_INR}/month` },
   { id: 'messaging', title: 'Messaging API', copy: 'Send email, SMS and WhatsApp from any app with an API key. Pay per message from a wallet.', icon: MessageSquare, tag: 'Pay as you go' },
   { id: 'documents', title: 'Documents API', copy: 'Generate GST invoices, quotations, receipts and labels as PDFs over an API.', icon: FileText, tag: 'Pay as you go' },
 ]
 
+// Showcase has its own signup (/onboard/showcase), so it is picked on its own; the others can be added later.
+function pick(prev: ServiceChoice[], next: ServiceChoice[]): ServiceChoice[] {
+  const added = next.filter(x => !prev.includes(x))
+  if (added.includes('showcase')) return ['showcase']
+  return added.length ? next.filter(x => x !== 'showcase') : next
+}
+
 export default function ServicePicker({ initial = [], onContinue }: { initial?: ServiceChoice[]; onContinue: (choice: ServiceChoice[]) => void }) {
-  const [picked, setPicked] = useState<ServiceChoice[]>(initial)
+  const [picked, setPickedRaw] = useState<ServiceChoice[]>(initial)
+  const setPicked = (next: ServiceChoice[]) => setPickedRaw(prev => pick(prev, next))
   return (
     <div className="w-full">
       <PageHeader eyebrow="Get started" title="What do you need?" description="Pick one or more. You can add the others any time from your dashboard — they all share one wallet." />
-      <ChoiceCards multiple ariaLabel="Services" className="gap-4" columns="grid-cols-1 md:grid-cols-3" cardClassName="rounded-2xl p-5 sm:p-6 bg-surface-elevated" value={picked} onChange={setPicked}
+      <ChoiceCards multiple ariaLabel="Services" className="gap-4" columns="grid-cols-1 md:grid-cols-2" cardClassName="rounded-2xl p-5 sm:p-6 bg-surface-elevated" value={picked} onChange={setPicked}
         options={OPTIONS.map(o => {
           const on = picked.includes(o.id)
           const Icon = o.icon

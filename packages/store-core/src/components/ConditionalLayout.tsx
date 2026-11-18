@@ -14,7 +14,8 @@ import CompareBar from '@/components/visitor/CompareBar'
 import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
 import NumberInputWheelGuard from './NumberInputWheelGuard'
-import CookieConsentBanner from './visitor/CookieConsentBanner'
+import CookieConsentBanner, { CookieSettingsLink } from './visitor/CookieConsentBanner'
+import AnnouncementBar from '@/components/visitor/AnnouncementBar'
 import Footer from './visitor/Footer'
 
 export default function ConditionalLayout({
@@ -28,8 +29,11 @@ export default function ConditionalLayout({
   isCertPortalSubdomain,
   isVaultSubdomain,
   cookieConsent,
+  codeChrome,
 }: {
   children: React.ReactNode
+  /** The store's AI-written header, footer and announcement bar (AI Site Studio), in place of the built-in ones. */
+  codeChrome?: { header: React.ReactNode | null; footer: React.ReactNode | null; announcement: React.ReactNode | null } | null
   initialStoreConfig?: StoreConfig
   isFormsSubdomain?: boolean
   isDocumentSubdomain?: boolean
@@ -85,11 +89,23 @@ export default function ConditionalLayout({
                     <NumberInputWheelGuard />
                     <div data-storefront className="flex flex-col min-h-[100dvh] bg-surface">
                       <PageTracker />
-                      <Header />
-                      <main className="flex-1 bg-surface pt-[calc(4rem+env(safe-area-inset-top,0px))] lg:pt-[calc(5rem+env(safe-area-inset-top,0px))]">
+                      {codeChrome?.header ?? <Header />}
+                      <main className={`flex-1 bg-surface ${codeChrome?.header ? '' : 'pt-[calc(4rem+env(safe-area-inset-top,0px))] lg:pt-[calc(5rem+env(safe-area-inset-top,0px))]'}`}>
+                        {codeChrome?.announcement ?? <AnnouncementBar />}
                         {children}
                       </main>
-                      <Footer cookieConsent={cookieConsent} />
+                      {codeChrome?.footer ? (
+                        <>
+                          {codeChrome.footer}
+                          {cookieConsent && (
+                            <div className="bg-surface px-4 py-3 text-center text-xs text-foreground-muted">
+                              <CookieSettingsLink className="underline" />
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <Footer cookieConsent={cookieConsent} />
+                      )}
                     </div>
                     <CompareBar />
                     <PolicyConsentGate />

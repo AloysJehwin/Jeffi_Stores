@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import type { SiteChrome } from '@/lib/site/chrome-types'
 
 export interface StoreConfig {
   /** Tenant slug, or null on the platform/flagship host. Used to namespace on-device AI (#489). */
@@ -37,6 +38,8 @@ export interface StoreConfig {
     /** The store's own trade line, shown under its name. Empty renders nothing. */
     metaTagline: string
   }
+  /** Site Builder's header links, footer columns and announcements; null keeps the built-in ones. */
+  chrome?: SiteChrome | null
 }
 
 // The server (app/layout.tsx → getSiteControls) always supplies initialConfig from the
@@ -114,6 +117,7 @@ export function StoreConfigProvider({ children, initialConfig }: { children: Rea
             flags: { ...prev.flags, ...(data.flags || {}) },
             orderAutoCancelMinutes: data.orderAutoCancelMinutes ?? prev.orderAutoCancelMinutes,
             storefront: { ...prev.storefront, ...(data.storefront || {}) },
+            chrome: prev.chrome,
           }
           // Only replace state if something actually changed — avoids a needless
           // re-render (and any flicker) when SSR and the API agree.
