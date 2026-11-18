@@ -1,7 +1,7 @@
 // The landing's product films (made from recordings of the real app, narrated). Each has an MP4, a WebM and a poster
 // under BASE; the overview sits beside the hero and the three short ones below it.
 
-const BASE = (process.env.NEXT_PUBLIC_DEMO_VIDEO_BASE || 'https://dm9rri2wgl1e.cloudfront.net/marketing/demo/v1').replace(/\/$/, '')
+const BASE = (process.env.NEXT_PUBLIC_DEMO_VIDEO_BASE || 'https://dm9rri2wgl1e.cloudfront.net/marketing/demo/v2').replace(/\/$/, '')
 
 /** The films lead the hero; a build with NEXT_PUBLIC_DEMO_VIDEOS=off shows the copy alone above the interactive demo. */
 export const DEMO_VIDEOS_READY = process.env.NEXT_PUBLIC_DEMO_VIDEOS !== 'off'
