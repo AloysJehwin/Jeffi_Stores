@@ -6220,8 +6220,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/admin/site-controls/ProvidersCard.tsx": {
-    "mtime": 1794518175.3187149,
-    "ast_hash": "a0251eb65d7b8317606e7e5673252a85",
+    "mtime": 1795023501.419661,
+    "ast_hash": "e7b22587bcc0508edda1c248ea9a3d56",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/admin/site-controls/SiteControlsTabs.tsx": {
@@ -7550,8 +7550,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/admin/settings-hub.ts": {
-    "mtime": 1794678760.3668282,
-    "ast_hash": "05a741d9e0d423dd5156de857c4635cb",
+    "mtime": 1795023514.2900767,
+    "ast_hash": "584f6855b234f44a8482a0bb30a052c5",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/admin/supplier-drafts.ts": {
@@ -10225,8 +10225,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/ai-client.ts": {
-    "mtime": 1794924996.788679,
-    "ast_hash": "c6b292d3fa7a2bf89272cfcb044d5e4a",
+    "mtime": 1795021876.6389365,
+    "ast_hash": "95f47e7b704e16246175d9914cfce305",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/ai-direct-ollama.ts": {
@@ -13560,8 +13560,8 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/settings/page.tsx": {
-    "mtime": 1794678760.3674178,
-    "ast_hash": "25b700f1c871520e5e977f6db8f8a99c",
+    "mtime": 1795023514.246589,
+    "ast_hash": "23728e504ca5df24e1c99bb66a12ad34",
     "semantic_hash": ""
   },
   "admin-service/src/app/(admin)/admin/settings/site-controls/page.tsx": {
@@ -16345,8 +16345,8 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/api/(admin)/admin/settings/providers/route.ts": {
-    "mtime": 1794518172.7258759,
-    "ast_hash": "10279796571b2e94b9fb23304348df12",
+    "mtime": 1795021876.6332307,
+    "ast_hash": "79cdcbbfcee2c9e9b17e89858286bcdc",
     "semantic_hash": ""
   },
   "admin-service/src/app/api/(admin)/admin/settings/route.ts": {
@@ -21155,8 +21155,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/ai-client.test.ts": {
-    "mtime": 1794518176.031627,
-    "ast_hash": "87a00a007d5fef23be2c727dd6f5236b",
+    "mtime": 1795022197.0112505,
+    "ast_hash": "791a806bfbe12ad4ada1ef2e88b07969",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/ai-feedback.test.ts": {
@@ -24420,8 +24420,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/auth/admin-principal.test.ts": {
-    "mtime": 1794554183.5057578,
-    "ast_hash": "cf1c5af01ee5b86655edffaf1729c7a1",
+    "mtime": 1794999162.849862,
+    "ast_hash": "7aa358765c3d9321fcfeb92af2f147b8",
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/ecom/pipeline/JobCard.tsx": {
@@ -24680,8 +24680,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/configuration/page.tsx": {
-    "mtime": 1794729230.260623,
-    "ast_hash": "eb515d3e9deba709c32dccfd08243b99",
+    "mtime": 1795023514.320178,
+    "ast_hash": "a24ca1e485998708dc58c92759a884c8",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/tenant-registry/host-prefixes.ts": {
@@ -29975,8 +29975,8 @@
     "semantic_hash": ""
   },
   "docs/MESSAGING_NUMBERS.md": {
-    "mtime": 1794728422.3902946,
-    "ast_hash": "3323dabfcf31fa27a6449b7359d5ea4a",
+    "mtime": 1795023752.8017304,
+    "ast_hash": "d94fde824e556c206990837a480d764d",
     "semantic_hash": ""
   },
   "controller-service/database/platform-only/migrations/2026-11-15_messaging_addon_price_500.sql": {
@@ -30020,8 +30020,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/ecom/message-pricing/route.ts": {
-    "mtime": 1794729823.9494889,
-    "ast_hash": "dd722ada01e1623268e47964e40b057b",
+    "mtime": 1795021876.642623,
+    "ast_hash": "ff58123a724705f450fc1099bdad292b",
     "semantic_hash": ""
   },
   "messaging-service/src/pricing-sheet.ts": {

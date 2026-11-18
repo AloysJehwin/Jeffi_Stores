@@ -16,13 +16,19 @@ Numbers live in control-plane `tenant_messaging_senders`, one row per (tenant, c
 
 ## The flagship's numbers (Twilio, US, $1.15/month each)
 
-| Audience | Number | WhatsApp display name |
-| --- | --- | --- |
-| customer | +1 (872) 217-9910 (the platform env `TWILIO_WHATSAPP_FROM`) | Jeffi Stores |
-| admin | +1 (872) 217-1682 (bought 2026-11-15) | Jeffi Stores Team |
-| ecom | +1 (872) 219-0609 (bought 2026-11-15) | Jeffi Stores for Business |
+| Audience | Number | WhatsApp display name | WhatsApp sender, checked 2026-11-18 |
+| --- | --- | --- | --- |
+| customer | +1 (872) 217-9910 (the platform env `TWILIO_WHATSAPP_FROM`) | Jeffi Stores | Online |
+| admin | None: flagship staff use the customer number (decided 2026-11-18) | | |
+| ecom | +1 (872) 217-1682 (bought 2026-11-15 as the admin number) | Jeffi Stores Team | Online |
 
-All three are in the platform's own Twilio account and on the same WhatsApp Business account. That means they share its business verification and approved templates, and each new number starts at Meta's lowest sending tier. Their SMS and WhatsApp webhooks point at `https://jeffistores.in/api/webhooks/twilio`. Enter the admin and ecom numbers in Settings → Numbers with the Twilio fields **blank**: a flagship row without credentials sends through the platform env's account.
++1 (872) 219-0609 was bought for ecom on 2026-11-15. Its WhatsApp sender went offline with Twilio error 410 ("create a support ticket"), and the number was released on 2026-11-18.
+
+Both numbers are in the platform's own Twilio account, which has no sub-accounts, and on the same WhatsApp Business account. That means they share its business verification and approved templates, and each new number starts at Meta's lowest sending tier.
+
+- **Webhooks:** both WhatsApp webhooks point at `https://jeffistores.in/api/webhooks/twilio`, and so does the ecom number's SMS webhook. The customer number's incoming SMS goes to a separate n8n workflow.
+- **Entering them:** enter the ecom number in Settings → Numbers → Ecom portal → WhatsApp with the Twilio fields **blank**. A flagship row without credentials sends through the platform env's account.
+- **Left empty:** admin-facing stays empty. The ecom portal's SMS waits for the DLT header on MSG91.
 
 ## Where they are set
 

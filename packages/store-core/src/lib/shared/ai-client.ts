@@ -182,7 +182,7 @@ async function withFallback<T>(op: string, gateway: () => Promise<T>, direct: Di
     return await gateway()
   } catch (err) {
     if (direct === 'razer-off' && err instanceof GatewayFailure && err.retryable) {
-      throw new AiClientError(`AI unavailable (${err.message}); Razer is off in Site Controls → Providers, so nothing else can answer`, 'gateway', err)
+      throw new AiClientError(`AI unavailable (${err.message}); Razer is off in Settings → Providers, so nothing else can answer`, 'gateway', err)
     }
     if (!fallback || !(err instanceof GatewayFailure) || !err.retryable) throw err
     console.error(`[ai-client] gateway ${op} failed (${err.message.slice(0, 300)}); falling back to direct Ollama`)
