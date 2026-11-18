@@ -1,5 +1,5 @@
 // Deletes every draft prepare.ts created (the manifest's, plus any titled with our prefix) and blanks the manifest's
-// preview tokens. Runs from global teardown; after a killed run: npx tsx --tsconfig tsconfig.json tests/responsive/cleanup.ts
+// preview tokens. Runs from global teardown; after a killed run: npx tsx --tsconfig tests/responsive/tsconfig.sweep.json tests/responsive/cleanup.ts
 import fs from 'node:fs'
 import { loadLocalEnv } from './env'
 import { DRAFT_TITLE_PREFIX, MANIFEST_PATH, type Manifest } from './pages'

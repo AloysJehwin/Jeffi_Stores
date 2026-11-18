@@ -70,6 +70,6 @@ export default async function globalTeardown() {
     const text = writeSummary()
     if (text) process.stdout.write('\n' + text + '\n')
   } finally {
-    execFileSync(path.join('node_modules', '.bin', 'tsx'), ['--tsconfig', 'tsconfig.json', 'tests/responsive/cleanup.ts'], { stdio: 'inherit' })
+    execFileSync(path.join('node_modules', '.bin', 'tsx'), ['--tsconfig', 'tests/responsive/tsconfig.sweep.json', 'tests/responsive/cleanup.ts'], { stdio: 'inherit' })
   }
 }
