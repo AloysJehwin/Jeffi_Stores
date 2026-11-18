@@ -8,16 +8,16 @@ export type ArrowsVariant = 'overlay' | 'rail'
 const ARROW: Record<ArrowsVariant, { base: string; prev: string; next: string; icon: string }> = {
   // Glass chevrons over imagery, md and up.
   overlay: {
-    base: 'absolute top-1/2 z-30 hidden -translate-y-1/2 rounded-full border border-white/25 bg-black/30 p-2.5 text-white backdrop-blur-sm transition-colors hover:bg-black/50 disabled:pointer-events-none disabled:opacity-0 md:inline-flex',
+    base: 'absolute top-1/2 z-30 hidden -translate-y-1/2 rounded-full border border-white/25 bg-black/30 p-3 text-white backdrop-blur-sm transition-colors hover:bg-black/50 disabled:pointer-events-none disabled:opacity-0 md:inline-flex',
     prev: 'left-4',
     next: 'right-4',
     icon: 'h-5 w-5',
   },
-  // Half outside a row of cards on the page surface, sm and up.
+  // Partly outside a row of cards on the page surface, sm and up; 16px out stays inside the page gutter.
   rail: {
-    base: 'hidden sm:flex absolute top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center rounded-full bg-surface-elevated border border-border-default shadow-sm text-foreground disabled:opacity-0 transition-opacity',
-    prev: 'left-0 -translate-x-1/2',
-    next: 'right-0 translate-x-1/2',
+    base: 'hidden sm:flex absolute top-1/2 -translate-y-1/2 z-10 w-11 h-11 items-center justify-center rounded-full bg-surface-elevated border border-border-default shadow-sm text-foreground disabled:opacity-0 transition-opacity',
+    prev: 'left-0 -translate-x-4',
+    next: 'right-0 translate-x-4',
     icon: 'w-4 h-4',
   },
 }
@@ -94,7 +94,8 @@ export interface SlideDotsProps {
   className?: string
 }
 
-// The active dot stretches into a pill. preventDefault keeps a dot inside a link from following it.
+// The active dot stretches into a pill. preventDefault keeps a dot inside a link from following it. md dots get a
+// 44px hit area, spaced so one never covers the next dot.
 export function SlideDots({
   count,
   index,
@@ -106,7 +107,7 @@ export function SlideDots({
 }: SlideDotsProps) {
   const [on, off] = DOT[tone][size]
   return (
-    <div className={`flex items-center ${size === 'sm' ? 'gap-1' : 'gap-2'} ${className}`}>
+    <div className={`flex items-center ${size === 'sm' ? 'gap-1' : 'gap-5'} ${className}`}>
       {Array.from({ length: count }, (_, i) => (
         <button
           key={i}
@@ -117,7 +118,7 @@ export function SlideDots({
           }}
           aria-label={label(i)}
           aria-current={i === index ? 'true' : undefined}
-          className={`rounded-full transition-all duration-300 motion-reduce:transition-none ${i === index ? on : off}`}
+          className={`${size === 'md' ? 'hit-44 relative ' : ''}rounded-full transition-all duration-300 motion-reduce:transition-none ${i === index ? on : off}`}
         />
       ))}
     </div>

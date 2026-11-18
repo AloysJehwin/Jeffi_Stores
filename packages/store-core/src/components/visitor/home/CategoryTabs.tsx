@@ -66,7 +66,7 @@ export default function CategoryTabs({ tabs, eyebrow, title, portal }: CategoryT
                   aria-controls={panelId(tab.id)}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(i)}
-                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
+                  className={`shrink-0 min-h-11 px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
                     selected
                       ? 'bg-accent-500 border-accent-500 text-white'
                       : 'bg-surface-elevated border-border-default text-foreground hover:border-accent-400'
@@ -88,7 +88,7 @@ export default function CategoryTabs({ tabs, eyebrow, title, portal }: CategoryT
           <div className="text-center mt-7">
             <Link
               href={`/products?category=${encodeURIComponent(current.slug)}`}
-              className="inline-flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold"
+              className="inline-flex min-h-11 -my-3 items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold"
             >
               View all {current.name}
               <svg

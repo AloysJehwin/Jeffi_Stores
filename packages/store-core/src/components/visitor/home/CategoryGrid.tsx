@@ -57,7 +57,7 @@ export default function CategoryGrid({ categories, title, eyebrow, carousel = fa
           </div>
           <Link
             href="/categories"
-            className="flex items-center gap-1 min-h-[44px] sm:min-h-0 -my-2 sm:my-0 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 whitespace-nowrap transition-colors"
+            className="flex items-center gap-1 min-h-[44px] -my-3 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 whitespace-nowrap transition-colors"
           >
             View All
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
