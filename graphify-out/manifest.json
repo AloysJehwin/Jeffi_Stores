@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1794925312.0861452,
-    "ast_hash": "69d1f60f7849289e9ff9f248c48315da",
+    "mtime": 1794952001.3128855,
+    "ast_hash": "20c6c31c07b48f9d88b0f9c9fcdd6e8f",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "vitest.config.ts": {
-    "mtime": 1794925258.3662434,
-    "ast_hash": "5d1664909c158297bb4fab3229d166a0",
+    "mtime": 1794975480.6893992,
+    "ast_hash": "7e8603ab8d9129d39c27a9dd4d10ec13",
     "semantic_hash": ""
   },
   ".github/pull_request_template.md": {
@@ -3040,8 +3040,8 @@
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/providers/google.ts": {
-    "mtime": 1794915418.6991625,
-    "ast_hash": "99d74a7bc0296db05816187cdfb830bf",
+    "mtime": 1794951881.9929621,
+    "ast_hash": "4b19ee4f03fb0a660f96a28df212a4e5",
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/providers/replicate.ts": {
