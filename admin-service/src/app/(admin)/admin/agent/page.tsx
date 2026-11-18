@@ -181,6 +181,27 @@ const TOOL_GROUPS: ToolGroup[] = [
         mutating: true,
         prompt: 'Propose creating a new brand:',
       },
+      {
+        name: 'find_products_for_bulk_update',
+        label: 'Find products for a bulk change',
+        description: 'Pick products by filters, names or ids, as on the Controls page',
+        mutating: false,
+        prompt: 'Find products for a bulk update:',
+      },
+      {
+        name: 'propose_bulk_update_products',
+        label: 'Bulk update products',
+        description: 'One Controls change on up to 200 products: discount, price, status and more (requires approval)',
+        mutating: true,
+        prompt: 'Propose a bulk update on products:',
+      },
+      {
+        name: 'propose_rollback_bulk_update',
+        label: 'Undo a bulk change',
+        description: 'Propose rolling back a change from Controls → History (requires approval)',
+        mutating: true,
+        prompt: 'Undo the last bulk change from Controls history',
+      },
     ],
   },
   {

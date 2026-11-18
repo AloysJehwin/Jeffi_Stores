@@ -5,6 +5,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { SALES_TOOLS } from './sales'
 import { MARKETING_TOOLS } from './marketing'
 import { CATALOG_TOOLS } from './catalog'
+import { CONTROLS_TOOLS } from './controls'
 import { CUSTOMER_OPS_TOOLS } from './customer-ops'
 import { OPERATIONS_TOOLS } from './operations'
 import { GOOGLE_ADS_TOOLS } from './google-ads'
@@ -1291,6 +1292,7 @@ export const TOOLS: ToolDef[] = [
   ...SALES_TOOLS,
   ...MARKETING_TOOLS,
   ...CATALOG_TOOLS,
+  ...CONTROLS_TOOLS,
   ...CUSTOMER_OPS_TOOLS,
   ...OPERATIONS_TOOLS,
   ...GOOGLE_ADS_TOOLS,

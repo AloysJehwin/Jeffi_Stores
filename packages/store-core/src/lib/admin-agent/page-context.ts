@@ -47,6 +47,16 @@ const TOOLS_FOR_KIND: Record<string, string[]> = {
   rfq: ['get_change_log'],
 }
 
+const BULK_TOOLS = ['find_products_for_bulk_update', 'propose_bulk_update_products', 'propose_rollback_bulk_update']
+
+// Admin pages that are neither a record nor a list, with their tools and what to tell the agent.
+const PAGES: Record<string, { tools: string[]; note: string }> = {
+  '/admin/controls': {
+    tools: BULK_TOOLS,
+    note: 'Bulk product changes: check the selection with find_products_for_bulk_update, then one propose_bulk_update_products (up to 200 products); propose_rollback_bulk_update undoes a change from History.',
+  },
+}
+
 // Admin list pages: their filter list and the kind of record each row is.
 const LISTS: Record<string, { list: string; kind?: string }> = {
   '/admin/orders': { list: 'orders', kind: 'order' },
@@ -110,7 +120,8 @@ export function pageTools(pc: PageContext | null): string[] {
   if (!pc) return []
   if (pc.entity) return TOOLS_FOR_KIND[pc.entity.kind] ?? []
   const list = pageList(pc)
-  return list ? ['get_page_rows', ...(list.kind ? TOOLS_FOR_KIND[list.kind] ?? [] : [])] : []
+  if (list) return ['get_page_rows', ...(list.kind ? TOOLS_FOR_KIND[list.kind] ?? [] : []), ...(list.key === 'products' ? BULK_TOOLS : [])]
+  return (pc.path && PAGES[pc.path]?.tools) || []
 }
 
 export function pageContextNote(pc: PageContext | null): string {
@@ -131,8 +142,15 @@ export function pageContextNote(pc: PageContext | null): string {
     lines.push(
       `To read or act on them, call get_page_rows with list="${list.key}" and query="${new URLSearchParams(list.q).toString()}", then propose one change per row (at most ${MAX_PROPOSALS_PER_TURN} per answer; ask the admin to narrow the list beyond that).`
     )
+    if (list.key === 'products') {
+      lines.push(
+        'For the same change on many of them, use one propose_bulk_update_products instead (up to 200 products): their ids from get_page_rows, or this query\'s params as attributes, with status "any" unless it filters is_active.'
+      )
+    }
   } else {
     lines.push(`The admin is viewing ${pc.section || 'the page'} (${pc.path}).`)
+    const page = pc.path ? PAGES[pc.path] : undefined
+    if (page) lines.push(page.note)
   }
   return `\n\n<page_context>${lines.join(' ')}</page_context>`
 }
