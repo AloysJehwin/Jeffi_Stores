@@ -1,7 +1,7 @@
 import { Fragment, createElement, type Key, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { PageKey } from '@jeffi/site-blocks'
-import type { CodeNode } from '@/lib/site/code/ast'
+import type { CodeNode, CodeValue } from '@/lib/site/code/ast'
 import { FORBIDDEN_KEYS, HTML_TAGS, MAX_DEPTH, MAX_EACH, VOID_TAGS, attrAllowed, safeHref, safeSrc, taxonomyOf } from '@/lib/site/code/allow'
 import { evalValue, toText, truthy } from '@/lib/site/code/evaluate'
 import { allowedOnPage, codeLibrary, type RenderCtx } from '@/lib/site/code/library'
@@ -24,14 +24,30 @@ export interface Env {
   empty: Set<unknown>
   /** Category and brand slugs the section links to that the store has; null when not checked. */
   taxonomy: Taxonomy | null
+  /** The ids on a one-page site (planSections); links to a section that draws nothing are left out. Null: not checked. */
+  anchors: Anchors | null
+  /** Rows that show a typed stand-in for a missing business detail (lib/site/code/placeholders.ts). */
+  rows: Map<object, CodeValue[]> | null
 }
 
 export type Taxonomy = { categories: Set<string>; brands: Set<string> }
 
+/** What a one-page site's links may point at: the ids it draws, those in parts that draw nothing, and whether some id is set from data. */
+export type Anchors = { ids: Set<string>; gone: Set<string>; open: boolean }
+
 /** Elements drawn per section at most (lists inside lists multiply). */
 const BUDGET = 4000
 
-export function makeEnv(opts: { data: SiteData; page?: PageKey | null; sectionId: string; priority?: boolean; empty?: Set<unknown>; taxonomy?: Taxonomy | null }): Env {
+export function makeEnv(opts: {
+  data: SiteData
+  page?: PageKey | null
+  sectionId: string
+  priority?: boolean
+  empty?: Set<unknown>
+  taxonomy?: Taxonomy | null
+  anchors?: Anchors | null
+  rows?: Map<object, CodeValue[]> | null
+}): Env {
   return {
     vars: new Map(),
     data: opts.data,
@@ -42,6 +58,8 @@ export function makeEnv(opts: { data: SiteData; page?: PageKey | null; sectionId
     depth: 0,
     empty: opts.empty ?? new Set(),
     taxonomy: opts.taxonomy ?? null,
+    anchors: opts.anchors ?? null,
+    rows: opts.rows?.size ? opts.rows : null,
   }
 }
 
@@ -51,11 +69,43 @@ const DECOR = new Set([
   'Image', 'Icon', 'Link', 'Reveal', 'Marquee', 'Carousel', 'Tabs', 'Tab', 'Accordion', 'AccordionItem', 'Countdown', 'Store',
   // The card parts draw a product they are given; they never carry a section on their own.
   'QuickAdd', 'WishlistToggle', 'PriceTag', 'DiscountBadge', 'StockBadge', 'RatingStars',
-  // A Showcase's identity, as Store is a store's.
-  'Business',
+  // A Showcase's identity and picture, as Store is a store's (a <Business> that tells the business's story carries it).
+  'Business', 'BusinessPicture',
 ])
 
 type CmpNode = Extract<CodeNode, { t: 'cmp' }>
+
+/** A render function that reads `field` of its item. */
+function reads(n: CmpNode, field: string): boolean {
+  const param = n.render?.param
+  const seek = (v: unknown, depth: number): boolean => {
+    if (!v || typeof v !== 'object' || depth > 200) return false
+    const o = v as { k?: unknown; root?: unknown; path?: unknown }
+    if (o.k === 'path' && o.root === param && Array.isArray(o.path) && o.path[0] === field) return true
+    return Object.values(v).some(x => seek(x, depth + 1))
+  }
+  return !!param && seek(n.render!.body, 0)
+}
+
+/** A section that introduces the business (reads its name, tagline or profession): an opening when the page has no h1. */
+export function introduces(n: unknown, depth = 0): boolean {
+  if (!n || typeof n !== 'object' || depth > MAX_DEPTH * 3) return false
+  const node = n as CodeNode
+  const any = (list: unknown) => Array.isArray(list) && list.some(c => introduces(c, depth + 1))
+  switch (node.t) {
+    case 'cmp':
+      return (node.name === 'Business' && ['name', 'tagline', 'profession'].some(f => reads(node, f))) || any(node.children) || introduces(node.render?.body, depth + 1)
+    case 'el':
+    case 'frag':
+      return any(node.children)
+    case 'cond':
+      return introduces(node.then, depth + 1) || introduces(node.else, depth + 1)
+    case 'each':
+      return introduces(node.body, depth + 1)
+    default:
+      return false
+  }
+}
 
 /** The data components in a subtree (not those inside another's items), and whether anything else there works on its own. */
 export function scanData(n: unknown, out: { data: CmpNode[]; other: boolean } = { data: [], other: false }, depth = 0): { data: CmpNode[]; other: boolean } {
@@ -67,7 +117,7 @@ export function scanData(n: unknown, out: { data: CmpNode[]; other: boolean } = 
       const def = codeLibrary().get(node.name)
       if (def?.count) out.data.push(node)
       else {
-        if (!DECOR.has(node.name)) out.other = true
+        if (!DECOR.has(node.name) || (node.name === 'Business' && reads(node, 'about'))) out.other = true
         all(node.children)
         if (node.render) scanData(node.render.body, out, depth + 1)
       }
@@ -96,19 +146,79 @@ export const onlyEmptyData = (children: unknown, empty: Set<unknown>) => {
   return found.data.length > 0 && !found.other && found.data.every(d => empty.has(d))
 }
 
+const ID = /^[A-Za-z][\w-]{0,40}$/
+
+/** The section an in-page link points at ("#services", "/#services"), or null for any other link. */
+export function anchorOf(href: unknown): string | null {
+  const m = typeof href === 'string' ? /^\/?#([A-Za-z][\w-]{0,40})$/.exec(href.trim()) : null
+  return m ? m[1] : null
+}
+
+/** A link to a section the page does not draw. #top always lands (it scrolls to the top of any page). */
+export function deadAnchor(href: unknown, anchors: Anchors | null): boolean {
+  const id = anchors ? anchorOf(href) : null
+  if (!id || id.toLowerCase() === 'top' || anchors!.ids.has(id)) return false
+  return anchors!.gone.has(id) || !anchors!.open
+}
+
+/** An element with its own id over nothing but empty data: on a one-page site it goes, as an empty section does. */
+const emptyAnchor = (node: Extract<CodeNode, { t: 'el' }>, empty: Set<unknown>) => {
+  const id = node.props?.id
+  return !!id && id.k === 'lit' && typeof id.v === 'string' && ID.test(id.v) && onlyEmptyData(node.children, empty)
+}
+
+/**
+ * The ids a section draws, into `out`: static ids under parts that show (`drawn`) go to ids, those under data with
+ * nothing to show to gone; an id set from data opens the page (a link to an id it never names may still land).
+ */
+export function scanIds(n: unknown, empty: Set<unknown>, out: Anchors, drawn = true, depth = 0): Anchors {
+  if (!n || typeof n !== 'object' || depth > MAX_DEPTH * 3) return out
+  const node = n as CodeNode
+  const all = (list: unknown, on: boolean) => Array.isArray(list) && list.forEach(c => scanIds(c, empty, out, on, depth + 1))
+  switch (node.t) {
+    case 'el': {
+      const on = drawn && !emptyAnchor(node, empty)
+      const id = node.props?.id
+      if (id && id.k === 'lit' && typeof id.v === 'string' && ID.test(id.v)) (on ? out.ids : out.gone).add(id.v)
+      else if (id && on) out.open = true
+      all(node.children, on)
+      return out
+    }
+    case 'cmp': {
+      const on = drawn && !empty.has(node) && !(node.name === 'Tab' && onlyEmptyData(node.children, empty))
+      all(node.children, on)
+      if (node.render) scanIds(node.render.body, empty, out, on, depth + 1)
+      return out
+    }
+    case 'frag':
+      all(node.children, drawn)
+      return out
+    case 'cond':
+      scanIds(node.then, empty, out, drawn, depth + 1)
+      scanIds(node.else, empty, out, drawn, depth + 1)
+      return out
+    case 'each':
+      scanIds(node.body, empty, out, drawn, depth + 1)
+      return out
+    default:
+      return out
+  }
+}
+
 const missing = (href: unknown, env: Env) => {
+  if (deadAnchor(href, env.anchors)) return true
   const t = env.taxonomy && typeof href === 'string' ? taxonomyOf(href) : null
   return !!t && !env.taxonomy![t.kind].has(t.slug)
 }
 
 /** A link to a category or brand the store does not have goes to all products instead of an empty page. */
 function liveHref(href: string, env: Env): string {
-  return missing(href, env) ? '/products' : href
+  return missing(href, env) && !anchorOf(href) ? '/products' : href
 }
 
-/** Component props with links (a menu, footer columns): items for a missing category or brand are left out. */
+/** Component props with links (a menu, footer columns): items for a missing category, brand or section are left out. */
 function liveLinks(v: unknown, env: Env, depth = 0): unknown {
-  if (!env.taxonomy || depth > 6 || !v || typeof v !== 'object') return v
+  if ((!env.taxonomy && !env.anchors) || depth > 6 || !v || typeof v !== 'object') return v
   if (Array.isArray(v)) return v.filter(x => !(x && typeof x === 'object' && missing((x as { href?: unknown }).href, env))).map(x => liveLinks(x, env, depth + 1))
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'href' && typeof x === 'string' ? liveHref(x, env) : liveLinks(x, env, depth + 1)]))
 }
@@ -131,9 +241,9 @@ const isThenable = (v: unknown): v is Promise<ReactNode> => !!v && typeof (v as 
 // What a link may hold: pictures, icons, text and data read through a render function. Anything else draws its own
 // links or controls (Logo, CartIcon, ProductCard, forms), and a link around it would nest <a> in <a>: invalid HTML and
 // a hydration error. Such a link is drawn as a plain wrapper instead.
-const LINK_SAFE = new Set(['Image', 'HeroPicture', 'Icon', 'ProductTitle', 'ProductPrice', 'ProductRating', 'Countdown', 'Reveal', 'Marquee', 'PriceTag', 'DiscountBadge', 'StockBadge', 'RatingStars'])
+const LINK_SAFE = new Set(['Image', 'HeroPicture', 'BusinessPicture', 'Icon', 'ProductTitle', 'ProductPrice', 'ProductRating', 'Countdown', 'Reveal', 'Marquee', 'PriceTag', 'DiscountBadge', 'StockBadge', 'RatingStars'])
 const DATA = new Set([
-  'Store', 'Product', 'Products', 'Categories', 'Brands', 'Reviews', 'Offers', 'HeroPicture', 'Business', 'Services', 'Work', 'Testimonials', 'Stats', 'Faqs',
+  'Store', 'Product', 'Products', 'Categories', 'Brands', 'Reviews', 'Offers', 'HeroPicture', 'Business', 'BusinessPicture', 'Services', 'Work', 'Testimonials', 'Stats', 'Faqs',
   // The catalogue pages' records: with a render function they draw only what it returns.
   'Category', 'SubCategories', 'CategoryFaqs', 'SeoText', 'Breadcrumbs', 'Brand', 'SearchQuery', 'AllCategories', 'AllBrands',
 ])
@@ -162,9 +272,21 @@ function holdsLink(n: unknown, depth = 0): boolean {
 const NUMERIC = new Set(['width', 'height', 'colSpan', 'rowSpan', 'start'])
 const BOOLEAN = new Set(['hidden', 'open', 'reversed'])
 
+// A typed quote is one no client gave: a Showcase's quotes come only from <Testimonials>, so a quote (or the figure
+// holding one) written as text in the code is left out.
+const typedOnly = (list: unknown): boolean => Array.isArray(list) && list.length > 0 && list.every(c => c && typeof c === 'object' && ((c as CodeNode).t === 'text' || ((c as CodeNode).t === 'el' && typedOnly((c as { children?: unknown }).children))))
+function typedQuote(node: Extract<CodeNode, { t: 'el' }>, depth = 0): boolean {
+  if (node.tag === 'blockquote' || node.tag === 'q') return typedOnly(node.children)
+  if (depth > 3 || (depth === 0 && node.tag !== 'figure')) return false
+  return (node.children ?? []).some(c => c?.t === 'el' && typedQuote(c, depth + 1))
+}
+
 function renderEl(node: Extract<CodeNode, { t: 'el' }>, env: Env, key?: Key): ReactNode {
   const tag = node.tag
   if (typeof tag !== 'string' || !HTML_TAGS.has(tag)) return null
+  // On a one-page site an anchored block over empty data goes with its links, as an empty section does.
+  if (env.anchors && emptyAnchor(node, env.empty)) return null
+  if (env.page === 'showcase' && typedQuote(node)) return null
   const props: Record<string, unknown> = key != null ? { key } : {}
   for (const [name, v] of Object.entries(node.props ?? {})) {
     if (name === 'key' || !attrAllowed(tag, name)) continue
@@ -196,7 +318,10 @@ function renderEl(node: Extract<CodeNode, { t: 'el' }>, env: Env, key?: Key): Re
     return createElement('img', { ...props, ...responsiveImg(props.src, '(min-width: 768px) 50vw, 100vw'), alt: props.alt ?? '', loading: props.loading ?? 'lazy', decoding: 'async' })
   }
   if (VOID_TAGS.has(tag)) return createElement(tag, props)
+  if (tag === 'a' && deadAnchor(props.href, env.anchors)) return null
   const children = kids(node.children, env)
+  // A list item whose only link was left out goes too.
+  if (tag === 'li' && env.anchors && children.length && children.every(c => c == null || c === false || c === '')) return null
   if (tag === 'a') {
     if (Array.isArray(node.children) && node.children.some(c => holdsLink(c))) {
       delete props.href
@@ -224,6 +349,7 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
   }
   const parsed = def.props.safeParse(raw)
   if (!parsed.success) return null
+  if (def.name === 'Link' && deadAnchor((parsed.data as { href?: unknown }).href, env.anchors)) return null
   const children = kids(node.children, env)
   if (def.name === 'Link' && Array.isArray(node.children) && node.children.some(c => holdsLink(c)))
     return createElement('span', { ...(key != null ? { key } : {}), ...(className ? { className } : {}) }, ...children)
@@ -258,6 +384,9 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
 export function renderNode(n: unknown, env: Env, key?: Key): ReactNode {
   if (!n || typeof n !== 'object' || env.depth > MAX_DEPTH * 3 || env.budget.n-- <= 0) return null
   const node = n as CodeNode
+  // A row holding a typed stand-in for a detail the business did not give is left out.
+  const facts = env.rows?.get(node)
+  if (facts && facts.some(f => !truthy(evalValue(f, env.vars)))) return null
   switch (node.t) {
     case 'text':
       return typeof node.value === 'string' ? node.value : null

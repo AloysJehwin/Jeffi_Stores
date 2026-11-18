@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Inbox, Loader2, Mail, MessageCircle, Phone } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import type { ShowcaseLead } from '@/lib/showcase/store'
-import { phoneHref } from '@/lib/showcase/views'
+import { phoneLinks } from '@/lib/showcase/phone'
 
 interface Page {
   leads: ShowcaseLead[]
@@ -12,19 +12,13 @@ interface Page {
   unread: number
 }
 
+// IST on the server render and in the browser alike (a server in UTC would otherwise disagree with the page).
 const when = (iso: string) =>
-  new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-
-/** wa.me wants the number with its country code: a 10-digit Indian number gets 91. */
-function whatsappLink(phone: string): string | null {
-  const digits = phone.replace(/\D/g, '')
-  const full = phone.trim().startsWith('+') ? digits : digits.length === 10 ? `91${digits}` : digits.length === 11 && digits.startsWith('0') ? `91${digits.slice(1)}` : digits
-  return /^\d{10,15}$/.test(full) ? `https://wa.me/${full}` : null
-}
+  new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' })
 
 const chip = 'inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-secondary'
 
-/** The Showcase's enquiries: newest first, unread ones marked; read state is the owner's own bookkeeping. */
+/** The Showcase's enquiries: newest first, open ones marked. Handled (read_at) is the owner's own bookkeeping. */
 export default function LeadsClient({ initial, pageSize, tenantSlug }: { initial: Page; pageSize: number; tenantSlug: string }) {
   const { showToast } = useToast()
   const [page, setPage] = useState(initial)
@@ -85,12 +79,12 @@ export default function LeadsClient({ initial, pageSize, tenantSlug }: { initial
             disabled={busy === 'load'}
             className={`rounded-full px-3 py-1.5 text-sm font-medium ${unreadOnly === u ? 'ecom-current font-semibold' : 'text-foreground-secondary ecom-hover hover:text-foreground'}`}
           >
-            {u ? `Unread (${page.unread})` : `All (${page.total})`}
+            {u ? `Open (${page.unread})` : `All (${page.total})`}
           </button>
         ))}
         {page.unread > 0 && (
           <button type="button" onClick={() => mark('all', true)} disabled={!!busy} className="ml-auto text-sm font-semibold ecom-accent-text hover:underline disabled:opacity-50">
-            {busy === 'all' ? 'Marking…' : 'Mark all as read'}
+            {busy === 'all' ? 'Marking…' : 'Mark all handled'}
           </button>
         )}
       </div>
@@ -100,22 +94,24 @@ export default function LeadsClient({ initial, pageSize, tenantSlug }: { initial
           <span className="inline-flex h-12 w-12 items-center justify-center rounded-full org-sand">
             <Inbox className="h-6 w-6 text-foreground" />
           </span>
-          <p className="text-sm text-foreground-secondary">{unreadOnly ? 'No unread enquiries.' : 'No enquiries yet. They appear here when visitors use the contact form on your site.'}</p>
+          <p className="text-sm text-foreground-secondary">{unreadOnly ? 'No open enquiries. Everything is handled.' : 'No enquiries yet. They appear here when visitors use the contact form on your site.'}</p>
         </section>
       ) : (
         <ul className="space-y-3">
           {page.leads.map(l => {
-            const wa = l.phone ? whatsappLink(l.phone) : null
-            const tel = l.phone ? phoneHref(l.phone) : ''
+            const { tel, whatsapp: wa } = l.phone ? phoneLinks(l.phone) : { tel: '', whatsapp: '' }
             return (
               <li key={l.id} className={`rounded-2xl border bg-surface-elevated p-5 ${l.readAt ? 'border-border-default' : 'border-[var(--org-terracotta-deep)]/40'}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      {!l.readAt && <span aria-label="Unread" className="h-2 w-2 shrink-0 rounded-full ecom-accent-bg" />}
+                      {!l.readAt && <span role="img" aria-label="Open" className="h-2 w-2 shrink-0 rounded-full ecom-accent-bg" />}
                       <h2 className={`break-words text-base text-foreground ${l.readAt ? 'font-semibold' : 'font-black'}`}>{l.name}</h2>
                     </div>
-                    <p className="mt-0.5 text-xs text-foreground-muted">{when(l.createdAt)}</p>
+                    <p className="mt-0.5 text-xs text-foreground-muted">
+                      {when(l.createdAt)}
+                      {l.readAt && ` · Handled ${when(l.readAt)}`}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -123,7 +119,7 @@ export default function LeadsClient({ initial, pageSize, tenantSlug }: { initial
                     disabled={!!busy}
                     className="text-xs font-semibold text-foreground-secondary hover:text-foreground disabled:opacity-50"
                   >
-                    {busy === l.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : l.readAt ? 'Mark unread' : 'Mark read'}
+                    {busy === l.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : l.readAt ? 'Reopen' : 'Mark handled'}
                   </button>
                 </div>
                 {l.message && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-foreground">{l.message}</p>}

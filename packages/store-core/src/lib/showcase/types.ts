@@ -32,6 +32,8 @@ export interface ShowcaseService {
   description?: string
   price?: string
   image?: string | null
+  /** Suggested by the AI from the brief (lib/showcase/starter.ts) and not yet edited by the owner. */
+  ai?: boolean
 }
 
 export interface ShowcaseWork {
@@ -57,6 +59,15 @@ export interface ShowcaseStat {
 export interface ShowcaseFaq {
   q: string
   a: string
+  /** Suggested by the AI and not yet edited by the owner. */
+  ai?: boolean
+}
+
+/** A picture for the page that is not the owner's work: a mood picture made for it (ai) or one they added. */
+export interface ShowcasePagePicture {
+  image: string
+  alt?: string
+  ai?: boolean
 }
 
 export interface ShowcaseContent {
@@ -65,6 +76,8 @@ export interface ShowcaseContent {
   reviews: ShowcaseReview[]
   stats: ShowcaseStat[]
   faqs: ShowcaseFaq[]
+  /** BusinessPicture shows these after the work photos; never presented as the owner's work. */
+  pictures?: ShowcasePagePicture[]
 }
 
 export type ShowcaseStatus = 'draft' | 'live' | 'paused'
@@ -115,7 +128,7 @@ export const SHOWCASE_PAGE_KEY = 'showcase:home'
 export const SHOWCASE_HOST_PREFIX = 'site-'
 export const SHOWCASE_PRICE_INR = 200
 export const SHOWCASE_FREE_DAYS = 30
-/** The most a paid showcase regeneration charges the wallet. */
-export const SHOWCASE_GENERATION_CAP_INR = 100
+/** A redesign (any AI design of the page after the free one) costs this from the workspace's wallet, flat. */
+export const SHOWCASE_REDESIGN_PRICE_INR = 50
 
 export const emptyShowcaseContent = (): ShowcaseContent => ({ services: [], work: [], reviews: [], stats: [], faqs: [] })

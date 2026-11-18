@@ -3,19 +3,19 @@ import { query } from '@/lib/shared/db'
 import { controlPlanePool, lookupTenantContextById } from '@/lib/tenant-registry'
 import { resolveTenant, runWithTenantContext, type TenantContext } from '@/lib/tenancy/tenant-context'
 import { isPlatformOwner } from '@/lib/integrations/owner'
-import { SHOWCASE_GENERATION_CAP_INR } from '@/lib/showcase/types'
 import { runPlatformFunded } from './billing'
 import { metered, runMetered } from './cost-meter'
-import { noteHoldError, openHold, recordHoldCost, settleHold, staleHolds, type OpenHold, type Settlement } from './generation-holds'
+import { noteHoldError, openHold, recordHoldCost, settleHold, staleHolds, type HoldTerms, type OpenHold, type Settlement } from './generation-holds'
 
 // AI generations the owner pays for: a site's full generations after its free first one. The cap is held on the
 // tenant's AI wallet (control plane) before the AI starts, and the hold recorded (./generation-holds.ts); the AI runs
 // on a provider-cost budget of cap / margin and stops there, keeping what it built, checkpointing its cost on the hold;
 // then the hold is trued-up to provider cost × margin, never above the cap. A hold its run never settled (the process
-// died) is settled the same way on the checkpointed cost by sweepStaleHolds. Each AI call is logged at price 0 under
-// the generation's wallet_ref and one ai_usage row carries the charge, in the request's store database or, when there
-// is none (the ecom console, a services tenant), the platform's. A site's free first generation runs through
-// runFreeGeneration on the same meter, paid by the platform.
+// died) is settled the same way on the checkpointed cost by sweepStaleHolds. A flat-priced generation (a Showcase
+// redesign) keeps its whole hold when it succeeds and none when it fails; it checkpoints no cost, so the sweep refunds
+// one whose process died. Each AI call is logged at price 0 under the generation's wallet_ref and one ai_usage row
+// carries the charge, in the request's store database or, when there is none (the ecom console, a services tenant),
+// the platform's. A site's free first generation runs through runFreeGeneration on the same meter, paid by the platform.
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -37,19 +37,19 @@ export function generationCharge(costInr: number, capInr: number, margin = aiReg
   return Math.min(round2(capInr), round2(cost * margin))
 }
 
-export type GenerationKind = 'store_site' | 'one_page'
+export type GenerationKind = 'store_site'
 
 // Typical provider cost (₹) of one generation at the gateway's prices. A store site is the AI Site Studio pipeline
 // (Site Builder's redesign, lib/site/studio/redesign.ts): an Opus brief, plan and direction, the product card and every
 // page (about 25, the working pages two sections each) written section by section on Opus with repairs. A build
-// measured ₹333 for 11 pages, so ₹450–₹800 for all of them; pictures add up to six draft images. A one-page site: a
-// few Opus and Sonnet calls. Only for the UI's range: the charge is what the run cost.
-const TYPICAL_COST_INR: Record<GenerationKind, [number, number]> = { store_site: [450, 800], one_page: [10, 40] }
+// measured ₹333 for 11 pages, so ₹450–₹800 for all of them; pictures add up to six draft images. Only for the UI's
+// range: the charge is what the run cost.
+const TYPICAL_COST_INR: Record<GenerationKind, [number, number]> = { store_site: [450, 800] }
 const PICTURES_COST_INR: [number, number] = [2, 40]
 
 /** A typical charge for the UI ("About ₹low–₹high"), in whole rupees, never above the cap. */
 export function estimateGeneration(kind: GenerationKind, opts: { images?: boolean; capInr?: number } = {}): { lowInr: number; highInr: number; capInr: number } {
-  const capInr = opts.capInr ?? (kind === 'one_page' ? SHOWCASE_GENERATION_CAP_INR : siteRegenCapInr())
+  const capInr = opts.capInr ?? siteRegenCapInr()
   const margin = aiRegenMargin()
   const [lo, hi] = TYPICAL_COST_INR[kind]
   const [plo, phi] = opts.images ? PICTURES_COST_INR : [0, 0]
@@ -90,6 +90,9 @@ export interface PaidGeneration {
   label: string
   /** ai_usage feature of the charge row (default 'site_generation'). */
   feature?: string
+  /** A flat price: the whole cap is charged when fn succeeds and nothing when it throws, whatever the AI used; the AI
+   *  stops at `budgetInr` of provider cost (any cost above the cap is the platform's). */
+  flat?: { budgetInr: number }
 }
 
 export interface PaidGenerationResult<T> {
@@ -104,18 +107,20 @@ export interface PaidGenerationResult<T> {
  * Runs `fn` as a generation the owner pays for. Throws PaidGenerationError before anything runs when the wallet can't
  * hold `capInr`. AI calls inside `fn` stop once capInr / margin of provider cost is spent (lib/site/agent.ts and the
  * studio's chat() check the budget). If `fn` throws, the error comes back out after the true-up: nothing spent is
- * refunded in full, otherwise what was spent is charged. Call it from a request without a services tenant's database
- * scope (the ecom console), so each call's usage row lands in the platform's database:
+ * refunded in full, otherwise what was spent is charged; a `flat` one is refunded in full either way. Call it from a
+ * request without a services tenant's database scope (the ecom console), so each call's usage row lands in the
+ * platform's database:
  *
  *   const { chargedInr, result } = await runPaidGeneration(
- *     { tenantId, capInr: SHOWCASE_GENERATION_CAP_INR, ref: `showcase:${site.id}:${site.generations + 1}`, label: 'Showcase site generation', feature: 'showcase_generation' },
- *     () => generateShowcasePage(...)
+ *     { tenantId, capInr: SHOWCASE_REDESIGN_PRICE_INR, flat: { budgetInr: 100 }, ref: `showcase:${site.id}:${run}`, label: 'Showcase redesign', feature: 'showcase_generation' },
+ *     () => designAndSavePage(...)
  *   )
  */
 export async function runPaidGeneration<T>(g: PaidGeneration, fn: () => Promise<T>): Promise<PaidGenerationResult<T>> {
   const capInr = round2(g.capInr)
   const walletRef = `aigen:${g.ref}`
   if (!(capInr > 0) || !g.ref || walletRef.length > 64) throw new Error('runPaidGeneration needs a positive capInr and a ref of 1 to 58 characters')
+  if (g.flat && !(g.flat.budgetInr > 0)) throw new Error('A flat-priced generation needs a positive budgetInr')
   const margin = aiRegenMargin()
   const note = `AI: ${g.label}`
   const feature = (g.feature ?? 'site_generation').slice(0, 64)
@@ -124,9 +129,10 @@ export async function runPaidGeneration<T>(g: PaidGeneration, fn: () => Promise<
   if (pays) {
     const hold = await openHold({ tenantId: g.tenantId, capInr, walletRef, note, margin, feature, usageDb: tenant?.infra?.rdsEndpoint ? 'store' : 'platform' })
     if (!hold.ok) {
+      const more = `Your AI wallet needs ₹${hold.needed.toFixed(2)} more`
       throw new PaidGenerationError(
         'wallet_low',
-        `Your AI wallet needs ₹${hold.needed.toFixed(2)} more: ₹${capInr} is held while the AI works, and what it doesn't use comes back.`,
+        g.flat ? `${more}: this costs ₹${capInr}.` : `${more}: ₹${capInr} is held while the AI works, and what it doesn't use comes back.`,
         hold.balance,
         hold.needed,
         capInr
@@ -139,7 +145,7 @@ export async function runPaidGeneration<T>(g: PaidGeneration, fn: () => Promise<
   let out: { ok: true; result: T } | { ok: false; error: unknown }
   try {
     const result = await runMetered(
-      capInr / margin,
+      g.flat ? g.flat.budgetInr : capInr / margin,
       async () => {
         try {
           return await runPlatformFunded(walletRef, Infinity, fn, walletRef)
@@ -147,7 +153,7 @@ export async function runPaidGeneration<T>(g: PaidGeneration, fn: () => Promise<
           costInr = metered()?.costInr ?? 0
         }
       },
-      pays ? costCheckpoint(g.tenantId, walletRef) : undefined
+      pays && !g.flat ? costCheckpoint(g.tenantId, walletRef) : undefined
     )
     out = { ok: true, result }
   } catch (error) {
@@ -156,7 +162,8 @@ export async function runPaidGeneration<T>(g: PaidGeneration, fn: () => Promise<
 
   let chargedInr = 0
   if (pays) {
-    const s = await settleRun(g.tenantId, walletRef, costInr, capInr, margin, note)
+    const flatInr = out.ok ? capInr : 0
+    const s = await settleRun(g.tenantId, walletRef, { costInr, capInr, margin }, note, g.flat ? () => flatInr : chargeOf, !g.flat)
     // A true-up that kept failing leaves the whole hold charged until the sweep settles it: say so.
     chargedInr = s?.chargedInr ?? capInr
     // When the sweep settled it first, the sweep wrote the charge row.
@@ -182,23 +189,24 @@ export async function runFreeGeneration<T>(label: string, budgetInr: number, fn:
   return { costInr, result }
 }
 
-const chargeOf = (t: { costInr: number; capInr: number; margin: number }) => generationCharge(t.costInr, t.capInr, t.margin)
+const chargeOf = (t: HoldTerms) => generationCharge(t.costInr, t.capInr, t.margin)
 
-// Settles the run's own hold, retrying briefly; null when it could not (the hold stands until the sweep settles it).
-async function settleRun(tenantId: string, walletRef: string, costInr: number, capInr: number, margin: number, note: string): Promise<Settlement | null> {
+// Settles the run's own hold at charge(run), retrying briefly; null when it could not (the hold stands until the sweep
+// settles it).
+async function settleRun(tenantId: string, walletRef: string, run: HoldTerms, note: string, charge: (t: HoldTerms) => number, keepCost: boolean): Promise<Settlement | null> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const s = await settleHold(tenantId, walletRef, 'run', chargeOf, costInr)
+      const s = await settleHold(tenantId, walletRef, 'run', charge, run.costInr)
       if (s) return s
       // No hold recorded: true the debit up directly.
-      const chargedInr = generationCharge(costInr, capInr, margin)
+      const chargedInr = charge(run)
       await trueUp({ tenantId, amountInr: chargedInr, externalRef: walletRef, note })
-      return { chargedInr, costInr, by: 'run', now: true }
+      return { chargedInr, costInr: run.costInr, by: 'run', now: true }
     } catch (err) {
       if (attempt === 3) {
-        console.error(`[paid-generation] true-up failed: ${walletRef} of tenant ${tenantId} stays held at ₹${capInr} until the ai_hold_sweep cron settles it`, (err as Error).message)
-        // So the sweep charges the whole run, not its last checkpoint.
-        await recordHoldCost(tenantId, walletRef, costInr).catch(() => {})
+        console.error(`[paid-generation] true-up failed: ${walletRef} of tenant ${tenantId} stays held at ₹${run.capInr} until the ai_hold_sweep cron settles it`, (err as Error).message)
+        // So the sweep charges the whole run, not its last checkpoint; a flat run's hold keeps no cost, so it is refunded.
+        if (keepCost) await recordHoldCost(tenantId, walletRef, run.costInr).catch(() => {})
         return null
       }
       await new Promise(r => setTimeout(r, 1000 * attempt))
@@ -259,7 +267,8 @@ export interface HoldSweep {
 /**
  * Settles paid-generation holds still open STALE_HOLD_MS after they were taken (their run's process died): charges the
  * provider cost the run checkpointed × the hold's margin, never above the cap, refunds the rest and writes the charge
- * row. A hold its run settles meanwhile is left alone. The controller's ai_hold_sweep cron, every 15 min.
+ * row. A flat-priced run checkpoints nothing, so its hold is refunded in full. A hold its run settles meanwhile is left
+ * alone. The controller's ai_hold_sweep cron, every 15 min.
  */
 export async function sweepStaleHolds(olderThanMs = STALE_HOLD_MS): Promise<HoldSweep> {
   const out: HoldSweep = { settled: [], failed: [] }

@@ -17,7 +17,7 @@ import ThemesEntry from './_builder/ThemesEntry'
 import ShowcaseThemes from '../_studio/ShowcaseThemes'
 import PublishPanel, { type Published } from './_builder/PublishPanel'
 import { detailsProblem } from './_builder/model'
-import { useShowcaseDetails } from './_builder/useShowcaseDetails'
+import { useRefreshAfterBuild, useShowcaseDetails } from './_builder/useShowcaseDetails'
 
 // The Showcase signup: Details (the business, how people reach it, what the page shows), then the site (the AI studio
 // in Showcase mode, ready-made themes later) and Publish. Everything autosaves to the draft site and the studio
@@ -52,6 +52,7 @@ export default function ShowcaseOnboard({
   const [studioKey, setStudioKey] = useState(0)
   const [published, setPublished] = useState<Published | null>(null)
   const top = useRef<HTMLDivElement>(null)
+  useRefreshAfterBuild(studio?.session?.status, d.refresh)
 
   // Braces: scrollIntoView returns a Promise in newer browsers, and an effect may only return a clean-up.
   useEffect(() => {

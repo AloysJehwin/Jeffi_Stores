@@ -104,13 +104,20 @@ function toText(html: string): string {
     .trim()
 }
 
-async function send(to: string, subject: string, html: string, attachments?: Array<{ filename: string; content: Buffer; contentType: string }>) {
+async function send(
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: Array<{ filename: string; content: Buffer; contentType: string }>,
+  reply?: { to?: string | null; hint: boolean }
+) {
   // Every outbound mail goes through the audited chokepoint so it is visible in
   // /admin/audit?tab=mail_log alongside the rest.
   await sendAuditedMail({
     kind: 'ecom',
     from: PLATFORM_FROM,
-    replyTo: PLATFORM_ADDRESS,
+    replyTo: reply?.to || PLATFORM_ADDRESS,
+    ...(reply ? { replyHint: reply.hint } : {}),
     to,
     subject,
     html,
@@ -420,8 +427,32 @@ export async function sendDomainEmail(
   await send(owner.email, mail.subject, html)
 }
 
-/** A notice about the owner's Showcase site (renewal, short wallet, paused, a new enquiry). Lines and rows are HTML. */
+/** A notice about the owner's Showcase site (renewal, short wallet, paused). Lines and rows are HTML. */
 export const sendShowcaseEmail = sendDomainEmail
+
+/**
+ * A new enquiry from the owner's Showcase site. Replying answers the visitor (replyTo, when they left an email), so
+ * this mail doesn't invite replies to us. Lines and rows are HTML; the preheader is text.
+ */
+export async function sendShowcaseLeadEmail(
+  owner: { email: string; name: string | null },
+  mail: { subject: string; preheader: string; title: string; lines: string[]; rows: Row[]; cta: { href: string; label: string }; replyTo?: string | null }
+) {
+  const html = mailShell({
+    brand: PLATFORM_BRAND,
+    kicker: 'Showcase',
+    title: mail.title,
+    preheader: mail.preheader,
+    footerLines: [FOOTER_LINES[0], `Questions about your site? Write to <a href="mailto:${SUPPORT_ADDRESS}" style="color:#666;">${SUPPORT_ADDRESS}</a>.`],
+    content: `
+    <p style="margin:0 0 14px;">Hi ${escHtml(owner.name ?? 'there')},</p>
+    ${mail.lines.map(l => `<p style="margin:0 0 14px;">${l}</p>`).join('')}
+    ${detailTable(mail.rows)}
+    ${button(mail.cta.href, mail.cta.label)}
+  `,
+  })
+  await send(owner.email, mail.subject, html, undefined, { to: mail.replyTo, hint: false })
+}
 
 /** A notice about one of the store's licences (not accepted, expiring, expired). Lines and rows are HTML. */
 export const sendComplianceEmail = sendDomainEmail

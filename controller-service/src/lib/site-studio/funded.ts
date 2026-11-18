@@ -4,7 +4,7 @@ import { addStudioSpend, type StudioSession } from './sessions'
 import { allowanceOf, BUDGET_INR, freeCapInr } from './allowance'
 
 // Every studio AI call runs platform-funded (lib/site/studio runStudioFunded) and its spend is added to the session,
-// so the free generation's cap (SITE_STUDIO_BUDGET_INR, ₹1,000; a Showcase's ₹100) holds across requests, not per
+// so the free generation's cap (SITE_STUDIO_BUDGET_INR, ₹1,000; a Showcase's ₹150) holds across requests, not per
 // request.
 
 /** What is left of the owner's free generation. */
