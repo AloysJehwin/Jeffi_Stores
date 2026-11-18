@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Play, Power, PowerOff, RotateCcw, Server } from 'lucide-react'
+import { Play, Power, PowerOff, RotateCcw, Server, Square } from 'lucide-react'
 import { ActionButton, useActionToast } from '@/components/admin/kit'
 import DeprovisionDialog from './DeprovisionDialog'
 
-// Operator actions on a tenant: Provision / Retry / Deprovision + test-tenant-only
+// Operator actions on a tenant: Provision / Retry / Deprovision (Stop & deprovision while a build runs) + test-tenant-only
 // Disable/Enable instance. Rendered in the tenant detail header.
 export default function TenantActions({
   tenantId,
@@ -52,6 +52,8 @@ export default function TenantActions({
   const failed = jobStatus === 'failed'
   // Rollback deleted what the run had built, so resuming mid-way is not available, only a fresh provision.
   const canResume = failed && !rolledBack
+  // A live, half-built or rolled-back store can be torn down; a build still going is stopped first.
+  const canDeprovision = status === 'active' || status === 'provisioning' || status === 'suspended'
   const base = `/api/admin/ecom/customers/${tenantId}`
 
   return (
@@ -82,13 +84,14 @@ export default function TenantActions({
         />
       )}
 
-      {status === 'active' && (
+      {canDeprovision && (
         <>
-          <ActionButton action={{ label: 'Deprovision', icon: Server, danger: true, onClick: () => setDeprovisionOpen(true) }} />
+          <ActionButton action={{ label: inFlight ? 'Stop & deprovision' : 'Deprovision', icon: inFlight ? Square : Server, danger: true, onClick: () => setDeprovisionOpen(true) }} />
           <DeprovisionDialog
             open={deprovisionOpen}
             slug={slug}
             retentionDays={retentionDays}
+            building={inFlight}
             onClose={() => setDeprovisionOpen(false)}
             onConfirm={async keep => {
               await call(`${base}/deprovision`, { confirm: true, keep })()

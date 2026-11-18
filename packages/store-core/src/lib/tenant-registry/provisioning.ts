@@ -104,6 +104,33 @@ export async function resumeProvisioningJob(
   return { ok: true, resumedFrom: step }
 }
 
+/**
+ * Stop the tenant's build (deprovisioned while it runs): waits up to `waitMs` for a step in flight to finish, so nothing
+ * is created after the teardown, then fails the job so the worker leaves it. Returns whether a build was stopped.
+ */
+export async function stopProvisioningJob(tenantId: string, reason: string, waitMs = 60_000): Promise<boolean> {
+  const pool = controlPlanePool()
+  const until = Date.now() + waitMs
+  for (;;) {
+    const job = (
+      await pool.query<{ id: string; status: string }>(
+        `SELECT id, status FROM provisioning_jobs WHERE tenant_id=$1 AND status IN ('pending','running') ORDER BY created_at DESC LIMIT 1`,
+        [tenantId]
+      )
+    ).rows[0]
+    if (!job) return false
+    if (job.status === 'running' && Date.now() < until) {
+      await new Promise(r => setTimeout(r, 2000))
+      continue
+    }
+    await pool.query(
+      `UPDATE provisioning_jobs SET status='failed', last_error=$2, next_attempt_at=NULL, updated_at=now() WHERE id=$1 AND status IN ('pending','running')`,
+      [job.id, reason]
+    )
+    return true
+  }
+}
+
 /** Fetch active jobs the worker should advance (skips jobs backing off until next_attempt_at). */
 export async function activeProvisioningJobs(): Promise<ProvisioningJob[]> {
   const pool = controlPlanePool()

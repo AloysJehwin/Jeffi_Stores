@@ -194,6 +194,18 @@ describe('parseCreateTables', () => {
     expect(t.columns[2].type).toBe('numeric(10,2) DEFAULT 0')
   })
 
+  // A comma inside a quoted default is not a column separator. Cutting there left an open string that broke every new
+  // store's schema load (site_pages.published_doc, live 2026-11-19).
+  it('keeps a quoted default that contains commas in one piece', () => {
+    const [t] = parseCreateTables(`CREATE TABLE public.demo (
+    doc jsonb DEFAULT '{"a": 1, "b": [], "c": "it''s, fine"}'::jsonb NOT NULL,
+    label character varying(20) DEFAULT 'x'::character varying
+);`)
+    expect(t.columns.map(c => c.name)).toEqual(['doc', 'label'])
+    expect(t.columns[0].type).toBe(`jsonb DEFAULT '{"a": 1, "b": [], "c": "it''s, fine"}'::jsonb`)
+    expect(sql).toContain(`ALTER TABLE public.site_pages ADD COLUMN IF NOT EXISTS published_doc jsonb DEFAULT '{"schemaVersion": 1, "blocks": {}, "order": []}'::jsonb;`)
+  })
+
   it('the real catalog: products columns declared under comment headings are reconciled', () => {
     const cols = desiredTableColumns().get('products') ?? []
     expect(cols).toEqual(expect.arrayContaining(['sku', 'color', 'barcode', 'fragile', 'meta_title', 'is_draft']))

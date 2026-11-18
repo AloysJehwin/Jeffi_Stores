@@ -89,6 +89,22 @@ Code: `controller-service/src/lib/compute/`.
 - Every host the plan has moves onto it (`brand.in`, `www.`, `admin.` behind the store's mTLS, `invoice.`/`quotation.`/`purchaseorder.`, `forms.`, `vault.`, `business.` on Pro+), each a `tenant_custom_domains` row with `order_id` and its own cert-manager certificate. Routing is by first label (`lib/tenancy/admin-host.ts`).
 - Off in production until `DOMAIN_REGISTRAR=route53`; everywhere else a fake registrar. Details, renewal policy and production setup: [`DOMAIN_PURCHASE.md`](DOMAIN_PURCHASE.md).
 
+## Live end-to-end store test (2026-11-19)
+
+- **Load schema failed for every new store** since `100f9080b`.
+  - Cause: the column reconciliation's splitter (`splitTopLevel` in `tenant-migrations-schema.ts`) cut `site_pages.published_doc`'s JSON default at a comma inside its quotes. That left an open string, and Postgres rejected the whole tenant schema (`syntax error at or near "store"`). The tenant fan-out uses the same blob.
+  - Fix: the splitter skips commas inside quotes. A regression test covers it, and the full tenant schema loads into a fresh database, twice.
+- **Starter catalogue matches the AI site.** `seed_data` seeds the owner's AI Site Studio sample catalogue when the site came from the studio (`seedStudioCatalog`); otherwise it seeds the category's starter catalogue.
+  - What's seeded: categories with the studio's slugs, brands, and products with price, MRP and pictures. Pictures stay on the platform CDN.
+  - A category without a picture takes its first product's, as the studio preview does.
+  - Made-up reviews and offers stay out.
+  - Proved locally: with the studio site installed through `/api/cron/site-build`, the listing, category and product pages showed the seeded products and pictures.
+- **Stop & deprovision** (admin store page, while a build runs):
+  - The deprovision API (`stopProvisioningJob`) waits up to a minute for a step in flight, fails the job, then tears the store down.
+  - The worker never advances a job whose store is terminated.
+  - Deprovision is also offered for a store that is provisioning or suspended, not only an active one.
+- **The live test store** (`e2e-test-store`, Pro) rolled back by itself after 8 retries. AWS showed its server terminated and its disk and bucket gone. It was then deleted from the admin.
+
 ---
 
 ## What Has Been Done

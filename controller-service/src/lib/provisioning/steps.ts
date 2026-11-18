@@ -1,5 +1,6 @@
 import type { ProvisioningProvider } from './provider'
 import type { StorePart } from '@/lib/k8s/tenant-workload'
+import type { SampleCatalog } from '@/lib/site/data/types'
 import { appBootUserData } from './user-data'
 import { dedicatedNodeName } from '@/lib/provisioning/tiers'
 import {
@@ -331,7 +332,7 @@ const HANDLERS: Record<Step, Handler> = {
         return key ? ok() : skip('no backup to restore')
   },
 
-  async seed_data({ slug, res }) {
+  async seed_data({ job, slug, res }) {
         // Optional starter-catalog seed. No-op unless the job carries a `seedProfile`
         // (mirrors restore_data's opt-in shape). Deliberately separate from load_schema so
         // "empty store" stays the default and seeding never runs by accident. Skipped
@@ -340,18 +341,32 @@ const HANDLERS: Record<Step, Handler> = {
         const profile = res.seedProfile as string | undefined
         if (profile && !res.restored) {
           try {
-            const { seedTenantData } = await import('./seed')
+            const { seedTenantData, seedStudioCatalog } = await import('./seed')
             const auth = jobDbAuth(slug, res)
-            if (auth) await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile, auth)
-            else await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile)
-            res.seeded = profile
+            // A site designed in the AI Site Studio brings its sample catalogue: the live pages then show the products
+            // the owner saw them with. Otherwise the category's starter catalogue.
+            // A lookup failure falls back to the starter catalogue rather than leaving the store empty.
+            const studio = await import('@controller/lib/site-studio/sessions')
+              .then(m => m.studioSiteForTenant(job.tenant_id))
+              .catch(() => null)
+            const catalog = studio?.catalog as SampleCatalog | null | undefined
+            if (catalog?.products?.length) {
+              const n = auth
+                ? await seedStudioCatalog(res.endpoint, res.dbName ?? TENANT_DB, catalog, profile, auth)
+                : await seedStudioCatalog(res.endpoint, res.dbName ?? TENANT_DB, catalog, profile)
+              res.seeded = `studio: ${n.products} products, ${n.images} pictures, ${n.categories} categories`
+            } else {
+              if (auth) await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile, auth)
+              else await seedTenantData(res.endpoint, res.dbName ?? TENANT_DB, profile)
+              res.seeded = profile
+            }
             delete res.seedError
           } catch (e: any) {
             res.seedError = e?.message || 'seeding failed'
           }
         }
         if (!profile || res.restored) return skip(res.restored ? 'store restored from a backup' : 'no starter catalogue chosen')
-        return res.seedError ? warn(res.seedError) : ok()
+        return res.seedError ? warn(res.seedError) : ok(typeof res.seeded === 'string' ? res.seeded : undefined)
   },
 
   async generate_legals({ job, res }) {
@@ -867,6 +882,11 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
   const tenant = await getTenant(job.tenant_id)
   if (!tenant) {
     await updateProvisioningJob(job.id, { status: 'failed', last_error: 'tenant not found' })
+    return 'failed'
+  }
+  // Deprovisioned while the build was going (Stop & deprovision): nothing more is built, the teardown has the rest.
+  if (tenant.status === 'terminated') {
+    await updateProvisioningJob(job.id, { status: 'failed', last_error: 'stopped: the store was deprovisioned', clearNextAttempt: true })
     return 'failed'
   }
   const slug = tenant.slug

@@ -128,14 +128,20 @@ function syncTableColumns(sql: string): string {
  * inside parentheses (e.g. numeric(6,2), CHECK (x IN ('a','b'))). A naive split on ',' would
  * cut those in half.
  */
+// Commas inside a quoted default ('{"a": 1, "b": 2}'::jsonb) or a quoted name are not separators. A doubled quote
+// ('' or "") closes and reopens at once, so toggling keeps the state right.
 function splitTopLevel(body: string): string[] {
   const items: string[] = []
   let depth = 0
   let current = ''
+  let quote: string | null = null
   for (const ch of body) {
-    if (ch === '(') depth++
+    if (quote) {
+      if (ch === quote) quote = null
+    } else if (ch === "'" || ch === '"') quote = ch
+    else if (ch === '(') depth++
     else if (ch === ')') depth--
-    if (ch === ',' && depth === 0) {
+    if (ch === ',' && depth === 0 && !quote) {
       items.push(current)
       current = ''
     } else {

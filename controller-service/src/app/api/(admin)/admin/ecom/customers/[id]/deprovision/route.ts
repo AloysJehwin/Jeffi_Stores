@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { getTenant, controlPlanePool, KEEP_ALL, parseArchiveKeep, archiveRetentionDays } from '@/lib/tenant-registry'
+import { getTenant, controlPlanePool, KEEP_ALL, parseArchiveKeep, archiveRetentionDays, stopProvisioningJob } from '@/lib/tenant-registry'
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic'
 // for the owner to restore within the retention period, then deletes the database and the bucket
 // and revokes the store's API keys and certificates. `keep` is { database, media, config }, all
 // three booleans; left out, everything is kept (the admin page always sends it: the administrator
-// decides each item). Routes through the shared trigger (one code path).
+// decides each item). Routes through the shared trigger (one code path). A build still going is stopped first
+// (Stop & deprovision), so the worker creates nothing the teardown has already removed.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -38,6 +39,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id ?? null
 
+  const requestedBy = (admin as { email?: string; id?: string }).email ?? (admin as { id?: string }).id ?? 'operator'
+  const stopped = await stopProvisioningJob(id, `stopped by ${requestedBy}: deprovisioned`)
+
   const result = await triggerProvisioning({
     action: 'deprovision',
     tenantId: id,
@@ -46,11 +50,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ownerId,
     reason: 'operator',
     keep,
-    requestedBy: (admin as { email?: string; id?: string }).email ?? (admin as { id?: string }).id ?? 'operator',
+    requestedBy,
   })
 
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
   }
-  return NextResponse.json({ ok: true, kept: keep, archiveId: result.archiveId ?? null, retentionDays: archiveRetentionDays() })
+  return NextResponse.json({ ok: true, stopped, kept: keep, archiveId: result.archiveId ?? null, retentionDays: archiveRetentionDays() })
 }
