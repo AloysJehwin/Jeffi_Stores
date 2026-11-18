@@ -3,6 +3,7 @@ import { normalizeDoc, validateDoc, type Block, type PageDoc, type PageKey } fro
 import type { AiChatMessage } from '@/lib/shared/ai-client'
 import { siteRegistry } from '../blocks'
 import { CODE_SECTION, ONCE_COMPONENTS, checkPageParts, compileSection, countComponent, type CompiledSection } from '../code/compile'
+import { deadClasses } from '../code/css'
 import { CARD_PAGE } from '../code/ast'
 import { CARD_KEY } from '../card'
 import { chat, StudioAiDownError, StudioBudgetError, studioBudgetLeft } from './ai'
@@ -45,6 +46,14 @@ export function extractTsx(raw: string): string | null {
 
 const issueText = (i: { message: string; line?: number }) => (i.line ? `line ${i.line}: ${i.message}` : i.message)
 
+/** Classes the section's CSS has no rule for: they would do nothing on the page. */
+function deadNote(c: CompiledSection): string[] {
+  const dead = deadClasses(c.classes, c.css)
+  return dead.length
+    ? [`These classes do nothing (no such Tailwind class in this theme): ${dead.slice(0, 12).join(' ')}. Use Tailwind's own classes and the theme colours; an opacity like /60 works on the primary, secondary and accent scales only.`]
+    : []
+}
+
 type Written = { ok: true; source: string; compiled: CompiledSection } | { ok: false; reason: string }
 
 /** One section: write, compile, repair. Compile failures come back as { ok: false }; AI errors, budget and abort throw. */
@@ -53,7 +62,8 @@ async function writeSection(
   messages: AiChatMessage[],
   page: PageKey,
   onRepair: (issues: string[]) => void,
-  maxTokens = MAX_TOKENS
+  maxTokens = MAX_TOKENS,
+  first = false
 ): Promise<Written> {
   let issues: string[] = []
   // A section that compiled but still hard-codes store data is kept if the repairs do not get it clean.
@@ -67,7 +77,9 @@ async function writeSection(
     else {
       const r = await compileSection(source, { page })
       if (r.ok) {
-        const notes = (page === CARD_PAGE ? [...studioLint(r.section.ast, page), ...cardLint(r.section.ast)] : studioLint(r.section.ast, page)).concat(templateLint(r.section.ast, page))
+        const notes = (page === CARD_PAGE ? [...studioLint(r.section.ast, page), ...cardLint(r.section.ast)] : studioLint(r.section.ast, page, { first }))
+          .concat(templateLint(r.section.ast, page))
+          .concat(deadNote(r.section))
         if (!notes.length) return { ok: true, source, compiled: r.section }
         compiledOnce = { ok: true, source, compiled: r.section }
         if (round === REPAIRS) return compiledOnce
@@ -96,6 +108,22 @@ ${parts.map(p => `        <${p} />`).join('\n')}
 }`
 }
 
+// A Showcase's sections in the order they are written: what the page cannot do without first (header, opening,
+// contact, footer), then those the business has content for, and last those that stay hidden until it adds work,
+// reviews or numbers, so a budget that runs out leaves out what would not show yet. Other pages go in plan order.
+const LATER: Record<string, number> = { Services: 1, Faqs: 1, Work: 2, Testimonials: 2, Stats: 2 }
+export function writeOrder(p: Pick<PlannedPage, 'page' | 'sections'>): number[] {
+  const all = p.sections.map((_, i) => i)
+  if (p.page !== 'showcase') return all
+  const last = p.sections.length - 1
+  const rank = (i: number) => {
+    const parts = p.sections[i].parts ?? []
+    if (i === 0 || i === 1 || i === last || parts.includes('LeadForm')) return 0
+    return Math.max(0, ...parts.map(x => LATER[x] ?? 0)) + 1
+  }
+  return all.sort((a, b) => rank(a) - rank(b) || a - b)
+}
+
 async function runLimited<T>(items: T[], limit: number, fn: (item: T, i: number) => Promise<void>) {
   let next = 0
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -115,7 +143,8 @@ export async function generatePage(ctx: StudioCtx, page: PlannedPage | string, o
   const skipped: { label: string; reason: string }[] = []
   let budgetOut = false
   try {
-    await runLimited(p.sections, CONCURRENCY, async (s: PlannedSection, index) => {
+    await runLimited(writeOrder(p), CONCURRENCY, async (index: number) => {
+      const s: PlannedSection = p.sections[index]
       if (budgetOut) {
         skipped.push({ label: s.label, reason: 'The free generation budget is spent' })
         onEvent({ type: 'section', page: p.key, index, total, label: s.label, status: 'skipped', issues: ['budget'] })
@@ -128,7 +157,7 @@ export async function generatePage(ctx: StudioCtx, page: PlannedPage | string, o
       ]
       let r: Written
       try {
-        r = await writeSection(ctx, messages, p.page, issues => onEvent({ type: 'section', page: p.key, index, total, label: s.label, status: 'repairing', issues }))
+        r = await writeSection(ctx, messages, p.page, issues => onEvent({ type: 'section', page: p.key, index, total, label: s.label, status: 'repairing', issues }), MAX_TOKENS, index === 0)
       } catch (err) {
         if (err instanceof StudioBudgetError) budgetOut = true
         else if (err instanceof StudioAiDownError || ctx.signal?.aborted) throw err

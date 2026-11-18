@@ -1,19 +1,21 @@
 import 'server-only'
 import { generatePage, regeneratePage, StudioAiDownError, StudioBudgetError, type PlannedPage, type StudioEvent } from '@/lib/site/studio'
 import { PaidGenerationError, runPaidGeneration } from '@/lib/ai/paid-generation'
-import { SHOWCASE_GENERATION_CAP_INR, SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
+import { SHOWCASE_PAGE_KEY, SHOWCASE_REDESIGN_PRICE_INR } from '@/lib/showcase/types'
 import { claimFreeShowcaseGeneration, recordShowcaseGeneration, type ShowcaseSiteRow } from '@/lib/showcase/store'
 import { AI_UNAVAILABLE_CODE } from '@/lib/site/ai-status'
 import { studioCtx } from '@controller/lib/site-studio/build'
 import { freeBudgetLeft, funded } from '@controller/lib/site-studio/funded'
+import { SHOWCASE_FREE_CAP_INR } from '@controller/lib/site-studio/allowance'
 import type { SseSend } from '@controller/lib/site-studio/http'
 import { copyStudioPage } from './publish'
+import { addStarterContent } from './starter'
 import { finishBuild, saveStudioPage, settlePaidBuild, updateStudioSession, type StudioProgress, type StudioSession } from '@controller/lib/site-studio/sessions'
 
 // A Showcase's generations, streamed like the store's build (start · page · progress · page-done | page-failed), so
-// the studio's build step follows them unchanged. The first is free (platform-funded on what is left of the ₹100 free
-// budget, resumable); later ones are charged to the workspace's AI wallet (lib/ai/paid-generation.ts, never over
-// SHOWCASE_GENERATION_CAP_INR) and design the page again from a fresh plan.
+// the studio's build step follows them unchanged. The first is free (platform-funded on what is left of the ₹150 free
+// budget, resumable); later ones are redesigns for SHOWCASE_REDESIGN_PRICE_INR, flat, from the workspace's AI wallet
+// (lib/ai/paid-generation.ts), and design the page again from a fresh plan.
 
 const slim = (e: StudioEvent) => (e.type === 'done' ? { type: e.type, page: e.page, skipped: e.skipped } : e)
 const errText = (err: unknown) => ((err as Error)?.message || 'unknown error').slice(0, 300)
@@ -49,7 +51,9 @@ export async function runShowcaseBuild(session: StudioSession, site: ShowcaseSit
     const doc = await funded(id, freeBudgetLeft(session), async () => {
       send('page', { key: page.key, label: page.label, sections: page.sections.length })
       await updateStudioSession(id, { progress: progressOf(page, 'building', `Designing ${page.label}`) })
-      return generatePage(ctx, page, e => send('progress', slim(e)))
+      // Alongside the page: starter services, questions and mood pictures where the business gave none.
+      const [doc] = await Promise.all([generatePage(ctx, page, e => send('progress', slim(e))), site ? addStarterContent(site, ctx.brief) : null])
+      return doc
     })
     if (!doc.order.length) throw new Error('no section could be written')
     await saveStudioPage(id, page.key, doc, progressOf(page, 'done', 'Your page is ready'))
@@ -72,9 +76,10 @@ export async function runShowcaseBuild(session: StudioSession, site: ShowcaseSit
 }
 
 /**
- * A paid generation (claimed by claimPaidBuild): the page planned and designed again, charged to the workspace's
- * wallet. The wallet is held before the AI starts; when it can't hold the cap nothing runs and the session is as it
- * was. The page built before stays until the new one replaces it.
+ * A redesign (claimed by claimPaidBuild): the page planned and designed again for SHOWCASE_REDESIGN_PRICE_INR from the
+ * workspace's wallet. The price is held before the AI starts and kept only once the new page is saved; a run that fails
+ * gives it back. When the wallet can't hold it nothing runs and the session is as it was. The page built before stays
+ * until the new one replaces it.
  */
 export async function runShowcasePaidBuild(session: StudioSession, site: ShowcaseSiteRow & { tenantId: string }, send: SseSend): Promise<{ session: StudioSession | null; chargedInr: number }> {
   const id = session.id
@@ -84,38 +89,46 @@ export async function runShowcasePaidBuild(session: StudioSession, site: Showcas
   const hadPage = !!session.pages?.[SHOWCASE_PAGE_KEY]
   send('start', { total: 1, done: [], pages: [{ key: current.key, label: current.label }], paid: true })
   try {
-    const { chargedInr, result } = await runPaidGeneration(
+    const { chargedInr } = await runPaidGeneration(
       {
         tenantId: site.tenantId,
-        capInr: SHOWCASE_GENERATION_CAP_INR,
+        capInr: SHOWCASE_REDESIGN_PRICE_INR,
+        // As much AI as the free design gets; what it costs above the price is the platform's.
+        flat: { budgetInr: SHOWCASE_FREE_CAP_INR() },
         // Unique per run: a ref that already ran is refused.
         ref: `showcase:${site.id}:${Date.now().toString(36)}`,
-        label: `Showcase page for site-${site.slug}`.slice(0, 80),
+        label: `Showcase redesign for site-${site.slug}`.slice(0, 80),
         feature: 'showcase_generation',
       },
+      // Everything up to the saved page, so a run that fails before it is not charged.
       async () => {
         send('page', { key: current.key, label: current.label, sections: current.sections.length })
         await updateStudioSession(id, { progress: progressOf(current, 'building', `Designing ${current.label}`) })
-        if (hadPage) return regeneratePage(ctx, current, e => send('progress', slim(e)))
-        return { page: current, doc: await generatePage(ctx, current, e => send('progress', slim(e))) }
+        // Starter services, FAQs and mood pictures fill any list still empty, as on the free design.
+        const [made] = await Promise.all([
+          hadPage ? regeneratePage(ctx, current, e => send('progress', slim(e))) : generatePage(ctx, current, e => send('progress', slim(e))).then(doc => ({ page: current, doc })),
+          Promise.resolve()
+            .then(() => addStarterContent(site, ctx.brief))
+            .catch(err => console.warn('[showcase] starter content not added:', errText(err))),
+        ])
+        if (!made.doc.order.length) throw new Error('no section could be written')
+        await updateStudioSession(id, { plan: { ...ctx.plan, pages: ctx.plan.pages.map(p => (p.key === current.key ? made.page : p)) } })
+        await saveStudioPage(id, current.key, made.doc, progressOf(current, 'done', 'Your page is ready'))
       }
     )
-    if (!result.doc.order.length) throw new Error('no section could be written')
-    await updateStudioSession(id, { plan: { ...ctx.plan, pages: ctx.plan.pages.map(p => (p.key === current.key ? result.page : p)) } })
-    await saveStudioPage(id, current.key, result.doc, progressOf(current, 'done', 'Your page is ready'))
     send('page-done', { key: current.key, label: current.label, chargedInr })
     await recordShowcaseGeneration(site.id).catch(err => console.warn('[showcase] generation not counted:', errText(err)))
     return { session: await draftPage(site, await settlePaidBuild(id)), chargedInr }
   } catch (err) {
     if (err instanceof PaidGenerationError) {
-      send('error', { ...err.body(), topUpUrl: WALLET_URL })
+      send('error', { ...err.body(), priceInr: SHOWCASE_REDESIGN_PRICE_INR, topUpUrl: WALLET_URL })
       return { session: await settlePaidBuild(id, err.message), chargedInr: 0 }
     }
     console.error('[showcase] paid generation failed:', errText(err))
     const message =
       err instanceof StudioAiDownError
-        ? `${err.message} Your page is as it was.`
-        : 'The page could not be designed again right now. Your page is as it was; you were only charged for what the AI used.'
+        ? `${err.message} Your page is as it was, and you were not charged.`
+        : 'The page could not be designed again right now. Your page is as it was, and you were not charged.'
     send('page-failed', { key: current.key, label: current.label, error: message })
     if (err instanceof StudioAiDownError) send('error', { error: message, code: AI_UNAVAILABLE_CODE })
     return { session: await settlePaidBuild(id, message), chargedInr: 0 }

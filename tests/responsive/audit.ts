@@ -156,12 +156,26 @@ export function auditInPage(opts: AuditOptions): AuditResult {
   }
 
   // 3. Tap targets in Site Builder blocks. A link stretched over its card by an absolute ::after/::before counts the
-  // card's box.
+  // card's box; a positioned control whose pseudo reaches past it (negative insets, as .hit-44 does) counts both.
   const hitRect = (el: Element) => {
     for (const pseudo of ['::after', '::before']) {
       const ps = getComputedStyle(el, pseudo)
       if (ps.content === 'none' || ps.content === 'normal' || ps.position !== 'absolute') continue
-      if (!['top', 'right', 'bottom', 'left'].every(k => parseFloat(ps.getPropertyValue(k)) <= 0)) continue
+      const [t, r, b, l] = ['top', 'right', 'bottom', 'left'].map(k => parseFloat(ps.getPropertyValue(k)))
+      if (![t, r, b, l].every(v => v <= 0)) continue
+      if (getComputedStyle(el).position !== 'static') {
+        // The pseudo is placed against the padding box. Worked out from the border box, not the whole-pixel client*
+        // sizes, so a sub-pixel size (a dot mid-transition) stays exact; snapped to Chromium's 1/64px layout unit.
+        const box = el.getBoundingClientRect()
+        const cs = getComputedStyle(el)
+        const [bt, br, bb, bl] = ['top', 'right', 'bottom', 'left'].map(k => parseFloat(cs.getPropertyValue(`border-${k}-width`)) || 0)
+        const snap = (v: number) => Math.round(v * 64) / 64
+        const left = Math.min(box.left, box.left + bl + l)
+        const top = Math.min(box.top, box.top + bt + t)
+        const right = Math.max(box.right, box.right - br - r)
+        const bottom = Math.max(box.bottom, box.bottom - bb - b)
+        return new DOMRect(left, top, snap(right - left), snap(bottom - top))
+      }
       let cb: Element | null = el
       while (cb && cb !== document.body && getComputedStyle(cb).position === 'static') cb = cb.parentElement
       if (cb) return cb.getBoundingClientRect()

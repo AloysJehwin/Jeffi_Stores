@@ -30,6 +30,11 @@ export const TOOL_SCOPES: Record<string, string | 'owner'> = {
   list_inventory_low: 'inventory:read',
   propose_adjust_inventory: 'inventory:write',
 
+  // Product Controls: bulk changes through /api/admin/controls
+  find_products_for_bulk_update: 'controls:read',
+  propose_bulk_update_products: 'controls:write',
+  propose_rollback_bulk_update: 'controls:write',
+
   // Customers (tasks routes are gated on customers:*)
   search_customers: 'customers:read',
   get_recent_customers: 'customers:read',
@@ -154,6 +159,8 @@ export const ACTION_SCOPES: Record<string, string | 'owner'> = {
   adjust_inventory: 'inventory:write',
   create_brand: 'brands:write',
   create_category: 'categories:write',
+  bulk_update_products: 'controls:write',
+  rollback_bulk_update: 'controls:write',
   add_customer_note: 'customers:write',
   add_customer_tag: 'customers:write',
   remove_customer_tag: 'customers:write',
@@ -188,6 +195,7 @@ const AREA_LABELS: Record<string, string> = {
   inventory: 'Inventory',
   brands: 'Brands',
   categories: 'Categories',
+  controls: 'Product controls',
   coupons: 'Coupons',
   mailer: 'Email & campaigns',
   quotations: 'Quotations',

@@ -13,9 +13,10 @@ export default function CertsPage() {
       navTitle={CERT_PORTAL.navTitle}
       homeHref={CERT_PORTAL.successHref}
       navRight={<PortalSignOutButton endpoint={CERT_PORTAL.auth.logout} homeHref={CERT_PORTAL.homeHref} />}
+      contentWidth="max-w-6xl"
     >
       <h1 className="text-2xl font-bold text-foreground">Your certificates</h1>
-      <p className="mt-2 text-sm text-foreground-secondary">
+      <p className="mt-2 max-w-3xl text-sm text-foreground-secondary">
         Download your admin certificate, then install it in your browser or system keychain. Each certificate can be
         downloaded once - save it and its password somewhere safe.
       </p>

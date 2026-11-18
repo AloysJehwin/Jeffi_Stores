@@ -53,7 +53,7 @@ export default function ComputeClient({
   current,
   change,
   priceInrMonth,
-  paymentsEnabled,
+  paymentRequired,
   paused,
   plans,
   featureMatrix,
@@ -66,7 +66,8 @@ export default function ComputeClient({
   change: { desired: ComputeSpec; status: string; error: string | null; applyMode: ApplyMode } | null
   /** What the running servers cost on the current plan, per month (plan fee and GST included). */
   priceInrMonth: number | null
-  paymentsEnabled: boolean
+  /** Mandatory store: plan changes go through its subscription. Optional: they apply now, unbilled. */
+  paymentRequired: boolean
   paused: boolean
   plans: { slug: string; name: string }[]
   featureMatrix: Record<string, string[]>
@@ -205,7 +206,7 @@ export default function ComputeClient({
                   />
                 )}
                 <p className="text-xs text-foreground-muted">
-                  {paymentsEnabled ? 'Plan changes are billed on your subscription (upgrade now, downgrade at renewal).' : 'Plan changes apply now.'} Server changes {what?.classChange ? (applyMode === 'now' ? 'apply right away.' : 'apply in the maintenance window.') : 'apply right away.'}
+                  {paymentRequired ? 'Plan changes are billed on your subscription (upgrade now, downgrade at renewal).' : 'Plan changes apply now.'} Server changes {what?.classChange ? (applyMode === 'now' ? 'apply right away.' : 'apply in the maintenance window.') : 'apply right away.'}
                 </p>
               </div>
             )}

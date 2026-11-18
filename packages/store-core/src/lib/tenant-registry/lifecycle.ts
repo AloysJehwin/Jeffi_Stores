@@ -56,6 +56,12 @@ export async function setUpiMode(tenantId: string, mode: UpiMode): Promise<void>
   await pool.query(`UPDATE tenants SET upi_mode=$1, updated_at=now() WHERE id=$2`, [mode, tenantId])
 }
 
+/** The platform admin's payment choice at approval: Mandatory (true) or Optional (false). */
+export async function setPaymentRequired(tenantId: string, required: boolean): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`UPDATE tenants SET payment_required=$1, updated_at=now() WHERE id=$2`, [required, tenantId])
+}
+
 /**
  * Flip whether a tenant ships on their own Delhivery token. Enabling requires a connected Delhivery
  * token — enforced by the caller (delivery-mode route), not here.

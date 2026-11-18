@@ -12,7 +12,11 @@ export default {
     await page.waitForSelector('tbody tr', { timeout: 30000 })
     await page.waitForTimeout(1500)
     await page.mouse.move(900, 700)
-    for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 85); await page.waitForTimeout(60) }
+    // Table head to the top, however tall the totals above it get.
+    await page.evaluate(() => document.querySelector('table')?.scrollIntoView({ block: 'start' }))
+    await page.waitForTimeout(600)
+    const top = await page.evaluate(() => document.querySelector('table')?.getBoundingClientRect().top ?? 999)
+    if (top > 200) throw new Error(`orders table still at ${Math.round(top)}px: the revenue totals would be in shot`)
     await page.waitForTimeout(1200)
   },
   async run(page, h) {

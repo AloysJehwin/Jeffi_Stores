@@ -1,5 +1,4 @@
-import { SHOWCASE_GENERATION_CAP_INR } from '@/lib/showcase/types'
-import { estimateGeneration } from '@/lib/ai/paid-generation'
+import { SHOWCASE_REDESIGN_PRICE_INR } from '@/lib/showcase/types'
 import type { StudioProduct, StudioSession } from './sessions'
 
 // What the platform pays for in the studio (AI_SITE_STUDIO_PLAN.md §1): one free full-site generation per owner, up
@@ -15,8 +14,8 @@ export const BUDGET_INR = { small: 25, page: 60 } as const
 /** The free generation's cap (the same setting lib/site/studio reads). */
 export const FREE_CAP_INR = () => Number(process.env.SITE_STUDIO_BUDGET_INR || process.env.SITE_BUILD_BUDGET_INR || 1000)
 
-/** A Showcase's free generation is one page: ₹100 of provider cost (SHOWCASE_STUDIO_BUDGET_INR). */
-export const SHOWCASE_FREE_CAP_INR = () => Number(process.env.SHOWCASE_STUDIO_BUDGET_INR || 100)
+/** A Showcase's free generation is one page: ₹150 of provider cost (SHOWCASE_STUDIO_BUDGET_INR), enough for a full page on Opus. */
+export const SHOWCASE_FREE_CAP_INR = () => Number(process.env.SHOWCASE_STUDIO_BUDGET_INR || 150)
 export const freeCapInr = (product?: StudioProduct | null) => (product === 'showcase' ? SHOWCASE_FREE_CAP_INR() : FREE_CAP_INR())
 
 export const AFTER_LIVE = 'Your first full generation was free. Another is available from Site Builder after your store is live, charged to your AI wallet.'
@@ -26,8 +25,8 @@ export interface StudioAllowance {
   free: 'available' | 'resume' | 'used'
   tweaksLeft: number
   tweaksPerDay: number
-  /** A Showcase whose free generation is used: another one is charged to the wallet, usually ₹low–₹high, never over the cap. */
-  paid?: { lowInr: number; highInr: number; capInr: number }
+  /** A Showcase whose free generation is used: each redesign costs this, flat, from the workspace's wallet. */
+  paid?: { priceInr: number }
 }
 
 const today = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10)
@@ -41,6 +40,6 @@ export function allowanceOf(
     free,
     tweaksLeft: Math.max(0, TWEAKS_PER_DAY - used),
     tweaksPerDay: TWEAKS_PER_DAY,
-    ...(s?.product === 'showcase' && free === 'used' ? { paid: estimateGeneration('one_page', { capInr: SHOWCASE_GENERATION_CAP_INR }) } : {}),
+    ...(s?.product === 'showcase' && free === 'used' ? { paid: { priceInr: SHOWCASE_REDESIGN_PRICE_INR } } : {}),
   }
 }

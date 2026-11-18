@@ -214,7 +214,7 @@ export const DeliveryInfo = ({
             key={i}
             type="button"
             onClick={() => setActivePolicy(item)}
-            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden text-left w-full"
+            className="flex flex-col sm:flex-row items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden text-left w-full"
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
               {item.icon}
@@ -369,7 +369,7 @@ export const PincodeChecker = ({
       <button
         onClick={checkPincode}
         disabled={pincodeChecking}
-        className="shrink-0 min-h-[44px] sm:min-h-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
+        className="shrink-0 min-h-[44px] xl:min-h-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
       >
         {pincodeChecking ? 'Checking…' : 'Check'}
       </button>
@@ -444,7 +444,7 @@ export function PdpWishlistButton({ page }: { page: ProductPageState }) {
       onClick={page.handleWishlist}
       disabled={page.wishlistLoading}
       aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-      className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
+      className="w-11 h-11 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
     >
       <svg
         className={`w-5 h-5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
@@ -469,7 +469,7 @@ export function PdpShareButton({ page }: { page: ProductPageState }) {
     <button
       onClick={page.handleShare}
       aria-label="Share product"
-      className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
+      className="w-11 h-11 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
     >
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path

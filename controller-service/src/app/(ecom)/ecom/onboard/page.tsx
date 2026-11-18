@@ -16,11 +16,9 @@ import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { addonPrices, getRequestedAddons } from '@/lib/billing/requested-addons'
 import { ADDON_INFO, type AddonId } from '@/lib/billing/addons'
+import { paymentRequired } from '@/lib/billing/payment-required'
 
 export const dynamic = 'force-dynamic'
-
-// Payments off (default): approval starts the build, so the last step is setup, not checkout.
-const paymentsEnabled = () => process.env.ECOM_PAYMENTS_ENABLED === 'true'
 
 /** A plan + interval carried from the pricing page, kept only when it names an active store plan. */
 function pickedPlan(
@@ -38,11 +36,14 @@ function StatusLayout({
   owner,
   tenant,
   currentStep,
+  payment = true,
   children,
 }: {
   owner: { email: string; name: string | null }
   tenant: { slug: string; display_name: string }
   currentStep: number
+  /** The last step: checkout (Mandatory, and assumed before approval) or the build (Optional). */
+  payment?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -50,7 +51,7 @@ function StatusLayout({
       owner={owner}
       heading={tenant.display_name}
       subheading={`${tenant.slug}.jeffistores.in`}
-      steps={statusSteps(paymentsEnabled())}
+      steps={statusSteps(payment)}
       current={currentStep}
     >
       <div className="w-full">{children}</div>
@@ -113,11 +114,11 @@ export default async function OnboardPage({
     // Approved but the Razorpay subscription/checkout link isn't ready yet.
     if (t.status === 'awaiting_payment') {
       return (
-        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP}>
+        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP} payment={paymentRequired(t)}>
           <PageHeader eyebrow="Store application" title="Approved" actions={<Badge tone="sage">Approved</Badge>} />
           <Card>
             <p className="text-sm text-foreground-secondary">
-              {paymentsEnabled()
+              {paymentRequired(t)
                 ? 'Payment link is being generated — please refresh in a moment.'
                 : 'Approved — your store setup is starting. Please refresh in a moment.'}
             </p>
@@ -129,16 +130,16 @@ export default async function OnboardPage({
       )
     }
 
-    // Paid → the engine is actively building infra. Show a setting-up state (no payment link).
+    // Paid (Mandatory) or approved (Optional) → the engine is building infra. Show a setting-up state (no payment link).
     if (t.status === 'provisioning') {
       return (
-        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP}>
+        <StatusLayout owner={who} tenant={t} currentStep={FINAL_STEP} payment={paymentRequired(t)}>
           <PageHeader eyebrow="Store application" title="Setting up your store" actions={<Badge tone="peach">Setting up</Badge>} />
           <Card>
             <div className="flex items-start gap-3 text-sm text-foreground-secondary">
               <span className="mt-0.5 w-4 h-4 shrink-0 border-2 border-[var(--console-terracotta)] border-t-transparent rounded-full animate-spin" />
               <p className="min-w-0 break-words">
-                {paymentsEnabled() ? 'Payment confirmed' : 'Approved'} — we&apos;re setting up{' '}
+                {paymentRequired(t) ? 'Payment confirmed' : 'Approved'} — we&apos;re setting up{' '}
                 <span className="font-semibold text-foreground">{t.slug}.jeffistores.in</span>. This takes a few minutes;
                 you&apos;ll be emailed when it&apos;s live.
               </p>
@@ -215,9 +216,7 @@ export default async function OnboardPage({
           <Card title="What happens next">
             <p className="text-sm text-foreground-secondary break-words">
               We&apos;re verifying your licences and certificates for <span className="font-semibold text-foreground">{t.display_name}</span>.{' '}
-              {paymentsEnabled()
-                ? "Once approved, you'll complete payment and your store goes live."
-                : 'Once approved, we set up your store right away. Billing starts later.'}
+              Once approved, you&apos;ll complete payment and your store goes live.
             </p>
           </Card>
         </div>
@@ -276,7 +275,6 @@ export default async function OnboardPage({
       plans={plans}
       addons={addons}
       computeEnabled={computeSpecEnabled()}
-      paymentsEnabled={paymentsEnabled()}
       initialDraft={initialDraft}
       reusingPreviousDetails={submitted}
       ownerName={owner.name}
@@ -333,7 +331,6 @@ async function UpgradeWizard({
       plans={plans}
       addons={addons}
       computeEnabled={computeSpecEnabled()}
-      paymentsEnabled={paymentsEnabled()}
       // A reopened application starts over at Plan, whatever step its draft was submitted from.
       initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data: reopened ? { ...data, stepId: undefined } : data }}
       ownerName={ownerName}

@@ -34,6 +34,17 @@ const inKeyframes = (node: { parent?: Container | { parent?: unknown } | undefin
   return false
 }
 
+// group and peer style nothing themselves: other classes' selectors read them.
+const MARKER = /^(group|peer)(\/[\w-]+)?$/
+
+/** The classes of a section that its compiled CSS has no rule for: not Tailwind classes this theme has, so inert. */
+export function deadClasses(classes: string[], css: string): string[] {
+  const seen = new Set<string>()
+  for (const m of css.matchAll(/\.((?:\\[0-9a-fA-F]{1,6} ?|\\.|[\w-])+)/g))
+    seen.add(m[1].replace(/\\([0-9a-fA-F]{1,6}) ?|\\(.)/g, (_, hex: string | undefined, ch: string | undefined) => (hex ? String.fromCodePoint(parseInt(hex, 16)) : (ch ?? ''))))
+  return classes.filter(c => safeClass(c) && !MARKER.test(c) && !seen.has(c))
+}
+
 export async function compileSectionCss(classes: string[], scope: string): Promise<string> {
   const list = [...new Set(classes)].filter(safeClass)
   if (!list.length) return ''

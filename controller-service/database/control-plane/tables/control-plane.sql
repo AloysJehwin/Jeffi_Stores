@@ -971,6 +971,13 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS messaging_addon_renew boolea
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS requested_addons text[] NOT NULL DEFAULT '{}'::text[];
 
 --
+-- The platform administrator's choice at KYC approval (lib/billing/payment-required.ts). Mandatory (true):
+-- approval creates the Razorpay subscription and its first charge starts the build. Optional (false):
+-- approval starts the build with no checkout.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS payment_required boolean NOT NULL DEFAULT true;
+
+--
 -- tenant_messaging_senders: the sender Jeffi assigned a tenant for a channel and audience — a DLT-registered
 -- SMS header or a WhatsApp number — plus the provider credentials that send through it
 -- (lib/messaging/tenant-senders.ts). config_enc is AES-256-GCM of the JSON credential blob

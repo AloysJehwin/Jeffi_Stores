@@ -20,9 +20,9 @@ import { indexPage } from './context'
 /** Entries an index list draws at most (a store's every brand, not a slice of them). */
 const MAX_INDEX = 120
 
-type Layout = 'grid' | 'carousel' | 'list'
+type Layout = 'grid' | 'carousel' | 'list' | 'mosaic'
 const own = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined)
-const layoutOf = (v: unknown): Layout => (v === 'carousel' || v === 'list' ? v : 'grid')
+const layoutOf = (v: unknown): Layout => (v === 'carousel' || v === 'list' || v === 'mosaic' ? v : 'grid')
 const plural = (n: number) => `${n} ${n === 1 ? 'product' : 'products'}`
 const wrap = (className: string | undefined, body: ReactNode) => (className ? <div className={className}>{body}</div> : body)
 
@@ -269,7 +269,7 @@ export async function renderSubCategories(ctx: RenderCtx, props: Record<string, 
       label="Subcategories"
       fallbackGrid={tiles ? 'grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6' : 'flex flex-wrap gap-2'}
     >
-      {list.map((s, i) => (ctx.renderItem ? ctx.renderItem(s, i) : tiles ? <CategoryTile key={s.id} c={s} priority={false} /> : <SubCategoryChip key={s.id} s={s} />))}
+      {list.map((s, i) => (ctx.renderItem ? ctx.renderItem(s, i) : tiles ? <CategoryTile key={s.id} c={s} priority={false} fill={props.layout === 'mosaic'} /> : <SubCategoryChip key={s.id} s={s} />))}
     </ItemsLayout>
   )
 }

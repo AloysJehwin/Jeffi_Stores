@@ -73,9 +73,8 @@ export async function POST(request: NextRequest) {
       // engine — this is the ONLY place real provisioning starts. Do NOT set 'active' here;
       // only the engine's activate step does that, after infra exists + the host verifies.
       // A services workspace whose store application is approved is not live as a store yet either.
-      // NOTE: while payments are off (ECOM_PAYMENTS_ENABLED unset), KYC-approve starts provisioning
-      // directly, so no subscription is created and this charged path does not fire — it stays here
-      // so re-enabling payments restores the first-charge-starts-store flow unchanged.
+      // NOTE: only a Mandatory store (tenants.payment_required) gets here first; an Optional one starts
+      // its build at KYC approval with no subscription, so this path never fires for it.
       if (tenant.store_request === 'awaiting_payment' || (!tenant.store_request && tenant.status !== 'active' && tenant.status !== 'provisioning')) {
         // First charge: the subscription covers the plan fee and the servers, so the store starts now.
         await setSubscriptionStatus(tenant.id, 'active')

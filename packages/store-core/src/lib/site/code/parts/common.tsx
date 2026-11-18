@@ -1,9 +1,9 @@
 import type { ReactElement, ReactNode } from 'react'
 import { z } from 'zod'
 import { defineCodeComponent, type RenderCtx } from '../registry'
-import { MAX_EACH } from '../allow'
+import { MAX_EACH, safeSrc } from '../allow'
 import { ProductQuery } from '../../composed'
-import type { ProductView, SiteData } from '../../data/types'
+import type { CategoryView, OfferView, ProductView, SiteData } from '../../data/types'
 import { siteCard } from '../../card'
 import { ASPECTS, BrandTile, CategoryTile, CodeIcon, CodeImage, CodeLink, ItemsLayout, OfferCard, ReviewCard } from '@/components/visitor/site/code/common/tiles'
 import { ProductItem } from '@/components/visitor/site/code/common/SiteCard'
@@ -20,9 +20,12 @@ import Countdown from '@/components/visitor/site/code/islands/Countdown'
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined)
 const slug = z.string().trim().min(1).max(120).regex(/^[a-z0-9][a-z0-9-]*$/i)
-const layoutProps = {
-  layout: z.enum(['grid', 'carousel', 'list']).default('grid').describe('grid uses className as the grid; carousel swipes'),
-  itemClassName: z.string().max(200).optional().describe('carousel item widths, e.g. "w-[70%] md:w-[30%]"'),
+export const layoutProps = {
+  layout: z
+    .enum(['grid', 'carousel', 'list', 'mosaic'])
+    .default('grid')
+    .describe('grid uses className as the grid; mosaic is a picture mosaic (the first item large) that fits any number of items, className adding only gap or auto-rows-[…]; carousel swipes'),
+  itemClassName: z.string().max(200).optional().describe('classes on each item: grid spans ("lg:col-span-2"), carousel widths ("w-[70%] md:w-[30%]")'),
 }
 
 export const PRODUCT_FIELDS: Record<string, string> = {
@@ -110,7 +113,7 @@ defineCodeComponent({
     if (!list.length) return null
     return (
       <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName} label="Categories" fallbackGrid="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {items(list, ctx, (c, i) => <CategoryTile key={c.id ?? i} c={c} priority={i === 0 && ctx.claimPriority()} />)}
+        {items(list, ctx, (c, i) => <CategoryTile key={c.id ?? i} c={c} priority={i === 0 && ctx.claimPriority()} fill={p.layout === 'mosaic'} />)}
       </ItemsLayout>
     )
   },
@@ -182,9 +185,65 @@ defineCodeComponent({
     if (!list.length) return null
     return (
       <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName} label="Offers" fallbackGrid="grid gap-4 md:grid-cols-3">
-        {items(list, ctx, (o, i) => <OfferCard key={o.id ?? i} o={o} priority={i === 0 && ctx.claimPriority()} />)}
+        {items(list, ctx, (o, i) => <OfferCard key={o.id ?? i} o={o} priority={i === 0 && ctx.claimPriority()} fill={p.layout === 'mosaic'} />)}
       </ItemsLayout>
     )
+  },
+})
+
+/** What an opening picture shows: kind says where it came from ('none': the store has no picture yet). */
+export interface HeroView {
+  kind: 'offer' | 'product' | 'category' | 'none'
+  image: string | null
+  mobileImage: string | null
+  title: string
+  subtitle: string | null
+  badge: string | null
+  url: string
+  cta: string | null
+}
+
+/** The store's best picture for its opening: a live offer's, else a featured (or the newest) product's, else a category's. */
+export async function heroPicture(data: SiteData): Promise<HeroView> {
+  const offer = (await data.offers({ limit: 8 }).catch(() => [] as OfferView[])).find(o => safeSrc(o.image) || safeSrc(o.mobileImage))
+  if (offer)
+    return { kind: 'offer', image: offer.image ?? offer.mobileImage, mobileImage: offer.mobileImage ?? offer.image, title: offer.title, subtitle: offer.subtitle, badge: offer.badge, url: offer.url, cta: offer.cta }
+  const photo = async (q: Parameters<SiteData['products']>[0]) => (await data.products(q).catch(() => [] as ProductView[])).find(p => safeSrc(p.image))
+  const product = (await photo({ featured: true, sort: 'featured', limit: 12 })) ?? (await photo({ sort: 'new', limit: 24 }))
+  if (product) return { kind: 'product', image: product.image, mobileImage: product.image, title: product.name, subtitle: product.brand ?? product.category, badge: product.badge, url: product.url, cta: null }
+  const category = (await data.categories({ parent: null, limit: 12 }).catch(() => [] as CategoryView[])).find(c => safeSrc(c.image))
+  if (category) return { kind: 'category', image: category.image, mobileImage: category.image, title: category.name, subtitle: null, badge: null, url: category.url, cta: null }
+  const store = await data.store().catch(() => null)
+  return { kind: 'none', image: null, mobileImage: null, title: store?.name || 'Shop', subtitle: null, badge: null, url: '/products', cta: null }
+}
+
+const HeroPictureProps = z.object({
+  aspect: z.enum(ASPECTS).default('4:5').describe('the picture shape without a render function'),
+  fit: z.enum(['cover', 'contain']).default('cover'),
+  sizes: z.string().max(200).regex(/^[\w\s(),.:%-]*$/).optional().describe('e.g. "(min-width: 1024px) 50vw, 100vw"'),
+  priority: z.boolean().default(false).describe('load it eagerly even outside the first section'),
+})
+defineCodeComponent({
+  name: 'HeroPicture',
+  pages: 'any',
+  props: HeroPictureProps,
+  binding: {
+    kind: '"offer" (a campaign picture made for a full-bleed banner), "product", "category", or "none" (no picture yet: <Image src={h.image}> draws a designed fill)',
+    image: 'picture URL, or null when the store has none yet',
+    mobileImage: 'picture for phones, or null',
+    title: "what it shows: the offer's title, the product's or category's name, else the store's name",
+    subtitle: 'subtitle or null',
+    badge: 'badge text or null',
+    url: 'where it leads: the offer, product or category (all products when none)',
+    cta: "the offer's button label, or null",
+  },
+  describe:
+    "The opening (hero) picture, always there: the first live offer's picture, else a featured (or the newest) product's photo, else a category's, else a designed fill in the theme's colours. Without a render function, the picture itself (aspect, fit). {h => …} to lay it out yourself; h.kind === 'offer' is a campaign picture made for a full-bleed banner.",
+  async render(props, ctx) {
+    const p = props as z.infer<typeof HeroPictureProps>
+    const h = await heroPicture(ctx.data)
+    if (ctx.renderItem) return ctx.renderItem(h, 0)
+    return <CodeImage src={h.image} alt={h.title} aspect={p.aspect} fit={p.fit} sizes={p.sizes ?? '(min-width: 1024px) 50vw, 100vw'} priority={p.priority || ctx.claimPriority()} className={str(props.className)} />
   },
 })
 
@@ -232,7 +291,7 @@ defineCodeComponent({
   describe: 'A responsive, optimised image in a fixed shape (aspect), so nothing shifts while it loads.',
   render(props, ctx) {
     const p = props as z.infer<typeof ImageProps>
-    return <CodeImage src={p.src} hoverSrc={p.hoverSrc} alt={p.alt} aspect={p.aspect} fit={p.fit} sizes={p.sizes} priority={p.priority || ctx.claimPriority()} quiet={!ctx.data.sample} className={str(props.className)} />
+    return <CodeImage src={p.src} hoverSrc={p.hoverSrc} alt={p.alt} aspect={p.aspect} fit={p.fit} sizes={p.sizes} priority={p.priority || ctx.claimPriority()} className={str(props.className)} />
   },
 })
 

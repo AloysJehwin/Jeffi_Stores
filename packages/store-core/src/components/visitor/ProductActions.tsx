@@ -699,7 +699,7 @@ export type ProductPurchase = ReturnType<typeof useProductPurchase>
 export type VariantPickerStyle = 'buttons' | 'swatches' | 'dropdown'
 
 const OPTION_CLS = (selected: boolean, inStock: boolean) =>
-  `px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+  `min-h-11 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
     selected
       ? 'bg-accent-500 text-white border-accent-500'
       : inStock
@@ -831,7 +831,7 @@ export function PurchaseOptions({ s, style = 'buttons' }: { s: ProductPurchase; 
                 key={pt}
                 type="button"
                 onClick={() => s.setSelectedMode(pt)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                className={`min-h-11 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
                   selectedMode === pt
                     ? 'bg-primary-600 text-white border-primary-600'
                     : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'

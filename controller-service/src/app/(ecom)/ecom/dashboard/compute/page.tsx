@@ -4,6 +4,7 @@ import { legacySpecFor } from '@/lib/compute/legacy'
 import { getTenantCompute } from '@controller/lib/compute/store'
 import { priceInrMonthForPlan } from '@controller/lib/compute/pricing-month'
 import { planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
+import { paymentRequired } from '@/lib/billing/payment-required'
 import { getTenantS3UsageBytes } from '@jeffi/tenancy'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
@@ -53,7 +54,7 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
             : null
         }
         priceInrMonth={priceInrMonth}
-        paymentsEnabled={process.env.ECOM_PAYMENTS_ENABLED === 'true'}
+        paymentRequired={paymentRequired(tenant)}
         paused={row?.status === 'paused'}
         plans={plans.map(p => ({ slug: p.slug, name: p.name }))}
         featureMatrix={featureMatrix}

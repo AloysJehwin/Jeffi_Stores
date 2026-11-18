@@ -493,7 +493,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 return (
                   <button
                     onClick={() => openEdit(ownReview)}
-                    className="inline-flex items-center gap-2 bg-surface-elevated hover:bg-surface-secondary border border-border-secondary text-foreground px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    className="inline-flex min-h-11 items-center gap-2 bg-surface-elevated hover:bg-surface-secondary border border-border-secondary text-foreground px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path
@@ -517,7 +517,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                     }
                     setShowForm(true)
                   }}
-                  className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                  className="inline-flex min-h-11 items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path

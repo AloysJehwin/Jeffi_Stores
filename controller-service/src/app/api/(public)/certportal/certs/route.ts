@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
+import { ROOT_DOMAIN } from '@/lib/tenant-registry/shared'
 import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
 import { certNeedsMobileCheck, inCertStore } from '@controller/lib/auth/cert-mobile'
 import { maskMobile } from '@/lib/auth/admin-mobile'
@@ -34,6 +35,22 @@ export async function GET(request: NextRequest) {
       mobiles.set(key, m ?? { needsMobile: true, mobileHint: null })
     }
 
+  // The admin panel each certificate opens: a store's own admin.<domain> once its bought domain is live, else
+  // admin-<slug>.<root>; the platform's certificates open admin.<root>.
+  const tenantIds = [...new Set((rows as any[]).map(r => r.tenant_id).filter(Boolean))]
+  const hosts = new Map<string, string>()
+  if (tenantIds.length) {
+    const { rows: tenants } = await controlPlanePool().query(
+      `SELECT t.id::text, t.slug,
+              (SELECT cd.domain FROM tenant_custom_domains cd
+                WHERE cd.tenant_id = t.id AND cd.domain LIKE 'admin.%' AND cd.status = 'verified'
+                ORDER BY cd.created_at LIMIT 1) AS admin_domain
+         FROM tenants t WHERE t.id = ANY($1::uuid[])`,
+      [tenantIds]
+    )
+    for (const t of tenants) hosts.set(t.id, t.admin_domain || `admin-${t.slug}.${ROOT_DOMAIN}`)
+  }
+
   const now = Date.now()
   const certs = rows.map((r: any) => {
     const expired = new Date(r.expires_at).getTime() <= now
@@ -43,6 +60,7 @@ export async function GET(request: NextRequest) {
       commonName: r.common_name,
       role: r.role,
       storeName: r.store_name,
+      adminHost: r.tenant_id ? hosts.get(r.tenant_id) ?? null : platformAdminHost(),
       expiresAt: r.expires_at,
       downloadedAt: r.downloaded_at,
       status,
@@ -52,4 +70,11 @@ export async function GET(request: NextRequest) {
   })
 
   return NextResponse.json({ email: session.email, name: session.name, certs })
+}
+
+function platformAdminHost(): string {
+  try {
+    if (process.env.ADMIN_BASE_URL) return new URL(process.env.ADMIN_BASE_URL).host
+  } catch {}
+  return `admin.${ROOT_DOMAIN}`
 }

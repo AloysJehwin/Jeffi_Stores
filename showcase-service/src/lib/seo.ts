@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { businessView, workViews } from '@/lib/showcase/views'
+import { businessView, pictureViews } from '@/lib/showcase/views'
 import type { ShowcaseSiteRow } from '@/lib/showcase/store'
 
 // Title, description and share cards from the business, and its LocalBusiness record for search engines.
@@ -12,7 +12,8 @@ export function siteMetadata(site: ShowcaseSiteRow, origin: string): Metadata {
   const title = lead ? `${b.name} – ${lead}` : b.name
   const where = b.location ? ` in ${b.location}` : ''
   const description = clip(b.about || [b.tagline, b.profession && `${b.profession}${where}`].filter(Boolean).join('. ') || `${b.name}${where}.`, 160)
-  const image = b.logo || workViews(site.content)[0]?.image || null
+  // The logo, else the page's first picture: a work photo, else one made for the page.
+  const image = b.logo || pictureViews(site.content)[0]?.image || null
   const abs = (u: string) => (u.startsWith('/') ? `${origin}${u}` : u)
   return {
     metadataBase: new URL(origin),

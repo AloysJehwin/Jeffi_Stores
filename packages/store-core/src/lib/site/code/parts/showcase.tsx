@@ -3,9 +3,10 @@ import { z } from 'zod'
 import { defineCodeComponent, type RenderCtx } from '../registry'
 import { MAX_EACH } from '../allow'
 import type { SiteData } from '../../data/types'
-import type { ShowcaseView } from '@/lib/showcase/types'
-import { businessView, faqViews, serviceViews, statViews, testimonialViews, workViews } from '@/lib/showcase/views'
-import { ASPECTS, ItemsLayout } from '@/components/visitor/site/code/common/tiles'
+import { emptyShowcaseContent, type ShowcaseView } from '@/lib/showcase/types'
+import { businessView, faqViews, pictureView, serviceViews, statViews, testimonialViews, workViews } from '@/lib/showcase/views'
+import { ASPECTS, CodeImage, ItemsLayout } from '@/components/visitor/site/code/common/tiles'
+import { layoutProps } from './common'
 import { FaqList, ServiceCard, StatTile, TestimonialCard, WorkTile } from '@/components/visitor/site/code/parts/showcase/tiles'
 import LeadFormPart, { type LeadField } from '@/components/visitor/site/code/parts/showcase/LeadFormPart'
 
@@ -16,10 +17,6 @@ import LeadFormPart, { type LeadField } from '@/components/visitor/site/code/par
 
 const PAGES: ['showcase'] = ['showcase']
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined)
-const layoutProps = {
-  layout: z.enum(['grid', 'carousel', 'list']).default('grid').describe('grid uses className as the grid; carousel swipes'),
-  itemClassName: z.string().max(200).optional().describe('carousel item widths, e.g. "w-[80%] md:w-[32%]"'),
-}
 const view = async (data: SiteData): Promise<ShowcaseView | null> => (data.showcase ? data.showcase().catch(() => null) : null)
 const items = <T,>(list: T[], ctx: RenderCtx, tile: (item: T, i: number) => ReactNode) => list.slice(0, MAX_EACH).map((it, i) => (ctx.renderItem ? ctx.renderItem(it, i) : tile(it, i)))
 
@@ -50,12 +47,41 @@ defineCodeComponent({
     mapUrl: 'map link for the address, or empty',
     socials: 'array of { network, href, label } (may be empty)',
     year: 'the current year',
+    facts: 'only the details the business gave, as rows: array of { key ("hours", "address", "phone", "whatsapp" or "email"), label, value, href (a link, empty for hours), icon (an Icon name) }; {b.facts.map(f => …)} draws hours, address and contact rows with no row for a missing one',
   },
-  describe: "The business's details, once: <Business>{b => <a href={b.whatsappUrl}>Chat on WhatsApp</a>}</Business>. Name, logo, contact details, hours, address and socials come only from here; guard optional fields with b.phone && ….",
+  describe:
+    "The business's details, once: <Business>{b => <a href={b.whatsappUrl}>Chat on WhatsApp</a>}</Business>. Name, logo, contact details, hours, address and socials come only from here. A detail the business did not give has no row at all: guard each one (b.hours && …) or draw the rows from b.facts; never a stand-in such as \"Call for today's hours\" or \"In your neighbourhood\".",
   async render(_props, ctx) {
     if (!ctx.renderItem) return null
     const v = await view(ctx.data)
     return v ? ctx.renderItem(businessView(v.business), 0) : null
+  },
+})
+
+const PictureProps = z.object({
+  index: z.number().int().min(0).max(5).default(0).describe('which picture: 0 in the opening, 1, 2… in later sections so they differ'),
+  aspect: z.enum(ASPECTS).default('4:5').describe('the picture shape without a render function'),
+  fit: z.enum(['cover', 'contain']).default('cover'),
+  sizes: z.string().max(200).regex(/^[\w\s(),.:%-]*$/).optional().describe('e.g. "(min-width: 1024px) 50vw, 100vw"'),
+  priority: z.boolean().default(false).describe('load it eagerly even outside the first section'),
+})
+defineCodeComponent({
+  name: 'BusinessPicture',
+  pages: PAGES,
+  props: PictureProps,
+  binding: {
+    kind: '"work" (the owner\'s own photo of their work), "mood" (a picture made for this page: never call it their work, a project or a client\'s) or "none" (no picture yet: <Image src={p.image}> draws a designed fill)',
+    image: 'picture URL, or null when there is none yet',
+    alt: 'what it shows (may be empty)',
+  },
+  describe:
+    "A picture for the page that is always there: the owner's photo of their work, else a picture made for this page, else a designed fill in the theme's colours. The opening section always has one. Without a render function, the picture itself (aspect, fit); {p => …} to lay it out yourself.",
+  async render(props, ctx) {
+    const p = props as z.infer<typeof PictureProps>
+    const v = await view(ctx.data)
+    const pic = pictureView(v?.business ?? { name: '' }, v?.content ?? emptyShowcaseContent(), p.index)
+    if (ctx.renderItem) return ctx.renderItem(pic, 0)
+    return <CodeImage src={pic.image} alt={pic.alt} aspect={p.aspect} fit={p.fit} sizes={p.sizes ?? '(min-width: 1024px) 50vw, 100vw'} priority={p.priority || ctx.claimPriority()} className={str(props.className)} />
   },
 })
 
@@ -89,7 +115,7 @@ defineCodeComponent({
   pages: PAGES,
   props: WorkProps,
   binding: { title: 'title (may be empty)', description: 'short description (may be empty)', image: 'picture URL (always set)', link: 'https link to the project, or empty', number: '"01", "02"…' },
-  describe: 'Work samples (a portfolio gallery). Without a render function each shows as a picture tile with its caption.',
+  describe: "Work samples: only the owner's own uploads (a portfolio gallery), so a section built on it hides, with the links to it, until they add some; never fill a gallery with <BusinessPicture>. Without a render function each shows as a picture tile with its caption.",
   count: async (props, data) => {
     const v = await view(data)
     return v ? Math.min(workViews(v.content).length, (props as z.infer<typeof WorkProps>).limit) : 0
@@ -113,7 +139,7 @@ defineCodeComponent({
   pages: PAGES,
   props: TestimonialsProps,
   binding: { name: "client's name", quote: 'what they said', rating: '1–5 or null', stars: 'the rating as "★★★★★", or empty', source: 'where it was said, e.g. "Google" (may be empty)', avatar: 'photo URL or null', initial: "the name's first letter" },
-  describe: "What clients say about the business. Without a render function each shows as a quote card.",
+  describe: "What clients say about the business: only the reviews the owner added, so a section built on it hides until there are some; never write a quote, a name or a rating yourself. Without a render function each shows as a quote card.",
   count: async (props, data) => {
     const p = props as z.infer<typeof TestimonialsProps>
     const v = await view(data)

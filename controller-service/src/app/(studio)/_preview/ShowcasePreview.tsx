@@ -1,6 +1,6 @@
 import { cssVarsRule, googleFontsHref, normalizeTheme, themeCssVars, topBlocks } from '@jeffi/site-blocks'
 import type { CompiledSection } from '@/lib/site/code/compile'
-import CodeSection from '@/components/visitor/site/code/CodeSection'
+import CodeSection, { planSections } from '@/components/visitor/site/code/CodeSection'
 import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
 import { getShowcaseByOwner } from '@/lib/showcase/store'
@@ -28,12 +28,14 @@ export default async function ShowcasePreview({ session }: { session: StudioSess
 html{scroll-behavior:smooth}`
 
   const blocks = doc ? topBlocks(doc).filter(b => b.type === 'code_section' && b.props.compiled && !b.visibility?.hidden) : []
+  // As the live page draws them (showcase-service): header and opening always, links only to sections that draw.
+  const plan = await planSections(blocks.map(b => b.props.compiled as CompiledSection), data)
   const body = await runWithSiteData(data, async () =>
     blocks.length ? (
       <main>
         {blocks.map((b, i) => (
           <div key={b.id} data-studio-block={b.id} data-studio-page={SHOWCASE_PAGE_KEY} data-studio-label={String(b.props.label ?? 'Section')} className="studio-block">
-            <CodeSection section={b.props.compiled as CompiledSection} id={b.id} page="showcase" data={data} priority={i === 0} always={i === 0} />
+            <CodeSection section={b.props.compiled as CompiledSection} id={b.id} page="showcase" data={data} priority={i === 0} always={plan.always[i]} anchors={plan.anchors} />
           </div>
         ))}
       </main>

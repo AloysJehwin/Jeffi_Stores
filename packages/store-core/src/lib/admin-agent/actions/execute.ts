@@ -27,6 +27,7 @@ import {
   createBrand,
   createCategory,
 } from './catalog'
+import { bulkUpdateProducts, rollbackBulkUpdate } from './controls'
 import {
   addCustomerNote,
   addCustomerTag,
@@ -63,6 +64,8 @@ const HANDLERS: Record<string, ActionHandler> = {
   set_product_featured: setProductFeatured,
   create_brand: createBrand,
   create_category: createCategory,
+  bulk_update_products: bulkUpdateProducts,
+  rollback_bulk_update: rollbackBulkUpdate,
   add_customer_note: addCustomerNote,
   add_customer_tag: addCustomerTag,
   remove_customer_tag: removeCustomerTag,

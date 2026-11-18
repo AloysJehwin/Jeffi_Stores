@@ -205,14 +205,14 @@
       "line": "o6",
       "type": "duo",
       "clip": {
-        "name": "paws-home",
+        "name": "halo-home",
         "from": 0.6,
         "rate": 1.6
       },
-      "url": "pawsandco.jeffistores.in",
+      "url": "halo-audio.jeffistores.in",
       "phone": {
         "clip": {
-          "name": "paws-phone",
+          "name": "halo-phone",
           "from": 0.5,
           "rate": 1.4
         }

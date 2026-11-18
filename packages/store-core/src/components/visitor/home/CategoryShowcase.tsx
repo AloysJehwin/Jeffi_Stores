@@ -31,17 +31,17 @@ export default function CategoryShowcase({
       key={cat.id}
       className="h-full bg-surface-elevated rounded-2xl border border-border-default overflow-hidden hover:border-accent-500/40 hover:shadow-lg transition-all duration-200"
     >
-      {/* Category title */}
+      {/* Category title; below lg the name alone links to the category (no room for "See all" too). */}
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
         <Link
           href={`/categories/${cat.slug}`}
-          className="font-bold text-foreground hover:text-accent-500 transition-colors text-sm leading-tight"
+          className="flex min-h-11 -my-3 min-w-0 items-center font-bold text-foreground hover:text-accent-500 transition-colors text-sm leading-tight"
         >
           {cat.name}
         </Link>
         <Link
           href={`/categories/${cat.slug}`}
-          className="text-[10px] text-accent-500 hover:text-accent-400 font-semibold whitespace-nowrap ml-2 flex-shrink-0"
+          className="hidden lg:flex min-h-11 min-w-11 -my-3 items-center justify-end text-[10px] text-accent-500 hover:text-accent-400 font-semibold whitespace-nowrap ml-2 flex-shrink-0"
         >
           See all
         </Link>
@@ -101,7 +101,7 @@ export default function CategoryShowcase({
           </div>
           <Link
             href="/categories"
-            className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
+            className="hidden sm:flex min-h-11 -my-3 items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
           >
             All categories
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

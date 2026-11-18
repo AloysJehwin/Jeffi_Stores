@@ -216,7 +216,11 @@ describe('gateway principal', () => {
 
   it('refuses a forged, foreign-store, other-host or wrong-API header', async () => {
     mockQueryOne.mockClear() // isolate from any DB call another file in the shard left on the shared mock
-    const forged = signGatewayToken(claims).replace(/.$/, c => (c === 'A' ? 'B' : 'A'))
+    // Flip a character inside the signature: the last one carries 2 padding bits, so swapping A/B/C/D there can leave the
+    // signature's bytes as they were (1 run in 16) and the "forgery" verifies.
+    const signed = signGatewayToken(claims)
+    const at = signed.length - 10
+    const forged = `${signed.slice(0, at)}${signed[at] === 'A' ? 'B' : 'A'}${signed.slice(at + 1)}`
     expect(await resolveAdminPrincipal(req({ gateway: forged }), { tenantId: null })).toBeNull()
     expect(await resolveAdminPrincipal(req({ gateway: signGatewayToken({ ...claims, tenantId: 'other' }) }), { tenantId: null })).toBeNull()
     expect(await resolveAdminPrincipal(req({ gateway: signGatewayToken(claims), host: 'admin-acme.jeffistores.in' }), { tenantId: null })).toBeNull()

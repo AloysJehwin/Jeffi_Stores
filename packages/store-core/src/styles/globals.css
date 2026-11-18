@@ -169,6 +169,18 @@
     @apply h-[26px] inline-flex items-center justify-center gap-1 px-2 text-xs rounded leading-none;
   }
 
+  /* Grows a small control's hit area to at least 44px square without changing its look. The control needs a
+     position of its own (relative/absolute) and room around it, or the grown area covers its neighbours. A fixed
+     size, not insets: rounding then only moves the box, so it never drops below 44px (a dot mid-transition). */
+  .hit-44::before {
+    content: '';
+    position: absolute;
+    left: min(0px, calc(50% - 22px));
+    top: min(0px, calc(50% - 22px));
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+
   /* Icon-only: square, so a row of them lines up with the fields beside it. */
   .control-md.control-icon {
     @apply w-[32px] px-0;
