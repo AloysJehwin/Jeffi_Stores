@@ -28,7 +28,7 @@ export default function CopySku({ sku, className = '' }: { sku?: string | null; 
       onClick={handleCopy}
       title={copied ? 'Copied!' : `Copy SKU ${sku}`}
       aria-label={`Copy SKU ${sku}`}
-      className={`inline-flex shrink-0 align-middle text-foreground-muted hover:text-accent-600 transition-colors ${className}`}
+      className={`hit-44 relative inline-flex shrink-0 align-middle text-foreground-muted hover:text-accent-600 transition-colors ${className}`}
     >
       {copied ? (
         <svg

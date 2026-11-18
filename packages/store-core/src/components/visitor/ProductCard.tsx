@@ -290,7 +290,7 @@ export default function ProductCard({
                 {name}
               </Link>
             </h3>
-            <div className="relative z-10 flex-shrink-0 flex items-center gap-1.5 mt-0.5">
+            <div className="relative z-10 flex-shrink-0 flex items-center gap-2 mt-0.5">
               <QuickAddButton
                 productId={id}
                 productName={name}
@@ -307,13 +307,13 @@ export default function ProductCard({
                 isDigital={digital}
                 portal={portal}
               />
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 {!isBusiness && (
                   <button
                     onClick={handleWishlist}
                     disabled={wishlistLoading}
                     aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-                    className="ui-btn w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
+                    className="ui-btn hit-44 relative w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
                   >
                     {wishlistIcon}
                   </button>
@@ -321,7 +321,7 @@ export default function ProductCard({
                 <button
                   onClick={handleShare}
                   aria-label="Share product"
-                  className="ui-btn hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                  className="ui-btn hit-44 relative hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path

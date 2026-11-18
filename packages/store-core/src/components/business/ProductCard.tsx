@@ -203,7 +203,7 @@ export default function ProductCard({
               <h3 className="font-semibold text-sm sm:text-base text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
                 {name}
               </h3>
-              <div className="flex-shrink-0 flex items-center gap-1.5 mt-0.5">
+              <div className="flex-shrink-0 flex items-center gap-2 mt-0.5">
                 <QuickAddButton
                   productId={id}
                   productName={name}
@@ -222,7 +222,7 @@ export default function ProductCard({
                 <button
                   onClick={handleShare}
                   aria-label="Share product"
-                  className="hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                  className="hit-44 relative hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path
