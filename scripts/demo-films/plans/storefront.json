@@ -22,39 +22,39 @@
       "text": "Home, categories, brands, products, cart and checkout: designed together, filled with your catalogue.",
       "images": [
         {
-          "src": "stills/paws-home.jpg",
+          "src": "stills/halo-home.jpg",
           "label": "Home"
         },
         {
-          "src": "stills/paws-categories.jpg",
+          "src": "stills/halo-categories.jpg",
           "label": "All categories"
         },
         {
-          "src": "stills/paws-category.jpg",
+          "src": "stills/halo-category.jpg",
           "label": "Category"
         },
         {
-          "src": "stills/paws-brand.jpg",
+          "src": "stills/halo-brand.jpg",
           "label": "Brand"
         },
         {
-          "src": "stills/paws-product.jpg",
+          "src": "stills/halo-product.jpg",
           "label": "Product"
         },
         {
-          "src": "stills/paws-search.jpg",
+          "src": "stills/halo-search.jpg",
           "label": "Search"
         },
         {
-          "src": "stills/paws-cart.jpg",
+          "src": "stills/halo-cart.jpg",
           "label": "Cart"
         },
         {
-          "src": "stills/paws-checkout.jpg",
+          "src": "stills/halo-checkout.jpg",
           "label": "Checkout"
         },
         {
-          "src": "stills/paws-wishlist.jpg",
+          "src": "stills/halo-wishlist.jpg",
           "label": "Wishlist"
         }
       ]
@@ -63,7 +63,7 @@
       "line": "s3",
       "type": "screen",
       "clip": {
-        "name": "paws-category",
+        "name": "halo-category",
         "from": 0.3,
         "rate": 1.4,
         "cuts": [
@@ -81,7 +81,7 @@
           ]
         ]
       },
-      "url": "pawsandco.jeffistores.in/dog-food",
+      "url": "halo-audio.jeffistores.in/products",
       "lower": {
         "kicker": "Works out of the box",
         "title": "Search, filters, wishlist, cart"
@@ -105,7 +105,7 @@
       "line": "s4",
       "type": "phone",
       "clip": {
-        "name": "paws-phone",
+        "name": "halo-phone",
         "from": 0.5,
         "rate": 1.3
       },
