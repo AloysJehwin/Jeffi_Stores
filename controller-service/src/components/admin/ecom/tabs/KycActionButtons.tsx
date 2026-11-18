@@ -10,20 +10,25 @@ export default function KycActionButtons({
   mode = 'pending',
 }: {
   tenantId: string
-  // 'pending' = show Approve+Reject; 'retry' = show only Resend payment link
+  // 'pending' = show Approve+Reject; 'retry' = an approved Mandatory store with no payment link: retry it, or switch to Optional
   mode?: 'pending' | 'retry'
 }) {
   const router = useRouter()
   const toast = useActionToast()
   const [showReject, setShowReject] = useState(false)
   const [note, setNote] = useState('')
+  const [paymentRequired, setPaymentRequired] = useState(true)
 
-  // Approve, or re-run subscription creation for an approved store whose Razorpay step failed.
+  // Approve, or re-run it for an approved store whose Razorpay step failed.
   async function approve(retry: boolean) {
-    const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/approve`, { method: 'POST' }).catch(() => null)
+    const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentRequired }),
+    }).catch(() => null)
     const data = await res?.json().catch(() => ({}))
     if (!res?.ok || !data?.ok) return toast.error(data?.error || 'Failed')
-    toast.success(retry && !data.provisioningStarted ? 'Payment link generated; the owner can pay now.' : approvedMessage(data))
+    toast.success(approvedMessage(data, retry))
     router.refresh()
   }
 
@@ -39,7 +44,28 @@ export default function KycActionButtons({
     router.refresh()
   }
 
-  if (mode === 'retry') return <ActionButton variant="primary" action={{ label: 'Resend payment link', icon: Send, onClick: () => approve(true) }} />
+  const choice = <PaymentChoice value={paymentRequired} onChange={setPaymentRequired} />
+
+  if (mode === 'retry') {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {choice}
+        <ActionButton
+          variant="primary"
+          action={
+            paymentRequired
+              ? { label: 'Resend payment link', icon: Send, onClick: () => approve(true) }
+              : {
+                  label: 'Start build',
+                  icon: Check,
+                  onClick: () => approve(true),
+                  confirm: { title: 'Start the build without payment?', message: 'The store becomes payment optional: its build starts now and no checkout link is sent.', confirmLabel: 'Start build' },
+                }
+          }
+        />
+      </div>
+    )
+  }
 
   if (showReject) {
     return (
@@ -59,14 +85,54 @@ export default function KycActionButtons({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {choice}
       <ActionButton action={{ label: 'Reject', icon: X, danger: true, onClick: () => setShowReject(true) }} />
-      <ActionButton variant="primary" action={{ label: 'Approve', icon: Check, onClick: () => approve(false) }} />
+      <ActionButton
+        variant="primary"
+        action={{
+          label: 'Approve',
+          icon: Check,
+          onClick: () => approve(false),
+          confirm: paymentRequired
+            ? {
+                title: 'Approve with payment mandatory?',
+                message: 'We create the Razorpay subscription and email the owner a checkout link. The build starts when their first payment lands.',
+                confirmLabel: 'Approve',
+              }
+            : { title: 'Approve with payment optional?', message: 'The build starts now. No checkout link is sent and nothing is charged.', confirmLabel: 'Approve' },
+        }}
+      />
     </div>
   )
 }
 
-// Payments off: approval starts the build directly (no checkout link exists).
-function approvedMessage(data: { provisioningStarted?: boolean; paymentBypassed?: boolean }): string {
-  return data.provisioningStarted || data.paymentBypassed ? 'Approved: store setup started.' : 'Approved: payment link sent to owner.'
+/** Payment: Mandatory | Optional, one control tall so it lines up with the buttons beside it. */
+function PaymentChoice({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const option = (v: boolean, label: string, hint: string) => (
+    <button
+      type="button"
+      aria-pressed={value === v}
+      title={hint}
+      onClick={() => onChange(v)}
+      className={`h-full rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 ${
+        value === v ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary hover:text-foreground'
+      }`}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div role="group" aria-label="Payment" className="inline-flex h-control items-center gap-0.5 rounded-lg border border-border-default bg-surface-elevated p-0.5">
+      <span className="px-1.5 text-xs text-foreground-muted">Payment</span>
+      {option(true, 'Mandatory', 'Checkout link; the first payment starts the build')}
+      {option(false, 'Optional', 'The build starts on approval; no checkout')}
+    </div>
+  )
+}
+
+// Mandatory answers with a checkout link; Optional starts the build.
+function approvedMessage(data: { checkoutUrl?: string }, retry: boolean): string {
+  if (data.checkoutUrl) return retry ? 'Payment link generated; the owner can pay now.' : 'Approved: payment link sent to owner.'
+  return retry ? 'Build started; payment is optional for this store.' : 'Approved with payment optional: store setup started.'
 }

@@ -102,15 +102,12 @@ export default function OnboardWizard({
   extraServices = [],
   upgrade,
   computeEnabled = false,
-  paymentsEnabled = false,
 }: {
   /** Shown in the rail with the sign-out button. */
   owner: { email: string; name: string | null }
   plans: Plan[]
   /** Add-ons offered on the Plan step, with their live monthly prices. */
   addons?: AddonPrice[]
-  /** ECOM_PAYMENTS_ENABLED: approval leads to checkout. Off: approval starts the build directly. */
-  paymentsEnabled?: boolean
   /** Owners pick their server size here (COMPUTE_SPEC_ENABLED). */
   computeEnabled?: boolean
   /** A services workspace adding a store: the tenant (and its subdomain) already exists. */
@@ -1411,9 +1408,8 @@ export default function OnboardWizard({
               )}
               <div className={`${noteCls} org-peach`}>
                 After submitting, our team will review your licences and certificates (1–2 business days).{' '}
-                {paymentsEnabled
-                  ? "You'll receive an email when approved — then you'll complete payment and your store goes live."
-                  : "Once we approve your details, we'll set up your store right away. Billing starts later."}
+                {/* Assumes payment: the administrator picks Mandatory or Optional at approval. */}
+                You&apos;ll receive an email when approved — then you&apos;ll complete payment and your store goes live.
               </div>
             </div>
           )}

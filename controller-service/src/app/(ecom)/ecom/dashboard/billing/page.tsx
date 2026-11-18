@@ -43,7 +43,6 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           plans={plans}
           renewalDate={renewalDate}
           priceInrMonth={priceInrMonth}
-          paymentsEnabled={process.env.ECOM_PAYMENTS_ENABLED === 'true'}
         />
       </div>
     </>

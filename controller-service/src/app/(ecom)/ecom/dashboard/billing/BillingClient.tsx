@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { TenantRow } from '@/lib/tenant-registry'
+import { paymentRequired } from '@/lib/billing/payment-required'
 import { focusRing } from '../../_ui'
 
 interface Plan {
@@ -28,14 +29,12 @@ export default function BillingClient({
   plans,
   renewalDate,
   priceInrMonth = null,
-  paymentsEnabled = false,
 }: {
   tenant: TenantRow
   plans: Plan[]
   renewalDate: string | null
   /** tenant_compute.price_inr_month: plan fee + servers + GST on servers. */
   priceInrMonth?: number | null
-  paymentsEnabled?: boolean
 }) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -73,8 +72,10 @@ export default function BillingClient({
     }
   }
 
-  // No subscription behind the store (payments off, or not yet paid): no status badge to show.
+  // No subscription behind the store (Optional, or not yet paid): no status badge to show.
   const hasSubscription = !!tenant.razorpay_subscription_id
+  // A workspace with no store and no store application has no store subscription to wait for.
+  const mandatory = paymentRequired(tenant) && ((tenant.service_types ?? ['store']).includes('store') || !!tenant.store_request)
   const plan = plans.find(p => p.slug === tenant.plan)
   const fee = Number(plan?.monthly_price_inr ?? 0)
   const yearly = tenant.billing_interval === 'yearly'
@@ -105,7 +106,7 @@ export default function BillingClient({
             </span>
           ) : (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-muted">
-              {paymentsEnabled ? 'Awaiting payment' : 'Not billed yet'}
+              {mandatory ? 'Awaiting payment' : 'Not billed yet'}
             </span>
           )}
           {renewalDate && (
@@ -125,7 +126,7 @@ export default function BillingClient({
             Plan {inr(fee)} + servers {inr(Math.max(0, priceInrMonth - fee))} (incl. GST) ={' '}
             <span className="font-semibold text-foreground">{inr(priceInrMonth)}/mo</span>
             {yearly && <> · billed {inr(priceInrMonth * 10)}/yr</>}
-            {!hasSubscription && !paymentsEnabled && <span className="text-foreground-muted"> (billing starts later)</span>}
+            {!hasSubscription && !mandatory && <span className="text-foreground-muted"> (billing starts later)</span>}
           </div>
         )}
         {tenant.razorpay_subscription_id && (

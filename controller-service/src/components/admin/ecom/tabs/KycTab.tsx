@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { TenantDetail, TenantKyc, ServiceApproval } from '@/lib/tenant-registry'
+import { paymentRequired } from '@/lib/billing/payment-required'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
 import ServiceApprovals from './ServiceApprovals'
@@ -85,6 +86,11 @@ export default function KycTab({
   }
 
   const pending = kyc.status === 'pending'
+  const approved = kyc.status === 'approved'
+  const store = (t.service_types ?? ['store']).includes('store') || !!t.store_request
+  // Approved as Mandatory, but the Razorpay subscription failed, so there is no link to pay.
+  const noPaymentLink =
+    approved && store && paymentRequired(t) && !t.razorpay_checkout_url && (t.store_request ? t.store_request === 'awaiting_payment' : t.status === 'awaiting_payment')
   const today = todayIst()
   const standing = complianceStanding(documents, today)
 
@@ -99,13 +105,11 @@ export default function KycTab({
         </div>
 
         {pending && <KycActionButtons tenantId={t.id} mode="pending" />}
-        {/* Approved but no checkout URL — Razorpay sub creation failed, allow retry */}
-        {kyc.status === 'approved' && t.status === 'provisioning' && !t.razorpay_checkout_url && (
-          <KycActionButtons tenantId={t.id} mode="retry" />
-        )}
-        {kyc.status === 'approved' && t.razorpay_checkout_url && (
+        {noPaymentLink && <KycActionButtons tenantId={t.id} mode="retry" />}
+        {approved && !noPaymentLink && (
           <div className="text-xs text-foreground-muted">
             Approved by {kyc.reviewed_by} on {dateIN(kyc.reviewed_at)}
+            {store && ` · payment ${paymentRequired(t) ? 'mandatory' : 'optional'}`}
           </div>
         )}
         {kyc.status === 'rejected' && (
