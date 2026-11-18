@@ -7085,8 +7085,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/home/business/BusinessQuotes.tsx": {
-    "mtime": 1794518175.4336338,
-    "ast_hash": "7623034c17c42c8382c27b8b2fc051ed",
+    "mtime": 1794977209.3779936,
+    "ast_hash": "84a8275139e82575a3921786f8f69696",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/home/business/business-home.ts": {
@@ -30280,18 +30280,18 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/site/AuthSplit.tsx": {
-    "mtime": 1794853276.7228956,
-    "ast_hash": "1ef0e747f784e6de328fb3eb25b56c04",
+    "mtime": 1794977209.0328636,
+    "ast_hash": "9e184731bfc8d21c1ad6e9e2b231931a",
     "semantic_hash": ""
   },
   "storefront-service/src/app/(auth)/login/LoginClient.tsx": {
-    "mtime": 1794934058.8763847,
-    "ast_hash": "d8369fa3a42bceaec7b00974f27b64af",
+    "mtime": 1794977209.1449335,
+    "ast_hash": "dd7dec3b0fd7628c53b3baf8f4a31ad3",
     "semantic_hash": ""
   },
   "storefront-service/src/app/(auth)/signup/SignupClient.tsx": {
-    "mtime": 1794934072.878868,
-    "ast_hash": "9af2037b7102d78fc5cd43fb8f1ac6b7",
+    "mtime": 1794977222.7959943,
+    "ast_hash": "01e2a06d67fcfd3cec91e658c9894f31",
     "semantic_hash": ""
   },
   "storefront-service/src/app/(storefront)/account/(home)/AccountClient.tsx": {
@@ -30450,8 +30450,8 @@
     "semantic_hash": ""
   },
   "tests/responsive/cleanup.ts": {
-    "mtime": 1794858049.7338986,
-    "ast_hash": "a7d48f0cea937429f86b85d86c046836",
+    "mtime": 1794976205.1789074,
+    "ast_hash": "a033cb11d39a0be35d7e0c13e434882d",
     "semantic_hash": ""
   },
   "tests/responsive/env.ts": {
@@ -30460,8 +30460,8 @@
     "semantic_hash": ""
   },
   "tests/responsive/global-setup.ts": {
-    "mtime": 1794853668.1988895,
-    "ast_hash": "46a87d961b5dfb72438cfb6d9af27723",
+    "mtime": 1794976205.053351,
+    "ast_hash": "9a704535d1c0d40462526f79a0632dd9",
     "semantic_hash": ""
   },
   "tests/responsive/pages.ts": {
@@ -30475,8 +30475,8 @@
     "semantic_hash": ""
   },
   "tests/responsive/summary.ts": {
-    "mtime": 1794858043.5418363,
-    "ast_hash": "a863fbe0225334414a4b2ddb9b018205",
+    "mtime": 1794976205.1281025,
+    "ast_hash": "9e3cf6c6089e5ede5ccadad2ae5f11ec",
     "semantic_hash": ""
   },
   "tests/responsive/sweep.spec.ts": {
@@ -31792,6 +31792,196 @@
   "deploy/k8s/platform/48-showcase-service.yaml": {
     "mtime": 1794925390.5071433,
     "ast_hash": "dc47599fe875e631f0e583dfe8c0a29d",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/manifest.json": {
+    "mtime": 1794977571.0595305,
+    "ast_hash": "53318aaa17751ae4808be5d8e5471b80",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/summary.json": {
+    "mtime": 1794977570.8714778,
+    "ast_hash": "7983eb523008d79cd9b0883207d5e0b8",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/.last-run.json": {
+    "mtime": 1794977573.5600722,
+    "ast_hash": "a6f8f5fcad61301c194ce8670e14bb90",
+    "semantic_hash": ""
+  },
+  "tests/responsive/tsconfig.sweep.json": {
+    "mtime": 1794976185.6750665,
+    "ast_hash": "13972a8c1369f4640f0be05e9cfb28f0",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/0a182bf1b47492958acffbcaf8e0ae30b56ac7e2.md": {
+    "mtime": 1794977572.738737,
+    "ast_hash": "b8225dfce5ce22be99213a789dccdfbd",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/371b3a8b54bff5b365568e6c2155a578e5a02348.md": {
+    "mtime": 1794977572.76987,
+    "ast_hash": "3c42d4275404065f183a8fa3944cc2c7",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/5163bb986174b134a683f9ce105fcda6f94539b1.md": {
+    "mtime": 1794977572.7616627,
+    "ast_hash": "4c90ab170a4ee9720dbd3cef8d9226df",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/5871fbe699ed75412aa20f0fa15e749e1d352280.md": {
+    "mtime": 1794977572.7442162,
+    "ast_hash": "047e4fcc53b614372eaf12bd87ca6371",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/6657d9eaf4035341193f27dda7a85933d48bdbf4.md": {
+    "mtime": 1794977572.8764405,
+    "ast_hash": "b0cd34cffb09b2ced15d866a90579418",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/935787efa06a564d87b3d2bec04f46df1ec4e96c.md": {
+    "mtime": 1794977572.7467198,
+    "ast_hash": "e9d4ff8c5351158119f792819be2e0ee",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/f2e06bb297a8a3087c648781eeb3d5e8475d9e48.md": {
+    "mtime": 1794977572.7974505,
+    "ast_hash": "812ae228f1790cb5e275508204d71cde",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/index.html": {
+    "mtime": 1794977573.5593212,
+    "ast_hash": "9fd6256915f0a63ce94b65e06e345d24",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/summary.md": {
+    "mtime": 1794977570.8691783,
+    "ast_hash": "39e7ee409ccc7708aba5bb14f4c7e8cf",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-B2B-Pro-\u00b7-home-chromium/error-context.md": {
+    "mtime": 1794977570.3451893,
+    "ast_hash": "b0cd34cffb09b2ced15d866a90579418",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Bold-Playful-\u00b7-cart-chromium/error-context.md": {
+    "mtime": 1794977537.3723056,
+    "ast_hash": "812ae228f1790cb5e275508204d71cde",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Bold-Playful-\u00b7-home-chromium/error-context.md": {
+    "mtime": 1794977465.299172,
+    "ast_hash": "4c90ab170a4ee9720dbd3cef8d9226df",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Bold-Playful-\u00b7-product-chromium/error-context.md": {
+    "mtime": 1794977526.4197743,
+    "ast_hash": "3c42d4275404065f183a8fa3944cc2c7",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Heritage-Luxury-\u00b7-cart-chromium/error-context.md": {
+    "mtime": 1794977433.1778114,
+    "ast_hash": "e9d4ff8c5351158119f792819be2e0ee",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Heritage-Luxury-\u00b7-home-chromium/error-context.md": {
+    "mtime": 1794977333.5949726,
+    "ast_hash": "b8225dfce5ce22be99213a789dccdfbd",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Heritage-Luxury-\u00b7-product-chromium/error-context.md": {
+    "mtime": 1794977421.243395,
+    "ast_hash": "047e4fcc53b614372eaf12bd87ca6371",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/3841790d67379b23e953e9c2633654c1a2b17686.png": {
+    "mtime": 1794977572.7553685,
+    "ast_hash": "617725c26eea76c70b3e68c355b1fc26",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/65f013d569a3424b5ee0a956f3a885176d69fbbf.png": {
+    "mtime": 1794977572.7325664,
+    "ast_hash": "6d0955d5ada93951b028b90b5b4810b0",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/735083738cc10cad0c81c4f17ad1c18172530885.png": {
+    "mtime": 1794977572.8359146,
+    "ast_hash": "4b49ee4589c7b6932d137f7c5b2807b5",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/7bd0e3500bf39a2d80c6d46fa7076a34e14bc217.png": {
+    "mtime": 1794977572.839898,
+    "ast_hash": "84f459ac6b48708e0c21bb799abb3878",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/839af6bd14298e55474547a8c0a22aa891416765.png": {
+    "mtime": 1794977572.7300315,
+    "ast_hash": "7e9af8263662b81ad6666c33f98e52c8",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/report/data/bff8e3218618211757ed5bd6fd2e5b93ad706677.png": {
+    "mtime": 1794977572.752701,
+    "ast_hash": "329f2bb236d0b5c5e942d1bfe9aa89ae",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/screenshots/b2b_pro/home-360.png": {
+    "mtime": 1794977563.443745,
+    "ast_hash": "4b49ee4589c7b6932d137f7c5b2807b5",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/screenshots/b2b_pro/home-768.png": {
+    "mtime": 1794977569.7482367,
+    "ast_hash": "84f459ac6b48708e0c21bb799abb3878",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/screenshots/bold_playful/home-360.png": {
+    "mtime": 1794977457.967774,
+    "ast_hash": "329f2bb236d0b5c5e942d1bfe9aa89ae",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/screenshots/bold_playful/home-768.png": {
+    "mtime": 1794977464.6554837,
+    "ast_hash": "617725c26eea76c70b3e68c355b1fc26",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/screenshots/heritage_luxury/home-360.png": {
+    "mtime": 1794977325.2275314,
+    "ast_hash": "7e9af8263662b81ad6666c33f98e52c8",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/screenshots/heritage_luxury/home-768.png": {
+    "mtime": 1794977332.9379966,
+    "ast_hash": "6d0955d5ada93951b028b90b5b4810b0",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-B2B-Pro-\u00b7-home-chromium/attachments/b2b-pro-home-360-01bb62ef87000d653c6e34cdf803b7917bf81e38.png": {
+    "mtime": 1794977563.4505537,
+    "ast_hash": "4b49ee4589c7b6932d137f7c5b2807b5",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-B2B-Pro-\u00b7-home-chromium/attachments/b2b-pro-home-768-cc3251b0b04d4e54db2fcf05e04cce2b98b61d1c.png": {
+    "mtime": 1794977569.7532098,
+    "ast_hash": "84f459ac6b48708e0c21bb799abb3878",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Bold-Playful-\u00b7-home-chromium/attachments/bold-playful-home-360-f214299aba90c6f220d6c3310f5adcd728886368.png": {
+    "mtime": 1794977457.972809,
+    "ast_hash": "329f2bb236d0b5c5e942d1bfe9aa89ae",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Bold-Playful-\u00b7-home-chromium/attachments/bold-playful-home-768-9acaa049cb194bd187c280429b702e590627bf30.png": {
+    "mtime": 1794977464.6617422,
+    "ast_hash": "617725c26eea76c70b3e68c355b1fc26",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Heritage-Luxury-\u00b7-home-chromium/attachments/heritage-luxury-home-360-329979b3a7d004d96ca6ba848f6c6416c90ddc87.png": {
+    "mtime": 1794977325.2342556,
+    "ast_hash": "7e9af8263662b81ad6666c33f98e52c8",
+    "semantic_hash": ""
+  },
+  "tests/responsive/output/test-results/sweep-responsive-sweep-Heritage-Luxury-\u00b7-home-chromium/attachments/heritage-luxury-home-768-b91cd27f00c8aec2d5e6bbbdadaded5cf4aee92b.png": {
+    "mtime": 1794977332.9458687,
+    "ast_hash": "6d0955d5ada93951b028b90b5b4810b0",
     "semantic_hash": ""
   }
 }

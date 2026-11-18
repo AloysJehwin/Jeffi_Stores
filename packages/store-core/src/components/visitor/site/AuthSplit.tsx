@@ -16,7 +16,7 @@ export default function AuthSplit({ props, form }: { props: Record<string, unkno
   const right = props.sidePosition === 'right'
   return (
     <section className="container mx-auto px-4 py-6 lg:py-12">
-      <div className="grid overflow-hidden rounded-[var(--radius-card,0.75rem)] border border-border-default bg-surface-elevated lg:grid-cols-2">
+      <div className="grid grid-cols-1 overflow-hidden rounded-[var(--radius-card,0.75rem)] border border-border-default bg-surface-elevated lg:grid-cols-2">
         <div className={`relative min-h-[200px] lg:min-h-[560px] bg-secondary-800 ${right ? 'lg:order-2' : ''}`}>
           {image && (
             // eslint-disable-next-line @next/next/no-img-element
