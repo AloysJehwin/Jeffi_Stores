@@ -2,7 +2,6 @@ import { Sk } from '@/components/admin/kit/skeleton'
 import type { PricingSettings } from '@/lib/compute/spec'
 
 export const SETTINGS: { key: keyof PricingSettings; label: string; step: string }[] = [
-  { key: 'usdInr', label: 'USD → INR', step: '0.01' },
   { key: 'gstRate', label: 'GST rate', step: '0.01' },
   { key: 'platformShareUsd', label: 'Platform share per store (USD/month)', step: '0.5' },
   { key: 'rootVolumeGb', label: 'Server disk (GB)', step: '1' },

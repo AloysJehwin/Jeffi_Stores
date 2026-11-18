@@ -642,8 +642,8 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           </div>
 
           {/* ── Right panel — preview ── */}
-          <div className="w-full lg:w-72 shrink-0">
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 sticky top-4">
+          <div className="w-full lg:w-72 shrink-0 admin-sticky-pane">
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
               <div className="flex items-center justify-between mb-1">
                 <h2 className="text-sm font-semibold text-foreground">Preview</h2>
                 <span className="text-xs text-foreground-muted">{activeSize.label}</span>

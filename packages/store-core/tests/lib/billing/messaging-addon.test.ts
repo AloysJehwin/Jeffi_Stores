@@ -61,7 +61,7 @@ describe('buyMessagingAddonMonth', () => {
     expect(r.ok).toBe(true)
     const today = new Date().toISOString().slice(0, 10)
     expect(debitWallet).toHaveBeenCalledWith(
-      expect.objectContaining({ amountInr: 142, category: 'messaging_addon', externalRef: messagingAddonRef(T, 'both', today), floorInr: 0 })
+      expect.objectContaining({ amountInr: 500, category: 'messaging_addon', externalRef: messagingAddonRef(T, 'both', today), floorInr: 0 })
     )
   })
 

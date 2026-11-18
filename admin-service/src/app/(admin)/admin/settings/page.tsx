@@ -4,11 +4,12 @@ import { isPlatformOwner } from '@/lib/auth/scopes'
 import SettingsHub from '@/components/admin/SettingsHub'
 import CliTokensPanel from './_components/CliTokensPanel'
 import AccountPanel from './_components/AccountPanel'
+import NumbersPanel from './_components/NumbersPanel'
 import TeamPanel from '../team/_components/TeamPanel'
 import ServiceAccountsPanel from '../service-accounts/_components/ServiceAccountsPanel'
 import AuditPanel from '../audit/AuditPanel'
 
-// Settings hub: Account, Team, Service accounts, CLI & tokens and Audit log, picked by ?tab=.
+// Settings hub: Account, Team, Numbers, Service accounts, CLI & tokens and Audit log, picked by ?tab=.
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -25,6 +26,14 @@ export default async function SettingsPage({
   const tab = visibleSettingsHubTabs(role, scopes).some(t => t.id === requested) ? requested : 'account'
 
   if (tab === 'team') return <TeamPanel />
+  if (tab === 'numbers') {
+    return (
+      <>
+        <SettingsHub active="numbers" />
+        <NumbersPanel role={role} />
+      </>
+    )
+  }
   if (tab === 'service-accounts') return <ServiceAccountsPanel />
   if (tab === 'cli') {
     return (

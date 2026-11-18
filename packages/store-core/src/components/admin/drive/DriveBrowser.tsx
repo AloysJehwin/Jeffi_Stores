@@ -44,7 +44,7 @@ import { KIND_OPTIONS } from './DrivePicker'
 import FilePreview from './FilePreview'
 import MoveDialog from './MoveDialog'
 import ShareDialog from './ShareDialog'
-import { DriveItemsLoading } from './DriveLoading'
+import { DRIVE_SPLIT, DriveItemsLoading } from './DriveLoading'
 
 interface UploadJob {
   key: string
@@ -316,8 +316,8 @@ export default function DriveBrowser({ initialFolder, initialTrash }: { initialF
   const editablePicked = picked.filter(f => f.access === 'edit' || f.access === 'manage')
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
-      <nav aria-label="Drive" className="flex gap-1 overflow-x-auto lg:flex-col">
+    <div className="admin-split grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]" style={DRIVE_SPLIT}>
+      <nav aria-label="Drive" className="admin-pane flex gap-1 overflow-x-auto lg:flex-col">
         <Place icon={<HardDrive className="h-4 w-4" />} active={!trash && !inGallery && !inDocs} onClick={() => go('root')}>
           My Drive
         </Place>
@@ -338,7 +338,8 @@ export default function DriveBrowser({ initialFolder, initialTrash }: { initialF
         </p>
       </nav>
 
-      <section className="relative min-w-0 rounded-xl border border-border-default bg-surface-elevated" {...dragProps}>
+      {/* Desktop: the toolbars stay put and only the files below them scroll. */}
+      <section className="relative min-w-0 rounded-xl border border-border-default bg-surface-elevated lg:flex lg:min-h-0 lg:flex-col" {...dragProps}>
         <div className="flex flex-wrap items-center gap-2 border-b border-border-default px-4 py-3">
           <div className="flex min-w-0 flex-1 items-center gap-1 text-sm">
             {trash ? (
@@ -481,7 +482,7 @@ export default function DriveBrowser({ initialFolder, initialTrash }: { initialF
                 </button>
               )}
             </div>
-            <ul className="space-y-1">
+            <ul className="space-y-1 lg:max-h-32 lg:overflow-y-auto">
               {jobs.map(j => (
                 <li key={j.key} className="flex items-center gap-2 text-xs">
                   {j.error ? <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" /> : j.done ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600" /> : <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent-500" />}
@@ -501,7 +502,7 @@ export default function DriveBrowser({ initialFolder, initialTrash }: { initialF
           </div>
         )}
 
-        <div className="min-h-[50vh] p-4">
+        <div className="admin-pane min-h-[50vh] p-4 lg:flex-1">
           {loading && !data ? (
             <DriveItemsLoading view={view} />
           ) : error ? (

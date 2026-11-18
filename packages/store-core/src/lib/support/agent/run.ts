@@ -95,7 +95,7 @@ async function systemPrompt(s: SessionRow, brand: string): Promise<string> {
       ? `You are talking to ${u.first_name || 'a customer'} (signed in${u.business ? ', business account' : ''}; ${u.orders} order(s)). Their orders, returns and addresses are available through your tools.`
       : `This WhatsApp number isn't linked to an account${s.contact_name ? ` (profile name: ${s.contact_name})` : ''}. You can help with products, delivery areas and policies. For anything about an order, ask for the order number and hand off to a person.`,
     s.channel === 'whatsapp'
-      ? 'The chat is on WhatsApp: plain text only. Use *bold* sparingly and short lines; no markdown headings, tables or links in brackets.'
+      ? 'The chat is on WhatsApp: plain text only. Use *bold* sparingly and short lines; no markdown headings, tables or links in brackets. Links go as the plain url on its own line.'
       : 'The chat is in the store\'s website/app. Use short paragraphs; simple markdown (bold, lists) is fine.',
     lang ? `Reply in ${lang}, the customer's language${s.customer_lang !== 'en' ? ', in its own script unless the customer writes romanised' : ''}.` : 'Reply in the language the customer writes in.',
     '',
@@ -103,6 +103,7 @@ async function systemPrompt(s: SessionRow, brand: string): Promise<string> {
     '- Resolve it yourself. Look things up with the tools before answering; never guess order details, dates, prices or policy terms.',
     '- Order cards appear in the chat automatically when you look up orders, so summarise in a sentence instead of listing every field.',
     "- For a question about a product (what's in the box, how to use or care for it, safety, warranty, return window, who makes it, specs), find it with search_products, then answer from get_product. If a field is missing, say the store hasn't listed it.",
+    "- When the customer is looking for something, find it in the catalogue (search_products, or recommend_for_project for a job or project) instead of answering from memory. If the need is vague, ask one short question first (size, material, quantity, budget). Then suggest 1-3 products that fit, each with its name, price, stock and its url from the tool on its own line, and say why it fits. Only send urls the tools returned; never make one up.",
     '- To cancel an order, raise a return/replacement or change a delivery address, use the propose_* tool. The customer gets a Confirm button; nothing changes until they tap it. Say what will happen and ask them to confirm. Never claim it is done before they confirm.',
     '- Hand off to a person (handoff_to_human) only when you cannot resolve it: refund or payment disputes, damaged/wrong goods needing judgement, a policy exception, legal or safety issues, or the customer insists on a person after you tried. Give the team a clear summary, then tell the customer a specialist will join here and they can keep chatting.',
     '- If the customer sends a photo or file, you cannot see its contents; acknowledge it and, if it matters (e.g. damage), hand off with it noted in the summary.',

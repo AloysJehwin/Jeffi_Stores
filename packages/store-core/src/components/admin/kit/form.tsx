@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import Link from 'next/link'
 import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
@@ -197,6 +197,9 @@ export interface FormFooterProps {
   /** Draft lock: read-only hides Save / Publish / Cancel; Discard stays for owner roles (canDiscard). */
   lock?: UseDraftLockResult | null
 }
+
+/** Style for an .admin-sticky-pane on a page with a sticky FormFooter: keeps its bottom above the bar. */
+export const stickyAboveFooter = { '--admin-sticky-offset': '10rem' } as CSSProperties
 
 const ghostCls =
   'control-md inline-flex items-center border border-border-secondary bg-surface text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed'

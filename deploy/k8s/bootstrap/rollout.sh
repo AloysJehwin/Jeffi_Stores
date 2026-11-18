@@ -1,7 +1,7 @@
 #!/bin/bash
 # Roll a release, in phases (ci.yml runs each part as its own job; no phase = platform, then stores):
 #   platform   the platform (controller; the flagship's storefront, admin and business; messaging, document,
-#              public-api and mobile services; CronJobs), then its routes once those serve. ci.yml runs it in
+#              public-api, mobile and showcase services; CronJobs), then its routes once those serve. ci.yml runs it in
 #              parts: `platform prep` (room on the core, the pull secret, what the services share), then
 #              `platform <service>` in that service's own job; the controller (with the routes and CronJobs)
 #              waits until the flagship's storefront, admin and business run the release
@@ -20,7 +20,7 @@ TAG=${1:?tag}
 PHASE=all PART=
 for a in "${@:2}"; do case $a in
   platform|tenant-db|tenant-schema|tenant-migrations|stores) PHASE=$a ;;
-  prep|shared|controller|storefront|admin|business|messaging|documents|public-api|mobile) PART=$a ;;
+  prep|shared|controller|storefront|admin|business|messaging|documents|public-api|mobile|showcase) PART=$a ;;
 esac; done
 STORE_PARTS="storefront admin business messaging documents"
 k8s_tunnel
@@ -97,7 +97,7 @@ platform_service() {
 platform() {
   case $PART in
     prep) platform_prep ;;
-    '') platform_prep; for s in storefront admin business messaging documents public-api mobile controller; do platform_service $s; done ;;
+    '') platform_prep; for s in storefront admin business messaging documents public-api mobile showcase controller; do platform_service $s; done ;;
     *) platform_service "$PART" ;;
   esac
 }

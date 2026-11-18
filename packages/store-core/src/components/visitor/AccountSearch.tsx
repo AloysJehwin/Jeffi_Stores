@@ -49,7 +49,7 @@ export default function AccountSearch({ placeholder, suggestions, value, onChang
           }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
-          className="w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-surface-elevated border border-border-default text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-colors"
+          className="ui-input w-full pl-9 pr-8 py-2 text-sm rounded-lg bg-surface-elevated border border-border-default text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-colors"
         />
         {value && (
           <button
@@ -68,7 +68,7 @@ export default function AccountSearch({ placeholder, suggestions, value, onChang
       </div>
 
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden">
+        <ul className="ui-raised absolute z-50 mt-1 w-full bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden">
           {filtered.map((s, i) => (
             <li key={i}>
               <button

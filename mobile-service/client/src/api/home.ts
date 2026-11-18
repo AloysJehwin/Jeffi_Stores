@@ -1,5 +1,6 @@
 import { api } from './client'
 import { useHomeLayoutStore } from '../stores/homeLayoutStore'
+import { useSiteThemeStore } from '../stores/siteThemeStore'
 import type { HomeAudience, HomeModel, HomePage } from '../types/home'
 
 // The app's own layout; the server falls back to the website layout until the app has sections of its own.
@@ -10,5 +11,7 @@ export async function getHome(page: HomePage = 'home', audience: HomeAudience = 
   const model = await api<HomeModel>(`/api/home?surface=app${q}`)
   // The next launch's skeleton follows this layout.
   useHomeLayoutStore.getState().remember(page, audience, model.sections)
+  // The store's theme rides on the store home (older servers send none: keep what we have).
+  if (page === 'home' && audience === 'store' && model.theme !== undefined) useSiteThemeStore.getState().set(model.theme?.vars ?? null)
   return model
 }

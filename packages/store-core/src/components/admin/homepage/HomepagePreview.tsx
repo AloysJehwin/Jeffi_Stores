@@ -38,16 +38,16 @@ const localSlug = (host: string): string | null => {
 }
 
 /** The page's URL on the store's (or business portal's) own host, which is a different Next app. */
-export function homepagePreviewUrl(audience: HomepageAudience, token: string, layout: Device['layout']): string {
+export function homepagePreviewUrl(audience: HomepageAudience, token: string, layout: Device['layout'], path = '/'): string {
   const { hostname, port } = window.location
   const host = hostname.toLowerCase()
   const q = `?preview=${encodeURIComponent(token)}&layout=${layout}`
   if (host === 'localhost' || host.endsWith('.localhost')) {
     const slug = localSlug(host)
     const base = `http://${slug ? `${slug}.` : ''}localhost${port ? `:${port}` : ''}`
-    return `${base}${audience === 'business' ? '/business' : '/'}${q}`
+    return `${base}${audience === 'business' ? `/business${path === '/' ? '' : path}` : path}${q}`
   }
-  return audience === 'business' ? `https://${businessHostForHost(host)}/${q}` : `https://${storeHostForHost(host)}/${q}`
+  return audience === 'business' ? `https://${businessHostForHost(host)}${path}${q}` : `https://${storeHostForHost(host)}${path}${q}`
 }
 
 const DEVICE_FOR: Record<HomepageSurface, DeviceId> = { web: 'desktop', web_mobile: 'phone', app: 'app' }

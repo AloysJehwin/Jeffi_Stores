@@ -31,6 +31,7 @@ import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { isPaymentBypassed, bypassAuditNote } from '@controller/lib/payments/ecom-payment-bypass'
 import { tenantCapacityError } from '@controller/lib/k8s/capacity'
 import { startStore } from '@controller/lib/provisioning/start-store'
+import { approveComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,6 +77,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Approve KYC — sets tenant status to 'provisioning'
   await approveKyc(tenantId, admin.email ?? 'admin')
+  // The licences were reviewed with it.
+  await approveComplianceDocuments(tenantId, admin.email ?? 'admin').catch(e => console.warn('[kyc] licences not marked approved', e?.message || e))
 
   // 1. Create Razorpay Route linked account for POBO transfers.
   // Only create if not already exists (idempotent — admin can retry). A returning owner whose

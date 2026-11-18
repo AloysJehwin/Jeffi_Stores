@@ -19,10 +19,11 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import {
   SECTION_META,
   groupRows,
+  HOMEPAGE_SURFACES,
   rowAudience,
+  rowSurface,
   sectionPlacement,
   sectionSide,
-  sectionSurfaces,
   sectionTypesFor,
   type HomepageAudience,
   type HomepagePage,
@@ -57,7 +58,7 @@ interface Props {
   heroEditor?: React.ReactNode
   /** Render every section's editor open and non-collapsible (dedicated Homepage page). */
   alwaysExpanded?: boolean
-  /** The device the page's selector highlights: each card's switch shows / hides it there. */
+  /** The device whose layout this edits; every device has its own. */
   surface?: HomepageSurface
 }
 
@@ -114,7 +115,7 @@ export default function HomepageSectionManager({
   const homepage = useHomepageLock()
   // Read-only while another admin holds the homepage draft.
   const canWrite = useCanWrite('settings:write') && !homepage.readOnly
-  const [sections, setSections] = useState(() => initial.filter(s => rowAudience(s) === audience))
+  const [sections, setSections] = useState(() => initial.filter(s => rowAudience(s) === audience && rowSurface(s) === surface))
   const [picking, setPicking] = useState(false)
   const [addedId, setAddedId] = useState<string | null>(null)
   const [copying, setCopying] = useState(false)
@@ -137,17 +138,20 @@ export default function HomepageSectionManager({
     return clash ? `Can't be combined with ${SECTION_META[clash].label}` : null
   }
 
-  // Business homepage: "Start from the store homepage" copies the store's sections (and slides) onto it
-  // with new ids, then reloads so both managers (and the hero editor) pick up the rows. A 409 means it
-  // already has rows of its own: confirm, then replace them.
-  async function copyStore(replace = false) {
+  const sourceName = (from: HomepageSurface, fromAudience: HomepageAudience) =>
+    fromAudience !== audience ? `the store homepage (${SURFACE_NAME[from]})` : `the ${SURFACE_NAME[from]} layout`
+
+  // Copies another layout's sections (and, on the homepage, its hero slides) onto this device's layout
+  // with new ids, then reloads so the managers and the hero editor pick up the rows. A 409 means this
+  // layout already has rows of its own: confirm, then replace them.
+  async function copyFrom(from: HomepageSurface, fromAudience: HomepageAudience = audience, replace = false) {
     setCopying(true)
     try {
       const res = await fetch('/api/admin/homepage-draft/copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...homepage.headers() },
         credentials: 'include',
-        body: JSON.stringify({ from: 'web', to: 'web', page, audience, fromAudience: 'store', ...(replace ? { replace } : {}) }),
+        body: JSON.stringify({ from, to: surface, page, audience, fromAudience, ...(replace ? { replace } : {}) }),
       })
       if (await homepage.locked(res)) {
         setCopying(false)
@@ -157,27 +161,28 @@ export default function HomepageSectionManager({
       if (res.status === 409 && !replace) {
         setCopying(false)
         const ok = await showConfirm({
-          title: 'Replace this layout?',
-          message: 'The business homepage already has its own sections or slides. Replace them with a copy of the store homepage? It only changes the draft until you publish.',
+          title: `Replace the ${SURFACE_NAME[surface]} layout?`,
+          message: `Its sections${page === 'home' ? ' and hero slides' : ''} are replaced with a copy of ${sourceName(from, fromAudience)}. Other devices are not changed, and nothing goes live until you publish.`,
           confirmText: 'Replace',
           type: 'danger',
         })
-        if (ok) await copyStore(true)
+        if (ok) await copyFrom(from, fromAudience, true)
         return
       }
       if (!res.ok) {
-        showToast(data.error || 'Failed to copy the store homepage', 'error')
+        showToast(data.error || 'Failed to copy the layout', 'error')
         setCopying(false)
         return
       }
-      showToast('Store homepage copied to the draft', 'success')
+      showToast(`Copied ${sourceName(from, fromAudience)} to the draft`, 'success')
       notifyHomepageDraftChanged()
       window.location.reload()
     } catch {
-      showToast('Failed to copy the store homepage', 'error')
+      showToast('Failed to copy the layout', 'error')
       setCopying(false)
     }
   }
+  const otherSurfaces = HOMEPAGE_SURFACES.filter(s => s !== surface)
 
   async function patch(id: string, body: Record<string, unknown>) {
     const res = await fetch(`/api/admin/homepage-sections/${id}`, {
@@ -201,18 +206,13 @@ export default function HomepageSectionManager({
     patch(section.id, { config: next })
   }
 
-  function toggleSurface(section: HomepageSection) {
-    const on = sectionSurfaces(section)
-    saveConfigFor(section, { surfaces: { ...on, [surface]: !on[surface] } })
-  }
-
   async function addSection(type: SectionType) {
     setPicking(false)
     const res = await fetch('/api/admin/homepage-sections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...homepage.headers() },
       credentials: 'include',
-      body: JSON.stringify({ type, page, audience }),
+      body: JSON.stringify({ type, page, audience, surface }),
     })
     if (!res.ok) {
       if (!(await homepage.locked(res))) {
@@ -308,8 +308,6 @@ export default function HomepageSectionManager({
     onChange: update,
     onSave: patch,
     onRemove: removeSection,
-    surface,
-    onToggleSurface: toggleSurface,
     alwaysExpanded,
     defaultOpen: section.id === addedId,
     extra:
@@ -365,11 +363,28 @@ export default function HomepageSectionManager({
       </DndContext>
 
       {!business && sections.length === 0 && (
-        <p className="text-xs text-foreground-muted">
-          {listing
-            ? 'No sections here yet. Add one and choose after how many products it appears; it shows between the products on every page of this kind.'
-            : 'No sections configured — the homepage is using its built-in default layout.'}
-        </p>
+        <div className="rounded-lg border border-dashed border-border-secondary p-4 space-y-3">
+          <p className="text-xs text-foreground-muted">
+            {listing
+              ? `No sections on ${SURFACE_NAME[surface]} here yet. Add one and choose after how many products it appears; it shows between the products on every page of this kind.`
+              : `No sections on ${SURFACE_NAME[surface]} yet, so it shows the built-in default layout. Start from another device's layout, or add sections below.`}
+          </p>
+          {canWrite && (
+            <div className="flex flex-wrap gap-2">
+              {otherSurfaces.map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={copying}
+                  onClick={() => copyFrom(s)}
+                  className="inline-flex items-center gap-1.5 px-3 h-control text-sm font-medium rounded-lg border border-border-secondary text-foreground hover:bg-surface-secondary disabled:opacity-50"
+                >
+                  <Copy className="w-4 h-4" /> Start from {SURFACE_NAME[s]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* The business homepage shows the store homepage until it has rows of its own. */}
@@ -385,7 +400,7 @@ export default function HomepageSectionManager({
             <button
               type="button"
               disabled={copying}
-              onClick={() => copyStore()}
+              onClick={() => copyFrom(surface, 'store')}
               className="inline-flex items-center gap-1.5 px-3 h-control text-sm font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50"
             >
               <Copy className="w-4 h-4" /> {copying ? 'Copying…' : 'Start from the store homepage'}
@@ -395,11 +410,39 @@ export default function HomepageSectionManager({
       )}
 
       {sections.length > 0 && (
-        <p className="text-xs text-foreground-muted">
-          Drag a section between rows, or onto the left or right half of another to put the two side by side on wide screens
-          (they stack on phones and in the app). The switch on each section&apos;s left edge shows or hides it on the device picked above;
-          the one on the right hides it everywhere.
-        </p>
+        <div className="space-y-2">
+          <p className="text-xs text-foreground-muted">
+            This is the {SURFACE_NAME[surface]} layout: every device has its own, so changes here (order, shapes, text) don&apos;t
+            touch the others. Drag a section between rows, or onto the left or right half of another to put the two side by
+            side on wide screens. The switch on the right hides a section.
+          </p>
+          {canWrite && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-foreground-muted">
+              <span>Replace with a copy of:</span>
+              {otherSurfaces.map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={copying}
+                  onClick={() => copyFrom(s, audience, false)}
+                  className="inline-flex items-center gap-1 px-2 h-7 rounded-md border border-border-secondary text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                >
+                  <Copy className="w-3.5 h-3.5" /> {SURFACE_NAME[s]}
+                </button>
+              ))}
+              {business && (
+                <button
+                  type="button"
+                  disabled={copying}
+                  onClick={() => copyFrom(surface, 'store', false)}
+                  className="inline-flex items-center gap-1 px-2 h-7 rounded-md border border-border-secondary text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                >
+                  <Copy className="w-3.5 h-3.5" /> Store homepage
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {canWrite && (
@@ -484,8 +527,6 @@ interface RowProps {
   onChange: (id: string, patch: Partial<HomepageSection>) => void
   onSave: (id: string, body: Record<string, unknown>) => Promise<void>
   onRemove: (section: HomepageSection) => void
-  surface: HomepageSurface
-  onToggleSurface: (section: HomepageSection) => void
   extra?: React.ReactNode
   alwaysExpanded?: boolean
   /** Open on mount, e.g. a section the admin just added. */
@@ -506,8 +547,6 @@ function SectionRow({
   onChange,
   onSave,
   onRemove,
-  surface,
-  onToggleSurface,
   extra,
   alwaysExpanded = false,
   defaultOpen = false,
@@ -520,8 +559,6 @@ function SectionRow({
   const meta = SECTION_META[section.type]
   const open = alwaysExpanded || expanded
   const editable = canWrite && inPlan
-  // Shown on the device the page's selector highlights; off dims the whole card.
-  const shown = sectionSurfaces(section)[surface]
   const planBadge = inPlan ? null : (
     <span
       title={planNeeds ? `Comes with ${planNeeds}` : 'Not in your plan'}
@@ -544,19 +581,8 @@ function SectionRow({
   )
 
   return (
-    <div ref={setNodeRef} className={`rounded-lg border border-border-default bg-surface ${isDragging ? 'opacity-50' : shown ? '' : 'opacity-50'}`}>
+    <div ref={setNodeRef} className={`rounded-lg border border-border-default bg-surface ${isDragging ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={shown}
-          disabled={!editable}
-          title={`${shown ? 'Shown' : 'Hidden'} on ${SURFACE_NAME[surface]}`}
-          onClick={() => onToggleSurface(section)}
-          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors disabled:cursor-not-allowed ${shown ? 'bg-accent-500' : 'bg-border-secondary'}`}
-        >
-          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${shown ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
         {/* Listeners stay on the grip: on the row they would swallow clicks on the toggle
             and every input inside the expanded editor. */}
         <button

@@ -139,7 +139,7 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
         )}
       </div>
 
-      <div className="md:col-span-2 space-y-4">
+      <div className="md:col-span-2 space-y-4 lg:self-start admin-sticky-pane">
         <Section title="Template">
           <div className="flex flex-wrap gap-2">
             <a href="/api/admin/data-source/template" className={btnGhost}>

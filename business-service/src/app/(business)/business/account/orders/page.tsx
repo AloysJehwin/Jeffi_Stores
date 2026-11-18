@@ -206,7 +206,7 @@ export default function OrdersPage() {
 
         <div>
           {orders.length === 0 && !loading ? (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+            <div className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg
                 className="w-16 h-16 text-foreground-muted mx-auto mb-4"
                 fill="none"
@@ -220,11 +220,11 @@ export default function OrdersPage() {
                   d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                 />
               </svg>
-              <h3 className="text-xl font-semibold text-foreground mb-2">No orders yet</h3>
+              <h3 className="ui-heading text-xl font-semibold text-foreground mb-2">No orders yet</h3>
               <p className="text-foreground-secondary mb-6">You haven&apos;t placed any orders yet.</p>
               <Link
                 href={bp('/business/products')}
-                className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+                className="ui-btn inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
               >
                 Start Shopping
               </Link>
@@ -248,7 +248,7 @@ export default function OrdersPage() {
                 return (
                   <div
                     key={order.id}
-                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden"
+                    className="ui-card bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden"
                   >
                     {/* Mobile card — compact header + first item only */}
                     <div className="sm:hidden">
@@ -261,7 +261,7 @@ export default function OrdersPage() {
                             {order.order_number}
                           </Link>
                           <span
-                            className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                            className={`ui-badge flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
                           >
                             {getStatusLabel(order.status)}
                           </span>
@@ -364,7 +364,7 @@ export default function OrdersPage() {
                             </div>
                           </div>
                           <span
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                            className={`ui-badge inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
                           >
                             {getStatusLabel(order.status)}
                           </span>

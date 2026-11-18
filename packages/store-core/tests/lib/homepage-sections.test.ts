@@ -7,7 +7,7 @@ import {
   groupRows,
   isWithinWindow,
   sectionSide,
-  sectionSurfaces,
+  slidesForSurface,
   productRowKey,
   productSource,
   sectionLayout,
@@ -169,7 +169,7 @@ describe('config accessors', () => {
   })
 })
 
-describe('single layout: sides and surfaces', () => {
+describe('sides and per-surface layouts', () => {
   const side = (id: string, s: 'full' | 'left' | 'right') => make({ id, config: s === 'full' ? {} : { layout: { side: s } } })
 
   it('pairs a left followed by a right; anything else is a row of its own', () => {
@@ -178,13 +178,13 @@ describe('single layout: sides and surfaces', () => {
     expect(sectionSide(make({ config: { layout: { side: 'nonsense' } } }))).toBe('full')
   })
 
-  it('shows on every surface unless config.surfaces says otherwise', () => {
-    expect(sectionSurfaces(make())).toEqual({ web: true, web_mobile: true, app: true })
-    expect(sectionSurfaces(make({ config: { surfaces: { app: false } } }))).toEqual({ web: true, web_mobile: true, app: false })
-    // A row from before the single layout shows on its own surface alone.
-    expect(sectionSurfaces(make({ surface: 'app' }))).toEqual({ web: false, web_mobile: false, app: true })
-    const rows = [make({ id: 'w' }), make({ id: 'm', config: { surfaces: { web: false, app: false } } })]
+  it('gives each surface its own sections and slides, never another surface\'s', () => {
+    const rows = [make({ id: 'w' }), make({ id: 'm', surface: 'web_mobile' }), make({ id: 'a', surface: 'app' })]
     expect(forSurface(rows, 'web').map(s => s.id)).toEqual(['w'])
-    expect(forSurface(rows, 'web_mobile').map(s => s.id)).toEqual(['w', 'm'])
+    expect(forSurface(rows, 'web_mobile').map(s => s.id)).toEqual(['m'])
+    expect(forSurface(rows, 'app').map(s => s.id)).toEqual(['a'])
+    const slides = [{ id: 's1', surface: 'web' }, { id: 's2', surface: null }]
+    expect(slidesForSurface(slides, 'web').map(s => s.id)).toEqual(['s1', 's2'])
+    expect(slidesForSurface(slides, 'app')).toEqual([])
   })
 })

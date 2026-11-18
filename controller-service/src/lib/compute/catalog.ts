@@ -1,8 +1,10 @@
 import 'server-only'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import type { Catalog, PlanCompute, PresetKey, PriceRow, PricingSettings } from '@/lib/compute/spec'
+import { loadUsdInr } from '@/lib/billing/fx'
 
 // Prices and settings the calculator reads (compute_prices + platform_infra 'compute_pricing'), cached a minute.
+// usdInr is always the live rate (lib/billing/fx); the stored value and the default below are ignored.
 
 export const DEFAULT_SETTINGS: PricingSettings = {
   usdInr: 88,
@@ -31,9 +33,10 @@ let cache: { at: number; catalog: Catalog } | null = null
 export async function getCatalog(): Promise<Catalog> {
   if (cache && Date.now() - cache.at < 60_000) return cache.catalog
   const pool = controlPlanePool()
-  const [prices, settings] = await Promise.all([
+  const [prices, settings, fx] = await Promise.all([
     pool.query(`SELECT * FROM compute_prices ORDER BY sort, code`),
     pool.query<{ value: string }>(`SELECT value FROM platform_infra WHERE key = 'compute_pricing'`),
+    loadUsdInr(),
   ])
   let stored: Partial<PricingSettings> = {}
   try {
@@ -57,7 +60,7 @@ export async function getCatalog(): Promise<Catalog> {
         sort: r.sort,
       })
     ),
-    settings: { ...DEFAULT_SETTINGS, ...stored },
+    settings: { ...DEFAULT_SETTINGS, ...stored, usdInr: fx.rate },
   }
   cache = { at: Date.now(), catalog }
   return catalog

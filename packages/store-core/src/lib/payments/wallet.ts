@@ -48,6 +48,7 @@ export type WalletCategory =
   | 'messaging_addon'
   | 'domain'
   | 'infra'
+  | 'showcase'
   | 'adjustment'
 
 export interface TenantWallet {

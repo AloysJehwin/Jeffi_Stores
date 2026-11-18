@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid, Server } from 'lucide-react'
+import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid, Server, PanelsTopLeft, Inbox, BadgeCheck } from 'lucide-react'
 import type { ServiceType } from '@/lib/tenant-registry'
 
 export interface NavItem {
@@ -37,6 +37,15 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    // The editor (/dashboard/showcase/edit) opens from the Site page.
+    title: 'Showcase',
+    items: [
+      { href: '/dashboard/showcase', label: 'Site', icon: PanelsTopLeft, exact: true, requires: 'showcase' },
+      { href: '/dashboard/showcase/leads', label: 'Enquiries', icon: Inbox, requires: 'showcase' },
+      { href: '/dashboard/showcase', label: 'Get a website', icon: PanelsTopLeft, exact: true, hideWhen: 'showcase' },
+    ],
+  },
+  {
     title: 'Finance',
     items: [
       { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
@@ -50,6 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/dashboard/billing', label: 'Billing', icon: CreditCard, requires: 'store' },
       { href: '/dashboard/business', label: 'Business details', icon: Building2 },
+      { href: '/dashboard/licences', label: 'Licences', icon: BadgeCheck, requires: 'store' },
     ],
   },
 ]

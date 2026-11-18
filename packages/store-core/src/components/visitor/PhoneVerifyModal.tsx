@@ -141,8 +141,8 @@ export default function PhoneVerifyModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <div className="bg-surface-elevated rounded-lg shadow-xl p-6 w-full max-w-sm">
-        <h3 className="text-lg font-semibold text-foreground mb-2">
+      <div className="ui-raised bg-surface-elevated rounded-lg shadow-xl p-6 w-full max-w-sm">
+        <h3 className="ui-heading text-lg font-semibold text-foreground mb-2">
           {title || (stage === 'otp' ? 'Verify Mobile Number' : 'Add Mobile Number')}
         </h3>
         <p className="text-sm text-foreground-secondary mb-6">
@@ -166,7 +166,7 @@ export default function PhoneVerifyModal({
                 Mobile Number *
               </label>
               <div className="flex">
-                <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                <span className="ui-addon inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
                   +91
                 </span>
                 <input
@@ -178,7 +178,7 @@ export default function PhoneVerifyModal({
                   required
                   autoFocus
                   onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                  className="ui-input w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                   placeholder="00000 00000"
                 />
               </div>
@@ -245,7 +245,7 @@ export default function PhoneVerifyModal({
                 (requiresPolicy && !policyAccepted) ||
                 (requiresDob && !isValidDob(dob))
               }
-              className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <>
@@ -272,7 +272,7 @@ export default function PhoneVerifyModal({
                 required
                 autoFocus
                 onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                className="w-full px-4 py-3 tracking-[0.5em] text-center border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                className="ui-input w-full px-4 py-3 tracking-[0.5em] text-center border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 placeholder="000000"
               />
             </div>
@@ -280,7 +280,7 @@ export default function PhoneVerifyModal({
             <button
               type="submit"
               disabled={loading || otp.length !== 6}
-              className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              className="ui-btn w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <>

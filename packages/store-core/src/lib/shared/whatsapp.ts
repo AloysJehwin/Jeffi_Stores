@@ -7,6 +7,7 @@ import { messagingGateAllows, debitMessageEstimate } from '@/lib/shared/messagin
 import { estimateFor } from '@/lib/shared/messaging/pricing'
 import { sendByTemplate } from '@/lib/shared/send-by-template'
 import type { OutboundMedia } from '@/lib/shared/messaging/types'
+import type { SenderAudience } from '@/lib/messaging/tenant-senders'
 import { currentReplyScope } from '@/lib/replies/scope'
 
 // WhatsApp wrappers now dispatch via sendByTemplate (slug → messaging-service).
@@ -148,8 +149,9 @@ export async function sendFreeTextWhatsApp(params: {
   phone?: string | null
   body: string
   kind?: string
+  audience?: SenderAudience
 }): Promise<boolean> {
-  return !!(await sendWhatsAppDirect({ phone: params.phone, text: params.body, kind: params.kind }))
+  return !!(await sendWhatsAppDirect({ phone: params.phone, text: params.body, kind: params.kind, audience: params.audience }))
 }
 
 /**
@@ -162,12 +164,14 @@ export async function sendWhatsAppDirect(params: {
   text?: string
   media?: OutboundMedia
   kind?: string
+  /** Which of the store's numbers sends it; staff conversations use 'admin'. */
+  audience?: SenderAudience
 }): Promise<string | null> {
   const normalized = normalizePhone(params.phone)
   if (!normalized) return null
   if (!(await whatsappChannelEnabled())) return null
   if (!(await messagingGateAllows('whatsapp', false))) return null
-  const provider = await getWhatsAppProvider()
+  const provider = await getWhatsAppProvider(params.audience ?? 'customer')
   if (!provider.configured) return null
   const kind = params.kind || 'support_reply'
   const body = params.media ? params.media.caption || `[${params.media.filename || params.media.kind}]` : params.text || ''
@@ -183,9 +187,9 @@ export async function sendWhatsAppDirect(params: {
 }
 
 /** Blue ticks on an inbound WhatsApp message (no-op where the provider can't). */
-export async function markWhatsAppRead(providerMessageId: string): Promise<void> {
+export async function markWhatsAppRead(providerMessageId: string, audience: SenderAudience = 'customer'): Promise<void> {
   try {
-    await (await getWhatsAppProvider()).markRead(providerMessageId)
+    await (await getWhatsAppProvider(audience)).markRead(providerMessageId)
   } catch {
     /* best effort */
   }

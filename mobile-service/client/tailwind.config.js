@@ -4,6 +4,15 @@
 const plugin = require('tailwindcss/plugin')
 const tokens = require('../../packages/design-tokens')
 
+// Brand scales read `--c-<name>-<shade>` channels ("R G B"): a store's Site Builder theme sets them at runtime
+// (app/_layout.tsx), and the design tokens are the defaults below. <alpha-value> keeps `/NN` modifiers working.
+const SCALES = { primary: tokens.primary, secondary: tokens.secondary, accent: tokens.accent }
+const channels = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(' ')
+const scale = name => Object.fromEntries(Object.keys(SCALES[name]).map(shade => [shade, `rgb(var(--c-${name}-${shade}) / <alpha-value>)`]))
+const scaleDefaults = Object.fromEntries(
+  Object.entries(SCALES).flatMap(([name, shades]) => Object.entries(shades).map(([shade, hex]) => [`--c-${name}-${shade}`, channels(hex)]))
+)
+
 module.exports = {
   content: ['./app/**/*.{js,jsx,ts,tsx}', './src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
@@ -11,9 +20,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: tokens.primary,
-        secondary: tokens.secondary,
-        accent: tokens.accent,
+        primary: scale('primary'),
+        secondary: scale('secondary'),
+        accent: scale('accent'),
         surface: 'var(--color-surface)',
         'surface-elevated': 'var(--color-surface-elevated)',
         'surface-secondary': 'var(--color-surface-secondary)',
@@ -37,7 +46,7 @@ module.exports = {
   plugins: [
     plugin(({ addBase }) =>
       addBase({
-        ':root': tokens.cssVars('light'),
+        ':root': { ...scaleDefaults, ...tokens.cssVars('light') },
         '@media (prefers-color-scheme: dark)': { ':root': tokens.cssVars('dark') },
       })
     ),

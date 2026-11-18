@@ -4,6 +4,7 @@
 // When the gateway is unreachable, times out or answers 5xx (never 4xx), calls go straight to
 // Ollama at OLLAMA_BASE_URL (ai-direct-ollama.ts) and come back with fallbackUsed: true.
 import { directChat, directEmbed, directVision, ollamaDirectUrl } from './ai-direct-ollama'
+import { meterAiCost } from '@/lib/ai/cost-meter'
 
 export interface AiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -238,6 +239,7 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
     () => gatewayPost('/v1/chat', { ...req, ...ctx }, '', true) as Promise<AiChatResponse>,
     directFor(ctx.providers, ms => directChat(req, ms)),
   )
+  meterAiCost(res.usage?.costInr)
   if (req.billing !== false) {
     void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
   }
@@ -272,6 +274,7 @@ export async function aiChatStream(
     if (r.content) opts.onEvent?.({ type: 'text', text: r.content })
     return r
   }
+  meterAiCost(res.usage?.costInr)
   if (req.billing !== false) {
     void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
   }

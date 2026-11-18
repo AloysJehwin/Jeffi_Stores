@@ -14,7 +14,7 @@ export default async function StoreStatusDetailPage({ params }: { params: Promis
   const d = await loadTenantDetail(id)
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 w-full max-w-full min-w-0 overflow-x-hidden">
+    <div className="p-4 sm:p-6 space-y-5 w-full max-w-full min-w-0 overflow-x-clip">
       <TenantObjectHeader d={d} back={{ href: '/admin/ecom/store-status', label: 'Store Status' }} section="status" />
 
       {d.isStore ? (

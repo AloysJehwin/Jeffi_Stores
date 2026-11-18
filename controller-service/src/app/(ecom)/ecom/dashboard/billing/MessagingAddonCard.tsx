@@ -131,7 +131,10 @@ export default function MessagingAddonCard({ initial, tenantSlug }: { initial: M
               </button>
             </div>
           )}
-          <p className="text-sm text-foreground-secondary mb-4">Send OTPs, order updates and campaigns by SMS and WhatsApp from your own numbers.</p>
+          <p className="text-sm text-foreground-secondary mb-4">
+            Send OTPs, order updates and campaigns by SMS and WhatsApp from your own numbers. Includes two dedicated numbers: a customer-facing
+            number for WhatsApp and SMS, and an admin-facing WhatsApp number where your team uses the store assistant.
+          </p>
           {buy}
         </>
       )}

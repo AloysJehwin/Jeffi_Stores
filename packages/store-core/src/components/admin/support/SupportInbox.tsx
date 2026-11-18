@@ -6,7 +6,7 @@ import PresenceBadge from '@/components/chat/PresenceBadge'
 import { ago, previewOf } from '@/components/chat/format'
 import type { SupportChannel, SupportEvent, SupportSession } from '@/lib/support/types'
 import SupportConversation, { CHANNEL_ICON, CHANNEL_LABEL } from './SupportConversation'
-import { SessionRowsLoading } from './SupportInboxLoading'
+import { INBOX_SPLIT, SessionRowsLoading } from './SupportInboxLoading'
 
 type Filter = 'needs_human' | 'approval' | 'mine' | 'ai' | 'open' | 'closed'
 const TABS: Array<{ key: Filter; label: string }> = [
@@ -161,7 +161,7 @@ export default function SupportInbox({ initialId, initialFilter, me }: { initial
   const visible = useMemo(() => sessions.filter(s => fits(s, filter, me) || s.id === selected), [sessions, filter, me, selected])
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,360px)_1fr] gap-0 rounded-xl border border-border-default bg-surface-elevated overflow-hidden h-[calc(100dvh-15rem)] min-h-[520px]">
+    <div className="admin-split grid grid-cols-1 lg:grid-cols-[minmax(300px,360px)_1fr] gap-0 rounded-xl border border-border-default bg-surface-elevated overflow-hidden h-[calc(100dvh-15rem)] min-h-[520px]" style={INBOX_SPLIT}>
       <aside className={`min-h-0 flex-col border-r border-border-default ${selected ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-3 space-y-2 border-b border-border-default">
           <div className="relative">

@@ -21,7 +21,7 @@ export default function Loading() {
 
       <div className="container mx-auto px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-foreground">Product Comparison</h1>
+          <h1 className="ui-heading text-2xl font-bold text-foreground">Product Comparison</h1>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default bg-surface text-sm font-medium text-foreground-muted">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -30,7 +30,7 @@ export default function Loading() {
           </span>
         </div>
 
-        <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-x-auto">
+        <div className="ui-card bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b border-border-default">

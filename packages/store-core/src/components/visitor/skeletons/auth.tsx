@@ -57,9 +57,9 @@ export function StoreAuthSkeleton({ kind }: { kind: 'login' | 'signup' }) {
       aria-label={login ? 'Loading login' : 'Loading sign up'}
     >
       <div className="max-w-md w-full">
-        <div className="bg-surface-elevated rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
+        <div className="ui-card bg-surface-elevated rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-foreground">{login ? 'Welcome Back' : 'Create Account'}</h2>
+            <h2 className="ui-heading text-3xl font-bold text-foreground">{login ? 'Welcome Back' : 'Create Account'}</h2>
             <p className="mt-2 text-sm text-foreground-secondary flex items-center justify-center gap-1">
               {login ? 'Login to your' : 'Join'} <Sk className="inline-block h-4 w-20" />{' '}
               {login ? 'account' : 'for exclusive deals'}
@@ -102,7 +102,7 @@ export function StoreAuthSkeleton({ kind }: { kind: 'login' | 'signup' }) {
               <div>
                 <Label>Mobile Number *</Label>
                 <div className="flex">
-                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                  <span className="ui-addon inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
                     +91
                   </span>
                   <div className={`${INPUT} rounded-l-none`}>00000 00000</div>
@@ -189,7 +189,7 @@ export function BusinessAuthSkeleton({ kind }: { kind: 'signin' | 'signup' }) {
           <span aria-hidden className="sk block h-6 w-36 rounded bg-white/15" />
         </div>
         <div className="relative max-w-lg">
-          <h2 className="text-4xl font-black leading-[1.1] xl:text-5xl">{c.headline}</h2>
+          <h2 className="ui-heading text-4xl font-black leading-[1.1] xl:text-5xl">{c.headline}</h2>
           <p className="mt-4 text-base leading-relaxed opacity-80">{c.sub}</p>
           <ul className="mt-8 space-y-3">
             {points.map(p => (
@@ -210,7 +210,7 @@ export function BusinessAuthSkeleton({ kind }: { kind: 'signin' | 'signup' }) {
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8">
             <p className="text-sm text-foreground-muted mb-6">← Back to store</p>
-            <h1 className="text-3xl font-bold text-foreground">{c.title}</h1>
+            <h1 className="ui-heading text-3xl font-bold text-foreground">{c.title}</h1>
             {kind === 'signin' ? (
               <p className="text-sm text-foreground-secondary mt-2 flex flex-wrap items-center gap-1">
                 Access your <Sk className="inline-block h-4 w-20" /> business partner account
@@ -243,7 +243,7 @@ export function BusinessAuthSkeleton({ kind }: { kind: 'signin' | 'signup' }) {
             <span className="text-accent-600 dark:text-accent-400 font-medium">{c.footer[1]}</span>
           </p>
         </div>
-        <div className="mx-auto mt-10 w-full max-w-sm rounded-2xl border border-border-default bg-surface-elevated p-5 lg:hidden">
+        <div className="ui-card mx-auto mt-10 w-full max-w-sm rounded-2xl border border-border-default bg-surface-elevated p-5 lg:hidden">
           <p className="text-base font-bold leading-snug text-foreground">{c.headline}</p>
           <ul className="mt-3 space-y-2.5">
             {points.map(p => (

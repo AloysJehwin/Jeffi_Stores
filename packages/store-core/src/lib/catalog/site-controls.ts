@@ -2,6 +2,7 @@ import { queryMany } from '@/lib/shared/db'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 import type { MessagingLocks } from '@/lib/billing/messaging-locks'
 import { DEFAULT_MEDIA_LIMITS, type MediaLimits } from './product-media-shared'
+import { STORE_SOCIAL_KEYS, STORE_SOCIAL_NETWORKS, STORE_WHATSAPP_KEY, socialUrl, whatsappDigits, type StoreSocials } from './store-socials'
 
 // Centralized reader for all admin-controlled store settings, backed by the
 // site_settings key/value table. Mirrors the cache pattern in delivery-settings.ts:
@@ -19,6 +20,8 @@ export interface StoreIdentity {
   logoUrl: string // '' means "no logo" — render the store name as text
   faviconUrl: string // browser-tab icon; '' falls back to logoUrl
   emailAccent: string // '#rrggbb' for email buttons and links; '' keeps the default blue
+  whatsapp: string // digits with the country code ('919876543210'); '' when not set
+  socials: StoreSocials // profile links (absolute https URLs), only the networks set
 }
 
 export interface FeatureFlags {
@@ -179,6 +182,8 @@ const DEFAULTS: SiteControls = {
     logoUrl: '',
     faviconUrl: '',
     emailAccent: '',
+    whatsapp: '',
+    socials: {},
   },
   flags: {
     // Preserve current env-driven behavior when the DB key is unset.
@@ -305,6 +310,8 @@ const KEYS = [
   'business_logo_url',
   'business_favicon_url',
   'business_email_accent',
+  STORE_WHATSAPP_KEY,
+  ...Object.values(STORE_SOCIAL_KEYS),
   'business_hours',
   'feature_razorpay_enabled',
   'feature_upi_enabled',
@@ -453,6 +460,8 @@ async function identityDefaults(): Promise<StoreIdentity> {
     logoUrl: '',
     faviconUrl: '',
     emailAccent: '',
+    whatsapp: '',
+    socials: {},
   }
 }
 
@@ -500,6 +509,10 @@ export async function getSiteControls(): Promise<SiteControls> {
         logoUrl: str('business_logo_url', id.logoUrl),
         faviconUrl: str('business_favicon_url', str('business_logo_url', id.logoUrl)),
         emailAccent: str('business_email_accent', id.emailAccent),
+        whatsapp: whatsappDigits(str(STORE_WHATSAPP_KEY, id.whatsapp)) || '',
+        socials: Object.fromEntries(
+          STORE_SOCIAL_NETWORKS.map(n => [n, socialUrl(n, str(STORE_SOCIAL_KEYS[n], '')) || '']).filter(([, url]) => url)
+        ) as StoreSocials,
       },
       flags: {
         razorpayEnabled: bool('feature_razorpay_enabled', d.flags.razorpayEnabled),
@@ -722,3 +735,4 @@ export function invalidateSiteControlsCache() {
 }
 
 export { DEFAULTS as SITE_CONTROLS_DEFAULTS }
+export { cacheKey as tenantCacheKey }

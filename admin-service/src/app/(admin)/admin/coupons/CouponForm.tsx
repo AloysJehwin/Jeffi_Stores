@@ -10,7 +10,7 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AIFillForm from '@/components/admin/AIFillForm'
 import CouponUserSelector from '@/components/admin/CouponUserSelector'
 import { useEditSession } from '@/hooks/useEditSession'
-import { Badge, DraftLockBanner, FormButton, FormField, FormFooter, FormSection, LockedFieldset, fieldInputCls } from '@/components/admin/kit'
+import { Badge, DraftLockBanner, FormButton, FormField, FormFooter, FormSection, LockedFieldset, fieldInputCls, stickyAboveFooter } from '@/components/admin/kit'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import type { DraftLockState } from '@/lib/client/draft-lock-client'
@@ -246,7 +246,7 @@ export default function CouponForm({
             </FormSection>
           </div>
 
-          <aside className="space-y-4">
+          <aside className="space-y-4 lg:self-start admin-sticky-pane" style={stickyAboveFooter}>
             <FormSection title="Status">
               <input type="hidden" name="is_active" value={isActive ? 'true' : 'false'} />
               <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />

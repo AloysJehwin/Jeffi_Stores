@@ -33,6 +33,9 @@ const LABELS: Record<string, string> = {
   reply_reader: 'Customer reply reading',
   campaign_scenario: 'Campaign scenario',
   form_fill: 'AI form fill',
+  site_builder: 'Site Builder AI',
+  site_generation: 'Site generation',
+  showcase_generation: 'Showcase generation',
   vision: 'Vision / OCR',
   quotation_ocr: 'Quotation OCR',
 }

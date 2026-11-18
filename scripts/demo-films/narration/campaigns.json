@@ -1,0 +1,30 @@
+{
+  "voice": "Sulafat",
+  "lines": [
+    {
+      "id": "c1",
+      "text": "Grow with campaigns that sell on autopilot."
+    },
+    {
+      "id": "c2",
+      "text": "Pick who to reach: new customers, repeat buyers, or shoppers who left something in their cart."
+    },
+    {
+      "id": "c3",
+      "text": "Send beautiful emails, WhatsApp messages and SMS from ready, approved templates."
+    },
+    {
+      "id": "c4",
+      "text": "Schedule it once, then watch the results come in: opens, clicks and orders."
+    },
+    {
+      "id": "c5",
+      "text": "Turn first-time buyers into regulars."
+    }
+  ],
+  "model": "gemini-3.8-flash-tts",
+  "language": "en-IN",
+  "gap": 0.55,
+  "leadIn": 0.8,
+  "tail": 2.4
+}

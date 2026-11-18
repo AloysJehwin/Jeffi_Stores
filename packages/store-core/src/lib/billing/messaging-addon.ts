@@ -26,11 +26,13 @@ export interface MessagingAddonPricing {
   priceInr: number
 }
 export const DEFAULT_MESSAGING_COST_LINES: MessagingCostLine[] = [
-  // Twilio local number $1.15/month at ₹88 (compute pricing's rate). The store's messaging server is
-  // already on its daily server bill; WhatsApp senders and the shared SMS header have no monthly fee.
-  { label: 'Dedicated number (Twilio local number, $1.15/month)', inrMonth: 101.2 },
+  // Two Twilio local numbers at $1.15/month and ₹88 (compute pricing's rate): customer-facing (WhatsApp + SMS) and
+  // admin-facing (WhatsApp). The store's messaging server is already on its daily server bill.
+  { label: 'Customer-facing number (Twilio local, $1.15/month)', inrMonth: 101.2 },
+  { label: 'Admin-facing number (Twilio local, $1.15/month)', inrMonth: 101.2 },
+  { label: 'WhatsApp sender registration, upkeep and support', inrMonth: 197.6 },
 ]
-export const DEFAULT_MESSAGING_MARGIN_PCT = 40
+export const DEFAULT_MESSAGING_MARGIN_PCT = 25
 
 export function messagingAddonPrice(costLines: MessagingCostLine[], marginPct: number): { costInr: number; priceInr: number } {
   const costInr = Math.round(costLines.reduce((a, l) => a + (Number(l.inrMonth) || 0), 0) * 100) / 100
@@ -165,8 +167,8 @@ export async function messagingEntitlement(tenantId: string | null | undefined, 
   if (hit && Date.now() - hit.at < Math.min(ENTITLEMENT_TTL_MS, opts.maxAgeMs ?? ENTITLEMENT_TTL_MS)) return hit.value
   const r = await controlPlanePool().query(
     `SELECT t.messaging_addon AS tier, t.messaging_addon_until > now() AS active,
-            EXISTS (SELECT 1 FROM tenant_messaging_senders s WHERE s.tenant_id = t.id AND s.channel = 'sms' AND s.status = 'active') AS sms_sender,
-            EXISTS (SELECT 1 FROM tenant_messaging_senders s WHERE s.tenant_id = t.id AND s.channel = 'whatsapp' AND s.status = 'active') AS wa_sender
+            EXISTS (SELECT 1 FROM tenant_messaging_senders s WHERE s.tenant_id = t.id AND s.channel = 'sms' AND s.audience = 'customer' AND s.status = 'active') AS sms_sender,
+            EXISTS (SELECT 1 FROM tenant_messaging_senders s WHERE s.tenant_id = t.id AND s.channel = 'whatsapp' AND s.audience = 'customer' AND s.status = 'active') AS wa_sender
        FROM tenants t WHERE t.id = $1`,
     [id]
   )

@@ -8,6 +8,7 @@ import { PRESETS, presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 import { monthlyTotal, quoteSpec } from '@controller/lib/compute/pricing'
 import type { Catalog, ComputeSpec, PresetKey, PriceRow, PricingSettings } from '@/lib/compute/spec'
 import { PricingLoading, SETTINGS } from './PricingLoading'
+import LiveUsdInr, { type FxRate } from './LiveUsdInr'
 
 type PlanRow = {
   slug: string
@@ -23,6 +24,7 @@ type PlanPrice = { infraInrMonth: number; totalInrMonth: number } | null
 
 type View = {
   prices: PriceRow[]
+  fx: FxRate
   settings: PricingSettings
   plans: PlanRow[]
   presets: { key: string; label: string; awsInrMonth: number | null; plans: Record<string, PlanPrice> }[]
@@ -125,6 +127,7 @@ export default function ComputePricingClient() {
 
       <section className="rounded-xl border border-border-default bg-surface-elevated p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <LiveUsdInr fx={view.fx} />
           {SETTINGS.map(s => (
             <label key={s.key} className="block">
               <span className="mb-1 block text-xs text-foreground-muted">{s.label}</span>

@@ -1,0 +1,50 @@
+{
+  "voice": "Sulafat",
+  "lines": [
+    {
+      "id": "o1",
+      "text": "Meet Jeffi Stores: the easiest way to sell online in India."
+    },
+    {
+      "id": "o2",
+      "text": "Tell us about your business once. Your products, your contacts, your social pages, and even the licences your category needs."
+    },
+    {
+      "id": "o3",
+      "text": "Then pick a look you love, from minimalist and brutalist to glass, luxury or playful, and our AI designs every page of your store."
+    },
+    {
+      "id": "o4",
+      "text": "In a hurry? Pick a ready-made theme, and your store fills it in instantly."
+    },
+    {
+      "id": "o5",
+      "text": "Make it yours with drag and drop. Move sections, edit text and photos, or simply ask the AI for a change."
+    },
+    {
+      "id": "o6",
+      "text": "Your customers get a fast, beautiful store on every device, from search to checkout."
+    },
+    {
+      "id": "o7",
+      "text": "Behind the scenes, one admin runs it all: products, orders, delivery, payments and GST invoices."
+    },
+    {
+      "id": "o8",
+      "text": "When you're ready to grow, campaigns on email, WhatsApp and SMS bring your customers back."
+    },
+    {
+      "id": "o9",
+      "text": "Just need a website for your business? Showcase builds a beautiful one-page site, free for the first month."
+    },
+    {
+      "id": "o10",
+      "text": "Jeffi Stores. Sell anything. We run the store."
+    }
+  ],
+  "model": "gemini-3.8-flash-tts",
+  "language": "en-IN",
+  "gap": 0.55,
+  "leadIn": 1.2,
+  "tail": 2.4
+}

@@ -5,7 +5,8 @@ import { ZodError, z } from 'zod'
 import type pg from 'pg'
 import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, SendPushRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
-import { mediaPriceInr, usdToInr } from '@jeffi/pricing'
+import { followsProviderPrice, mediaPriceInr, usdToInr } from '@jeffi/pricing'
+import { ensurePricing } from './pricing-sheet.js'
 import * as wallet from '@jeffi/wallet'
 import { sendPush } from '@jeffi/push'
 import { resolveServiceScope, scopeSql, inScope, verifyLink } from '@jeffi/tenancy'
@@ -467,14 +468,16 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   const sig = String(req.headers['x-twilio-signature'] ?? '')
   let valid = twilioSignatureValid(sig, id, req.body ?? {})
   if (!valid && m && (m.metadata as any)?.sender?.own && m.channel !== 'email') {
-    const s = await tenantSender(m.tenant_id, m.channel).catch(() => null)
+    const s = await tenantSender(m.tenant_id, m.channel, (m.metadata as any)?.sender?.audience ?? 'customer').catch(() => null)
     valid = !!s?.config.auth_token && twilioSignatureValid(sig, id, req.body ?? {}, s.config.auth_token)
   }
   if (!valid) return reply.code(403).send({ ok: false })
   if (!m) return { ok: true }
   await applyStatus(id, status, { code: req.body?.ErrorCode, message: req.body?.ErrorMessage, payload: req.body })
   const usd = priceUsd(req.body?.Price)
-  if (usd !== null && status !== 'failed' && status !== 'undelivered') {
+  await ensurePricing()
+  // The pricing sheet decides whether Twilio's reported price replaces the fixed one for this provider and channel.
+  if (usd !== null && status !== 'failed' && status !== 'undelivered' && followsProviderPrice(m.channel as any, (m.metadata as any)?.pricing_provider ?? 'twilio')) {
     const { withMargin } = await import('@jeffi/pricing')
     const exact = (m.metadata as any)?.internal ? usdToInr(usd) : withMargin(usdToInr(usd))
     await wallet.trueUp({ tenantId: m.tenant_id, amountInr: exact, externalRef: `pub:${id}`, note: `${m.channel} → ${m.to_address} (exact)` })

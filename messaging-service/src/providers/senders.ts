@@ -1,13 +1,14 @@
 import { db } from '../db.js'
 import { decryptToken } from '../cipher.js'
-import { PLATFORM_TENANT_ID } from '../templates-v2.js'
 
 // A store's own sender (DLT header / WhatsApp number) and provider credentials from the control plane's
-// tenant_messaging_senders (written by the flagship admin through lib/messaging/tenant-senders.ts). The
-// Twilio / AWS providers take it as an override; without a row the platform env sends, exactly as before.
+// tenant_messaging_senders (written by the flagship admin through lib/messaging/tenant-senders.ts), one row per
+// (tenant, channel, audience). The Twilio / AWS providers take it as an override; a missing audience falls back to
+// the customer row, and with no row at all the platform env sends, exactly as before.
 
 export type SenderChannel = 'sms' | 'whatsapp'
 export type SenderProvider = 'twilio' | 'aws'
+export type SenderAudience = 'customer' | 'admin' | 'ecom'
 
 export interface SenderOverride {
   /** The number / DLT header to send from. */
@@ -19,6 +20,7 @@ export interface SenderOverride {
 export interface TenantSender extends SenderOverride {
   channel: SenderChannel
   provider: SenderProvider
+  audience: SenderAudience
 }
 
 const TTL_MS = 30_000
@@ -31,18 +33,20 @@ export function invalidateTenantSenders(tenantId?: string) {
 
 export class SenderError extends Error {}
 
-/** null for the platform tenant, when the tenant has no active row, or when the table is missing. Throws
- *  SenderError when a row exists but can't be decrypted — the send must fail rather than use the platform number. */
-export async function tenantSender(tenantId: string, channel: SenderChannel): Promise<TenantSender | null> {
-  if (!tenantId || tenantId === PLATFORM_TENANT_ID) return null
-  const key = `${tenantId}:${channel}`
+/** The audience's own row, else the customer row; null when neither exists or the table is missing. Throws
+ *  SenderError when a row exists but can't be decrypted — the send must fail rather than use another number. */
+export async function tenantSender(tenantId: string, channel: SenderChannel, audience: SenderAudience = 'customer'): Promise<TenantSender | null> {
+  if (!tenantId) return null
+  const key = `${tenantId}:${channel}:${audience}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL_MS) return hit.sender
-  let row: { provider: string; sender: string; config_enc: string } | undefined
+  let row: { audience: string; provider: string; sender: string; config_enc: string } | undefined
   try {
     row = (await db.query<NonNullable<typeof row>>(
-      `SELECT provider, sender, config_enc FROM tenant_messaging_senders WHERE tenant_id=$1::uuid AND channel=$2 AND status='active'`,
-      [tenantId, channel]
+      `SELECT audience, provider, sender, config_enc FROM tenant_messaging_senders
+        WHERE tenant_id=$1::uuid AND channel=$2 AND audience IN ($3,'customer') AND status='active'
+        ORDER BY (audience=$3) DESC LIMIT 1`,
+      [tenantId, channel, audience]
     )).rows[0]
   } catch {
     return null // table not there yet / control plane down: not cached, the next send retries
@@ -55,7 +59,8 @@ export async function tenantSender(tenantId: string, channel: SenderChannel): Pr
     } catch (e: any) {
       throw new SenderError(`This store's ${channel} sender credentials cannot be read (${e?.message ?? e})`)
     }
-    sender = { channel, provider: row.provider, sender: row.sender, config }
+    const a = row.audience === 'admin' || row.audience === 'ecom' ? row.audience : 'customer'
+    sender = { channel, provider: row.provider, sender: row.sender, config, audience: a }
   }
   cache.set(key, { at: Date.now(), sender })
   return sender

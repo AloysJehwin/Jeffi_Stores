@@ -1,4 +1,5 @@
-import type { HomeSection, HomeData, CardProduct } from '../../types/home'
+import type { ReactNode } from 'react'
+import type { HomeSection, HomeData, CardProduct, SectionProps } from '../../types/home'
 import ProductRowSection, { ProductPair, ProductRowHead, ROW_STYLES, type RowStyle } from './ProductRowSection'
 import HeroCarousel from './HeroCarousel'
 import OfferSlider from './OfferSlider'
@@ -26,12 +27,20 @@ import ProductSpotlight from './ProductSpotlight'
 import RewardsGame from './RewardsGame'
 import SlidesSection from './SlidesSection'
 import BusinessReorder from './business/BusinessReorder'
+import { Faq, ImageBanner, ImageText, RichText } from './ContentBlocks'
+import { Composed } from './ComposedBlock'
 import BusinessOffers from './business/BusinessOffers'
 import BusinessQuotes from './business/BusinessQuotes'
 import BusinessAccount from './business/BusinessAccount'
 
 // Mirror of controller-service components/visitor/home/SectionRenderer.tsx.
 const SIMPLE = {
+  // Site Builder content blocks (contact details stay a website block).
+  rich_text: RichText,
+  image_text: ImageText,
+  image_banner: ImageBanner,
+  faq: Faq,
+  composed: Composed,
   hero: HeroCarousel,
   motion_hero: MotionHero,
   stories: Stories,
@@ -101,7 +110,7 @@ export default function SectionRenderer({ section, data, rowIndex }: { section: 
     case 'business_offers':
       return <BusinessOffers section={section} data={data} style={ROW_STYLES[rowIndex % ROW_STYLES.length]} />
     default: {
-      const Component = SIMPLE[section.type]
+      const Component = (SIMPLE as Partial<Record<string, (p: SectionProps) => ReactNode>>)[section.type]
       return Component ? <Component section={section} data={data} /> : null
     }
   }

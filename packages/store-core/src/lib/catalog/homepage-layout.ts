@@ -38,7 +38,7 @@ export interface PageLayout {
   surfaces: SurfaceLayouts
 }
 
-const VERSION = 'v1'
+const VERSION = 'v2' // v2: a layout per surface
 const REDIS_TTL_S = 15 * 60
 const MEMO_TTL_MS = 15 * 1000
 

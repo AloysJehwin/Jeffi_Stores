@@ -9,8 +9,9 @@ const SMS_FROM = process.env.TWILIO_FROM_NUMBER || ''
 const WA_FROM = process.env.TWILIO_WHATSAPP_FROM || ''
 
 // A store's own Twilio account (tenant_messaging_senders) builds a per-call client; the platform env otherwise.
+// A row without an account (the flagship's numbers, bought in the platform's account) uses the env credentials.
 function client(ov?: SenderOverride) {
-  const c = ov?.config
+  const c = ov?.config?.account_sid ? ov.config : undefined
   const sid = c ? c.account_sid : ACCOUNT_SID
   if (!sid) return null
   const [keySid, keySecret, token] = c ? [c.api_key_sid, c.api_key_secret, c.auth_token] : [API_KEY_SID, API_KEY_SECRET, AUTH_TOKEN]

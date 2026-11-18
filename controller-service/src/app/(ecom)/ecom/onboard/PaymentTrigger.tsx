@@ -99,7 +99,7 @@ export default function PaymentTrigger({
       <PageHeader eyebrow="Store application" title="Application approved!" actions={<Badge tone="sage">Approved</Badge>} />
       <Card>
         <p className="text-sm text-foreground-secondary break-words">
-          Your GST certificate has been verified. Complete your subscription payment to launch{' '}
+          Your licences and business details have been verified. Complete your subscription payment to launch{' '}
           <span className="font-semibold text-foreground">{displayName}</span> ({slug}.jeffistores.in).
         </p>
         {upiAutopay && (

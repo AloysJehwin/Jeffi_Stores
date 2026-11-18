@@ -594,6 +594,43 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
+  name: cron-showcase-renew
+  namespace: jeffi
+  labels: { app.kubernetes.io/part-of: jeffi-cron }
+spec:
+  schedule: '30 5 * * *'
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3000
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels: { app.kubernetes.io/part-of: jeffi-cron }
+        spec:
+          restartPolicy: Never
+          nodeSelector: { jeffi.io/role: core }
+          imagePullSecrets: [{ name: regcred }]
+          containers:
+            - name: run
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+              # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs showcase_renew POST /api/cron/showcase-renew']
+              env:
+                - name: CRON_SECRET
+                  valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+              resources:
+                requests: { cpu: 10m, memory: 48Mi }
+                limits: { memory: 128Mi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
   name: cron-publish-social-posts
   namespace: jeffi
   labels: { app.kubernetes.io/part-of: jeffi-cron }
@@ -2000,6 +2037,43 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
+  name: cron-ai-hold-sweep
+  namespace: jeffi
+  labels: { app.kubernetes.io/part-of: jeffi-cron }
+spec:
+  schedule: '*/15 * * * *'
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 870
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels: { app.kubernetes.io/part-of: jeffi-cron }
+        spec:
+          restartPolicy: Never
+          nodeSelector: { jeffi.io/role: core }
+          imagePullSecrets: [{ name: regcred }]
+          containers:
+            - name: run
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+              # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs ai_hold_sweep POST /api/cron/ai-hold-sweep']
+              env:
+                - name: CRON_SECRET
+                  valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+              resources:
+                requests: { cpu: 10m, memory: 48Mi }
+                limits: { memory: 128Mi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
   name: cron-s3-usage
   namespace: jeffi
   labels: { app.kubernetes.io/part-of: jeffi-cron }
@@ -2064,6 +2138,43 @@ spec:
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs ai_health GET /api/internal/ai/health']
+              env:
+                - name: CRON_SECRET
+                  valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+              resources:
+                requests: { cpu: 10m, memory: 48Mi }
+                limits: { memory: 128Mi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-compliance-expiry
+  namespace: jeffi
+  labels: { app.kubernetes.io/part-of: jeffi-cron }
+spec:
+  schedule: '0 9 * * *'
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3000
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels: { app.kubernetes.io/part-of: jeffi-cron }
+        spec:
+          restartPolicy: Never
+          nodeSelector: { jeffi.io/role: core }
+          imagePullSecrets: [{ name: regcred }]
+          containers:
+            - name: run
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+              # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs compliance_expiry POST /api/cron/compliance-expiry']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }

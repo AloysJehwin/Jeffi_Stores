@@ -55,11 +55,14 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Platform control plane: gated by host and isPlatformAdmin in middleware.
   'ecom/kyc/[tenantId]/approve',
   'ecom/kyc/[tenantId]/reject',
+  // Per-licence review (approve or reject one compliance document): isPlatformAdmin, like approve and reject.
+  'ecom/kyc/[tenantId]/doc/[docId]/review',
   // Platform-admin tenant billing controls (admin.jeffistores.in): gated on isPlatformAdmin,
   // which is strictly stronger than any :write scope, so a read-only member can never reach them.
   'ecom/[tenantId]/account-mode',
   'ecom/[tenantId]/upi-mode',
   'ecom/[tenantId]/messaging-senders/[channel]',
+  'ecom/[tenantId]/numbers',
   'ecom/[tenantId]/delivery-mode',
   'ecom/[tenantId]/shipments/[orderId]/correct',
   // Revoke a tenant admin certificate — platform-owner only (isPlatformAdmin), same as the other

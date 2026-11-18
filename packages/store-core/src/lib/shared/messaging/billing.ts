@@ -9,6 +9,7 @@ import {
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { estimateFor, channelCategory, type MessagingChannel } from './pricing'
+import { loadMessagePricing } from '@/lib/billing/message-pricing'
 
 // Messaging uses a ₹0 floor (block only when the balance can't cover the charge), independent of the
 // ₹500 shipping floor. Marketing sends are blocked on low balance; transactional (OTP/order/payment)
@@ -25,6 +26,7 @@ export async function checkMessagingBalance(params: {
   channel: MessagingChannel
   isMarketing: boolean
 }): Promise<MessagingGate> {
+  await loadMessagePricing()
   const { tenantId, channel, isMarketing } = params
   if (isFlagshipTenant(tenantId)) return { ok: true }
   const estimate = estimateFor(channel)
@@ -49,6 +51,7 @@ export async function debitMessageEstimate(params: {
   channel: MessagingChannel
   providerSid: string | null | undefined
 }): Promise<void> {
+  await loadMessagePricing()
   if (!gateEnabled() || !params.providerSid) return
   const tenantId = await resolveTenantId().catch(() => null)
   if (!tenantId || isFlagshipTenant(tenantId)) return
@@ -98,6 +101,7 @@ export async function refundMessageEstimate(params: {
   status: string
   internal?: boolean
 }): Promise<{ refundedInr: number; keptInr: number }> {
+  await loadMessagePricing()
   if (!gateEnabled() || !params.sid) return { refundedInr: 0, keptInr: 0 }
   if (!TERMINAL_FAILURE_STATUSES.has(params.status)) return { refundedInr: 0, keptInr: 0 }
   const tenantId = params.tenantId ?? (await resolveTenantId().catch(() => null))
@@ -159,6 +163,7 @@ export function isMarketingKind(kind: string): boolean {
 // Email has no delivery callback, so it is charged a fixed estimate synchronously on send success,
 // idempotent on the SES message id.
 export async function debitEmailCost(messageId: string | null | undefined): Promise<void> {
+  await loadMessagePricing()
   if (!gateEnabled() || !messageId) return
   const tenantId = await resolveTenantId().catch(() => null)
   if (!tenantId || isFlagshipTenant(tenantId)) return

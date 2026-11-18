@@ -333,3 +333,8 @@ export function useCart() {
   }
   return context
 }
+
+/** The cart, or null outside a CartProvider (the business portal, the onboarding studio's preview). */
+export function useCartOptional() {
+  return useContext(CartContext) ?? null
+}

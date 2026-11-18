@@ -1339,7 +1339,7 @@ export default function TemplateEditor({
       </div>
 
       {!embedded && (
-        <div className="bg-surface-secondary/50 rounded-lg border border-border-default p-4">
+        <div className="admin-sticky-pane bg-surface-secondary/50 rounded-lg border border-border-default p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Preview</div>
             {value.channel === 'email' && (

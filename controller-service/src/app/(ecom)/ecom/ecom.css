@@ -85,6 +85,7 @@
 .ecom-field:focus, .ecom-field:focus-within { outline: none; border-color: var(--org-terracotta) !important; box-shadow: var(--focus-halo) !important; }
 .ecom-scroll-x { scrollbar-width: none; }
 .ecom-scroll-x::-webkit-scrollbar { display: none; }
+@media (min-width: 1024px) { .ecom-scroll-y { scrollbar-width: thin; scrollbar-gutter: stable; } }
 
 /* accent-* utility remaps (green → terracotta/brown) */
 .ecom-scope .bg-accent-50 { background-color: var(--org-peach) !important; }

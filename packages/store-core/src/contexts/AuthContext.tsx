@@ -213,3 +213,8 @@ export function useAuth() {
   }
   return context
 }
+
+/** The signed-in state, or null outside an AuthProvider (a page part drawn where there is none). */
+export function useAuthOptional() {
+  return useContext(AuthContext) ?? null
+}

@@ -9,6 +9,30 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "dev-local-env",
+      "runtimeExecutable": "/usr/bin/env",
+      "runtimeArgs": [
+        "ALLOW_ENV_FALLBACK=true",
+        "AI_GATEWAY_URL=http://localhost:8090",
+        "npm",
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "showcase",
+      "runtimeExecutable": "/usr/bin/env",
+      "runtimeArgs": [
+        "ALLOW_ENV_FALLBACK=true",
+        "AI_GATEWAY_URL=http://localhost:8090",
+        "npm",
+        "run",
+        "dev:app:showcase"
+      ],
+      "port": 3014
     }
   ]
 }

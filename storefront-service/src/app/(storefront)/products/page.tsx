@@ -4,7 +4,9 @@ import { listingMetadata } from '@/lib/catalog/listing-seo'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import FilterSidebar from '@/components/visitor/FilterSidebar'
 import { LISTING_PAGE_SIZE, buildListingModel, getListingProducts } from '@/lib/catalog/listing-model'
-import { getWebSurface } from '@/lib/catalog/web-surface'
+import { renderPartsPage } from '@/components/visitor/site/code/parts/product/site-page'
+import ListingPageParts from '@/components/visitor/site/code/parts/listing/ListingPageParts'
+import { previewRows } from '@/lib/site/preview'
 import { EAGER_CARDS, productPageItems } from '@/components/visitor/listing/listing-sections'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
@@ -81,8 +83,9 @@ export default async function ProductsPage({
 
   // Server-renders this page's product cards; later pages come from loadPage, appended on scroll
   // without touching the URL.
-  const surface = await getWebSurface(resolvedSearchParams.layout)
-  const pagedItems = await productPageItems(products as any[], gstEnabled, { page: 'products', surface, pageNum: page, pageSize: LISTING_PAGE_SIZE, total }, EAGER_CARDS)
+  // A Site Builder preview renders the draft's between-products sections on this first page.
+  const { surface, draft } = await previewRows(resolvedSearchParams.preview, resolvedSearchParams.layout)
+  const pagedItems = await productPageItems(products as any[], gstEnabled, { page: 'products', surface, pageNum: page, pageSize: LISTING_PAGE_SIZE, total, draft }, EAGER_CARDS)
   async function loadPage(p: number) {
     'use server'
     const next = await getListingProducts({ ...resolvedSearchParams, page: String(p) })
@@ -94,108 +97,143 @@ export default async function ProductsPage({
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
   const subCats = allCats.filter((c: any) => c.parent_category_id)
 
-  return (
-    <div className="bg-surface min-h-screen">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-          {/* Sidebar Filters — desktop only */}
-          <aside className="hidden lg:block lg:col-span-1 py-6 sticky top-0 self-start max-h-screen overflow-y-auto">
-            <FilterSidebar facets={facets} categories={allCats} offers={filterOffers} />
-          </aside>
+  // The listing itself. With a Site Builder layout it is the page's `listing_main` block, with the store's blocks
+  // above and below it; otherwise it is the page.
+  const main = (
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+            {/* Sidebar Filters — desktop only */}
+            <aside className="hidden lg:block lg:col-span-1 py-6 sticky top-0 self-start max-h-screen overflow-y-auto">
+              <FilterSidebar facets={facets} categories={allCats} offers={filterOffers} />
+            </aside>
 
-          {/* Products area */}
-          <div className="lg:col-span-3 py-6">
-            {/* Page heading */}
-            <div className="mb-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
-            </div>
-            {/* Compare strip */}
-            <CompareStripLazy />
+            {/* Products area */}
+            <div className="lg:col-span-3 py-6">
+              {/* Page heading */}
+              <div className="mb-4">
+                <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
+              </div>
+              {/* Compare strip */}
+              <CompareStripLazy />
 
-            {/* Profile-based insight banner */}
-            <SearchInsightBanner
-              activeBrands={(brands as any[])
-                .filter(
-                  (b: any) =>
-                    resolvedSearchParams.brand?.split(',').includes(String(b.id)) ||
-                    resolvedSearchParams.brand?.split(',').includes(b.slug)
-                )
-                .map((b: any) => b.name)}
-              activeCategories={(categories as any[])
-                .filter(
-                  (c: any) =>
-                    resolvedSearchParams.category?.split(',').includes(String(c.id)) ||
-                    resolvedSearchParams.category?.split(',').includes(c.slug)
-                )
-                .map((c: any) => c.name)}
-              resultCount={total}
-            />
-
-            {/* Products Grid */}
-            {products.length > 0 ? (
-              <ProductGrid
-                products={products as any[]}
-                gstEnabled={gstEnabled}
-                categoryBanners={categoryBanners as any[]}
-                total={total}
-                start={start}
-                end={end}
-                filterSlot={
-                  <MobileFilterSheet
-                    key="mobile-filters"
-                    categories={allCats}
-                    brands={brands as any[]}
-                    facets={facets}
-                    offers={filterOffers}
-                  />
-                }
-                pagedItems={pagedItems}
-                loadPage={loadPage}
-                page={page}
+              {/* Profile-based insight banner */}
+              <SearchInsightBanner
+                activeBrands={(brands as any[])
+                  .filter(
+                    (b: any) =>
+                      resolvedSearchParams.brand?.split(',').includes(String(b.id)) ||
+                      resolvedSearchParams.brand?.split(',').includes(b.slug)
+                  )
+                  .map((b: any) => b.name)}
+                activeCategories={(categories as any[])
+                  .filter(
+                    (c: any) =>
+                      resolvedSearchParams.category?.split(',').includes(String(c.id)) ||
+                      resolvedSearchParams.category?.split(',').includes(c.slug)
+                  )
+                  .map((c: any) => c.name)}
+                resultCount={total}
               />
-            ) : (
-              <>
-                {/* Phones keep the filter sheet so a dead-end filter can be undone. */}
-                <div className="flex gap-2 mb-4 lg:hidden">
-                  <MobileFilterSheet
-                    categories={allCats}
-                    brands={brands as any[]}
-                    facets={facets}
-                    offers={filterOffers}
-                  />
-                </div>
-                <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-12 text-center">
-                  <svg
-                    className="mx-auto h-24 w-24 text-foreground-muted mb-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1}
-                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                    />
-                  </svg>
-                  <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
-                  <p className="text-foreground-secondary mb-6">
-                    We couldn&apos;t find any products matching your filters. Try adjusting your search criteria.
-                  </p>
-                  <Link
-                    href="/products"
-                    className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    View All Products
-                  </Link>
-                </div>
-              </>
-            )}
 
-            <RecentlyViewed title="Recently viewed" minItems={2} limit={6} />
+              {/* Products Grid */}
+              {products.length > 0 ? (
+                <ProductGrid
+                  products={products as any[]}
+                  gstEnabled={gstEnabled}
+                  categoryBanners={categoryBanners as any[]}
+                  total={total}
+                  start={start}
+                  end={end}
+                  filterSlot={
+                    <MobileFilterSheet
+                      key="mobile-filters"
+                      categories={allCats}
+                      brands={brands as any[]}
+                      facets={facets}
+                      offers={filterOffers}
+                    />
+                  }
+                  pagedItems={pagedItems}
+                  loadPage={loadPage}
+                  page={page}
+                />
+              ) : (
+                <>
+                  {/* Phones keep the filter sheet so a dead-end filter can be undone. */}
+                  <div className="flex gap-2 mb-4 lg:hidden">
+                    <MobileFilterSheet
+                      categories={allCats}
+                      brands={brands as any[]}
+                      facets={facets}
+                      offers={filterOffers}
+                    />
+                  </div>
+                  <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-12 text-center">
+                    <svg
+                      className="mx-auto h-24 w-24 text-foreground-muted mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                      />
+                    </svg>
+                    <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
+                    <p className="text-foreground-secondary mb-6">
+                      We couldn&apos;t find any products matching your filters. Try adjusting your search criteria.
+                    </p>
+                    <Link
+                      href="/products"
+                      className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      View All Products
+                    </Link>
+                  </div>
+                </>
+              )}
+
+              <RecentlyViewed title="Recently viewed" minItems={2} limit={6} />
+            </div>
           </div>
         </div>
-      </div>
+  )
+  // A search uses the search-results layout when the store has one, else the products layout. An AI layout that
+  // places ProductResults works from the listing parts alone; otherwise the listing renders as its core block.
+  const params = { preview: resolvedSearchParams.preview, layout: resolvedSearchParams.layout }
+  const searching = !!resolvedSearchParams.search?.trim()
+  const searchPage = searching ? await renderPartsPage({ audience: 'store', page: 'search' }, params, 'search_main', main, ['ProductResults']) : null
+  const { site, code } = searchPage?.site ? searchPage : await renderPartsPage({ audience: 'store', page: 'products' }, params, 'listing_main', main, ['ProductResults'])
+
+  return (
+    <div className="bg-surface min-h-screen">
+      <ListingPageParts
+        data={{
+          kind: searching ? 'search' : 'products',
+          basePath: '/products',
+          portal: 'storefront',
+          productBase: '/products',
+          products: products as any[],
+          gstEnabled,
+          total,
+          page,
+          pageSize: LISTING_PAGE_SIZE,
+          pagedItems,
+          loadPage,
+          sections: { page: 'products', surface, pageNum: page, pageSize: LISTING_PAGE_SIZE, total, draft },
+          categoryBanners: categoryBanners as any[],
+          // Only AI code sections' Filters read these (the built-in listing passes its own).
+          filters: code ? { facets, categories: allCats, brands: brands as any[], offers: filterOffers } : null,
+          grid: 'grid grid-flow-row-dense grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6',
+          // What SearchQuery shows.
+          search: searching ? { term: resolvedSearchParams.search!.trim().slice(0, 100), total } : null,
+        }}
+      >
+        {site ?? main}
+      </ListingPageParts>
     </div>
   )
 }

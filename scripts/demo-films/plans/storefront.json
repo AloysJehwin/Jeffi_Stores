@@ -1,0 +1,158 @@
+{
+  "music": "music/lyria-3-clip-preview-1.mp3",
+  "musicVolume": 0.26,
+  "poster": 7.5,
+  "scenes": [
+    {
+      "line": "s1",
+      "type": "title",
+      "kicker": "Your storefront",
+      "lines": [
+        "Designed for you,",
+        "page by page."
+      ],
+      "accentLine": 1,
+      "size": 124
+    },
+    {
+      "line": "s2",
+      "type": "grid",
+      "kicker": "AI site studio",
+      "title": "Every page, in your style",
+      "text": "Home, categories, brands, products, cart and checkout: designed together, filled with your catalogue.",
+      "images": [
+        {
+          "src": "stills/paws-home.jpg",
+          "label": "Home"
+        },
+        {
+          "src": "stills/paws-categories.jpg",
+          "label": "All categories"
+        },
+        {
+          "src": "stills/paws-category.jpg",
+          "label": "Category"
+        },
+        {
+          "src": "stills/paws-brand.jpg",
+          "label": "Brand"
+        },
+        {
+          "src": "stills/paws-product.jpg",
+          "label": "Product"
+        },
+        {
+          "src": "stills/paws-search.jpg",
+          "label": "Search"
+        },
+        {
+          "src": "stills/paws-cart.jpg",
+          "label": "Cart"
+        },
+        {
+          "src": "stills/paws-checkout.jpg",
+          "label": "Checkout"
+        },
+        {
+          "src": "stills/paws-wishlist.jpg",
+          "label": "Wishlist"
+        }
+      ]
+    },
+    {
+      "line": "s3",
+      "type": "screen",
+      "clip": {
+        "name": "paws-category",
+        "from": 0.3,
+        "rate": 1.4,
+        "cuts": [
+          [
+            0.8,
+            7.2
+          ],
+          [
+            9.4,
+            12.2
+          ],
+          [
+            17.2,
+            20.4
+          ]
+        ]
+      },
+      "url": "pawsandco.jeffistores.in/dog-food",
+      "lower": {
+        "kicker": "Works out of the box",
+        "title": "Search, filters, wishlist, cart"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.05,
+          "cx": 0.55,
+          "cy": 0.3
+        },
+        {
+          "k": 1,
+          "z": 1.05,
+          "cx": 0.5,
+          "cy": 0.3
+        }
+      ]
+    },
+    {
+      "line": "s4",
+      "type": "phone",
+      "clip": {
+        "name": "paws-phone",
+        "from": 0.5,
+        "rate": 1.3
+      },
+      "x": 1220,
+      "side": {
+        "kicker": "On every phone",
+        "title": "Shop anywhere",
+        "points": [
+          "Fast on mobile data",
+          "The same style, made for touch",
+          "Checkout in a few taps"
+        ]
+      }
+    },
+    {
+      "line": "s5",
+      "type": "screen",
+      "clip": {
+        "name": "studio-dnd",
+        "from": 0.3,
+        "rate": 1.0,
+        "cuts": [
+          [
+            2.4,
+            8.0
+          ]
+        ]
+      },
+      "url": "ecom.jeffistores.in/onboard",
+      "lower": {
+        "kicker": "Drag and drop",
+        "title": "Change anything, any time"
+      },
+      "camera": [
+        {
+          "k": 0,
+          "z": 1.2,
+          "cx": 0.68,
+          "cy": 0.42
+        },
+        {
+          "k": 1,
+          "z": 1.25,
+          "cx": 0.68,
+          "cy": 0.45
+        }
+      ]
+    }
+  ]
+}

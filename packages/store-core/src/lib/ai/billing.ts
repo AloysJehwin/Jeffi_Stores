@@ -5,12 +5,14 @@
 // idempotently by external_ref = 'ai:' || usage.id. Insufficient balance throws AiWalletError
 // before any provider call.
 
+import { AsyncLocalStorage } from 'async_hooks'
 import { query, queryOne } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { credentialOwnerId, isPlatformOwner } from '@/lib/integrations/owner'
 import { debit, trueUp } from '@jeffi/wallet'
 import { getTenantWallet } from '@/lib/payments/wallet'
 import { aiFeatureLabel } from './feature-labels'
+import { meterAiCost } from './cost-meter'
 
 export type Capability = 'text' | 'embed' | 'vision' | 'image' | 'video'
 export type UnitType = 'token_1k_in' | 'token_1k_out' | 'image' | 'video_second' | 'call'
@@ -46,6 +48,28 @@ export class AiWalletError extends Error {
     super(message)
     this.name = 'AiWalletError'
   }
+}
+
+// Platform-funded AI (a new store's onboarding site build): usage is priced and logged as usual, marked
+// wallet_ref 'platform:<label>', and never touches the store's wallet. The caller stops at the budget.
+// A paid generation (ai/paid-generation.ts) passes its own walletRef: each call is logged under it at price 0,
+// since the owner pays once, for the whole generation.
+interface Funded {
+  label: string
+  budgetInr: number
+  spentInr: number
+  walletRef?: string
+}
+const funded = new AsyncLocalStorage<Funded>()
+
+export function runPlatformFunded<T>(label: string, budgetInr: number, fn: () => Promise<T>, walletRef?: string): Promise<T> {
+  return funded.run({ label, budgetInr, spentInr: 0, walletRef }, fn)
+}
+
+/** Inside runPlatformFunded: what is left of the budget and what was spent; else null. */
+export function platformFunding(): { remainingInr: number; spentInr: number } | null {
+  const f = funded.getStore()
+  return f ? { remainingInr: Math.max(0, f.budgetInr - f.spentInr), spentInr: round4(f.spentInr) } : null
 }
 
 type PriceRow = { price_inr: number; cost_inr: number; model: string }
@@ -111,7 +135,8 @@ export async function preauthorize(
 ): Promise<{ usageId: string; priceInr: number }> {
   const ownerId = await credentialOwnerId()
   const isFlagship = isPlatformOwner(ownerId)
-  const estimated = isFlagship ? 0 : await priceUnits(input.capability, input.provider, input.model, input.estimateUnits)
+  const f = funded.getStore()
+  const estimated = isFlagship || f?.walletRef ? 0 : await priceUnits(input.capability, input.provider, input.model, input.estimateUnits)
 
   const row = await queryOne<{ id: string }>(
     `INSERT INTO ai_usage (feature, capability, provider, model, units, cost_inr, price_inr, wallet_ref, status, ref, actor)
@@ -123,6 +148,10 @@ export async function preauthorize(
   const walletRef = `ai:${usageId}`
 
   if (isFlagship) return { usageId, priceInr: 0 }
+  if (f) {
+    await query(`UPDATE ai_usage SET wallet_ref = $2 WHERE id = $1`, [usageId, f.walletRef ?? `platform:${f.label}`]).catch(() => {})
+    return { usageId, priceInr: estimated }
+  }
 
   const result = await debit({
     tenantId: ownerId,
@@ -150,6 +179,7 @@ export async function settle(
   usageId: string,
   input: Pick<UsageInput, 'units' | 'costInr' | 'latencyMs' | 'cache'> & { status: 'ok' | 'failed'; error?: string }
 ): Promise<void> {
+  meterAiCost(input.costInr)
   if (!usageId) return
   const current = await queryOne<{ feature: string; capability: Capability; provider: string; model: string; wallet_ref: string | null }>(
     `SELECT feature, capability, provider, model, wallet_ref FROM ai_usage WHERE id = $1`,
@@ -160,13 +190,18 @@ export async function settle(
   const isFailed = input.status === 'failed'
   const finalPrice = isFailed ? 0 : await priceUnits(current.capability, current.provider, current.model, input.units)
   const walletRef = current.wallet_ref ?? `ai:${usageId}`
+  const f = funded.getStore()
 
   await query(
     `UPDATE ai_usage SET units = $2::jsonb, cost_inr = $3, price_inr = $4, latency_ms = $5, cache = $6,
        status = $7, error = $8 WHERE id = $1`,
-    [usageId, JSON.stringify(input.units), round4(input.costInr || 0), round4(finalPrice), input.latencyMs ?? null, input.cache ?? null, input.status, input.error ?? null]
+    [usageId, JSON.stringify(input.units), round4(input.costInr || 0), round4(f?.walletRef ? 0 : finalPrice), input.latencyMs ?? null, input.cache ?? null, input.status, input.error ?? null]
   ).catch(() => {})
 
+  if (f) {
+    f.spentInr += finalPrice
+    return
+  }
   const ownerId = await credentialOwnerId()
   if (isPlatformOwner(ownerId)) return
   await trueUp({ tenantId: ownerId, amountInr: finalPrice, externalRef: walletRef, note: `AI: ${aiFeatureLabel(current.feature)}` }).catch(err => {
@@ -181,7 +216,8 @@ export async function settle(
 export async function recordUsage(input: UsageInput): Promise<{ usageId: string; priceInr: number }> {
   const ownerId = await credentialOwnerId()
   const isFlagship = isPlatformOwner(ownerId)
-  const price = isFlagship ? 0 : await priceUnits(input.capability, input.provider, input.model, input.units)
+  const f = funded.getStore()
+  const price = isFlagship || f?.walletRef ? 0 : await priceUnits(input.capability, input.provider, input.model, input.units)
   const row = await queryOne<{ id: string }>(
     `INSERT INTO ai_usage (feature, capability, provider, model, units, cost_inr, price_inr, wallet_ref, status, ref, actor, latency_ms, cache)
      VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,NULL,'pending',$8,$9,$10,$11)
@@ -203,9 +239,18 @@ export async function recordUsage(input: UsageInput): Promise<{ usageId: string;
   const usageId = row!.id
   const walletRef = `ai:${usageId}`
 
+  if (f?.walletRef && !isFlagship) {
+    await query(`UPDATE ai_usage SET status = 'ok', wallet_ref = $2 WHERE id = $1`, [usageId, f.walletRef]).catch(() => {})
+    return { usageId, priceInr: 0 }
+  }
   if (isFlagship || price <= 0) {
     await query(`UPDATE ai_usage SET status = 'ok' WHERE id = $1`, [usageId]).catch(() => {})
     return { usageId, priceInr: 0 }
+  }
+  if (f) {
+    f.spentInr += price
+    await query(`UPDATE ai_usage SET status = 'ok', wallet_ref = $2 WHERE id = $1`, [usageId, `platform:${f.label}`]).catch(() => {})
+    return { usageId, priceInr: price }
   }
 
   const result = await debit({

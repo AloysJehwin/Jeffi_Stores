@@ -7,6 +7,7 @@ import { PRESETS, presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 import { PRESET_RANK } from '@/lib/compute/validate'
 import { monthlyTotal, quoteSpec, UnknownPriceError } from '@controller/lib/compute/pricing'
 import type { ComputeSpec, PresetKey, PricingSettings } from '@/lib/compute/spec'
+import { loadUsdInr } from '@/lib/billing/fx'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,7 @@ const SIZES: { key: string; preset: PresetKey; label: string; spec: ComputeSpec 
 })
 
 async function view() {
+  const fx = await loadUsdInr({ wait: true })
   const catalog = await getCatalog()
   const plans = await computePlans()
   const presets = SIZES
@@ -59,6 +61,7 @@ async function view() {
     .filter(p => Object.values(p.plans).some(Boolean))
   return {
     ...catalog,
+    fx,
     plans: plans.map(p => ({
       slug: p.slug, name: p.name, tier: p.tier, monthlyPriceInr: p.monthlyPriceInr, infraMargin: p.infraMargin ?? 0, rdsMargin: p.rdsMargin ?? null,
       minPreset: p.minPreset ?? null, defaultPreset: p.defaultPreset,
@@ -75,7 +78,6 @@ export async function GET(req: NextRequest) {
 
 const PRICE_FIELDS = ['usd_hourly', 'usd_hourly_multi_az', 'usd_gb_month', 'usd_gb_month_multi_az'] as const
 const SETTING_BOUNDS: Partial<Record<keyof PricingSettings, [number, number]>> = {
-  usdInr: [1, 1000],
   margin: [0, 5],
   gstRate: [0, 1],
   platformShareUsd: [0, 1000],

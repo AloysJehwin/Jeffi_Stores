@@ -7,6 +7,8 @@ export type SectionType =
   | 'category_tabs' | 'bundle_spotlight' | 'back_in_stock' | 'blog_teaser' | 'social_strip' | 'value_stats'
   | 'motion_hero' | 'stories' | 'product_spotlight' | 'rewards_game' | 'slides'
   | 'business_reorder' | 'business_quotes' | 'business_offers' | 'business_account'
+  // Site Builder content blocks; their settings are the section's config.
+  | 'rich_text' | 'image_text' | 'image_banner' | 'faq' | 'contact_details'
 
 /** Which homepage a model is: the store's, or the business one an approved business sees once it's published. */
 export type HomeAudience = 'store' | 'business'
@@ -314,6 +316,8 @@ export interface HomeModel {
   data: HomeData
   /** What was served; absent from older servers (store). */
   audience?: HomeAudience
+  /** Site Builder theme variables (colour channels, radius); null or absent keeps the built-in look. */
+  theme?: { vars: Record<string, string> } | null
 }
 
 /** Every home section component takes the section and the shared data, like the web's SectionRenderer. */

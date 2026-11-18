@@ -302,9 +302,14 @@ export class SurfaceNotEmpty extends Error {
 
 export type CopySurfaceResult = { sections: number; slides: number; replaced: number }
 
-/** The next display_order on one page's layout (one layout per page and homepage; surfaces are toggles). */
-export function nextDisplayOrderOn(rows: HomepageSection[], page: HomepagePage, audience: HomepageAudience = 'store'): number {
-  return nextDisplayOrder(rows.filter(r => rowPage(r) === page && rowAudience(r) === audience))
+/** The next display_order on one surface's layout of a page. */
+export function nextDisplayOrderOn(
+  rows: HomepageSection[],
+  page: HomepagePage,
+  audience: HomepageAudience = 'store',
+  surface: HomepageSurface = 'web'
+): number {
+  return nextDisplayOrder(rows.filter(r => rowPage(r) === page && rowAudience(r) === audience && rowSurface(r) === surface))
 }
 
 /** Reorders by `order` and sets each listed section's half/full side (`config.layout.side`). */
