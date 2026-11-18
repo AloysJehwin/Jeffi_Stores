@@ -4,11 +4,12 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Select from '@/components/ui/Select'
-import { Badge, Banner, TabAction, Table, Tabs, api, btnGhost, btnPrimary, when } from '@/components/admin/kit/core'
+import { Badge, Banner, TabAction, TabActionsPortal, Table, api, btnGhost, btnPrimary, when } from '@/components/admin/kit/core'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { SectionCard } from './controls'
 
-// Platform Configuration page (flagship only): the provider policy every store follows, plus per-store overrides.
+// Flagship administrator only. view 'default': the provider policy every store follows (Settings → Providers).
+// view 'overrides': the stores that differ (Ecom → Configuration → Provider overrides).
 
 type Key = 'sms_provider' | 'whatsapp_provider' | 'ai_text_providers' | 'ai_image_providers' | 'ai_video_providers' | 'ai_image_default_quality'
 type Setting = { tenant_id: string | null; key: Key; value: unknown; updated_by: string | null; updated_at: string }
@@ -21,7 +22,6 @@ type Data = {
   messaging: Record<'sms' | 'whatsapp', Record<'twilio' | 'aws', boolean>>
   gateway: Gateway | null
 }
-type Tab = 'default' | 'overrides'
 type Cap = 'text' | 'image' | 'video'
 
 const KEY_LABEL: Record<Key, string> = {
@@ -40,10 +40,9 @@ const label = (p: string) => PROVIDER_LABEL[p] ?? p
 const describeValue = (k: Key, v: unknown) =>
   Array.isArray(v) ? (v.length ? v.map(x => label(String(x))).join(' > ') : 'Gateway default') : k === 'ai_image_default_quality' ? String(v) : label(String(v))
 
-export default function ProvidersCard() {
+export default function ProvidersCard({ view }: { view: 'default' | 'overrides' }) {
   const canWrite = useCanWrite('settings:write')
   const [data, setData] = useState<Data | null>(null)
-  const [tab, setTab] = useState<Tab>('default')
   const toast = useActionToast()
   const [loadError, setLoadError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
@@ -75,26 +74,60 @@ export default function ProvidersCard() {
   const overrides = useMemo(() => (data?.settings ?? []).filter(s => s.tenant_id), [data])
   const tenantName = useMemo(() => new Map((data?.tenants ?? []).map(t => [t.id, t.display_name || t.slug])), [data])
 
+  if (view === 'overrides') {
+    return (
+      <SectionCard
+        title="Store overrides"
+        description="Stores that use a different SMS, WhatsApp or AI provider from the platform default in Settings → Providers. An override beats the default. Changes apply within 30 seconds."
+      >
+        {canWrite && (
+          <TabActionsPortal>
+            <TabAction icon={<Plus className="w-4 h-4" />} label="Add override" onClick={() => setAdding(a => !a)} />
+          </TabActionsPortal>
+        )}
+        {loadError && !data && <Banner ok={false}>{loadError}</Banner>}
+        {!data ? (
+          <OverridesSkeleton />
+        ) : (
+          <>
+            {adding && canWrite && <AddOverride data={data} onCancel={() => setAdding(false)} onSave={async (t, k, v) => (await save(t, k, v)) && setAdding(false)} />}
+            <Table
+              rows={overrides}
+              rowKey={r => `${r.tenant_id}:${r.key}`}
+              empty="No store overrides. Every store follows the platform default."
+              cols={[
+                { key: 'store', label: 'Store', render: r => tenantName.get(r.tenant_id!) ?? r.tenant_id, sort: r => tenantName.get(r.tenant_id!) ?? '' },
+                { key: 'key', label: 'Setting', render: r => KEY_LABEL[r.key] ?? r.key, sort: r => r.key },
+                { key: 'value', label: 'Value', render: r => <Badge tone="blue">{describeValue(r.key, r.value)}</Badge> },
+                { key: 'by', label: 'Updated by', render: r => <span className="text-xs text-foreground-muted">{r.updated_by || '-'}</span> },
+                { key: 'at', label: 'Updated', render: r => <span className="text-xs text-foreground-muted">{when(r.updated_at)}</span>, sort: r => r.updated_at },
+                {
+                  key: 'clear',
+                  label: '',
+                  render: r =>
+                    canWrite ? (
+                      <button type="button" className={btnGhost} onClick={() => clear(r.tenant_id, r.key)} aria-label="Clear override" title="Clear override">
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : null,
+                },
+              ]}
+            />
+          </>
+        )}
+      </SectionCard>
+    )
+  }
+
   return (
     <SectionCard
       title="Providers"
-      description="Which provider sends SMS and WhatsApp and serves AI text, images and video for every store. A store override beats the platform default. Changes apply within 30 seconds."
+      description="Which provider sends SMS and WhatsApp and serves AI text, images and video, for the flagship and every store. A store that needs a different one gets an override in Ecom → Configuration → Provider overrides. Changes apply within 30 seconds."
     >
-      <Tabs
-        tabs={[
-          { id: 'default' as Tab, label: 'Platform default' },
-          { id: 'overrides' as Tab, label: 'Store overrides', count: overrides.length || undefined },
-        ]}
-        value={tab}
-        onChange={setTab}
-        actions={
-          canWrite && tab === 'overrides' ? <TabAction icon={<Plus className="w-4 h-4" />} label="Add override" onClick={() => setAdding(a => !a)} /> : undefined
-        }
-      />
       {loadError && !data && <Banner ok={false}>{loadError}</Banner>}
       {!data ? (
         <ProvidersSkeleton />
-      ) : tab === 'default' ? (
+      ) : (
         <>
           <Section title="Messaging">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -131,34 +164,6 @@ export default function ProvidersCard() {
             <div className="mt-4 max-w-xs">
               <QualityField value={(platform.get('ai_image_default_quality') as string) ?? ''} disabled={!canWrite} onSave={v => (v ? save(null, 'ai_image_default_quality', v) : clear(null, 'ai_image_default_quality'))} />
             </div>
-          </Section>
-        </>
-      ) : (
-        <>
-          {adding && canWrite && <AddOverride data={data} onCancel={() => setAdding(false)} onSave={async (t, k, v) => (await save(t, k, v)) && setAdding(false)} />}
-          <Section title="Store overrides">
-            <Table
-              rows={overrides}
-              rowKey={r => `${r.tenant_id}:${r.key}`}
-              empty="No store overrides. Every store follows the platform default."
-              cols={[
-                { key: 'store', label: 'Store', render: r => tenantName.get(r.tenant_id!) ?? r.tenant_id, sort: r => tenantName.get(r.tenant_id!) ?? '' },
-                { key: 'key', label: 'Setting', render: r => KEY_LABEL[r.key] ?? r.key, sort: r => r.key },
-                { key: 'value', label: 'Value', render: r => <Badge tone="blue">{describeValue(r.key, r.value)}</Badge> },
-                { key: 'by', label: 'Updated by', render: r => <span className="text-xs text-foreground-muted">{r.updated_by || '-'}</span> },
-                { key: 'at', label: 'Updated', render: r => <span className="text-xs text-foreground-muted">{when(r.updated_at)}</span>, sort: r => r.updated_at },
-                {
-                  key: 'clear',
-                  label: '',
-                  render: r =>
-                    canWrite ? (
-                      <button type="button" className={btnGhost} onClick={() => clear(r.tenant_id, r.key)} aria-label="Clear override" title="Clear override">
-                        <X className="w-4 h-4" />
-                      </button>
-                    ) : null,
-                },
-              ]}
-            />
           </Section>
         </>
       )}
@@ -367,6 +372,17 @@ function AddOverride({ data, onCancel, onSave }: { data: Data; onCancel: () => v
 }
 
 const bar = 'bg-surface-secondary rounded'
+
+// While the overrides load.
+function OverridesSkeleton() {
+  return (
+    <div className="space-y-2 animate-pulse" aria-busy="true" aria-label="Loading store overrides">
+      {[0, 1, 2].map(i => (
+        <div key={i} className={`h-10 w-full ${bar} opacity-70`} />
+      ))}
+    </div>
+  )
+}
 
 // Two provider selects, then the three AI order lists, while the settings load.
 function ProvidersSkeleton() {

@@ -258,7 +258,7 @@ describe('direct Ollama fallback (OLLAMA_BASE_URL set, Razer in Site Controls)',
     gateway = () => status(503, '{"error":"no text provider in the requested order is available"}')
     const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
     expect(err).toBeInstanceOf(AiClientError)
-    expect(err.message).toMatch(/Razer is off in Site Controls/)
+    expect(err.message).toMatch(/Razer is off in Settings → Providers/)
     expect((await aiVision(['x'], 'read')).ok).toBe(false)
     expect(calls(OLLAMA)).toHaveLength(0)
   })

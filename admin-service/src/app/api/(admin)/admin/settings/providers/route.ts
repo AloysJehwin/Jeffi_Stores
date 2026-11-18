@@ -16,7 +16,7 @@ import { messagingProviderReadiness } from '@/lib/shared/messaging'
 export const dynamic = 'force-dynamic'
 
 // Platform provider policy (control plane platform_provider_settings), edited from the flagship's
-// Site Controls. Platform owner on the flagship only: a store admin (tenant resolved) never reaches it.
+// Settings → Providers. Platform owner on the flagship only: a store admin (tenant resolved) never reaches it.
 
 async function platformOnly(admin: Awaited<ReturnType<typeof requireAdminScope>>) {
   if (admin instanceof NextResponse) return admin
