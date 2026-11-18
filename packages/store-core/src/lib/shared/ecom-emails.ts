@@ -121,11 +121,7 @@ async function send(to: string, subject: string, html: string, attachments?: Arr
   })
 }
 
-// Payments are off until ECOM_PAYMENTS_ENABLED=true: approval starts the build with no checkout.
-export function ecomPaymentsEnabled(): boolean {
-  return process.env.ECOM_PAYMENTS_ENABLED === 'true'
-}
-
+// Sent before approval, so it assumes payment: the administrator picks Mandatory or Optional at approval.
 export async function sendKycSubmittedEmail(owner: { email: string; name: string | null }) {
   const name = owner.name ?? 'there'
   const html = baseHtml(
@@ -135,9 +131,7 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details, licences and certificates, and our team has started the verification.</p>
     ${notice(
-      ecomPaymentsEnabled()
-        ? 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.'
-        : 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, we set up your store right away. Billing starts later.'
+      'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.'
     )}
     <p style="margin:0;">We will email you as soon as there is an update. No action is needed from you in the meantime.</p>
   `
@@ -159,7 +153,7 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
   await send(PLATFORM_ADMIN, `New merchant application: ${owner.email}`, adminHtml)
 }
 
-/** checkoutUrl null = payments off: approval starts the build directly. */
+/** checkoutUrl null = an Optional store: approval starts the build directly. */
 export async function sendKycApprovedEmail(
   owner: { email: string; name: string | null },
   tenant: { display_name: string; slug: string },

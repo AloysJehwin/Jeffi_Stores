@@ -43,7 +43,7 @@ export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified' AND NOT (cd.order_id IS NOT NULL AND cd.domain ~ '^(www|admin|invoice|quotation|purchaseorder|forms|business|vault)\\.')) AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
-            t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
+            t.billing_interval, t.payment_required, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
             pp.slug AS pending_plan, t.pending_billing_interval,
             p.slug AS plan, p.monthly_price_inr, COALESCE(p.max_custom_domains, 0) AS max_custom_domains,

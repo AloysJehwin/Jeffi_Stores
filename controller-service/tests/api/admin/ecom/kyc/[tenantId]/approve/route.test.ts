@@ -1,12 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// The route reads ECOM_PAYMENTS_ENABLED into a module-level const at import time. Most tests
-// below exercise the subscription path, so enable payments before the route module is evaluated.
-// The dedicated payments-off test re-imports the route with the flag unset.
-vi.hoisted(() => {
-  process.env.ECOM_PAYMENTS_ENABLED = 'true'
-})
+// The body's paymentRequired picks the path: Mandatory (the default, so most tests below) runs the
+// subscription path; Optional starts the build on approval.
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -28,6 +24,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   getOwnerBankAccount: vi.fn(),
   getOwnerBankWithRoute: vi.fn(),
   persistLinkedAccountToOwnerBank: vi.fn(),
+  setPaymentRequired: vi.fn(),
   hasService: vi.fn((t: { service_types?: string[] | null }, s: string) => (t?.service_types ?? ['store']).includes(s)),
   reviewServiceApproval: vi.fn(),
   controlPlanePool: vi.fn(),
@@ -91,6 +88,7 @@ import {
   getOwnerBankAccount,
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
+  setPaymentRequired,
   reviewServiceApproval,
   controlPlanePool,
 } from '@/lib/tenant-registry'
@@ -231,14 +229,17 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
 
   // --- Happy path ---
 
-  it('approves KYC, creates linked account + subscription, returns checkoutUrl (payments on)', async () => {
+  it('approves KYC, creates linked account + subscription, returns checkoutUrl (payment mandatory by default)', async () => {
     const res = await POST(postReq(), params)
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.ok).toBe(true)
+    expect(json.paymentRequired).toBe(true)
     expect(json.checkoutUrl).toBe('https://rzp.io/i/checkout')
     expect(json.linkedAccountId).toBe('acc_link_123')
     expect(approveKyc).toHaveBeenCalledWith(TENANT_ID, ADMIN.email)
+    expect(setPaymentRequired).toHaveBeenCalledWith(TENANT_ID, true)
+    expect(startStore).not.toHaveBeenCalled()
     expect(createLinkedAccount).toHaveBeenCalled()
     expect(saveLinkedAccountId).toHaveBeenCalledWith(TENANT_ID, 'acc_link_123')
     expect(configureRouteSettlement).toHaveBeenCalled()
@@ -247,36 +248,45 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(sendKycApprovedEmail).toHaveBeenCalled()
   })
 
-  // Payments off (default): KYC approval starts provisioning directly, no subscription. The route
-  // reads the flag at module load, so re-import it with the flag unset.
-  it('starts provisioning on approval and skips the subscription when payments are off', async () => {
-    const prev = process.env.ECOM_PAYMENTS_ENABLED
-    delete process.env.ECOM_PAYMENTS_ENABLED
-    vi.resetModules()
+  // Optional: KYC approval starts provisioning directly, no subscription.
+  it('starts provisioning on approval and skips the subscription when payment is optional', async () => {
+    const res = await POST(postReq({ paymentRequired: false }), params)
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.ok).toBe(true)
+    expect(json.paymentRequired).toBe(false)
+    expect(json.provisioningStarted).toBe(true)
+    expect(json.linkedAccountId).toBe('acc_link_123')
+    expect(approveKyc).toHaveBeenCalledWith(TENANT_ID, ADMIN.email)
+    expect(setPaymentRequired).toHaveBeenCalledWith(TENANT_ID, false)
+    expect(createLinkedAccount).toHaveBeenCalled()
+    expect(startStore).toHaveBeenCalledWith({ id: TENANT_ID, store_request: null })
+    expect(createRazorpaySubscription).not.toHaveBeenCalled()
+    expect(json.checkoutUrl).toBeUndefined()
+    // Approved email without a checkout link ("we're building your store").
+    expect(sendKycApprovedEmail).toHaveBeenCalledWith(
+      { email: OWNER.email, name: OWNER.name },
+      { display_name: TENANT.display_name, slug: TENANT.slug },
+      null
+    )
+  })
+
+  // The old payment-bypass allow-list is gone: Mandatory wins even if its variable is still set.
+  it('ignores a leftover ECOM_PAYMENT_BYPASS_EMAILS when payment is mandatory', async () => {
+    const prev = process.env.ECOM_PAYMENT_BYPASS_EMAILS
+    process.env.ECOM_PAYMENT_BYPASS_EMAILS = OWNER.email
     try {
-      const { POST: POST_OFF } = await import(
-        '@controller/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route'
-      )
-      const res = await POST_OFF(postReq(), params)
+      const res = await POST(postReq({ paymentRequired: true }), params)
       const json = await res.json()
       expect(res.status).toBe(200)
-      expect(json.ok).toBe(true)
-      expect(json.provisioningStarted).toBe(true)
-      expect(json.linkedAccountId).toBe('acc_link_123')
-      expect(approveKyc).toHaveBeenCalledWith(TENANT_ID, ADMIN.email)
-      expect(createLinkedAccount).toHaveBeenCalled()
-      expect(startStore).toHaveBeenCalledWith({ id: TENANT_ID, store_request: null })
-      expect(createRazorpaySubscription).not.toHaveBeenCalled()
-      expect(json.checkoutUrl).toBeUndefined()
-      // Approved email without a checkout link ("we're building your store").
-      expect(sendKycApprovedEmail).toHaveBeenCalledWith(
-        { email: OWNER.email, name: OWNER.name },
-        { display_name: TENANT.display_name, slug: TENANT.slug },
-        null
-      )
+      expect(json.paymentRequired).toBe(true)
+      expect(json.checkoutUrl).toBe('https://rzp.io/i/checkout')
+      expect(setPaymentRequired).toHaveBeenCalledTimes(1)
+      expect(setPaymentRequired).toHaveBeenCalledWith(TENANT_ID, true)
+      expect(startStore).not.toHaveBeenCalled()
     } finally {
-      if (prev !== undefined) process.env.ECOM_PAYMENTS_ENABLED = prev
-      vi.resetModules()
+      if (prev === undefined) delete process.env.ECOM_PAYMENT_BYPASS_EMAILS
+      else process.env.ECOM_PAYMENT_BYPASS_EMAILS = prev
     }
   })
 

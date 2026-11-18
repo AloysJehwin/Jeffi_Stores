@@ -36,9 +36,8 @@ const charged = () =>
     body: JSON.stringify({ event: 'subscription.charged', payload: { subscription: { entity: { id: 'sub_1' } } } }),
   })
 
-// Payments are off by default (ECOM_PAYMENTS_ENABLED unset), so KYC-approve starts provisioning
-// directly and no subscription.charged fires in production today. These cases still cover the
-// charged handler so re-enabling payments restores the first-charge-starts-store flow unchanged.
+// A Mandatory store (tenants.payment_required) starts its build on the first subscription.charged; an
+// Optional one starts at KYC approval with no subscription, so this handler never sees it.
 describe('subscription.charged on an approved store upgrade', () => {
   beforeEach(() => {
     vi.clearAllMocks()

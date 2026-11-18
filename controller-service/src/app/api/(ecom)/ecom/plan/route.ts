@@ -23,6 +23,7 @@ import { checkComputeChange } from '@controller/lib/compute/change'
 import { saveDesiredCompute, patchTenantCompute } from '@controller/lib/compute/store'
 import { priceInrMonthForPlan } from '@controller/lib/compute/pricing-month'
 import { specKey } from '@/lib/compute/presets'
+import { paymentRequired } from '@/lib/billing/payment-required'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,12 +35,9 @@ const Body = z.object({
   applyMode: z.enum(['window', 'now']).default('window'),
 })
 
-// Off until KYC-approved stores are charged; the Razorpay path below stays for when it is on.
-const paymentsEnabled = () => process.env.ECOM_PAYMENTS_ENABLED === 'true'
-
 /**
  * Unified plan + spec change for a live store. Computes the new monthly subscription price (plan fee + infra margin + GST).
- * Payments off: the plan and spec change now. Payments on:
+ * Optional store (tenants.payment_required false): the plan and spec change now, unbilled. Mandatory store:
  *   higher than today → upgradeSubscription now (returns checkoutUrl), spec saved as pending
  *   lower            → downgradeSubscription at cycle end; spec queued on tenant_compute (status 'scheduled')
  *                       and the plan change held on tenants.pending_plan_id until the webhook moves it
@@ -56,7 +54,8 @@ export async function POST(request: NextRequest) {
   const tenants = await getOwnerTenants(owner.id)
   const tenant = tenants.find(t => t.id === tenantId)
   if (!tenant) return NextResponse.json({ error: 'Store not found' }, { status: 404 })
-  if (paymentsEnabled() && !tenant.razorpay_subscription_id) return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
+  const billed = paymentRequired(tenant)
+  if (billed && !tenant.razorpay_subscription_id) return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
 
   const plans = await listPlans()
   const newPlan = plans.find(p => p.slug === planSlug)
@@ -72,7 +71,7 @@ export async function POST(request: NextRequest) {
   const newPrice = await priceInrMonthForPlan(planSlug, spec)
   if (!newPrice || newPrice <= 0) return NextResponse.json({ error: 'Could not price the new servers.' }, { status: 400 })
 
-  if (!paymentsEnabled()) {
+  if (!billed) {
     if (!samePlan) {
       await updateTenantPlan(tenantId, { planSlug, billingInterval })
       await setPendingPlan(tenantId, null)

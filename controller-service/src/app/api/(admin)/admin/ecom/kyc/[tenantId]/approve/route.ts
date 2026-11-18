@@ -13,6 +13,7 @@ import {
   getOwnerBankAccount,
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
+  setPaymentRequired,
 } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import {
@@ -26,24 +27,25 @@ import {
 } from '@/lib/payments/razorpay-route'
 import { sendKycApprovedEmail, sendServicesReviewedEmail } from '@/lib/shared/ecom-emails'
 import { hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
-// TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
-import { isPaymentBypassed, bypassAuditNote } from '@controller/lib/payments/ecom-payment-bypass'
 import { tenantCapacityError } from '@controller/lib/k8s/capacity'
 import { startStore } from '@controller/lib/provisioning/start-store'
 import { approveComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
 
 export const dynamic = 'force-dynamic'
 
-// Payments are off by default while Razorpay subscriptions are disabled platform-wide. When off,
-// KYC approval starts provisioning directly (what the bypass does for one owner, now for everyone);
-// flip ECOM_PAYMENTS_ENABLED=true to restore the subscription + first-charge-webhook path.
-const PAYMENTS_ENABLED = process.env.ECOM_PAYMENTS_ENABLED === 'true'
-
 export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+  // The administrator's choice for this store. Mandatory (default): a Razorpay subscription, and its first
+  // charge (webhook) starts the build. Optional: approval starts the build, no checkout.
+  const body = await request.json().catch(() => null)
+  if (body?.paymentRequired !== undefined && typeof body.paymentRequired !== 'boolean') {
+    return NextResponse.json({ error: 'paymentRequired must be true or false' }, { status: 400 })
+  }
+  const paymentRequired = body?.paymentRequired !== false
 
   const { tenantId } = await params
   const tenant = await getTenant(tenantId)
@@ -75,8 +77,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   }
 
-  // Approve KYC — sets tenant status to 'provisioning'
+  // Approve KYC (the store moves to awaiting_payment) and record the payment choice with it.
   await approveKyc(tenantId, admin.email ?? 'admin')
+  await setPaymentRequired(tenantId, paymentRequired)
   // The licences were reviewed with it.
   await approveComplianceDocuments(tenantId, admin.email ?? 'admin').catch(e => console.warn('[kyc] licences not marked approved', e?.message || e))
 
@@ -226,33 +229,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  // ── TEMPORARY payment bypass ────────────────────────────────────────────────
-  // Skips Razorpay entirely for an allow-listed owner and starts provisioning
-  // straight away, mirroring what the subscription.charged webhook would do.
-  // Remove this block together with src/lib/ecom-payment-bypass.ts.
-  if (isPaymentBypassed(owner.email)) {
-    process.stderr.write(`[ecom] ${bypassAuditNote(owner.email)} tenant=${tenantId}\n`)
-    await startStore({ id: tenantId, store_request: tenant.store_request ? 'awaiting_payment' : null })
-    return NextResponse.json({
-      ok: true,
-      paymentBypassed: true,
-      linkedAccountId,
-      message: 'Payment bypassed (internal testing) - provisioning started.',
-    })
-  }
-  // ── end TEMPORARY payment bypass ────────────────────────────────────────────
-
-  // Payments off (default): start provisioning on approval, same call the bypass uses. The
-  // subscription path below (and the first-charge webhook that normally starts the store) is
-  // skipped but kept intact, re-enablable via ECOM_PAYMENTS_ENABLED=true.
-  if (!PAYMENTS_ENABLED) {
+  // Optional: start the build now. Mandatory: the subscription below, whose first charge starts it.
+  if (!paymentRequired) {
     await startStore({ id: tenantId, store_request: tenant.store_request ? 'awaiting_payment' : null })
     sendKycApprovedEmail(
       { email: owner.email, name: owner.name },
       { display_name: tenant.display_name, slug: tenant.slug },
       null
     ).catch(() => {})
-    return NextResponse.json({ ok: true, provisioningStarted: true, linkedAccountId })
+    return NextResponse.json({ ok: true, paymentRequired, provisioningStarted: true, linkedAccountId })
   }
 
   // 2. Create Razorpay Subscription and return checkout URL.
@@ -261,7 +246,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const plan = plans.find(p => p.slug === tenant.plan)
   if (!plan) {
     return NextResponse.json(
-      { ok: false, kycApproved: true, linkedAccountId, error: `Plan '${tenant.plan ?? 'none'}' is not an active store plan — set the store's plan, then approve again` },
+      { ok: false, kycApproved: true, paymentRequired, linkedAccountId, error: `Plan '${tenant.plan ?? 'none'}' is not an active store plan — set the store's plan, then approve again` },
       { status: 409 }
     )
   }
@@ -272,7 +257,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   )
   const priceInrMonth = Number(priceRow.rows[0]?.price ?? plan.monthly_price_inr ?? 0)
   if (!(priceInrMonth > 0)) {
-    return NextResponse.json({ ok: false, kycApproved: true, linkedAccountId, error: 'No subscription price on tenant_compute.price_inr_month' }, { status: 500 })
+    return NextResponse.json({ ok: false, kycApproved: true, paymentRequired, linkedAccountId, error: 'No subscription price on tenant_compute.price_inr_month' }, { status: 500 })
   }
 
   try {
@@ -293,12 +278,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       { display_name: tenant.display_name, slug: tenant.slug },
       shortUrl
     ).catch(() => {})
-    return NextResponse.json({ ok: true, checkoutUrl: shortUrl, linkedAccountId })
+    return NextResponse.json({ ok: true, paymentRequired, checkoutUrl: shortUrl, linkedAccountId })
   } catch (err: any) {
     return NextResponse.json(
       {
         ok: false,
         kycApproved: true,
+        paymentRequired,
         linkedAccountId,
         error: `KYC approved but Razorpay subscription failed: ${err?.message ?? err}`,
       },
