@@ -131,7 +131,7 @@ function resolveSlide(s: HeroSlide, i: number): Resolved {
   }
 }
 
-const MEDIA = `absolute right-0 top-0 h-full w-[62%] sm:w-[60%] ${EDGE_MASK}`
+const MEDIA = `absolute right-0 top-0 bottom-0 h-full w-[62%] sm:w-[60%] ${EDGE_MASK}`
 
 // Fade a slide's left edge into the base instead of cutting it off; only the current slide's clip plays.
 function Backdrop({ s }: { s: Resolved }) {

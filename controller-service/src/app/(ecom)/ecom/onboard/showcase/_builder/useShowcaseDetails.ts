@@ -37,6 +37,34 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
   const running = useRef<Promise<boolean> | null>(null)
   const again = useRef(false)
   const ownSlug = site?.slug ?? null
+  // The content as the server has it: a save sends the content only when the owner changed it since, so editing the
+  // details never writes a stale copy over what a design run added meanwhile.
+  const savedContent = useRef(form.content)
+
+  /**
+   * The site again from the server: a design run fills lists that were empty (starter services and questions, mood
+   * pictures), and those come into the form, which would otherwise save its empty ones over them. Lists the owner has
+   * filled stay as they are.
+   */
+  const refresh = useCallback(async () => {
+    const data = await fetch(BASE, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .catch(() => null)
+    const next = data?.site as ClientSite | null | undefined
+    if (!next) return
+    setSite(next)
+    setFormState(f => {
+      const c = f.content
+      const theirs = next.content
+      const services = !c.services.length && theirs?.services?.length ? theirs.services : c.services
+      const faqs = !c.faqs.length && theirs?.faqs?.length ? theirs.faqs : c.faqs
+      const pictures = !c.pictures?.length && theirs?.pictures?.length ? theirs.pictures : c.pictures
+      if (services === c.services && faqs === c.faqs && pictures === c.pictures) return f
+      const content = { ...c, services, faqs, pictures }
+      if (c === savedContent.current) savedContent.current = content
+      return { ...f, content }
+    })
+  }, [])
 
   const setForm = useCallback((next: DetailsForm | ((f: DetailsForm) => DetailsForm)) => {
     setFormState(f => (typeof next === 'function' ? next(f) : next))
@@ -50,11 +78,12 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
     const slugOk = current.current.slug.state === 'ok'
     if (!current.current.site && !slugOk) return false
     setSaving(true)
+    const sendContent = f.content !== savedContent.current || !current.current.site
     try {
       const res = await fetch(BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), content: f.content }),
+        body: JSON.stringify({ ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), ...(sendContent ? { content: f.content } : {}) }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -64,6 +93,7 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
       }
       setSite(data.site)
       setSaveError(null)
+      if (sendContent) savedContent.current = f.content
       if (latest.current === f) setDirty(false)
       return true
     } catch {
@@ -133,5 +163,17 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
-  return { form, setForm, site, setSite, saving, saveError, dirty, saveNow, slug }
+  return { form, setForm, site, setSite, saving, saveError, dirty, saveNow, slug, refresh }
+}
+
+/** When a design run ends (the studio's session leaves 'building'), the form takes in what it added. */
+export function useRefreshAfterBuild(status: string | undefined, refresh: () => Promise<void>) {
+  const building = useRef(false)
+  useEffect(() => {
+    if (status === 'building') building.current = true
+    else if (building.current) {
+      building.current = false
+      void refresh()
+    }
+  }, [status, refresh])
 }

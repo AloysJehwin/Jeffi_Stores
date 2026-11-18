@@ -1,11 +1,11 @@
 import { socialUrl, whatsappDigits } from '@/lib/catalog/store-socials'
-import type { ShowcaseBusiness, ShowcaseContent, ShowcaseFaq, ShowcaseReview, ShowcaseService, ShowcaseStat, ShowcaseWork, SocialNetwork } from './types'
+import type { ShowcaseBusiness, ShowcaseContent, ShowcaseFaq, ShowcasePagePicture, ShowcaseReview, ShowcaseService, ShowcaseStat, ShowcaseWork, SocialNetwork } from './types'
 
 // What an owner types into a Showcase (the signup's Details step, the dashboard editor), trimmed, capped and checked:
 // links and pictures must be https (pictures are the owner's uploads), socials become profile URLs, WhatsApp digits
 // with the country code. Pure, so the forms and the routes read the same rules.
 
-export const SHOWCASE_LIMITS = { services: 24, work: 30, reviews: 20, stats: 8, faqs: 20 } as const
+export const SHOWCASE_LIMITS = { services: 24, work: 30, reviews: 20, stats: 8, faqs: 20, pictures: 6 } as const
 export const SHOWCASE_SOCIALS: SocialNetwork[] = ['instagram', 'facebook', 'youtube', 'x', 'linkedin', 'pinterest']
 
 const rec = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
@@ -55,11 +55,14 @@ export function cleanBusiness(input: unknown): ShowcaseBusiness {
   }
 }
 
+// The AI's suggestions keep their mark until the owner edits them (the editor drops it).
+const ai = (x: Record<string, unknown>) => (x.ai === true ? { ai: true as const } : {})
+
 export function cleanContent(input: unknown): ShowcaseContent {
   const c = rec(input)
   const services: ShowcaseService[] = list(c.services)
     .map(rec)
-    .map(x => opt({ title: text(x.title, 120), description: para(x.description, 600), price: text(x.price, 60), image: https(x.image) || null }))
+    .map(x => opt({ title: text(x.title, 120), description: para(x.description, 600), price: text(x.price, 60), image: https(x.image) || null, ...ai(x) }))
     .filter(x => x.title)
     .slice(0, SHOWCASE_LIMITS.services)
   const work: ShowcaseWork[] = list(c.work)
@@ -82,10 +85,15 @@ export function cleanContent(input: unknown): ShowcaseContent {
     .slice(0, SHOWCASE_LIMITS.stats)
   const faqs: ShowcaseFaq[] = list(c.faqs)
     .map(rec)
-    .map(x => ({ q: text(x.q ?? x.question, 200), a: para(x.a ?? x.answer, 1500) }))
+    .map(x => ({ q: text(x.q ?? x.question, 200), a: para(x.a ?? x.answer, 1500), ...ai(x) }))
     .filter(x => x.q && x.a)
     .slice(0, SHOWCASE_LIMITS.faqs)
-  return { services, work, reviews, stats, faqs }
+  const pictures: ShowcasePagePicture[] = list(c.pictures)
+    .map(rec)
+    .map(x => opt({ image: https(x.image), alt: text(x.alt, 120), ...ai(x) }) as ShowcasePagePicture)
+    .filter(x => x.image)
+    .slice(0, SHOWCASE_LIMITS.pictures)
+  return { services, work, reviews, stats, faqs, ...(pictures.length ? { pictures } : {}) }
 }
 
 /** The ways a visitor can reach the business (a Showcase needs one). */

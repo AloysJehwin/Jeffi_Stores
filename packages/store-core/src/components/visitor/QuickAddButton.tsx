@@ -39,8 +39,8 @@ interface QuickAddButtonProps {
 }
 
 const MAX_QTY = 10
-const TRIGGER = 'ui-btn w-7 h-7 rounded-full bg-accent-500 hover:bg-accent-600 text-white flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm'
-const TRIGGER_OFF = 'ui-btn w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted opacity-60 cursor-not-allowed'
+const TRIGGER = 'ui-btn hit-44 relative w-7 h-7 rounded-full bg-accent-500 hover:bg-accent-600 text-white flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm'
+const TRIGGER_OFF = 'ui-btn hit-44 relative w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted opacity-60 cursor-not-allowed'
 
 export default function QuickAddButton({
   productId,

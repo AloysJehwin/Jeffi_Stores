@@ -7,7 +7,8 @@ import { offerHref } from '@/lib/catalog/product-offers-shared'
 import { brandsFor, categoriesFor, productsFor, reviewsFor } from '../composed-data'
 import { ProductQuery as ProductQuerySchema } from '../composed'
 import { money, stars } from './format'
-import { loadBrandIndex, loadBrandPage, loadCategoryIndex, loadCategoryPage } from './taxonomy'
+import { categoryPhotos, loadBrandIndex, loadBrandPage, loadCategoryIndex, loadCategoryPage } from './taxonomy'
+import { safeSrc } from '../code/allow'
 import type { ProductDetailView, ProductQuery, ProductView, SiteData } from './types'
 
 // The live store as a SiteData source: the composed block's bound-parameter queries, mapped to views.
@@ -93,7 +94,9 @@ export function dbSiteData(): SiteData {
     product,
     async categories(q) {
       const rows = await categoriesFor({ parent: q.parent ?? null, slugs: q.slugs, limit: q.limit })
-      return rows.map(c => ({ id: c.id, slug: c.slug, name: c.name, url: `/categories/${c.slug}`, image: c.image_url }))
+      // A category without a picture of its own shows its products' photo.
+      const photos = await categoryPhotos(rows.filter(c => !safeSrc(c.image_url)).map(c => c.id)).catch(() => new Map<string, string>())
+      return rows.map(c => ({ id: c.id, slug: c.slug, name: c.name, url: `/categories/${c.slug}`, image: safeSrc(c.image_url) ? c.image_url : (photos.get(c.id) ?? null) }))
     },
     async brands(q) {
       const rows = await brandsFor({ slugs: q.slugs, featured: q.featured, limit: q.limit })

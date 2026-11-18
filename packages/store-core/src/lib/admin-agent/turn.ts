@@ -99,6 +99,11 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
     tools: ['list_repo_files', 'read_repo_file', 'list_admin_api_routes', 'call_admin_api'],
   },
   { test: /\[attachment_id=|\b(attach(ed|ment)?|pdf|document|image|photo|screenshot|spreadsheet|excel|csv|sheet)\b/i, tools: ['read_attachment', 'extract_quotation_lines_from_attachment'] },
+  {
+    // One change to many products through Controls, and its undo.
+    test: /\b(bulk|batch|mass|controls|discounts?|inflate|mark ?up|price (hike|increase|rise|drop|cut)|roll ?back|undo|revert|delist|(these|those|all|every|multiple|many|several|\d+) (\w+ )?products?)\b|%\s*off\b/i,
+    tools: ['find_products_for_bulk_update', 'propose_bulk_update_products', 'propose_rollback_bulk_update'],
+  },
   { test: /\b(similar|recommend|like this|related)\b/i, tools: ['find_similar_products'] },
   { test: /\b(recent|latest|new)\b/i, tools: ['get_recent_customers', 'get_recent_products'] },
   {

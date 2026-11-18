@@ -75,7 +75,7 @@ export default function ProductRowSection({
           {viewAllHref && (
             <Link
               href={viewAllHref}
-              className="flex items-center gap-1 min-h-[44px] sm:min-h-0 -my-2 sm:my-0 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 whitespace-nowrap transition-colors"
+              className="flex items-center gap-1 min-h-[44px] -my-3 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 whitespace-nowrap transition-colors"
             >
               {inlineViewAllArrow ? (
                 <>

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineCodeComponent } from '../registry'
+import { layoutProps } from './common'
 import {
   brandIndex,
   currentBrand,
@@ -20,10 +21,7 @@ import {
 // copy), the breadcrumbs, the search term, and every category or brand for the index pages. They read the page they
 // are on, so a design never names a category or brand: the store's own fill it in.
 
-const list = {
-  layout: z.enum(['grid', 'carousel', 'list']).default('grid').describe('grid uses className as the grid; carousel swipes'),
-  itemClassName: z.string().max(200).optional().describe('carousel item widths, e.g. "w-[70%] md:w-[30%]"'),
-}
+const list = layoutProps
 
 const SUBCATEGORY: Record<string, string> = {
   id: 'category id',

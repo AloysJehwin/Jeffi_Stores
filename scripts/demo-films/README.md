@@ -44,8 +44,9 @@ You need:
 
 | Store | Studio session | Owner |
 |---|---|---|
-| Paws & Co | `340c9782…` | `studio-ui-check@crm.test` |
+| Halo Audio, wearing Glass · Mint (`halo-*`, `studio-dnd`, `studio-look-build` and the stills) | `bb7b7c9c…` | `film-audio@crm.test` |
 | Lumen Home | `ecf96288…` | `theme-demo@crm.test`, who also owns the Showcase site |
+| Paws & Co (only the old `paws-*` shots) | `340c9782…` | `studio-ui-check@crm.test` |
 
 If these stores are gone, create new ones through onboarding and update `shots/common.mjs`.
 
@@ -77,8 +78,8 @@ Run everything from this folder.
 ```bash
 node setup.mjs admin    # the film admin, demo-films@crm.test; two-factor is enrolled on its first sign-in
 node setup.mjs mask
-./rec.sh paws-home admin-orders    # any shots; then check clips/sheet-<shot>.jpg
-node stills.mjs home categories category brand product search cart checkout wishlist    # the storefront page grid
+./rec.sh halo-home admin-orders    # any shots; then check clips/sheet-<shot>.jpg
+node stills.mjs home categories category brand product search cart checkout wishlist    # the storefront page grid (Halo Audio; FILMS_STORE=paws or lumen for another store)
 ./make-film.sh overview storefront admin campaigns
 node check-landing.mjs --local     # the landing page playing the new renders from out/
 node setup.mjs cleanup  # removes the film admin and .local/

@@ -589,6 +589,17 @@ function htmlElement(ctx: Ctx, e: t.JSXElement, tag: string, scope: Scope, w: Wa
   return { t: 'el', tag, props, children: children(ctx, e.children, scope, w) }
 }
 
+const MOSAIC_OWN = /(^|:)(grid-cols-|grid-rows-|grid-flow-|col-span-|row-span-|col-start-|col-end-|row-start-|row-end-)/
+
+/** Every class string a className value can take (each side of a ternary, a template literal's text). */
+function classStrings(v: CodeValue | undefined): string[] {
+  if (!v) return []
+  if (v.k === 'lit') return typeof v.v === 'string' ? [v.v] : []
+  if (v.k === 'tpl') return v.parts.flatMap(p => (typeof p === 'string' ? [p] : classStrings(p)))
+  if (v.k === 'cond') return [...classStrings(v.then), ...classStrings(v.else)]
+  return []
+}
+
 /** Prop names a component accepts, when its schema is an object. */
 function propKeys(def: CodeComponentDef): Set<string> | null {
   const shape = (def.props as { shape?: Record<string, unknown> }).shape
@@ -643,6 +654,13 @@ function component(ctx: Ctx, e: t.JSXElement, name: string, scope: Scope, w: Wal
     if (pn === 'src') checkUrl(ctx, a, 'src', v)
     props[pn] = v
   }
+  // A mosaic places its items itself: columns and spans written on it would fight its own.
+  const layout = props.layout
+  if (layout?.k === 'lit' && layout.v === 'mosaic')
+    for (const k of ['className', 'itemClassName']) {
+      const own = classStrings(props[k]).flatMap(splitClasses).filter(c => MOSAIC_OWN.test(c))
+      if (own.length) issue(ctx, e, `<${name} layout="mosaic"> places its items itself: drop ${own.slice(0, 4).map(c => `"${c}"`).join(', ')} from ${k} (its className may add gap or auto-rows-[…])`)
+    }
   // Literal props are checked now; bound ones (product={p}) at render.
   const literal: Record<string, unknown> = {}
   const bound = new Set<string>()
@@ -677,6 +695,10 @@ function component(ctx: Ctx, e: t.JSXElement, name: string, scope: Scope, w: Wal
     const b = arrowScope(ctx, fn, scope, new Set(Object.keys(def.binding)), `<${name}>`)
     if (!b) return { t: 'cmp', name, props, children: [] }
     const body = arrowBody(ctx, fn, b.scope, { ...w, guarded: true })
+    if (layout?.k === 'lit' && layout.v === 'mosaic' && (body.t === 'el' || body.t === 'cmp')) {
+      const own = classStrings(body.props.className).flatMap(splitClasses).filter(c => MOSAIC_OWN.test(c))
+      if (own.length) issue(ctx, fnChild, `<${name} layout="mosaic"> places its items itself: drop ${own.slice(0, 4).map(c => `"${c}"`).join(', ')} from the item's className`)
+    }
     return { t: 'cmp', name, props, children: [], render: { param: b.param, ...(b.index ? { index: b.index } : {}), body } }
   }
   if (SLIDERS.has(name)) {

@@ -4,8 +4,10 @@ import { ECOM, ADMIN, api, ownerLogin, adminLogin } from '../lib.mjs'
 export { ECOM, ADMIN, api, ownerLogin, adminLogin }
 export const PAWS = '340c9782-f7da-49ae-ace0-59acec540bab'
 export const LUMEN = 'ecf96288-0f30-4769-90ad-ad79134478c3'
+export const HALO = 'bb7b7c9c-cd87-4e1f-8c7f-e25cdaa685e7'
 export const PAWS_OWNER = 'studio-ui-check@crm.test'
 export const LUMEN_OWNER = 'theme-demo@crm.test'
+export const HALO_OWNER = 'film-audio@crm.test'
 
 /** Signs the owner in, puts the onboarding draft on a step and opens the wizard there. */
 export async function openWizard(page, email, step, stepId) {
@@ -18,6 +20,16 @@ export async function openWizard(page, email, step, stepId) {
   await page.getByRole('button', { name: /^Continue$/ }).click()
   await page.waitForLoadState('networkidle').catch(() => {})
   await page.waitForTimeout(3000)
+}
+
+/** Scrolls until the h1/h2 starting with `text` sits `offset` px below the top of the window, wherever the theme put it. */
+export async function toHeading(page, h, text, offset, ms) {
+  const by = await page.evaluate(([t, o]) => {
+    const el = [...document.querySelectorAll('h1, h2')].find(e => e.textContent.trim().startsWith(t))
+    return el ? Math.round(el.getBoundingClientRect().top - o) : null
+  }, [text, offset])
+  if (by === null) throw new Error(`no heading "${text}"`)
+  await h.scroll(by, ms)
 }
 
 /** Compiles studio preview routes ahead of filming (dev server). */

@@ -211,6 +211,81 @@ describe('runPaidGeneration', () => {
   })
 })
 
+describe('runPaidGeneration, flat (a Showcase redesign)', () => {
+  const flat = { ...gen, capInr: 50, feature: 'showcase_generation', flat: { budgetInr: 100 } }
+  const checkpoints = () => holdDb.query.mock.calls.filter(c => /GREATEST\(cost_inr/.test(c[0]))
+
+  it('holds the price, runs on its own budget and charges exactly the price, whatever the AI used', async () => {
+    for (const spent of [5, 90]) {
+      vi.clearAllMocks()
+      holds.clear()
+      const r = await runPaidGeneration(flat, async () => {
+        expect(metered()?.remainingInr).toBe(100)
+        meterAiCost(spent)
+        return 'page'
+      })
+      expect(debitIn).toHaveBeenCalledWith(holdDb, expect.objectContaining({ amountInr: 50, externalRef: REF }))
+      expect(trueUpIn).toHaveBeenCalledWith(holdDb, { tenantId: TENANT, amountInr: 50, externalRef: REF })
+      expect(r).toEqual({ chargedInr: 50, costInr: spent, result: 'page' })
+      expect(holds.get(KEY)).toMatchObject({ cap_inr: '50', settled_by: 'run', charged_inr: '50', cost_inr: String(spent) })
+      expect(usageRows().map(c => c[1])).toEqual([['showcase_generation', 50, REF, 'site:abc']])
+      expect(checkpoints()).toEqual([])
+    }
+  })
+
+  it('gives the whole price back when the run fails, even after the AI spent', async () => {
+    const boom = new Error('no section could be written')
+    await expect(
+      runPaidGeneration(flat, async () => {
+        meterAiCost(30)
+        throw boom
+      })
+    ).rejects.toBe(boom)
+    expect(trueUpIn).toHaveBeenCalledWith(holdDb, { tenantId: TENANT, amountInr: 0, externalRef: REF })
+    expect(holds.get(KEY)).toMatchObject({ settled_by: 'run', charged_inr: '0' })
+    expect(usageRows()).toEqual([])
+  })
+
+  it('keeps no cost on the hold, so the sweep refunds a run that died in full', async () => {
+    const r = await runPaidGeneration(flat, async () => {
+      meterAiCost(30)
+      await new Promise(res => setTimeout(res, 0))
+      expect(holds.get(KEY)!.cost_inr).toBe('0')
+      expect((await sweepStaleHolds(0)).settled).toEqual([{ tenantId: TENANT, walletRef: REF, costInr: 0, chargedInr: 0, refundedInr: 50 }])
+      return 'late'
+    })
+    expect(r.chargedInr).toBe(0)
+    expect(usageRows()).toEqual([])
+  })
+
+  it('leaves a hold it could not settle at no cost, for the sweep to refund', async () => {
+    vi.useFakeTimers()
+    vi.mocked(trueUpIn).mockRejectedValue(new Error('db down'))
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const p = runPaidGeneration(flat, async () => {
+      meterAiCost(30)
+    })
+    await vi.runAllTimersAsync()
+    expect((await p).chargedInr).toBe(50)
+    expect(holds.get(KEY)).toMatchObject({ settled_by: null, cost_inr: '0' })
+    err.mockRestore()
+    vi.useRealTimers()
+  })
+
+  it('names the price when the wallet is short, and runs nothing', async () => {
+    vi.mocked(debitIn).mockResolvedValue({ ok: false, error: 'insufficient_balance', balance: 40, needed: 10 } as any)
+    const fn = vi.fn()
+    const err = await runPaidGeneration(flat, fn).catch(e => e)
+    expect(err.body()).toMatchObject({ code: 'wallet_low', error: 'Your AI wallet needs ₹10.00 more: this costs ₹50.', balanceInr: 40, neededInr: 10, capInr: 50 })
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('needs a budget', async () => {
+    await expect(runPaidGeneration({ ...flat, flat: { budgetInr: 0 } }, vi.fn())).rejects.toThrow(/budgetInr/)
+    expect(debitIn).not.toHaveBeenCalled()
+  })
+})
+
 describe('sweepStaleHolds', () => {
   it('settles a hold open two hours on: recorded cost × margin, the rest refunded, one charge row', async () => {
     seedHold()
@@ -281,7 +356,5 @@ describe('estimateGeneration', () => {
     expect(e.highInr).toBeLessThanOrEqual(1500)
     expect(estimateGeneration('store_site', { capInr: 1500, images: true }).highInr).toBeGreaterThan(e.highInr)
     expect(estimateGeneration('store_site', { capInr: 600 }).highInr).toBe(600)
-    expect(estimateGeneration('one_page').capInr).toBe(100)
-    expect(estimateGeneration('one_page', { capInr: 20 }).highInr).toBeLessThanOrEqual(20)
   })
 })

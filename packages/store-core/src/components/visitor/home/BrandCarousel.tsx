@@ -48,7 +48,7 @@ export default function BrandCarousel({ brands, title, eyebrow, carousel = false
           </div>
           <Link
             href="/brands"
-            className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
+            className="hidden sm:flex min-h-11 -my-3 items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
           >
             All brands{' '}
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

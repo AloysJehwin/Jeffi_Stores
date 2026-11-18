@@ -76,6 +76,7 @@ export {
   setOwnRazorpay,
   setOwnDelhivery,
   setUpiMode,
+  setPaymentRequired,
   persistLinkedAccountToOwnerBank,
   saveSubscriptionId,
   setSubscriptionStatus,

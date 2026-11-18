@@ -29,6 +29,8 @@ export interface TenantRow {
   /** A downgrade waiting for the paid cycle to end (owner queries only). */
   pending_plan?: string | null
   pending_billing_interval?: string | null
+  /** Mandatory (true) or Optional (false), set at KYC approval; read it through paymentRequired() (getTenant and owner queries). */
+  payment_required?: boolean
   razorpay_subscription_id: string | null
   razorpay_checkout_url: string | null
   razorpay_linked_account_id: string | null
@@ -310,7 +312,7 @@ export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.requested_addons, t.created_at, t.instance_state,
-            t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
+            t.billing_interval, t.payment_required, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.shared_db_host, i.iam_auth, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.cloudfront_id

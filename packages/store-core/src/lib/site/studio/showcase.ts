@@ -1,6 +1,8 @@
 import { isPageKey, type PageKey } from '@jeffi/site-blocks'
-import { SHOWCASE_PAGE_KEY } from '../../showcase/types'
-import { askJson, newSeed, orNull, str } from './ai'
+import { generateImage } from '@/lib/ai/media'
+import { SHOWCASE_PAGE_KEY, type ShowcaseBusiness, type ShowcaseFaq, type ShowcasePagePicture, type ShowcaseService } from '../../showcase/types'
+import { cleanStarter, reachText } from '../../showcase/starter'
+import { askJson, newSeed, orNull, str, studioBudgetLeft } from './ai'
 import { cleanAnswers, readRefs } from './brief'
 import type { StudioAnswers, StudioBrief } from './types'
 import { uiStyle } from './ui-styles'
@@ -72,4 +74,55 @@ export async function suggestShowcaseAnswer(question: string, so: StudioAnswers 
     { maxTokens: 300, temperature: 0.9, modelHint: 'copy' }
   )
   return str(out?.answer, 400)
+}
+
+/**
+ * Starter services (or menu highlights) and questions for a business that gave none, written from its brief on the
+ * copy model; lib/showcase/starter.ts keeps only what states no fact the owner did not give. Empty when the budget is
+ * spent or the answer is unusable.
+ */
+export async function showcaseStarter(b: StudioBrief, business: ShowcaseBusiness): Promise<{ services: ShowcaseService[]; faqs: ShowcaseFaq[] }> {
+  if (studioBudgetLeft() <= 0) return { services: [], faqs: [] }
+  const out = await askJson(
+    `You suggest starter content for the one-page website of an Indian business whose owner has given little detail; the owner checks and edits it before it matters. Return JSON {"services": [3-6 {"title": 2-5 plain words, "description": one short sentence on what it is}], "faqs": [2-4 {"q": a question their clients often ask, "a": a short answer}]}.
+Services are what a business of this kind usually offers (for a café, menu highlights such as coffee or fresh bakes; for a photographer, the kinds of shoots), named plainly.
+Never state a fact you were not given: no price, number, duration, year, opening hours, days, address, area, brand, ingredient origin, award, certification, guarantee, delivery, offer or claim of being the best. When an answer depends on such a fact (prices, timings, availability, bookings, delivery), say how to ask instead: ${reachText(business)}.
+No quotes, reviews or client names. Indian English, no emoji.`,
+    `Business: ${b.storeName}. ${b.summary}
+What they do: ${b.category}. Clients: ${b.audience || 'not given'}. Words their clients use: ${b.vocabulary.join(', ') || 'none given'}. Voice: ${b.voice}.${b.about ? `\nIn their words: ${b.about.slice(0, 600)}` : ''}`,
+    { maxTokens: 1500, temperature: 0.5, modelHint: 'copy' }
+  ).catch(orNull)
+  return cleanStarter(out)
+}
+
+// Mood pictures: the place, the craft and the setting of a business of this kind, never its work, people or brands.
+const SCENES = ['the place and its atmosphere, wide', 'a close detail of the craft: tools, materials and textures', 'the setting where clients enjoy the result, calm and inviting']
+
+/**
+ * Up to `max` mood pictures for a Showcase's page at draft quality, while the budget lasts (BusinessPicture shows
+ * them after the owner's own work photos and never as their work). Stops at the first failure and says why.
+ */
+export async function showcasePictures(b: StudioBrief, max: number): Promise<{ pictures: ShowcasePagePicture[]; error?: string }> {
+  const pictures: ShowcasePagePicture[] = []
+  for (const scene of SCENES.slice(0, Math.max(0, max))) {
+    if (studioBudgetLeft() <= 0) break
+    try {
+      const r = await generateImage({
+        prompt: `A mood photograph for the website of a ${b.category || 'local business'} in India: ${scene}. ${b.mood ? `Mood: ${b.mood}. ` : ''}${b.artDirection}. No people's faces, no text, no logos, no brand names, no watermarks.`,
+        negativePrompt: 'text, letters, watermark, logo, brand, faces, people, distorted hands',
+        width: 1024,
+        height: 1024,
+        feature: 'homepage_image',
+        // Site generation always uses the cheapest image model.
+        quality: 'draft',
+        ref: 'site-studio:showcase-mood',
+        skipGallery: true,
+      })
+      const url = r.images[0]?.url
+      if (url) pictures.push({ image: url, ai: true })
+    } catch (err) {
+      return { pictures, error: (err as Error)?.message?.slice(0, 400) || 'image generation failed' }
+    }
+  }
+  return { pictures }
 }

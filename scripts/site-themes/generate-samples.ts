@@ -9,7 +9,7 @@
 //   npx tsx --tsconfig scripts/site-themes/tsconfig.json scripts/site-themes/generate-samples.ts --budget=300
 //
 //   --category="Pet Supplies",Automotive   only these categories (default: all fourteen)
-//   --images=6                             photos per category (default 6; 0 for text only)
+//   --images=6                             photos per category (default 6, up to 24 so a whole catalogue fits; 0 for text only)
 //   --budget=<₹>                           AI spend cap for this run (default 300)
 //   --force                                write the catalogue again (its photos too)
 //   --dry-run                              list what would be made; no AI, nothing written
@@ -50,7 +50,7 @@ async function main() {
 
   const dryRun = arg('dry-run') !== undefined
   const force = arg('force') !== undefined
-  const images = Math.max(0, Math.min(12, Number(arg('images') ?? 6)))
+  const images = Math.max(0, Math.min(24, Number(arg('images') ?? 6)))
   const budget = Number(arg('budget') ?? 300)
   const wanted = arg('category')?.split(',').map(s => s.trim()).filter(Boolean)
   const categories = SELLING_CATEGORIES.filter(c => !wanted || wanted.some(w => w.toLowerCase() === c.toLowerCase() || sampleSlug(w) === sampleSlug(c)))

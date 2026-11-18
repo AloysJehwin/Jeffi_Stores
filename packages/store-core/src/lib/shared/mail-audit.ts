@@ -27,6 +27,8 @@ export interface SendAuditedMailOptions {
   cc?: string | string[]
   bcc?: string | string[]
   replyTo?: string
+  /** The footer's "you can reply" line; by default there whenever the mail carries a reply address. */
+  replyHint?: boolean
   /** The message this answers (threads the conversation in the customer's mail app). */
   inReplyTo?: string
   attachments?: any[]
@@ -156,7 +158,7 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
   const scope = currentReplyScope()
   const scoped = scope && !guarded.replyTo ? { ...guarded, replyTo: scope.replyTo, entityType: guarded.entityType ?? scope.entityType, entityId: guarded.entityId ?? scope.entityId } : guarded
   // The store's accent colour, and a reply line when replies come back to us.
-  const o = scoped.html ? { ...scoped, html: await themed(scoped.html, !!scoped.replyTo) } : scoped
+  const o = scoped.html ? { ...scoped, html: await themed(scoped.html, scoped.replyHint ?? !!scoped.replyTo) } : scoped
   // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
   // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.
   const from = o.from || (await resolveDefaultFrom())

@@ -1,5 +1,6 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { hasService } from '@/lib/tenant-registry'
+import { paymentRequired } from '@/lib/billing/payment-required'
 import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
@@ -9,8 +10,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function AddStorePage() {
   const { tenant } = await loadOwnerContext()
-  // Off (default): approval starts the build directly; no checkout step.
-  const payments = process.env.ECOM_PAYMENTS_ENABLED === 'true'
+  // Mandatory: checkout after approval. Optional: approval starts the build. Under review, payment is assumed.
+  const payments = paymentRequired(tenant)
   if (hasService(tenant, 'store') && !tenant.store_request) {
     return (
       <>
@@ -20,9 +21,7 @@ export default async function AddStorePage() {
             {tenant.status === 'active'
               ? `Live at ${tenant.slug}.jeffistores.in.`
               : tenant.status === 'pending_approval'
-                ? payments
-                  ? 'Your store is under review. We email you when it is approved and ready for payment.'
-                  : 'Your store is under review. Once approved, we set it up right away and email you when it is live.'
+                ? 'Your store is under review. We email you when it is approved and ready for payment.'
                 : tenant.status === 'awaiting_payment'
                   ? payments
                     ? 'Approved — complete the subscription payment from the onboarding page to start provisioning.'

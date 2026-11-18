@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "19bb41445f8868c8ef8e903c677577fa580f0b79b7e378e9a08950c958600129",
+ "manifestHash": "70bc8df4f98ae1691a7713e0483b9337a785ad66bf68defaed3af42f0539b863",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -46143,8 +46143,19 @@
    "scopes": [],
    "guard": "auth",
    "platform": "admin",
-   "body": null,
-   "noBody": true,
+   "body": {
+    "type": "object",
+    "properties": {
+     "paymentRequired": {
+      "type": "boolean",
+      "examples": [
+       false
+      ]
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
    "summary": "Approve a KYC",
    "command": "platform kyc approve"
   },

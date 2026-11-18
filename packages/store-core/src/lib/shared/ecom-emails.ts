@@ -104,13 +104,20 @@ function toText(html: string): string {
     .trim()
 }
 
-async function send(to: string, subject: string, html: string, attachments?: Array<{ filename: string; content: Buffer; contentType: string }>) {
+async function send(
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: Array<{ filename: string; content: Buffer; contentType: string }>,
+  reply?: { to?: string | null; hint: boolean }
+) {
   // Every outbound mail goes through the audited chokepoint so it is visible in
   // /admin/audit?tab=mail_log alongside the rest.
   await sendAuditedMail({
     kind: 'ecom',
     from: PLATFORM_FROM,
-    replyTo: PLATFORM_ADDRESS,
+    replyTo: reply?.to || PLATFORM_ADDRESS,
+    ...(reply ? { replyHint: reply.hint } : {}),
     to,
     subject,
     html,
@@ -121,11 +128,7 @@ async function send(to: string, subject: string, html: string, attachments?: Arr
   })
 }
 
-// Payments are off until ECOM_PAYMENTS_ENABLED=true: approval starts the build with no checkout.
-export function ecomPaymentsEnabled(): boolean {
-  return process.env.ECOM_PAYMENTS_ENABLED === 'true'
-}
-
+// Sent before approval, so it assumes payment: the administrator picks Mandatory or Optional at approval.
 export async function sendKycSubmittedEmail(owner: { email: string; name: string | null }) {
   const name = owner.name ?? 'there'
   const html = baseHtml(
@@ -135,9 +138,7 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details, licences and certificates, and our team has started the verification.</p>
     ${notice(
-      ecomPaymentsEnabled()
-        ? 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.'
-        : 'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, we set up your store right away. Billing starts later.'
+      'Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.'
     )}
     <p style="margin:0;">We will email you as soon as there is an update. No action is needed from you in the meantime.</p>
   `
@@ -159,7 +160,7 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
   await send(PLATFORM_ADMIN, `New merchant application: ${owner.email}`, adminHtml)
 }
 
-/** checkoutUrl null = payments off: approval starts the build directly. */
+/** checkoutUrl null = an Optional store: approval starts the build directly. */
 export async function sendKycApprovedEmail(
   owner: { email: string; name: string | null },
   tenant: { display_name: string; slug: string },
@@ -426,8 +427,32 @@ export async function sendDomainEmail(
   await send(owner.email, mail.subject, html)
 }
 
-/** A notice about the owner's Showcase site (renewal, short wallet, paused, a new enquiry). Lines and rows are HTML. */
+/** A notice about the owner's Showcase site (renewal, short wallet, paused). Lines and rows are HTML. */
 export const sendShowcaseEmail = sendDomainEmail
+
+/**
+ * A new enquiry from the owner's Showcase site. Replying answers the visitor (replyTo, when they left an email), so
+ * this mail doesn't invite replies to us. Lines and rows are HTML; the preheader is text.
+ */
+export async function sendShowcaseLeadEmail(
+  owner: { email: string; name: string | null },
+  mail: { subject: string; preheader: string; title: string; lines: string[]; rows: Row[]; cta: { href: string; label: string }; replyTo?: string | null }
+) {
+  const html = mailShell({
+    brand: PLATFORM_BRAND,
+    kicker: 'Showcase',
+    title: mail.title,
+    preheader: mail.preheader,
+    footerLines: [FOOTER_LINES[0], `Questions about your site? Write to <a href="mailto:${SUPPORT_ADDRESS}" style="color:#666;">${SUPPORT_ADDRESS}</a>.`],
+    content: `
+    <p style="margin:0 0 14px;">Hi ${escHtml(owner.name ?? 'there')},</p>
+    ${mail.lines.map(l => `<p style="margin:0 0 14px;">${l}</p>`).join('')}
+    ${detailTable(mail.rows)}
+    ${button(mail.cta.href, mail.cta.label)}
+  `,
+  })
+  await send(owner.email, mail.subject, html, undefined, { to: mail.replyTo, hint: false })
+}
 
 /** A notice about one of the store's licences (not accepted, expiring, expired). Lines and rows are HTML. */
 export const sendComplianceEmail = sendDomainEmail

@@ -138,7 +138,7 @@ One subscription: flat plan fee (GST included) + servers at AWS cost × (1 + `pl
 | Pro | ₹1,000 | 20% | ₹5,216 |
 | Enterprise | ₹2,000 | 20% | ₹9,845 |
 
-Yearly = 10× the monthly price (2 months free), charged once a year. Starter (₹999, shared server) is retired. Payments are off until `ECOM_PAYMENTS_ENABLED=true` — see `SAAS_MULTITENANT_STATUS.md`.
+Yearly = 10× the monthly price (2 months free), charged once a year. Starter (₹999, shared server) is retired. Whether a store pays (Mandatory or Optional) is chosen at approval — see `SAAS_MULTITENANT_STATUS.md`.
 
 Custom domain add-on: charged on top of subscription (amount TBD).
 

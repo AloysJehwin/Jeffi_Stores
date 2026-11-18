@@ -42,6 +42,8 @@ const STORE: PageSpec[] = [
       ['A wall of customer reviews', 'A testimonial carousel with ratings'],
       ['A closing call to shop the collection', 'An offer banner for the live offers'],
     ],
+    // The hero's picture is always there (an offer's, else a product's or category's photo, else a designed fill).
+    parts: [['HeroPicture']],
   },
   { page: 'products', label: 'Product listing', sections: [1, 3], must: ['ProductResults'], pool: [['A short title band for the listing with the result count'], ['Filters and sort beside or above the product results'], ['Shop-by-category chips above the results', 'A promise strip under the results']], parts: [[], ['Filters', 'SortMenu', 'ProductResults']] },
   // Every category page wears this design, filled with its own category: never one category's name or picture. A plan
@@ -378,7 +380,7 @@ const SHOWCASE: PageSpec[] = [
     must: ['LeadForm'],
     pool: [
       ['The header: the logo or name, links to the sections below and a call or WhatsApp button; compact on phones'],
-      ['Hero: what the business does in one bold line, the tagline, and calls to action to get in touch and to see the work', 'Split hero: the headline and calls to action beside a picture of their work', 'Typographic hero: the profession set large with the business name and one contact button'],
+      ['Hero: what the business does in one bold line, the tagline, calls to action to get in touch, and the page\'s picture', 'Split hero: the headline and calls to action beside the page\'s picture', 'Typographic hero: the profession set large with the business name, one contact button and a band with the page\'s picture'],
       ['About: the story in their words, what they do and where', 'About beside the numbers they are proud of'],
       ['Services as cards with their prices', 'Services as a numbered list with descriptions', 'Services in an accordion, quick to scan'],
       ['A gallery of their work', 'Their work as a carousel of large pictures', 'Their work as a bento grid with one large tile'],
@@ -388,7 +390,7 @@ const SHOWCASE: PageSpec[] = [
       ['Contact: the enquiry form beside phone, WhatsApp, email, address, hours and a map link', 'Contact: a band with call and WhatsApp buttons over the enquiry form'],
       ['The footer: name, a short line, contact, social links and the year'],
     ],
-    parts: [['Business'], ['Business'], ['Business'], ['Services'], ['Work'], ['Stats'], ['Testimonials'], ['Faqs'], ['LeadForm', 'Business'], ['Business', 'SocialLinks']],
+    parts: [['Business'], ['Business', 'BusinessPicture'], ['Business'], ['Services'], ['Work'], ['Stats'], ['Testimonials'], ['Faqs'], ['LeadForm', 'Business'], ['Business', 'SocialLinks']],
   },
 ]
 
@@ -411,7 +413,7 @@ export async function planShowcase(b: StudioBrief): Promise<StudioPlan> {
           `You plan a one-page website for an Indian business, section by section, top to bottom. Every page you plan is different: choose the sections, their mix and order for THIS business, not a standard template.
 Pick one approach from: ${candidates.map(c => `${c.id} (${c.description})`).join('; ')}.
 Each section: {"label": 2-4 plain words the owner reads (not a component name), "intent": what it shows and why, specific to this business, "layout": its composition (vary it: no two neighbours alike), "parts": library components it uses}.
-Start with the header (the name or logo, links to the sections below, a call or WhatsApp button) and end with the footer; one section near the end is for getting in touch and holds <LeadForm>.
+Start with the header (the name or logo, links to the sections below, a call or WhatsApp button), then the opening, which holds <BusinessPicture>, and end with the footer; one section near the end is for getting in touch and holds <LeadForm>. A section built only on services, work, reviews, numbers or questions shows only once the business has some.
 Return JSON {"approach": id, "sections": [sections]}.`,
           `Business: ${b.storeName}. ${b.summary} What they do: ${b.category}. Clients: ${b.audience}. Voice: ${b.voice}. Mood: ${b.mood}.
 ${b.references.length ? `Sites they like (patterns only): ${b.references.map(x => x.patterns.slice(0, 8).join(', ')).join(' | ')}\n` : ''}Layout ideas to draw on: ${shuffle(r, LAYOUTS).slice(0, 8).join('; ')}.

@@ -88,7 +88,7 @@ export default function CompareChangeButton({ productId, currentIds, categoryId 
     <div className="relative" ref={containerRef}>
       <button
         onClick={() => setOpen(v => !v)}
-        className="text-xs text-accent-500 hover:text-accent-600 hover:underline font-medium"
+        className="inline-flex min-h-11 min-w-11 -my-3.5 items-center justify-center text-xs text-accent-500 hover:text-accent-600 hover:underline font-medium"
       >
         Change
       </button>
