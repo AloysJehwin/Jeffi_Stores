@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isOTPVerified, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
 import { sendWelcomeEmail } from '@/lib/email'
-import { queryOne } from '@/lib/shared/db'
+import { query, queryOne } from '@/lib/shared/db'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/auth/issue-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { logActivity } from '@/lib/shared/activity'
@@ -76,6 +76,13 @@ export async function POST(request: NextRequest) {
 
     if (!newUser) {
       return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+    }
+
+    // The guest's cart and wishlist come along to the new account, as they do on sign-in.
+    const guestSessionId = request.cookies.get('session_id')?.value
+    if (guestSessionId?.startsWith('guest_')) {
+      const guestUser = await queryOne('SELECT id FROM users WHERE session_id = $1 AND is_guest = true', [guestSessionId])
+      if (guestUser) await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUser.id, newUser.id]).catch(() => {})
     }
 
     sendWelcomeEmail(email, firstName).catch(() => {})
