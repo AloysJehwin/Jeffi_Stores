@@ -8,6 +8,7 @@ import ProductReviews from '@/components/visitor/ProductReviews'
 import { PDP_REVIEWS_ID } from '@/components/visitor/pdp/pdp'
 import { renderProductItem } from '@/components/visitor/listing/listing-items'
 import { ProductItem } from '@/components/visitor/site/code/common/SiteCard'
+import SectionCarousel from '@/components/visitor/SectionCarousel'
 import { siteCard } from '@/lib/site/card'
 import type { RenderCtx } from '@/lib/site/code/registry'
 import type { ProductDetailView, ProductView, SiteData } from '@/lib/site/data/types'
@@ -132,6 +133,17 @@ export async function relatedCount(data: SiteData, props: Record<string, unknown
 
 export async function renderRelated(ctx: RenderCtx, props: Record<string, unknown>): Promise<ReactNode> {
   const limit = Math.min(8, Math.max(1, Number(props.limit) || 4))
+  // The list: its grid, or one product a slide.
+  const list = (kids: ReactNode[]) =>
+    props.layout === 'carousel' ? (
+      <div className={typeof props.className === 'string' ? props.className : undefined}>
+        <SectionCarousel ariaLabel="Related products" itemClassName={own(props.itemClassName, 'w-[45%] md:w-[23%]')}>
+          {kids}
+        </SectionCarousel>
+      </div>
+    ) : (
+      <div className={own(props.className, RELATED_GRID)}>{kids}</div>
+    )
   const parts = productParts()
   const card = ctx.renderItem ? null : await siteCard(ctx.data)
   let items: ProductView[]
@@ -139,13 +151,7 @@ export async function renderRelated(ctx: RenderCtx, props: Record<string, unknow
     const rows = parts.related.slice(0, limit)
     if (!rows.length) return null
     if (!ctx.renderItem && !card) {
-      return (
-        <div className={own(props.className, RELATED_GRID)}>
-          {rows.map(row => (
-            <div key={row.id}>{renderProductItem(row, parts.gstEnabled, true)}</div>
-          ))}
-        </div>
-      )
+      return list(rows.map(row => <div key={row.id}>{renderProductItem(row, parts.gstEnabled, true)}</div>))
     }
     items = await rowViews(rows, parts.gstEnabled)
   } else {
@@ -156,11 +162,7 @@ export async function renderRelated(ctx: RenderCtx, props: Record<string, unknow
     if (!items.length) return null
   }
   const render = ctx.renderItem
-  return (
-    <div className={own(props.className, RELATED_GRID)}>
-      {items.map((v, i) => (render ? render(v, i) : <ProductItem key={v.id} product={v} card={card} data={ctx.data} deferred />))}
-    </div>
-  )
+  return list(items.map((v, i) => (render ? render(v, i) : <ProductItem key={v.id} product={v} card={card} data={ctx.data} deferred />)))
 }
 
 // Off a product page the interactive parts have no product to act on; the preview shows what they look like.

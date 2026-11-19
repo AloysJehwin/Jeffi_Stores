@@ -1,7 +1,7 @@
 import type { PageKey } from '@jeffi/site-blocks'
-import { CARD_PRODUCT, type CodeNode, type CodeValue } from '../code/ast'
+import { CARD_PRODUCT, carouselList, type CodeNode, type CodeValue } from '../code/ast'
 import { splitClasses, taxonomyOf } from '../code/allow'
-import { gridTrouble, PHONE as PHONE_WIDTH } from '../code/grid'
+import { checkGrid, gridTrouble, PHONE as PHONE_WIDTH } from '../code/grid'
 import { placeholderRows } from '../code/placeholders'
 
 // What a studio section must not hard-code. It is written against a sample catalogue but goes live on the store's own,
@@ -39,6 +39,8 @@ export const LINT = {
     'A detail the business did not give has no row at all: drop the typed stand-ins ("Call for today\'s hours", "In your neighbourhood", b.hours || "…", b.hours ? … : "…") and guard the row instead (b.hours && …), or draw the rows from b.facts.',
   quotes: 'Do not type client quotes, names or star ratings: what clients say comes only from <Testimonials>, so a reviews section shows real reviews or nothing.',
   anchor: 'Link only to the page\'s own sections: #top, #about, #services, #work, #reviews, #faq or #contact.',
+  navMenu:
+    'On phones and tablets <NavLinks> is a menu button (below lg, or the width its from= gives), and this header leaves it centred or alone on a row. It belongs at the left or right edge of the logo row: for links on a centred row of their own, pass mobile="scroll" (that row then keeps its links, scrolling on phones), or keep <NavLinks> at an edge of the logo row until the links move to their own row, with from set to that width (from="md" for a row that starts at md:).',
 } as const
 
 /** The ids a Showcase section may take, and so the only in-page links its header and buttons may use. */
@@ -86,8 +88,8 @@ const SHOWCASE_LINT: Partial<Record<string, string>> = {
 
 /**
  * What a studio section gets wrong, as repair notes (none = fine), worded for its page: hard-coded store data, a home
- * opening (`first`, or the section holding the page's h1) without a picture that is always there, and data grids
- * that break for some number of items.
+ * opening (`first`, or the section holding the page's h1) without a picture that is always there, data grids that
+ * break for some number of items, and layouts that squeeze them or strand the header's menu button (layoutNotes).
  */
 export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: boolean } = {}): string[] {
   const found = new Set<string>()
@@ -174,6 +176,7 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
     if (showcase && STARS.test(text)) found.add(LINT.quotes)
   }
   walk(ast)
+  layoutNotes(ast, page, found)
   if (page === 'home' && (opts.first || h1) && !picture) found.add(LINT.hero)
   // A Showcase opens with its header (`first`); the opening is the section holding the page's h1.
   if (showcase && h1 && !opts.first && !businessPicture) found.add(LINT.showcaseHero)
@@ -198,6 +201,243 @@ function draws(n: unknown, depth = 0): boolean {
     default:
       return false
   }
+}
+
+// ── Layout, worked out from literal classes at a few widths ─────────────────────────────────────────────────────────
+
+const SCREEN: Record<string, number> = { sm: 640, md: 768, lg: 1024, xl: 1280, '2xl': 1536 }
+
+/** A class's screen range and utility (`md:col-span-3` → from 768, col-span-3); null under hover:, dark: and other states. */
+function screenOf(token: string): { min: number; max: number; util: string } | null {
+  const parts = token.split(/:(?![^[]*\])/)
+  const util = parts.pop()!.replace(/^!/, '')
+  let min = 0
+  let max = Infinity
+  for (const v of parts) {
+    if (SCREEN[v]) min = Math.max(min, SCREEN[v])
+    else if (v.startsWith('max-') && SCREEN[v.slice(4)]) max = Math.min(max, SCREEN[v.slice(4)])
+    else return null
+  }
+  return { min, max, util }
+}
+
+/** What the winning class of one kind says at a width: a wider screen variant beats a narrower one, then the later class. */
+function at<T>(classes: string[], width: number, read: (util: string) => T | undefined): T | undefined {
+  let best: T | undefined
+  let from = -1
+  for (const c of classes) {
+    const s = screenOf(c)
+    if (!s || s.min > width || width >= s.max || s.min < from) continue
+    const v = read(s.util)
+    if (v !== undefined) {
+      best = v
+      from = s.min
+    }
+  }
+  return best
+}
+
+const DISPLAY = /^(block|inline-block|inline|flex|inline-flex|grid|inline-grid|table|flow-root|contents|hidden)$/
+const display = (c: string[], w: number) => at(c, w, u => (DISPLAY.test(u) ? u : undefined)) ?? 'block'
+const isGrid = (c: string[], w: number) => /grid$/.test(display(c, w))
+
+/** Columns a grid-cols class makes: grid-cols-3, grid-cols-[auto_1fr_auto], grid-cols-[repeat(4,minmax(0,1fr))]. */
+function tracks(u: string): number | undefined {
+  const m = /^grid-cols-(?:(\d+)|\[(.+)\]|(none))$/.exec(u)
+  if (!m) return undefined
+  if (m[1] || m[3]) return m[3] ? 1 : Number(m[1])
+  const rep = /^repeat\((\d+),/.exec(m[2])
+  if (rep) return Number(rep[1])
+  let depth = 0
+  let n = 1
+  for (const ch of m[2]) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    else if (ch === '_' && !depth) n++
+  }
+  return n
+}
+const colsAt = (c: string[], w: number) => (isGrid(c, w) ? (at(c, w, tracks) ?? 1) : 1)
+const spanAt = (c: string[], w: number) => at(c, w, u => (u === 'col-span-full' ? Infinity : /^col-span-\d+$/.test(u) ? Number(u.slice(9)) : undefined)) ?? 1
+/** The class of one family (`all`) that wins at a width is `pick`. */
+const wins = (c: string[], w: number, all: RegExp, pick: RegExp) => pick.test(at(c, w, u => (all.test(u) ? u : undefined)) ?? '')
+
+/** A box lays its children out one under another at a width: a block, a flex column or a one-column grid. */
+function stacks(c: string[], w: number): boolean {
+  const d = display(c, w)
+  if (/flex$/.test(d)) return wins(c, w, /^flex-(row|col)(-reverse)?$/, /^flex-col/)
+  if (/grid$/.test(d)) return colsAt(c, w) === 1 && !wins(c, w, /^grid-flow-/, /col/)
+  return d === 'block' || d === 'flow-root'
+}
+const CENTRES = [/^justify-(?!items-|self-)(.+)$/, /^justify-items-(.+)$/, /^place-content-(.+)$/, /^place-items-(.+)$/]
+const centres = (c: string[], w: number) => CENTRES.some(re => at(c, w, u => re.exec(u)?.[1]) === 'center')
+const fills = (c: string[], w: number) =>
+  wins(c, w, /^(flex-(1|auto|initial|none)|(flex-)?grow(-0)?)$/, /^(flex-1|(flex-)?grow)$/) || wins(c, w, /^w-/, /^w-full$/) || wins(c, w, /^basis-/, /^basis-full$/)
+
+type Box = { cls: string[] | null; kids: number }
+const NAV_FROM: Record<string, number> = { md: 768, lg: 1024, xl: 1280 }
+const NAV_AT = [390, 700, 900, 1150]
+
+/**
+ * Below its `from` width NavLinks is a menu button: true when that button is left alone on a row (its row stacks, or
+ * the box holding it spans every column or takes a whole wrapped line) or centred, at some width it shows.
+ */
+function navAlone(chain: Box[], from: number): boolean {
+  // The boxes holding only the menu, then the first holding it among other things: its row.
+  const shell: Box[] = []
+  let row: Box | null = null
+  for (let i = chain.length - 1; i >= 0 && !row; i--) {
+    if (chain[i].kids > 1) row = chain[i]
+    else shell.push(chain[i])
+  }
+  const r = row?.cls
+  if (!r) return false
+  // What the row places: the outermost shell (NavLinks' own className styles its list, not its button).
+  const place = shell.length ? shell[shell.length - 1].cls : []
+  for (const w of NAV_AT) {
+    if (w >= from) break
+    if (chain.some(b => b.cls && display(b.cls, w) === 'hidden')) continue
+    const alone =
+      stacks(r, w) ||
+      (!!place && isGrid(r, w) && colsAt(r, w) > 1 && spanAt(place, w) >= colsAt(r, w)) ||
+      (!!place && /flex$/.test(display(r, w)) && wins(r, w, /^flex-(wrap|wrap-reverse|nowrap)$/, /^flex-wrap/) && (wins(place, w, /^w-/, /^w-full$/) || wins(place, w, /^basis-/, /^basis-full$/)))
+    if (alone || centres(r, w) || shell.some(b => b.cls && centres(b.cls, w) && fills(b.cls, w))) return true
+  }
+  return false
+}
+
+const SQUEEZE_AT = [390, 768, 1024, 1280, 1440]
+const pageWidth = (w: number) => Math.min(w - 32, 1280)
+const MAX_W: Record<string, number> = { xs: 320, sm: 384, md: 448, lg: 512, xl: 576, '2xl': 672, '3xl': 768, '4xl': 896, '5xl': 1024, '6xl': 1152, '7xl': 1280, prose: 600 }
+
+/** The width a w-, basis- or max-w- class gives inside `base` px; undefined for auto, fit, 0 and other classes. */
+function sized(u: string, prop: 'w' | 'basis' | 'max-w', base: number, w: number): number | undefined {
+  if (!u.startsWith(`${prop}-`)) return undefined
+  const v = u.slice(prop.length + 1)
+  let m: RegExpExecArray | null
+  if (v === 'full') return base
+  if (v === 'screen') return w
+  if ((m = /^(\d+)\/(\d+)$/.exec(v))) return (base * Number(m[1])) / Number(m[2])
+  if ((m = /^\[(\d+(?:\.\d+)?)(%|px|rem)\]$/.exec(v))) return m[2] === '%' ? (base * Number(m[1])) / 100 : Number(m[1]) * (m[2] === 'rem' ? 16 : 1)
+  if (prop === 'max-w') return MAX_W[v]
+  return (m = /^(\d+(?:\.5)?)$/.exec(v)) && Number(m[1]) > 0 ? Number(m[1]) * 4 : undefined
+}
+
+/** A box's width at a page width: its share of the parent grid's columns, then its own basis-, w- and max-w-. */
+function widthIn(cls: string[] | null, grid: string[] | null, w: number, px: number): number {
+  let base = px
+  if (grid && isGrid(grid, w)) {
+    const cols = colsAt(grid, w)
+    base = (px * Math.min(cls ? spanAt(cls, w) : 1, cols)) / cols
+  }
+  if (!cls) return base
+  const own = at(cls, w, u => sized(u, 'basis', base, w)) ?? at(cls, w, u => sized(u, 'w', base, w)) ?? base
+  return Math.min(own, at(cls, w, u => sized(u, 'max-w', base, w)) ?? Infinity)
+}
+
+// A rail's slide: kept from shrinking (or snapped to) at a share of the rail's width.
+const SLIDE = /^(snap-(start|center|end)|shrink-0|flex-shrink-0|flex-none)$/
+const SHARE = /^(min-w|w|basis)-(\d+\/\d+|\[\d+(\.\d+)?%\])$/
+const utilOf = (c: string) => screenOf(c)?.util ?? ''
+const slideOf = (cls: string[] | null) =>
+  cls && cls.some(c => SLIDE.test(utilOf(c))) && cls.some(c => SHARE.test(utilOf(c))) ? `a rail's slide ("${cls.join(' ').slice(0, 80)}")` : null
+const CAROUSEL_SLIDE = 'one <Carousel> slide (each child of <Carousel> is a slide, so the whole list is one)'
+
+// Lists that draw cards, and the grids they draw without a className (ItemsLayout's fallbackGrid, RelatedProducts').
+const CARD_LISTS = new Set([...DATA_LISTS, 'RelatedProducts', 'CartUpsell'])
+const LIST_GRID: Record<string, string> = {
+  Brands: 'grid grid-cols-3 md:grid-cols-6',
+  Reviews: 'grid md:grid-cols-3',
+  Offers: 'grid md:grid-cols-3',
+  Testimonials: 'grid md:grid-cols-3',
+  Services: 'grid sm:grid-cols-2 lg:grid-cols-3',
+  Work: 'grid grid-cols-2 md:grid-cols-3',
+  RelatedProducts: 'grid grid-cols-2 lg:grid-cols-4',
+}
+// A list's limit as written: limit={n}, or query={{ …, limit: n }} (literal or holding bound values).
+const listLimit = (node: Extract<CodeNode, { t: 'cmp' }>): number | null => {
+  const own = lit(node.props?.limit)
+  if (typeof own === 'number') return own
+  const q = node.props?.query
+  const v = q?.k === 'lit' && q.v && typeof q.v === 'object' ? (q.v as Record<string, unknown>).limit : q?.k === 'obj' ? lit(q.v.limit) : undefined
+  return typeof v === 'number' ? v : null
+}
+const listGrid = (node: Extract<CodeNode, { t: 'cmp' }>, cls: string[]): string[] | null => {
+  const layout = lit(node.props?.layout)
+  if (layout === 'carousel' || layout === 'list') return null
+  if (cls.length && layout !== 'mosaic') return cls
+  // <Products> draws a single product in one column (its fallbackGrid), so a one-product spotlight fits anywhere.
+  if (node.name === 'Products' && listLimit(node) === 1) return null
+  return splitClasses(LIST_GRID[node.name] ?? 'grid grid-cols-2 md:grid-cols-4')
+}
+
+type Room = { px: number[]; hidden: boolean[]; slide: string | null; grid: string[] | null }
+
+// What makes an item a card (a button, a price, a title) rather than a thumbnail, which may be small.
+const CARD_PARTS = new Set(['ProductCard', 'QuickAdd', 'PriceTag', 'WishlistToggle', 'RatingStars', 'AddToCart'])
+function cardish(n: unknown, depth = 0): boolean {
+  if (!n || typeof n !== 'object' || depth > 200) return false
+  const node = n as CodeNode
+  const any = (list: unknown) => Array.isArray(list) && list.some(c => cardish(c, depth + 1))
+  if (node.t === 'cmp') return CARD_PARTS.has(node.name) || any(node.children) || cardish(node.render?.body, depth + 1)
+  if (node.t === 'el') return /^h[1-6]$/.test(node.tag) || any(node.children)
+  if (node.t === 'frag') return any(node.children)
+  if (node.t === 'cond') return cardish(node.then, depth + 1) || cardish(node.else, depth + 1)
+  return node.t === 'each' && cardish(node.body, depth + 1)
+}
+
+const squeezed = (name: string, cols: number, where: string) =>
+  `<${name}> lays out ${cols} columns ${where}, so its cards shrink to slivers ("Add to cart" wraps word by word, names are cut).`
+
+/** A card list of 2+ columns inside a rail's slide, or in a box so narrow its cards come out under 150px. */
+function squeeze(node: Extract<CodeNode, { t: 'cmp' }>, cls: string[], room: Room): string | null {
+  const grid = listGrid(node, cls)
+  if (!grid || (node.render && !cardish(node.render.body))) return null
+  const cols = SQUEEZE_AT.map((w, i) => (room.hidden[i] ? 0 : (checkGrid(grid, [], w)?.cols ?? 1)))
+  const most = Math.max(...cols)
+  if (room.slide && most >= 2)
+    return `${squeezed(node.name, most, `inside ${room.slide}`)} Give each slide one card: make the list itself the rail (layout="carousel" where it has one, else a className like "grid grid-flow-col auto-cols-[80%] sm:auto-cols-[45%] overflow-x-auto snap-x [&>*]:snap-start") instead of slides around it, or drop the rail and lay the grid out at full width.`
+  for (const [i, w] of SQUEEZE_AT.entries())
+    if (cols[i] >= 2 && room.px[i] < pageWidth(w) * 0.55 && room.px[i] / cols[i] < 150)
+      return `${squeezed(node.name, cols[i], `in a column about ${Math.round((room.px[i] / pageWidth(w)) * 100)}% of the page wide`)} Lay the grid out at full width, or give that column one card per row (grid-cols-1) or a rail of one card per slide.`
+  return null
+}
+
+const kidsOf = (list: unknown): number =>
+  Array.isArray(list)
+    ? list.reduce((s: number, c: CodeNode | null) => s + (!c || typeof c !== 'object' ? 0 : c.t === 'text' ? (c.value?.trim() ? 1 : 0) : c.t === 'frag' ? kidsOf(c.children) : c.t === 'each' ? 2 : 1), 0)
+    : 0
+
+/** Layout findings: a header's menu button left centred or alone on a row, and card lists squeezed into slivers. */
+function layoutNotes(ast: unknown, page: PageKey | null | undefined, found: Set<string>): void {
+  const walk = (n: unknown, chain: Box[], room: Room, depth: number): void => {
+    if (!n || typeof n !== 'object' || depth > 200) return
+    const node = n as CodeNode
+    if (node.t === 'frag') return node.children?.forEach(c => walk(c, chain, room, depth + 1))
+    if (node.t === 'cond') return (walk(node.then, chain, room, depth + 1), walk(node.else, chain, room, depth + 1))
+    if (node.t === 'each') return walk(node.body, chain, room, depth + 1)
+    if (node.t !== 'el' && node.t !== 'cmp') return
+    const lc = literalClass(node.props?.className)
+    const cls = lc == null ? null : splitClasses(lc)
+    const list = node.t === 'cmp' && CARD_LISTS.has(node.name) ? node : null
+    const inner: Room = {
+      px: SQUEEZE_AT.map((w, i) => widthIn(cls, room.grid, w, room.px[i])),
+      hidden: SQUEEZE_AT.map((w, i) => room.hidden[i] || (!!cls && display(cls, w) === 'hidden')),
+      // A <Carousel> holding only a list draws the list's own carousel (interpret.tsx), so that list is not one slide.
+      slide: room.slide ?? slideOf(cls) ?? (node.t === 'cmp' && node.name === 'Carousel' && !carouselList(node) ? CAROUSEL_SLIDE : null),
+      grid: list ? listGrid(list, cls ?? []) : cls,
+    }
+    if (node.t === 'cmp' && node.name === 'NavLinks' && page === 'header' && (lit(node.props?.mobile) ?? 'menu') === 'menu')
+      if (navAlone(chain, NAV_FROM[String(lit(node.props?.from) ?? 'lg')] ?? 1024)) found.add(LINT.navMenu)
+    if (list && cls) {
+      const note = squeeze(list, cls, inner)
+      if (note) found.add(note)
+    }
+    const next = [...chain, { cls, kids: kidsOf(node.children) + (node.t === 'cmp' && node.render ? 2 : 0) }]
+    node.children?.forEach(c => walk(c, next, inner, depth + 1))
+    if (node.t === 'cmp' && node.render) walk(node.render.body, next, inner, depth + 1)
+  }
+  walk(ast, [], { px: SQUEEZE_AT.map(pageWidth), hidden: SQUEEZE_AT.map(() => false), slide: null, grid: null }, 0)
 }
 
 const CARD_LINT = {

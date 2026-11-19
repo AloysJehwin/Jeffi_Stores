@@ -24,7 +24,7 @@ const DATA_RULE = [
 
 // Products always show as the site's own product card (cardSystem below), the same in every list.
 const CARD_RULE =
-  "Products show as the site's own product card, designed once for this site and the same everywhere: <Products>, <ProductResults>, <RelatedProducts> and <CartUpsell> draw it by themselves, so lay them out with className (a grid, or layout=\"carousel\") and give them no render function. Never give <ProductResults> one (it would lose the endless scroll). Write {p => …} on <Products> only for a layout a card cannot make (a large spotlight, a numbered list, names in a marquee), with <QuickAdd product={p} /> to add to cart and <PriceTag product={p} /> for the price, both outside any link."
+  "Products show as the site's own product card, designed once for this site and the same everywhere: <Products>, <ProductResults>, <RelatedProducts> and <CartUpsell> draw it by themselves, so lay them out with className (a grid, or layout=\"carousel\") and give them no render function. Never give <ProductResults> one (it would lose the endless scroll). Write {p => …} on <Products> only for a layout a card cannot make (a large spotlight, a numbered list, names in a marquee), with <QuickAdd product={p} /> to add to cart and <PriceTag product={p} /> for the price, both outside any link. Cards need room: a grid of them spans the page or its main column; in a narrow column or a slider each card gets a row or a slide of its own (layout=\"carousel\" makes the list itself the slider), never a grid of several columns inside a slide, a <Carousel> or a sidebar."
 
 // The catalogue pages serve every category, brand or search: what is on them comes from the page's own record
 // (parts/taxonomy.ts), never typed (studioLint flags a typed <h1> on a category or brand page).
@@ -41,6 +41,10 @@ const PAGE_RULES: Partial<Record<PageKey, string>> = {
   brands:
     "This page lists every brand: <AllBrands> (required) draws them, featured first, {b => …} per brand; <Breadcrumbs> gives the trail. Its heading is about the brands the store carries, never one brand's name.",
 }
+
+// studioLint's navMenu note catches a header that breaks it.
+const HEADER_RULE =
+  'This is only the header: the announcement bar is its own section above it, so add no promo, offer or message strip here. On phones and tablets the menu button sits in the logo row, at its left or right edge: never alone on a row, never centred. <NavLinks> draws that button below the width its links show from (from="lg" by default; from="md" shows them from 768px). Links on a centred row of their own (a centred logo over the menu, a wide search with the menu below) need mobile="scroll" on <NavLinks> (that row then keeps its links, scrolling on phones), or <NavLinks> kept at an edge of the logo row until the links move to their own row, with from set to that width.'
 
 export const RESPONSIVE = `One source serves desktop and phone: write mobile-first. Base classes are for phones (320-430px wide), then sm: md: lg: xl: for wider screens. Nothing may overflow at 320px (use flex-wrap, grid-cols-1 or 2 on phones, overflow-x-auto only for an intended scroller). Tap targets at least 44px tall; body text at least text-base on phones.`
 
@@ -66,7 +70,7 @@ ${themeRules(d)}
 
 Copy: Indian English, specific to this store and its shoppers, short headings, no emoji, no prices, discounts, offer codes, numbers (customers served, years, orders, pin codes) or claims you were not given. Never invent quotes, testimonials, people, experts, panels, awards, certifications, guarantees, or free-shipping, delivery or returns promises the brief does not give. The section labels in the plan are notes for you, not headings: write real headings.
 
-${page === 'header' ? 'This is only the header: the announcement bar is its own section above it, so add no promo, offer or message strip here.\n\n' : ''}${PAGE_RULES[page] ? `${PAGE_RULES[page]}\n\n` : ''}${utilityRules(page)}Reply with one \`\`\`tsx code block and nothing else.
+${page === 'header' ? `${HEADER_RULE}\n\n` : ''}${PAGE_RULES[page] ? `${PAGE_RULES[page]}\n\n` : ''}${utilityRules(page)}Reply with one \`\`\`tsx code block and nothing else.
 
 Component library for this page:
 ${libraryText(page)}`

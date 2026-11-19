@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'
+import SectionCarousel from '@/components/visitor/SectionCarousel'
 import { useCheckoutParts } from '../checkout/context'
 import { CheckoutCoupon } from '../checkout/parts'
 import { useCartParts } from './context'
@@ -246,16 +247,31 @@ export function CartUpsellPart({
   items,
   limit = 4,
   className,
+  carousel,
 }: {
   items: { id: string; node: ReactNode }[]
   limit?: number
   className?: string
+  /** One product a slide instead of the grid. */
+  carousel?: { itemClassName?: string } | null
 }) {
   const c = useCartParts()
   if (c && (c.isLoading || c.cartItems.length === 0)) return null
   const taken = new Set(c ? [...c.cartItems, ...c.savedItems].map(i => i.product_id) : [])
   const shown = items.filter(i => !taken.has(i.id)).slice(0, limit)
   if (!shown.length) return null
+  if (carousel)
+    return (
+      <div className={className}>
+        <SectionCarousel ariaLabel="Add to your order" itemClassName={carousel.itemClassName || 'w-[45%] md:w-[23%]'}>
+          {shown.map(i => (
+            <div key={i.id} className="h-full">
+              {i.node}
+            </div>
+          ))}
+        </SectionCarousel>
+      </div>
+    )
   return (
     <div className={className || DEFAULT_UPSELL_GRID}>
       {shown.map(i => (

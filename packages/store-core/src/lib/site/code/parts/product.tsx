@@ -200,10 +200,14 @@ defineCodeComponent({
 defineCodeComponent({
   name: 'RelatedProducts',
   pages: PRODUCT,
-  props: z.object({ limit: z.number().int().min(1).max(8).default(4) }),
+  props: z.object({
+    limit: z.number().int().min(1).max(8).default(4),
+    layout: z.enum(['grid', 'carousel']).default('grid').describe('grid: className is the grid; carousel: each product a slide'),
+    itemClassName: z.string().max(200).optional().describe('carousel slide widths, e.g. "w-[80%] md:w-[30%]"'),
+  }),
   binding: PRODUCT_VIEW_BINDING,
   describe:
-    "Products related to this one, each drawn as the site's product card; className sets the list's layout (a grid by default). A render function {p => …} replaces the card, only for a special layout.",
+    "Products related to this one, each drawn as the site's product card; className sets the list's layout (a grid by default), or layout=\"carousel\" swipes them one product a slide. A render function {p => …} replaces the card, only for a special layout.",
   count: (props, data) => relatedCount(data, props),
   render: (props, ctx) => renderRelated(ctx, props),
 })
