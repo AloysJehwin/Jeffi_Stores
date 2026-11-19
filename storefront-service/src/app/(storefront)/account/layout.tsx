@@ -53,7 +53,10 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     <AccountSearchProvider>
       <PathnameClearer />
       <div className="flex flex-col min-h-screen bg-surface">
-        <AccountNavBar />
+        {/* contents keeps the bar sticky in this column; an AI-designed page draws its own (globals.css hides this one) */}
+        <div className="account-nav-top contents">
+          <AccountNavBar />
+        </div>
         <div className="flex-1">{children}</div>
       </div>
     </AccountSearchProvider>

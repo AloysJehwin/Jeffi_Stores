@@ -54,7 +54,7 @@ export function FiltersPart({ layout = 'sidebar', className }: Cls & { layout?: 
   return (
     <div className={className}>
       <div className="hidden lg:block">
-        <FilterSidebar basePath={page.basePath} facets={f.facets} categories={f.categories} offers={f.offers} />
+        <FilterSidebar compact basePath={page.basePath} facets={f.facets} categories={f.categories} offers={f.offers} />
       </div>
       <div className="flex gap-2 lg:hidden">{sheet(false)}</div>
     </div>

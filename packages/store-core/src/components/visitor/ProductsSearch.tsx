@@ -294,7 +294,7 @@ export default function ProductsSearch({
                           <div className="w-9 h-9 bg-surface-secondary rounded flex-shrink-0 overflow-hidden border border-border-default">
                             {primaryImage ? (
                               <img
-                                src={primaryImage.thumbnail_url}
+                                src={primaryImage.thumbnail_url || primaryImage.image_url}
                                 alt={product.name}
                                 className="w-full h-full object-contain p-0.5"
                               />

@@ -489,7 +489,8 @@ function Track({
 
   const trackBase = cards
     ? `group/slides relative flex gap-[var(--slide-gap)] [--slide-gap:0.75rem] md:[--slide-gap:1.25rem] py-4 overflow-x-auto snap-x snap-mandatory overscroll-x-contain ${HIDE_SCROLLBAR} ${EDGE_MASK} focus:outline-none ${cardWidth}`
-    : `flex overflow-x-auto snap-x snap-mandatory overscroll-x-contain motion-safe:scroll-smooth ${HIDE_SCROLLBAR} focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded-lg`
+    : // relative: a slide's absolute child (an sr-only label) is clipped by the track, not left to widen the page.
+      `relative flex overflow-x-auto snap-x snap-mandatory overscroll-x-contain motion-safe:scroll-smooth ${HIDE_SCROLLBAR} focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded-lg`
 
   return (
     <div
