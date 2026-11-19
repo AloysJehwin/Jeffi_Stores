@@ -3,7 +3,7 @@
 import { Heart } from 'lucide-react'
 import QuickAddButton from '@/components/visitor/QuickAddButton'
 import { useProductLikeShare } from '@/components/visitor/useProductLikeShare'
-import { CardIcon, QUICK_ADD_CLASS, WISHLIST_CLASS, quickAddText, type CardIconName, type CardProduct } from './shared'
+import { CardIcon, QUICK_ADD_CLASS, WISHLIST_CLASS, aboveLink, quickAddText, type CardIconName, type CardProduct } from './shared'
 
 // The card's working buttons (QuickAdd, WishlistToggle), on the live store. They sit above the card's stretched link
 // (relative z-10); the AI's className styles them. The studio preview draws the inert look-alikes in marks.tsx instead.
@@ -38,7 +38,7 @@ export function QuickAddPart({
       portal={portal}
       quick
       triggerClassName="contents"
-      buttonClassName={`relative z-10 ${className || QUICK_ADD_CLASS}`}
+      buttonClassName={aboveLink(className || QUICK_ADD_CLASS)}
       ariaLabel={`${text || quickAddText(p)}: ${p.name}`}
       buttonContent={
         <>
@@ -59,7 +59,7 @@ export function WishlistTogglePart({ product: p, label, className }: { product: 
       disabled={wishlistLoading}
       aria-pressed={isInWishlist}
       aria-label={label ? undefined : isInWishlist ? `Remove ${p.name} from your wishlist` : `Save ${p.name} to your wishlist`}
-      className={`relative z-10 ${className || WISHLIST_CLASS}`}
+      className={aboveLink(className || WISHLIST_CLASS)}
     >
       <Heart aria-hidden className={`h-[1.1em] w-[1.1em] shrink-0 transition-transform ${isInWishlist ? 'scale-110' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} strokeWidth={2} />
       {label && <span>{label}</span>}
