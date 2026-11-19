@@ -14,10 +14,12 @@ export async function messagingTenant(): Promise<{ tenantId: string; slug: strin
   return t ? { tenantId: t.tenantId, slug: t.slug } : { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' }
 }
 
-export function serviceToken(tenantId: string, tenantSlug: string): string {
+// senderTenant: a send as the platform that goes out from that store's numbers. Internal only: it never reaches the
+// public API's request body.
+export function serviceToken(tenantId: string, tenantSlug: string, senderTenant?: string): string {
   const secret = process.env.SERVICE_AUTH_SECRET
   if (!secret) throw new Error('SERVICE_AUTH_SECRET is not set')
-  const payload = JSON.stringify({ service: 'platform', internal: true, tenantId, tenantSlug, exp: Math.floor(Date.now() / 1000) + 60 })
+  const payload = JSON.stringify({ service: 'platform', internal: true, tenantId, tenantSlug, ...(senderTenant ? { senderTenant } : {}), exp: Math.floor(Date.now() / 1000) + 60 })
   const sig = createHmac('sha256', secret).update(payload).digest()
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }

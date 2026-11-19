@@ -18,7 +18,8 @@ export interface SenderOverride {
 }
 
 export interface TenantSender extends SenderOverride {
-  /** Whose row it is: a workspace without a number of its own sends from the platform's ecom row. */
+  /** Whose row it is: a workspace without a number of its own sends from the platform's ecom row, and the platform
+   *  sends a store's staff codes from that store's row. */
   tenantId: string
   channel: SenderChannel
   provider: SenderProvider

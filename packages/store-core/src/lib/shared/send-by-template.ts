@@ -22,6 +22,8 @@ export interface SendByTemplateInput {
   asPlatform?: boolean
   /** sms/whatsapp: which of the store's numbers sends it (customer default; admin = staff; ecom = flagship owner portal). */
   audience?: 'customer' | 'admin' | 'ecom'
+  /** With asPlatform: send from this store's numbers (the audience's, else its customer number), else the platform's. */
+  senderTenant?: string | null
 }
 
 export interface SendResult {
@@ -62,6 +64,7 @@ async function channelOn(channel: Channel): Promise<boolean> {
 export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult> {
   if (!i.asPlatform && !(await channelOn(i.channel))) return { status: 'skipped', error: 'channel_disabled' }
   const tenant = i.asPlatform ? { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' } : await messagingTenant()
+  const senderTenant = i.asPlatform && i.channel !== 'email' ? i.senderTenant ?? undefined : undefined
   const extra = await brandFields(i.channel)
   const body = {
     channel: i.channel,
@@ -79,7 +82,7 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
   try {
     const res = await fetch(`${MESSAGING_URL}/messages`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${serviceToken(tenant.tenantId, tenant.slug)}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${serviceToken(tenant.tenantId, tenant.slug, senderTenant)}`, 'content-type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
     })
