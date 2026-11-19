@@ -6,9 +6,10 @@ import { Phone, RefreshCw, Search, ShoppingCart, Trash2, RotateCcw } from 'lucid
 import { ActionButton, Badge, FormField, FormGrid, TextInput, useActionToast } from '@/components/admin/kit'
 import type { SenderAudience, TenantSenderMeta } from '@/lib/messaging/tenant-senders'
 
-// Get a number for a store's audience in one step (platform admin, store → Numbers): search the platform's Twilio
-// account, buy, bind to every channel the audience has, register it on WhatsApp under a display name. A bought
-// number shows its WhatsApp status and can be retried or released (charges stop).
+// Get a number for an audience in one step (platform admin: ecom → store → Numbers, and the flagship's admin-facing and
+// ecom numbers in Settings → Numbers): search the platform's Twilio account, buy, bind to every channel the audience
+// has, register it on WhatsApp under a display name. A bought number shows its WhatsApp status and can be retried or
+// released (charges stop).
 
 interface Available {
   number: string
@@ -17,22 +18,28 @@ interface Available {
 }
 
 const STATUS_TONE: Record<string, 'green' | 'amber' | 'muted'> = { ONLINE: 'green', OFFLINE: 'amber', NOT_REGISTERED: 'amber', UNKNOWN: 'amber' }
+const NAME_SUFFIX: Record<SenderAudience, string> = { customer: '', admin: ' Team', ecom: ' for Business' }
+const BOUND_TO: Record<SenderAudience, string> = {
+  customer: 'customer-facing WhatsApp and SMS',
+  admin: 'admin-facing WhatsApp',
+  ecom: 'ecom portal WhatsApp and SMS',
+}
 
-export default function StoreNumberPanel({
+export default function NumberBuyPanel({
   tenantId,
   audience,
   storeName,
   rows,
 }: {
   tenantId: string
-  audience: Exclude<SenderAudience, 'ecom'>
+  audience: SenderAudience
   storeName: string
   rows: TenantSenderMeta[]
 }) {
   const router = useRouter()
   const toast = useActionToast()
   const base = `/api/admin/ecom/${tenantId}/numbers`
-  const defaultName = audience === 'admin' ? `${storeName} Team` : storeName
+  const defaultName = `${storeName}${NAME_SUFFIX[audience]}`
   const [open, setOpen] = useState(false)
   const [areaCode, setAreaCode] = useState('872')
   const [found, setFound] = useState<Available[] | null>(null)
@@ -76,7 +83,7 @@ export default function StoreNumberPanel({
     const json = await send('POST', base, { audience, number: pick, displayName: displayName.trim() })
     if (!json) return
     if (json.result?.error) toast.error(`Number bought, WhatsApp registration failed: ${json.result.error}`)
-    else toast.success(`${pick} bought and bound; WhatsApp registration started`)
+    else toast.success(`${pick} bought. SMS uses it now; WhatsApp switches to it once it's Online`)
     setOpen(false)
     setFound(null)
     router.refresh()
@@ -102,7 +109,7 @@ export default function StoreNumberPanel({
             danger: true,
             onClick: release,
             disabled: busy,
-            confirm: { title: `Release ${bought.sender}?`, message: 'It is removed from WhatsApp and given back to Twilio (no refund for the current month). The store stops using it at once.' },
+            confirm: { title: `Release ${bought.sender}?`, message: `It is removed from WhatsApp and given back to Twilio (no refund for the current month). ${storeName} stops using it at once.` },
           }}
         />
       </div>
@@ -147,7 +154,7 @@ export default function StoreNumberPanel({
               disabled: busy || !pick || displayName.trim().length < 3,
               confirm: {
                 title: `Buy ${pick ?? ''}?`,
-                message: `${price != null ? `US$${price.toFixed(2)} a month` : 'The monthly number price'}, charged to the platform's Twilio account until released. It is bound to this store's ${audience === 'admin' ? 'admin-facing WhatsApp' : 'customer-facing WhatsApp and SMS'} and registered on WhatsApp as "${displayName.trim()}".`,
+                message: `${price != null ? `US$${price.toFixed(2)} a month` : 'The monthly number price'}, charged to the platform's Twilio account until released. It is bound to the ${BOUND_TO[audience]} of ${storeName} and registered on WhatsApp as "${displayName.trim()}".`,
               },
             }}
           />

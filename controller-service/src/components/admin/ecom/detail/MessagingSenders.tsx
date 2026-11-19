@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import SenderCard, { CHANNEL_LABEL, day } from '@/components/admin/messaging/SenderCard'
-import StoreNumberPanel from '@controller/components/admin/ecom/detail/StoreNumberPanel'
+import NumberBuyPanel from '@/components/admin/messaging/NumberBuyPanel'
 import { AUDIENCE_CHANNELS, type SenderAudience } from '@/lib/messaging/audiences'
 import type { TenantSenderMeta } from '@/lib/messaging/tenant-senders'
 import type { EntitlementState, MessagingAddonStatus } from '@/lib/billing/messaging-addon'
@@ -61,7 +61,7 @@ export default function MessagingSenders({
               <h3 className="text-sm font-semibold text-foreground">{g.title}</h3>
               <p className="mt-0.5 text-xs text-foreground-muted">{g.blurb}</p>
             </div>
-            <StoreNumberPanel tenantId={tenantId} audience={g.audience as 'customer' | 'admin'} storeName={storeName} rows={senders.filter(s => s.audience === g.audience)} />
+            <NumberBuyPanel tenantId={tenantId} audience={g.audience} storeName={storeName} rows={senders.filter(s => s.audience === g.audience)} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {AUDIENCE_CHANNELS[g.audience].map(ch => (
@@ -81,6 +81,7 @@ export default function MessagingSenders({
                   const state = entitlement[ch]
                   if (state === 'addon') return sender ? { tone: 'amber', label: 'Assigned, add-on missing' } : { tone: 'muted', label: 'No number' }
                   if (!sender) return g.audience === 'customer' ? { tone: 'muted', label: 'No number' } : { tone: 'muted', label: 'Uses customer number' }
+                  if (sender.status === 'pending') return { tone: 'amber', label: 'Waiting for WhatsApp' }
                   return { tone: 'green', label: 'Live' }
                 }}
                 note={sender =>

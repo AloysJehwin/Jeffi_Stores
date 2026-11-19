@@ -62,7 +62,8 @@ CREATE TABLE public.support_sessions (
     customer_notified_at timestamp with time zone,
     wa_window_expires_at timestamp with time zone,
     contact_email character varying(255),
-    email_subject character varying(255)
+    email_subject character varying(255),
+    wa_audience character varying(10)
 );
 
 

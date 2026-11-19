@@ -1,20 +1,25 @@
 import { getProviderPolicy } from '@/lib/providers/policy'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { getTenantSender, type MessagingChannel, type SenderAudience, type TenantSender } from '@/lib/messaging/tenant-senders'
+import { getTenantSender, PLATFORM_TENANT_ID, type MessagingChannel, type SenderAudience, type TenantSender } from '@/lib/messaging/tenant-senders'
 import type { ProviderName, SmsProvider, WhatsAppProvider } from './types'
 import { twilioSmsProvider, twilioWhatsAppProvider, twilioSmsProviderFor, twilioWhatsAppProviderFor } from './twilio-provider'
 import { awsSmsProvider, awsWhatsAppProvider, awsSmsProviderFor, awsWhatsAppProviderFor } from './aws-provider'
 
 // Pick the SMS/WhatsApp provider for the current store. A store with its own sender (control-plane
 // tenant_messaging_senders) sends from that number with its own credentials, and the row's provider wins.
+// The flagship (no tenant) has its rows under PLATFORM_TENANT_ID.
 // Otherwise the platform provider policy (lib/providers/policy.ts; set on the flagship Site Controls) decides;
 // with no policy row the store's old Site Controls choice still applies. Any resolver failure falls back to
 // Twilio — except a sender row that can't be decrypted, which leaves the channel unconfigured rather than
 // quietly sending from the platform number.
 
 async function ownSender(channel: MessagingChannel, audience: SenderAudience): Promise<TenantSender | null | 'broken'> {
-  const tid = await resolveTenantId().catch(() => null)
-  if (!tid) return null
+  let tid: string
+  try {
+    tid = (await resolveTenantId()) ?? PLATFORM_TENANT_ID
+  } catch {
+    return null
+  }
   try {
     return await getTenantSender(tid, channel, audience)
   } catch (e) {

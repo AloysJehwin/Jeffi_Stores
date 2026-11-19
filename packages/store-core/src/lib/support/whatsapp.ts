@@ -5,13 +5,15 @@ import { sendSupportReplyWhatsApp, sendWhatsAppDirect } from '@/lib/shared/whats
 import { cloudMediaKind } from '@jeffi/api-contracts'
 import { getFileRow, signFile, s3Location } from '@/lib/drive/files'
 import { getWhatsAppProvider } from '@/lib/shared/messaging'
+import type { SenderAudience } from '@/lib/messaging/audiences'
 import { setMessageStatus } from './messages'
 import type { SessionRow } from './sessions'
 import type { SupportMessage, SupportPayload } from './types'
 
-// Agent/AI replies to a customer who wrote from WhatsApp. Inside the 24h window: free text plus each
-// attachment as media. Outside it: the approved support/reply template, with a link to the web chat
-// for anything that can't ride in a template.
+// Agent/AI replies to a customer who wrote from WhatsApp, from the number they last wrote to (the session's
+// wa_audience; the 24h window is that number's). Inside the window: free text plus each attachment as media.
+// Outside it: the approved support/reply template, with a link to the web chat for anything that can't ride
+// in a template.
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`
 
@@ -46,31 +48,35 @@ export async function relayToWhatsApp(s: SessionRow, m: SupportMessage, textForC
     await setMessageStatus(m.id, 'failed', 'No WhatsApp number for this customer')
     return
   }
-  const fresh = await queryOne<{ wa_window_expires_at: string | null }>(`SELECT wa_window_expires_at FROM support_sessions WHERE id = $1`, [s.id])
+  const fresh = await queryOne<Pick<SessionRow, 'wa_window_expires_at' | 'wa_audience'>>(
+    `SELECT wa_window_expires_at, wa_audience FROM support_sessions WHERE id = $1`,
+    [s.id]
+  )
   const inWindow = !!fresh?.wa_window_expires_at && new Date(fresh.wa_window_expires_at).getTime() > Date.now()
+  const audience = fresh?.wa_audience ?? 'customer'
   const extra = await payloadText(m.payloads)
   const text = [textForCustomer, extra].filter(Boolean).join('\n\n').trim()
 
   if (!inWindow) {
     const link = `${await storeBaseUrlAsync().catch(() => '')}/support`
     const note = m.attachments.length ? `\n\n${m.attachments.length} attachment(s): ${link}` : ''
-    const ok = await sendSupportReplyWhatsApp({ phone, message: `${text || 'You have a new message from support.'}${note}`.slice(0, 1000) })
+    const ok = await sendSupportReplyWhatsApp({ phone, message: `${text || 'You have a new message from support.'}${note}`.slice(0, 1000), audience })
     await setMessageStatus(m.id, ok ? 'sent' : 'failed', ok ? null : 'WhatsApp template send failed')
     return
   }
 
-  const provider = await getWhatsAppProvider()
+  const provider = await getWhatsAppProvider(audience)
   let firstSid: string | null = null
   let failed: string | null = null
   if (text) {
-    const sid = await sendWhatsAppDirect({ phone, text, kind: 'support_reply' })
+    const sid = await sendWhatsAppDirect({ phone, text, kind: 'support_reply', audience })
     if (sid) firstSid = sid
     else failed = 'WhatsApp send failed'
   }
   for (const a of m.attachments) {
     const fileId = a.id ? await attachmentFileId(a.id) : null
     if (!fileId) continue
-    const out = await sendDriveFileWhatsApp(phone, fileId, 'support_reply')
+    const out = await sendDriveFileWhatsApp(phone, fileId, 'support_reply', audience)
     if (out.sid) firstSid ??= out.sid
     else failed = `Couldn't send ${out.name ?? 'a file'} on WhatsApp`
   }
@@ -82,14 +88,20 @@ export async function relayToWhatsApp(s: SessionRow, m: SupportMessage, textForC
 }
 
 /** One Drive file as WhatsApp media (inside the 24h window), through a short-lived signed link. */
-export async function sendDriveFileWhatsApp(phone: string, fileId: string, kind: string): Promise<{ sid: string | null; name: string | null }> {
+export async function sendDriveFileWhatsApp(
+  phone: string,
+  fileId: string,
+  kind: string,
+  audience: SenderAudience = 'customer'
+): Promise<{ sid: string | null; name: string | null }> {
   const f = await getFileRow(fileId, { withDeleted: true })
   if (!f) return { sid: null, name: null }
-  const provider = await getWhatsAppProvider()
+  const provider = await getWhatsAppProvider(audience)
   const url = await signFile(f, { ttlSeconds: 15 * 60 })
   const sid = await sendWhatsAppDirect({
     phone,
     kind,
+    audience,
     media: {
       kind: cloudMediaKind(f.mime_type),
       mime: f.mime_type,

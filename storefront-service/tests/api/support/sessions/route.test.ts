@@ -55,6 +55,7 @@ function row(over: Partial<SessionRow> = {}): SessionRow {
     wa_window_expires_at: null,
     contact_email: null,
     email_subject: null,
+    wa_audience: null,
     ...over,
   }
 }

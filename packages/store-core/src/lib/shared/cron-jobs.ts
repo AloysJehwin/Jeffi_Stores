@@ -211,6 +211,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job: a number bought with Get a number starts sending on WhatsApp once its sender is Online.
+    id: 'messaging_numbers_online',
+    name: 'Turn on new WhatsApp numbers',
+    path: '/api/cron/messaging-numbers-online',
+    method: 'POST',
+    intervalMs: 5 * MIN,
+    intervalLabel: 'every 5 min',
+    startDelayMs: 105 * SEC,
+    lockTtlMs: 5 * MIN - 30 * SEC,
+    tenantScope: null,
+  },
+  {
     // Platform job: Showcase hosting (lib/showcase/billing.ts): reminders, renewals from the wallet, unpaid sites paused.
     id: 'showcase_renew',
     name: 'Renew Showcase sites',
