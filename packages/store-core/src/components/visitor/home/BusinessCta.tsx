@@ -1,6 +1,5 @@
-import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
+import { copyDefaultsFor } from '@/lib/catalog/homepage-sections'
 
-const COPY = SECTION_COPY_DEFAULTS.business_cta
 
 interface BusinessCtaProps {
   businessLandingUrl: string
@@ -9,6 +8,7 @@ interface BusinessCtaProps {
   subtitle?: string | null
   ctaLabel?: string | null
   ctaUrl?: string | null
+  flagshipCopy?: boolean
 }
 
 export default function BusinessCta({
@@ -18,7 +18,9 @@ export default function BusinessCta({
   subtitle,
   ctaLabel,
   ctaUrl,
+  flagshipCopy = true,
 }: BusinessCtaProps) {
+  const COPY = copyDefaultsFor('business_cta', flagshipCopy)
   return (
     <div className="px-3 sm:px-6 md:px-8 py-3 md:py-6 bg-surface">
       <div
@@ -67,7 +69,7 @@ export default function BusinessCta({
               },
               {
                 icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
-                label: '24h RFQ turnaround',
+                label: flagshipCopy ? '24h RFQ turnaround' : 'Quotes on request',
               },
             ].map(item => (
               <div key={item.label} className="flex items-center gap-2.5">

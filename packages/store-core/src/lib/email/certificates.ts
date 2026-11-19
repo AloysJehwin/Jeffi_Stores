@@ -49,7 +49,7 @@ export async function sendCertInviteEmail(
       <div class="info">
         <strong>How it works</strong>
         <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-          <li>Sign in with <strong>${esc(email)}</strong> — the Google account this invitation was sent to.</li>
+          <li>Sign in as <strong>${esc(email)}</strong>: with Google if it is a Google account, or with the one-time code the portal emails to it.</li>
           <li>You will see your certificate and can download it a single time.</li>
           <li>Save the <code>.p12</code> file and the import password it shows you somewhere safe.</li>
         </ol>

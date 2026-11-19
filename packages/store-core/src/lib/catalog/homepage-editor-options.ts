@@ -1,6 +1,7 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
-import { defaultAboutCopy, resolveAboutStats } from '@/lib/catalog/homepage-sections'
+import { copyDefaultsFor, defaultAboutCopy, resolveAboutStats, tileDefaultsFor } from '@/lib/catalog/homepage-sections'
+import { isFlagshipTenant } from '@/lib/payments/wallet'
 import type { SectionCopy, SectionType } from '@/lib/catalog/homepage-sections'
 
 // The picker options and counts the section editors show (Homepage editor and Site Builder).
@@ -50,6 +51,8 @@ export async function loadSectionOptions(
   brands: { value: string; label: string }[]
 ): Promise<SectionOptions> {
   const [storefront, identity] = await Promise.all([getStorefrontContent(), getStoreIdentity()])
+  const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+  const flagship = isFlagshipTenant(await resolveTenantId().catch(() => null))
   const counts = await queryOne<{
     featured: string
     new_arrivals: string
@@ -83,11 +86,20 @@ export async function loadSectionOptions(
       bundles: Number(counts?.bundles ?? 0),
       approvedReviews: Number(counts?.approved_reviews ?? 0),
     },
+    // What the storefront shows for empty fields: the flagship's copy, or the neutral one for every other store.
     copyDefaults: {
-      about: { subtitle: defaultAboutCopy(storefront.aboutCopy, identity.name) },
+      ...(flagship ? {} : { why_us: copyDefaultsFor('why_us', false), business_cta: copyDefaultsFor('business_cta', false) }),
+      about: { ...(flagship ? {} : copyDefaultsFor('about', false)), subtitle: defaultAboutCopy(storefront.aboutCopy, identity.name) },
     },
     tileDefaults: {
-      about: resolveAboutStats(storefront.statsJson),
+      about: resolveAboutStats(storefront.statsJson, flagship),
+      ...(flagship
+        ? {}
+        : {
+            trust_strip: tileDefaultsFor('trust_strip', false) ?? [],
+            why_us: tileDefaultsFor('why_us', false) ?? [],
+            benefits: tileDefaultsFor('benefits', false) ?? [],
+          }),
     },
   }
 }
