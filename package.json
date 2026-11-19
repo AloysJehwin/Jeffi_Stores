@@ -1,6 +1,6 @@
 {
   "name": "jeffi-stores",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Jeffi Stores - Industrial Hardware E-commerce Platform",
   "private": true,
   "scripts": {
@@ -91,7 +91,7 @@
     "mailauth": "^8.0.4",
     "mailparser": "^3.9.38",
     "motion": "^13.4.6",
-    "next": "^15.5.26",
+    "next": "^15.5.28",
     "node-forge": "^1.4.0",
     "nodemailer": "^10.0.5",
     "openai": "^6.37.0",

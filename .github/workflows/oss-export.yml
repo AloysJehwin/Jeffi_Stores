@@ -1,0 +1,83 @@
+name: OSS export
+
+# Every push to main exports the services it changed to their repos in the Jeffi-ERP org (oss/README.md).
+# Each org repo gets one commit with an "Upstream-Commit:" trailer; the org's merge pipeline skips those commits.
+# Changes apply 3-way over contributions merged there but not yet promoted; a conflict opens an issue in that repo
+# and fails this run. Every changed file is scanned with trufflehog first, and a finding stops that repo.
+# The GitHub App key lives in the oss-export environment, which only main can use.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Only these org repos (comma-separated; empty = all)
+        default: ''
+      dry_run:
+        description: Show what would change; push nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oss-export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Export to Jeffi-ERP
+    runs-on: ubuntu-latest
+    environment: oss-export
+    timeout-minutes: 30
+    steps:
+      - name: Is the export app set up?
+        id: ready
+        env:
+          APP_ID: ${{ vars.OSS_EXPORT_APP_ID }}
+        run: |
+          if [ -n "$APP_ID" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::The export app isn't set up yet (oss/README.md, steps 3 and 5), so nothing was exported."; fi
+      - if: steps.ready.outputs.ok
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: trufflehog (pinned, checksum-verified)
+        if: steps.ready.outputs.ok
+        env:
+          V: 3.99.9
+        run: |
+          base="https://github.com/trufflesecurity/trufflehog/releases/download/v$V"
+          curl -sSfL -o th.tgz "$base/trufflehog_${V}_linux_amd64.tar.gz"
+          curl -sSfL -o th.txt "$base/trufflehog_${V}_checksums.txt"
+          echo "$(grep " trufflehog_${V}_linux_amd64.tar.gz$" th.txt | cut -d' ' -f1)  th.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin" && tar -xzf th.tgz -C "$RUNNER_TEMP/bin" trufflehog && rm th.tgz th.txt
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Token for Jeffi-ERP (from the oss-export environment)
+        if: steps.ready.outputs.ok
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.OSS_EXPORT_APP_ID }}
+          private-key: ${{ secrets.OSS_EXPORT_APP_KEY }}
+          owner: Jeffi-ERP
+      - name: Bot identity
+        if: steps.ready.outputs.ok
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          echo "name=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=$(gh api "users/$SLUG%5Bbot%5D" --jq .id)+${SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+      - name: Export
+        if: steps.ready.outputs.ok
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          OSS_BOT_NAME: ${{ steps.bot.outputs.name }}
+          OSS_BOT_EMAIL: ${{ steps.bot.outputs.email }}
+          ONLY: ${{ inputs.only }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: node oss/export.mjs --upstream "$GITHUB_SHA" --only "$ONLY" $DRY_RUN

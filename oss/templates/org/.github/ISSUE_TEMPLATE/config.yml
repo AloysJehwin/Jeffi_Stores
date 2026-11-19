@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Jeffi-ERP/.github/blob/main/SECURITY.md
+    about: Report privately through the repository's Security tab or by email. Never in a public issue.
+  - name: Ask a question
+    url: https://github.com/Jeffi-ERP/workspace/discussions
+    about: Setup, how something works, or whether a change would be accepted.
+  - name: Commercial licensing
+    url: https://github.com/Jeffi-ERP/.github/blob/main/SUPPORT.md#commercial-licensing
+    about: Production use needs a commercial licence. Email support@jeffistores.in.

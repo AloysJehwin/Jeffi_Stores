@@ -39,6 +39,17 @@ feat(api)!: drop legacy order payload
 BREAKING CHANGE: /api/orders no longer accepts the v1 shape.
 ```
 
+## Setting a version
+
+A `Release-As:` footer in any commit on the branch sets the next version outright, whatever the
+commit types say, as long as it is above the last tag:
+
+```
+chore(release): version 2.0.0
+
+Release-As: 2.0.0
+```
+
 ## Fixing a wrong version
 
 Delete the tag and its release (`gh release delete vX.Y.Z --cleanup-tag`), land a follow-up commit
@@ -48,5 +59,8 @@ To re-run the release for the current `main`: Actions → Release → Run workfl
 ## Notes
 
 - The release notes live on the GitHub Release. `CHANGELOG.md` holds history up to v1.2.0 and is
-  no longer updated; `package.json` `version` is not bumped (the tag is the version).
+  no longer updated.
+- The tag is the version. The root `package.json` `version` is what the apps report
+  (`NEXT_PUBLIC_APP_VERSION`: the health probe, traces, `jeffi whoami`). Releases don't bump it;
+  set it by hand at a major, as for 2.0.0.
 - Deploys are separate: the pipeline (`ci.yml`) deploys every push to `main` after approval.
