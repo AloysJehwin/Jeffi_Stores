@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'
+import SectionCarousel from '@/components/visitor/SectionCarousel'
 import { useCheckoutParts } from '../checkout/context'
 import { CheckoutCoupon } from '../checkout/parts'
 import { useCartParts } from './context'
@@ -162,8 +163,8 @@ export function CouponBoxPart({ className, demo = false }: { className?: string;
     return demo ? (
       <div className={className}>
         <div className="flex gap-2" aria-hidden>
-          <span className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground-muted">Coupon code</span>
-          <span className="px-4 py-2 text-sm font-semibold bg-accent-500 text-white rounded-lg">Apply</span>
+          <span className="min-w-0 flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground-muted">Coupon code</span>
+          <span className="shrink-0 px-4 py-2 text-sm font-semibold bg-accent-500 text-white rounded-lg">Apply</span>
         </div>
       </div>
     ) : null
@@ -246,16 +247,31 @@ export function CartUpsellPart({
   items,
   limit = 4,
   className,
+  carousel,
 }: {
   items: { id: string; node: ReactNode }[]
   limit?: number
   className?: string
+  /** One product a slide instead of the grid. */
+  carousel?: { itemClassName?: string } | null
 }) {
   const c = useCartParts()
   if (c && (c.isLoading || c.cartItems.length === 0)) return null
   const taken = new Set(c ? [...c.cartItems, ...c.savedItems].map(i => i.product_id) : [])
   const shown = items.filter(i => !taken.has(i.id)).slice(0, limit)
   if (!shown.length) return null
+  if (carousel)
+    return (
+      <div className={className}>
+        <SectionCarousel ariaLabel="Add to your order" itemClassName={carousel.itemClassName || 'w-[45%] md:w-[23%]'}>
+          {shown.map(i => (
+            <div key={i.id} className="h-full">
+              {i.node}
+            </div>
+          ))}
+        </SectionCarousel>
+      </div>
+    )
   return (
     <div className={className || DEFAULT_UPSELL_GRID}>
       {shown.map(i => (

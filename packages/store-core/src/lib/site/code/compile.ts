@@ -23,6 +23,7 @@ import { allowedOnPage, codeLibrary } from './library'
 import type { CodeComponentDef } from './registry'
 import { PRODUCT_FIELDS } from './parts/common'
 import { cardScope, compileSectionCss } from './css'
+import { codeSkeleton } from './skeleton'
 import { coreBlockFor } from '../blocks'
 
 // A code section's TSX checked against the allowlist and turned into a JSON AST. Nothing here runs the code: Babel
@@ -36,6 +37,8 @@ export interface CompiledSection {
   classes: string[]
   css: string
   components: string[]
+  /** The section's loading skeleton (skeleton.ts), drawn with the same CSS. Absent on sections compiled before it. */
+  skeleton?: CodeNode
 }
 export interface CompileIssue {
   message: string
@@ -897,12 +900,12 @@ export async function compileSection(source: string, ctx: { page: PageKey | null
   if (!r.ok) return r
   let css: string
   try {
-    css = await compileSectionCss(r.classes, ctx.page === CARD_PAGE ? cardScope(r.id) : r.id)
+    css = await compileSectionCss(r.classes, ctx.page === CARD_PAGE ? cardScope(r.id) : r.id, r.id)
   } catch (err) {
     console.error('[code-section] css', err)
     return { ok: false, issues: [{ message: `The section's styles could not be built (${err instanceof Error ? err.message : String(err)})` }] }
   }
-  return { ok: true, section: { id: r.id, ast: r.ast, classes: r.classes, css, components: r.components } }
+  return { ok: true, section: { id: r.id, ast: r.ast, classes: r.classes, css, components: r.components, skeleton: codeSkeleton(r.ast) } }
 }
 
 // ── Whole pages ────────────────────────────────────────────────────────────────────────────────

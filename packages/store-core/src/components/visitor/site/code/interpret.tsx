@@ -1,8 +1,9 @@
 import { Fragment, createElement, type Key, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { PageKey } from '@jeffi/site-blocks'
-import type { CodeNode, CodeValue } from '@/lib/site/code/ast'
+import { carouselList, type CodeNode, type CodeValue } from '@/lib/site/code/ast'
 import { FORBIDDEN_KEYS, HTML_TAGS, MAX_DEPTH, MAX_EACH, VOID_TAGS, attrAllowed, safeHref, safeSrc, taxonomyOf } from '@/lib/site/code/allow'
+import { codeMark } from '@/lib/site/code/css'
 import { evalValue, toText, truthy } from '@/lib/site/code/evaluate'
 import { allowedOnPage, codeLibrary, type RenderCtx } from '@/lib/site/code/library'
 import type { SiteData } from '@/lib/site/data/types'
@@ -17,6 +18,8 @@ export interface Env {
   data: SiteData
   page: PageKey | null
   sectionId: string
+  /** The class the section's CSS asks for (codeMark): on every element it styled. */
+  mark: string
   lcp: { on: boolean }
   budget: { n: number }
   /** Numbers the async parts' fragments (renderCmp). */
@@ -55,6 +58,7 @@ export function makeEnv(opts: {
     data: opts.data,
     page: opts.page ?? null,
     sectionId: opts.sectionId,
+    mark: codeMark(opts.sectionId),
     lcp: { on: !!opts.priority },
     budget: { n: BUDGET },
     seq: { n: 0 },
@@ -232,6 +236,7 @@ export async function Resolve({ promise }: { promise: Promise<ReactNode> }) {
 }
 
 const deeper = (env: Env): Env => ({ ...env, depth: env.depth + 1 })
+const marked = (cls: string, env: Env) => (env.mark ? `${cls} ${env.mark}` : cls)
 const bind = (env: Env, param: string, value: unknown, index: string | undefined, i: number): Env => {
   const vars = new Map(env.vars)
   vars.set(param, value)
@@ -316,6 +321,8 @@ function renderEl(node: Extract<CodeNode, { t: 'el' }>, env: Env, key?: Key): Re
       if (s) props[name] = s
     }
   }
+  // The section's own CSS styles only what carries its mark (lib/site/code/css.ts).
+  if (typeof props.className === 'string') props.className = marked(props.className, env)
   if (tag === 'img') {
     if (typeof props.src !== 'string') return null
     return createElement('img', { ...props, ...responsiveImg(props.src, '(min-width: 768px) 50vw, 100vw'), alt: props.alt ?? '', loading: props.loading ?? 'lazy', decoding: 'async' })
@@ -338,6 +345,17 @@ function renderEl(node: Extract<CodeNode, { t: 'el' }>, env: Env, key?: Key): Re
 }
 
 function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): ReactNode {
+  // A <Carousel> holding only a list draws that list as its own carousel (each item a slide): written so, the whole
+  // list would be one slide, its grid squeezed into it. The list's className was for that grid, so it is dropped.
+  const list = carouselList(node)
+  if (list) {
+    const { className: _grid, ...own } = list.props ?? {}
+    const slides: Record<string, CodeValue> = { ...own, layout: { k: 'lit', v: 'carousel' } }
+    if (node.props?.itemClassName) slides.itemClassName = node.props.itemClassName
+    const out = renderCmp({ ...list, props: slides }, env, key)
+    const wrap = node.props?.className ? toText(evalValue(node.props.className, env.vars)) : ''
+    return wrap ? createElement('div', { ...(key != null ? { key } : {}), className: marked(wrap, env) }, out) : out
+  }
   const def = typeof node.name === 'string' ? codeLibrary().get(node.name) : undefined
   if (!def || !allowedOnPage(def, env.page) || env.empty.has(node)) return null
   // A tab of only empty store data is left out (Tabs with none left draws nothing).
@@ -347,10 +365,15 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
   for (const [k, v] of Object.entries(node.props ?? {})) {
     if (FORBIDDEN_KEYS.has(k) || k === 'key') continue
     const val = evalValue(v, env.vars)
-    if (k === 'className') className = toText(val) || undefined
-    else raw[k] = k === 'href' && typeof val === 'string' ? liveHref(val, env) : liveLinks(val, env)
+    if (k === 'className') {
+      const s = toText(val)
+      className = s ? marked(s, env) : undefined
+    } else raw[k] = k === 'href' && typeof val === 'string' ? liveHref(val, env) : liveLinks(val, env)
   }
-  const parsed = def.props.safeParse(raw)
+  // Its class props (itemClassName, inputClassName…) carry the mark too, unless that takes one past its length cap.
+  const classProps = env.mark ? Object.keys(raw).filter(k => k.endsWith('ClassName') && typeof raw[k] === 'string' && raw[k] !== '') : []
+  let parsed = classProps.length ? def.props.safeParse({ ...raw, ...Object.fromEntries(classProps.map(k => [k, marked(raw[k] as string, env)])) }) : null
+  if (!parsed?.success) parsed = def.props.safeParse(raw)
   if (!parsed.success) return null
   if (def.name === 'Link' && deadAnchor((parsed.data as { href?: unknown }).href, env.anchors)) return null
   const children = kids(node.children, env)

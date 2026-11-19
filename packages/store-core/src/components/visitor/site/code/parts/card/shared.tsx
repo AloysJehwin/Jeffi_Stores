@@ -42,6 +42,13 @@ export function cardProduct(v: unknown): CardProduct | null {
 /** The button's words when the design gives none: what a tap does for this product. */
 export const quickAddText = (p: CardProduct) => (!p.inStock ? 'Sold out' : p.hasVariants ? 'Choose options' : p.isDigital ? 'Buy now' : 'Add to cart')
 
+/**
+ * A card button's classes, kept above the card's stretched link (z-10). `relative` gives the z-index a stacking context,
+ * but only when the AI's base classes don't position the button themselves: next to an AI `absolute` it would win (both
+ * are app utilities, `relative` later) and drop a corner button into the flow. A breakpoint's `md:absolute` still wins.
+ */
+export const aboveLink = (cls: string): string => (/(^|\s)!?(absolute|fixed|sticky|relative)(?=\s|$)/.test(cls) ? `z-10 ${cls}` : `relative z-10 ${cls}`)
+
 export const QUICK_ADD_CLASS =
   'ui-btn inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-60'
 export const WISHLIST_CLASS =

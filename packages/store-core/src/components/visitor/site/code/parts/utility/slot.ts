@@ -5,6 +5,14 @@ import type { ReactNode } from 'react'
 // component here before its Site Builder page renders, and the AI design's core part (SignInForm, AccountPage…) draws
 // it. The first part placed takes it, so a part placed twice never draws two forms.
 
+/**
+ * The wrapper's classes for a working component drawn inside an AI design (code/parts/utility.tsx): its standalone-page
+ * chrome gives way to the design's layout (a viewport-tall minimum, its own container width and padding, the account
+ * menu's sticky band and repeated title). Here, not in lib/, so the apps' Tailwind sees them.
+ */
+export const FRAMED =
+  '[&_.min-h-screen]:min-h-0 [&_.container]:max-w-none [&_.container]:px-0 [&_.account-nav-band]:static [&_.account-nav-band]:pt-0 [&_.account-nav-band]:bg-transparent [&_.account-nav-band]:shadow-none [&_.account-nav-label]:hidden'
+
 type Box = { parts: Map<string, ReactNode> }
 // React's per-request cache (the App Router's React); a plain module box where it is missing (unit tests).
 const reactCache = (React as unknown as { cache?: <F extends (...a: never[]) => unknown>(fn: F) => F }).cache

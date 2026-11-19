@@ -13,7 +13,7 @@ interface Product {
   mrp: number | null
   variant_min_price: number | null
   has_variants: boolean
-  product_images: Array<{ thumbnail_url: string; is_primary: boolean }>
+  product_images: Array<{ image_url?: string; thumbnail_url: string | null; is_primary: boolean }>
 }
 
 export default function FeaturedProducts() {
@@ -48,7 +48,7 @@ export default function FeaturedProducts() {
               <div className="relative aspect-square bg-surface overflow-hidden">
                 {image ? (
                   <img
-                    {...responsiveImg(image.thumbnail_url, '(min-width: 768px) 200px, 50vw')}
+                    {...responsiveImg(image.thumbnail_url || image.image_url || '', '(min-width: 768px) 200px, 50vw')}
                     onError={onImgError}
                     alt={p.name}
                     className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"

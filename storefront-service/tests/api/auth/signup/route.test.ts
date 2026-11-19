@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
 
 const mockCookieStore = vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256'
@@ -56,7 +57,7 @@ import * as otpLib from '@/lib/auth/otp'
 import * as db from '@/lib/shared/db'
 
 function makeRequest(body: object) {
-  return new Request('http://localhost/api/auth/signup', {
+  return new NextRequest('http://localhost/api/auth/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

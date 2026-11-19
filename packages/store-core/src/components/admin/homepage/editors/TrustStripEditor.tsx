@@ -16,7 +16,7 @@ export default function TrustStripEditor(props: EditorProps) {
         label="Strip items"
         hint="Write {amount} in a label to insert the free-delivery threshold."
         tiles={readTiles(b.cfg.items, KEYS)}
-        defaults={SECTION_TILE_DEFAULTS.trust_strip}
+        defaults={props.options?.tileDefaults?.trust_strip ?? SECTION_TILE_DEFAULTS.trust_strip}
         fields={[{ key: 'label', label: 'Label', placeholder: 'Free delivery above {amount}' }]}
         blank={{ icon: 'Truck', label: '' }}
         disabled={!canWrite}

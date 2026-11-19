@@ -50,7 +50,8 @@ defineCodeComponent({
 
 const NavLinksProps = z.object({
   links: z.array(link).min(1).max(10).optional().describe("used until the owner sets the store's menu; default: Home, Products, Categories, About Us, Support"),
-  mobile: z.enum(['menu', 'scroll', 'hide', 'show']).default('menu').describe("phones: a menu button opening the store's drawer, a scrolling row, hidden, or as-is"),
+  mobile: z.enum(['menu', 'scroll', 'hide', 'show']).default('menu').describe("phones and tablets: a menu button opening the store's drawer (at an edge of the logo row), a scrolling row, hidden, or as-is"),
+  from: z.enum(['md', 'lg', 'xl']).default('lg').describe('with mobile menu or hide: the width the links show from (md 768px, lg 1024px, xl 1280px)'),
 })
 
 defineCodeComponent({
@@ -63,7 +64,7 @@ defineCodeComponent({
     const s = settings(NavLinksProps, props)
     const links = (await storeMenu(ctx)) ?? s.links ?? DEFAULT_NAV
     const items = ctx.renderItem ? links.map((l, i) => ctx.renderItem!({ label: l.label, href: l.href }, i)) : undefined
-    return <NavList links={links} items={items} mobile={s.mobile} className={cls(props.className)} />
+    return <NavList links={links} items={items} mobile={s.mobile} from={s.from} className={cls(props.className)} />
   },
 })
 

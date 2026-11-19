@@ -3,8 +3,9 @@ import { z } from 'zod'
 import type { PageKey } from '@jeffi/site-blocks'
 import { defineCodeComponent, type RenderCtx } from '../registry'
 import { studioPreview } from '../../portal'
-import { takePageCore } from '@/components/visitor/site/code/parts/utility/slot'
+import { FRAMED, takePageCore } from '@/components/visitor/site/code/parts/utility/slot'
 import NotFoundView from '@/components/visitor/site/code/parts/utility/NotFoundView'
+import { AccountNavBar } from '@/components/visitor/AccountSidebar'
 import {
   AccountPreview,
   ComparePreview,
@@ -26,6 +27,9 @@ import {
 const cls = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined)
 const storeName = async (ctx: RenderCtx) => (await ctx.data.store().catch(() => null))?.name || 'Your store'
 
+// The account menu, which the account layout draws above a page with no design, goes inside these designs instead.
+const ACCOUNT_MENU = new Set(['AccountPage', 'OrderDetail'])
+
 function core(name: string, page: PageKey, describe: string, preview: (ctx: RenderCtx) => ReactNode | Promise<ReactNode>, required = true) {
   defineCodeComponent({
     name,
@@ -34,10 +38,21 @@ function core(name: string, page: PageKey, describe: string, preview: (ctx: Rend
     props: z.object({}),
     describe: `LOCKED, exactly once: ${describe} No props but className, for its wrapper.`,
     render: async (props, ctx) => {
-      const node = studioPreview(ctx.data) ? await preview(ctx) : takePageCore(name)
-      if (node == null) return null
       const c = cls(props.className)
-      return c ? <div className={c}>{node}</div> : node
+      if (studioPreview(ctx.data)) {
+        const node = await preview(ctx)
+        return c ? <div className={c}>{node}</div> : node
+      }
+      const node = takePageCore(name)
+      if (node == null) return null
+      const menu = ACCOUNT_MENU.has(name)
+      return (
+        // contents without a className: the component stays the box the design lays out, as before (a block with the menu).
+        <div className={c ? `${FRAMED} ${c}` : menu ? FRAMED : `contents ${FRAMED}`} {...(menu ? { 'data-account-framed': '' } : {})}>
+          {menu && <AccountNavBar />}
+          {node}
+        </div>
+      )
     },
   })
 }

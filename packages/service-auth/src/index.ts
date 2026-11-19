@@ -13,6 +13,7 @@ export interface ServiceClaims {
   role?: string
   scopes?: string[]
   space?: 'store' | 'api' // which template copies the caller reads/edits (default by service)
+  senderTenant?: string // internal sends as the platform only: go out from this store's numbers (its staff's codes)
   exp: number
 }
 

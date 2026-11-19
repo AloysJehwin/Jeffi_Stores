@@ -575,12 +575,12 @@ export function CouponInput({ c }: { c: CartParts }) {
           }}
           onKeyDown={e => e.key === 'Enter' && c.handleApplyCoupon()}
           placeholder="Coupon code"
-          className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder-foreground-muted focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
+          className="min-w-0 flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder-foreground-muted focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
         />
         <button
           onClick={() => c.handleApplyCoupon()}
           disabled={couponLoading || !couponCode.trim()}
-          className="px-4 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="shrink-0 px-4 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {couponLoading ? '...' : 'Apply'}
         </button>

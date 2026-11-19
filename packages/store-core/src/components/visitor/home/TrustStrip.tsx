@@ -1,5 +1,5 @@
 import IconByName from './IconByName'
-import { SECTION_TILE_DEFAULTS } from '@/lib/catalog/homepage-sections'
+import { honestTrustTiles, tileDefaultsFor } from '@/lib/catalog/homepage-sections'
 
 export interface TrustStripItem {
   icon: string
@@ -9,17 +9,21 @@ export interface TrustStripItem {
 interface TrustStripProps {
   freeShippingThreshold: number
   items?: TrustStripItem[] | null
+  codEnabled?: boolean
+  flagshipCopy?: boolean
 }
 
-export default function TrustStrip({ freeShippingThreshold, items }: TrustStripProps) {
+export default function TrustStrip({ freeShippingThreshold, items, codEnabled = true, flagshipCopy = true }: TrustStripProps) {
   const amount = `₹${freeShippingThreshold.toLocaleString('en-IN')}`
-  const tiles = (items && items.length > 0 ? items : SECTION_TILE_DEFAULTS.trust_strip).map(item => ({
+  const base = items && items.length > 0 ? items : ((tileDefaultsFor('trust_strip', flagshipCopy) ?? []) as unknown as TrustStripItem[])
+  const tiles = honestTrustTiles(base, { freeShippingThreshold, codEnabled }).map(item => ({
     ...item,
     label: item.label.replace(/\{amount\}/g, amount),
   }))
 
   // One row from sm up for up to 5 tiles, else two even rows; two columns on phones, a lone last tile spans both.
   const n = tiles.length
+  if (!n) return null
   const cols = n <= 5 ? n : Math.ceil(n / 2)
 
   return (

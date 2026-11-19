@@ -1,5 +1,5 @@
 import { Heart, Star } from 'lucide-react'
-import { CardIcon, QUICK_ADD_CLASS, WISHLIST_CLASS, type CardIconName } from './shared'
+import { CardIcon, QUICK_ADD_CLASS, WISHLIST_CLASS, aboveLink, type CardIconName } from './shared'
 
 // The card parts drawn on the server: the price, discount, stock and rating marks (plain text the AI styles with
 // className, safe inside a link), and the inert look-alikes of the card's buttons for the studio preview.
@@ -96,7 +96,7 @@ export function RatingStarsMark({ product: p, count = true, className }: { produ
 /** QuickAdd in the studio preview: how it looks, without a cart behind it. */
 export function QuickAddMark({ text: label, icon, className }: { text: string; icon: CardIconName; className?: string }) {
   return (
-    <span role="presentation" className={`relative z-10 ${className || QUICK_ADD_CLASS}`}>
+    <span role="presentation" className={aboveLink(className || QUICK_ADD_CLASS)}>
       <CardIcon name={icon} />
       {label && <span>{label}</span>}
     </span>
@@ -106,7 +106,7 @@ export function QuickAddMark({ text: label, icon, className }: { text: string; i
 /** WishlistToggle in the studio preview. */
 export function WishlistMark({ label, className }: { label?: string; className?: string }) {
   return (
-    <span role="presentation" className={`relative z-10 ${className || WISHLIST_CLASS}`}>
+    <span role="presentation" className={aboveLink(className || WISHLIST_CLASS)}>
       <Heart aria-hidden className="h-[1.1em] w-[1.1em] shrink-0" strokeWidth={2} />
       {label && <span>{label}</span>}
     </span>

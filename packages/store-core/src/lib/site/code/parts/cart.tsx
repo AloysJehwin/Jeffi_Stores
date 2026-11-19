@@ -105,7 +105,11 @@ defineCodeComponent({
   render: (props, ctx) => <CartEmptyPart className={cls(props.className)}>{ctx.children}</CartEmptyPart>,
 })
 
-const CartUpsellProps = z.object({ limit: z.number().int().min(1).max(8).default(4).describe('products shown') })
+const CartUpsellProps = z.object({
+  limit: z.number().int().min(1).max(8).default(4).describe('products shown'),
+  layout: z.enum(['grid', 'carousel']).default('grid').describe('grid: className is the grid; carousel: each product a slide'),
+  itemClassName: z.string().max(200).optional().describe('carousel slide widths, e.g. "w-[80%] md:w-[30%]"'),
+})
 
 defineCodeComponent({
   name: 'CartUpsell',
@@ -116,7 +120,7 @@ defineCodeComponent({
     "Best sellers to add, skipping what is already in the cart, each as the site's product card (with add to cart); className lays out the list. A render function replaces the card: give it QuickAdd so it can still be added.",
   count: async (props, data) => (await data.products({ sort: 'best_sellers', limit: Math.min(24, settings(CartUpsellProps, props).limit + 8) }).catch(() => [])).length,
   render: async (props, ctx) => {
-    const { limit } = settings(CartUpsellProps, props)
+    const { limit, layout, itemClassName } = settings(CartUpsellProps, props)
     const candidates = await ctx.data.products({ sort: 'best_sellers', limit: Math.min(24, limit + 8) }).catch(() => [])
     const card = ctx.renderItem ? null : await siteCard(ctx.data)
     const items = candidates.map((p, i) => ({
@@ -126,7 +130,7 @@ defineCodeComponent({
     return (
       <>
         {card && <SiteCardStyles card={card} />}
-        <CartUpsellPart items={items} limit={limit} className={cls(props.className)} />
+        <CartUpsellPart items={items} limit={limit} className={cls(props.className)} carousel={layout === 'carousel' ? { itemClassName } : null} />
       </>
     )
   },

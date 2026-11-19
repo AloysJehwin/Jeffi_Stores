@@ -20,9 +20,11 @@ Numbers live in control-plane `tenant_messaging_senders`, one row per (tenant, c
 | --- | --- | --- | --- |
 | customer | +1 (872) 217-9910 (the platform env `TWILIO_WHATSAPP_FROM`) | Jeffi Stores | Online |
 | admin | None: flagship staff use the customer number (decided 2026-11-18) | | |
-| ecom | +1 (872) 217-1682 (bought 2026-11-15 as the admin number) | Jeffi Stores Team | Online |
+| ecom | +1 (872) 270-4479 (bought 2026-11-19 with Get a number; WhatsApp and SMS) | | Online |
 
 +1 (872) 219-0609 was bought for ecom on 2026-11-15. Its WhatsApp sender went offline with Twilio error 410 ("create a support ticket"), and the number was released on 2026-11-18.
+
++1 (872) 217-1682 was the intended ecom number until 2026-11-19. If it is still in the Twilio account, nothing binds it any more: messages to it land in the flagship's customer chat. Release it, or bind it to an audience again.
 
 Both numbers are in the platform's own Twilio account, which has no sub-accounts, and on the same WhatsApp Business account. That means they share its business verification and approved templates, and each new number starts at Meta's lowest sending tier.
 
@@ -74,8 +76,15 @@ Local dev and tests use a fake number provider (`number-provider.ts`): nothing i
 
 `getTenantSender(tenant, channel, audience)` (store-core) and `tenantSender(...)` (messaging-service) take the audience's own row, else the customer row, else (flagship only) the platform env (`TWILIO_WHATSAPP_FROM`, `TWILIO_FROM_NUMBER`, the AWS keys). So nothing changes until a number is entered. The flagship has no tenant, so its rows are looked up under `00000000-0000-0000-0000-000000000000` both by store-core's direct sends (`ownSender`) and by messaging-service (`messagingTenant()`).
 
+- **A store without a number** can't send SMS or WhatsApp. messaging-service locks the channel (`channel_locked`), and store-core's direct sends (support replies, the admin assistant, CRM free text, campaign SMS) report the channel unconfigured. They never fall back to the platform env, whose numbers are the flagship's.
+- **API workspaces** (the ecom dashboard's Play and Bulk messages, `/v1`): a workspace without a number of its own sends from the flagship's ecom number, else the platform env. `metadata.sender.tenant` records the row's owner, so status callbacks and polling use that row's account. Replies to the ecom number land in the support inbox.
+- **Staff verification codes** (an admin's mobile, `admin-mobile.ts`: Account settings and the certificate portal) are sent and billed as the platform, outside the store's Site Controls switches and the add-on lock, so a store with an empty wallet or no add-on still gets them. They go out from the store's admin number, else its customer number (a code by SMS always uses the customer SMS number), else the flagship's numbers as before. A store's row that can't be decrypted falls through to the flagship's numbers instead of failing.
+  - The store travels in the service token, not the request: `sendByTemplate({ asPlatform, senderTenant })` → `serviceToken(…, senderTenant)`. messaging-service honours `senderTenant` only on the platform tenant's internal tokens, so it never appears in the public `SendMessageRequest`.
+  - The store's admin pod sends to the store's own messaging pod, which takes this one call (`POST /messages`, a platform internal token naming its own store) besides its own tenant's. It used to refuse it.
+  - `metadata.sender.tenant` names the store, so status callbacks and polling use its row. The message itself stays the platform's.
+
 - Callers pass `audience`: `sendByTemplate({ audience })` (→ `POST /messages { audience }`), `sendWhatsAppDirect({ audience })`, `getWhatsAppProvider(audience)`.
-- Admin-facing today: the admin assistant's replies, admin mobile verification codes, and the "staff only" reply.
+- Admin-facing today: the admin assistant's replies, admin mobile verification codes (from the store's numbers, above), and the "staff only" reply.
 - Everything else defaults to `customer`.
 - messaging-service records `metadata.sender.audience` on each message, so delivery callbacks and polling use the same account.
 

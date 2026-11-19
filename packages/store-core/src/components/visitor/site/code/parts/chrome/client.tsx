@@ -61,8 +61,12 @@ export function SearchBoxPart({ variant = 'icon', placeholder = 'Search products
   )
 }
 
-/** The phone menu button; opens the store's own menu drawer (links, categories, account, cart). */
-export function MenuButtonPart({ className }: { className?: string }) {
+const MENU_BUTTON = 'relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-accent-500 transition-all active:scale-90'
+// Written out whole, so the app's stylesheet has them.
+const MENU_HIDDEN_FROM = { md: 'md:hidden', lg: 'lg:hidden', xl: 'xl:hidden' } as const
+
+/** The phone menu button, gone from `from` up; opens the store's own menu drawer (links, categories, account, cart). */
+export function MenuButtonPart({ className, from = 'lg' }: { className?: string; from?: keyof typeof MENU_HIDDEN_FROM }) {
   const cart = useCartOptional()
   const [open, setOpen] = useState(false)
   const count = cart?.cartCount ?? 0
@@ -70,7 +74,7 @@ export function MenuButtonPart({ className }: { className?: string }) {
     <>
       <button
         type="button"
-        className={className || 'lg:hidden relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center hover:text-accent-500 transition-all active:scale-90'}
+        className={className || `${MENU_HIDDEN_FROM[from] ?? MENU_HIDDEN_FROM.lg} ${MENU_BUTTON}`}
         onClick={() => cart && setOpen(true)}
         aria-label={count > 0 ? `Open menu, ${count} in cart` : 'Open menu'}
       >

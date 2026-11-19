@@ -142,6 +142,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         .then(s => loadCodeChrome('store', s, sitePreview))
         .catch(() => null)
     : null
+  // The AI-written product card's styles, once, in <head>. A card's own copy can land in a tree the browser never
+  // shows (the 404 page every route carries), which would leave every shown card without them. Loaded only on demand.
+  const siteCardStyles = isStorefrontHost
+    ? await Promise.all([import('@/lib/site/card'), import('@/components/visitor/site/code/common/SiteCard')])
+        .then(async ([{ siteCard }, { SiteCardStyles }]) => {
+          const card = await siteCard()
+          return card ? <SiteCardStyles card={card} always /> : null
+        })
+        .catch(() => null)
+    : null
   const siteThemeCss = siteTheme
     ? `${cssVarsRule('body.site-theme.site-theme', themeCssVars(siteTheme))}body.site-theme{font-family:var(--font-body),system-ui,sans-serif}`
     : null
@@ -203,6 +213,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {showAds && <script id="adsense-init" dangerouslySetInnerHTML={{ __html: adsenseInitScript() }} />}
         {siteTheme && <link rel="stylesheet" href={googleFontsHref(siteTheme)} />}
         {siteThemeCss && <style id="site-theme" dangerouslySetInnerHTML={{ __html: siteThemeCss }} />}
+        {siteCardStyles}
       </head>
       <body
         className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}${siteTheme ? ' site-theme' : ''}`}

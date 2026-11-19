@@ -44,12 +44,18 @@ declare module 'fastify' {
 
 const scope = await resolveServiceScope()
 
+// An internal send as the platform that goes out from a store's numbers (its staff's verification codes). Only the
+// platform tenant's internal tokens carry it, never the public API's.
+const platformSendFor = (c: ServiceClaims) => (c.internal && c.tenantId === tpl.PLATFORM_TENANT_ID ? c.senderTenant : undefined)
+
 // Every non-webhook route needs a gateway-issued service token.
 app.addHook('onRequest', async (req, reply) => {
   if (req.url.startsWith('/webhooks') || req.url.startsWith('/s/') || req.url === '/healthz') return
   const claims = verifyServiceToken(bearer(req as FastifyRequest))
   if (!claims) return reply.code(401).send({ error: 'unauthorized', message: 'Missing or invalid service token' })
-  if (!inScope(scope, claims.tenantId)) return reply.code(403).send({ error: 'forbidden', message: 'This service belongs to another tenant' })
+  // A store's pod also takes the platform's send of that store's staff code, which its admin pod sends here.
+  const ownStoreSend = req.method === 'POST' && req.url === '/messages' && !!scope.tenantId && platformSendFor(claims) === scope.tenantId
+  if (!inScope(scope, claims.tenantId) && !ownStoreSend) return reply.code(403).send({ error: 'forbidden', message: 'This service belongs to another tenant' })
   req.claims = claims
 })
 
@@ -67,7 +73,7 @@ app.get('/healthz', async () => ({ ok: true, service: 'messaging' }))
 app.post('/messages', async req => {
   const body = SendMessageRequest.parse(req.body)
   const { tenantId, tenantSlug, apiKeyId, internal } = req.claims
-  return msgToApi(await sendMessage({ tenantId, tenantSlug, apiKeyId, internal, space: spaceOf(req) }, body))
+  return msgToApi(await sendMessage({ tenantId, tenantSlug, apiKeyId, internal, space: spaceOf(req), senderTenant: platformSendFor(req.claims) }, body))
 })
 
 app.post('/messages/batch', async req => {
@@ -468,7 +474,8 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   const sig = String(req.headers['x-twilio-signature'] ?? '')
   let valid = twilioSignatureValid(sig, id, req.body ?? {})
   if (!valid && m && (m.metadata as any)?.sender?.own && m.channel !== 'email') {
-    const s = await tenantSender(m.tenant_id, m.channel, (m.metadata as any)?.sender?.audience ?? 'customer').catch(() => null)
+    const meta = (m.metadata as any).sender
+    const s = await tenantSender(meta.tenant ?? m.tenant_id, m.channel, meta.audience ?? 'customer').catch(() => null)
     valid = !!s?.config.auth_token && twilioSignatureValid(sig, id, req.body ?? {}, s.config.auth_token)
   }
   if (!valid) return reply.code(403).send({ ok: false })

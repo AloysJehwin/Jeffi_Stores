@@ -5,7 +5,7 @@ import { MAX_EACH } from '../allow'
 import type { SiteData } from '../../data/types'
 import { emptyShowcaseContent, type ShowcaseView } from '@/lib/showcase/types'
 import { businessView, faqViews, pictureView, serviceViews, statViews, testimonialViews, workViews } from '@/lib/showcase/views'
-import { ASPECTS, CodeImage, ItemsLayout } from '@/components/visitor/site/code/common/tiles'
+import { ASPECTS, CodeImage, ItemsLayout, TESTIMONIAL_SLIDE } from '@/components/visitor/site/code/common/tiles'
 import { layoutProps } from './common'
 import { FaqList, ServiceCard, StatTile, TestimonialCard, WorkTile } from '@/components/visitor/site/code/parts/showcase/tiles'
 import LeadFormPart, { type LeadField } from '@/components/visitor/site/code/parts/showcase/LeadFormPart'
@@ -151,7 +151,7 @@ defineCodeComponent({
     const list = v ? testimonialViews(v.content, p.minRating).slice(0, p.limit) : []
     if (!list.length) return null
     return (
-      <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName || 'w-[85%] md:w-[32%]'} label="Testimonials" fallbackGrid="grid gap-5 md:grid-cols-3">
+      <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName || TESTIMONIAL_SLIDE} label="Testimonials" fallbackGrid="grid gap-5 md:grid-cols-3">
         {items(list, ctx, (t, i) => <TestimonialCard key={i} t={t} />)}
       </ItemsLayout>
     )
