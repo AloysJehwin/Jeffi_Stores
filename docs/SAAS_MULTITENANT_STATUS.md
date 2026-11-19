@@ -104,6 +104,16 @@ Code: `controller-service/src/lib/compute/`.
   - The worker never advances a job whose store is terminated.
   - Deprovision is also offered for a store that is provisioning or suspended, not only an active one.
 - **The live test store** (`e2e-test-store`, Pro) rolled back by itself after 8 retries. AWS showed its server terminated and its disk and bucket gone. It was then deleted from the admin.
+- **Fixed from that test's findings** (not yet re-run live):
+  - Bad SQL fails a build at once: SQLSTATE class 42 (or Postgres's wording for it) is terminal in `isTerminalError`, so a broken schema rolls back instead of retrying for half an hour. Connection errors, timeouts and AWS throttling still retry.
+  - Attach database disk re-checks EBS every 3 s within the worker's tick (at most 8 times) instead of costing one worker minute per disk state.
+  - The admin store page reads "Not deployed yet" / "Being built" / "Not deployed (build failed)" until the store has infrastructure, and shows the planned server ("Own server · t4g.medium") from the applied, pinned or resolved compute spec. No more "Instance running" or "shared pool" for a store with nothing deployed.
+  - Ecom portal: its own tab titles ("… · Jeffi Commerce"); the owner's sign-up code email greets them by name and comes from Jeffi Commerce; no native `alert`/`confirm` (app dialog and toasts) and no native date inputs (custom DatePicker); the phone is typed once; PAN and GSTIN are checked by shape in the wizard, on submit and on drafts, with an "Invalid format" badge in the admin KYC tab; the Review step masks PAN, account number and UPI ID.
+  - AI Site Studio: every sample product gets a photo (4 at a time, within the budget); "Home Décor" slugs to `home-decor` everywhere; text is cut at a word with "…"; the Review page count matches the build.
+  - Ready-made theme samples: every product has a photo (Fashion & Apparel 17, Home & Kitchen 20, Health & Beauty 18; the 43 missing ones made with `gemini-3.1-flash-lite-image` for about ₹135).
+  - A Showcase workspace's address comes from the business name, never the site-address field (which browsers autofilled with a street address).
+  - Storefront: the cart's guest user is race-safe (a new visitor's parallel cart calls made two guests, and the unique `session_id` failed one with a silent 500); reads no longer create guest rows (1,626 of 1,627 local guests were orphans). The release deletes the existing orphans on the flagship and every store: `storefront-service/database/migrations/2026-11-19_delete_orphan_guest_users.sql` removes guests over an hour old that no row references (every FK to `users` read from the catalog, plus the user-id columns without one). New indexes on `users(merged_to_user_id)` and `email_campaign_logs(user_id)` keep the per-row FK checks fast.
+  - Storefront hydration: a code section's async part (e.g. `<Logo>`) sits in a keyed fragment. React 19.2 canary (Next 15.5) replays an element that suspends on a late RSC chunk without rewinding its hydration cursor, so the element claimed its own first child and hydration failed intermittently on studio-built pages.
 
 ---
 

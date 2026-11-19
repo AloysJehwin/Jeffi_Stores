@@ -419,6 +419,9 @@ CREATE INDEX idx_delhivery_pickup_requests_created_at ON public.delhivery_pickup
 
 CREATE INDEX idx_email_campaign_logs_campaign ON public.email_campaign_logs USING btree (campaign_id);
 
+-- The FK to users checks this column for every deleted user.
+CREATE INDEX idx_email_campaign_logs_user ON public.email_campaign_logs USING btree (user_id);
+
 CREATE UNIQUE INDEX idx_email_campaign_logs_push_device ON public.email_campaign_logs USING btree (campaign_id, push_device_id) WHERE (push_device_id IS NOT NULL);
 
 CREATE INDEX idx_email_campaign_logs_push_due ON public.email_campaign_logs USING btree (send_after) WHERE ((channel)::text = 'push'::text AND (status)::text = ANY (ARRAY['queued'::text, 'deferred'::text]));
