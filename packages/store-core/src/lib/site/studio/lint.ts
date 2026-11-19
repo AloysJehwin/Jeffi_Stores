@@ -89,7 +89,8 @@ const SHOWCASE_LINT: Partial<Record<string, string>> = {
 /**
  * What a studio section gets wrong, as repair notes (none = fine), worded for its page: hard-coded store data, a home
  * opening (`first`, or the section holding the page's h1) without a picture that is always there, data grids that
- * break for some number of items, and layouts that squeeze them or strand the header's menu button (layoutNotes).
+ * break for some number of items, and layouts that squeeze cards or working parts, cut a carousel's last card or
+ * strand the header's menu button (layoutNotes).
  */
 export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: boolean } = {}): string[] {
   const found = new Set<string>()
@@ -222,13 +223,13 @@ function screenOf(token: string): { min: number; max: number; util: string } | n
 }
 
 /** What the winning class of one kind says at a width: a wider screen variant beats a narrower one, then the later class. */
-function at<T>(classes: string[], width: number, read: (util: string) => T | undefined): T | undefined {
+function at<T>(classes: string[], width: number, read: (util: string, token: string) => T | undefined): T | undefined {
   let best: T | undefined
   let from = -1
   for (const c of classes) {
     const s = screenOf(c)
     if (!s || s.min > width || width >= s.max || s.min < from) continue
-    const v = read(s.util)
+    const v = read(s.util, c)
     if (v !== undefined) {
       best = v
       from = s.min
@@ -306,7 +307,9 @@ function navAlone(chain: Box[], from: number): boolean {
   return false
 }
 
-const SQUEEZE_AT = [390, 768, 1024, 1280, 1440]
+// The widths a section is laid out at; the card grids (squeeze) skip sm, the working parts and rails need it.
+const ROOM_AT = [390, 640, 768, 1024, 1280, 1440]
+const SQUEEZE_AT = new Set([390, 768, 1024, 1280, 1440])
 const pageWidth = (w: number) => Math.min(w - 32, 1280)
 const MAX_W: Record<string, number> = { xs: 320, sm: 384, md: 448, lg: 512, xl: 576, '2xl': 672, '3xl': 768, '4xl': 896, '5xl': 1024, '6xl': 1152, '7xl': 1280, prose: 600 }
 
@@ -333,6 +336,21 @@ function widthIn(cls: string[] | null, grid: string[] | null, w: number, px: num
   if (!cls) return base
   const own = at(cls, w, u => sized(u, 'basis', base, w)) ?? at(cls, w, u => sized(u, 'w', base, w)) ?? base
   return Math.min(own, at(cls, w, u => sized(u, 'max-w', base, w)) ?? Infinity)
+}
+
+/** A grid whose columns differ at a width (grid-cols-[1fr_22rem], auto-fill): a child's share of it is a guess. */
+function uneven(c: string[], w: number): boolean {
+  const m = /^grid-cols-\[(.+)\]$/.exec(at(c, w, u => (u.startsWith('grid-cols-') ? u : undefined)) ?? '')
+  if (!m) return false
+  const list: string[] = ['']
+  let depth = 0
+  for (const ch of m[1]) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (ch === '_' && !depth) list.push('')
+    else list[list.length - 1] += ch
+  }
+  return list.length > 1 ? new Set(list).size > 1 : /^repeat\((?!\d+,)/.test(list[0])
 }
 
 // A rail's slide: kept from shrinking (or snapped to) at a share of the rail's width.
@@ -371,7 +389,8 @@ const listGrid = (node: Extract<CodeNode, { t: 'cmp' }>, cls: string[]): string[
   return splitClasses(LIST_GRID[node.name] ?? 'grid grid-cols-2 md:grid-cols-4')
 }
 
-type Room = { px: number[]; hidden: boolean[]; slide: string | null; grid: string[] | null }
+/** A box's room at each of ROOM_AT: its width, hidden, and rough (a share of uneven grid columns, so only a guess). */
+type Room = { px: number[]; hidden: boolean[]; rough: boolean[]; slide: string | null; grid: string[] | null }
 
 // What makes an item a card (a button, a price, a title) rather than a thumbnail, which may be small.
 const CARD_PARTS = new Set(['ProductCard', 'QuickAdd', 'PriceTag', 'WishlistToggle', 'RatingStars', 'AddToCart'])
@@ -393,14 +412,149 @@ const squeezed = (name: string, cols: number, where: string) =>
 function squeeze(node: Extract<CodeNode, { t: 'cmp' }>, cls: string[], room: Room): string | null {
   const grid = listGrid(node, cls)
   if (!grid || (node.render && !cardish(node.render.body))) return null
-  const cols = SQUEEZE_AT.map((w, i) => (room.hidden[i] ? 0 : (checkGrid(grid, [], w)?.cols ?? 1)))
+  const cols = ROOM_AT.map((w, i) => (room.hidden[i] || !SQUEEZE_AT.has(w) ? 0 : (checkGrid(grid, [], w)?.cols ?? 1)))
   const most = Math.max(...cols)
   if (room.slide && most >= 2)
     return `${squeezed(node.name, most, `inside ${room.slide}`)} Give each slide one card: make the list itself the rail (layout="carousel" where it has one, else a className like "grid grid-flow-col auto-cols-[80%] sm:auto-cols-[45%] overflow-x-auto snap-x [&>*]:snap-start") instead of slides around it, or drop the rail and lay the grid out at full width.`
-  for (const [i, w] of SQUEEZE_AT.entries())
+  for (const [i, w] of ROOM_AT.entries())
     if (cols[i] >= 2 && room.px[i] < pageWidth(w) * 0.55 && room.px[i] / cols[i] < 150)
       return `${squeezed(node.name, cols[i], `in a column about ${Math.round((room.px[i] / pageWidth(w)) * 100)}% of the page wide`)} Lay the grid out at full width, or give that column one card per row (grid-cols-1) or a rail of one card per slide.`
   return null
+}
+
+// The working parts and the room each needs at every width (min, px), or from lg up as a share of the page (share).
+type Need = { parts: string[]; min?: number; share?: number; why: string; fix: string }
+const NEEDS: Need[] = [
+  {
+    parts: ['ContactForm', 'AddressForm', 'DeliveryOptions', 'PaymentStep'],
+    min: 340,
+    why: 'too narrow for a checkout step, which needs about 340px: its fields, options and pay button wrap and crowd',
+    fix: 'Stack <ContactForm>, <AddressForm>, <DeliveryOptions> and <PaymentStep> in one column beside the order summary: lg:grid-cols-12 with the steps in lg:col-span-7 and <OrderSummary> in lg:col-span-5 (lg:sticky lg:top-24 lg:self-start), one column below lg, never three or more columns.',
+  },
+  {
+    parts: ['CartLines'],
+    min: 340,
+    why: 'too narrow for the cart lines, which need about 340px: names, quantity and remove crowd',
+    fix: 'Give the lines most of the row: lg:grid-cols-12 with <CartLines> in lg:col-span-7 or 8 and the summary in lg:col-span-5 or 4, or one column with the summary card after the lines; one column below lg, never three columns or a scroller.',
+  },
+  {
+    parts: ['OrderSummary', 'CartSummary', 'CouponBox', 'CheckoutButton'],
+    min: 260,
+    why: 'too narrow for the summary, which needs about 260px: totals and buttons wrap',
+    fix: 'Give the summary column lg:col-span-5 of lg:grid-cols-12 (lg:col-span-4 in a row max-w-6xl or wider, about 300px) beside the lines or the steps, or put it after them in one column; one column below lg.',
+  },
+  {
+    parts: ['SignInForm', 'SignUpForm'],
+    min: 300,
+    why: 'too narrow for its card, which needs about 300px (the card is about 28rem)',
+    fix: 'Give it a column of its own at least that wide: beside your brand panel from lg (lg:grid-cols-2), alone under a slim line below lg.',
+  },
+  {
+    parts: ['AccountPage', 'OrderDetail', 'WishlistGrid', 'CompareTable'],
+    share: 0.6,
+    why: 'but it is the page itself and needs a full-width row of its own',
+    fix: 'Give it its own row at full width (w-full in a max-w-6xl or wider container, nothing beside it), with your bands above or below it.',
+  },
+]
+const NEED_OF = new Map(NEEDS.flatMap(n => n.parts.map(p => [p, n] as const)))
+type Narrow = { names: string[]; px: number; w: number; ratio: number }
+
+/** Where a working part comes out narrowest for its need (the lowest share of the room it needs), if too narrow anywhere. */
+function narrowest(need: Need, room: Room): Omit<Narrow, 'names'> | null {
+  let worst: Omit<Narrow, 'names'> | null = null
+  for (const [i, w] of ROOM_AT.entries()) {
+    const want = need.share ? (w >= 1024 ? need.share * pageWidth(w) : 0) : (need.min ?? 0)
+    if (room.hidden[i] || room.rough[i] || room.px[i] + 1 >= want) continue
+    const ratio = room.px[i] / want
+    if (!worst || ratio < worst.ratio) worst = { px: room.px[i], w, ratio }
+  }
+  return worst
+}
+
+const tagList = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).map(n => `<${n}>`).join(', ')} and <${list[list.length - 1]}>` : `<${list[0]}>`)
+
+function narrowNote(need: Need, n: Narrow): string {
+  const size = need.share ? `about ${Math.round((n.px / pageWidth(n.w)) * 100)}% of the page wide (${Math.round(n.px)}px)` : `about ${Math.round(n.px)}px wide`
+  return `${tagList(n.names)} ${n.names.length > 1 ? 'come' : 'comes'} out ${size} on a ${n.w}px-wide screen, ${need.why}. ${need.fix}`
+}
+
+// The storefront rail (Slides in rail mode, which every carousel draws): slides in a flex row, gap-3 below md, md:gap-5.
+const railGap = (w: number) => (w >= 768 ? 20 : 12)
+const RAIL_STEPS: [string, number][] = [['', 0], ['sm:', 640], ['md:', 768], ['lg:', 1024], ['xl:', 1280], ['2xl:', 1536]]
+const PEEK = 'w-[80%] sm:w-[42%] md:w-[28%] lg:w-[21%]'
+// How many items a list shows unless its limit says otherwise, so how many slides its carousel has.
+const SHOWS: Record<string, number> = { Reviews: 3, Offers: 3, Stats: 4, CartUpsell: 4, RelatedProducts: 4, Testimonials: 6, Services: 12, Work: 12 }
+const listShows = (node: Extract<CodeNode, { t: 'cmp' }>) => listLimit(node) ?? SHOWS[node.name] ?? 8
+/** The slides a <Carousel>'s children make: one each, a literal .map its length, a bound one any number. */
+const slideCount = (list: unknown): number =>
+  Array.isArray(list)
+    ? list.reduce((s: number, c: CodeNode | null) => {
+        if (!c || typeof c !== 'object') return s
+        if (c.t === 'text') return s + (c.value?.trim() ? 1 : 0)
+        if (c.t === 'frag') return s + slideCount(c.children)
+        const items = c.t === 'each' ? lit(c.items) : null
+        return s + (c.t !== 'each' ? 1 : Array.isArray(items) ? items.length : Infinity)
+      }, 0)
+    : 0
+
+/** A slide's share of the rail at a width (w-1/4, w-[24%], basis-…) and its class; NaN for a width that is no share (w-72, a calc). */
+function slideShare(cls: string[], w: number): { share: number; util: string; token: string } | undefined {
+  const read = (prop: 'basis' | 'w') =>
+    at(cls, w, (u, token) => {
+      if (!u.startsWith(`${prop}-`) || u === 'basis-auto') return undefined
+      const v = u.slice(prop.length + 1)
+      const frac = /^(\d+)\/(\d+)$/.exec(v)
+      const pct = /^\[(\d+(?:\.\d+)?)%\]$/.exec(v)
+      return { share: v === 'full' ? 1 : frac ? Number(frac[1]) / Number(frac[2]) : pct ? Number(pct[1]) / 100 : NaN, util: u, token }
+    })
+  return read('basis') ?? read('w')
+}
+
+/**
+ * The last card a rail shows at ROOM_AT[i], cut by a sliver: the n slides that show (n-1 whole, the nth across the edge)
+ * and their gaps overrun the rail by more than 2px but under a third of a card, so it reads as clipped, not a peek.
+ * Typically n slides of w% fill the rail on paper (n·w ≤ 100%) and the n-1 gaps come on top. None past `most` slides.
+ */
+function sliverAt(cls: string[], room: Room, i: number, most: number): { n: number; share: number; token: string; rail: number; over: number } | null {
+  const w = ROOM_AT[i]
+  const s = room.hidden[i] || room.rough[i] ? undefined : slideShare(cls, w)
+  if (!s || !(s.share > 0 && s.share <= 1)) return null
+  const rail = room.px[i]
+  const slide = s.share * rail
+  const gap = railGap(w)
+  const n = Math.floor((rail + gap) / (slide + gap) + 1e-9) + 1
+  const over = n * slide + (n - 1) * gap - rail
+  return n <= most && over > 2 && over < slide / 3 ? { n, share: s.share, token: s.token, rail, over } : null
+}
+
+/** The slide widths with each one that cuts a card made exact (n slides and their gaps fill the rail); the rest kept. */
+function exactSlides(cls: string[], room: Room, most: number): string {
+  const out = cls.filter(c => !/^(w|basis)-/.test(utilOf(c)))
+  let prev: { token: string; util: string } | null = null
+  RAIL_STEPS.forEach(([prefix, from], k) => {
+    const s = slideShare(cls, from)
+    if (!s) return
+    const to = RAIL_STEPS[k + 1]?.[1] ?? Infinity
+    const widths = ROOM_AT.flatMap((w, i) => (w >= from && w < to ? [i] : []))
+    const n = widths.map(i => sliverAt(cls, room, i, most)?.n).find(Boolean)
+    const util = !widths.length && prev?.token === s.token ? prev.util : n ? `w-[calc((100%-${+((n - 1) * (from >= 768 ? 1.25 : 0.75)).toFixed(3)}rem)/${n})]` : s.util
+    if (util !== prev?.util) out.push(prefix + util)
+    prev = { token: s.token, util }
+  })
+  return out.join(' ')
+}
+
+/** Carousel slides (`most` of them) that cut the last card by a sliver at some width, worded at the worst one. */
+function railNote(label: string, cls: string[], room: Room, most: number): string | null {
+  let worst: (NonNullable<ReturnType<typeof sliverAt>> & { w: number }) | null = null
+  for (const [i, w] of ROOM_AT.entries()) {
+    const cut = sliverAt(cls, room, i, most)
+    if (cut && (!worst || cut.over > worst.over)) worst = { ...cut, w }
+  }
+  if (!worst) return null
+  const { w, n, share, token, rail, over } = worst
+  const why = n * share <= 1 + 1e-9 ? 'the gaps are not part of the percentages' : 'their widths alone add up to more than the rail'
+  return `${label} cut the last card by a sliver: on a ${w}px-wide screen, ${n} slides of "${token}" and their ${n - 1} ${n === 2 ? 'gap' : 'gaps'} of ${railGap(w)}px need about ${Math.round(rail + over)}px, but the rail is about ${Math.round(rail)}px wide (${why}). Make that many slides fit exactly, gaps included, e.g. itemClassName="${exactSlides(cls, room, most)}", or show a clear peek of the next card, e.g. itemClassName="${PEEK}".`
 }
 
 const kidsOf = (list: unknown): number =>
@@ -408,8 +562,15 @@ const kidsOf = (list: unknown): number =>
     ? list.reduce((s: number, c: CodeNode | null) => s + (!c || typeof c !== 'object' ? 0 : c.t === 'text' ? (c.value?.trim() ? 1 : 0) : c.t === 'frag' ? kidsOf(c.children) : c.t === 'each' ? 2 : 1), 0)
     : 0
 
-/** Layout findings: a header's menu button left centred or alone on a row, and card lists squeezed into slivers. */
+/**
+ * Layout findings: a header's menu button left centred or alone on a row, card lists squeezed into slivers, working
+ * parts (checkout steps, cart lines, summaries, sign-in, the account cores) drawn too narrow, and carousel slides that
+ * cut the last card by a sliver.
+ */
 function layoutNotes(ast: unknown, page: PageKey | null | undefined, found: Set<string>): void {
+  const narrow = new Map<Need, Narrow>()
+  // Lists a <Carousel> draws as its own carousel: checked with the <Carousel>.
+  const drawn = new Set<CodeNode>()
   const walk = (n: unknown, chain: Box[], room: Room, depth: number): void => {
     if (!n || typeof n !== 'object' || depth > 200) return
     const node = n as CodeNode
@@ -420,11 +581,13 @@ function layoutNotes(ast: unknown, page: PageKey | null | undefined, found: Set<
     const lc = literalClass(node.props?.className)
     const cls = lc == null ? null : splitClasses(lc)
     const list = node.t === 'cmp' && CARD_LISTS.has(node.name) ? node : null
+    const own = node.t === 'cmp' ? carouselList(node) : null
     const inner: Room = {
-      px: SQUEEZE_AT.map((w, i) => widthIn(cls, room.grid, w, room.px[i])),
-      hidden: SQUEEZE_AT.map((w, i) => room.hidden[i] || (!!cls && display(cls, w) === 'hidden')),
+      px: ROOM_AT.map((w, i) => widthIn(cls, room.grid, w, room.px[i])),
+      hidden: ROOM_AT.map((w, i) => room.hidden[i] || (!!cls && display(cls, w) === 'hidden')),
+      rough: ROOM_AT.map((w, i) => room.rough[i] || (!!room.grid && isGrid(room.grid, w) && uneven(room.grid, w) && (cls ? spanAt(cls, w) : 1) < colsAt(room.grid, w))),
       // A <Carousel> holding only a list draws the list's own carousel (interpret.tsx), so that list is not one slide.
-      slide: room.slide ?? slideOf(cls) ?? (node.t === 'cmp' && node.name === 'Carousel' && !carouselList(node) ? CAROUSEL_SLIDE : null),
+      slide: room.slide ?? slideOf(cls) ?? (node.t === 'cmp' && node.name === 'Carousel' && !own ? CAROUSEL_SLIDE : null),
       grid: list ? listGrid(list, cls ?? []) : cls,
     }
     if (node.t === 'cmp' && node.name === 'NavLinks' && page === 'header' && (lit(node.props?.mobile) ?? 'menu') === 'menu')
@@ -433,11 +596,34 @@ function layoutNotes(ast: unknown, page: PageKey | null | undefined, found: Set<
       const note = squeeze(list, cls, inner)
       if (note) found.add(note)
     }
+    if (node.t === 'cmp') {
+      const need = NEED_OF.get(node.name)
+      const tight = need && narrowest(need, inner)
+      if (need && tight) {
+        const had = narrow.get(need)
+        const parts = [...new Set([...(had?.names ?? []), node.name])]
+        narrow.set(need, had && had.ratio <= tight.ratio ? { ...had, names: parts } : { ...tight, names: parts })
+      }
+      // Slide widths: a <Carousel>'s itemClassName (else the list it draws), or a list's own with layout="carousel".
+      if (own) drawn.add(own)
+      const slides =
+        node.name === 'Carousel'
+          ? (lit(node.props?.itemClassName) ?? (own ? lit(own.props?.itemClassName) : undefined))
+          : CARD_LISTS.has(node.name) && lit(node.props?.layout) === 'carousel' && !drawn.has(node)
+            ? lit(node.props?.itemClassName)
+            : undefined
+      const shows = node.name === 'Carousel' ? (own ? listShows(own) : slideCount(node.children)) : listShows(node)
+      if (typeof slides === 'string' && shows > 1) {
+        const note = railNote(node.name === 'Carousel' ? "<Carousel>'s slides" : `<${node.name}>'s carousel slides`, splitClasses(slides), inner, shows)
+        if (note) found.add(note)
+      }
+    }
     const next = [...chain, { cls, kids: kidsOf(node.children) + (node.t === 'cmp' && node.render ? 2 : 0) }]
     node.children?.forEach(c => walk(c, next, inner, depth + 1))
     if (node.t === 'cmp' && node.render) walk(node.render.body, next, inner, depth + 1)
   }
-  walk(ast, [], { px: SQUEEZE_AT.map(pageWidth), hidden: SQUEEZE_AT.map(() => false), slide: null, grid: null }, 0)
+  walk(ast, [], { px: ROOM_AT.map(pageWidth), hidden: ROOM_AT.map(() => false), rough: ROOM_AT.map(() => false), slide: null, grid: null }, 0)
+  for (const [need, n] of narrow) found.add(narrowNote(need, n))
 }
 
 const CARD_LINT = {
