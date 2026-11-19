@@ -1,5 +1,6 @@
 import { CartSkeleton } from '@/components/visitor/skeletons/commerce'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
-export default function Loading() {
-  return <CartSkeleton />
+export default async function Loading() {
+  return (await studioSkeleton('cart', <CartSkeleton />)) ?? <CartSkeleton />
 }

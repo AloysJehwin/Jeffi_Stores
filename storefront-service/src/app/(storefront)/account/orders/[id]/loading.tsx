@@ -1,5 +1,6 @@
 import { OrderDetailSkeleton } from '@/components/visitor/skeletons/account'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
-export default function Loading() {
-  return <OrderDetailSkeleton />
+export default async function Loading() {
+  return (await studioSkeleton('track', <OrderDetailSkeleton />)) ?? <OrderDetailSkeleton />
 }

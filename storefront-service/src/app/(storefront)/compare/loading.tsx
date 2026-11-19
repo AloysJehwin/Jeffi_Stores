@@ -1,10 +1,15 @@
 import { Sk } from '@/components/admin/kit/skeleton'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
 const LABEL = 'p-4 text-xs font-semibold text-foreground-muted uppercase tracking-wide bg-surface-secondary align-top whitespace-nowrap'
 const COLS = [0, 1, 2]
 
+export default async function Loading() {
+  return (await studioSkeleton('compare', <CompareSkeleton />)) ?? <CompareSkeleton />
+}
+
 // Which spec rows appear depends on the products; Brand and Category always do.
-export default function Loading() {
+function CompareSkeleton() {
   return (
     <div className="bg-surface min-h-screen" role="status" aria-busy="true" aria-label="Loading comparison">
       <div className="bg-surface-elevated border-b border-border-default">
