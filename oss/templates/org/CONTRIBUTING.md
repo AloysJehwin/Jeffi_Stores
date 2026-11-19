@@ -15,47 +15,94 @@ The code is under the Business Source License 1.1 (the `LICENSE` file in each re
 
 ## Set up the workspace
 
-The services share root config and build together, so you work in an assembled workspace rather than a single repository.
+The services share root config and build together, so you work in an assembled workspace rather than a single repository. You never need Jeffi Stores' own keys: you generate local secrets, and every integration (AWS, payments, shipping, email, SMS, AI) stays off unless you add your own sandbox key. A one-command setup is planned in [workspace#10](https://github.com/Jeffi-ERP/workspace/issues/10); until then, follow these steps.
 
 You need:
 
-- Node.js 20 and npm
-- PostgreSQL 16 on your machine. Use a local database only; never point your environment at a shared or production database.
-- Redis, optional (set `REDIS_URL` if you run it)
+- Node.js 20.6 or later, and npm
+- Docker, for PostgreSQL 16 with the pgvector extension. A local PostgreSQL with pgvector works too. Use a local database only; never point your environment at a shared or production one.
+- `openssl`, to generate secrets
 
 1. Clone the workspace and assemble it:
 
    ```bash
    git clone https://github.com/Jeffi-ERP/workspace.git jeffi-erp
    cd jeffi-erp
-   node oss/assemble.mjs   # clones every repository into its folder
-   npm ci
+   node oss/assemble.mjs                  # clones every repository into its folder
+   ONNXRUNTIME_NODE_INSTALL=skip npm ci   # skips onnxruntime's CUDA download
    ```
 
-2. Create your environment file and fill it in for your machine:
+2. Start a database, then load the schema and the plans in the order CI uses:
 
    ```bash
-   cp .env.example .env.local
-   ```
-
-   Set `DATABASE_URL` to an empty local database and load the schema into it, in the order `node scripts/db-files.mjs` prints the files (the platform set), then the control-plane tables:
-
-   ```bash
-   createdb jeffi_dev   # DATABASE_URL=postgresql://localhost:5432/jeffi_dev
-   for f in $(node scripts/db-files.mjs) $(node scripts/db-files.mjs control-plane); do
-     psql -d jeffi_dev -q -v ON_ERROR_STOP=1 -f "$f"
+   docker run -d --name jeffi-pg -p 5432:5432 \
+     -e POSTGRES_USER=jeffi -e POSTGRES_PASSWORD=jeffi -e POSTGRES_DB=jeffi_dev pgvector/pgvector:pg16
+   for f in $(node scripts/db-files.mjs) $(node scripts/db-files.mjs control-plane) \
+            controller-service/database/seeds/seed-plans.sql; do
+     docker exec -i jeffi-pg psql -U jeffi -d jeffi_dev -q < "$f"
    done
    ```
 
-   Never commit `.env.local`.
+   One error is expected for now: `relation "shelf_stock_unique" already exists`. Everything else loads.
 
-3. Start the apps:
+3. Write `.env.local` with fresh secrets, and link it into each app's folder (Next.js reads env files from the app's own folder):
+
+   ```bash
+   cat > .env.local <<EOF
+   DATABASE_URL=postgresql://jeffi:jeffi@localhost:5432/jeffi_dev
+   JWT_SECRET=$(openssl rand -hex 32)
+   MFA_ENCRYPTION_KEY=$(openssl rand -hex 32)
+   SERVICE_AUTH_SECRET=$(openssl rand -hex 32)
+   SOCIAL_TOKEN_ENC_KEY=$(openssl rand -hex 32)
+   CRON_SECRET=$(openssl rand -hex 16)
+   APP_URL=http://localhost:3000
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   NEXT_PUBLIC_BASE_URL=http://localhost:3000
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   ADMIN_BASE_URL=http://localhost:3000/admin
+   PLATFORM_OWNER_EMAIL=admin@example.test
+   MAIL_DISABLED=true
+   SMS_DISABLED=true
+   WHATSAPP_DISABLED=true
+   IN_PROCESS_CRON=false
+   TENANT_MTLS_ENFORCED=false
+   ADSENSE_DISABLED=true
+   ENABLE_RAZORPAY=false
+   ENABLE_UPI=false
+   ENABLE_GST=false
+   AI_GATEWAY_URL=http://127.0.0.1:8080
+   RAG_PG_HOST=127.0.0.1
+   EOF
+   for app in controller-service storefront-service admin-service business-service showcase-service; do
+     ln -sf ../.env.local "$app/.env.local"
+   done
+   ```
+
+   `.env.example` lists every other setting. Leave integration keys empty unless you have your own sandbox account (for example Razorpay test mode). Never commit `.env.local`.
+
+4. Create a local admin:
+
+   ```bash
+   docker exec -i jeffi-pg psql -U jeffi -d jeffi_dev <<'SQL'
+   WITH u AS (INSERT INTO users (email, first_name, last_name)
+              VALUES ('admin@example.test', 'Local', 'Admin') RETURNING id)
+   INSERT INTO admins (user_id, role) SELECT id, 'administrator' FROM u;
+   SQL
+   ```
+
+5. Start the apps:
 
    ```bash
    ALLOW_ENV_FALLBACK=true npm run dev
    ```
 
-   This starts the storefront, admin, business and controller apps behind a dev router on port 3000. `ALLOW_ENV_FALLBACK=true` lets the secrets loader carry on when it can't reach AWS, so the apps run on your `.env.local`.
+   The secrets loader tries AWS, fails, and carries on with your `.env.local`. The dev router serves everything on port 3000:
+
+   - http://localhost:3000 is the storefront.
+   - http://localhost:3000/admin is the admin. Sign in as `admin@example.test` with the email code `000000` (accepted outside production), then enrol any authenticator app.
+   - http://ecom.localhost:3000 is the ecom console. Stores run on `<slug>.localhost:3000`.
+
+Not working locally yet: placing orders (shipping needs a local stand-in), product images stored in S3, and AI features. They are part of [workspace#10](https://github.com/Jeffi-ERP/workspace/issues/10).
 
 ## Work on a repository
 
