@@ -2,6 +2,7 @@ import type { PageKey } from '@jeffi/site-blocks'
 import { FORBIDDEN_KEYS, inertCss, taxonomyOf } from '@/lib/site/code/allow'
 import { CARD_PAGE, type CodeNode } from '@/lib/site/code/ast'
 import type { CompiledSection } from '@/lib/site/code/compile'
+import { currentCss } from '@/lib/site/code/css'
 import { evalValue } from '@/lib/site/code/evaluate'
 import { codeLibrary } from '@/lib/site/code/library'
 import { siteData, type SiteData } from '@/lib/site/data'
@@ -161,13 +162,14 @@ export default async function CodeSection({
   if (page === CARD_PAGE)
     return (
       <div id={blockId && /^[A-Za-z0-9_-]{1,64}$/.test(blockId) ? blockId : undefined}>
-        <CardSamples card={{ id, ast: s.ast, css: typeof s.css === 'string' ? s.css : '' }} data={src} />
+        <CardSamples card={{ id, ast: s.ast, css: currentCss(s.css, id) }} data={src} />
       </div>
     )
   const found = scanData(s.ast)
   const [empty, taxonomy] = await Promise.all([emptyData(found, src), taxonomyFor(s.ast, src)])
   if (!always && hides(found, empty)) return null
-  const css = inertCss(s.css)
+  // CSS saved in an earlier format gets this section's mark here, once per process.
+  const css = inertCss(currentCss(s.css, id))
   const rows = page === 'showcase' ? placeholderRows(s.ast) : null
   const env = makeEnv({ data: src, page, sectionId: id, priority, empty, taxonomy, anchors, rows })
   return (

@@ -6,11 +6,14 @@ import { MenuButtonPart } from './client'
 // Server-rendered header and footer parts: links, footer columns and social icons.
 
 export type NavMobile = 'menu' | 'scroll' | 'hide' | 'show'
+export type NavFrom = 'md' | 'lg' | 'xl'
 const NAV_LIST = 'flex items-center gap-5 xl:gap-8'
 const NAV_LINK = 'font-medium whitespace-nowrap opacity-80 hover:opacity-100 hover:text-accent-500 transition-colors'
+// Written out whole, so the app's stylesheet has them.
+const LINKS_FROM: Record<NavFrom, string> = { md: 'hidden md:block', lg: 'hidden lg:block', xl: 'hidden xl:block' }
 
-/** Menu links; on phones a menu button (the store's drawer), a scrolling row, hidden, or as-is. */
-export function NavList({ links, items, mobile = 'menu', className }: { links: ChromeLink[]; items?: ReactNode[]; mobile?: NavMobile; className?: string }) {
+/** Menu links; below `from` a menu button (the store's drawer), a scrolling row, hidden, or as-is. */
+export function NavList({ links, items, mobile = 'menu', from = 'lg', className }: { links: ChromeLink[]; items?: ReactNode[]; mobile?: NavMobile; from?: NavFrom; className?: string }) {
   const list = (
     <ul className={className || NAV_LIST}>
       {links.map((l, i) => (
@@ -35,8 +38,8 @@ export function NavList({ links, items, mobile = 'menu', className }: { links: C
     )
   return (
     <nav aria-label="Main" className="flex items-center">
-      <div className="hidden lg:block">{list}</div>
-      {mobile === 'menu' && <MenuButtonPart />}
+      <div className={LINKS_FROM[from] ?? LINKS_FROM.lg}>{list}</div>
+      {mobile === 'menu' && <MenuButtonPart from={from} />}
     </nav>
   )
 }
