@@ -18,6 +18,8 @@ export interface SenderOverride {
 }
 
 export interface TenantSender extends SenderOverride {
+  /** Whose row it is: a workspace without a number of its own sends from the platform's ecom row. */
+  tenantId: string
   channel: SenderChannel
   provider: SenderProvider
   audience: SenderAudience
@@ -60,7 +62,7 @@ export async function tenantSender(tenantId: string, channel: SenderChannel, aud
       throw new SenderError(`This store's ${channel} sender credentials cannot be read (${e?.message ?? e})`)
     }
     const a = row.audience === 'admin' || row.audience === 'ecom' ? row.audience : 'customer'
-    sender = { channel, provider: row.provider, sender: row.sender, config, audience: a }
+    sender = { tenantId, channel, provider: row.provider, sender: row.sender, config, audience: a }
   }
   cache.set(key, { at: Date.now(), sender })
   return sender

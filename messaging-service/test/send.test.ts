@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // In-memory stand-in for the messages table + mocked wallet/providers.
 const rows = new Map<string, any>()
+const senderRows = new Map<string, any>() // `${tenant}:${channel}` → a tenant_messaging_senders row
 vi.mock('../src/db.js', () => ({
   db: {
     query: vi.fn(async (sql: string, params: any[] = []) => {
+      if (sql.startsWith('SELECT audience, provider, sender, config_enc FROM tenant_messaging_senders')) {
+        const r = senderRows.get(`${params[0]}:${params[1]}`)
+        return { rows: r ? [r] : [], rowCount: r ? 1 : 0 }
+      }
       if (sql.startsWith('INSERT INTO messages')) {
         const [id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, reference, metadata] = params
         rows.set(id, { id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, charged_inr: 0, status: 'queued', provider: null, provider_ref: null, error: null, reference, metadata, created_at: new Date(), updated_at: new Date() })
@@ -42,6 +47,7 @@ import * as wallet from '@jeffi/wallet'
 import { sendEmail } from '../src/providers/email'
 import { sendSms, sendWhatsApp } from '../src/providers/twilio'
 import { messagingProvider } from '../src/providers/policy'
+import { encryptToken } from '../src/cipher'
 
 // Shaped like FullTemplate — the subset resolveTemplate reads.
 const v2 = (subject: string | null, body: string, provider_ref: string | null = null) => ({
@@ -60,6 +66,7 @@ describe('sendMessage', () => {
     vi.mocked(wallet.trueUp).mockReset()
     vi.mocked(sendEmail).mockReset().mockResolvedValue('ses-1')
     vi.mocked(sendSms).mockReset().mockResolvedValue('SM1')
+    vi.mocked(sendWhatsApp).mockReset()
     vi.mocked(findBySlugWithDefaults).mockReset().mockResolvedValue(null)
     vi.mocked(messagingProvider).mockReset().mockResolvedValue('twilio')
     awsSend.mockReset()
@@ -106,6 +113,21 @@ describe('sendMessage', () => {
     expect(m.status).toBe('failed')
     expect(m.error).toBe('twilio down')
     expect(vi.mocked(wallet.trueUp).mock.calls[0][0]).toMatchObject({ tenantId: 't1', amountInr: 0.5, externalRef: `pub:${m.id}` })
+  })
+
+  it("sends an API workspace without its own number from the ecom portal's number, a store send from the env", async () => {
+    process.env.SOCIAL_TOKEN_ENC_KEY = 'a'.repeat(64)
+    const PLATFORM = '00000000-0000-0000-0000-000000000000'
+    senderRows.set(`${PLATFORM}:whatsapp`, { audience: 'ecom', provider: 'twilio', sender: '+18722704479', config_enc: encryptToken('{}') })
+    vi.mocked(sendWhatsApp).mockResolvedValue('SMwa')
+
+    const api = await sendMessage({ tenantId: 'w1', tenantSlug: 'acme', apiKeyId: 'k1', space: 'api' }, { channel: 'whatsapp', to: '+919999999999', body: 'hi' } as any)
+    expect(api).toMatchObject({ status: 'sent', from_address: '+18722704479' })
+    expect(vi.mocked(sendWhatsApp).mock.calls[0][1]).toMatchObject({ sender: '+18722704479', tenantId: PLATFORM })
+
+    await sendMessage({ tenantId: 'w2', tenantSlug: 'shop' }, { channel: 'whatsapp', to: '+919999999999', body: 'hi' } as any)
+    expect(vi.mocked(sendWhatsApp).mock.calls[1][1]).toBeUndefined()
+    delete process.env.SOCIAL_TOKEN_ENC_KEY
   })
 
   describe('a tenant on AWS End User Messaging', () => {
