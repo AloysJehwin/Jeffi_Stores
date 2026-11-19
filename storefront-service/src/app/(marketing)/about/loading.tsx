@@ -1,5 +1,6 @@
 import { AboutSkeleton } from '@/components/visitor/skeletons/marketing'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
-export default function Loading() {
-  return <AboutSkeleton />
+export default async function Loading() {
+  return (await studioSkeleton('about')) ?? <AboutSkeleton />
 }

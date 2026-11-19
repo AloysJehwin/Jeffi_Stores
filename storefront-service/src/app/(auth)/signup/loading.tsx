@@ -1,5 +1,6 @@
 import { StoreAuthSkeleton } from '@/components/visitor/skeletons/auth'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
-export default function Loading() {
-  return <StoreAuthSkeleton kind="signup" />
+export default async function Loading() {
+  return (await studioSkeleton('signup', <StoreAuthSkeleton kind="signup" />)) ?? <StoreAuthSkeleton kind="signup" />
 }

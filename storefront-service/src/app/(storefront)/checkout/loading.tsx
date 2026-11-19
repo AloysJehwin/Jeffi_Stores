@@ -1,5 +1,6 @@
 import { CheckoutSkeleton } from '@/components/visitor/skeletons/commerce'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
-export default function Loading() {
-  return <CheckoutSkeleton />
+export default async function Loading() {
+  return (await studioSkeleton('checkout', <CheckoutSkeleton />)) ?? <CheckoutSkeleton />
 }

@@ -1,5 +1,7 @@
 import { LoyaltySkeleton } from '@/components/visitor/skeletons/account'
+import { studioSkeleton } from '@/components/visitor/skeletons/studio'
 
-export default function Loading() {
-  return <LoyaltySkeleton kind="rewards" />
+// The store's AI-designed account pages frame this one (renderAccountFrame).
+export default async function Loading() {
+  return (await studioSkeleton('account', <LoyaltySkeleton kind="rewards" />)) ?? <LoyaltySkeleton kind="rewards" />
 }
