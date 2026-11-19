@@ -468,7 +468,8 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   const sig = String(req.headers['x-twilio-signature'] ?? '')
   let valid = twilioSignatureValid(sig, id, req.body ?? {})
   if (!valid && m && (m.metadata as any)?.sender?.own && m.channel !== 'email') {
-    const s = await tenantSender(m.tenant_id, m.channel, (m.metadata as any)?.sender?.audience ?? 'customer').catch(() => null)
+    const meta = (m.metadata as any).sender
+    const s = await tenantSender(meta.tenant ?? m.tenant_id, m.channel, meta.audience ?? 'customer').catch(() => null)
     valid = !!s?.config.auth_token && twilioSignatureValid(sig, id, req.body ?? {}, s.config.auth_token)
   }
   if (!valid) return reply.code(403).send({ ok: false })

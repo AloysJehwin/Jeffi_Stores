@@ -70,7 +70,7 @@ export function startDeliverySync(log: (m: string) => void, scope: ServiceScope)
     for (const r of rows.rows) {
       try {
         // A send from the store's own Twilio account is polled with that account's client.
-        const ov = r.metadata?.sender?.own ? await tenantSender(r.tenant_id, r.channel, r.metadata.sender.audience ?? 'customer') : null
+        const ov = r.metadata?.sender?.own ? await tenantSender(r.metadata.sender.tenant ?? r.tenant_id, r.channel, r.metadata.sender.audience ?? 'customer') : null
         const s = await fetchStatus(r.provider_ref, ov ?? undefined)
         await applyStatus(r.id, s.status, { code: s.code, message: s.message, payload: { polled: true, ...s } })
       } catch (e: any) {
