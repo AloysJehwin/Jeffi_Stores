@@ -1,0 +1,180 @@
+# Managed from %%upstream%% (oss/templates); changes here are overwritten by the next export.
+#
+# A merge to main runs Pre-build (lint, type check), then Build (tests, production build), then stops at
+# "Approval · promote to Jeffi_Stores" (the `promote` environment; only maintainers can approve). After approval
+# the change is opened as a pull request on %%upstream%%. The token for %%upstream%% lives in that environment,
+# so no job can read it before the approval. Commits exported from %%upstream%% (an "Upstream-Commit:" trailer)
+# skip the pipeline: they came from there.
+name: Merge pipeline
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  init:
+    name: Init
+    if: ${{ !contains(github.event.head_commit.message, 'Upstream-Commit:') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pr: ${{ steps.pr.outputs.number }}
+    steps:
+      - id: pr
+        name: The merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          n=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0].number // empty')
+          echo "number=$n" >> "$GITHUB_OUTPUT"
+          { echo "### Merge pipeline"; echo; echo "\`${SHA::7}\`${n:+ (#$n)}: pre-build, build, then the promotion to %%upstream%% waits for a maintainer's approval."; } >> "$GITHUB_STEP_SUMMARY"
+
+  prebuild:
+    name: Pre-build
+    needs: init
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: This repo at the merged commit
+        uses: actions/checkout@v7
+        with:
+          path: ${{ github.event.repository.name == 'workspace' && 'ws' || 'pr' }}
+          persist-credentials: false
+      - name: Workspace (main)
+        if: github.event.repository.name != 'workspace'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workspace
+          path: ws
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ws/package-lock.json
+      - name: Assemble the other repos
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          if [ "$REPO" = workspace ]; then node ws/oss/assemble.mjs --root ws --shallow
+          else node ws/oss/assemble.mjs --root ws --shallow --place "$REPO=pr"; fi
+      - name: Install
+        working-directory: ws
+        run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - name: Lint and type check
+        working-directory: ws
+        run: node oss/checks.mjs "${{ github.event.repository.name }}" prebuild
+
+  build:
+    name: Build
+    needs: prebuild
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: This repo at the merged commit
+        uses: actions/checkout@v7
+        with:
+          path: ${{ github.event.repository.name == 'workspace' && 'ws' || 'pr' }}
+          persist-credentials: false
+      - name: Workspace (main)
+        if: github.event.repository.name != 'workspace'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workspace
+          path: ws
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ws/package-lock.json
+      - name: Assemble the other repos
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          if [ "$REPO" = workspace ]; then node ws/oss/assemble.mjs --root ws --shallow
+          else node ws/oss/assemble.mjs --root ws --shallow --place "$REPO=pr"; fi
+      - name: Install
+        working-directory: ws
+        run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - name: Tests and build
+        working-directory: ws
+        run: node oss/checks.mjs "${{ github.event.repository.name }}" build
+
+  promote:
+    name: Approval · promote to Jeffi_Stores
+    needs: [init, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: promote
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Token for %%upstream%% (from the promote environment)
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.OSS_PROMOTE_APP_ID }}
+          private-key: ${{ secrets.OSS_PROMOTE_APP_KEY }}
+          owner: '%%upstream_owner%%'
+          repositories: '%%upstream_name%%'
+      - name: This repo at the merged commit
+        uses: actions/checkout@v7
+        with:
+          path: src
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Workspace (main), for the promote script
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workspace
+          path: ws
+          persist-credentials: false
+      - name: Where this repo lives in %%upstream%%
+        id: where
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          node -e '
+            const m = require("./ws/oss/repos.json"); const r = m.repos.find(x => x.name === process.env.REPO)
+            const dirs = r.path ? [r.path] : [...new Set(r.include.filter(p => p.includes("/")).map(p => p.split("/")[0]))]
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, `sparse<<EOF\n${dirs.join("\n")}\nEOF\n`)'
+      - name: '%%upstream%% (%%base%%)'
+        uses: actions/checkout@v7
+        with:
+          repository: '%%upstream%%'
+          ref: '%%base%%'
+          path: mono
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 1
+          sparse-checkout: ${{ steps.where.outputs.sparse }}
+      - name: Bot identity
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          echo "name=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=$(gh api "users/$SLUG%5Bbot%5D" --jq .id)+${SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+      - name: Open the PR on %%upstream%%
+        env:
+          MONO_TOKEN: ${{ steps.app.outputs.token }}
+          ORG_TOKEN: ${{ github.token }}
+          OSS_BOT_NAME: ${{ steps.bot.outputs.name }}
+          OSS_BOT_EMAIL: ${{ steps.bot.outputs.email }}
+          REPO: ${{ github.event.repository.name }}
+          PR: ${{ needs.init.outputs.pr }}
+        run: node ws/oss/promote.mjs --repo "$REPO" --sha "$GITHUB_SHA" --src src --mono mono --pr "$PR"
