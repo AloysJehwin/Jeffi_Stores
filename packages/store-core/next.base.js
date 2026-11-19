@@ -97,6 +97,9 @@ function baseConfig({ app, headers = [] }) {
     output: 'standalone',
     // The apps live in <app>/; packages and node_modules sit at the repo root.
     outputFileTracingRoot: ROOT,
+    // The cert helpers write client-key.pem into a temp dir nft can't resolve, so it globbed the repo for it
+    // (certs/, other apps' standalone output) and each local build nested deeper. Paths are app-relative.
+    outputFileTracingExcludes: { '*': ['../**/client-key.pem', '../**/.next/standalone/**'] },
     turbopack: { root: ROOT },
     ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
     reactStrictMode: true,
