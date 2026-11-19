@@ -7,6 +7,7 @@ import { ServersTable } from '../detail/FleetTables'
 import CostBreakdown from '../detail/CostBreakdown'
 import Copyable from '../detail/Copyable'
 import DnsResyncButton from '../detail/DnsResyncButton'
+import { instanceStateLabel, isDeployed, notDeployedNote } from '../detail/labels'
 import K8sWorkloadSection from './K8sWorkloadSection'
 
 const SCHEMA: StatusMap = { behind: { label: 'Behind', tone: 'amber' }, current: { label: 'Current', tone: 'green' } }
@@ -38,13 +39,15 @@ export default function InfrastructureTab({ d, infra }: { d: TenantDetailData; i
           <p className="text-sm text-foreground-muted">{FLEET_UNKNOWN}</p>
         ) : fleet?.placement === 'pool' && servers.length === 0 ? (
           <p className="text-sm text-foreground-muted">Runs on the shared basic pool: no servers of its own.</p>
+        ) : !isDeployed(t) && servers.length === 0 ? (
+          <p className="text-sm text-foreground-muted">{notDeployedNote(t, job, d.spec)}</p>
         ) : (
           <ServersTable servers={servers} />
         )}
         <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label={res.computeMode === 'k8s' ? 'Ingress IP' : 'EC2 target'} value={t.ec2_target ? <Copyable value={t.ec2_target} /> : 'shared pool'} />
+          <Field label={res.computeMode === 'k8s' ? 'Ingress IP' : 'EC2 target'} value={t.ec2_target ? <Copyable value={t.ec2_target} /> : 'Not assigned yet'} />
           <Field label="Instance id (infra)" value={t.ec2_instance_id ? <Copyable value={t.ec2_instance_id} /> : '—'} />
-          <Field label="Instance state" value={<span className="capitalize">{t.instance_state}</span>} />
+          <Field label="Instance state" value={instanceStateLabel(t, job)} />
         </dl>
       </Section>
 

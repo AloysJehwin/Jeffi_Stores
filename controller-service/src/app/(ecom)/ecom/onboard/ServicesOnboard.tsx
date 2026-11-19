@@ -7,6 +7,7 @@ import { Card } from '../dashboard/_components/Card'
 import { fieldInput, noteCls, primaryBtn } from './ui'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { PhoneInput, isValidPhone } from '../_ui/phone'
+import { GSTIN_MESSAGE, PAN_MESSAGE, isGstin, isPan, taxIdInput } from '@controller/lib/catalog/tax-ids'
 
 // Short onboarding for messaging/documents-only customers: no plan, warehouse or bank step.
 type Form = {
@@ -29,12 +30,19 @@ const TYPES = [
   ['llp', 'LLP'],
   ['other', 'Other'],
 ]
-const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
 
 // The input sits at the bottom of the (stretched) grid cell, so two fields in a row line up even when one has a hint.
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function Field({ label, children, hint, htmlFor }: { label: string; children: React.ReactNode; hint?: string; htmlFor?: string }) {
   return (
-    <label className="flex h-full flex-col">
+    <label htmlFor={htmlFor} className="flex h-full flex-col">
       <span className="text-sm font-medium text-foreground-secondary">{label}</span>
       {hint && <span className="block text-xs text-foreground-muted mt-0.5">{hint}</span>}
       <div className="mt-auto pt-1.5">{children}</div>
@@ -49,8 +57,12 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(p => ({ ...p, [k]: v }))
+  // Shown once the field is left or full, not while it is typed.
+  const [left, setLeft] = useState({ pan: false, gst: false })
+  const panError = !!f.pan && !isPan(f.pan) && (left.pan || f.pan.length >= 10)
+  const gstError = !!f.gstNumber && !isGstin(f.gstNumber) && (left.gst || f.gstNumber.length >= 15)
 
-  const valid = f.displayName.length >= 2 && f.slug.length >= 3 && f.businessName.length >= 2 && f.pan.length === 10 && f.businessAddress.length >= 5 && (f.gstNumber === '' || f.gstNumber.length === 15) && f.ownerName && isValidPhone(f.mobile) && f.legalsAccepted
+  const valid = f.displayName.length >= 2 && f.slug.length >= 3 && f.businessName.length >= 2 && isPan(f.pan) && f.businessAddress.length >= 5 && (f.gstNumber === '' || isGstin(f.gstNumber)) && f.ownerName && isValidPhone(f.mobile) && f.legalsAccepted
 
   async function submit() {
     setBusy(true)
@@ -84,13 +96,19 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Legal business name"><input className={input} value={f.businessName} onChange={e => set('businessName', e.target.value)} /></Field>
           <Field label="Business type"><AdminSelect value={f.businessType} onChange={v => set('businessType', v)} options={TYPES.map(([value, label]) => ({ value, label }))} /></Field>
-          <Field label="PAN"><input className={input} value={f.pan} onChange={e => set('pan', e.target.value.toUpperCase())} maxLength={10} /></Field>
-          <Field label="GSTIN" hint="Optional — printed on invoices you generate"><input className={input} value={f.gstNumber} onChange={e => set('gstNumber', e.target.value.toUpperCase())} maxLength={15} /></Field>
+          <Field label="PAN">
+            <input className={input} value={f.pan} autoCapitalize="characters" autoComplete="off" spellCheck={false} aria-invalid={panError} onChange={e => set('pan', taxIdInput(e.target.value, 10))} onBlur={() => setLeft(l => ({ ...l, pan: true }))} />
+            {panError && <span className="mt-1 block text-xs text-[#8a2e1f]">{PAN_MESSAGE}</span>}
+          </Field>
+          <Field label="GSTIN" hint="Optional — printed on invoices you generate">
+            <input className={input} value={f.gstNumber} autoCapitalize="characters" autoComplete="off" spellCheck={false} aria-invalid={gstError} onChange={e => set('gstNumber', taxIdInput(e.target.value, 15))} onBlur={() => setLeft(l => ({ ...l, gst: true }))} />
+            {gstError && <span className="mt-1 block text-xs text-[#8a2e1f]">{GSTIN_MESSAGE}</span>}
+          </Field>
         </div>
         <Field label="Business address"><textarea className={input} rows={2} value={f.businessAddress} onChange={e => set('businessAddress', e.target.value)} /></Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Your name"><input className={input} value={f.ownerName} onChange={e => set('ownerName', e.target.value)} /></Field>
-          <Field label="Mobile"><PhoneInput value={f.mobile} onChange={v => set('mobile', v)} inputClassName={`${input} min-w-0 flex-1`} /></Field>
+          <Field label="Mobile" htmlFor="svc-mobile"><PhoneInput id="svc-mobile" value={f.mobile} onChange={v => set('mobile', v)} inputClassName={`${input} min-w-0 flex-1`} /></Field>
         </div>
         <label className="flex items-start gap-3 text-sm text-foreground-secondary">
           <input type="checkbox" className="mt-1" checked={f.legalsAccepted} onChange={e => set('legalsAccepted', e.target.checked)} />

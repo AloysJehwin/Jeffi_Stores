@@ -4,6 +4,7 @@ import { ADDON_IDS } from '@/lib/billing/addons'
 import { ContactSchema } from '@controller/lib/domains/contact'
 import { STORE_SOCIAL_LABELS, STORE_SOCIAL_NETWORKS, socialUrl, whatsappDigits, type StoreSocialNetwork } from '@/lib/catalog/store-socials'
 import { categoryList, complianceProblem } from '@controller/lib/catalog/compliance'
+import { GSTIN_MESSAGE, GSTIN_SHAPE, PAN_MESSAGE, PAN_SHAPE } from '@controller/lib/catalog/tax-ids'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE = /^\+?\d{8,15}$/
@@ -66,14 +67,16 @@ export const OnboardSchema = z
     ownerName: z.string().trim().min(2, 'Enter your full name').max(200),
     businessName: z.string().min(1).max(200),
     businessType: z.enum(['proprietor', 'partnership', 'pvt_ltd', 'llp', 'other']),
-    pan: z.string().min(10).max(10),
+    // A length check let a dummy like F6TRYCYT56 through.
+    pan: z.string().trim().toUpperCase().regex(PAN_SHAPE, PAN_MESSAGE),
     businessAddress: z.string().min(5),
     // GST. Optional, as in the wizard: registration is not required below the turnover threshold.
     gstNumber: z
       .string()
       .trim()
+      .toUpperCase()
       .default('')
-      .refine(v => v === '' || v.length === 15, 'GSTIN must be 15 characters, or leave it blank'),
+      .refine(v => v === '' || GSTIN_SHAPE.test(v), GSTIN_MESSAGE),
     gstCertS3Key: z.string().optional(),
     // Warehouse (optional)
     dailyPayout: z.boolean().optional(),

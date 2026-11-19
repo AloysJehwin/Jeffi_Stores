@@ -574,6 +574,60 @@ describe('provisioning state machine', () => {
       expect(res).toBe('failed')
     })
 
+    it('bad SQL at load_schema (SQLSTATE 42601) fails at once and rolls back, with no backoff', async () => {
+      vi.spyOn(provider, 'loadSchema').mockRejectedValue(Object.assign(new Error('syntax error at or near "store"'), { code: '42601' }))
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      const res = await advanceProvisioningJob(job({ step: 'load_schema', created_resources: { endpoint: 'ep-1' } }), provider)
+      expect(res).toBe('failed')
+      expect(patches().find(p => p.status === 'failed')?.last_error).toMatch(/syntax error at or near "store"/)
+      expect(patches().some(p => p.nextAttemptAt)).toBe(false)
+      expect(reg.setTenantStatus).toHaveBeenCalledWith('t-1', 'suspended')
+    })
+
+    it('bad SQL at restore_data is terminal by its message alone (no SQLSTATE)', async () => {
+      backupStore.getTenantBackup.mockResolvedValue(Buffer.from('archive'))
+      vi.spyOn(provider, 'restoreDb').mockRejectedValue(new Error('column "legacy_flag" of relation "products" does not exist'))
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      const res = await advanceProvisioningJob(job({ step: 'restore_data', created_resources: { endpoint: 'ep', restoreFromKey: 'k/1.sql.gz' } }), provider)
+      expect(res).toBe('failed')
+    })
+
+    it('a connection error at load_schema is still retried', async () => {
+      vi.spyOn(provider, 'loadSchema').mockRejectedValue(new Error('Connection terminated due to connection timeout'))
+      const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+      const res = await advanceProvisioningJob(job({ step: 'load_schema', created_resources: { endpoint: 'ep-1' } }), provider)
+      expect(res).toBe('pending')
+      expect(lastPatch().nextAttemptAt).toBeInstanceOf(Date)
+    })
+
+    it('classifies SQL class 42 as terminal; connection, timeout, busy-server and AWS throttling errors as retryable', async () => {
+      const { isTerminalError } = await import('@controller/lib/provisioning/steps')
+      const pg = (message: string, code: string) => Object.assign(new Error(message), { code })
+      const terminal: [string, unknown?][] = [
+        ['syntax error at or near "store"'],
+        ['syntax error at end of input'],
+        ['relation "site_pages" does not exist'],
+        ['column "published_doc" of relation "site_pages" does not exist'],
+        ['function gen_random_uuid() does not exist'],
+        ['type "citext" does not exist'],
+        ['multiple primary keys for table "orders" are not allowed', pg('multiple primary keys for table "orders" are not allowed', '42P16')],
+        ['generation expression is not immutable', pg('generation expression is not immutable', '42P17')],
+      ]
+      for (const [msg, err] of terminal) expect(isTerminalError(msg, err), msg).toBe(true)
+      const retryable: [string, unknown?][] = [
+        ['Connection terminated unexpectedly'],
+        ['connect ECONNREFUSED 10.0.0.5:5432', Object.assign(new Error('connect ECONNREFUSED 10.0.0.5:5432'), { code: 'ECONNREFUSED' })],
+        ['timeout expired'],
+        ['the database system is starting up', pg('the database system is starting up', '57P03')],
+        ['sorry, too many clients already', pg('sorry, too many clients already', '53300')],
+        ['canceling statement due to statement timeout', pg('canceling statement due to statement timeout', '57014')],
+        ['deadlock detected', pg('deadlock detected', '40P01')],
+        ['ThrottlingException: Rate exceeded'],
+        ['RequestLimitExceeded: Request limit exceeded.'],
+      ]
+      for (const [msg, err] of retryable) expect(isTerminalError(msg, err), msg).toBe(false)
+    })
+
     it('gives up once the attempt cap is reached even for a transient error', async () => {
       vi.spyOn(provider, 'ensureBucket').mockRejectedValue(new Error('ETIMEDOUT'))
       const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')

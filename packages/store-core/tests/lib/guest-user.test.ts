@@ -10,7 +10,17 @@ vi.mock('@/lib/shared/db', () => ({
 }))
 
 // ── Import under test ─────────────────────────────────────────────────────────
-import { getOrCreateGuestUser, mergeGuestToUser, getUserIdForSession } from '@/lib/shared/guest-user'
+let mockCookie: string | undefined
+const mockCookieSet = vi.fn()
+
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: () => (mockCookie ? { value: mockCookie } : undefined),
+    set: (...args: unknown[]) => mockCookieSet(...args),
+  }),
+}))
+
+import { getOrCreateGuestUser, mergeGuestToUser, existingCartOwner, cartOwner } from '@/lib/shared/guest-user'
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -104,65 +114,65 @@ describe('mergeGuestToUser', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('getUserIdForSession', () => {
-  describe('authenticated user', () => {
-    it('returns authUserId directly without hitting db', async () => {
-      const id = await getUserIdForSession('any-session', 'auth-user-uuid')
-      expect(id).toBe('auth-user-uuid')
-      expect(mockQueryOne).not.toHaveBeenCalled()
-    })
-
-    it('returns authUserId even when sessionId is undefined', async () => {
-      const id = await getUserIdForSession(undefined, 'auth-user-uuid')
-      expect(id).toBe('auth-user-uuid')
-    })
+describe('existingCartOwner', () => {
+  it('returns the signed-in user without touching the db', async () => {
+    expect(await existingCartOwner('auth-user-uuid')).toBe('auth-user-uuid')
+    expect(mockQueryOne).not.toHaveBeenCalled()
   })
 
-  describe('guest user with existing session', () => {
-    it('returns existing guest ID for the session', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'existing-guest' })
-
-      const id = await getUserIdForSession('sess_known', undefined)
-      expect(id).toBe('existing-guest')
-    })
-
-    it('passes the session ID to getOrCreateGuestUser', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'g-uuid' })
-
-      await getUserIdForSession('my-session-id', undefined)
-
-      const [, params] = mockQueryOne.mock.calls[0]
-      expect(params).toContain('my-session-id')
-    })
+  it("returns the session's guest", async () => {
+    mockCookie = 'sess_known'
+    mockQueryOne.mockResolvedValueOnce({ id: 'existing-guest' })
+    expect(await existingCartOwner(undefined)).toBe('existing-guest')
+    expect(mockQueryOne.mock.calls[0][1]).toEqual(['sess_known'])
   })
 
-  describe('guest user without session', () => {
-    it('auto-generates a session ID and creates a guest when sessionId is undefined', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce(null) // no existing
-        .mockResolvedValueOnce({ id: 'fresh-guest' }) // insert
-
-      const id = await getUserIdForSession(undefined, undefined)
-      expect(id).toBe('fresh-guest')
-
-      // The generated session_id should start with "guest_"
-      const [, params] = mockQueryOne.mock.calls[0]
-      expect(params[0]).toMatch(/^guest_\d+_/)
-    })
-
-    it('creates a new guest when session not found', async () => {
-      mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'new-guest-123' })
-
-      const id = await getUserIdForSession('new-session', undefined)
-      expect(id).toBe('new-guest-123')
-    })
+  it('never creates a guest: a session without one reads as empty', async () => {
+    mockCookie = 'sess_new'
+    mockQueryOne.mockResolvedValueOnce(null)
+    expect(await existingCartOwner(undefined)).toBeNull()
+    expect(mockQueryOne).toHaveBeenCalledOnce()
   })
 
-  describe('error handling', () => {
-    it('propagates db error from getOrCreateGuestUser', async () => {
-      mockQueryOne.mockRejectedValueOnce(new Error('connection error'))
+  it('gives a visitor without a session a cookie, and no row', async () => {
+    mockCookie = undefined
+    expect(await existingCartOwner(undefined)).toBeNull()
+    expect(mockCookieSet).toHaveBeenCalledWith('session_id', expect.stringMatching(/^guest_\d+_/), expect.any(Object))
+    expect(mockQueryOne).not.toHaveBeenCalled()
+  })
+})
 
-      await expect(getUserIdForSession('sess', undefined)).rejects.toThrow('connection error')
-    })
+describe('cartOwner', () => {
+  it('makes the guest under the session cookie on the first save', async () => {
+    mockCookie = 'sess_new'
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'fresh-guest' })
+    expect(await cartOwner(undefined)).toBe('fresh-guest')
+    expect(mockQueryOne.mock.calls[1][1]).toContain('sess_new')
+    expect(mockCookieSet).not.toHaveBeenCalled()
+  })
+
+  it("takes the row a parallel request just made instead of failing", async () => {
+    mockCookie = 'sess_race'
+    mockQueryOne
+      .mockResolvedValueOnce(null) // not there yet
+      .mockResolvedValueOnce(null) // the other request's insert won
+      .mockResolvedValueOnce({ id: 'winner' })
+    expect(await cartOwner(undefined)).toBe('winner')
+    expect(mockQueryOne.mock.calls[1][0]).toContain('ON CONFLICT DO NOTHING')
+  })
+
+  it('starts a new session when the cookie belongs to a guest who has signed in since', async () => {
+    mockCookie = 'sess_merged'
+    mockQueryOne
+      .mockResolvedValueOnce(null) // no unmerged guest
+      .mockResolvedValueOnce(null) // the merged guest holds the session
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null) // the new session has no guest yet
+      .mockResolvedValueOnce({ id: 'new-session-guest' })
+    expect(await cartOwner(undefined)).toBe('new-session-guest')
+    const [name, value] = mockCookieSet.mock.calls[0]
+    expect(name).toBe('session_id')
+    expect(value).toMatch(/^guest_/)
+    expect(value).not.toBe('sess_merged')
   })
 })

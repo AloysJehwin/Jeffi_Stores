@@ -15,7 +15,7 @@ export default function AddStoreClient({
     return (
       <Card title="Store under review">
         <p className="text-sm text-foreground-secondary">
-          We are reviewing your store application (usually same day). We email you when it is approved and ready for payment.{' '}
+          We are reviewing your store application (usually 1–2 business days). We email you when it is approved and ready for payment.{' '}
           Messaging and documents keep working meanwhile.
         </p>
       </Card>
@@ -52,7 +52,7 @@ export default function AddStoreClient({
     <Card title="Set up your store">
       <ol className="list-decimal ml-5 text-sm text-foreground-secondary space-y-1">
         <li>Choose a plan, and give us your store, business, GST, warehouse, bank and branding details — what we already have is filled in.</li>
-        <li>We review your application (usually same day).</li>
+        <li>We review your application (usually 1–2 business days).</li>
         <li>Pay the first subscription charge; provisioning takes a few minutes.</li>
         <li>Your store goes live on <strong>this workspace</strong> — same wallet, same keys.</li>
       </ol>

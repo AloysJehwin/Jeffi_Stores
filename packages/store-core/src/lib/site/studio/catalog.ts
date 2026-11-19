@@ -4,8 +4,8 @@ import { askJson, listOf, orNull, pick, rng, shuffle, str, studioBudgetLeft } fr
 import type { StudioBrief } from './types'
 
 // The sample catalogue the studio previews the site with: categories, 12-24 believable products in INR with
-// attributes, brands, a few reviews and offers. It never reaches the store: after provisioning the site reads the
-// store's real catalogue. Pictures are optional (generateImage within the budget); without them the Image component
+// attributes, brands, a few reviews and offers. Provisioning seeds it into the new store (provisioning/seed.ts), so the
+// owner starts from it. Each product gets a photo (addPictures, within the budget); without one the Image component
 // draws a placeholder.
 
 type Product = SampleCatalog['products'][number]
@@ -15,10 +15,12 @@ const MAX_PRODUCTS = 24
 const PRICE: Record<StudioBrief['priceTier'], [number, number]> = { value: [149, 1499], mid: [499, 4999], premium: [1499, 14999], luxury: [7999, 89999] }
 const NAMES = ['Ananya S.', 'Rohit K.', 'Meera P.', 'Arjun N.', 'Kavya R.', 'Farhan A.', 'Lakshmi V.', 'Ishaan M.', 'Priya D.', 'Sandeep G.']
 
+// 'Home Décor' → 'home-decor': NFKD splits off the accent, which is then dropped (not turned into a hyphen).
 export const slugify = (s: string) =>
   s
     .toLowerCase()
     .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60) || 'item'
@@ -142,32 +144,45 @@ Return JSON {"tagline": short, "about": two sentences, "categories": [4-6 {"name
   return catalog
 }
 
-/** Up to `max` product pictures in the brief's art direction, while the budget lasts; returns how many were made. */
-/** Product photos for the sample catalogue (at most `max`); stops at the first failure and says why. */
+/** Photos made at once: one product after another would take minutes for a full catalogue. */
+const PICTURE_WORKERS = 4
+
+/**
+ * A photo, in the brief's art direction, for each sample product without one (at most `max` made), while the budget
+ * lasts. After the first failure no new photo starts, and it says why; returns how many were made.
+ */
 export async function addPictures(catalog: SampleCatalog, b: StudioBrief, max: number): Promise<{ made: number; error?: string }> {
+  const todo = catalog.products.filter(p => !p.images?.length && p.imagePrompt)
   let made = 0
-  for (const p of catalog.products) {
-    if (made >= max || studioBudgetLeft() <= 0) break
-    if (p.images?.length || !p.imagePrompt) continue
-    try {
-      const r = await generateImage({
-        prompt: `${p.imagePrompt}. Product photograph for an online store. ${b.artDirection}. No text, no logos, no watermarks.`,
-        negativePrompt: 'text, letters, watermark, logo, distorted hands',
-        width: 1024,
-        height: 1024,
-        feature: 'homepage_image',
-        // Site generation always uses the cheapest image model.
-        quality: 'draft',
-        ref: 'site-studio:sample',
-        skipGallery: true,
-      })
-      if (r.images[0]?.url) {
-        p.images = [r.images[0].url]
-        made++
+  let running = 0
+  let error: string | undefined
+  const worker = async () => {
+    while (todo.length && !error && made + running < max && studioBudgetLeft() > 0) {
+      const p = todo.shift()!
+      running++
+      try {
+        const r = await generateImage({
+          prompt: `${p.imagePrompt}. Product photograph for an online store. ${b.artDirection}. No text, no logos, no watermarks.`,
+          negativePrompt: 'text, letters, watermark, logo, distorted hands',
+          width: 1024,
+          height: 1024,
+          feature: 'homepage_image',
+          // Site generation always uses the cheapest image model.
+          quality: 'draft',
+          ref: 'site-studio:sample',
+          skipGallery: true,
+        })
+        if (r.images[0]?.url) {
+          p.images = [r.images[0].url]
+          made++
+        }
+      } catch (err) {
+        error ??= (err as Error)?.message?.slice(0, 400) || 'image generation failed'
+      } finally {
+        running--
       }
-    } catch (err) {
-      return { made, error: (err as Error)?.message?.slice(0, 400) || 'image generation failed' }
     }
   }
-  return { made }
+  await Promise.all(Array.from({ length: Math.min(PICTURE_WORKERS, todo.length) }, worker))
+  return error ? { made, error } : { made }
 }

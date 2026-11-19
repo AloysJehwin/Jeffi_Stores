@@ -5,6 +5,7 @@ import { PayoutsTable } from '../_components/finance'
 import PayoutsClient, { type BankState } from './PayoutsClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Payouts' }
 
 export default async function PayoutsPage() {
   const { owner, tenant } = await loadOwnerContext()

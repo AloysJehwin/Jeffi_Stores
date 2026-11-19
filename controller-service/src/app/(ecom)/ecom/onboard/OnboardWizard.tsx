@@ -22,6 +22,7 @@ import { initialStoreDetails, storeDetailsPayload, storeDetailsProblem, type Sto
 import { DOCS, complianceProblem, compliancePlan, planQuestions, requiredDocs, type ComplianceState } from '@controller/lib/catalog/compliance'
 import { contactProblem, EMPTY_CONTACT, type DomainContact } from '../_domains/types'
 import { defaultContact } from '@controller/lib/domains/contact'
+import { GSTIN_MESSAGE, PAN_MESSAGE, isGstin, isPan, taxIdInput } from '@controller/lib/catalog/tax-ids'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -65,6 +66,17 @@ const lbl = fieldLabel
 
 // Same shape check as the bank endpoint (lib/payments/bank-verify.ts).
 const UPI_ID_RE = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/
+const IN_MOBILE = /^\+91[6-9]\d{9}$/
+const errText = 'mt-1 text-xs text-[#8a2e1f]'
+
+// The Review step shows these partly hidden: AB•••••34F, ••••6741, 94••••99@ybl.
+const maskPan = (p: string) => (p.length > 5 ? `${p.slice(0, 2)}${'•'.repeat(p.length - 5)}${p.slice(-3)}` : '•'.repeat(p.length))
+const maskAccount = (a: string) => `••••${String(a).slice(-4)}`
+function maskUpi(id: string) {
+  const at = id.lastIndexOf('@')
+  const name = at > 0 ? id.slice(0, at) : id
+  return `${name.length > 4 ? `${name.slice(0, 2)}••••${name.slice(-2)}` : `${name.slice(0, 1)}•••`}${at > 0 ? id.slice(at) : ''}`
+}
 
 /** What a deprovision kept for this owner (GET /api/ecom/onboard/restore-available). */
 interface RestoreArchive {
@@ -86,6 +98,9 @@ function slugify(s: string) {
   return s
     .toLowerCase()
     .trim()
+    // 'Café' → 'cafe': NFKD splits off the accent, which is then dropped.
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 63)
@@ -157,11 +172,16 @@ export default function OnboardWizard({
   // Business
   const [bizName, setBizName] = useState(init.bizName ?? '')
   const [bizType, setBizType] = useState(init.bizType ?? '')
-  const [pan, setPan] = useState(init.pan ?? '')
+  const [pan, setPan] = useState<string>(init.pan ?? '')
   const [bizAddress, setBizAddress] = useState(init.bizAddress ?? '')
+  // The PAN and GSTIN messages wait until the field is left or full, not while it is typed.
+  const [panLeft, setPanLeft] = useState(false)
+  const panError = !!pan && !isPan(pan) && (panLeft || pan.length >= 10)
 
   // GST: the number here; the certificate is uploaded with the licences in the Store step.
-  const [gstNumber, setGstNumber] = useState(init.gstNumber ?? '')
+  const [gstNumber, setGstNumber] = useState<string>(init.gstNumber ?? '')
+  const [gstLeft, setGstLeft] = useState(false)
+  const gstError = !!gstNumber && !isGstin(gstNumber) && (gstLeft || gstNumber.length >= 15)
   const [gstS3Key, setGstS3Key] = useState(init.gstS3Key ?? '')
   const [gstFilename, setGstFilename] = useState(init.gstFilename ?? '')
   const onGst = useCallback((s3Key: string, fileName: string) => {
@@ -175,9 +195,8 @@ export default function OnboardWizard({
   // The Delhivery token is a secret like the Razorpay key secret: it lives only in local state and is
   // sent once to submit(), never round-tripped through the cleartext autosave `data` blob.
   const [delhiveryToken, setDelhiveryToken] = useState('')
-  const [wh, setWh] = useState(
-    init.wh ?? { originPincode: '', pickupLocation: '', sellerName: '', sellerAddress: '', sellerPhone: '' }
-  )
+  // A draft saved before a field existed lacks it: the defaults fill it in.
+  const [wh, setWh] = useState({ originPincode: '', pickupLocation: '', sellerName: '', sellerAddress: '', sellerPhone: '', ...init.wh })
   const [pinCheck, setPinCheck] = useState<{ state: 'idle' | 'checking' | 'ok' | 'warn' | 'bad'; msg: string }>({
     state: 'idle',
     msg: '',
@@ -550,6 +569,14 @@ export default function OnboardWizard({
     } as DomainContact)
   }, [step, domainPick, domainContact.email, ownerFullName, owner.email, mobile, bizName, bizType, bizAddress, wh])
 
+  // The phone is typed once (Store step): an empty seller phone and owner's mobile start from it on entering their step.
+  const storeMobile = IN_MOBILE.test(details.contact.phone) ? details.contact.phone : ''
+  const sellerMobile = IN_MOBILE.test(wh.sellerPhone ?? '') ? (wh.sellerPhone as string) : ''
+  useEffect(() => {
+    if (key === 'warehouse' && storeMobile) setWh((w: typeof wh) => (w.sellerPhone ? w : { ...w, sellerPhone: storeMobile }))
+    if (key === 'branding' && (storeMobile || sellerMobile)) setMobile((m: string) => m || storeMobile || sellerMobile)
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps -- on entering a step only: a cleared field stays clear
+
   // ── Can proceed? ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const pin = wh.originPincode.replace(/\D/g, '')
@@ -598,12 +625,12 @@ export default function OnboardWizard({
       case 'site':
         return siteSkip || studio.ready || studio.description.trim().length >= 10
       case 'business':
-        return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
+        return bizName.trim().length > 0 && !!bizType && isPan(pan) && bizAddress.trim().length > 5
       // Optional: registration is not required below the turnover threshold, and Razorpay does
       // not need a GSTIN to create a linked account. Forcing it made the one tenant who had none
       // paste the platform's own GSTIN to get past this step.
       case 'gst':
-        return gstNumber.trim().length === 0 || gstNumber.trim().length === 15
+        return gstNumber.length === 0 || isGstin(gstNumber)
       case 'warehouse':
         return (
           /^\d{6}$/.test(wh.originPincode.replace(/\D/g, '')) &&
@@ -788,31 +815,40 @@ export default function OnboardWizard({
               <div className="space-y-5">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
-                  <label className={lbl}>Legal business name</label>
+                  <label htmlFor="biz-name" className={lbl}>Legal business name</label>
                   <input
+                    id="biz-name"
                     className={inp}
                     value={bizName}
                     onChange={e => setBizName(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className={lbl}>PAN number</label>
+                  <label htmlFor="biz-pan" className={lbl}>PAN number</label>
                   <input
+                    id="biz-pan"
                     className={inp}
                     value={pan}
-                    onChange={e => setPan(e.target.value.toUpperCase())}
-                    maxLength={10}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={panError}
+                    aria-describedby={panError ? 'biz-pan-error' : undefined}
+                    onChange={e => setPan(taxIdInput(e.target.value, 10))}
+                    onBlur={() => setPanLeft(true)}
                   />
+                  {panError && <p id="biz-pan-error" className={errText}>{PAN_MESSAGE}</p>}
                 </div>
                 </div>
                 <div>
-                  <label className={lbl}>Business type</label>
+                  <span className={lbl}>Business type</span>
                   <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
                     options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
                 </div>
                 <div>
-                  <label className={lbl}>Business address</label>
+                  <label htmlFor="biz-address" className={lbl}>Business address</label>
                   <textarea
+                    id="biz-address"
                     className={`${inp} h-24 resize-none`}
                     value={bizAddress}
                     onChange={e => setBizAddress(e.target.value)}
@@ -828,19 +864,29 @@ export default function OnboardWizard({
               <div className="space-y-5">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
-                  <label className={lbl}>
+                  <label htmlFor="gst-number" className={lbl}>
                     GSTIN <span className="text-foreground-muted font-normal">(optional)</span>
                   </label>
                   <input
+                    id="gst-number"
                     className={inp}
                     value={gstNumber}
-                    onChange={e => setGstNumber(e.target.value.toUpperCase())}
-                    maxLength={15}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={gstError}
+                    aria-describedby="gst-number-hint"
+                    onChange={e => setGstNumber(taxIdInput(e.target.value, 15))}
+                    onBlur={() => setGstLeft(true)}
                   />
-                  <p className="text-xs text-foreground-muted mt-1">
-                    15-character GST Identification Number. Leave blank if you are not registered — never enter another
-                    business&apos;s number.
-                  </p>
+                  {gstError ? (
+                    <p id="gst-number-hint" className={errText}>{GSTIN_MESSAGE}</p>
+                  ) : (
+                    <p id="gst-number-hint" className="text-xs text-foreground-muted mt-1">
+                      15-character GST Identification Number. Leave blank if you are not registered — never enter another
+                      business&apos;s number.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <span className={lbl}>GST registration certificate</span>
@@ -877,8 +923,9 @@ export default function OnboardWizard({
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                   <div>
-                    <label className={lbl}>Origin pincode</label>
+                    <label htmlFor="wh-pincode" className={lbl}>Origin pincode</label>
                     <input
+                      id="wh-pincode"
                       className={inp}
                       maxLength={6}
                       value={wh.originPincode}
@@ -899,29 +946,32 @@ export default function OnboardWizard({
                     )}
                   </div>
                   <div>
-                    <label className={lbl}>Pickup location name</label>
+                    <label htmlFor="wh-pickup" className={lbl}>Pickup location name</label>
                     <input
+                      id="wh-pickup"
                       className={inp}
                       value={wh.pickupLocation}
                       onChange={e => setWh({ ...wh, pickupLocation: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Seller / warehouse name</label>
+                    <label htmlFor="wh-seller-name" className={lbl}>Seller / warehouse name</label>
                     <input
+                      id="wh-seller-name"
                       className={inp}
                       value={wh.sellerName}
                       onChange={e => setWh({ ...wh, sellerName: e.target.value })}
                     />
                   </div>
                   <div className="xl:col-span-2">
-                    <label className={lbl}>Seller phone</label>
-                    <PhoneInput countries={['IN']} value={wh.sellerPhone} onChange={v => setWh({ ...wh, sellerPhone: v })} inputClassName={`${inp} min-w-0 flex-1`} />
+                    <label htmlFor="wh-seller-phone" className={lbl}>Seller phone</label>
+                    <PhoneInput id="wh-seller-phone" countries={['IN']} value={wh.sellerPhone} onChange={v => setWh({ ...wh, sellerPhone: v })} inputClassName={`${inp} min-w-0 flex-1`} />
                   </div>
                 </div>
                 <div>
-                  <label className={lbl}>Warehouse address</label>
+                  <label htmlFor="wh-address" className={lbl}>Warehouse address</label>
                   <textarea
+                    id="wh-address"
                     className={`${inp} h-24 resize-none`}
                     value={wh.sellerAddress}
                     onChange={e => setWh({ ...wh, sellerAddress: e.target.value })}
@@ -961,8 +1011,9 @@ export default function OnboardWizard({
                       shown again.
                     </p>
                     <div>
-                      <label className={lbl}>Delhivery API token</label>
+                      <label htmlFor="wh-delhivery-token" className={lbl}>Delhivery API token</label>
                       <input
+                        id="wh-delhivery-token"
                         className={inp}
                         type="password"
                         autoComplete="off"
@@ -1010,8 +1061,9 @@ export default function OnboardWizard({
                 <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                   <div className="col-span-full sm:col-span-2">
-                    <label className={lbl}>Account holder name</label>
+                    <label htmlFor="bank-holder" className={lbl}>Account holder name</label>
                     <input
+                      id="bank-holder"
                       className={inp}
                       value={bank.holderName}
                       disabled={bankVerified}
@@ -1023,8 +1075,9 @@ export default function OnboardWizard({
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Account number</label>
+                    <label htmlFor="bank-account" className={lbl}>Account number</label>
                     <input
+                      id="bank-account"
                       className={inp}
                       value={bank.accountNumber}
                       disabled={bankVerified}
@@ -1036,8 +1089,9 @@ export default function OnboardWizard({
                     />
                   </div>
                   <div>
-                    <label className={lbl}>IFSC code</label>
+                    <label htmlFor="bank-ifsc" className={lbl}>IFSC code</label>
                     <input
+                      id="bank-ifsc"
                       className={inp}
                       value={bank.ifsc}
                       disabled={bankVerified}
@@ -1049,10 +1103,11 @@ export default function OnboardWizard({
                     />
                   </div>
                   <div className="col-span-full sm:col-span-2">
-                    <label className={lbl}>
+                    <label htmlFor="bank-upi" className={lbl}>
                       UPI ID <span className="text-foreground-muted font-normal">(optional)</span>
                     </label>
                     <input
+                      id="bank-upi"
                       className={inp}
                       value={bank.upiId}
                       disabled={bankVerified}
@@ -1130,16 +1185,18 @@ export default function OnboardWizard({
                       shown again.
                     </p>
                     <div>
-                      <label className={lbl}>Razorpay Key ID</label>
+                      <label htmlFor="rzp-key-id" className={lbl}>Razorpay Key ID</label>
                       <input
+                        id="rzp-key-id"
                         className={inp}
                         value={rzpKeyId}
                         onChange={e => setRzpKeyId(e.target.value.trim())}
                       />
                     </div>
                     <div>
-                      <label className={lbl}>Razorpay Key Secret</label>
+                      <label htmlFor="rzp-key-secret" className={lbl}>Razorpay Key Secret</label>
                       <input
+                        id="rzp-key-secret"
                         className={inp}
                         type="password"
                         autoComplete="off"
@@ -1148,10 +1205,11 @@ export default function OnboardWizard({
                       />
                     </div>
                     <div>
-                      <label className={lbl}>
+                      <label htmlFor="rzp-webhook-secret" className={lbl}>
                         Webhook Secret <span className="text-foreground-muted font-normal">(optional)</span>
                       </label>
                       <input
+                        id="rzp-webhook-secret"
                         className={inp}
                         type="password"
                         autoComplete="off"
@@ -1171,8 +1229,9 @@ export default function OnboardWizard({
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
               <div className="mb-6">
-                <label className={lbl}>Your full name</label>
+                <label htmlFor="owner-name" className={lbl}>Your full name</label>
                 <input
+                  id="owner-name"
                   className={inp}
                   autoComplete="name"
                   maxLength={200}
@@ -1185,16 +1244,16 @@ export default function OnboardWizard({
               </div>
 
               <div className="mb-6">
-                <label className={lbl}>Mobile number</label>
-                <PhoneInput countries={['IN']} value={mobile} onChange={setMobile} inputClassName={`${inp} min-w-0 flex-1`} />
+                <label htmlFor="owner-mobile" className={lbl}>Mobile number</label>
+                <PhoneInput id="owner-mobile" countries={['IN']} value={mobile} onChange={setMobile} inputClassName={`${inp} min-w-0 flex-1`} />
                 <p className="text-xs text-foreground-muted mt-1">Used for account + payout notifications.</p>
               </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className={lbl}>Store seal (optional)</label>
-                  <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface p-4 cursor-pointer hover:border-accent-500 transition-colors min-h-[112px]">
+                  <span className={lbl}>Store seal (optional)</span>
+                  <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface p-4 cursor-pointer hover:border-accent-500 focus-within:border-accent-500 transition-colors min-h-[112px]">
                     {sealUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={sealUrl} alt="Store seal" className="max-h-16 object-contain" />
@@ -1204,7 +1263,8 @@ export default function OnboardWizard({
                     <input
                       type="file"
                       accept=".png,.jpg,.jpeg,.webp"
-                      className="hidden"
+                      className="sr-only"
+                      aria-label="Upload your store seal"
                       onChange={e => {
                         const f = e.target.files?.[0]
                         if (f) uploadSeal(f)
@@ -1314,10 +1374,10 @@ export default function OnboardWizard({
                     [gstS3Key ? 'GST certificate' : '', ...licences.map(l => DOCS[l.doc]?.name ?? l.doc)].filter(Boolean).join(', ') || 'None needed',
                   ],
                   ['Business', `${bizName} · ${bizType}`],
-                  ['PAN', pan],
+                  ['PAN', pan ? maskPan(pan) : '—'],
                   ['GSTIN', gstNumber || 'Not registered'],
-                  ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not added'],
-                  ['UPI ID', bankVerified && bank.upiId ? bank.upiId : '—'],
+                  ['Bank', bankVerified ? `${bank.holderName} · ${maskAccount(bank.accountNumber)}` : 'Not added'],
+                  ['UPI ID', bankVerified && bank.upiId ? maskUpi(bank.upiId) : '—'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
                   ['Delhivery', ownDelhivery ? 'Own account' : 'Managed by Jeffi'],
                   ['Payments', ownRazorpay ? 'Own Razorpay' : 'Routed via Jeffi'],

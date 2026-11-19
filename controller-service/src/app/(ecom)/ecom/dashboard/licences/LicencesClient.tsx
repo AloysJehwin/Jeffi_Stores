@@ -6,7 +6,7 @@ import { ExternalLink } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { ChoiceChips } from '../../_ui'
 import { Badge, fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../../onboard/ui'
-import { FileField, uploadKyc } from '../../onboard/CompliancePanel'
+import { ExpiryField, FileField, uploadKyc } from '../../onboard/CompliancePanel'
 import { Card } from '../_components/Card'
 import {
   DOCS,
@@ -106,14 +106,7 @@ function DocForm({ docType, today, number, onSave, onCancel }: { docType: string
             />
           </div>
         )}
-        {doc.expires && (
-          <div>
-            <label htmlFor={`${id}-expiry`} className={fieldLabel}>
-              Valid until
-            </label>
-            <input id={`${id}-expiry`} type="date" className={fieldInput} min={today} value={u.expiresOn ?? ''} onChange={e => setU(v => ({ ...v, expiresOn: e.target.value }))} />
-          </div>
-        )}
+        {doc.expires && <ExpiryField today={today} value={u.expiresOn ?? ''} onChange={expiresOn => setU(v => ({ ...v, expiresOn }))} />}
       </div>
       {(err || (u.s3Key && problem)) && <p className={errCls}>{err ?? problem}</p>}
       <div className="flex flex-wrap items-center gap-2">

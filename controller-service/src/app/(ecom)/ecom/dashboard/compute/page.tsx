@@ -11,6 +11,7 @@ import { Card } from '../_components/Card'
 import ComputeClient from './ComputeClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Plan & servers' }
 
 export default async function ComputePage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams

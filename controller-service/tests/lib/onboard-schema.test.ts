@@ -59,10 +59,33 @@ describe('OnboardSchema — pincode gate', () => {
   })
 })
 
+describe('OnboardSchema — PAN', () => {
+  it('REJECTS a 10-character PAN in the wrong shape', () => {
+    // The dummy a live onboarding got through with when only the length was checked.
+    const r = OnboardSchema.safeParse({ ...base, pan: 'F6TRYCYT56' })
+    expect(r.success).toBe(false)
+    expect(r.error!.issues[0].path).toEqual(['pan'])
+    expect(OnboardSchema.safeParse({ ...base, pan: 'ABCDE12345' }).success).toBe(false)
+    expect(OnboardSchema.safeParse({ ...base, pan: 'ABCD01234F' }).success).toBe(false)
+  })
+
+  it('accepts a PAN typed in lower case or with spaces round it, stored in capitals', () => {
+    const r = OnboardSchema.safeParse({ ...base, pan: ' abcde1234f ' })
+    expect(r.success).toBe(true)
+    expect(r.data!.pan).toBe('ABCDE1234F')
+  })
+})
+
 describe('OnboardSchema — GSTIN and licences', () => {
   it('accepts a blank GSTIN, as the wizard allows, but not a partial one', () => {
     expect(OnboardSchema.safeParse({ ...base, gstNumber: '' }).success).toBe(true)
     expect(OnboardSchema.safeParse({ ...base, gstNumber: '29ABCDE' }).success).toBe(false)
+  })
+
+  it('REJECTS a 15-character GSTIN in the wrong shape', () => {
+    expect(OnboardSchema.safeParse({ ...base, gstNumber: '99ABCDE1234F1Z5' }).success).toBe(false)
+    expect(OnboardSchema.safeParse({ ...base, gstNumber: 'ABCDEFGHIJKLMNO' }).success).toBe(false)
+    expect(OnboardSchema.safeParse({ ...base, gstNumber: '29abcde1234f1z5' }).data?.gstNumber).toBe('29ABCDE1234F1Z5')
   })
 
   it('requires the licences a category needs, complete and in date', () => {

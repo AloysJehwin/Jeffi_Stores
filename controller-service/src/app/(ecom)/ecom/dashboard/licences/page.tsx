@@ -8,6 +8,7 @@ import { Badge } from '../../onboard/ui'
 import LicencesClient from './LicencesClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Licences' }
 
 const DESCRIPTION = 'What Indian law asks of the products you sell. We review each licence and email you before one expires.'
 

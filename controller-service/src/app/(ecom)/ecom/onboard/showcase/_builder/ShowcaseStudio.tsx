@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Check, CloudOff, Loader2, RotateCcw, Sparkles, Wallet } from 'lucide-react'
 import { Card } from '../../../dashboard/_components/Card'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { noteCls, primaryBtn, secondaryBtn } from '../../ui'
 import { isAiDown, studioGet, studioPost, type StudioError, type StudioView } from '../../_studio/api'
 import BriefStep, { type BriefCopy } from '../../_studio/BriefStep'
@@ -58,6 +59,7 @@ export default function ShowcaseStudio({
   onView?: (v: StudioView) => void
 }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [view, setView] = useState<StudioView | null>(null)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('intro')
@@ -140,10 +142,16 @@ export default function ShowcaseStudio({
   }
 
   const startOver = async () => {
-    const msg = paid || view?.allowance.free === 'used'
-      ? `Start over? Your answers, sections and look are cleared, and so is the page in the studio (your live site stays as it is until you publish again). Designing a new page costs ${paid ? priceText(paid) : 'a redesign from your wallet'}.`
-      : 'Start over? Your answers, sections and look are cleared.'
-    if (!window.confirm(msg)) return
+    const ok = await confirm({
+      title: 'Start over?',
+      message:
+        paid || view?.allowance.free === 'used'
+          ? `Your answers, sections and look are cleared, and so is the page in the studio (your live site stays as it is until you publish again). Designing a new page costs ${paid ? priceText(paid) : 'a redesign from your wallet'}.`
+          : 'Your answers, sections and look are cleared.',
+      confirmLabel: 'Start over',
+      variant: 'danger',
+    })
+    if (!ok) return
     await call('restart', 'start', { restart: true }, () => go('brief'))
   }
 
@@ -178,8 +186,9 @@ export default function ShowcaseStudio({
             disabled={!s.direction}
             className={primaryBtn}
             title={s.direction ? undefined : 'Pick a look first'}
-            onClick={() => {
-              if (!window.confirm(`Design your page in this look for ${priceText(paid)}? If the page can’t be made, you aren’t charged.`)) return
+            onClick={async () => {
+              const ok = await confirm({ title: 'Design your page in this look?', message: `It costs ${priceText(paid)}. If the page can’t be made, you aren’t charged.`, confirmLabel: `Design my page · ₹${paid.priceInr}` })
+              if (!ok) return
               setWalletLow(null)
               setPaidStart(true)
               go('build')

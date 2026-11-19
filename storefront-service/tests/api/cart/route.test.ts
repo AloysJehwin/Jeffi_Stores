@@ -33,7 +33,8 @@ vi.mock('@/lib/shared/activity', () => ({
 }))
 
 vi.mock('@/lib/shared/guest-user', () => ({
-  getUserIdForSession: vi.fn().mockResolvedValue('guest-user-uuid'),
+  cartOwner: vi.fn().mockResolvedValue('guest-user-uuid'),
+  existingCartOwner: vi.fn().mockResolvedValue('guest-user-uuid'),
 }))
 
 // ---------------------------------------------------------------------------

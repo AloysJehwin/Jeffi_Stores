@@ -19,6 +19,8 @@ export interface Env {
   sectionId: string
   lcp: { on: boolean }
   budget: { n: number }
+  /** Numbers the async parts' fragments (renderCmp). */
+  seq: { n: number }
   depth: number
   /** Data components known to have nothing to show (CodeSection counts them first). */
   empty: Set<unknown>
@@ -55,6 +57,7 @@ export function makeEnv(opts: {
     sectionId: opts.sectionId,
     lcp: { on: !!opts.priority },
     budget: { n: BUDGET },
+    seq: { n: 0 },
     depth: 0,
     empty: opts.empty ?? new Set(),
     taxonomy: opts.taxonomy ?? null,
@@ -376,7 +379,14 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
       r => r,
       err => (console.error('[code-section]', def.name, err), null)
     )
-    return <Resolve key={key} promise={safe} />
+    // In a keyed fragment, which the payload keeps: a part's chunk can reach the browser after hydration has started,
+    // and React (19.2 canary) replays an element that suspends on it without rewinding its hydration cursor, so it
+    // claims its own first child and hydration fails. The fragment is what suspends and replays instead.
+    return (
+      <Fragment key={key ?? `async-${env.seq.n++}`}>
+        <Resolve promise={safe} />
+      </Fragment>
+    )
   }
   return key != null ? <Fragment key={key}>{out}</Fragment> : out
 }

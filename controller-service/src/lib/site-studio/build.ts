@@ -42,10 +42,12 @@ export function studioCtx(s: StudioSession, plan?: StudioPlan): StudioCtx {
 // Home first, then the header and footer, the main pages and the working pages (shared with Site Builder's redesign).
 export { buildOrder }
 
-/** Sample product photos for the preview, made last from what the free budget has left (0 turns them off). */
-const PICTURES = Math.min(6, Number(process.env.SITE_STUDIO_SAMPLE_PICTURES ?? 6))
+/** A photo for every sample product (the new store is seeded with them), made last from what the free budget has left. */
+const PICTURES = Number(process.env.SITE_STUDIO_SAMPLE_PICTURES ?? Infinity) // a cap; 0 turns them off
 /** Photos are skipped when less than this (₹) is left, so the budget goes to pages first. */
 const PICTURE_RESERVE_INR = 15
+/** A sample product the photo step can still make a photo for. */
+const unpictured = (p: SampleCatalog['products'][number]) => !p.images?.length && !!p.imagePrompt
 
 // A page's finished doc travels in the database, not over the stream.
 const slim = (e: StudioEvent) => (e.type === 'done' ? { type: e.type, page: e.page, skipped: e.skipped } : e)
@@ -118,7 +120,7 @@ export async function runStudioBuild(session: StudioSession, send: SseSend): Pro
       // Kept out of the store's gallery (skipGallery); a failure or a low budget leaves the placeholders.
       if (PICTURES > 0 && done.includes('store:home') && studioBudgetLeft() > PICTURE_RESERVE_INR) {
         const catalog = (await getStudioSessionById(id))?.catalog as SampleCatalog | null
-        if (catalog && !catalog.products.some(x => x.images?.length)) {
+        if (catalog && catalog.products.some(unpictured)) {
           send('status', { message: 'Adding product photos' })
           await updateStudioSession(id, { progress: progress(undefined, 'Adding product photos') })
           pictures = await addPictures(catalog, ctx.brief, PICTURES).catch(err => ({ made: 0, error: errText(err) }))
@@ -146,19 +148,22 @@ export async function runStudioBuild(session: StudioSession, send: SseSend): Pro
   return finishBuild(id, homeOk, homeOk ? undefined : 'The home page could not be designed. Try again: the pages already built are kept.')
 }
 
-/** The product photos again, for a built site whose photo step made none (the image service was down). */
+/**
+ * The product photos again, for a built site whose photo step stopped short (the image service was down, or the
+ * budget ran out): the products still without one.
+ */
 export async function runPictures(session: StudioSession): Promise<{ made: number; error?: string }> {
   const catalog = session.catalog as SampleCatalog | null
-  const had = catalog?.products.filter(x => x.images?.length).length ?? 0
+  const missing = catalog?.products.filter(unpictured).length ?? 0
   const budget = Math.max(PICTURE_RESERVE_INR, freeBudgetLeft(session))
   const r = !catalog?.products.length
     ? { made: 0, error: 'There are no sample products to photograph.' }
-    : had
-      ? { made: had }
+    : !missing
+      ? { made: catalog.products.filter(x => x.images?.length).length }
       : await funded(session.id, budget, () => addPictures(catalog, studioCtx(session).brief, PICTURES)).catch(err => ({ made: 0, error: errText(err) }))
   // Always written: it also releases the route's claim on the step.
   const p = session.progress
-  await updateStudioSession(session.id, { ...(r.made && !had ? { catalog } : {}), ...(p ? { progress: { ...p, pictures: r, at: new Date().toISOString() } } : {}) })
+  await updateStudioSession(session.id, { ...(r.made && missing ? { catalog } : {}), ...(p ? { progress: { ...p, pictures: r, at: new Date().toISOString() } } : {}) })
   return r
 }
 

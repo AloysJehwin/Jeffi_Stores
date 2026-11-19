@@ -917,8 +917,8 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     res.stepErrors = attempts
     await recordStepEvent(job.id, job.step, 'error', msg, resourcesFor(job.step as Step, res))
     const policy = STEP_CATALOG[job.step as Step] as (typeof STEP_CATALOG)[Step] | undefined
-    // Classify: transient errors get retried with backoff; deterministic errors fail now.
-    const terminal = isTerminalError(msg) || attempts >= (policy?.maxAttempts ?? MAX_PROVISION_ATTEMPTS)
+    // Classify: transient errors get retried with backoff; deterministic errors (bad SQL included) fail now.
+    const terminal = isTerminalError(msg, e) || attempts >= (policy?.maxAttempts ?? MAX_PROVISION_ATTEMPTS)
     if (!terminal) {
       // Retryable — keep the job alive (pending) and back off before the next tick.
       const delayMs = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempts - 1))
@@ -972,11 +972,35 @@ const K8S_VERIFY_DEADLINE_MS = 12 * 60 * 1000
 const BACKOFF_BASE_MS = 15_000 // 15s, doubling
 const BACKOFF_CAP_MS = 600_000 // capped at 10 min
 
-/** Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). */
-export function isTerminalError(msg: string): boolean {
-  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env|VcpuLimitExceeded|InstanceLimitExceeded|k8s node launch needs/i.test(
-    msg
+/**
+ * Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). `err`, the thrown error
+ * when there is one, is also checked for a Postgres SQLSTATE.
+ */
+export function isTerminalError(msg: string, err?: unknown): boolean {
+  return (
+    /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env|VcpuLimitExceeded|InstanceLimitExceeded|k8s node launch needs|Unsupported backup archive version|Unsafe identifier in backup/i.test(
+      msg
+    ) ||
+    isDeterministicSqlError(msg) ||
+    isDeterministicSqlError(err)
   )
+}
+
+// Postgres's wording for SQLSTATE class 42 (syntax, undefined objects, privileges), for an error that lost its code.
+// Connection failures, timeouts and a busy or starting server are other classes and stay retryable.
+const SQL_CLASS_42_MSG =
+  /syntax error at (?:or near|end of input)|unterminated .{1,40} at or near|\b(?:relation|table|column|type) "[^"]+"(?: of relation "[^"]+")? does not exist|\b(?:function|procedure) \S+\(.*\) does not exist|\boperator does not exist|permission denied (?:for|to) \w+|must be owner of \w+/i
+
+/**
+ * Bad SQL fails the same way however often it runs: SQLSTATE class 42 (syntax errors, undefined tables, columns or
+ * functions, invalid object definitions, privileges), or Postgres's message for one.
+ */
+export function isDeterministicSqlError(err: unknown): boolean {
+  if (!err) return false
+  if (typeof err === 'string') return SQL_CLASS_42_MSG.test(err)
+  const e = err as { code?: unknown; message?: unknown; cause?: { code?: unknown } }
+  if ([e.code, e.cause?.code].some(c => typeof c === 'string' && /^42[0-9A-Z]{3}$/.test(c))) return true
+  return typeof e.message === 'string' && SQL_CLASS_42_MSG.test(e.message)
 }
 
 function isTransientDnsError(msg: string): boolean {

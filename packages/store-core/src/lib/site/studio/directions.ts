@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { FONT_CHOICES, STYLE_CHOICES, googleFontsHref, normalizeTheme, type ThemeTokens } from '@jeffi/site-blocks'
 import { contrast } from '../critique'
-import { askJson, listOf, orNull, pick, rng, shuffle, str, studioBudgetLeft } from './ai'
+import { askJson, clip, listOf, orNull, pick, rng, shuffle, studioBudgetLeft } from './ai'
 import type { BriefReference, DesignDirection, StudioBrief, StudioTheme, StyleTokens } from './types'
 import { uiStyle, type UiStyle } from './ui-styles'
 
@@ -151,7 +151,7 @@ function fromModel(o: Record<string, unknown>, fallbackFeel: Feel, st: UiStyle |
   const [d, bo] = PAIRS[feel.kind][0]
   const neutral = HEX.test(String(pal.neutral ?? '')) ? String(pal.neutral) : hsl(toHsl(primary)[0], 0.15, 0.12)
   const theme = { ...feel.theme, ...o, primary, accent, neutral, fontDisplay: fontDisplay ?? d, fontBody: fontBody ?? bo } as Partial<StudioTheme>
-  return finish(str(o.name, 40, 'Direction'), theme, feel, str(o.layoutFeel ?? o.layout, 240, feel.text), str(o.rationale ?? o.why, 200, feel.text))
+  return finish(clip(o.name, 40, 'Direction'), theme, feel, clip(o.layoutFeel ?? o.layout, 320, feel.text), clip(o.rationale ?? o.why, 200, feel.text))
 }
 
 /** A reference site's colours as a readable palette, or null when it showed none worth using. */

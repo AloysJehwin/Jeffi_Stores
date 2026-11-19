@@ -155,6 +155,19 @@ export async function activeTenantCount(): Promise<number> {
 
 // Valid tenant slug: 3-63 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen.
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/
+
+/** A subdomain from a business or display name ("Café Lens & Light" → "cafe-lens-light"); '' when none is left. */
+export function slugFromName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '')
+}
+
 export interface CreateTenantInput {
   slug: string
   displayName: string

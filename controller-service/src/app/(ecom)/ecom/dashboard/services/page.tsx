@@ -5,6 +5,7 @@ import PageHeader from '../_components/PageHeader'
 import ServicesClient from './ServicesClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Services' }
 
 export default async function ServicesPage() {
   const { tenant } = await loadOwnerContext()
