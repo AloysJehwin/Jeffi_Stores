@@ -2,6 +2,7 @@
 
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import { Loader2, Upload } from 'lucide-react'
+import DatePicker from '@/components/ui/DatePicker'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { ChoiceChips } from '../_ui'
 import { fieldInput, fieldLabel, noteCls } from './ui'
@@ -78,6 +79,16 @@ export function FileField({ id, label, fileName, onFile, onRemove }: { id: strin
           }}
         />
       </label>
+    </div>
+  )
+}
+
+/** A licence's expiry: from today on. Also the console's Licences & certificates page. */
+export function ExpiryField({ today, value, onChange }: { today: string; value: string; onChange: (ymd: string) => void }) {
+  return (
+    <div>
+      <span className={fieldLabel}>Valid until</span>
+      <DatePicker aria-label="Valid until" className="w-full" triggerClassName={fieldInput} placeholder="Pick a date" min={today} value={value} onChange={onChange} />
     </div>
   )
 }
@@ -160,14 +171,7 @@ function DocCard({ docId, value, onPatch }: { docId: string; value: ComplianceUp
             />
           </div>
         )}
-        {doc.expires && (
-          <div>
-            <label htmlFor={`doc-${docId}-expiry`} className={fieldLabel}>
-              Valid until
-            </label>
-            <input id={`doc-${docId}-expiry`} type="date" className={fieldInput} min={today} value={value?.expiresOn ?? ''} onChange={e => onPatch({ expiresOn: e.target.value })} />
-          </div>
-        )}
+        {doc.expires && <ExpiryField today={today} value={value?.expiresOn ?? ''} onChange={expiresOn => onPatch({ expiresOn })} />}
       </div>
       {(err || problem) && <p className={errCls}>{err ?? problem}</p>}
     </div>

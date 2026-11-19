@@ -5,6 +5,7 @@ import { TransactionsTable } from '../_components/finance'
 import { PageLinks, PAGE_SIZE, pageParam } from '../_components/Pagination'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Transactions' }
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { tenant } = await loadOwnerContext()

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 import { SandTableLoading } from '../_components/Skeleton'
 import { Card } from '../_components/Card'
 import { ChoiceChips, fieldCls } from '../../_ui'
@@ -17,6 +18,7 @@ const LABEL = { messaging: 'Messaging', documents: 'Documents' } as const
 
 // A service still under review is announced by the dashboard layout's banner, on every page.
 export default function ApiKeysClient({ services, docsUrl }: { services: { messaging: boolean; documents: boolean }; docsUrl: string }) {
+  const { showToast } = useToast()
   const [keys, setKeys] = useState<Key[] | null>(null)
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<string[]>(SCOPES.filter(([, , s]) => !s || services[s]).map(([k]) => k))
@@ -31,9 +33,9 @@ export default function ApiKeysClient({ services, docsUrl }: { services: { messa
   async function create() {
     setBusy(true)
     const r = await fetch('/api/ecom/api-keys', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, scopes }) })
-    const d = await r.json()
+    const d = await r.json().catch(() => ({}))
     setBusy(false)
-    if (r.ok) { setCreated(d.key); setName(''); load() } else alert(d.error)
+    if (r.ok) { setCreated(d.key); setName(''); load() } else showToast(d.error || 'Could not create the key. Try again.', 'error')
   }
   async function revoke(id: string) {
     await fetch(`/api/ecom/api-keys/${id}`, { method: 'DELETE' }); load()

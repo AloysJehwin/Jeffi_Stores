@@ -42,8 +42,9 @@ export function studioView(s: StudioSession | null) {
       { sections: (doc.order ?? []).map(id => ({ id, label: String(doc.blocks?.[id]?.props?.label ?? 'Section'), ...(doc.blocks?.[id]?.visibility?.hidden ? { hidden: true } : {}) })) },
     ])
   )
-  const products = ((catalog as { products?: { images?: string[] }[] } | null)?.products ?? [])
-  return { session: { ...rest, pages: outline, hasCatalog: !!catalog, hasPictures: products.some(p => !!p.images?.length) }, allowance: allowanceOf(s) }
+  const products = ((catalog as { products?: { images?: string[]; imagePrompt?: string }[] } | null)?.products ?? [])
+  const missingPictures = products.filter(p => !p.images?.length && p.imagePrompt).length
+  return { session: { ...rest, pages: outline, hasCatalog: !!catalog, hasPictures: products.some(p => !!p.images?.length), missingPictures }, allowance: allowanceOf(s) }
 }
 
 export const fail = (error: string, status = 400, extra?: Record<string, unknown>) => NextResponse.json({ error, ...extra }, { status })

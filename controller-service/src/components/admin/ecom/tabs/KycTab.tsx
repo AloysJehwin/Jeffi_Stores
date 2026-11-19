@@ -10,6 +10,7 @@ import KycActionButtons from './KycActionButtons'
 import ComplianceDocRow from './ComplianceDocRow'
 import { DOCS, GENERAL, complianceStanding, docStanding, todayIst } from '@controller/lib/catalog/compliance'
 import type { ComplianceDocumentRow } from '@controller/lib/catalog/compliance-docs'
+import { isGstin, isPan } from '@controller/lib/catalog/tax-ids'
 
 const BORDER: Record<string, string> = {
   pending: 'border-yellow-500/40',
@@ -39,6 +40,20 @@ function reviewLine(d: ComplianceDocumentRow): string | undefined {
 }
 
 const link = 'text-accent-600 hover:underline text-xs whitespace-nowrap'
+
+/** A stored PAN or GSTIN, flagged when not in its proper shape (older applications let dummies through). */
+function TaxId({ value, ok, shape }: { value: string | null; ok: boolean; shape: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <Mono>{value || '—'}</Mono>
+      {!ok && (
+        <span className={badgeCls('amber')} title={`Expected ${shape}`}>
+          {value ? 'Invalid format' : 'Missing'}
+        </span>
+      )}
+    </span>
+  )
+}
 
 function DocRow({ name, detail, status, href }: { name: string; detail: ReactNode; status?: string; href?: string }) {
   return (
@@ -122,8 +137,11 @@ export default function KycTab({
       <dl className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 min-w-0">
         <Field label="Business name" value={kyc.business_name} />
         <Field label="Business type" value={kyc.business_type} />
-        <Field label="GSTIN" value={kyc.gst_number ? <Mono>{kyc.gst_number}</Mono> : 'Not registered'} />
-        <Field label="PAN" value={<Mono>{kyc.pan}</Mono>} />
+        <Field
+          label="GSTIN"
+          value={kyc.gst_number ? <TaxId value={kyc.gst_number} ok={isGstin(kyc.gst_number)} shape="a 15-character GSTIN like 29ABCDE1234F1Z5" /> : 'Not registered'}
+        />
+        <Field label="PAN" value={<TaxId value={kyc.pan} ok={isPan(kyc.pan)} shape="5 letters, 4 digits and a letter, like ABCDE1234F" />} />
         <Field label="Products" value={kyc.product_categories} />
         {kyc.business_address && <Field wide label="Business address" value={kyc.business_address} />}
       </dl>

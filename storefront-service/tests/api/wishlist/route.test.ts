@@ -34,7 +34,8 @@ vi.mock('@/lib/shared/activity', () => ({
 }))
 
 vi.mock('@/lib/shared/guest-user', () => ({
-  getUserIdForSession: vi.fn().mockResolvedValue('guest-user-uuid'),
+  cartOwner: vi.fn(async (authUserId?: string) => authUserId ?? 'guest-user-uuid'),
+  existingCartOwner: vi.fn(async (authUserId?: string) => authUserId ?? 'guest-user-uuid'),
 }))
 
 // wishlist/route.ts imports these SQL snippet constants

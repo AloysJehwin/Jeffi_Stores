@@ -2,6 +2,7 @@ import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { AUDIENCE_CHANNELS, PLATFORM_TENANT_ID, audiencesFor, type SenderAudience } from '@/lib/messaging/audiences'
 import { listTenantSenders } from '@/lib/messaging/tenant-senders'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
 import { AUDIENCE_LABEL, CHANNEL_LABEL } from '@/components/admin/messaging/SenderCard'
 import { Card } from '@/components/admin/kit/layout'
 import FlagshipNumbers from './FlagshipNumbers'
@@ -19,8 +20,9 @@ const USE: Record<SenderAudience, string> = {
 export default async function NumbersPanel({ role }: { role: string }) {
   const tenantId = (await resolveTenantId().catch(() => null)) ?? PLATFORM_TENANT_ID
   const flagship = tenantId === PLATFORM_TENANT_ID
+  // Uncached read: Get a number's router.refresh() shows the bought number at once.
   const senders = await listTenantSenders(tenantId)
-  if (flagship && isPlatformAdmin(role)) return <FlagshipNumbers senders={senders} />
+  if (flagship && isPlatformAdmin(role)) return <FlagshipNumbers senders={senders} storeName={await currentBrandNameAsync()} />
 
   const number = (a: SenderAudience, ch: 'whatsapp' | 'sms') => senders.find(s => s.audience === a && s.channel === ch && s.status === 'active')?.sender ?? null
   return (

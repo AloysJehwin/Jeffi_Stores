@@ -5,6 +5,7 @@ import { ArrowRight, Check, CloudOff, LayoutTemplate, Loader2, RotateCcw, Sparkl
 import { ChoiceCards } from '../../_ui'
 import { Card } from '../../dashboard/_components/Card'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { noteCls, primaryBtn, secondaryBtn } from '../ui'
 import { isAiDown, studioGet, studioPost, type StudioView } from './api'
 import BriefStep from './BriefStep'
@@ -64,6 +65,7 @@ export default function SiteStudio({
   onSummary: (s: StudioSummary) => void
 }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [view, setView] = useState<StudioView | null>(null)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('intro')
@@ -145,7 +147,8 @@ export default function SiteStudio({
     onSummary({
       free: view?.allowance.free ?? null,
       ready: s?.status === 'ready' && !!s.pages?.['store:home'],
-      pages: Object.keys(s?.pages ?? {}).length,
+      // As the build step counts them: the plan's pages that are built (the product card is saved beside them).
+      pages: (s?.plan?.pages ?? []).filter(p => p.enabled && s?.pages?.[p.key]).length,
       style: s?.direction?.name ?? null,
       description: describe(a),
       references: a.references ?? [],
@@ -177,17 +180,28 @@ export default function SiteStudio({
     call('start', 'start', { prefill: { storeName, sell: categories.join(', '), logoUrl } }, () => go('brief'))
 
   const startOver = async () => {
-    const msg =
-      view?.allowance.free === 'used'
-        ? 'Start over? Your designed site is cleared, and another full generation is only available from Site Builder after your store is live, charged to your AI wallet.'
-        : 'Start over? Your answers, pages and look are cleared.'
-    if (!window.confirm(msg)) return
+    const ok = await confirm({
+      title: 'Start over?',
+      message:
+        view?.allowance.free === 'used'
+          ? 'Your designed site is cleared, and another full generation is only available from Site Builder after your store is live, charged to your AI wallet.'
+          : 'Your answers, pages and look are cleared.',
+      confirmLabel: 'Start over',
+      variant: 'danger',
+    })
+    if (!ok) return
     await call('restart', 'start', { restart: true, prefill: { storeName, sell: categories.join(', '), logoUrl } }, () => go('brief'))
   }
 
   // A theme left the free generation unused: the AI designs the site from a fresh brief instead.
   const designWithAi = async () => {
-    if (!window.confirm('Design your site with AI instead? The theme’s pages are cleared, you answer a few questions, and your free AI generation designs a new site.')) return
+    const ok = await confirm({
+      title: 'Design your site with AI instead?',
+      message: 'The theme’s pages are cleared, you answer a few questions, and your free AI generation designs a new site.',
+      confirmLabel: 'Design with AI',
+      variant: 'danger',
+    })
+    if (!ok) return
     setMode('ai')
     await call('restart', 'start', { restart: true, prefill: { storeName, sell: categories.join(', '), logoUrl } }, () => go('brief'))
   }

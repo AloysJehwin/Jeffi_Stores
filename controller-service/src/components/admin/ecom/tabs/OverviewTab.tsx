@@ -5,6 +5,7 @@ import { Field, FieldGrid, Section, Mono, NOT_PROVISIONED } from '../EcomUI'
 import { JOB_STATUS, TenantStatus, dateIN, dateTimeIN, inr } from '../cells'
 import RunningNow from '../detail/RunningNow'
 import CostSummary from '../detail/CostSummary'
+import { instanceStateLabel, placementLabel } from '../detail/labels'
 import { ADDON_INFO, isAddonId } from '@/lib/billing/addons'
 
 function surfaces(slug: string, plan: string | null): string[] {
@@ -65,9 +66,10 @@ export default function OverviewTab({ d, owners }: { d: TenantDetailData; owners
 
         <Section title="Health">
           <FieldGrid>
-            <Field label="Instance state" value={<span className="capitalize">{t.instance_state}</span>} />
+            <Field label="Instance state" value={instanceStateLabel(t, job)} />
             <Field label="Database" value={t.rds_endpoint ? 'Provisioned' : NOT_PROVISIONED} />
-            <Field label="EC2 target" value={t.ec2_target ? <Mono>{t.ec2_target}</Mono> : 'shared pool'} />
+            <Field label="Server" value={placementLabel(d.spec)} />
+            <Field label="EC2 target" value={t.ec2_target ? <Mono>{t.ec2_target}</Mono> : 'Not assigned yet'} />
             <Field label="Region" value={t.region} />
             <Field label="Last job" value={job ? <span className="inline-flex flex-wrap items-center gap-1.5"><StatusBadge status={job.status} map={JOB_STATUS} /><Mono>{job.step}</Mono></span> : '—'} />
             <Field label="Last change" value={job ? dateTimeIN(job.updated_at) : '—'} />

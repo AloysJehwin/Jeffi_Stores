@@ -5,6 +5,7 @@ import PageHeader from '../_components/PageHeader'
 import { Card, Row } from '../_components/Card'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Business details' }
 
 export default async function BusinessPage() {
   const { tenant } = await loadOwnerContext()

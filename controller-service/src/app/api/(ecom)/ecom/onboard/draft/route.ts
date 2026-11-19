@@ -7,6 +7,7 @@ import { saveDraft, getDraft } from '@/lib/tenant-registry'
 import { WIZARD_STEPS } from '@controller/app/(ecom)/ecom/onboard/steps'
 import { getStudioSession } from '@controller/lib/site-studio/sessions'
 import { studioStoreContextFrom, syncStudioStore } from '@controller/lib/site-studio/context'
+import { isGstin, isPan } from '@controller/lib/catalog/tax-ids'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,13 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const data = parsed.data.data as Record<string, any>
+  // A draft keeps a PAN or GSTIN only in its proper shape (the Business and GST steps ask again). Rejecting the
+  // save instead would lose everything else typed since the last one.
+  for (const [k, ok] of [['pan', isPan], ['gstNumber', isGstin]] as const) {
+    if (!(k in data)) continue
+    const v = typeof data[k] === 'string' ? data[k].trim().toUpperCase() : ''
+    data[k] = ok(v) ? v : ''
+  }
   await saveDraft(owner.id, parsed.data.step, data)
   // The studio's preview shows the Store step's details: bring an existing session up to date (no AI runs).
   await getStudioSession(owner.id)

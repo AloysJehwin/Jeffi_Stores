@@ -1337,6 +1337,9 @@ ALTER TABLE ONLY public.support_sessions
 ALTER TABLE public.support_sessions
     ADD CONSTRAINT support_sessions_handler_check CHECK (handler IN ('ai','human'));
 
+ALTER TABLE public.support_sessions
+    ADD CONSTRAINT support_sessions_wa_audience_check CHECK (wa_audience IN ('customer','ecom'));
+
 ALTER TABLE ONLY public.support_message_attachments
     ADD CONSTRAINT support_message_attachments_pkey PRIMARY KEY (id);
 

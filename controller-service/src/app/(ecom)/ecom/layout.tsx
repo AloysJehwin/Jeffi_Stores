@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { cookies, headers } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
@@ -9,6 +10,13 @@ import './ecom.css'
 const display = Fraunces({ subsets: ['latin'], weight: 'variable', axes: ['SOFT', 'opsz'], variable: '--font-display', display: 'swap' })
 
 export const dynamic = 'force-dynamic'
+
+// Overrides the root layout's store title and description (the flagship's on this host); pages set their own title.
+export const metadata: Metadata = {
+  title: { default: 'Jeffi Commerce', template: '%s · Jeffi Commerce' },
+  description: 'Launch and run your online store, Showcase site and business messaging with Jeffi Commerce.',
+  appleWebApp: { capable: true, title: 'Jeffi Commerce', statusBarStyle: 'default' },
+}
 
 // Layout for the ecom control-plane surface. Reads the owner session server-side
 // and renders the custom ecom nav; the storefront Header/Footer are suppressed

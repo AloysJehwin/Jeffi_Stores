@@ -1,5 +1,5 @@
 import type { PageKey, SiteAudience } from '@jeffi/site-blocks'
-import { askJson, listOf, orNull, pick, rng, shuffle, str, studioBudgetLeft } from './ai'
+import { askJson, clip, listOf, orNull, pick, rng, shuffle, str, studioBudgetLeft } from './ai'
 import { partsFor, requiredParts } from './library'
 import type { PlannedPage, PlannedSection, StudioBrief, StudioPlan, ThemedPage } from './types'
 import { SHOWCASE_PAGE_KEY } from '../../showcase/types'
@@ -222,10 +222,7 @@ const plainLabel = (s: string) =>
     : s
 
 // A label from an idea: its first clause, cut at a word.
-const labelOf = (intent: string) => {
-  const first = intent.split(/[:,;]/)[0].trim()
-  return first.length <= 40 ? first : first.slice(0, 40).replace(/\s+\S*$/, '')
-}
+const labelOf = (intent: string) => clip(intent.split(/[:,;]/)[0], 40)
 
 function fallbackSections(spec: PageSpec, approach: string, r: () => number): Omit<PlannedSection, 'id'>[] {
   const [min, max] = spec.sections
@@ -263,9 +260,9 @@ function readSections(raw: unknown, r: () => number, layouts: readonly string[] 
   return listOf(raw, 'sections', 'items')
     .map(item => {
       const o = (item && typeof item === 'object' ? item : { intent: item }) as Record<string, unknown>
-      const intent = str(o.intent ?? o.description ?? o.purpose, 300)
+      const intent = clip(o.intent ?? o.description ?? o.purpose, 300)
       const parts = (Array.isArray(o.parts) ? o.parts : Array.isArray(o.components) ? o.components : []).map(p => String(p).replace(/[<>/\s]/g, '')).filter(p => /^[A-Z][A-Za-z]+$/.test(p))
-      return intent ? { label: plainLabel(str(o.label ?? o.name ?? o.title, 40, labelOf(intent))), intent, layout: str(o.layout ?? o.composition, 160, pick(r, layouts)), parts } : null
+      return intent ? { label: plainLabel(clip(o.label ?? o.name ?? o.title, 40, labelOf(intent))), intent, layout: str(o.layout ?? o.composition, 160, pick(r, layouts)), parts } : null
     })
     .filter((s): s is NonNullable<typeof s> => !!s)
 }

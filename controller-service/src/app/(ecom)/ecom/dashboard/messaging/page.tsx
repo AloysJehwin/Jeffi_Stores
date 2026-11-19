@@ -7,6 +7,7 @@ import PageHeader from '../_components/PageHeader'
 import MessagingClient from './MessagingClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Messaging' }
 
 export default async function MessagingPage() {
   const { tenant } = await loadOwnerContext()

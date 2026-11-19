@@ -7,6 +7,10 @@ import AppDemo from '@controller/app/(ecom)/ecom/apps/_demos'
 
 export const dynamic = 'force-dynamic'
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  return { title: findApp((await params).slug)?.name ?? 'Apps' }
+}
+
 export default async function AppDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const app = findApp(slug)

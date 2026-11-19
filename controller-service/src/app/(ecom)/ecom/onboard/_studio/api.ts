@@ -14,6 +14,8 @@ export type SessionView = Omit<StudioSession, 'catalog' | 'owner_id' | 'brief' |
   hasCatalog: boolean
   /** The sample products have photos (the photo step can fail while the image service is down). */
   hasPictures?: boolean
+  /** Sample products still without a photo (the step stopped early: a failure, or the budget ran out). */
+  missingPictures?: number
   pages: Record<string, PageOutline>
   answers: Partial<StudioAnswers>
   brief: StudioBrief | null

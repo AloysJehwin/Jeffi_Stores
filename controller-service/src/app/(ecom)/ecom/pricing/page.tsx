@@ -30,6 +30,7 @@ async function floorPrices(): Promise<{ floors: Record<string, number>; rdsExtra
 }
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Pricing' }
 
 function Check() {
   return (

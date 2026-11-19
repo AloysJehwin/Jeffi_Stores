@@ -33,7 +33,8 @@ export interface TenantSenderMeta {
   provider: SenderProvider
   sender: string
   meta: Record<string, unknown>
-  status: 'active' | 'disabled'
+  /** pending: not used for sending yet (a bought WhatsApp number waiting to go Online); the audience falls back. */
+  status: 'active' | 'pending' | 'disabled'
   createdBy: string | null
   createdAt: string
   updatedAt: string
@@ -197,7 +198,7 @@ export async function listTenantSenders(tenantId: string): Promise<TenantSenderM
         provider: x.provider as SenderProvider,
         sender: x.sender,
         meta: x.meta ?? {},
-        status: x.status === 'disabled' ? 'disabled' : 'active',
+        status: x.status === 'disabled' ? 'disabled' : x.status === 'pending' ? 'pending' : 'active',
         createdBy: x.created_by,
         createdAt: new Date(x.created_at).toISOString(),
         updatedAt: new Date(x.updated_at).toISOString(),
@@ -221,7 +222,10 @@ export async function saveTenantSender(i: {
   platformAccount?: boolean
   /** Merged into `meta` (e.g. the Twilio number SID and WhatsApp sender SID). */
   extraMeta?: Record<string, unknown>
+  /** pending: saved but not sent from until setTenantSenderStatus(…, 'active'). Default active. */
+  status?: 'active' | 'pending'
 }): Promise<TenantSenderMeta> {
+  const status = i.status ?? 'active'
   const audience = i.audience ?? 'customer'
   if (!i.tenantId) throw new Error('tenant is required')
   if (!isChannel(i.channel)) throw new Error('channel must be sms or whatsapp')
@@ -241,17 +245,17 @@ export async function saveTenantSender(i: {
   const meta = { ...maskSenderConfig(config), ...(i.platformAccount ? { platform_account: true } : {}), ...(i.extraMeta ?? {}) }
   const r = await controlPlanePool().query<{ created_by: string | null; created_at: string; updated_at: string }>(
     `INSERT INTO tenant_messaging_senders (id, tenant_id, channel, audience, provider, sender, config_enc, meta, status, created_by)
-     VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb,'active',$9)
+     VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb,$10,$9)
      ON CONFLICT (tenant_id, channel, audience) DO UPDATE SET
        provider=EXCLUDED.provider, sender=EXCLUDED.sender, config_enc=EXCLUDED.config_enc, meta=EXCLUDED.meta,
-       status='active', created_by=EXCLUDED.created_by, updated_at=now()
+       status=EXCLUDED.status, created_by=EXCLUDED.created_by, updated_at=now()
      RETURNING created_by, created_at, updated_at`,
-    [randomUUID(), i.tenantId, i.channel, audience, i.provider, sender, encryptToken(JSON.stringify(config)), JSON.stringify(meta), i.createdBy ?? null]
+    [randomUUID(), i.tenantId, i.channel, audience, i.provider, sender, encryptToken(JSON.stringify(config)), JSON.stringify(meta), i.createdBy ?? null, status]
   )
   invalidateTenantSenders(i.tenantId)
   const row = r.rows[0]
   return {
-    channel: i.channel, audience, provider: i.provider, sender, meta, status: 'active',
+    channel: i.channel, audience, provider: i.provider, sender, meta, status,
     createdBy: row?.created_by ?? i.createdBy ?? null,
     createdAt: new Date(row?.created_at ?? Date.now()).toISOString(),
     updatedAt: new Date(row?.updated_at ?? Date.now()).toISOString(),
@@ -265,6 +269,24 @@ export async function updateSenderMeta(tenantId: string, channel: MessagingChann
     [tenantId, channel, audience, JSON.stringify(patch)]
   )
   invalidateTenantSenders(tenantId)
+}
+
+/** Start sending from a row (active) or hold it back (pending: lookups skip it, so the audience falls back). */
+export async function setTenantSenderStatus(tenantId: string, channel: MessagingChannel, audience: SenderAudience, status: 'active' | 'pending'): Promise<void> {
+  await controlPlanePool().query(
+    `UPDATE tenant_messaging_senders SET status = $4, updated_at = now() WHERE tenant_id=$1::uuid AND channel=$2 AND audience=$3`,
+    [tenantId, channel, audience, status]
+  )
+  invalidateTenantSenders(tenantId)
+}
+
+/** Every pending WhatsApp row with a registered sender, across all tenants: the numbers waiting to go Online. */
+export async function listPendingWhatsAppSenders(): Promise<{ tenantId: string; audience: SenderAudience; senderSid: string }[]> {
+  const r = await controlPlanePool().query<{ tenant_id: string; audience: string; sid: string }>(
+    `SELECT tenant_id::text, audience, meta->>'wa_sender_sid' AS sid FROM tenant_messaging_senders
+      WHERE channel='whatsapp' AND status='pending' AND meta ? 'wa_sender_sid'`
+  )
+  return r.rows.flatMap(x => (isSenderAudience(x.audience) && x.sid ? [{ tenantId: x.tenant_id, audience: x.audience, senderSid: x.sid }] : []))
 }
 
 export async function deleteTenantSender(tenantId: string, channel: MessagingChannel, audience: SenderAudience = 'customer'): Promise<boolean> {
