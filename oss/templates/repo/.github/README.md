@@ -12,12 +12,11 @@ Part of [Jeffi ERP](https://github.com/%%org%%), where the Jeffi Stores commerce
 ```bash
 git clone https://github.com/%%org%%/workspace.git jeffi-erp
 cd jeffi-erp
-node oss/assemble.mjs        # clones every Jeffi ERP repo into its folder
-npm ci
-cp .env.example .env.local   # then fill in what you need
+node oss/assemble.mjs                  # clones every Jeffi ERP repo into its folder
+ONNXRUNTIME_NODE_INSTALL=skip npm ci
 ```
 
-To change this repo, fork it and add your fork as a remote inside %%folder%%. The full guide is in [CONTRIBUTING](https://github.com/%%org%%/.github/blob/main/CONTRIBUTING.md).
+Then follow [Set up the workspace](https://github.com/%%org%%/.github/blob/main/CONTRIBUTING.md#set-up-the-workspace) for the database, `.env.local` and a local admin. You never need Jeffi Stores' own keys. To change this repo, fork it and add your fork as a remote inside %%folder%%.
 
 ## How a change gets in
 
