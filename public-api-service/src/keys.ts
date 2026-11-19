@@ -1,3 +1,4 @@
+// Throwaway end-to-end check of the Jeffi ERP contribution flow (second push); not meant to merge upstream.
 import { createHash, randomBytes } from 'node:crypto'
 import type pg from 'pg'
 import { mainPool } from '@jeffi/tenancy'
