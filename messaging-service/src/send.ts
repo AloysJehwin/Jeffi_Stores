@@ -71,6 +71,8 @@ interface Ctx {
   batchId?: string
   internal?: boolean
   space?: tpl.Space
+  /** A send as the platform that goes out from this store's numbers (set only for internal platform calls). */
+  senderTenant?: string
 }
 
 // v2 library only (tenant copy → platform default). The legacy message_templates fallback was
@@ -299,10 +301,19 @@ export async function assertChannelOn(tenantId: string, channel: string, space: 
   if ((await channelsOff(tenantId)).has(channel)) throw new SendError(409, 'channel_disabled', `${label} is turned off in Site Controls`)
 }
 
-// The tenant's own number for the audience, else its customer number. A workspace sending through the API (ecom
-// dashboard Play, Bulk messages, /v1) with no number of its own goes out from the ecom portal's number, not from
-// the flagship store's shopper number in the env.
+// The tenant's own number for the audience, else its customer number. A platform send for a store (its staff's
+// verification code) tries that store's numbers first; a store row that can't be read falls through to the
+// platform's, so staff still get their code. A workspace sending through the API (ecom dashboard Play, Bulk
+// messages, /v1) with no number of its own goes out from the ecom portal's number, not from the flagship store's
+// shopper number in the env.
 async function outboundSender(ctx: Ctx, channel: 'sms' | 'whatsapp', audience: SenderAudience) {
+  if (ctx.senderTenant && ctx.senderTenant !== ctx.tenantId) {
+    const store = await tenantSender(ctx.senderTenant, channel, audience).catch(e => {
+      console.warn(`store ${ctx.senderTenant} ${channel} sender unavailable, sending from the platform's: ${e?.message ?? e}`)
+      return null
+    })
+    if (store) return store
+  }
   const own = await tenantSender(ctx.tenantId, channel, audience)
   if (own || ctx.space !== 'api' || ctx.tenantId === tpl.PLATFORM_TENANT_ID) return own
   return tenantSender(tpl.PLATFORM_TENANT_ID, channel, 'ecom')
@@ -369,7 +380,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
         : await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id }, sender ?? undefined)
     }
     // metadata.sender.own marks a send from the store's own account (its token signs the status callback); `tenant`
-    // names the row's owner when it is another tenant's (the platform's ecom number).
+    // names the row's owner when it is another tenant's (the platform's ecom number, a store's for its staff code).
     const senderMeta = sender && { own: true, provider: sender.provider, audience: sender.audience, ...(sender.tenantId !== ctx.tenantId ? { tenant: sender.tenantId } : {}) }
     await db.query(
       `UPDATE messages SET status='sent', provider=$2, provider_ref=$3, charged_inr=$4, metadata=COALESCE(metadata,'{}'::jsonb) || $5::jsonb, updated_at=now() WHERE id=$1`,

@@ -2,19 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // In-memory stand-in for the messages table + mocked wallet/providers.
 const rows = new Map<string, any>()
-const senderRows = new Map<string, any>() // `${tenant}:${channel}` → a tenant_messaging_senders row
+const senderRows = new Map<string, any>() // `${tenant}:${channel}` → a tenant_messaging_senders row, or several
 vi.mock('../src/db.js', () => ({
   db: {
     query: vi.fn(async (sql: string, params: any[] = []) => {
       if (sql.startsWith('SELECT audience, provider, sender, config_enc FROM tenant_messaging_senders')) {
-        const r = senderRows.get(`${params[0]}:${params[1]}`)
+        const all = [senderRows.get(`${params[0]}:${params[1]}`) ?? []].flat()
+        const r = all.find(x => x.audience === params[2]) ?? all.find(x => x.audience === 'customer')
         return { rows: r ? [r] : [], rowCount: r ? 1 : 0 }
       }
       if (sql.startsWith('INSERT INTO messages')) {
         const [id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, reference, metadata] = params
         rows.set(id, { id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, charged_inr: 0, status: 'queued', provider: null, provider_ref: null, error: null, reference, metadata, created_at: new Date(), updated_at: new Date() })
       } else if (sql.startsWith('UPDATE messages SET status=\'sent\'')) {
-        Object.assign(rows.get(params[0]), { status: 'sent', provider: params[1], provider_ref: params[2], charged_inr: params[3] })
+        const r = rows.get(params[0])
+        Object.assign(r, { status: 'sent', provider: params[1], provider_ref: params[2], charged_inr: params[3], metadata: { ...r.metadata, ...JSON.parse(params[4]) } })
       } else if (sql.startsWith('UPDATE messages SET status=')) {
         Object.assign(rows.get(params[0]), { status: sql.includes("'skipped'") ? 'skipped' : 'failed', error: params[1], charged_inr: 0 })
       }
@@ -127,6 +129,28 @@ describe('sendMessage', () => {
 
     await sendMessage({ tenantId: 'w2', tenantSlug: 'shop' }, { channel: 'whatsapp', to: '+919999999999', body: 'hi' } as any)
     expect(vi.mocked(sendWhatsApp).mock.calls[1][1]).toBeUndefined()
+    delete process.env.SOCIAL_TOKEN_ENC_KEY
+  })
+
+  it("sends a store's staff code (billed to the platform) from its admin number, else its customer number, else the platform's", async () => {
+    process.env.SOCIAL_TOKEN_ENC_KEY = 'a'.repeat(64)
+    const PLATFORM = '00000000-0000-0000-0000-000000000000'
+    const row = (audience: string, sender: string) => ({ audience, provider: 'twilio', sender, config_enc: encryptToken('{}') })
+    senderRows.set('s1:whatsapp', [row('customer', '+15550000001'), row('admin', '+15550000002')])
+    senderRows.set('s2:whatsapp', [row('customer', '+15550000003')])
+    senderRows.set(`${PLATFORM}:whatsapp`, [row('customer', '+18722179910'), row('ecom', '+18722704479')])
+    vi.mocked(sendWhatsApp).mockResolvedValue('SMwa')
+    const staffCode = (store: string) =>
+      sendMessage({ tenantId: PLATFORM, tenantSlug: 'platform', internal: true, senderTenant: store }, { channel: 'whatsapp', to: '+919999999999', body: 'code', audience: 'admin' } as any)
+
+    const s1 = await staffCode('s1')
+    expect(s1).toMatchObject({ status: 'sent', tenant_id: PLATFORM, from_address: '+15550000002' })
+    expect((s1.metadata as any).sender).toEqual({ own: true, provider: 'twilio', audience: 'admin', tenant: 's1' })
+    expect(await staffCode('s2')).toMatchObject({ from_address: '+15550000003', metadata: { sender: { audience: 'customer', tenant: 's2' } } })
+    const s3 = await staffCode('s3')
+    expect(s3.from_address).toBe('+18722179910')
+    expect((s3.metadata as any).sender.tenant).toBeUndefined()
+    expect(vi.mocked(wallet.debit).mock.calls.map(c => c[0].tenantId)).toEqual([PLATFORM, PLATFORM, PLATFORM])
     delete process.env.SOCIAL_TOKEN_ENC_KEY
   })
 
