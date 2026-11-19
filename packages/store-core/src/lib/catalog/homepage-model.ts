@@ -28,9 +28,11 @@ import {
   sectionAspect,
   sectionLimit,
   sectionPlacement,
+  copyDefaultsFor,
   defaultAboutCopy,
+  honestTrustTiles,
   resolveAboutStats,
-  sectionCopyDefaults,
+  tileDefaultsFor,
   sectionLayout,
   safeHref,
   justLandedDays,
@@ -42,7 +44,6 @@ import {
   storyGroups,
   LEGACY_APP_HIDDEN_TYPES,
   SECTION_TYPES,
-  SECTION_TILE_DEFAULTS,
   type HomepageAudience,
   type HomepagePage,
   type HomepageSection,
@@ -72,6 +73,9 @@ export interface SectionData {
   productRows: Map<string, any[]>
   freeShippingThreshold: number
   gstEnabled: boolean
+  codEnabled?: boolean
+  /** The flagship's own copy and pictures for empty fields; every other store gets neutral ones. */
+  flagshipCopy?: boolean
   stats: { value: string; label: string }[]
   aboutCopy: string
   storeName: string
@@ -324,10 +328,11 @@ export async function loadSectionData(
 ): Promise<SectionData> {
   const { surface = 'web', page = 'home', audience = 'store', draft } = await withSite(opts)
   const storefront = await getStorefrontContent()
-  const { gstEnabled } = await getFeatureFlags()
+  const { gstEnabled, codEnabled } = await getFeatureFlags()
 
   const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
-  const stats = resolveAboutStats(storefront.statsJson, isFlagshipTenant(await resolveTenantId().catch(() => null)))
+  const flagshipCopy = isFlagshipTenant(await resolveTenantId().catch(() => null))
+  const stats = resolveAboutStats(storefront.statsJson, flagshipCopy)
   // Flagship copy is withheld from tenants; an unset value means a tenant that hasn't written one.
   const identity = await getStoreIdentity()
   const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
@@ -391,6 +396,8 @@ export async function loadSectionData(
     productRows,
     freeShippingThreshold,
     gstEnabled,
+    codEnabled,
+    flagshipCopy,
     stats,
     aboutCopy,
     storeName: identity.name,
@@ -463,7 +470,10 @@ function sectionItems(s: HomepageSection, data: SectionData): Record<string, str
       .filter(i => i.url && (s.type === 'social_strip' ? i.imageUrl : (i as Record<string, string>).title?.trim()))
     return rows.length ? rows : null
   }
-  return rows ?? (SECTION_TILE_DEFAULTS as Partial<Record<SectionType, Record<string, string>[]>>)[s.type] ?? null
+  const tiles = rows ?? tileDefaultsFor(s.type, data.flagshipCopy ?? true)
+  return s.type === 'trust_strip' && tiles
+    ? honestTrustTiles(tiles as { icon: string; label: string }[], { freeShippingThreshold: data.freeShippingThreshold, codEnabled: data.codEnabled ?? true })
+    : tiles
 }
 
 export function toHomeModelJson({ audience, sections, data }: HomeModel): HomeModelJson {
@@ -529,7 +539,7 @@ export function toHomeModelJson({ audience, sections, data }: HomeModel): HomeMo
     if (business) extras[s.id] = business
   }
   const sectionsJson: HomeSectionJson[] = sections.map(s => {
-    const d = sectionCopyDefaults(s.type)
+    const d = copyDefaultsFor(s.type, data.flagshipCopy ?? true)
     const video = safeHref(typeof s.config?.video === 'string' ? s.config.video : null)
     return {
       ...s,

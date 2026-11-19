@@ -114,6 +114,45 @@ Code: `controller-service/src/lib/compute/`.
   - A Showcase workspace's address comes from the business name, never the site-address field (which browsers autofilled with a street address).
   - Storefront: the cart's guest user is race-safe (a new visitor's parallel cart calls made two guests, and the unique `session_id` failed one with a silent 500); reads no longer create guest rows (1,626 of 1,627 local guests were orphans). The release deletes the existing orphans on the flagship and every store: `storefront-service/database/migrations/2026-11-19_delete_orphan_guest_users.sql` removes guests over an hour old that no row references (every FK to `users` read from the catalog, plus the user-id columns without one). New indexes on `users(merged_to_user_id)` and `email_campaign_logs(user_id)` keep the per-row FK checks fast.
   - Storefront hydration: a code section's async part (e.g. `<Logo>`) sits in a keyed fragment. React 19.2 canary (Next 15.5) replays an element that suspends on a late RSC chunk without rewinding its hydration cursor, so the element claimed its own first child and hydration failed intermittently on studio-built pages.
+- **Re-run after the #626 release (2026-11-19, same owner and saved application):**
+  - The resubmitted application needed only a PAN in the new shape. It was approved with payment Optional at 05:45, and the store was live at 06:07, with 18 of 18 steps passing and no warnings.
+  - Step timings:
+    | Step | Time |
+    |---|---|
+    | Server joins the cluster | 152 s |
+    | Database disk attach | 67 s (3 min before) |
+    | Postgres start | 113 s |
+    | Load schema | 66 s (the step that failed before) |
+    | Seed | 55 s: the studio catalogue, 18 products / 5 categories / 6 pictures |
+    | Site install | ~3 min: 28 pages, Ink & Kraft |
+  - Each later step took about one worker tick.
+  - Checked live:
+    - storefront pages, add to cart (every cart call 200), the 8 generated legal pages, store admin's certificate gate (403 without one), business portal 200, the owner dashboard, Delhivery pickup created, and the under-review / approved / admin-certificate / store-live emails
+  - Found on that run and fixed (not yet released):
+    - **Code-section CSS clash, behind most layout faults on studio sites.** A section's scoped Tailwind rules (`[data-code-section] .flex`, 0,2,0) beat the app stylesheet's responsive variants on the platform parts placed inside the section. The header's menu button (`lg:hidden flex`) showed at every width, its links (`hidden lg:block`) never did, and every page had 2–6 such mismatches at 1024 px and up.
+      - Each section's rules now carry that section's own id as a class (`lib/site/code/css.ts`). The interpreter puts the same class on every element and className the AI wrote in that section, so a section's rules reach only its own elements: not the platform parts inside it, not cards, not a section drawn inside another.
+      - The first version used one shared mark. On the local probe store an outer section's `.flex` still beat a nested section's `md:block`, so the mark became per section.
+      - CSS saved before is upgraded when the page renders (`currentCss`, format `/*cs:3*/`, cached per process, ~1 ms). Sections and cards are both upgraded, so built sites need no rebuild.
+      - On the local probe store, no element's responsive classes now disagree with its computed display at any width. The live store had 2–6 per page.
+    - **Header rule.** The menu button sits at an edge of the logo row, never alone or centred: a prompt rule plus the `LINT.navMenu` repair note. `NavLinks` takes `from="md|lg|xl"` for when its links show; links on a centred row of their own use `mobile="scroll"`.
+    - **Squeezed cards.** A lint note catches a card list of 2+ columns inside a rail slide, a `<Carousel>` or a narrow column. The live "Pairs well with" drew 70 px cards in 330 px slides. The card prompt rule now says the same.
+      - A one-product `<Products>` draws one column by default.
+      - Eight ready-made theme sections had this pattern and were fixed: `<Carousel>` around `RelatedProducts`/`CartUpsell` on the brutalist, glass and minimalist product and cart pages, and the luxury home's column span placed inside `<Reveal>`.
+      - A `<Carousel>` that holds only a product or category list now draws that list as its own carousel, each item a slide (`carouselList`, `interpret.tsx`). Before, the whole list was one slide, so stores already built from those themes showed a few narrow cards in one corner. `RelatedProducts` and `CartUpsell` take `layout="carousel"` and `itemClassName` like `Products`.
+    - **Generated loading screens.** Each code section's skeleton is made when it compiles (`codeSkeleton`, `lib/site/code/skeleton.ts`) and stored with it, so every studio build, install and save produces one.
+      - The skeleton keeps the AI's layout and classes, with text as bars at its own font size, pictures and buttons as blocks, and lists as a few repeats.
+      - 28 storefront `loading.tsx` screens draw it when the published page has code sections (`studioSkeleton`); classic stores keep theirs.
+      - On the probe store, the /products loading screen followed the page's own layout on desktop and phone.
+    - **Guest cart at sign-up.** Signing up now merges the guest's cart and wishlist, as login already did. Before, a buyer who added items and then created an account at checkout lost them.
+    - **Payout account lookup.** `getTenantBankAccount` reads the owner's account when no store-specific row exists. Onboarding saves accounts by owner only, so every store showed "No payout account on file" (the admin Commerce tab and the setup guide).
+    - **Tenant default copy.** Tenants' empty-field copy no longer uses the flagship's claims (`TENANT_COPY_DEFAULTS` / `TENANT_TILE_DEFAULTS`): "Your Trusted Hardware Partner", fasteners and power tools, "10,000+ products", "500+ businesses", a 24-hour RFQ promise, the flagship's About picture and text.
+      - The trust strip drops "Free delivery above ₹0" without a threshold, and "Cash on delivery available" while COD is off. COD is off on every platform-Delhivery store by design (`site-controls.ts`).
+    - **Smaller fixes.** Legal pages wrap long URLs (`[overflow-wrap:anywhere]`; the privacy page scrolled sideways by 87 px on phones). The certificate email names both sign-in ways, since Google signs a `+alias` address in as the main one.
+  - Not changed:
+    - COD isn't testable on a platform-Delhivery store, and a prepaid order needs a real Razorpay payment, so no order was placed.
+    - The store loads AdSense in non-personalised mode after "Reject non-essential", which is by design (Consent Mode).
+    - Legal pages show the template's "last updated" dates.
+    - The store's photos: 6 of 18, because its studio session was built before every sample product got one.
 
 ---
 

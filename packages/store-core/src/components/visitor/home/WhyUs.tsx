@@ -1,7 +1,6 @@
 import IconByName from './IconByName'
-import { SECTION_COPY_DEFAULTS, SECTION_TILE_DEFAULTS } from '@/lib/catalog/homepage-sections'
+import { copyDefaultsFor, tileDefaultsFor } from '@/lib/catalog/homepage-sections'
 
-const COPY = SECTION_COPY_DEFAULTS.why_us
 
 export interface WhyUsItem {
   icon: string
@@ -14,12 +13,13 @@ interface WhyUsProps {
   title?: string | null
   eyebrow?: string | null
   items?: WhyUsItem[] | null
+  flagshipCopy?: boolean
 }
 
-const DEFAULT_ITEMS: WhyUsItem[] = SECTION_TILE_DEFAULTS.why_us
 
-export default function WhyUs({ title, eyebrow, items }: WhyUsProps = {}) {
-  const tiles = items && items.length > 0 ? items : DEFAULT_ITEMS
+export default function WhyUs({ title, eyebrow, items, flagshipCopy = true }: WhyUsProps = {}) {
+  const COPY = copyDefaultsFor('why_us', flagshipCopy)
+  const tiles = items && items.length > 0 ? items : ((tileDefaultsFor('why_us', flagshipCopy) ?? []) as unknown as WhyUsItem[])
 
   return (
     <section className="py-12 md:py-20 bg-surface-secondary">
