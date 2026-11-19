@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
-import { cookies } from 'next/headers'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
-import { getUserIdForSession } from '@/lib/shared/guest-user'
+import { cartOwner, existingCartOwner } from '@/lib/shared/guest-user'
 import { recordImplicitSignal } from '@/lib/shared/ai-feedback'
 import { logActivity } from '@/lib/shared/activity'
 import { parseBody, zUuid } from '@/lib/shared/validate'
@@ -31,19 +30,12 @@ const UpdateCartSchema = z.object({
   savedForLater: z.boolean().optional(),
 })
 
-async function resolveUserId(request: NextRequest) {
-  const cookieStore = await cookies()
-  let sessionId = cookieStore.get('session_id')?.value
+async function resolveUser(request: NextRequest) {
   const authResult = await authenticateUser(request)
   const authUserId = authResult?.userId
-  const userId = await getUserIdForSession(sessionId, authUserId)
-  if (!sessionId && !authUserId) {
-    sessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    cookieStore.set('session_id', sessionId, { maxAge: 30 * 24 * 60 * 60, path: '/' })
-  }
   // Same rule as checkout's business pricing: a business session or the business portal.
   const isBusiness = authResult?.isBusiness === true || (!!authUserId && request.headers.get('x-auth-portal') === 'business')
-  return { userId, sessionId, authUserId, isBusiness }
+  return { authUserId, isBusiness }
 }
 
 async function activeLineQuantity(
@@ -91,7 +83,8 @@ async function lineUnitConstraint(
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await resolveUserId(request)
+    const userId = await existingCartOwner((await resolveUser(request)).authUserId)
+    if (!userId) return NextResponse.json({ items: [] })
     const url = new URL(request.url)
     const savedOnly = url.searchParams.get('saved') === '1'
     const savedFilter = savedOnly ? 'TRUE' : 'FALSE'
@@ -191,6 +184,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items: cartItems || [] })
   } catch (err) {
+    console.error('[cart] GET failed:', err)
     return NextResponse.json({ error: 'Failed to fetch cart' }, { status: 500 })
   }
 }
@@ -205,7 +199,8 @@ export async function POST(request: NextRequest) {
     const buyUnit = parsedCart.data.buyUnit
     const quantity = parsedCart.data.quantity ?? 1
 
-    const { userId, isBusiness } = await resolveUserId(request)
+    const { authUserId, isBusiness } = await resolveUser(request)
+    const userId = await cartOwner(authUserId)
 
     const product = await queryOne(
       'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date, stock_status, is_digital, moq FROM products WHERE id = $1',
@@ -358,6 +353,7 @@ export async function POST(request: NextRequest) {
       quantity: newQuantity,
     })
   } catch (err) {
+    console.error('[cart] POST failed:', err)
     return NextResponse.json({ error: 'Failed to add to cart' }, { status: 500 })
   }
 }
@@ -369,8 +365,9 @@ export async function PATCH(request: NextRequest) {
     if (!parsedUpdate.ok) return parsedUpdate.response
     const { cartItemId, quantity, savedForLater } = parsedUpdate.data
 
-    const { userId, sessionId, authUserId, isBusiness } = await resolveUserId(request)
-    if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
+    const { authUserId, isBusiness } = await resolveUser(request)
+    const userId = await existingCartOwner(authUserId)
+    if (!userId) return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
 
     const cartItem = await queryOne(
       `
@@ -420,6 +417,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 })
   } catch (err) {
+    console.error('[cart] PATCH failed:', err)
     return NextResponse.json({ error: 'Failed to update cart' }, { status: 500 })
   }
 }
@@ -429,8 +427,9 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const cartItemId = searchParams.get('id')
 
-    const { userId, sessionId, authUserId } = await resolveUserId(request)
-    if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
+    const { authUserId } = await resolveUser(request)
+    const userId = await existingCartOwner(authUserId)
+    if (!userId) return NextResponse.json({ message: 'Item removed from cart' })
 
     const cartItem = await queryOne<{ product_id: string; product_name: string }>(
       `SELECT ci.product_id::text, p.name AS product_name
@@ -453,6 +452,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item removed from cart' })
   } catch (err) {
+    console.error('[cart] DELETE failed:', err)
     return NextResponse.json({ error: 'Failed to remove from cart' }, { status: 500 })
   }
 }

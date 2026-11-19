@@ -89,6 +89,32 @@ Code: `controller-service/src/lib/compute/`.
 - Every host the plan has moves onto it (`brand.in`, `www.`, `admin.` behind the store's mTLS, `invoice.`/`quotation.`/`purchaseorder.`, `forms.`, `vault.`, `business.` on Pro+), each a `tenant_custom_domains` row with `order_id` and its own cert-manager certificate. Routing is by first label (`lib/tenancy/admin-host.ts`).
 - Off in production until `DOMAIN_REGISTRAR=route53`; everywhere else a fake registrar. Details, renewal policy and production setup: [`DOMAIN_PURCHASE.md`](DOMAIN_PURCHASE.md).
 
+## Live end-to-end store test (2026-11-19)
+
+- **Load schema failed for every new store** since `100f9080b`.
+  - Cause: the column reconciliation's splitter (`splitTopLevel` in `tenant-migrations-schema.ts`) cut `site_pages.published_doc`'s JSON default at a comma inside its quotes. That left an open string, and Postgres rejected the whole tenant schema (`syntax error at or near "store"`). The tenant fan-out uses the same blob.
+  - Fix: the splitter skips commas inside quotes. A regression test covers it, and the full tenant schema loads into a fresh database, twice.
+- **Starter catalogue matches the AI site.** `seed_data` seeds the owner's AI Site Studio sample catalogue when the site came from the studio (`seedStudioCatalog`); otherwise it seeds the category's starter catalogue.
+  - What's seeded: categories with the studio's slugs, brands, and products with price, MRP and pictures. Pictures stay on the platform CDN.
+  - A category without a picture takes its first product's, as the studio preview does.
+  - Made-up reviews and offers stay out.
+  - Proved locally: with the studio site installed through `/api/cron/site-build`, the listing, category and product pages showed the seeded products and pictures.
+- **Stop & deprovision** (admin store page, while a build runs):
+  - The deprovision API (`stopProvisioningJob`) waits up to a minute for a step in flight, fails the job, then tears the store down.
+  - The worker never advances a job whose store is terminated.
+  - Deprovision is also offered for a store that is provisioning or suspended, not only an active one.
+- **The live test store** (`e2e-test-store`, Pro) rolled back by itself after 8 retries. AWS showed its server terminated and its disk and bucket gone. It was then deleted from the admin.
+- **Fixed from that test's findings** (not yet re-run live):
+  - Bad SQL fails a build at once: SQLSTATE class 42 (or Postgres's wording for it) is terminal in `isTerminalError`, so a broken schema rolls back instead of retrying for half an hour. Connection errors, timeouts and AWS throttling still retry.
+  - Attach database disk re-checks EBS every 3 s within the worker's tick (at most 8 times) instead of costing one worker minute per disk state.
+  - The admin store page reads "Not deployed yet" / "Being built" / "Not deployed (build failed)" until the store has infrastructure, and shows the planned server ("Own server · t4g.medium") from the applied, pinned or resolved compute spec. No more "Instance running" or "shared pool" for a store with nothing deployed.
+  - Ecom portal: its own tab titles ("… · Jeffi Commerce"); the owner's sign-up code email greets them by name and comes from Jeffi Commerce; no native `alert`/`confirm` (app dialog and toasts) and no native date inputs (custom DatePicker); the phone is typed once; PAN and GSTIN are checked by shape in the wizard, on submit and on drafts, with an "Invalid format" badge in the admin KYC tab; the Review step masks PAN, account number and UPI ID.
+  - AI Site Studio: every sample product gets a photo (4 at a time, within the budget); "Home Décor" slugs to `home-decor` everywhere; text is cut at a word with "…"; the Review page count matches the build.
+  - Ready-made theme samples: every product has a photo (Fashion & Apparel 17, Home & Kitchen 20, Health & Beauty 18; the 43 missing ones made with `gemini-3.1-flash-lite-image` for about ₹135).
+  - A Showcase workspace's address comes from the business name, never the site-address field (which browsers autofilled with a street address).
+  - Storefront: the cart's guest user is race-safe (a new visitor's parallel cart calls made two guests, and the unique `session_id` failed one with a silent 500); reads no longer create guest rows (1,626 of 1,627 local guests were orphans). The release deletes the existing orphans on the flagship and every store: `storefront-service/database/migrations/2026-11-19_delete_orphan_guest_users.sql` removes guests over an hour old that no row references (every FK to `users` read from the catalog, plus the user-id columns without one). New indexes on `users(merged_to_user_id)` and `email_campaign_logs(user_id)` keep the per-row FK checks fast.
+  - Storefront hydration: a code section's async part (e.g. `<Logo>`) sits in a keyed fragment. React 19.2 canary (Next 15.5) replays an element that suspends on a late RSC chunk without rewinding its hydration cursor, so the element claimed its own first child and hydration failed intermittently on studio-built pages.
+
 ---
 
 ## What Has Been Done

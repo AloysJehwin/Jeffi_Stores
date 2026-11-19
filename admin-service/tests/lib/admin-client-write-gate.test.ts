@@ -42,9 +42,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // A store's / the flagship's SMS & WhatsApp numbers: rendered only for the platform administrator (ecom → store →
   // Numbers, isPlatformAdmin) and the flagship's administrator (Settings → Numbers); both endpoints check that role.
   'packages/store-core/src/components/admin/messaging/SenderCard.tsx',
-  // Buys / releases a store's numbers in the platform's Twilio account: platform administrator only (store → Numbers);
-  // every /api/admin/ecom/[tenantId]/numbers handler checks isPlatformAdmin.
-  'controller-service/src/components/admin/ecom/detail/StoreNumberPanel.tsx',
+  // Buys / releases a store's or the flagship's numbers in the platform's Twilio account: platform administrator only
+  // (store → Numbers, flagship Settings → Numbers); every /api/admin/ecom/[tenantId]/numbers handler checks isPlatformAdmin.
+  'packages/store-core/src/components/admin/messaging/NumberBuyPanel.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
   'controller-service/src/components/admin/ecom/detail/DnsResyncButton.tsx',
   'controller-service/src/components/admin/ecom/detail/ReconcileButton.tsx',

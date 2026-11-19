@@ -164,8 +164,9 @@ ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging
     CHECK (audience <> 'admin' OR channel = 'whatsapp');
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_provider_check
     CHECK (provider IN ('twilio','aws'));
+-- pending: a bought WhatsApp number not used for sending until it is Online (lib/messaging/tenant-numbers).
 ALTER TABLE ONLY public.tenant_messaging_senders ADD CONSTRAINT tenant_messaging_senders_status_check
-    CHECK (status IN ('active','disabled'));
+    CHECK (status IN ('active','pending','disabled'));
 ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_archives ADD CONSTRAINT tenant_archives_status_check
     CHECK (status IN ('available','restored','expired'));

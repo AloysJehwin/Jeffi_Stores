@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { TenantStatus, inr, inrHr } from '../cells'
-import { apiServices, type DetailSection } from './labels'
+import { apiServices, instanceStateLabel, isDeployed, plannedPlacement, type DetailSection } from './labels'
 
 function Tile({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
@@ -19,7 +19,14 @@ const cap = (s: string | null | undefined) => (s ? s.charAt(0).toUpperCase() + s
 export default function KpiStrip({ d, section }: { d: TenantDetailData; section: DetailSection }) {
   const { t, job, cost, row, fleet, fleetKnown, serversRunning } = d
   const status = <TenantStatus status={t.status} />
-  const statusSub = job && (job.status === 'running' || job.status === 'pending') ? `Provisioning: ${job.step}` : job?.status === 'failed' ? `Failed at ${job.step}` : `Instance ${t.instance_state}`
+  const statusSub =
+    job && (job.status === 'running' || job.status === 'pending')
+      ? `Provisioning: ${job.step}`
+      : job?.status === 'failed'
+        ? `Failed at ${job.step}`
+        : isDeployed(t)
+          ? `Instance ${t.instance_state}`
+          : instanceStateLabel(t, job)
 
   if (!d.isStore) {
     return (
@@ -34,7 +41,10 @@ export default function KpiStrip({ d, section }: { d: TenantDetailData; section:
 
   let servers: ReactNode = '—'
   let serversSub: ReactNode = 'Read from the cluster'
-  if (fleetKnown) {
+  if (!isDeployed(t) && !fleet?.servers.length) {
+    servers = t.status === 'terminated' ? 'Removed' : 'None yet'
+    serversSub = plannedPlacement(t, d.spec)
+  } else if (fleetKnown) {
     const pods = fleet?.pods.total ? `${fleet.pods.ready}/${fleet.pods.total} pods ready` : 'No pods'
     if (fleet?.placement === 'pool') {
       servers = 'Shared pool'

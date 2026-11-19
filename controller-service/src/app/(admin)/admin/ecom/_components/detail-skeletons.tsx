@@ -179,7 +179,7 @@ export function OverviewTabLoading() {
         <FieldsSection title="Store" labels={['Subdomain', 'Custom domain', 'Plan', 'Plan fee', 'Billing', 'Payout', 'Subscription', 'Created']} />
         <FieldsSection
           title="Health"
-          labels={['Instance state', 'Database', 'EC2 target', 'Region', 'Last job', 'Last change', 'Notification email']}
+          labels={['Instance state', 'Database', 'Server', 'EC2 target', 'Region', 'Last job', 'Last change', 'Notification email']}
           wide={['Notification email']}
         />
       </DetailGrid>

@@ -30,7 +30,8 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
       const res = await fetch('/api/ecom/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        // The code's email greets a new owner by the name they typed.
+        body: JSON.stringify({ email, name: mode === 'signup' ? name.trim() || undefined : undefined }),
       })
       const data = await res.json()
       if (!res.ok) showToast(data.error || 'Failed to send OTP', 'error')

@@ -53,8 +53,12 @@ function DirectionCard({
         <div className="flex-1 p-4 pr-10">
           {d.reference && <span className="mb-1.5 inline-block rounded-full org-sand px-2 py-0.5 text-[11px] font-semibold text-foreground-secondary">From {d.reference}</span>}
           <div className="text-sm font-semibold text-foreground">{d.name}</div>
-          <p className="mt-1 text-xs text-foreground-secondary">{d.layoutFeel}</p>
-          <p className="mt-2 text-xs text-foreground-muted">{d.rationale}</p>
+          <p className="mt-1 line-clamp-5 text-xs text-foreground-secondary" title={d.layoutFeel}>
+            {d.layoutFeel}
+          </p>
+          <p className="mt-2 line-clamp-3 text-xs text-foreground-muted" title={d.rationale}>
+            {d.rationale}
+          </p>
         </div>
       </button>
       {selected && <SelectedMark className="absolute right-3 top-3" />}

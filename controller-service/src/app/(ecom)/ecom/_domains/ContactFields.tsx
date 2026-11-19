@@ -1,19 +1,21 @@
 'use client'
 
+import { useId } from 'react'
 import { fieldInput, fieldLabel } from '../onboard/ui'
 import type { DomainContact } from './types'
 
 /** The registrant contact for a domain. Route 53 keeps it private (WHOIS privacy) and the registry emails it to confirm. */
 export default function ContactFields({ value, onChange }: { value: DomainContact; onChange: (c: DomainContact) => void }) {
+  const uid = useId()
   const set = (patch: Partial<DomainContact>) => onChange({ ...value, ...patch })
   const field = (key: keyof DomainContact, label: string, opts: { placeholder?: string; type?: string; optional?: boolean; className?: string } = {}) => (
     <div className={opts.className}>
-      <label className={fieldLabel}>
+      <label htmlFor={`${uid}-${key}`} className={fieldLabel}>
         {label}
         {opts.optional && <span className="font-normal text-foreground-muted"> (optional)</span>}
       </label>
       <input
-        aria-label={label}
+        id={`${uid}-${key}`}
         className={fieldInput}
         type={opts.type ?? 'text'}
         value={(value[key] as string | undefined) ?? ''}
@@ -52,8 +54,8 @@ export default function ContactFields({ value, onChange }: { value: DomainContac
         {field('state', 'State')}
         {field('zipCode', 'PIN code')}
         <div>
-          <label className={fieldLabel}>Country</label>
-          <input className={`${fieldInput} opacity-70`} value="India" readOnly aria-readonly />
+          <label htmlFor={`${uid}-country`} className={fieldLabel}>Country</label>
+          <input id={`${uid}-country`} className={`${fieldInput} opacity-70`} value="India" readOnly aria-readonly />
         </div>
       </div>
     </div>

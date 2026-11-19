@@ -128,6 +128,55 @@ async function send(
   })
 }
 
+/** A store owner's sign-up or sign-in code for the ecom portal, greeting them by name when there is one. */
+export async function sendOwnerOTPEmail(email: string, otp: string, name?: string | null) {
+  const who = name?.trim() || null
+  const html = mailShell({
+    brand: PLATFORM_BRAND,
+    kicker: 'Verification Code',
+    title: 'Your verification code',
+    preheader: `Your ${PLATFORM_BRAND} code is ${otp}. It expires in 10 minutes. Do not share it.`,
+    content: `
+      <p>Hi ${who ? escHtml(who) : 'there'}, your ${PLATFORM_BRAND} verification code is:</p>
+
+      <div class="code-box">${otp}</div>
+
+      <p>Enter it on ecom.jeffistores.in to continue.</p>
+
+      <div class="warning">
+        <strong>This code expires in 10 minutes.</strong>
+        <br>
+        <small>Do not share it with anyone.</small>
+      </div>
+
+      <p>If you didn't ask for this code, you can ignore this email.</p>
+    `,
+    footerLines: [
+      `<a href="https://ecom.jeffistores.in" style="color:#666;">ecom.jeffistores.in</a>`,
+      `Questions? Write to <a href="mailto:${PLATFORM_ADDRESS}" style="color:#666;">${PLATFORM_ADDRESS}</a>.`,
+    ],
+  })
+  try {
+    const info = await sendAuditedMail({
+      from: PLATFORM_FROM,
+      to: email,
+      subject: `${otp} is your ${PLATFORM_BRAND} verification code`,
+      html,
+      // The code alone on its own line helps mail clients offer "Copy code".
+      text: `Hi ${who ?? 'there'}, your ${PLATFORM_BRAND} verification code is ${otp}.\n\n${otp}\n\nIt expires in 10 minutes. Do not share this code with anyone.`,
+      kind: 'otp',
+      templateName: 'owner_otp',
+      // The code stays out of the mail log.
+      redactBody: true,
+      entityType: null,
+      entityId: null,
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
 // Sent before approval, so it assumes payment: the administrator picks Mandatory or Optional at approval.
 export async function sendKycSubmittedEmail(owner: { email: string; name: string | null }) {
   const name = owner.name ?? 'there'

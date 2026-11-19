@@ -19,6 +19,7 @@ import { ADDON_INFO, type AddonId } from '@/lib/billing/addons'
 import { paymentRequired } from '@/lib/billing/payment-required'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Launch your store' }
 
 /** A plan + interval carried from the pricing page, kept only when it names an active store plan. */
 function pickedPlan(

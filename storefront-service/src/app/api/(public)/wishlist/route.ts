@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
-import { cookies } from 'next/headers'
-import { getUserIdForSession } from '@/lib/shared/guest-user'
+import { cartOwner, existingCartOwner } from '@/lib/shared/guest-user'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
@@ -23,20 +22,14 @@ const AddWishlistSchema = z
   })
   .refine(d => d.productId != null || d.product_id != null, { message: 'productId is required' })
 
-async function resolveUserId(request: NextRequest): Promise<string> {
-  const auth = await authenticateUser(request)
-  if (auth?.userId) return auth.userId
-  const cookieStore = await cookies()
-  const sessionId = cookieStore.get('session_id')?.value
-  return getUserIdForSession(sessionId, undefined)
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const userId = await resolveUserId(request)
+    const userId = await existingCartOwner((await authenticateUser(request))?.userId)
+    const idsOnly = new URL(request.url).searchParams.get('ids') === '1'
+    if (!userId) return NextResponse.json(idsOnly ? { productIds: [] } : { items: [] })
 
     // ?ids=1: just the saved product ids, for the hearts and header count on every page.
-    if (new URL(request.url).searchParams.get('ids') === '1') {
+    if (idsOnly) {
       const rows = await queryMany<{ product_id: string }>(
         `SELECT wi.product_id::text AS product_id
          FROM wishlist_items wi JOIN products p ON p.id = wi.product_id AND p.is_active = true
@@ -82,6 +75,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items: wishlistItems || [] })
   } catch (error) {
+    console.error('[wishlist] GET failed:', error)
     return NextResponse.json({ error: 'Failed to fetch wishlist' }, { status: 500 })
   }
 }
@@ -93,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (!parsedWishlist.ok) return parsedWishlist.response
     const productId = parsedWishlist.data.product_id || parsedWishlist.data.productId
 
-    const userId = await resolveUserId(request)
+    const userId = await cartOwner((await authenticateUser(request))?.userId)
 
     const existing = await query('SELECT id FROM wishlist_items WHERE user_id = $1 AND product_id = $2', [
       userId,
@@ -125,6 +119,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item added to wishlist' })
   } catch (error) {
+    console.error('[wishlist] POST failed:', error)
     return NextResponse.json({ error: 'Failed to add to wishlist' }, { status: 500 })
   }
 }
@@ -134,7 +129,8 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId') || searchParams.get('product_id')
 
-    const userId = await resolveUserId(request)
+    const userId = await existingCartOwner((await authenticateUser(request))?.userId)
+    if (!userId) return NextResponse.json({ message: 'Item removed from wishlist' })
 
     await query('DELETE FROM wishlist_items WHERE product_id = $1 AND user_id = $2', [productId, userId])
 
@@ -152,6 +148,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item removed from wishlist' })
   } catch (error) {
+    console.error('[wishlist] DELETE failed:', error)
     return NextResponse.json({ error: 'Failed to remove from wishlist' }, { status: 500 })
   }
 }

@@ -22,6 +22,7 @@ import type { TenantWorkloadStatus } from '@/lib/k8s/tenant-compute'
 import { DEFAULT_SETTINGS, computePlans, getCatalog } from '@controller/lib/compute/catalog'
 import { marginFor, monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
 import { getTenantCompute, type TenantCompute } from '@controller/lib/compute/store'
+import { resolveCompute } from '@controller/lib/compute/resolve'
 import { getTenantMigrationRuns, type TenantMigrationRun } from '@controller/lib/tenant-migrations'
 import { costsFor, type StoreCost } from './cost'
 import { getFleet, type TenantFleet } from './fleet'
@@ -46,6 +47,8 @@ export interface TenantDetailData {
   /** Running (or starting) servers dedicated to it; null when the fleet is unknown. */
   serversRunning: number | null
   purgeable: boolean
+  /** What the store runs, or the build will give it (its pinned or chosen spec, else its plan's); null for a workspace. */
+  spec: ComputeSpec | null
 }
 
 const NO_COST: StoreCost = { priceMonth: null, priceHour: null, awsMonth: null, marginMonth: null, mtdEstimate: null }
@@ -65,13 +68,17 @@ export async function loadTenantDetail(id: string): Promise<TenantDetailData> {
       .then(rows => rows.find(r => r.id === id) ?? null)
       .catch(() => null),
   ])
-  const cost = row ? ((await costsFor([row]))[id] ?? NO_COST) : NO_COST
+  const isStore = hasService(t, 'store')
+  const [cost, spec] = await Promise.all([
+    row ? costsFor([row]).then(c => c[id] ?? NO_COST) : NO_COST,
+    isStore ? storeSpec(t, row, job) : null,
+  ])
   const fleet = fleetAll?.tenants[t.slug] ?? null
   const serversRunning = fleetAll ? (fleet?.servers.filter(s => s.state === 'running' || s.state === 'pending').length ?? 0) : null
 
   return {
     t,
-    isStore: hasService(t, 'store'),
+    isStore,
     job,
     kyc,
     approvals,
@@ -82,7 +89,17 @@ export async function loadTenantDetail(id: string): Promise<TenantDetailData> {
     fleet,
     serversRunning,
     purgeable: isPurgeable(t, serversRunning),
+    spec,
   }
+}
+
+/** Applied, else pinned on the build, else what provisioning would build now (resolveCompute). */
+async function storeSpec(t: TenantDetail, row: TenantListRow | null, job: ProvisioningJob | null): Promise<ComputeSpec | null> {
+  const pinned = row?.applied ?? (job?.created_resources as { computeSpec?: ComputeSpec } | null)?.computeSpec
+  if (pinned) return normalizeSpec(pinned)
+  return resolveCompute(t.id, t.plan)
+    .then(c => c.spec)
+    .catch(() => null)
 }
 
 export interface CostBreakdown {

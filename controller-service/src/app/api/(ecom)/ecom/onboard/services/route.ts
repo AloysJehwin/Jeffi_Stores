@@ -6,6 +6,7 @@ import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { createTenant, getOwnerTenants, linkOwnerTenant, updateOwnerName, saveKyc, markDraftSubmitted, requestServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 import { sendServicesRequestedEmail } from '@/lib/shared/ecom-emails'
 import { parseBody } from '@/lib/shared/validate'
+import { GSTIN_MESSAGE, GSTIN_SHAPE, PAN_MESSAGE, PAN_SHAPE } from '@controller/lib/catalog/tax-ids'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,9 +16,9 @@ const Schema = z.object({
   displayName: z.string().min(2).max(200),
   businessName: z.string().min(2).max(200),
   businessType: z.string().min(1).max(40),
-  pan: z.string().length(10),
+  pan: z.string().trim().toUpperCase().regex(PAN_SHAPE, PAN_MESSAGE),
   businessAddress: z.string().min(5).max(1000),
-  gstNumber: z.string().length(15).optional().or(z.literal('')),
+  gstNumber: z.string().trim().toUpperCase().refine(v => v === '' || GSTIN_SHAPE.test(v), GSTIN_MESSAGE).optional(),
   ownerName: z.string().min(1).max(120),
   mobile: z.string().regex(/^\+\d{8,15}$/, 'Enter the mobile with its country code'),
   legalsAccepted: z.literal(true),

@@ -2,6 +2,7 @@ import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { StatusBadge } from '@/components/admin/kit/status'
 import { Field, FieldGrid, Mono, Section } from '../EcomUI'
 import { JOB_STATUS, dateTimeIN } from '../cells'
+import { instanceStateLabel, isDeployed } from './labels'
 
 type Tone = 'good' | 'warn' | 'bad'
 const BOX: Record<Tone, string> = {
@@ -29,7 +30,9 @@ export default function HealthSummary({ d }: { d: TenantDetailData }) {
             : 'Its database pod is not ready'
         : serving
           ? 'Serving, but not every pod is ready'
-          : 'Not serving customer traffic'
+          : isDeployed(t)
+            ? 'Not serving customer traffic'
+            : instanceStateLabel(t, job)
 
   return (
     <div className="space-y-5 sm:space-y-6 min-w-0">
@@ -59,7 +62,7 @@ export default function HealthSummary({ d }: { d: TenantDetailData }) {
           />
           <Field label="Database" value={t.rds_endpoint ? (fleet?.postgresReady === false ? <span className="text-red-600 dark:text-red-400">Pod not ready</span> : 'Provisioned') : 'Not provisioned'} />
           <Field label="Compute" value={<span className="capitalize">{row?.compute_status ?? '—'}</span>} />
-          <Field label="Instance state" value={<span className="capitalize">{t.instance_state}</span>} />
+          <Field label="Instance state" value={instanceStateLabel(t, job)} />
           <Field
             label="Last job"
             value={

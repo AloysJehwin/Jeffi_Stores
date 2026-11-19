@@ -94,6 +94,8 @@ export async function handleInboundWhatsApp(m: InboundWhatsApp): Promise<{ sessi
     return null
   }
 
+  // Replies go out from the number they last wrote to.
+  const audience = m.audience ?? 'customer'
   let session = userId ? await openSessionFor(userId) : last10 ? await openContactSession(last10) : null
   const isNew = !session
   if (!session) {
@@ -102,15 +104,19 @@ export async function handleInboundWhatsApp(m: InboundWhatsApp): Promise<{ sessi
       channel: 'whatsapp',
       contactPhone: customerNumber,
       contactName: m.profileName?.slice(0, 120) || null,
+      waAudience: audience,
     })
     if (userId) logActivity({ userId, kind: 'support_session_started', referenceId: session.id, referenceType: 'support_sessions', summary: 'Started a support chat on WhatsApp' }).catch(() => {})
-  } else if (!session.contact_phone) {
-    session = (await updateSession(session.id, { contact_phone: customerNumber })) ?? session
+  } else {
+    const set: Record<string, unknown> = {}
+    if (!session.contact_phone) set.contact_phone = customerNumber
+    if ((session.wa_audience ?? 'customer') !== audience) set.wa_audience = audience
+    if (Object.keys(set).length) session = (await updateSession(session.id, set)) ?? session
   }
 
   const attachments: AttachmentInput[] = []
   if (m.media.length) {
-    const provider = await getWhatsAppProvider(m.audience ?? 'customer')
+    const provider = await getWhatsAppProvider(audience)
     const folderId = await supportFolder(session.ticket_number, session.id)
     for (const item of m.media.slice(0, 10)) {
       try {

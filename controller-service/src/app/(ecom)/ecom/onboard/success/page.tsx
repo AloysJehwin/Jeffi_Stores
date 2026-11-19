@@ -14,6 +14,7 @@ import { statusSteps } from '../steps'
 import { primaryBtn } from '../ui'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Payment confirmed' }
 
 // Razorpay redirects here after checkout.
 // We verify the subscription status directly with Razorpay and activate the

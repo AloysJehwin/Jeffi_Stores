@@ -7,6 +7,7 @@ import { Card } from '../_components/Card'
 import AddStoreClient from './AddStoreClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Add a store' }
 
 export default async function AddStorePage() {
   const { tenant } = await loadOwnerContext()

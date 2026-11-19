@@ -6,6 +6,7 @@ import CustomDomains from '../CustomDomains'
 import DomainPurchase from '../DomainPurchase'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Domains' }
 
 export default async function DomainsPage() {
   const { tenant } = await loadOwnerContext()

@@ -26,7 +26,7 @@ async function view(force = false) {
     fx,
     defaults: DEFAULT_MESSAGE_PRICING,
     rows: RATE_ROWS,
-    // The provider each channel uses now (Configuration → Providers); email always goes through SES.
+    // The provider each channel uses now (Settings → Providers); email always goes through SES.
     active: { sms: policy?.smsProvider ?? 'twilio', whatsapp: policy?.whatsappProvider ?? 'twilio', email: 'ses' },
   }
 }

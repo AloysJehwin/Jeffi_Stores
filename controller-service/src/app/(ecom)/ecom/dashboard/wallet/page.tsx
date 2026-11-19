@@ -5,6 +5,7 @@ import WalletClient from './WalletClient'
 import { walletUpiAvailable } from '@/lib/payments/upi/creds'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Wallet' }
 
 export default async function WalletPage() {
   const { tenant } = await loadOwnerContext()

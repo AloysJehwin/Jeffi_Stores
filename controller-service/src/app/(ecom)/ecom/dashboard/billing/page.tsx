@@ -9,6 +9,7 @@ import { messagingAddonState } from '@controller/lib/ecom/messaging-addon-state'
 import { adFreeState } from '@controller/lib/ecom/ad-free-state'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Billing' }
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams

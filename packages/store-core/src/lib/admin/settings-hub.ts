@@ -1,8 +1,8 @@
-import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
+import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/auth/scopes'
 
 // Tabs of the Settings hub (/admin/settings?tab=). Each tab keeps its old route's gate; the old
 // routes redirect into the hub for admins who can open /admin/settings (settings:read).
-export type SettingsHubTabId = 'account' | 'team' | 'numbers' | 'service-accounts' | 'cli' | 'audit'
+export type SettingsHubTabId = 'account' | 'team' | 'numbers' | 'providers' | 'service-accounts' | 'cli' | 'audit'
 
 export const SETTINGS_HUB_TABS: {
   id: SettingsHubTabId
@@ -11,11 +11,15 @@ export const SETTINGS_HUB_TABS: {
   href: string
   scope: string
   ownerOnly?: boolean
+  /** Flagship administrator only (the role exists only on the flagship). */
+  platformAdminOnly?: boolean
 }[] = [
   { id: 'account', label: 'Account', href: '/admin/settings', scope: 'settings:read' },
   { id: 'team', label: 'Team', href: '/admin/team', scope: 'settings:read', ownerOnly: true },
   // The store's SMS / WhatsApp numbers: the flagship's administrator edits them, a store sees the ones Jeffi assigned.
   { id: 'numbers', label: 'Numbers', href: '/admin/settings?tab=numbers', scope: 'settings:read' },
+  // Which provider sends SMS / WhatsApp and serves AI, platform-wide; per-store overrides are in Ecom → Configuration.
+  { id: 'providers', label: 'Providers', href: '/admin/settings?tab=providers', scope: 'settings:read', platformAdminOnly: true },
   { id: 'service-accounts', label: 'Service accounts', href: '/admin/service-accounts', scope: 'service_accounts:read' },
   // No standalone route: `jeffi login` and extension tokens, one's own (owners: everyone's).
   { id: 'cli', label: 'CLI & tokens', href: '/admin/settings?tab=cli', scope: 'settings:read' },
@@ -36,7 +40,9 @@ export function resolveSettingsHubTab(tab: string | null | undefined): SettingsH
 }
 
 export function visibleSettingsHubTabs(role: string, scopes: string[]) {
-  return SETTINGS_HUB_TABS.filter(t => (!t.ownerOnly || isPlatformOwner(role)) && hasScope(role, scopes, t.scope))
+  return SETTINGS_HUB_TABS.filter(
+    t => (!t.ownerOnly || isPlatformOwner(role)) && (!t.platformAdminOnly || isPlatformAdmin(role)) && hasScope(role, scopes, t.scope)
+  )
 }
 
 /** Hub URL for a tab, or its standalone route when the admin cannot open /admin/settings. */

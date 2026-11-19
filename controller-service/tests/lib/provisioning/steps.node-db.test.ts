@@ -19,6 +19,8 @@ const reg = vi.hoisted(() => ({
 vi.mock('@/lib/tenant-registry', () => reg)
 const k8s = vi.hoisted(() => ({ ensureTenantNodes: vi.fn(), ensureNodeDbVolume: vi.fn(), postgresPodReady: vi.fn() }))
 vi.mock('@/lib/k8s/tenant-compute', () => k8s)
+const ec2 = vi.hoisted(() => ({ describeTenantDbVolume: vi.fn() }))
+vi.mock('@/lib/shared/ec2-client', () => ec2)
 const secret = vi.hoisted(() => ({ getOrCreateTenantDbPassword: vi.fn() }))
 vi.mock('@controller/lib/provisioning/tenant-db-secret', () => secret)
 const adminPool = vi.hoisted(() => ({ withTenantAdminPool: vi.fn() }))
@@ -75,12 +77,46 @@ describe('node-db steps', () => {
     expect(c.res).toMatchObject({ endpoint: expect.stringMatching(/acme/), dbName: expect.any(String) })
   })
 
-  it('attach_db_disk waits with the volume detail until it is attached to the first server', async () => {
-    k8s.ensureNodeDbVolume.mockResolvedValueOnce({ attached: false, detail: 'attaching the database volume' }).mockResolvedValueOnce({ attached: true, detail: '' })
-    const c = ctx({ nodeInstances: { 't-acme': 'i-1' } })
-    expect(await attachDbDisk(c)).toEqual({ wait: true, detail: 'attaching the database volume' })
-    expect(k8s.ensureNodeDbVolume).toHaveBeenCalledWith('acme', 't-acme', 20, 'i-1')
-    expect(await attachDbDisk(c)).toEqual({ ok: true })
+  describe('attach_db_disk', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+    // Steps the fake clock until the step returns (its imports resolve on the real event loop).
+    const run = async (c: NodeDbCtx) => {
+      let done = false
+      const p = attachDbDisk(c).finally(() => {
+        done = true
+      })
+      while (!done) await vi.advanceTimersByTimeAsync(1_000)
+      return p
+    }
+
+    it('creates and attaches the disk to the first server within one tick, polling a few seconds apart', async () => {
+      k8s.ensureNodeDbVolume
+        .mockResolvedValueOnce({ attached: false, detail: 'created the database volume vol-1' })
+        .mockResolvedValueOnce({ attached: false, detail: 'attaching the database volume' })
+        .mockResolvedValueOnce({ attached: true, detail: 'attaching the database volume' })
+      ec2.describeTenantDbVolume.mockResolvedValue({ volumeId: 'vol-1', state: 'available' })
+      expect(await run(ctx({ nodeInstances: { 't-acme': 'i-1' } }))).toEqual({ ok: true })
+      expect(k8s.ensureNodeDbVolume).toHaveBeenCalledTimes(3)
+      expect(k8s.ensureNodeDbVolume).toHaveBeenCalledWith('acme', 't-acme', 20, 'i-1')
+    })
+
+    it('never makes a second disk: a new one not listed yet is looked for, not created again', async () => {
+      k8s.ensureNodeDbVolume.mockResolvedValue({ attached: false, detail: 'created the database volume vol-1' })
+      ec2.describeTenantDbVolume.mockResolvedValue(null)
+      expect(await run(ctx())).toEqual({ wait: true, detail: 'created the database volume vol-1' })
+      expect(k8s.ensureNodeDbVolume).toHaveBeenCalledTimes(1)
+    })
+
+    it('waits for the next tick when the disk is still attaching after its polls, or is held elsewhere', async () => {
+      k8s.ensureNodeDbVolume.mockResolvedValue({ attached: false, detail: 'attaching the database volume' })
+      expect(await run(ctx())).toEqual({ wait: true, detail: 'attaching the database volume' })
+      expect(k8s.ensureNodeDbVolume.mock.calls.length).toBeLessThanOrEqual(10)
+
+      k8s.ensureNodeDbVolume.mockReset().mockResolvedValue({ attached: false, detail: 'the database volume is on i-9' })
+      expect(await run(ctx())).toEqual({ wait: true, detail: 'the database volume is on i-9' })
+      expect(k8s.ensureNodeDbVolume).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('start_postgres applies the namespace with the stored password and waits for the pod', async () => {

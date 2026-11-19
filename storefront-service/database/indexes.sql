@@ -405,6 +405,9 @@ CREATE INDEX idx_users_policies_accepted_version ON public.users USING btree (po
 
 CREATE INDEX idx_users_session_id ON public.users USING btree (session_id);
 
+-- The self-FK's ON DELETE SET NULL looks rows up by this column for every deleted user.
+CREATE INDEX idx_users_merged_to_user_id ON public.users USING btree (merged_to_user_id) WHERE (merged_to_user_id IS NOT NULL);
+
 
 
 --
