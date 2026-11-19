@@ -1,6 +1,7 @@
 import type { TenantDetailData } from '@controller/lib/ecom/detail'
 import { Section } from '../EcomUI'
 import { FLEET_UNKNOWN, PlacementCell, RunningCell, ServersCell } from '../cells'
+import { isDeployed, notDeployedNote } from './labels'
 
 /** What the store runs right now: placement, servers, pods and each Deployment. */
 export default function RunningNow({ d }: { d: TenantDetailData }) {
@@ -9,6 +10,8 @@ export default function RunningNow({ d }: { d: TenantDetailData }) {
     <Section title="Running now">
       {!fleetKnown ? (
         <p className="text-sm text-foreground-muted">{FLEET_UNKNOWN}</p>
+      ) : !fleet && !isDeployed(d.t) ? (
+        <p className="text-sm text-foreground-muted">{notDeployedNote(d.t, d.job, d.spec)}</p>
       ) : (
         <div className="space-y-4 min-w-0">
           <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">

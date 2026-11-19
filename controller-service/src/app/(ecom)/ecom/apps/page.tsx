@@ -4,6 +4,7 @@ import AppIcon from './AppIcon'
 import { Eyebrow, Display, Pill, SandCard } from '@controller/app/(ecom)/ecom/_ui'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Apps' }
 
 export default function AppsIndexPage() {
   return (

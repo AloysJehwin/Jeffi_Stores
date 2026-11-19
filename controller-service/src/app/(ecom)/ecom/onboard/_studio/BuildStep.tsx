@@ -6,6 +6,7 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities'
 import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import CodeContentFields from '@/components/admin/site-builder/CodeContentFields'
 import type { CodeLiteral, LiteralEdit } from '@/lib/site/code/literals'
 import { fieldInput, ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../ui'
@@ -180,6 +181,7 @@ export default function BuildStep({
   aiDown?: boolean
 }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const refresh = useCallback(async () => {
     const v = await studioGet().catch(() => null)
     if (v) onView(v)
@@ -335,11 +337,11 @@ export default function BuildStep({
   async function rebuild() {
     if (!currentPage || currentPage.themed) return
     const ask = paid
-      ? `Design your page again for ₹${paid.priceInr} from your wallet? If the new page can’t be made, you aren’t charged. Your current page stays until the new one is ready.`
+      ? { title: 'Design your page again?', message: `It costs ₹${paid.priceInr} from your wallet. If the new page can’t be made, you aren’t charged. Your current page stays until the new one is ready.`, confirmLabel: `Design again · ₹${paid.priceInr}` }
       : showcase
-        ? 'Design your page with AI? This is your free design. Your current page stays until the new one is ready.'
-        : `Design the ${currentPage.label} page again? It counts as ${5} of today’s free changes.`
-    if (!window.confirm(ask)) return
+        ? { title: 'Design your page with AI?', message: 'This is your free design. Your current page stays until the new one is ready.', confirmLabel: 'Design my page' }
+        : { title: `Design the ${currentPage.label} page again?`, message: 'It counts as 5 of today’s free changes.', confirmLabel: 'Design again' }
+    if (!(await confirm(ask))) return
     setWorking('rebuild')
     setPicked(null)
     try {
@@ -454,7 +456,8 @@ export default function BuildStep({
     if (copy) setPicked({ page: current, blockId: copy.id, label: copy.label })
   }
   const deleteSection = async (x: OutlineSection) => {
-    if (!window.confirm(`Delete “${x.label}” from this page? You can’t undo this here; designing the page again brings new sections.`)) return
+    const ok = await confirm({ title: `Delete “${x.label}” from this page?`, message: 'You can’t undo this here; designing the page again brings new sections.', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
     if (await edit({ op: 'delete', blockId: x.id }, `Deleted “${x.label}”`)) setPicked(p => (p?.blockId === x.id ? null : p))
   }
 
@@ -568,10 +571,11 @@ export default function BuildStep({
         </div>
       )}
 
-      {!building && !working && s.status === 'ready' && s.hasCatalog && !s.hasPictures && (
+      {!building && !working && s.status === 'ready' && s.hasCatalog && (!s.hasPictures || !!s.missingPictures) && (
         <div className={`${noteCls} mb-4 flex flex-wrap items-center justify-between gap-3 org-sand`} role="status">
           <span className="text-foreground-secondary">
-            No product photos yet{s.progress?.pictures?.error ? ': the image service wasn’t available' : ''}. The preview shows placeholders; your live store shows your own product photos.
+            {s.hasPictures && s.missingPictures ? `${s.missingPictures} sample product${s.missingPictures === 1 ? ' has' : 's have'} no photo yet` : 'No product photos yet'}
+            {s.progress?.pictures?.error ? ': the image service wasn’t available' : ''}. The preview shows placeholders for them.
           </span>
           <button type="button" onClick={() => void addPhotos()} className={secondaryBtn}>
             <ImageIcon className="h-4 w-4" /> Add product photos
@@ -740,7 +744,7 @@ export default function BuildStep({
       )}
       {s.status === 'ready' && !showcase && (
         <div className={`${noteCls} mt-4 org-sage org-sage-text`}>
-          Saved with your application. It is installed into your store when it goes live, and the sample products are replaced by yours.
+          Saved with your application. It is installed into your store when it goes live, with the sample products in your catalogue to edit or remove.
         </div>
       )}
       {!building && !homeReady && (

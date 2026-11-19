@@ -4,6 +4,7 @@ import PageHeader from '../_components/PageHeader'
 import DeliveryAccount from '../DeliveryAccount'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Delivery' }
 
 export default async function DeliveryPage() {
   const { tenant } = await loadOwnerContext()

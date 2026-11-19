@@ -7,6 +7,7 @@ import PageHeader from '../../_components/PageHeader'
 import LeadsClient from './LeadsClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Enquiries' }
 
 const PAGE = 50
 

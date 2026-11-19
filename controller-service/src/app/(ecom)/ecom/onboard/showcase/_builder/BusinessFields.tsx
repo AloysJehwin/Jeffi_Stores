@@ -84,12 +84,14 @@ export default function BusinessFields({
                   value={form.slug}
                   readOnly={slugLocked}
                   autoCapitalize="none"
+                  // Browsers otherwise fill this with the street address.
+                  autoComplete="off"
                   spellCheck={false}
                   maxLength={58}
                   aria-describedby="sc-slug-state"
                   onChange={e => {
                     onSlugTouched()
-                    setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 58) }))
+                    setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 58) }))
                   }}
                 />
                 <span className="shrink-0 font-mono text-sm text-foreground-muted">.{ROOT}</span>

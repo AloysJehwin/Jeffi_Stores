@@ -34,6 +34,8 @@ export function sampleStore(ctx: StudioStoreContext): SampleCatalog['store'] {
 const slug = (s: string) =>
   s
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 const AUTHORS = ['Ananya S.', 'Rohit K.', 'Meera P.', 'Arjun N.']

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowLeft, Check, Eye, Loader2, X } from 'lucide-react'
 import { paletteFrom } from '@jeffi/site-blocks'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import { THEME_PALETTES, THEME_STYLES, themeIdOf, themeName, themeOfDirection, themeStyle, themeTokens, type ThemeAvailable, type ThemePalette, type ThemeStyleId } from '@/lib/site/themes/catalog'
 import { choiceCardCls } from '../../_ui'
@@ -165,6 +166,7 @@ export default function ThemeGallery({
   onCancel?: () => void
 }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const s = view?.session ?? null
   const wearing = themeOfDirection(s?.direction)
   const hasSite = !!s && Object.keys(s.pages ?? {}).length > 0
@@ -204,8 +206,16 @@ export default function ThemeGallery({
 
   async function choose(style: ThemeStyleId, palette: ThemePalette, replace = hasSite) {
     const label = themeName(style, palette)
-    const ask = `Use the ${label} theme? It replaces the pages you have now, along with any changes made to them. Your free AI generation stays available.`
-    if (replace && !window.confirm(ask)) return
+    if (
+      replace &&
+      !(await confirm({
+        title: `Use the ${label} theme?`,
+        message: 'It replaces the pages you have now, along with any changes made to them. Your free AI generation stays available.',
+        confirmLabel: 'Use this theme',
+        variant: 'danger',
+      }))
+    )
+      return
     const id = themeIdOf(style, palette.id)
     setBusy(id)
     try {

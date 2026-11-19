@@ -4,6 +4,7 @@ import PageHeader from '../_components/PageHeader'
 import ApiKeysClient from './ApiKeysClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'API keys' }
 
 export default async function ApiKeysPage() {
   const { tenant } = await loadOwnerContext()

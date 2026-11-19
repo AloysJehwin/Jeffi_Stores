@@ -1,5 +1,5 @@
 import { controlPlanePool } from '@/lib/tenant-registry/shared'
-import { createTenant } from '@/lib/tenant-registry/tenants'
+import { createTenant, slugFromName } from '@/lib/tenant-registry/tenants'
 import { getOwnerTenants, linkOwnerTenant } from '@/lib/tenant-registry/owners'
 import type { ShowcaseSite } from './types'
 
@@ -14,8 +14,10 @@ export async function ensureShowcaseWorkspace(site: Pick<ShowcaseSite, 'id' | 'o
   if (!tenantId) {
     const name = site.business.name?.trim() || site.slug
     const rand = () => Math.random().toString(36).slice(2, 8)
-    // The site's own address first; a store slug may not start with site- nor clash with another workspace.
-    for (const slug of [site.slug, `${site.slug}-site`, `${site.slug.slice(0, 50)}-${rand()}`, `showcase-${rand()}`]) {
+    // From the business name, never the site address: a browser can autofill a street address into that field.
+    // A store slug may not start with site- nor clash with another workspace.
+    const base = slugFromName(site.business.name ?? '')
+    for (const slug of [...(base ? [base, `${base}-${rand()}`] : []), `showcase-${rand()}`]) {
       const r = await createTenant({ slug, displayName: name, planSlug: 'services', status: 'active', serviceTypes: ['showcase'] })
       if (!r.ok) continue
       tenantId = r.tenantId

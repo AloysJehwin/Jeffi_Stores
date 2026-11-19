@@ -14,6 +14,7 @@ import { serviceStates } from '@controller/lib/ecom/service-states'
 import { priceList } from '@jeffi/pricing'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Dashboard' }
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams

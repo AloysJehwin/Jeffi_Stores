@@ -17,9 +17,12 @@ import { dbTarget, tenantAdminPool, type DbAuth } from './tenant-admin-pool'
 
 const KNOWN_PROFILES = new Set<string>(SEED_PROFILES)
 
+// 'Home Décor' → 'home-decor': the accent is dropped, not turned into a hyphen.
 function slugify(s: string): string {
   return s
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 }

@@ -113,6 +113,17 @@ export function listOf(o: unknown, ...keys: string[]): unknown[] {
 
 export const str = (v: unknown, max: number, d = '') => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : d)
 
+/** Like str, for text the owner reads: a longer one is cut at a word and ends in "…", never mid-word. */
+export function clip(v: unknown, max: number, d = ''): string {
+  const s = str(v, Infinity)
+  if (!s) return d
+  if (s.length <= max) return s
+  const cut = s.slice(0, max - 1).replace(/\s+\S*$/, '')
+  // Not on a dangling "in a" or a comma.
+  const tidy = cut.replace(/(\s+(a|an|the|and|or|of|in|on|at|to|for|with|by|as|from|into|its|their))+$/i, '').replace(/[\s,;:.\-–—]+$/, '')
+  return `${tidy || s.slice(0, max - 1)}…`
+}
+
 // Seeded choices: one brief always makes the same picks for the same salt, another brief (or seed) makes others.
 export function rng(seed: number, salt = '') {
   let h = seed >>> 0

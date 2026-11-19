@@ -29,6 +29,7 @@ export {
   tenantSummary,
   activeTenantCount,
   createTenant,
+  slugFromName,
   planMix,
   planSlugs,
   listPlans,

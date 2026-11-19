@@ -37,7 +37,7 @@ function PageRow({ p, onToggle, locked }: { p: PlannedPage; onToggle: (v: boolea
         {p.enabled && p.sections.length > 1 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {p.sections.map(s => (
-              <span key={s.id} title={s.intent} className="rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] text-foreground-secondary">
+              <span key={s.id} title={s.intent} className="max-w-full truncate rounded-full bg-surface-secondary px-2 py-0.5 text-[11px] text-foreground-secondary">
                 {s.label}
               </span>
             ))}

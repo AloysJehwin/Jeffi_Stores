@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { SkeletonRows } from './_components/Skeleton'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Domain {
   id: string
@@ -21,6 +22,7 @@ export default function CustomDomains({
   maxDomains: number
 }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [domains, setDomains] = useState<Domain[]>([])
   const [loaded, setLoaded] = useState(false)
   const [cnameTarget, setCnameTarget] = useState(`${slug}.jeffistores.in`)
@@ -28,8 +30,14 @@ export default function CustomDomains({
   const [newDomain, setNewDomain] = useState('')
   const [busy, setBusy] = useState(false)
 
-  async function del(id: string) {
-    if (!confirm('Remove this domain?')) return
+  async function del(id: string, domain: string) {
+    const ok = await confirm({
+      title: 'Remove this domain?',
+      message: `Your store stops using ${domain}. You can add it again later.`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    })
+    if (!ok) return
     setBusy(true)
     const res = await fetch(`/api/ecom/domains/${id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
@@ -51,7 +59,7 @@ export default function CustomDomains({
   }
   useEffect(() => {
     load()
-  }, [tenantId])
+  }, [tenantId]) // eslint-disable-line react-hooks/exhaustive-deps -- reload per store
 
   async function addDomain() {
     setBusy(true)
@@ -144,7 +152,7 @@ export default function CustomDomains({
                 </button>
               )}
               <button
-                onClick={() => del(d.id)}
+                onClick={() => del(d.id, d.domain)}
                 disabled={busy}
                 className="text-xs px-3 py-1 rounded-xl border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
               >

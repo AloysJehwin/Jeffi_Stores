@@ -7,6 +7,7 @@ import PageHeader from '../_components/PageHeader'
 import DocumentsClient from './DocumentsClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Documents' }
 
 export default async function DocumentsPage() {
   const { tenant } = await loadOwnerContext()

@@ -7,6 +7,7 @@ import PageHeader from '../_components/PageHeader'
 import ShowcaseClient from './ShowcaseClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Showcase' }
 
 const POINTS = [
   'Your work, services, reviews and contacts on one page, at site-yourname.jeffistores.in',
