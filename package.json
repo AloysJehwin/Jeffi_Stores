@@ -103,7 +103,7 @@
     "pg": "^8.20.0",
     "pngjs": "^7.0.0",
     "postcss": "^8.5.23",
-    "postcss-selector-parser": "^6.1.4",
+    "postcss-selector-parser": "^6.1.6",
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "react": "^18.2.0",
