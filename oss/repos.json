@@ -1,0 +1,325 @@
+{
+  "org": "Jeffi-ERP",
+  "upstream": { "repo": "AloysJehwin/Jeffi_Stores", "branch": "main" },
+  "promote": { "base": "main" },
+  "label": "ok-to-test",
+  "maintainers": "maintainers",
+  "owner": "AloysJehwin",
+  "homepage": "https://jeffistores.in",
+  "apps": { "export": 5836021, "promote": 5836027 },
+  "managed": [".github/", "LICENSE"],
+  "env": {
+    "test": {
+      "JWT_SECRET": "test-jwt-secret-at-least-32-bytes!!",
+      "CRON_SECRET": "test-cron-secret",
+      "SERVICE_AUTH_SECRET": "test-service-auth-secret",
+      "RAZORPAY_WEBHOOK_SECRET": "test-webhook-secret",
+      "DELHIVERY_API_KEY": "test-delhivery-key",
+      "GOOGLE_CLIENT_ID": "test-google-client-id"
+    },
+    "build": {
+      "NODE_OPTIONS": "--max-old-space-size=6144",
+      "DATABASE_URL": "postgresql://localhost:5432/dummy",
+      "JWT_SECRET": "ci-test-secret",
+      "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
+      "SKIP_DB_CHECK": "true"
+    }
+  },
+  "repos": [
+    {
+      "name": "workspace",
+      "path": "",
+      "include": [
+        "package.json", "package-lock.json", "tsconfig.json", "tsconfig.services.json",
+        "vitest.config.ts", "vitest.integration.config.ts", "playwright.config.ts",
+        ".eslintrc.services.cjs", ".editorconfig", ".gitignore", ".prettierrc.json", ".prettierignore", ".env.example",
+        "scripts/db-files.mjs", "scripts/check-api-test-mirror.mjs", "scripts/gen-admin-manifest.ts",
+        "scripts/admin-manifest/", "scripts/dev-router.ts", "scripts/site-themes/",
+        "database/", "tests/", "vendor/", "certs/", "deploy/load-secrets.mjs"
+      ],
+      "managed": ["oss/"],
+      "description": "Start here: shared root config (package.json, tsconfig, Vitest, ESLint), the DB schema loader, and oss/assemble.mjs, which clones every Jeffi ERP repo into place.",
+      "topics": ["jeffi-erp", "monorepo", "workspace", "nextjs", "typescript", "ecommerce"],
+      "discussions": true,
+      "checks": {
+        "pr": [
+          { "name": "Type check (everything)", "run": "npx tsc --noEmit" },
+          { "name": "Admin API manifest", "run": "npm run cli:check" },
+          { "name": "API test mirror", "run": "node scripts/check-api-test-mirror.mjs" }
+        ],
+        "prebuild": [
+          { "name": "Type check (everything)", "run": "npx tsc --noEmit" },
+          { "name": "Admin API manifest", "run": "npm run cli:check" }
+        ],
+        "build": [
+          { "name": "Unit tests · store-core", "run": "npx vitest run --project store-core", "env": "test" },
+          { "name": "Build · controller", "run": "npm run build:controller", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "storefront-service",
+      "path": "storefront-service",
+      "description": "Customer storefront (Next.js): catalogue, search, cart, checkout and accounts.",
+      "topics": ["jeffi-erp", "ecommerce", "storefront", "nextjs", "react", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx next lint storefront-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p storefront-service/tsconfig.typecheck.json" },
+          { "name": "Unit tests", "run": "npx vitest run --project storefront --passWithNoTests", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx next lint storefront-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p storefront-service/tsconfig.typecheck.json" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npx vitest run --project storefront --passWithNoTests", "env": "test" },
+          { "name": "Build", "run": "npm run build:storefront", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "admin-service",
+      "path": "admin-service",
+      "description": "Store admin panel (Next.js): products, orders, invoices, GST, CRM and campaigns.",
+      "topics": ["jeffi-erp", "ecommerce", "admin-panel", "erp", "nextjs", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx next lint admin-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p admin-service/tsconfig.typecheck.json" },
+          { "name": "Unit tests", "run": "npx vitest run --project admin --passWithNoTests", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx next lint admin-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p admin-service/tsconfig.typecheck.json" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npx vitest run --project admin --passWithNoTests", "env": "test" },
+          { "name": "Build", "run": "npm run build:admin", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "business-service",
+      "path": "business-service",
+      "description": "B2B portal (Next.js): business accounts, RFQs, quotations and bulk ordering.",
+      "topics": ["jeffi-erp", "ecommerce", "b2b", "nextjs", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx next lint business-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p business-service/tsconfig.typecheck.json" },
+          { "name": "Unit tests", "run": "npx vitest run --project business --passWithNoTests", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx next lint business-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p business-service/tsconfig.typecheck.json" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npx vitest run --project business --passWithNoTests", "env": "test" },
+          { "name": "Build", "run": "npm run build:business", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "controller-service",
+      "path": "controller-service",
+      "description": "Platform control plane (Next.js): tenants, provisioning, plans, billing and the ecom portal.",
+      "topics": ["jeffi-erp", "saas", "multi-tenant", "control-plane", "nextjs", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx next lint controller-service --dir src" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p controller-service/tsconfig.typecheck.json" },
+          { "name": "Unit tests", "run": "npx vitest run --project controller --passWithNoTests", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx next lint controller-service --dir src" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p controller-service/tsconfig.typecheck.json" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npx vitest run --project controller --passWithNoTests", "env": "test" },
+          { "name": "Build", "run": "npm run build:controller", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "showcase-service",
+      "path": "showcase-service",
+      "description": "One-page business websites (Next.js).",
+      "topics": ["jeffi-erp", "website-builder", "nextjs", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx next lint showcase-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p showcase-service/tsconfig.typecheck.json" },
+          { "name": "Unit tests", "run": "npx vitest run --project showcase --passWithNoTests", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx next lint showcase-service" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p showcase-service/tsconfig.typecheck.json" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npx vitest run --project showcase --passWithNoTests", "env": "test" },
+          { "name": "Build", "run": "npm run build:showcase", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "messaging-service",
+      "path": "messaging-service",
+      "description": "WhatsApp, SMS, email and push messaging: templates, sending and delivery tracking.",
+      "topics": ["jeffi-erp", "whatsapp", "sms", "email", "push-notifications", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts messaging-service/src" },
+          { "name": "Type check", "run": "npm --prefix messaging-service run typecheck" },
+          { "name": "Unit tests", "run": "npm --prefix messaging-service test", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts messaging-service/src" },
+          { "name": "Type check", "run": "npm --prefix messaging-service run typecheck" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npm --prefix messaging-service test", "env": "test" }
+        ]
+      }
+    },
+    {
+      "name": "document-service",
+      "path": "document-service",
+      "description": "PDF documents: invoices, quotations, purchase orders and receipts.",
+      "topics": ["jeffi-erp", "pdf", "invoicing", "gst", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts document-service/src" },
+          { "name": "Type check", "run": "npm --prefix document-service run typecheck" },
+          { "name": "Unit tests", "run": "npm --prefix document-service test", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts document-service/src" },
+          { "name": "Type check", "run": "npm --prefix document-service run typecheck" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npm --prefix document-service test", "env": "test" }
+        ]
+      }
+    },
+    {
+      "name": "public-api-service",
+      "path": "public-api-service",
+      "description": "Public REST API (/v1) for stores and integrations.",
+      "topics": ["jeffi-erp", "rest-api", "ecommerce-api", "typescript"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts public-api-service/src" },
+          { "name": "Type check", "run": "npm --prefix public-api-service run typecheck" },
+          { "name": "Unit tests", "run": "npm --prefix public-api-service test -- --passWithNoTests", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts public-api-service/src" },
+          { "name": "Type check", "run": "npm --prefix public-api-service run typecheck" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npm --prefix public-api-service test -- --passWithNoTests", "env": "test" }
+        ]
+      }
+    },
+    {
+      "name": "mobile-service",
+      "path": "mobile-service",
+      "description": "Mobile backend API and the Expo (React Native) shopping app.",
+      "topics": ["jeffi-erp", "react-native", "expo", "mobile-app", "typescript"],
+      "exclude": ["client/google-services.json"],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts mobile-service/src" },
+          { "name": "Type check", "run": "npm --prefix mobile-service run typecheck" },
+          { "name": "Unit tests", "run": "npm --prefix mobile-service test -- --passWithNoTests", "env": "test" },
+          { "name": "App type check", "run": "npm --prefix mobile-service/client ci && npm --prefix mobile-service/client run typecheck" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts mobile-service/src" },
+          { "name": "Type check", "run": "npm --prefix mobile-service run typecheck" },
+          { "name": "App type check", "run": "npm --prefix mobile-service/client ci && npm --prefix mobile-service/client run typecheck" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npm --prefix mobile-service test -- --passWithNoTests", "env": "test" }
+        ]
+      }
+    },
+    {
+      "name": "ai-platform",
+      "path": "ai-platform",
+      "description": "AI gateway and SDK: chat, embeddings, vision and OCR with caching and a durable queue.",
+      "topics": ["jeffi-erp", "ai-gateway", "llm", "ollama", "ocr", "typescript"],
+      "exclude": ["deploy/"],
+      "checks": {
+        "pr": [
+          { "name": "Install", "run": "npm --prefix ai-platform ci" },
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts ai-platform/gateway/src ai-platform/sdk" },
+          { "name": "Type check", "run": "npm --prefix ai-platform run typecheck" },
+          { "name": "Unit tests", "run": "npm --prefix ai-platform test" }
+        ],
+        "prebuild": [
+          { "name": "Install", "run": "npm --prefix ai-platform ci" },
+          { "name": "Lint", "run": "npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts ai-platform/gateway/src ai-platform/sdk" },
+          { "name": "Type check", "run": "npm --prefix ai-platform run typecheck" }
+        ],
+        "build": [
+          { "name": "Install", "run": "npm --prefix ai-platform ci" },
+          { "name": "Unit tests", "run": "npm --prefix ai-platform test" },
+          { "name": "Build", "run": "npm --prefix ai-platform run build" }
+        ]
+      }
+    },
+    {
+      "name": "store-core",
+      "path": "packages/store-core",
+      "description": "Shared core of the Next.js apps: UI components, domain logic, database access, auth and middleware.",
+      "topics": ["jeffi-erp", "ecommerce", "nextjs", "react", "typescript"],
+      "exclude": [
+        "tests/lib/razorpay-route-payload.test.ts",
+        "tests/lib/shipping/courier-consignee.test.ts",
+        "tests/lib/showcase-complete.test.ts"
+      ],
+      "checks": {
+        "pr": [
+          { "name": "Lint", "run": "npx next lint controller-service --dir ../packages/store-core/src" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p packages/store-core/tsconfig.typecheck.json" },
+          { "name": "Unit tests", "run": "npx vitest run --project store-core", "env": "test" }
+        ],
+        "prebuild": [
+          { "name": "Lint", "run": "npx next lint controller-service --dir ../packages/store-core/src" },
+          { "name": "Type check", "run": "npx tsc --noEmit -p packages/store-core/tsconfig.typecheck.json" },
+          { "name": "Type check · admin", "run": "npx tsc --noEmit -p admin-service/tsconfig.typecheck.json" },
+          { "name": "Type check · storefront", "run": "npx tsc --noEmit -p storefront-service/tsconfig.typecheck.json" }
+        ],
+        "build": [
+          { "name": "Unit tests", "run": "npx vitest run --project store-core", "env": "test" },
+          { "name": "Build · storefront", "run": "npm run build:storefront", "env": "build" }
+        ]
+      }
+    },
+    {
+      "name": "packages",
+      "path": "packages",
+      "description": "Shared TypeScript packages: tenancy, service auth, pricing, GST, wallet, push, bulk jobs, the CLI and more.",
+      "topics": ["jeffi-erp", "typescript", "npm-workspaces", "cli"],
+      "exclude": ["store-core/"],
+      "checks": {
+        "pr": [
+          { "name": "Type check · cli", "run": "npx tsc --noEmit -p packages/cli/tsconfig.json" },
+          { "name": "Type check · services", "run": "npm run typecheck:services" },
+          { "name": "Unit tests · cli", "run": "npx vitest run --project cli", "env": "test" },
+          { "name": "Admin API manifest", "run": "npm run cli:check" }
+        ],
+        "prebuild": [
+          { "name": "Type check · cli", "run": "npx tsc --noEmit -p packages/cli/tsconfig.json" },
+          { "name": "Type check · services", "run": "npm run typecheck:services" }
+        ],
+        "build": [
+          { "name": "Unit tests · cli", "run": "npx vitest run --project cli", "env": "test" },
+          { "name": "Build · cli", "run": "npm run cli:build" }
+        ]
+      }
+    }
+  ]
+}

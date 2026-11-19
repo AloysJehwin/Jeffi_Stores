@@ -1,0 +1,70 @@
+# Managed from %%upstream%% (oss/templates); changes here are overwritten by the next export.
+#
+# Nothing runs when a PR is opened. A maintainer adds the `%%label%%` label after reading the change; that runs the
+# checks below with a read-only token and no secrets. "PR checks" (the last job) is the required status: it
+# exists only for `%%label%%` runs, so another label's skipped run can't satisfy it. New pushes drop the label
+# (pr-gate.yml), and the new head has no checks until a maintainer labels it again.
+name: PR checks
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}-${{ github.event.label.name }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: ${{ github.event.label.name == '%%label%%' && 'Lint, type check, unit tests' || 'Not requested' }}
+    if: github.event.label.name == '%%label%%'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: This repo at the PR's merge commit
+        uses: actions/checkout@v7
+        with:
+          path: ${{ github.event.repository.name == 'workspace' && 'ws' || 'pr' }}
+          persist-credentials: false
+      - name: Workspace (main)
+        if: github.event.repository.name != 'workspace'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workspace
+          path: ws
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ws/package-lock.json
+      - name: Assemble the other repos
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          if [ "$REPO" = workspace ]; then node ws/oss/assemble.mjs --root ws --shallow
+          else node ws/oss/assemble.mjs --root ws --shallow --place "$REPO=pr"; fi
+      - name: Install
+        working-directory: ws
+        run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+      - name: Checks
+        working-directory: ws
+        run: node oss/checks.mjs "${{ github.event.repository.name }}" pr
+
+  result:
+    name: ${{ github.event.label.name == '%%label%%' && 'PR checks' || 'PR checks · not requested' }}
+    needs: checks
+    if: always() && github.event.label.name == '%%label%%'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every check passed
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: |
+          echo "Checks: $RESULT"
+          [ "$RESULT" = success ]

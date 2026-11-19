@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500" role="img" aria-labelledby="t">
+<title id="t">Jeffi ERP</title>
+<rect width="500" height="500" rx="110" fill="#f59e0b"/>
+<path d="M235 72.66A30 30 0 0 1 265 72.66L396.08 148.34A30 30 0 0 1 411.08 174.32L411.08 325.68A30 30 0 0 1 396.08 351.66L265 427.34A30 30 0 0 1 235 427.34L103.92 351.66A30 30 0 0 1 88.92 325.68L88.92 174.32A30 30 0 0 1 103.92 148.34Z" fill="none" stroke="#363948" stroke-width="42"/>
+<path d="M242 168V284A48 48 0 0 1 194 332H154V297H186A12 12 0 0 0 198 285V168ZM262 168H346V203H306V232.5H338V267.5H306V297H346V332H262Z" fill="#363948"/>
+</svg>

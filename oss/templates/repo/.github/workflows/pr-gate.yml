@@ -1,0 +1,59 @@
+# Managed from %%upstream%% (oss/templates); changes here are overwritten by the next export.
+#
+# Runs from main's copy of this file (pull_request_target), so a PR can't change it, and it never checks out or
+# runs PR code. On new commits it drops `%%label%%`, so checks only ever run on code a maintainer has looked at.
+# On `%%label%%` it adds the "Guard" status (required): a PR may not change the files this repo gets from
+# %%upstream%% (.github/, LICENSE, and oss/ in workspace), including this workflow.
+name: PR gate
+
+on:
+  pull_request_target:
+    types: [labeled, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  unlabel:
+    name: Drop %%label%% on new commits
+    if: github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | grep -qx '%%label%%'; then
+            gh api -X DELETE "repos/$REPO/issues/$PR/labels/%%label%%" > /dev/null
+            echo "Removed %%label%%: the new commits need a maintainer's look before checks run again."
+          else
+            echo "No %%label%% label to remove."
+          fi
+
+  guard:
+    name: ${{ github.event.label.name == '%%label%%' && 'Guard' || 'Guard · not requested' }}
+    if: github.event.action == 'labeled' && github.event.label.name == '%%label%%'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Managed files are untouched
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NAME: ${{ github.event.repository.name }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$BASE" != main ]; then echo "::error::PRs go to main (this one targets $BASE)."; exit 1; fi
+          gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)' > files.txt
+          pattern='^(\.github/|LICENSE$)'
+          if [ "$NAME" = workspace ]; then pattern='^(\.github/|LICENSE$|oss/)'; fi
+          if grep -E "$pattern" files.txt; then
+            echo "::error::This PR changes files that come from %%upstream%% (listed above). Revert them here and describe the change in an issue instead."
+            exit 1
+          fi
+          echo "OK: $(wc -l < files.txt | tr -d ' ') files changed, none of them managed."

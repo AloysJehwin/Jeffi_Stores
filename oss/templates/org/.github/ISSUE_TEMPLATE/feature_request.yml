@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose an improvement or a new capability.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For larger changes, agree on the approach here before you write code. Questions go to [Discussions](https://github.com/Jeffi-ERP/workspace/discussions).
+
+        **Never paste secrets, API keys, tokens, `.env` values, customer data or order details.**
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve, and for whom (shopper, store owner, business buyer, platform operator, developer)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should change. Mention other repositories it touches, new dependencies and database changes.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Storefront
+        - Store admin
+        - B2B portal
+        - Control plane or ecom portal
+        - Showcase websites
+        - Messaging (WhatsApp, SMS, email, push)
+        - Documents (PDF)
+        - Public API
+        - Mobile app or mobile API
+        - AI gateway
+        - Shared packages or store-core
+        - Workspace setup or tooling
+        - Other
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues and discussions.
+          required: true
+        - label: This request contains no secrets, customer data or order details.
+          required: true
+        - label: I would like to work on this myself.
