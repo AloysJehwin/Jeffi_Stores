@@ -84,7 +84,9 @@
    "badge": "Bestseller",
    "featured": true,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061449215-ai-homepage_image-1795061449214-0.webp"
+   ],
    "imagePrompt": "Amber glass dropper bottle with a white label on a soft beige background, a few citrus slices beside it, bright natural light."
   },
   {
@@ -105,7 +107,9 @@
    "badge": null,
    "featured": true,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061446344-ai-homepage_image-1795061446344-0.webp"
+   ],
    "imagePrompt": "White squeeze tube with a minimal teal label, a smooth swatch of gel cream on a pale grey surface."
   },
   {
@@ -126,7 +130,9 @@
    "badge": "Bestseller",
    "featured": true,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061449585-ai-homepage_image-1795061449584-0.webp"
+   ],
    "imagePrompt": "Green pump bottle beside fresh neem leaves on a wooden tray, with soft white foam on a wet stone."
   },
   {
@@ -147,7 +153,9 @@
    "badge": "New",
    "featured": true,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061446136-ai-homepage_image-1795061446135-0.webp"
+   ],
    "imagePrompt": "Slim white tube with orange cap and a sunny yellow backdrop, a bead of sunscreen on a palm."
   },
   {
@@ -168,7 +176,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061452197-ai-homepage_image-1795061452196-0.webp"
+   ],
    "imagePrompt": "Frosted glass jar with a rose gold lid, a small swatch of tinted cream on a marble tile."
   },
   {
@@ -189,7 +199,9 @@
    "badge": "Bestseller",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061452926-ai-homepage_image-1795061452926-0.webp"
+   ],
    "imagePrompt": "Brown glass bottle with a cream label, a sprig of bhringraj leaves and a small brass bowl of oil."
   },
   {
@@ -210,7 +222,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061455047-ai-homepage_image-1795061455047-0.webp"
+   ],
    "imagePrompt": "Frosted white bottle with a sage green label, halved amla fruit and a few argan kernels beside it."
   },
   {
@@ -231,7 +245,9 @@
    "badge": "New",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061455816-ai-homepage_image-1795061455816-0.webp"
+   ],
    "imagePrompt": "Slender dropper bottle with a dark green label, fresh rosemary sprigs tied with twine on a linen cloth."
   },
   {
@@ -252,7 +268,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061458111-ai-homepage_image-1795061458110-0.webp"
+   ],
    "imagePrompt": "Tall pump bottle with a warm cream label, a honeycomb piece and half a coconut on a wooden surface."
   },
   {
@@ -273,7 +291,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061458957-ai-homepage_image-1795061458957-0.webp"
+   ],
    "imagePrompt": "Soft pink tub with a cream label, a scoop of whipped lotion resting on a ceramic dish."
   },
   {
@@ -294,7 +314,9 @@
    "badge": "Bestseller",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061460929-ai-homepage_image-1795061460929-0.webp"
+   ],
    "imagePrompt": "Round tin with a natural kraft label beside a lip balm stick, a kokum fruit cut in half."
   },
   {
@@ -315,7 +337,9 @@
    "badge": "New",
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061461817-ai-homepage_image-1795061461817-0.webp"
+   ],
    "imagePrompt": "Slim rose-gold balm stick with the cap off, a few dried rose petals on a white background."
   },
   {
@@ -336,7 +360,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061463752-ai-homepage_image-1795061463752-0.webp"
+   ],
    "imagePrompt": "Clear spray bottle with a white cap and a pale pink label, dewy droplets on a pale green leaf."
   },
   {
@@ -357,7 +383,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061464834-ai-homepage_image-1795061464834-0.webp"
+   ],
    "imagePrompt": "Clear jar of aloe gel with a green lid, a cut aloe leaf beside it on a sunlit windowsill."
   },
   {
@@ -378,7 +406,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061466757-ai-homepage_image-1795061466757-0.webp"
+   ],
    "imagePrompt": "Amber dropper bottle with a green label, a tea tree sprig and a cotton pad on a light wood tray."
   },
   {
@@ -399,7 +429,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061467852-ai-homepage_image-1795061467852-0.webp"
+   ],
    "imagePrompt": "Small airless pump tube in matte white, a soft cotton ball on a cream-coloured silk backdrop."
   },
   {
@@ -420,7 +452,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061469736-ai-homepage_image-1795061469735-0.webp"
+   ],
    "imagePrompt": "Deep red-pink bottle with a cream label, fresh hibiscus flowers scattered around its base."
   },
   {
@@ -441,7 +475,9 @@
    "badge": null,
    "featured": false,
    "inStock": true,
-   "images": [],
+   "images": [
+    "https://dm9rri2wgl1e.cloudfront.net/dev/gallery/1795061471039-ai-homepage_image-1795061471039-0.webp"
+   ],
    "imagePrompt": "Small white jar with a vanilla-coloured label, a spoonful of golden sugar scrub on a wooden spoon."
   }
  ],
