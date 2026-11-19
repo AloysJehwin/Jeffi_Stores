@@ -33,12 +33,13 @@ async function sendBySlug(
   phone: string | null | undefined,
   slug: string,
   variables: Record<string, string | number>,
-  reference?: string
+  reference?: string,
+  audience?: SenderAudience
 ): Promise<boolean> {
   const normalized = normalizePhone(phone)
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
-  const res = await sendByTemplate({ channel: 'whatsapp', slug, to: normalized, variables, reference })
+  const res = await sendByTemplate({ channel: 'whatsapp', slug, to: normalized, variables, reference, audience })
   const ok = res.status !== 'failed' && res.status !== 'skipped'
   if (res.status !== 'skipped') {
     const scope = currentReplyScope()
@@ -119,8 +120,9 @@ export async function sendSupportAckWhatsApp(p: { phone?: string | null }): Prom
 export async function sendSupportTicketCreatedWhatsApp(p: { phone?: string | null; ticket: string }): Promise<boolean> {
   return sendBySlug(p.phone, 'support/ticket-created', { '1': p.ticket })
 }
-export async function sendSupportReplyWhatsApp(p: { phone?: string | null; message: string }): Promise<boolean> {
-  return sendBySlug(p.phone, 'support/reply', { '1': p.message })
+/** `audience`: the number the customer wrote to, so the reply lands in the same chat. */
+export async function sendSupportReplyWhatsApp(p: { phone?: string | null; message: string; audience?: SenderAudience }): Promise<boolean> {
+  return sendBySlug(p.phone, 'support/reply', { '1': p.message }, undefined, p.audience)
 }
 export async function sendSupportResolvedWhatsApp(p: { phone?: string | null; ticket: string }): Promise<boolean> {
   return sendBySlug(p.phone, 'support/resolved', { '1': p.ticket })

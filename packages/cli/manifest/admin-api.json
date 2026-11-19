@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "70bc8df4f98ae1691a7713e0483b9337a785ad66bf68defaed3af42f0539b863",
+ "manifestHash": "7d16ce478387e227eeef48bd8da57013e047df92c7b769ded40e1913f1cd7acb",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -44578,7 +44578,8 @@
       "type": "string",
       "enum": [
        "customer",
-       "admin"
+       "admin",
+       "ecom"
       ]
      },
      "number": {
@@ -44630,7 +44631,8 @@
       "type": "string",
       "enum": [
        "customer",
-       "admin"
+       "admin",
+       "ecom"
       ]
      },
      "displayName": {
@@ -44673,7 +44675,8 @@
       "type": "string",
       "enum": [
        "customer",
-       "admin"
+       "admin",
+       "ecom"
       ]
      }
     }
@@ -44687,7 +44690,8 @@
     "type": "string",
     "enum": [
      "customer",
-     "admin"
+     "admin",
+     "ecom"
     ]
    },
    "bodySource": "zod",

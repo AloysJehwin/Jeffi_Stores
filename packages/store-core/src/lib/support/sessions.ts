@@ -30,6 +30,8 @@ export interface SessionRow {
   contact_email: string | null
   /** Subject of the customer's latest email, so replies thread in their mail app. */
   email_subject: string | null
+  /** The WhatsApp number they last wrote to (flagship: customer or ecom); replies go from it. null = customer. */
+  wa_audience: 'customer' | 'ecom' | null
 }
 
 const iso = (v: unknown): string | null => (v ? new Date(v as string).toISOString() : null)
@@ -121,15 +123,16 @@ export async function createSession(input: {
   contactName?: string | null
   contactEmail?: string | null
   customerLang?: string | null
+  waAudience?: 'customer' | 'ecom' | null
 }): Promise<SessionRow> {
   const tenantId = await resolveTenantId().catch(() => null)
   const row = await queryOne<SessionRow>(
     `INSERT INTO support_sessions
-       (user_id, tenant_id, channel, handler, contact_phone, contact_name, customer_lang, contact_email, last_message_at, customer_last_seen_at, ticket_number)
-     VALUES ($1, $2, $3::varchar, $4, $5, $6, $7, $8, now(), CASE WHEN $3::varchar IN ('whatsapp', 'email') THEN NULL ELSE now() END,
+       (user_id, tenant_id, channel, handler, contact_phone, contact_name, customer_lang, contact_email, wa_audience, last_message_at, customer_last_seen_at, ticket_number)
+     VALUES ($1, $2, $3::varchar, $4, $5, $6, $7, $8, $9, now(), CASE WHEN $3::varchar IN ('whatsapp', 'email') THEN NULL ELSE now() END,
              'SUP-' || to_char(now() AT TIME ZONE 'Asia/Kolkata', 'YYMM') || '-' || lpad(nextval('support_ticket_seq')::text, 4, '0'))
      RETURNING *`,
-    [input.userId, tenantId, input.channel, input.handler ?? 'ai', input.contactPhone ?? null, input.contactName ?? null, input.customerLang ?? null, input.contactEmail ?? null]
+    [input.userId, tenantId, input.channel, input.handler ?? 'ai', input.contactPhone ?? null, input.contactName ?? null, input.customerLang ?? null, input.contactEmail ?? null, input.waAudience ?? null]
   )
   if (!row) throw new Error('support session insert failed')
   void emitSession(row.id)
