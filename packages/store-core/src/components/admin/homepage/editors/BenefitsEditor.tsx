@@ -16,7 +16,7 @@ export default function BenefitsEditor(props: EditorProps) {
       <TileListEditor
         label="Tiles"
         tiles={readTiles(b.cfg.items, KEYS)}
-        defaults={SECTION_TILE_DEFAULTS.benefits}
+        defaults={props.options?.tileDefaults?.benefits ?? SECTION_TILE_DEFAULTS.benefits}
         fields={[
           { key: 'title', label: 'Title', placeholder: 'Bulk order discounts' },
           { key: 'sub', label: 'Description', kind: 'textarea' },

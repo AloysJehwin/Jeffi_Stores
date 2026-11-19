@@ -1,9 +1,8 @@
 import Link from 'next/link'
 import StoreMedia from '@/components/visitor/media/StoreMedia'
 import { responsiveImg } from '@/lib/shared/image-url'
-import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
+import { copyDefaultsFor } from '@/lib/catalog/homepage-sections'
 
-const COPY = SECTION_COPY_DEFAULTS.about
 
 interface AboutSectionProps {
   aboutCopy: string
@@ -17,6 +16,8 @@ interface AboutSectionProps {
   video?: string | null
   ctaLabel?: string | null
   ctaUrl?: string | null
+  /** false: a store other than the flagship, which gets neutral copy and no stock picture. */
+  flagshipCopy?: boolean
 }
 
 export default function AboutSection({
@@ -30,16 +31,19 @@ export default function AboutSection({
   video,
   ctaLabel,
   ctaUrl,
+  flagshipCopy = true,
 }: AboutSectionProps) {
+  const COPY = copyDefaultsFor('about', flagshipCopy)
   const image = imageUrl || COPY.imageUrl
   return (
     <section className="py-12 md:py-20 bg-surface">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-20 items-center">
+        <div className={image || video ? 'grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-20 items-center' : 'max-w-3xl'}>
+          {(image || video) && (
           <div className="relative rounded-2xl overflow-hidden shadow-2xl">
             <StoreMedia image={image} video={video} className="absolute inset-0 h-full w-full object-cover">
               <img
-                {...responsiveImg(image, '(min-width: 768px) 50vw, 100vw')}
+                {...responsiveImg(image ?? '', '(min-width: 768px) 50vw, 100vw')}
                 alt={`${storeName} team`}
                 className="w-full h-56 sm:h-80 md:h-[440px] object-cover"
               />
@@ -57,6 +61,7 @@ export default function AboutSection({
               ))}
             </div>
           </div>
+          )}
 
           <div className="space-y-5">
             <div>
@@ -68,11 +73,11 @@ export default function AboutSection({
               </h2>
             </div>
             <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">{aboutCopy}</p>
-            <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">{body || COPY.body}</p>
+            {(body || COPY.body) && <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">{body || COPY.body}</p>}
 
             <div className="flex flex-wrap gap-3 pt-2">
               <Link
-                href={ctaUrl || COPY.ctaUrl}
+                href={ctaUrl || COPY.ctaUrl || '/about'}
                 className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-bold transition-all text-sm shadow-lg shadow-primary-500/20"
               >
                 {ctaLabel || COPY.ctaLabel}

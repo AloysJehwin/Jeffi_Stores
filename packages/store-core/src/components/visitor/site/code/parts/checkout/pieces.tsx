@@ -7,6 +7,7 @@ import MobileCheckoutBar from '@/components/visitor/cart/MobileCheckoutBar'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { PaymentSections, UpiManualDialog } from '@/components/payments'
 import type { CheckoutParts } from './context'
+import { badgeColumns } from './TrustBadges'
 
 // The checkout's markup, cut from the old CheckoutClient into pieces the built-in checkout and the AI parts both place.
 
@@ -226,7 +227,7 @@ export function OrderItemsList({ c }: P) {
               <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                 {primaryImage ? (
                   <ImgWithSkeleton
-                    src={primaryImage.thumbnail_url}
+                    src={primaryImage.thumbnail_url || primaryImage.image_url}
                     alt={item.products.name}
                     blurhash={primaryImage.blurhash}
                     className="w-full h-full object-cover rounded-lg"
@@ -404,7 +405,7 @@ export function PaymentMethod({ c }: P) {
 export function TrustStrip() {
   return (
     <div className="mt-8 bg-surface-elevated rounded-lg border border-border-default p-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3" style={badgeColumns(2)}>
         <div className="flex items-center gap-3">
           <svg
             className="w-8 h-8 text-green-600 dark:text-green-400 flex-shrink-0"

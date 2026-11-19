@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 // Reassurance badges for the checkout (and cart): the built-in four by default, or the design's own. Static markup.
 
 export const TRUST_ICONS = {
@@ -27,13 +29,17 @@ export const DEFAULT_TRUST_BADGES: TrustBadge[] = [
   { icon: 'phone', title: '24×7 Support', text: 'Always here to help' },
 ]
 
-const GRID: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-2 md:grid-cols-3', 4: 'grid-cols-2 md:grid-cols-4' }
+/** Up to `n` columns of at least 10rem: in a narrow column (a cart summary) the badges stack instead of squeezing. */
+export const badgeColumns = (n: number): CSSProperties => {
+  const cols = Math.min(Math.max(Math.round(n) || 2, 1), 4)
+  return { gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, max(10rem, calc((100% - ${cols - 1} * 0.75rem) / ${cols}))), 1fr))` }
+}
 
 export default function TrustBadges({ items = DEFAULT_TRUST_BADGES, columns = 2, className }: { items?: TrustBadge[]; columns?: number; className?: string }) {
   if (!items.length) return null
   return (
     <div className={className}>
-      <div className={`grid ${GRID[columns] ?? GRID[2]} gap-3`}>
+      <div className="grid gap-3" style={badgeColumns(columns)}>
         {items.map((b, i) => (
           <div key={`${b.title}:${i}`} className="flex items-center gap-3">
             <svg aria-hidden="true" className="w-8 h-8 text-accent-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

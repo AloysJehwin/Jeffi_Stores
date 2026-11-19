@@ -359,6 +359,11 @@ html[data-no-ads] .google-auto-placed {
 }
 
 /* The storefront footer pads for the home indicator itself, so the body's inset would double it. */
+/* An AI-designed account page carries the account menu inside its own frame (site/code/parts/utility.tsx). */
+.account-nav-top:has(+ * [data-account-framed]) {
+  display: none;
+}
+
 body:has([data-footer-strip]) {
   padding-bottom: 0;
 }

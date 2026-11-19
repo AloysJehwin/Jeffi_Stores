@@ -42,11 +42,12 @@ export async function SiteCardView({ card, product, data, priority = false }: { 
 }
 
 /**
- * The card's styles on their own, always, ahead of a list that hides some of its cards on the client (the cart's
- * suggestions drop what is already in the cart), where a card that carried them might not be shown.
+ * The card's styles on their own. The storefront's root layout puts them in <head> (`always`): the first card of a
+ * request can sit in a tree the browser never shows, such as the 404 page's product list, which every route carries in
+ * case it 404s, and every shown card would then go without them. Elsewhere (the cart's suggestions), once per request.
  */
-export function SiteCardStyles({ card }: { card: SiteCardSection }) {
-  firstStyles(card.id)
+export function SiteCardStyles({ card, always = false }: { card: SiteCardSection; always?: boolean }) {
+  if (!firstStyles(card.id) && !always) return null
   const css = inertCss(card.css)
   return css ? <style dangerouslySetInnerHTML={{ __html: css }} /> : null
 }

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
                 'product_name', oi.product_name,
                 'quantity', oi.quantity,
                 'thumbnail_url', (
-                  SELECT pi.thumbnail_url FROM product_images pi
+                  SELECT COALESCE(pi.thumbnail_url, pi.image_url) FROM product_images pi
                   WHERE pi.product_id = oi.product_id AND pi.is_primary = true
                   LIMIT 1
                 )

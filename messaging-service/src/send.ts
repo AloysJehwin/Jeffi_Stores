@@ -12,7 +12,7 @@ import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
 import * as aws from './providers/aws.js'
 import { messagingProvider } from './providers/policy.js'
-import { tenantSender, SenderError } from './providers/senders.js'
+import { tenantSender, SenderError, type SenderAudience } from './providers/senders.js'
 import { ensurePricing } from './pricing-sheet.js'
 import { wrapEmail } from './mail-shell.js'
 import { hostUrl, MediaError } from './media.js'
@@ -71,6 +71,8 @@ interface Ctx {
   batchId?: string
   internal?: boolean
   space?: tpl.Space
+  /** A send as the platform that goes out from this store's numbers (set only for internal platform calls). */
+  senderTenant?: string
 }
 
 // v2 library only (tenant copy → platform default). The legacy message_templates fallback was
@@ -299,15 +301,33 @@ export async function assertChannelOn(tenantId: string, channel: string, space: 
   if ((await channelsOff(tenantId)).has(channel)) throw new SendError(409, 'channel_disabled', `${label} is turned off in Site Controls`)
 }
 
+// The tenant's own number for the audience, else its customer number. A platform send for a store (its staff's
+// verification code) tries that store's numbers first; a store row that can't be read falls through to the
+// platform's, so staff still get their code. A workspace sending through the API (ecom dashboard Play, Bulk
+// messages, /v1) with no number of its own goes out from the ecom portal's number, not from the flagship store's
+// shopper number in the env.
+async function outboundSender(ctx: Ctx, channel: 'sms' | 'whatsapp', audience: SenderAudience) {
+  if (ctx.senderTenant && ctx.senderTenant !== ctx.tenantId) {
+    const store = await tenantSender(ctx.senderTenant, channel, audience).catch(e => {
+      console.warn(`store ${ctx.senderTenant} ${channel} sender unavailable, sending from the platform's: ${e?.message ?? e}`)
+      return null
+    })
+    if (store) return store
+  }
+  const own = await tenantSender(ctx.tenantId, channel, audience)
+  if (own || ctx.space !== 'api' || ctx.tenantId === tpl.PLATFORM_TENANT_ID) return own
+  return tenantSender(tpl.PLATFORM_TENANT_ID, channel, 'ecom')
+}
+
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
   await ensurePricing()
   const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
-  // The store's own sender (number + credentials) when the platform assigned it one; the platform env otherwise.
+  // A sender row (number + credentials) when one applies; the platform env otherwise.
   const sender = req.channel === 'email'
     ? null
-    : await tenantSender(ctx.tenantId, req.channel, req.audience ?? 'customer').catch(e => { throw e instanceof SenderError ? new SendError(500, 'sender_unavailable', e.message) : e })
+    : await outboundSender(ctx, req.channel, req.audience ?? 'customer').catch(e => { throw e instanceof SenderError ? new SendError(500, 'sender_unavailable', e.message) : e })
 
   const id = randomUUID()
   // Priced by provider and channel from the pricing sheet: the store's own sender's provider, else the policy's.
@@ -359,10 +379,12 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
         ? await aws.sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id, headerUrl: waHeader }, sender ?? undefined)
         : await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id }, sender ?? undefined)
     }
-    // metadata.sender.own marks a send from the store's own account (its token signs the status callback).
+    // metadata.sender.own marks a send from the store's own account (its token signs the status callback); `tenant`
+    // names the row's owner when it is another tenant's (the platform's ecom number, a store's for its staff code).
+    const senderMeta = sender && { own: true, provider: sender.provider, audience: sender.audience, ...(sender.tenantId !== ctx.tenantId ? { tenant: sender.tenantId } : {}) }
     await db.query(
       `UPDATE messages SET status='sent', provider=$2, provider_ref=$3, charged_inr=$4, metadata=COALESCE(metadata,'{}'::jsonb) || $5::jsonb, updated_at=now() WHERE id=$1`,
-      [id, provider, ref, debit.charged ? priceInr : 0, JSON.stringify(sender ? { sender: { own: true, provider: sender.provider, audience: sender.audience } } : {})]
+      [id, provider, ref, debit.charged ? priceInr : 0, JSON.stringify(senderMeta ? { sender: senderMeta } : {})]
     )
     await db.query(`INSERT INTO message_events (message_id, event) VALUES ($1,'sent')`, [id])
   } catch (e: any) {

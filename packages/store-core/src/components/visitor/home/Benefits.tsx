@@ -1,5 +1,5 @@
 import IconByName from './IconByName'
-import { SECTION_TILE_DEFAULTS } from '@/lib/catalog/homepage-sections'
+import { tileDefaultsFor } from '@/lib/catalog/homepage-sections'
 
 export interface BenefitItem {
   icon: string
@@ -11,12 +11,12 @@ interface BenefitsProps {
   title?: string | null
   eyebrow?: string | null
   items?: BenefitItem[] | null
+  flagshipCopy?: boolean
 }
 
-const DEFAULT_ITEMS: BenefitItem[] = SECTION_TILE_DEFAULTS.benefits
 
-export default function Benefits({ title, eyebrow, items }: BenefitsProps = {}) {
-  const tiles = items && items.length > 0 ? items : DEFAULT_ITEMS
+export default function Benefits({ title, eyebrow, items, flagshipCopy = true }: BenefitsProps = {}) {
+  const tiles = items && items.length > 0 ? items : ((tileDefaultsFor('benefits', flagshipCopy) ?? []) as unknown as BenefitItem[])
 
   return (
     <section className="py-8 bg-surface border-y border-border-default">

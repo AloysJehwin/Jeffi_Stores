@@ -230,7 +230,8 @@ export async function seedStudioCatalog(
       counts.products++
       for (const [j, url] of (p.images ?? []).filter(isUrl).slice(0, 6).entries()) {
         await client.query(
-          `INSERT INTO product_images (product_id, image_url, file_name, alt_text, display_order, is_primary) VALUES ($1,$2,$3,$4,$5,$6)`,
+          // The picture is its own thumbnail: lists that draw thumbnails (search, orders) would otherwise show none.
+          `INSERT INTO product_images (product_id, image_url, thumbnail_url, file_name, alt_text, display_order, is_primary) VALUES ($1,$2,$2,$3,$4,$5,$6)`,
           [id, url, (url.split('/').pop() || 'image').slice(0, 255), name, j, j === 0]
         )
         counts.images++

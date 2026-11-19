@@ -276,7 +276,7 @@ export default function ProductImageGallery({
               >
                 <div className="w-full h-20 flex items-center justify-center">
                   <ImgWithSkeleton
-                    src={image.thumbnail_url}
+                    src={image.thumbnail_url || image.image_url}
                     alt={`${productName} - Thumbnail ${index + 1}`}
                     blurhash={image.blurhash}
                     sizes="128px"
@@ -634,7 +634,7 @@ export function Lightbox({ images, index, productName, onIndex, onClose }: Light
               }`}
             >
               <ImgWithSkeleton
-                src={img.thumbnail_url}
+                src={img.thumbnail_url || img.image_url}
                 alt={`Thumbnail ${i + 1}`}
                 blurhash={img.blurhash}
                 className="w-full h-full object-contain bg-surface-secondary overflow-hidden rounded"

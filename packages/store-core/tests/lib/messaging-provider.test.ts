@@ -2,6 +2,12 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 const getProviderPolicy = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/providers/policy', () => ({ getProviderPolicy }))
+const { resolveTenantId, getTenantSender } = vi.hoisted(() => ({
+  resolveTenantId: vi.fn(async (): Promise<string | null> => null),
+  getTenantSender: vi.fn(async () => null),
+}))
+vi.mock('@/lib/tenancy/tenant-context', async orig => ({ ...(await orig<any>()), resolveTenantId }))
+vi.mock('@/lib/messaging/tenant-senders', async orig => ({ ...(await orig<any>()), getTenantSender }))
 
 import { getSmsProvider, getWhatsAppProvider, messagingProviderReadiness } from '@/lib/shared/messaging'
 import { twilioSmsProvider, twilioWhatsAppProvider } from '@/lib/shared/messaging/twilio-provider'
@@ -27,6 +33,13 @@ describe('messaging provider selector', () => {
     expect(await getSmsProvider()).toBe(awsSmsProvider)
     expect(await getWhatsAppProvider()).toBe(twilioWhatsAppProvider)
     expect(getProviderPolicy).toHaveBeenCalledWith()
+  })
+
+  it("leaves a store without its own number unconfigured instead of sending from the flagship's", async () => {
+    resolveTenantId.mockResolvedValueOnce('t1').mockResolvedValueOnce('t1')
+    expect((await getSmsProvider()).configured).toBe(false)
+    expect((await getWhatsAppProvider('admin')).configured).toBe(false)
+    expect(getProviderPolicy).not.toHaveBeenCalled()
   })
 
   it('falls back to Twilio when the policy resolver throws', async () => {

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         RETURNING provider_sid, read_at`,
       [sessionId, parsed.data.upTo]
     ).catch(() => null)
-    if (wa?.provider_sid) await markWhatsAppRead(wa.provider_sid).catch(() => {})
+    if (wa?.provider_sid) await markWhatsAppRead(wa.provider_sid, ctx.session.wa_audience ?? 'customer').catch(() => {})
   }
   return NextResponse.json({ updated })
 }

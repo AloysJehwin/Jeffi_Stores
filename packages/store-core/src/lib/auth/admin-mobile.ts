@@ -10,7 +10,8 @@ import { normalizePhoneE164 } from '@/lib/google-ads/conversions/hash'
 // An admin's mobile number, verified by a code sent on WhatsApp (else SMS). Needed before a certificate
 // download, and it is the number the admin assistant answers on WhatsApp. The store's admins row holds
 // it; the control plane's admin_mobiles maps the number back to the store for inbound WhatsApp.
-// Codes are sent and billed as the platform: a new store's empty wallet must not lock its admins out.
+// Codes are sent and billed as the platform: a new store's empty wallet must not lock its admins out. They go out
+// from the store's own numbers (admin, else customer) when it has them, else from the platform's.
 
 const CODE_TTL_SEC = 600
 const MAX_ATTEMPTS = 5
@@ -78,7 +79,7 @@ export async function sendAdminMobileCode(store: AdminStore, adminId: string, ra
     return { ok: false, error: 'Too many codes for this number. Try again in an hour.', status: 429, retryAfter: 3600 }
 
   const code = String(randomInt(100000, 1000000))
-  const channel = await deliver(phone, code, storeName)
+  const channel = await deliver(store, phone, code, storeName)
   if (!channel) return { ok: false, error: 'The code could not be sent by WhatsApp or SMS. Check the number and try again.', status: 502 }
 
   await Promise.all([
@@ -90,13 +91,13 @@ export async function sendAdminMobileCode(store: AdminStore, adminId: string, ra
   return { ok: true, channel, retryAfter: COOLDOWNS_SEC[Math.min(sends, COOLDOWNS_SEC.length - 1)] }
 }
 
-async function deliver(phone: string, code: string, storeName: string): Promise<'whatsapp' | 'sms' | null> {
+async function deliver(store: AdminStore, phone: string, code: string, storeName: string): Promise<'whatsapp' | 'sms' | null> {
   const attempts: Array<['whatsapp' | 'sms', Record<string, unknown>]> = [
     ['whatsapp', { '1': code }],
     ['sms', { code, ttl_minutes: 10, store_name: storeName }],
   ]
   for (const [channel, variables] of attempts) {
-    const r = await sendByTemplate({ channel, slug: 'otp/verify', to: phone, variables, asPlatform: true, audience: 'admin' })
+    const r = await sendByTemplate({ channel, slug: 'otp/verify', to: phone, variables, asPlatform: true, audience: 'admin', senderTenant: store })
     const ok = r.status !== 'failed' && r.status !== 'skipped'
     logMessage({ channel, to: phone, from: 'messaging-service', body: r.body ?? '[otp/verify]', kind: 'otp', status: ok ? 'sent' : 'failed', error: r.error, providerSid: r.providerSid ?? null, provider: 'messaging-service', entityType: 'admin_mobile' })
     if (ok) return channel

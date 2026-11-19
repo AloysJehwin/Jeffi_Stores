@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { blockVisible, normalizeDoc, pageRefKey, topBlocks, type PageDoc, type PageRef, type SiteSurface } from '@jeffi/site-blocks'
 import { CARD_PAGE } from './code/ast'
+import { currentCss } from './code/css'
 import { siteData, type SiteCardSection, type SiteData } from './data'
 import { portalHere } from './portal'
 
@@ -20,7 +21,8 @@ export function cardOf(doc: unknown): SiteCardSection | null {
   const block = topBlocks(normalizeDoc(doc as Partial<PageDoc>)).find(b => b.type === 'code_section' && blockVisible(b, Date.now()))
   const c = block?.props.compiled as Partial<SiteCardSection> | null | undefined
   if (!c || typeof c !== 'object' || !c.ast || typeof c.ast !== 'object' || typeof c.id !== 'string' || !ID.test(c.id)) return null
-  return { id: c.id, ast: c.ast, css: typeof c.css === 'string' ? c.css : '' }
+  // Cards saved before the CSS mark get it on read, like sections (CodeSection).
+  return { id: c.id, ast: c.ast, css: currentCss(c.css, c.id) }
 }
 
 async function loadLive(): Promise<SiteCardSection | null> {

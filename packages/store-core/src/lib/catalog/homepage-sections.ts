@@ -579,6 +579,60 @@ export const SECTION_TILE_DEFAULTS = {
   ],
 } satisfies Partial<Record<SectionType, Record<string, string>[]>>
 
+// What every other store shows in place of the flagship's own claims (a hardware range, "10,000+ products",
+// "500+ businesses", a 24-hour RFQ promise, an account manager).
+export const TENANT_COPY_DEFAULTS = {
+  why_us: { eyebrow: 'Why us', title: 'Why shop with us' },
+  about: { eyebrow: 'About us', title: 'Our story', ctaLabel: 'Learn more', ctaUrl: '/about' },
+  business_cta: {
+    eyebrow: 'For business',
+    title: 'Buying for a business?',
+    subtitle: 'Business prices, GST invoices and quotes for bulk orders.',
+    ctaLabel: 'Register now',
+  },
+} satisfies Partial<Record<SectionType, SectionCopy>>
+
+export const TENANT_TILE_DEFAULTS = {
+  trust_strip: [
+    { icon: 'Truck', label: 'Free delivery above {amount}' },
+    { icon: 'Receipt', label: 'GST invoice on every order' },
+    { icon: 'ShieldCheck', label: 'Secure payments' },
+    { icon: 'CreditCard', label: 'Cash on delivery available' },
+  ],
+  benefits: SECTION_TILE_DEFAULTS.benefits.slice(0, 2),
+  why_us: [
+    {
+      icon: 'PackageCheck',
+      title: 'Packed with care',
+      desc: 'Every order is checked and packed before it ships, with tracking to your door.',
+      color: 'primary',
+    },
+    { icon: 'ShieldCheck', title: 'Secure checkout', desc: 'Pay safely by UPI, card or net banking.', color: 'accent' },
+    { icon: 'MessageCircle', title: 'Here to help', desc: 'Write or call us about any order and we will sort it out.', color: 'secondary' },
+  ],
+} satisfies Partial<Record<SectionType, Record<string, string>[]>>
+
+/** A section's empty-field copy: the flagship's own, or the neutral one for every other store. */
+export function copyDefaultsFor(type: SectionType, flagship: boolean): SectionCopy {
+  const own = sectionCopyDefaults(type)
+  if (flagship) return own
+  // The flagship's pictures and About text are its own too; cleared here so a merge over its defaults drops them.
+  return { ...own, imageUrl: undefined, body: undefined, ...(TENANT_COPY_DEFAULTS as Partial<Record<SectionType, SectionCopy>>)[type] }
+}
+
+/** A tile section's tiles when none are saved, for the flagship or any other store (whose About gets no figures). */
+export function tileDefaultsFor(type: SectionType, flagship: boolean): Record<string, string>[] | null {
+  const table: Partial<Record<SectionType, Record<string, string>[]>> = flagship
+    ? SECTION_TILE_DEFAULTS
+    : { ...SECTION_TILE_DEFAULTS, about: [], ...TENANT_TILE_DEFAULTS }
+  return table[type] ?? null
+}
+
+/** Trust tiles a store can stand behind: no free-delivery tile without a threshold, no COD tile with COD off. */
+export function honestTrustTiles<I extends { icon: string; label: string }>(tiles: I[], o: { freeShippingThreshold: number; codEnabled: boolean }): I[] {
+  return tiles.filter(t => (o.freeShippingThreshold > 0 || !t.label.includes('{amount}')) && (o.codEnabled || !/cash on delivery|\bcod\b/i.test(t.label)))
+}
+
 /** The About stats from the store's stats JSON setting, else the built-in tiles (`fallback: false` = none: the built-in
  *  figures are the flagship's, never another store's claims). */
 export function resolveAboutStats(statsJson: string, fallback = true): { value: string; label: string }[] {

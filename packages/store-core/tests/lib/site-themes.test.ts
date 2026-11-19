@@ -180,12 +180,12 @@ describe('itemClassName on a grid', () => {
     const r = await compileSection(src, { page: 'home' })
     if (!r.ok) throw new Error(JSON.stringify(r.issues))
     // The CSS for the variants is built at save time, scoped to the section.
-    expect(r.section.css).toContain('.first\\:col-span-2:first-child')
-    expect(r.section.css).toContain('.lg\\:\\[\\&\\:nth-child\\(n\\+4\\)\\]\\:col-span-2:nth-child(n+4)')
+    expect(r.section.css).toContain(`.first\\:col-span-2.${r.section.id}:first-child`)
+    expect(r.section.css).toContain(`.lg\\:\\[\\&\\:nth-child\\(n\\+4\\)\\]\\:col-span-2.${r.section.id}:nth-child(n+4)`)
     const [withFn, plain] = categoryGrids(await draw(r.section.ast, { ...GENERIC_SAMPLE, store }))
-    for (const a of withFn.children) expect(classes(a)).toEqual(expect.arrayContaining(['block', 'first:col-span-2', 'lg:[&:nth-child(n+4)]:col-span-2']))
-    // A default tile takes them on its own root too.
-    for (const a of plain.children) expect(a.tagName === 'A' && classes(a).includes('first:col-span-3')).toBe(true)
+    for (const a of withFn.children) expect(classes(a)).toEqual(expect.arrayContaining(['block', 'first:col-span-2', 'lg:[&:nth-child(n+4)]:col-span-2', 'cs-test']))
+    // A default tile takes them on its own root too, with the mark of the section drawing it (its id).
+    for (const a of plain.children) expect(a.tagName === 'A' && classes(a).includes('first:col-span-3') && classes(a).includes('cs-test')).toBe(true)
   })
 })
 
@@ -201,6 +201,39 @@ describe('the grid lint', () => {
     // Twelve columns with nothing spanning them: slivers.
     expect(grid('grid grid-cols-2 lg:grid-cols-12', 'block').join()).toMatch(/slivers/)
     expect(gridTrouble(['grid', 'grid-cols-2', 'md:grid-cols-4', '[&>*:first-child]:col-span-2', '[&>*:first-child]:row-span-2'], [], 9)).not.toBeNull()
+  })
+})
+
+describe('the layout lint', () => {
+  const lint = (jsx: string, page: 'header' | 'product' | 'home') => {
+    const r = checkSection(`export default function S() { return ${jsx} }`, { page })
+    if (!r.ok) throw new Error(JSON.stringify(r.issues))
+    return studioLint(r.ast, page)
+  }
+
+  it('catches a header that leaves its menu button alone on a centred row', () => {
+    // The live store's header: links on their own centred row from md, a menu button until lg.
+    const header = (nav: string) =>
+      `<header className="border-b"><div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-2 px-4 md:grid-cols-[1fr_auto_1fr]"><div className="col-start-1 row-start-1 flex min-h-11 items-center md:col-span-3 md:row-start-2 md:mt-2 md:justify-center md:border-t md:border-b">${nav}</div><div className="col-start-2 row-start-1 flex justify-center"><Logo /></div><div className="col-start-3 row-start-1 flex items-center justify-end"><CartIcon /></div></div></header>`
+    expect(lint(header('<NavLinks />'), 'header')).toContain(LINT.navMenu)
+    expect(lint(header('<NavLinks from="md" />'), 'header')).not.toContain(LINT.navMenu)
+    expect(lint(header('<NavLinks mobile="scroll" />'), 'header')).not.toContain(LINT.navMenu)
+    expect(lint('<header className="py-4"><div className="flex justify-center"><Logo /></div><div className="mt-3 flex justify-center"><NavLinks /></div></header>', 'header')).toContain(LINT.navMenu)
+    expect(lint('<header className="border-b"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4"><Logo /><NavLinks /><CartIcon /></div></header>', 'header')).not.toContain(LINT.navMenu)
+  })
+
+  it('catches a card grid inside a rail slide or a narrow column, and leaves full-width grids and rails of cards alone', () => {
+    const squeezed = (notes: string[]) => notes.filter(n => / lays out \d+ columns /.test(n))
+    // The live store's "Pairs well with": the product grid inside one slide of a rail.
+    const rail = (list: string) =>
+      `<section className="py-10"><h2 className="text-2xl">Pairs well with</h2><div className="flex overflow-x-auto snap-x snap-mandatory gap-4"><div className="snap-start shrink-0 w-[82%] sm:w-[48%] lg:w-[44%] xl:w-[40%]">${list}</div></div></section>`
+    expect(squeezed(lint(rail('<RelatedProducts className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4" />'), 'product')).join()).toMatch(/<RelatedProducts> lays out 4 columns inside a rail's slide .*Give each slide one card/)
+    // A <Carousel> holding only the list draws the list's own carousel (each product a slide); wrapped in anything else, the list is one slide.
+    expect(squeezed(lint('<Carousel itemClassName="w-[82%] sm:w-[48%] lg:w-[44%] xl:w-[40%]"><RelatedProducts /></Carousel>', 'product'))).toEqual([])
+    expect(squeezed(lint('<Carousel itemClassName="w-[82%] sm:w-[48%] lg:w-[44%] xl:w-[40%]"><div><RelatedProducts /></div></Carousel>', 'product')).join()).toMatch(/inside one <Carousel> slide/)
+    expect(squeezed(lint('<div className="grid lg:grid-cols-12"><div className="lg:col-span-3"><Products limit={4} /></div><div className="lg:col-span-9"><h2>Why us</h2></div></div>', 'home')).join()).toMatch(/in a column about 25% of the page wide/)
+    expect(squeezed(lint('<section><RelatedProducts className="grid grid-cols-2 lg:grid-cols-4 gap-4" /></section>', 'product'))).toEqual([])
+    expect(squeezed(lint('<Products layout="carousel" itemClassName="w-[82%] sm:w-[48%] lg:w-[23%]" />', 'home'))).toEqual([])
   })
 })
 

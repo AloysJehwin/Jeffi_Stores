@@ -82,7 +82,8 @@ defineCodeComponent({
     if (!list.length) return null
     const card = ctx.renderItem ? null : await siteCard(ctx.data)
     return (
-      <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName} label="Products" fallbackGrid="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
+      // A single product (a spotlight) fills its box: a four-column default would shrink it to a sliver.
+      <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName} label="Products" fallbackGrid={list.length === 1 ? 'grid grid-cols-1' : 'grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5'}>
         {items(list, ctx, (v, i) => (
           <ProductItem key={v.id ?? i} product={v} aspect={p.aspect} card={card} data={ctx.data} priority={!!card && i === 0 && ctx.claimPriority()} />
         ))}

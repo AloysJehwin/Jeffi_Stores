@@ -137,6 +137,8 @@ export default function SectionRenderer({
         <TrustStrip
           freeShippingThreshold={data.freeShippingThreshold}
           items={tiles<TrustStripItem>(cfg.items, ['icon', 'label'])}
+          codEnabled={data.codEnabled ?? true}
+          flagshipCopy={data.flagshipCopy}
         />
       )
 
@@ -232,6 +234,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           items={tiles<BenefitItem>(cfg.items, ['icon', 'title', 'sub'])}
+          flagshipCopy={data.flagshipCopy}
         />
       )
 
@@ -241,6 +244,7 @@ export default function SectionRenderer({
           title={section.title}
           eyebrow={section.eyebrow}
           items={tiles<WhyUsItem>(cfg.items, ['icon', 'title', 'desc', 'color'])}
+          flagshipCopy={data.flagshipCopy}
         />
       )
 
@@ -257,6 +261,7 @@ export default function SectionRenderer({
           ctaUrl={section.cta_url}
           stats={tiles<{ value: string; label: string }>(cfg.stats, ['value', 'label']) ?? data.stats}
           storeName={data.storeName}
+          flagshipCopy={data.flagshipCopy}
         />
       )
 
@@ -269,6 +274,7 @@ export default function SectionRenderer({
           subtitle={section.subtitle}
           ctaLabel={section.cta_label}
           ctaUrl={section.cta_url}
+          flagshipCopy={data.flagshipCopy}
         />
       )
 

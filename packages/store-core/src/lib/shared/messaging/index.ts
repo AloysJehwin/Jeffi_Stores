@@ -7,21 +7,20 @@ import { awsSmsProvider, awsWhatsAppProvider, awsSmsProviderFor, awsWhatsAppProv
 
 // Pick the SMS/WhatsApp provider for the current store. A store with its own sender (control-plane
 // tenant_messaging_senders) sends from that number with its own credentials, and the row's provider wins.
-// The flagship (no tenant) has its rows under PLATFORM_TENANT_ID.
-// Otherwise the platform provider policy (lib/providers/policy.ts; set on the flagship Site Controls) decides;
-// with no policy row the store's old Site Controls choice still applies. Any resolver failure falls back to
-// Twilio — except a sender row that can't be decrypted, which leaves the channel unconfigured rather than
-// quietly sending from the platform number.
+// The flagship (no tenant) has its rows under PLATFORM_TENANT_ID; without one, the platform provider policy
+// (lib/providers/policy.ts; set on the flagship Site Controls) picks the platform env's account, with Twilio on any
+// resolver failure. A store without a number of its own can't send: the platform env's numbers are the flagship's.
+// A sender row that can't be decrypted also leaves the channel unconfigured.
 
-async function ownSender(channel: MessagingChannel, audience: SenderAudience): Promise<TenantSender | null | 'broken'> {
+async function ownSender(channel: MessagingChannel, audience: SenderAudience): Promise<TenantSender | 'platform' | 'none' | 'broken'> {
   let tid: string
   try {
     tid = (await resolveTenantId()) ?? PLATFORM_TENANT_ID
   } catch {
-    return null
+    return 'platform'
   }
   try {
-    return await getTenantSender(tid, channel, audience)
+    return (await getTenantSender(tid, channel, audience)) ?? (tid === PLATFORM_TENANT_ID ? 'platform' : 'none')
   } catch (e) {
     console.warn(`[messaging] ${channel} sender unavailable: ${(e as Error)?.message}`)
     return 'broken'
@@ -37,7 +36,8 @@ const unavailable = (name: ProviderName, why: string): SmsProvider & WhatsAppPro
 export async function getSmsProvider(audience: SenderAudience = 'customer'): Promise<SmsProvider> {
   const own = await ownSender('sms', audience)
   if (own === 'broken') return unavailable('twilio', 'SMS sender credentials unavailable')
-  if (own) return own.provider === 'aws' ? awsSmsProviderFor(own) : twilioSmsProviderFor(own)
+  if (own === 'none') return unavailable('twilio', 'This store has no SMS number yet')
+  if (own !== 'platform') return own.provider === 'aws' ? awsSmsProviderFor(own) : twilioSmsProviderFor(own)
   try {
     return (await getProviderPolicy()).smsProvider === 'aws' ? awsSmsProvider : twilioSmsProvider
   } catch {
@@ -48,7 +48,8 @@ export async function getSmsProvider(audience: SenderAudience = 'customer'): Pro
 export async function getWhatsAppProvider(audience: SenderAudience = 'customer'): Promise<WhatsAppProvider> {
   const own = await ownSender('whatsapp', audience)
   if (own === 'broken') return unavailable('twilio', 'WhatsApp sender credentials unavailable')
-  if (own) return own.provider === 'aws' ? awsWhatsAppProviderFor(own) : twilioWhatsAppProviderFor(own)
+  if (own === 'none') return unavailable('twilio', 'This store has no WhatsApp number yet')
+  if (own !== 'platform') return own.provider === 'aws' ? awsWhatsAppProviderFor(own) : twilioWhatsAppProviderFor(own)
   try {
     return (await getProviderPolicy()).whatsappProvider === 'aws' ? awsWhatsAppProvider : twilioWhatsAppProvider
   } catch {

@@ -11,6 +11,8 @@ type ColorFacet = { value: string; hex: string | null; count: number }
 type BrandFacet = { id: string; name: string; count: number }
 
 interface FilterSidebarProps {
+  /** Lighter padding for a column of any width (the AI-designed pages' <Filters>), where p-6 would crowd the rows. */
+  compact?: boolean
   basePath?: string
   categories?: CategoryItem[]
   offers?: { slug: string; title: string }[]
@@ -120,6 +122,7 @@ const STORAGE_KEY = 'filter_sidebar_sections_v2'
 const DEFAULT_OPEN_SECTIONS = ['Categories', 'Price Range', 'Availability', 'Offers', 'Brand', 'Color']
 
 export default function FilterSidebar({
+  compact = false,
   basePath = '/products',
   categories = [],
   facets,
@@ -296,7 +299,7 @@ export default function FilterSidebar({
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+    <div className={`bg-surface-elevated rounded-lg shadow-sm border border-border-default ${compact ? 'p-4' : 'p-4 sm:p-6'}`}>
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-bold text-lg text-foreground">Filters</h2>
         {anyFilterActive && (
@@ -379,7 +382,7 @@ export default function FilterSidebar({
         <p className="text-sm text-foreground-secondary mb-3">
           ₹{facets.priceMin.toLocaleString('en-IN')} – ₹{facets.priceMax.toLocaleString('en-IN')}
         </p>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
           <input
             type="number"
             inputMode="numeric"
@@ -389,9 +392,9 @@ export default function FilterSidebar({
             onKeyDown={e => {
               if (e.key === 'Enter') applyPriceInputs()
             }}
-            className="w-full min-w-0 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
+            className="min-w-[3.5rem] flex-1 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
-          <span className="text-foreground-muted text-sm">–</span>
+          <span className="shrink-0 text-foreground-muted text-sm">–</span>
           <input
             type="number"
             inputMode="numeric"
@@ -401,7 +404,7 @@ export default function FilterSidebar({
             onKeyDown={e => {
               if (e.key === 'Enter') applyPriceInputs()
             }}
-            className="w-full min-w-0 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
+            className="min-w-[3.5rem] flex-1 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
           <button
             type="button"

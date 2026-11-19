@@ -229,14 +229,16 @@ export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount 
 }
 
 /**
- * The payout account for a store. Rows carry both owner_id and tenant_id, and the tenant one is
- * what the operator wants: an owner with several stores can have a different account per store.
+ * The payout account for a store: a row tied to this store (an owner with several stores can have one per store),
+ * else its owner's account. Onboarding saves the account by owner only, so most stores have no tenant row.
  */
 export async function getTenantBankAccount(tenantId: string): Promise<BankAccount | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name
-     FROM tenant_bank_accounts WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1`,
+     FROM tenant_bank_accounts
+     WHERE tenant_id=$1 OR (tenant_id IS NULL AND owner_id IN (SELECT owner_id FROM owner_tenants WHERE tenant_id=$1))
+     ORDER BY (tenant_id IS NOT NULL) DESC, created_at DESC LIMIT 1`,
     [tenantId]
   )
   return (res.rows[0] as BankAccount) || null

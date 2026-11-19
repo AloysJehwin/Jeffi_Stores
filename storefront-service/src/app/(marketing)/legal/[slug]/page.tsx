@@ -71,7 +71,7 @@ export default async function PolicyPage({ params, searchParams }: { params: Pro
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-|-$/g, '')}
-              className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6"
+              className="ui-card bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6 [overflow-wrap:anywhere]"
             >
               <h2 className="ui-heading text-base md:text-lg font-bold text-foreground mb-3">{section.heading}</h2>
               {Array.isArray(section.body) ? (

@@ -23,6 +23,8 @@ interface PageSpec {
   parts?: string[][]
   /** Compositions that suit this page (functional pages and the chrome); the general list otherwise. */
   layouts?: string[]
+  /** The compositions that suit each pool group's section (by group), where the page's list holds ones that suit only some. */
+  groupLayouts?: string[][]
 }
 
 const STORE: PageSpec[] = [
@@ -45,7 +47,15 @@ const STORE: PageSpec[] = [
     // The hero's picture is always there (an offer's, else a product's or category's photo, else a designed fill).
     parts: [['HeroPicture']],
   },
-  { page: 'products', label: 'Product listing', sections: [1, 3], must: ['ProductResults'], pool: [['A short title band for the listing with the result count'], ['Filters and sort beside or above the product results'], ['Shop-by-category chips above the results', 'A promise strip under the results']], parts: [[], ['Filters', 'SortMenu', 'ProductResults']] },
+  {
+    page: 'products',
+    label: 'Product listing',
+    sections: [1, 3],
+    must: ['ProductResults'],
+    pool: [['A short title band for the listing with the result count'], ['Filters and sort beside or above the product results'], ['Shop-by-category chips above the results', 'A promise strip under the results']],
+    parts: [[], ['Filters', 'SortMenu', 'ProductResults']],
+    groupLayouts: [['a band in the brand colour with light text', 'an oversized word or number as the graphic'], ['filters in a column on the left, the grid on the right'], ['horizontal scroller with the next card peeking', 'three equal columns with thin dividers', 'an edge-to-edge marquee strip']],
+  },
   // Every category page wears this design, filled with its own category: never one category's name or picture. A plan
   // that falls back to the pool takes its first `sections[0]` groups, so those hold what the page needs.
   {
@@ -63,6 +73,11 @@ const STORE: PageSpec[] = [
     ],
     parts: [['Category', 'Breadcrumbs', 'SubCategories'], ['Filters', 'SortMenu', 'ProductResults'], ['CategoryFaqs', 'SeoText']],
     layouts: ['a full-width band with the words over the picture', 'two columns: words on one side, picture or list on the other', 'a slim band under a thin rule', 'filters in a column on the left, the grid on the right', 'a centred narrow column with generous space'],
+    groupLayouts: [
+      ['a full-width band with the words over the picture', 'two columns: words on one side, picture or list on the other', 'a slim band under a thin rule'],
+      ['filters in a column on the left, the grid on the right'],
+      ['two columns: words on one side, picture or list on the other', 'a centred narrow column with generous space', 'a slim band under a thin rule'],
+    ],
   },
   {
     page: 'brand',
@@ -80,6 +95,11 @@ const STORE: PageSpec[] = [
     ],
     parts: [['Brand', 'Breadcrumbs'], ['Filters', 'SortMenu', 'ProductResults'], ['SeoText']],
     layouts: ['a full-width band with the words over the banner', 'the logo and words in two columns', 'a slim band under a thin rule', 'filters in a column on the left, the grid on the right', 'a centred narrow column with generous space'],
+    groupLayouts: [
+      ['a full-width band with the words over the banner', 'the logo and words in two columns', 'a slim band under a thin rule'],
+      ['filters in a column on the left, the grid on the right'],
+      ['a centred narrow column with generous space', 'a slim band under a thin rule'],
+    ],
   },
   {
     page: 'search',
@@ -95,6 +115,7 @@ const STORE: PageSpec[] = [
       ["Other categories: the store's categories from <Categories> for shoppers who did not find what they wanted"],
     ],
     parts: [['SearchQuery', 'SearchBox', 'Filters', 'SortMenu', 'ProductResults'], ['Categories']],
+    groupLayouts: [['filters in a column on the left, the grid on the right'], ['horizontal scroller with the next card peeking', 'bento grid with one large tile', 'a heading pinned beside a list']],
   },
   {
     page: 'product',
@@ -102,10 +123,35 @@ const STORE: PageSpec[] = [
     sections: [2, 4],
     must: ['ProductGallery', 'ProductTitle', 'ProductPrice', 'VariantPicker', 'AddToCart'],
     pool: [['Gallery beside the buy box: title, rating, price, options, quantity, add to cart, buy now, delivery check'], ['Description and specifications in tabs or an accordion'], ['Customer reviews'], ['Related products in a carousel']],
+    parts: [['ProductGallery', 'ProductTitle', 'ProductPrice', 'VariantPicker', 'AddToCart'], ['ProductDescription', 'ProductSpecs'], ['ProductReviews'], ['RelatedProducts']],
     layouts: ['gallery left, sticky buy box right', 'a large gallery on top, details in two columns below', 'a thumbnail rail, the big picture, then the buy box', 'a full-width band with a centred heading over a card grid'],
+    groupLayouts: [
+      ['gallery left, sticky buy box right', 'a large gallery on top, details in two columns below', 'a thumbnail rail, the big picture, then the buy box'],
+      ['tabs over a centred readable column', 'a heading pinned beside the details'],
+      ['the rating summary pinned beside the reviews', 'a centred readable column'],
+      ['a full-width band with a centred heading over a card grid'],
+    ],
   },
-  { page: 'cart', label: 'Cart', sections: [1, 3], must: ['CartLines', 'CheckoutButton'], pool: [['Free shipping progress above the cart'], ['Cart lines beside the summary, coupon and checkout button'], ['Products to add before checkout']], layouts: ['lines left, a sticky summary right', 'one column with the summary card at the end', 'a slim full-width band', 'a horizontal scroller of cards'] },
-  { page: 'checkout', label: 'Checkout', sections: [1, 2], must: ['ContactForm', 'AddressForm', 'DeliveryOptions', 'PaymentStep', 'OrderSummary'], pool: [['Contact, address, delivery and the payment step beside the order summary'], ['Trust badges and help under the checkout']], layouts: ['form steps left, a sticky order summary right', 'the summary first on phones, two columns on desktop', 'a quiet centred band with three columns'] },
+  {
+    page: 'cart',
+    label: 'Cart',
+    sections: [1, 3],
+    must: ['CartLines', 'CheckoutButton'],
+    pool: [['Free shipping progress above the cart'], ['Cart lines beside the summary, coupon and checkout button'], ['Products to add before checkout']],
+    parts: [['FreeShippingProgress'], ['CartLines', 'CartSummary', 'CouponBox', 'CheckoutButton'], ['CartUpsell']],
+    layouts: ['lines left, a sticky summary right', 'one column with the summary card at the end', 'a slim full-width band', 'a horizontal scroller of cards'],
+    groupLayouts: [['a slim full-width band'], ['lines left, a sticky summary right', 'one column with the summary card at the end'], ['a horizontal scroller of cards']],
+  },
+  {
+    page: 'checkout',
+    label: 'Checkout',
+    sections: [1, 2],
+    must: ['ContactForm', 'AddressForm', 'DeliveryOptions', 'PaymentStep', 'OrderSummary'],
+    pool: [['Contact, address, delivery and the payment step beside the order summary'], ['Trust badges and help under the checkout']],
+    parts: [['ContactForm', 'AddressForm', 'DeliveryOptions', 'PaymentStep', 'OrderSummary'], ['TrustBadges']],
+    layouts: ['form steps left, a sticky order summary right', 'the summary first on phones, two columns on desktop', 'a quiet centred band with three columns'],
+    groupLayouts: [['form steps left, a sticky order summary right', 'the summary first on phones, two columns on desktop'], ['a quiet centred band with three columns']],
+  },
   { page: 'about', label: 'About', optional: true, sections: [3, 5], must: [], pool: [['An opening statement over a large picture', 'A typographic opening with the founding year'], ['The story in words and pictures', 'A timeline of milestones'], ['How the products are made', 'The people behind the store'], ['What customers say'], ['A call to shop the collection']] },
   { page: 'contact', label: 'Contact', optional: true, sections: [2, 3], must: [], pool: [['How to reach the store: phone, email, WhatsApp, address'], ['Questions shoppers ask, in an accordion'], ['A band inviting a visit or a call']] },
   {
@@ -123,6 +169,10 @@ const STORE: PageSpec[] = [
     ],
     parts: [['Breadcrumbs', 'AllCategories'], []],
     layouts: ['a slim title band over a wide grid', 'a centred heading over a mosaic with one large tile', 'a heading pinned beside the list'],
+    groupLayouts: [
+      ['a slim title band over a wide grid', 'a centred heading over a mosaic with one large tile', 'a heading pinned beside the list'],
+      ['a band in the brand colour with light text', 'a centered card floating over a tinted background'],
+    ],
   },
   {
     page: 'brands',
@@ -139,6 +189,10 @@ const STORE: PageSpec[] = [
     ],
     parts: [['Breadcrumbs', 'AllBrands'], []],
     layouts: ['a slim title band over a wide grid', 'a centred heading over a logo wall', 'a heading pinned beside the list'],
+    groupLayouts: [
+      ['a slim title band over a wide grid', 'a centred heading over a logo wall', 'a heading pinned beside the list'],
+      ['a band in the brand colour with light text', 'a centered card floating over a tinted background'],
+    ],
   },
   { page: 'footer', label: 'Footer', sections: [1, 1], must: ['FooterLinks'], pool: [['The footer: link columns, social links and the store line']], layouts: ['four link columns over a slim bottom bar', 'a large brand line beside the link columns', 'a band of social links over the link columns', 'a dark band with centred links and social icons'] },
 ]
@@ -157,7 +211,15 @@ const BUSINESS: PageSpec[] = [
       ['A call to request a quote or talk to the trade desk'],
     ],
   },
-  { page: 'catalog', label: 'Trade catalogue', sections: [1, 3], must: ['ProductResults'], pool: [['A title band for the trade catalogue'], ['Filters and sort beside the catalogue results'], ['A note on tier pricing and minimum order']] },
+  {
+    page: 'catalog',
+    label: 'Trade catalogue',
+    sections: [1, 3],
+    must: ['ProductResults'],
+    pool: [['A title band for the trade catalogue'], ['Filters and sort beside the catalogue results'], ['A note on tier pricing and minimum order']],
+    parts: [[], ['Filters', 'SortMenu', 'ProductResults']],
+    groupLayouts: [['a band in the brand colour with light text', 'an oversized word or number as the graphic'], ['filters in a column on the left, the grid on the right'], ['a centered card floating over a tinted background', 'three equal columns with thin dividers']],
+  },
 ]
 
 // The store's working pages (account, orders, sign in, policies, help…) are designed now (UTILITY_SPECS); a plan made
@@ -224,6 +286,41 @@ const plainLabel = (s: string) =>
 // A label from an idea: its first clause, cut at a word.
 const labelOf = (intent: string) => clip(intent.split(/[:,;]/)[0], 40)
 
+/** The layouts that suit a pool group's section: its own list, else the page's. */
+const layoutsOf = (spec: PageSpec, group: number): readonly string[] => (spec.groupLayouts?.[group]?.length ? spec.groupLayouts[group] : (spec.layouts ?? LAYOUTS))
+
+/**
+ * A layout for a section the planner gave none: one suiting the pool group whose parts it shares most, else one
+ * suiting every group of the page, else any of the page's.
+ */
+function layoutFor(spec: PageSpec | undefined, parts: string[], r: () => number): string {
+  const groups = spec?.groupLayouts
+  if (spec && groups?.length) {
+    let best = -1
+    let most = 0
+    spec.parts?.forEach((g, i) => {
+      const n = g.filter(p => parts.includes(p)).length
+      if (n > most && groups[i]?.length) {
+        best = i
+        most = n
+      }
+    })
+    if (best >= 0) return pick(r, groups[best])
+    const shared = groups.reduce((all, g) => all.filter(l => g.includes(l)))
+    if (shared.length) return pick(r, shared)
+  }
+  return pick(r, spec?.layouts ?? LAYOUTS)
+}
+
+// The page's section ideas for the planner, with the layouts that suit each group where the page has them.
+const ideasText = (spec: PageSpec) =>
+  spec.groupLayouts
+    ? `ideas, with the layouts that suit each in brackets: ${spec.pool.map((g, i) => `${g.join(' / ')} [${layoutsOf(spec, i).join(' / ')}]`).join('; ')}`
+    : `ideas: ${spec.pool.flat().slice(0, 8).join(' / ')}${spec.layouts ? `; layouts that suit it: ${spec.layouts.join(' / ')}` : ''}`
+
+// What a page planned again may draw on: its ideas with their layouts, else a few layouts.
+const replanIdeas = (spec: PageSpec, r: () => number) => (spec.groupLayouts ? `Section ${ideasText(spec)}` : `Layout ideas: ${shuffle(r, spec.layouts ?? LAYOUTS).slice(0, 6).join('; ')}`)
+
 function fallbackSections(spec: PageSpec, approach: string, r: () => number): Omit<PlannedSection, 'id'>[] {
   const [min, max] = spec.sections
   let groups = spec.pool
@@ -237,7 +334,8 @@ function fallbackSections(spec: PageSpec, approach: string, r: () => number): Om
   const chosen = groups.length <= n ? groups : [groups[0], ...groups.slice(1, -1).slice(0, n - 2), groups[groups.length - 1]].slice(0, n)
   return chosen.map(g => {
     const intent = pick(r, g)
-    return { label: labelOf(intent), intent, layout: pick(r, spec.layouts ?? LAYOUTS), parts: [...(spec.parts?.[spec.pool.indexOf(g)] ?? [])] }
+    const i = spec.pool.indexOf(g)
+    return { label: labelOf(intent), intent, layout: pick(r, layoutsOf(spec, i)), parts: [...(spec.parts?.[i] ?? [])] }
   })
 }
 
@@ -256,13 +354,13 @@ function assignParts(sections: Omit<PlannedSection, 'id'>[], spec: PageSpec, pag
   return out
 }
 
-function readSections(raw: unknown, r: () => number, layouts: readonly string[] = LAYOUTS): Omit<PlannedSection, 'id'>[] {
+function readSections(raw: unknown, r: () => number, spec?: PageSpec): Omit<PlannedSection, 'id'>[] {
   return listOf(raw, 'sections', 'items')
     .map(item => {
       const o = (item && typeof item === 'object' ? item : { intent: item }) as Record<string, unknown>
       const intent = clip(o.intent ?? o.description ?? o.purpose, 300)
       const parts = (Array.isArray(o.parts) ? o.parts : Array.isArray(o.components) ? o.components : []).map(p => String(p).replace(/[<>/\s]/g, '')).filter(p => /^[A-Z][A-Za-z]+$/.test(p))
-      return intent ? { label: plainLabel(clip(o.label ?? o.name ?? o.title, 40, labelOf(intent))), intent, layout: str(o.layout ?? o.composition, 160, pick(r, layouts)), parts } : null
+      return intent ? { label: plainLabel(clip(o.label ?? o.name ?? o.title, 40, labelOf(intent))), intent, layout: str(o.layout ?? o.composition, 160, layoutFor(spec, parts, r)), parts } : null
     })
     .filter((s): s is NonNullable<typeof s> => !!s)
 }
@@ -288,7 +386,7 @@ Return JSON {"approach": id, "pages": {"<page>": [sections]}}.`,
           `Store: ${b.storeName}. ${b.summary} Sells ${b.category} to ${b.audience}. Price tier ${b.priceTier}. Voice: ${b.voice}. Mood: ${b.mood}.
 ${b.references.length ? `Sites they like (patterns only): ${b.references.map(x => x.patterns.slice(0, 8).join(', ')).join(' | ')}\n` : ''}Layout ideas to draw on: ${shuffle(r, LAYOUTS).slice(0, 8).join('; ')}.
 Pages (key: sections min-max; must contain; ideas):
-${specs.map(({ audience, spec }) => `- ${audience === 'business' ? 'business_' : ''}${spec.page}: ${spec.sections[0]}-${spec.sections[1]}; must contain ${mustFor(spec).join(', ') || 'nothing in particular'}; ideas: ${spec.pool.flat().slice(0, 8).join(' / ')}${spec.layouts ? `; layouts that suit it: ${spec.layouts.join(' / ')}` : ''}; parts available: ${partsFor(spec.page).slice(0, 40).join(', ')}`).join('\n')}`,
+${specs.map(({ audience, spec }) => `- ${audience === 'business' ? 'business_' : ''}${spec.page}: ${spec.sections[0]}-${spec.sections[1]}; must contain ${mustFor(spec).join(', ') || 'nothing in particular'}; ${ideasText(spec)}; parts available: ${partsFor(spec.page).slice(0, 40).join(', ')}`).join('\n')}`,
           { maxTokens: 7000, temperature: 0.9 }
         ).catch(orNull)
       : null
@@ -298,7 +396,7 @@ ${specs.map(({ audience, spec }) => `- ${audience === 'business' ? 'business_' :
   const pages: PlannedPage[] = [...specs, ...UTILITY_SPECS.map(spec => ({ audience: 'store' as SiteAudience, spec }))].map(({ audience, spec }) => {
     const key = `${audience === 'business' ? 'business_' : ''}${spec.page}`
     const [min, max] = spec.sections
-    let sections = readSections(byPage?.[key], r, spec.layouts).slice(0, max)
+    let sections = readSections(byPage?.[key], r, spec).slice(0, max)
     if (sections.length < min) sections = [...sections, ...fallbackSections(spec, approach.id, r).slice(sections.length)].slice(0, Math.max(min, sections.length))
     return {
       key: `${audience}:${spec.page}`,
@@ -328,11 +426,11 @@ export async function replanPage(b: StudioBrief, current: StudioPlan, key: strin
       ? await askJson(
           `You plan ${showcase ? "the one page of an Indian business's website" : "one page of an Indian online store's website"} again, differently from before. Return JSON {"sections": [{"label", "intent", "layout", "parts"}]} with ${spec.sections[0]}-${spec.sections[1]} sections. It must contain ${mustFor(spec).join(', ') || 'nothing in particular'}. Parts available: ${partsFor(spec.page).join(', ')}.`,
           `${showcase ? 'Business' : 'Store'}: ${b.storeName}. ${b.summary} Approach: ${current.approach.description}
-The page was: ${page.sections.map(s => `${s.label} (${s.layout})`).join('; ')}. Make it different. Layout ideas: ${shuffle(r, spec.layouts ?? LAYOUTS).slice(0, 6).join('; ')}.`,
+The page was: ${page.sections.map(s => `${s.label} (${s.layout})`).join('; ')}. Make it different. ${replanIdeas(spec, r)}.`,
           { maxTokens: 1500, temperature: 1 }
         ).catch(orNull)
       : null
-  let sections = readSections(out, r, spec.layouts).slice(0, spec.sections[1])
+  let sections = readSections(out, r, spec).slice(0, spec.sections[1])
   if (sections.length < spec.sections[0]) sections = fallbackSections(spec, current.approach.id, r)
   return { ...page, sections: assignParts(sections, spec, page.page).map((s, i) => ({ ...s, id: `s${i + 1}` })) }
 }
@@ -419,7 +517,7 @@ ${spec.sections[0]}-${spec.sections[1]} sections; must contain ${mustFor(spec).j
         ).catch(orNull)
       : null
   const approach = SHOWCASE_APPROACHES.find(a => a.id === out?.approach) ?? candidates[0]
-  let sections = readSections(out, r, spec.layouts).slice(0, spec.sections[1])
+  let sections = readSections(out, r, spec).slice(0, spec.sections[1])
   if (sections.length < spec.sections[0]) sections = fallbackSections(spec, approach.id, r)
   const page: PlannedPage = {
     key: SHOWCASE_PAGE_KEY,

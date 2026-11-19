@@ -2,6 +2,7 @@ import type { PageDoc } from '@jeffi/site-blocks'
 import { describe, it, expect, vi } from 'vitest'
 import { cloneElement, createElement, isValidElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import postcss from 'postcss'
 import { z } from 'zod'
 
 // The other parts' modules are built separately; the engine is tested on its own components.
@@ -19,6 +20,7 @@ import { inertCss, safeHref, safeSrc } from '@/lib/site/code/allow'
 import { evalValue } from '@/lib/site/code/evaluate'
 import type { CodeNode } from '@/lib/site/code/ast'
 import { makeEnv, renderNode, Resolve } from '@/components/visitor/site/code/interpret'
+import CodeSection from '@/components/visitor/site/code/CodeSection'
 import { sampleSiteData, type SampleCatalog } from '@/lib/site/data'
 import { siteRegistry } from '@/lib/site/blocks'
 
@@ -92,8 +94,8 @@ export default function Section() {
     expect(s.components).toEqual(['Products'])
     expect(s.classes).toEqual(expect.arrayContaining(['grid-cols-2', 'md:grid-cols-4', 'opacity-60', 'text-accent-600', 'font-display']))
     const scope = `[data-code-section="${s.id}"]`
-    expect(s.css).toContain(`${scope} .grid-cols-2`)
-    expect(s.css).toContain(`${scope} .md\\:grid-cols-4`)
+    expect(s.css).toContain(`${scope} .grid-cols-2.${s.id}`)
+    expect(s.css).toContain(`${scope} .md\\:grid-cols-4.${s.id}`)
     expect(s.css).toContain('@media (min-width: 768px)')
     // Theme colours resolve to the store's variables.
     expect(s.css).toMatch(/--c-accent-600/)
@@ -108,18 +110,114 @@ export default function Section() {
     expect(out).toContain('href="/products/kanjivaram-red"')
     // Sorted by price, highest first; the out-of-stock one is dimmed.
     expect(out.indexOf('Kanjivaram')).toBeLessThan(out.indexOf('Banarasi'))
-    expect(out).toMatch(/class="group block opacity-60"[^>]*><h3[^>]*>Cotton Blue/)
+    expect(out).toMatch(/class="group block opacity-60 cs-test"[^>]*><h3[^>]*>Cotton Blue/)
   })
 
-  it('scopes every rule but keyframe steps, and keeps hover / dark / group variants working', async () => {
-    const { compileSectionCss } = await import('@/lib/site/code/css')
-    const css = await compileSectionCss(['animate-spin', 'hover:underline', 'dark:bg-black', 'group-hover:scale-105', 'space-y-4', 'bogus-class'], 'cs-abc')
+  it('scopes every rule but keyframe steps to the marked elements, and keeps hover / dark / group variants working', async () => {
+    const { compileSectionCss, cardScope, CSS_FORMAT } = await import('@/lib/site/code/css')
+    const css = await compileSectionCss(['animate-spin', 'hover:underline', 'dark:bg-black', 'group-hover:scale-105', 'space-y-4', 'md:flex', 'supports-[display:grid]:grid', 'bogus-class'], 'cs-abc')
+    expect(css.startsWith(CSS_FORMAT)).toBe(true)
     expect(css).toMatch(/@keyframes spin \{to \{transform: rotate\(360deg\)\}\}/)
-    expect(css).toContain('[data-code-section="cs-abc"] .hover\\:underline:hover')
-    expect(css).toContain('[data-code-section="cs-abc"] .group:hover .group-hover\\:scale-105')
-    expect(css).toContain('[data-code-section="cs-abc"] .space-y-4 > :not([hidden]) ~ :not([hidden])')
+    expect(css).toContain('[data-code-section="cs-abc"] .hover\\:underline.cs-abc:hover')
+    expect(css).toContain('[data-code-section="cs-abc"] .dark\\:bg-black.cs-abc:is(.dark *)')
+    expect(css).toContain('[data-code-section="cs-abc"] .group:hover .group-hover\\:scale-105.cs-abc')
+    expect(css).toContain('[data-code-section="cs-abc"] .space-y-4.cs-abc > :not([hidden]) ~ :not([hidden])')
+    expect(css).toMatch(/@media \(min-width: 768px\) \{\[data-code-section="cs-abc"\] \.md\\:flex\.cs-abc \{/)
+    expect(css).toMatch(/@supports \(display:grid\) \{\[data-code-section="cs-abc"\] \.supports-\\\[display\\:grid\\\]\\:grid\.cs-abc \{/)
     expect(css).not.toContain('bogus')
-    for (const rule of css.replace(/@keyframes[^{]+\{([^{}]*\{[^{}]*\})*\}/g, '').match(/(^|\})[^{}@]+\{/g) ?? []) expect(rule.replace(/^\}/, '')).toMatch(/^\[data-code-section="cs-abc"\] /)
+    for (const rule of css.slice(CSS_FORMAT.length).replace(/@keyframes[^{]+\{([^{}]*\{[^{}]*\})*\}/g, '').match(/(^|\})[^{}@]+\{/g) ?? [])
+      expect(rule.replace(/^\}/, '')).toMatch(/^\[data-code-section="cs-abc"\] .*\.cs-abc/)
+    // A card's doubled scope still leads, and its id is its mark.
+    expect(await compileSectionCss(['flex'], cardScope('cs-card'))).toContain('[data-site-card="cs-card"][data-site-card="cs-card"] .flex.cs-card')
+  })
+
+  it("marks the compound holding each rule's own class, in every selector shape", async () => {
+    const { markSelector } = await import('@/lib/site/code/css')
+    const cases: [string, string][] = [
+      ['.flex', '.flex.cs-1'],
+      ['.group:hover .group-hover\\:x', '.group:hover .group-hover\\:x.cs-1'],
+      ['.placeholder\\:x::placeholder', '.placeholder\\:x.cs-1::placeholder'],
+      ['.space-x-4 > :not([hidden]) ~ :not([hidden])', '.space-x-4.cs-1 > :not([hidden]) ~ :not([hidden])'],
+      ['.\\[\\&\\>\\*\\]\\:p-4 > *', '.\\[\\&\\>\\*\\]\\:p-4.cs-1 > *'],
+      ['.dark\\:bg-black:is(.dark *)', '.dark\\:bg-black.cs-1:is(.dark *)'],
+      [':is(.dark .dark\\:bg-black)', ':is(.dark .dark\\:bg-black.cs-1)'],
+      ['.dark .\\[\\.dark_\\&\\]\\:block', '.dark .\\[\\.dark_\\&\\]\\:block.cs-1'],
+      ['.marker\\:x *::marker', '.marker\\:x.cs-1 *::marker'],
+      ['.\\[\\&_\\&\\]\\:p-1 .\\[\\&_\\&\\]\\:p-1', '.\\[\\&_\\&\\]\\:p-1.cs-1 .\\[\\&_\\&\\]\\:p-1.cs-1'],
+      // Format 2's shared mark, or this one, is replaced.
+      ['.hover\\:x.cs-own:hover', '.hover\\:x.cs-1:hover'],
+      ['.flex.cs-1', '.flex.cs-1'],
+      ['to', 'to'],
+    ]
+    for (const [from, to] of cases) expect(markSelector(from, 'cs-1'), from).toBe(to)
+  })
+
+  const selectors = (css: string) => {
+    const out: string[] = []
+    postcss.parse(css).walkRules(r => {
+      out.push(...r.selectors)
+    })
+    return out
+  }
+  const draw = async (section: CompiledSection) =>
+    renderToStaticMarkup(createElement('div', null, await resolve(await CodeSection({ section, data: sampleSiteData(catalog), page: 'home' }))))
+
+  it("leaves the parts' own markup to the app stylesheet: a lg:hidden menu button is not the section's to show", async () => {
+    const { compileSectionCss, CSS_FORMAT } = await import('@/lib/site/code/css')
+    const css = await compileSectionCss(['flex', 'hidden', 'items-center', 'md:flex'], 'cs-hdr')
+    const root = document.createElement('div')
+    root.setAttribute('data-code-section', 'cs-hdr')
+    root.innerHTML = '<button class="lg:hidden flex"></button><div class="hidden lg:block"></div><div class="flex items-center cs-hdr"></div>'
+    document.body.append(root)
+    const [button, links, own] = [...root.children]
+    for (const s of selectors(css)) {
+      expect(button.matches(s), s).toBe(false)
+      expect(links.matches(s), s).toBe(false)
+    }
+    expect(selectors(css).some(s => own.matches(s))).toBe(true)
+    // The CSS from before reached them, and its `.flex` beat the app's `lg:hidden`.
+    expect(selectors(css.slice(CSS_FORMAT.length).replaceAll('.cs-hdr', '')).some(s => button.matches(s))).toBe(true)
+    root.remove()
+  })
+
+  it("keeps an outer section's rules off a section drawn inside it", async () => {
+    const { compileSectionCss } = await import('@/lib/site/code/css')
+    const section = async (id: string, cls: string) =>
+      ({ id, ast: { t: 'el', tag: 'div', props: { className: { k: 'lit', v: cls } }, children: [] }, classes: cls.split(' '), css: await compileSectionCss(cls.split(' '), id), components: [] }) as unknown as CompiledSection
+    const outer = await section('cs-0a0a0a0a', 'flex')
+    const inner = await section('cs-1b1b1b1b', 'flex md:block')
+    const root = document.createElement('div')
+    root.innerHTML = await draw(outer)
+    root.querySelector('.flex')!.innerHTML = await draw(inner)
+    document.body.append(root)
+    const nested = root.querySelector('[data-code-section="cs-1b1b1b1b"] .flex')!
+    expect(nested.className).toBe('flex md:block cs-1b1b1b1b')
+    // Only the inner section's own `.flex` and `md:block` rules reach it, so its md:block wins from md up.
+    expect(selectors(outer.css).filter(s => nested.matches(s))).toEqual([])
+    expect(selectors(inner.css).filter(s => nested.matches(s))).toHaveLength(2)
+    root.remove()
+  })
+
+  it('upgrades CSS saved in an earlier format at render, and draws the section with it', async () => {
+    const { compileSectionCss, currentCss, CSS_FORMAT } = await import('@/lib/site/code/css')
+    const id = 'cs-0ld0ld00'
+    const fresh = await compileSectionCss(['text-4xl', 'md:text-6xl', 'hover:underline', 'space-y-4', 'animate-spin'], id)
+    const old = fresh.slice(CSS_FORMAT.length).replaceAll(`.${id}`, '')
+    const shared = `/*cs:2*/${fresh.slice(CSS_FORMAT.length).replaceAll(`.${id}`, '.cs-own')}`
+    expect(currentCss(old, id)).toBe(fresh)
+    expect(currentCss(shared, id)).toBe(fresh)
+    expect(currentCss(fresh, id)).toBe(fresh)
+    expect(currentCss(undefined)).toBe('')
+    const section = {
+      id,
+      ast: { t: 'el', tag: 'h1', props: { className: { k: 'lit', v: 'text-4xl md:text-6xl' } }, children: [{ t: 'text', value: 'Hi' }] },
+      classes: ['md:text-6xl', 'text-4xl'],
+      css: old,
+      components: [],
+    } as unknown as CompiledSection
+    const out = await draw(section)
+    expect(out).toContain(`[data-code-section="${id}"] .text-4xl.${id}`)
+    expect(out).toContain(`<h1 class="text-4xl md:text-6xl ${id}">Hi</h1>`)
   })
 
   it('supports .map over literal lists, destructured parameters, Store and conditionals', async () => {
@@ -130,7 +228,7 @@ export default function Section() {
     const r = check(src)
     if (!r.ok) throw new Error(JSON.stringify(r.issues))
     const out = await html(r.ast)
-    expect(out).toContain('<li class="font-bold"><a href="/products">Shop</a></li>')
+    expect(out).toContain('<li class="font-bold cs-test"><a href="/products">Shop</a></li>')
     expect(out).toContain(`© ${new Date().getFullYear()} Loom &amp; Thread`)
   })
 
@@ -315,7 +413,7 @@ describe('code sections: the interpreter re-checks the AST', () => {
       ],
     } as unknown as CodeNode
     const out = await html(ast)
-    expect(out).toBe('<div><div class="box"><a>bad link</a><a href="https://ok.example" target="_blank" rel="noopener noreferrer">ok</a></div></div>')
+    expect(out).toBe('<div><div class="box cs-test"><a>bad link</a><a href="https://ok.example" target="_blank" rel="noopener noreferrer">ok</a></div></div>')
     // PaymentStep renders on checkout only.
     expect(await html({ t: 'cmp', name: 'PaymentStep', props: {}, children: [] }, 'checkout')).toContain('data-pay')
   })

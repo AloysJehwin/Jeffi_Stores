@@ -22,7 +22,7 @@ export default function WhyUsEditor(props: EditorProps) {
       <TileListEditor
         label="Cards"
         tiles={readTiles(b.cfg.items, KEYS)}
-        defaults={SECTION_TILE_DEFAULTS.why_us}
+        defaults={props.options?.tileDefaults?.why_us ?? SECTION_TILE_DEFAULTS.why_us}
         fields={[
           { key: 'title', label: 'Title', placeholder: 'Fast Delivery' },
           { key: 'desc', label: 'Description', kind: 'textarea' },
