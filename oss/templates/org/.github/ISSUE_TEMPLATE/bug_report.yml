@@ -1,0 +1,71 @@
+name: Bug report
+description: Something in this repository is broken or behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Follow the [security policy](https://github.com/Jeffi-ERP/.github/blob/main/SECURITY.md) instead.
+
+        **Never paste secrets, API keys, tokens, `.env` values, customer data or order details.** Redact logs and screenshots before you add them.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: On a local workspace where possible.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Storefront
+        - Store admin
+        - B2B portal
+        - Control plane or ecom portal
+        - Showcase websites
+        - Messaging (WhatsApp, SMS, email, push)
+        - Documents (PDF)
+        - Public API
+        - Mobile app or mobile API
+        - AI gateway
+        - Shared packages or store-core
+        - Workspace setup or tooling
+        - Other
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The commit you were running (`git rev-parse --short HEAD` in the repository's folder).
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js and PostgreSQL versions, and the browser or device if it matters.
+      placeholder: macOS 15, Node.js 20, PostgreSQL 16, Chrome
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove secrets, personal data and order details first.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues.
+          required: true
+        - label: This report contains no secrets, customer data or order details.
+          required: true

@@ -1,0 +1,3 @@
+# Managed from %%upstream%% (oss/templates); edits here are overwritten by the next export.
+# Maintainers review every change; only they (and the owner) can merge.
+* @%%org%%/%%maintainers%% @%%owner%%
