@@ -12,6 +12,9 @@ import { CODE_ICONS } from './icons'
 // Server renderers behind the engine's common code components (lib/site/code/parts/common.tsx). Every class here is
 // literal, so the apps' own Tailwind build (which scans this folder) has it.
 
+
+/** Testimonials' slides by default: three to a row from md, gaps included (here so the apps' Tailwind sees the class). */
+export const TESTIMONIAL_SLIDE = 'w-[85%] md:w-[calc((100%-2.5rem)/3)]'
 export const ASPECTS = ['auto', '1:1', '4:5', '3:4', '2:3', '4:3', '3:2', '16:9', '21:9', '3:1'] as const
 const ASPECT: Record<string, string> = {
   auto: '', '1:1': 'aspect-square', '4:5': 'aspect-[4/5]', '3:4': 'aspect-[3/4]', '2:3': 'aspect-[2/3]', '4:3': 'aspect-[4/3]', '3:2': 'aspect-[3/2]',

@@ -163,8 +163,8 @@ export function CouponBoxPart({ className, demo = false }: { className?: string;
     return demo ? (
       <div className={className}>
         <div className="flex gap-2" aria-hidden>
-          <span className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground-muted">Coupon code</span>
-          <span className="px-4 py-2 text-sm font-semibold bg-accent-500 text-white rounded-lg">Apply</span>
+          <span className="min-w-0 flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground-muted">Coupon code</span>
+          <span className="shrink-0 px-4 py-2 text-sm font-semibold bg-accent-500 text-white rounded-lg">Apply</span>
         </div>
       </div>
     ) : null

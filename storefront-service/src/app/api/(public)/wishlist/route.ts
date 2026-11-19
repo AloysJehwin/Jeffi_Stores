@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           'hazardous', p.hazardous,
           'flammable', p.flammable,
           'product_images', COALESCE(
-            (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
+            (SELECT json_agg(json_build_object('thumbnail_url', COALESCE(pi.thumbnail_url, pi.image_url), 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),
             '[]'::json
           )

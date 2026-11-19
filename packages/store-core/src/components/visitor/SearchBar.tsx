@@ -496,7 +496,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                             <div className="w-10 h-10 bg-surface-secondary rounded-lg flex-shrink-0 overflow-hidden border border-border-default">
                               {primaryImage ? (
                                 <img
-                                  src={primaryImage.thumbnail_url}
+                                  src={primaryImage.thumbnail_url || primaryImage.image_url}
                                   alt={product.name}
                                   className="w-full h-full object-contain p-0.5"
                                 />
