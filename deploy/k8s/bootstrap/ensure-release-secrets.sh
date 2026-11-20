@@ -1,8 +1,9 @@
 #!/bin/bash
 # Makes sure jeffi/production holds ADMIN_GATEWAY_SECRET, CRON_SECRET and UPG_ALERT_SECRET (signs each store's UPI
 # bank-alert forwarding address): a missing one is generated, an existing one is never replaced (that would change
-# every forwarding address). Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production (the release does not),
-# and checks the copies the store apps and CronJobs read. Warns (only) when the Meta app keys are missing.
+# every forwarding address). Then copies ADMIN_GATEWAY_SECRET to jeffi/public-api/production and SOCIAL_TOKEN_ENC_KEY
+# to jeffi/messaging/production (the release does neither), and checks the copies the store apps and CronJobs read.
+# Warns (only) when the Meta app keys are missing.
 # Prints no values; rollback commands go to $OUT_DIR/ensure-secrets-rollback.sh.
 # Usage: bash deploy/k8s/bootstrap/ensure-release-secrets.sh [--dry-run] [--yes] [--sync-store] [--cluster]
 #   --sync-store  refresh jeffi/store now (store-secret.sh); each release does it anyway
@@ -25,6 +26,7 @@ src_f, dst_f, out_f, *keys = sys.argv[1:]
 src, dst = json.load(open(src_f)), json.load(open(dst_f))
 new, n = dict(dst), 0
 for k in keys:
+    if not src.get(k): print(f'  {k}: WARNING, missing from jeffi/production; nothing to copy'); continue
     if dst.get(k) == src.get(k): print(f'  {k}: matches jeffi/production'); continue
     print(f'  {k}: {"different" if dst.get(k) else "missing"}, will be copied from jeffi/production')
     new[k] = src[k]; n += 1
@@ -65,6 +67,10 @@ PY
 say "jeffi/public-api/production (the gateway signs with it)"
 get jeffi/public-api/production > "$TMP/pub.json"
 if run python3 -I "$TMP/copy.py" "$TMP/prod.new" "$TMP/pub.json" "$TMP/pub.new" ADMIN_GATEWAY_SECRET; then TODO="$TODO pub"; fi
+
+say "jeffi/messaging/production (decrypts the stores' sender credentials with the app's key)"
+get jeffi/messaging/production > "$TMP/msg.json"
+if run python3 -I "$TMP/copy.py" "$TMP/prod.new" "$TMP/msg.json" "$TMP/msg.new" SOCIAL_TOKEN_ENC_KEY; then TODO="$TODO msg"; fi
 
 say "jeffi/store (store apps; store-secret.sh copies it from jeffi/production on every release)"
 if get jeffi/store > "$TMP/store.json" 2>/dev/null; then
@@ -111,6 +117,7 @@ put() {
 say "Writing"
 case " $TODO " in *" prod "*) put jeffi/production "$TMP/prod.new" ;; esac
 case " $TODO " in *" pub "*) put jeffi/public-api/production "$TMP/pub.new" ;; esac
+case " $TODO " in *" msg "*) put jeffi/messaging/production "$TMP/msg.new" ;; esac
 case " $TODO " in *" store "*) bash "$(dirname "$0")/store-secret.sh" ;; esac
 case " $TODO " in *" cron "*)
   kubectl -n jeffi create secret generic cron-secret --from-file=CRON_SECRET="$TMP/cron.prod" --dry-run=client -o yaml |
@@ -120,3 +127,7 @@ esac
 echo
 echo "Done. Rollback for Secrets Manager: bash $RB"
 echo "Pods read secrets when they start, so the next release's rollout picks the values up; CronJobs read cron-secret on every run."
+case " $TODO " in *" msg "*)
+  echo "To send from the stores' own numbers before the next release, restart every messaging pod:"
+  echo "  kubectl get deploy -A -l app=messaging-service --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name | while read -r ns n; do kubectl -n \"\$ns\" rollout restart deploy/\"\$n\"; done" ;;
+esac
