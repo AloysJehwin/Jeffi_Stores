@@ -2,17 +2,20 @@ import 'server-only'
 import { ROOT_DOMAIN } from '@/lib/tenant-registry/shared'
 import { sendComplianceEmail } from '@/lib/shared/ecom-emails'
 import { DOCS, daysUntil, todayIst } from './compliance'
+import { KYB_DOCS } from '@controller/lib/kyb/requirements'
 
 // Mail about a store's licences: to the owner when one is not accepted, about to lapse or lapsed; to the platform admin
 // when the owner sends one from the console. Lines and rows of the owner mail are HTML, so everything typed is escaped.
 
 export const LICENCES_PAGE = `https://ecom.${ROOT_DOMAIN}/dashboard/licences`
+/** Where KYB documents (PAN card, GST certificate, registration proofs) are replaced. */
+export const BUSINESS_PAGE = `https://ecom.${ROOT_DOMAIN}/dashboard/business`
 /** Stores whose owner has the console to fix a licence in; an application still under review is settled with its KYC. */
 export const CONSOLE_STATUSES = ['active', 'provisioning', 'suspended']
 
 const esc = (s: string) => s.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c]!)
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-const docName = (type: string) => DOCS[type]?.name ?? type
+const docName = (type: string) => DOCS[type]?.name ?? KYB_DOCS[type]?.label ?? type
 
 interface Owner {
   email: string
@@ -30,23 +33,27 @@ export interface ExpiryNotice extends Doc {
 }
 
 const docRows = (d: Doc, lapsed = false) => [
-  ...(d.doc_number ? [{ label: DOCS[d.doc_type]?.numberLabel ?? 'Number', value: esc(d.doc_number) }] : []),
+  ...(d.doc_number ? [{ label: DOCS[d.doc_type]?.numberLabel ?? KYB_DOCS[d.doc_type]?.numberLabel ?? 'Number', value: esc(d.doc_number) }] : []),
   ...(d.expires_on ? [{ label: lapsed ? 'Expired on' : 'Valid until', value: day(d.expires_on) }] : []),
 ]
 
 /** The platform admin did not accept a document the owner has to replace. */
 export async function notifyDocumentRejected(owner: Owner, store: string, doc: Doc, note: string | null): Promise<void> {
   const name = docName(doc.doc_type)
+  // A KYB document (PAN card, GST certificate, registration proof) is replaced on Business verification.
+  const kyb = !DOCS[doc.doc_type] && !!KYB_DOCS[doc.doc_type]
   await sendComplianceEmail(owner, {
     subject: `${store}: your ${name} was not accepted`,
-    title: 'A licence was not accepted',
+    title: kyb ? 'A verification document was not accepted' : 'A licence was not accepted',
     lines: [
       `We could not accept the <strong>${esc(name)}</strong> you sent for <strong>${esc(store)}</strong>.`,
-      'Upload a corrected copy from Licences &amp; certificates in your console. We review it again as soon as it arrives.',
+      kyb
+        ? 'Upload a corrected copy from Business verification in your console. We review it again as soon as it arrives.'
+        : 'Upload a corrected copy from Licences &amp; certificates in your console. We review it again as soon as it arrives.',
     ],
     rows: docRows(doc),
     ...(note ? { warn: `<strong>Reason:</strong> ${esc(note)}` } : {}),
-    cta: { href: LICENCES_PAGE, label: 'Upload a new copy' },
+    cta: { href: kyb ? BUSINESS_PAGE : LICENCES_PAGE, label: 'Upload a new copy' },
   })
 }
 

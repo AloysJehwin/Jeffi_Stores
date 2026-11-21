@@ -1,54 +1,30 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { getKyc } from '@/lib/tenant-registry'
-import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
+import { hasService } from '@/lib/tenant-registry'
+import { loadKybView } from '@controller/lib/kyb/view'
+import { todayIst } from '@controller/lib/catalog/compliance'
 import PageHeader from '../_components/PageHeader'
-import { Card, Row } from '../_components/Card'
+import { Badge } from '../../onboard/ui'
+import BusinessClient from './BusinessClient'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Business details' }
+export const metadata = { title: 'Business verification' }
 
-export default async function BusinessPage() {
-  const { tenant } = await loadOwnerContext()
-  const kyc = await getKyc(tenant.id).catch(() => null)
-  const dash = (v: string | null | undefined) => v || '—'
+const DESCRIPTION = 'Jeffi verifies the business behind each service before switching it on. Save each part as you go; documents are checked as soon as you upload them.'
+
+export default async function BusinessPage({ searchParams }: { searchParams: Promise<{ for?: string }> }) {
+  const { for: wanted } = await searchParams
+  const { owner, tenant } = await loadOwnerContext()
+  const kyb = await loadKybView(tenant, owner.id)
+  const focus = wanted === 'messaging' || wanted === 'documents' ? wanted : null
   return (
     <>
       <PageHeader
         eyebrow="Account"
-        title="Business details"
-        description="What you submitted during onboarding. Contact support to change any of it."
-        actions={kyc && <StatusPill status={kyc.status} />}
+        title="Business verification"
+        description={DESCRIPTION}
+        actions={kyb.status === 'approved' ? <Badge tone="sage">Business approved</Badge> : kyb.status === 'rejected' ? <Badge tone="red">Not approved</Badge> : null}
       />
-      {!kyc ? (
-        <Card>
-          <p className="text-sm text-foreground-secondary">No business details on file for this store.</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card title="Business">
-            <div className="space-y-2.5">
-              <Row label="Legal name" value={dash(kyc.business_name)} />
-              <Row label="Type" value={<span className="capitalize">{dash(kyc.business_type)}</span>} />
-              <Row label="Address" value={<span className="whitespace-pre-line">{dash(kyc.business_address)}</span>} />
-              <Row label="Mobile" value={dash(kyc.mobile)} />
-              <Row label="Categories" value={dash(kyc.product_categories)} />
-            </div>
-          </Card>
-          <Card title="Tax">
-            <div className="space-y-2.5">
-              <Row label="GSTIN" mono value={dash(kyc.gst_number)} />
-              <Row label="PAN" mono value={dash(kyc.pan)} />
-              <Row label="GST certificate" value={kyc.gst_cert_s3_key ? 'Uploaded' : '—'} />
-              <Row label="Legals accepted" value={kyc.legals_accepted_version ? `v${kyc.legals_accepted_version}` : '—'} />
-            </div>
-          </Card>
-          {kyc.reviewer_note && (
-            <Card title="Reviewer note" className="lg:col-span-2">
-              <p className="text-sm text-foreground whitespace-pre-line">{kyc.reviewer_note}</p>
-            </Card>
-          )}
-        </div>
-      )}
+      <BusinessClient initial={kyb} focus={focus} slug={tenant.slug} hasStore={hasService(tenant, 'store')} today={todayIst()} />
     </>
   )
 }

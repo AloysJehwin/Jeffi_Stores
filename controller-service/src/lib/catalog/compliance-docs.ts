@@ -67,9 +67,9 @@ async function upsertDocuments(tenantId: string, ownerId: string, docs: Complian
   return r.rows
 }
 
-/** The application's documents replace the store's: types no longer needed go, each one sent goes back to review. */
+/** The application's licences replace the store's: types no longer needed go (KYB documents stay), each one sent goes back to review. */
 export async function saveComplianceDocuments(tenantId: string, ownerId: string, docs: ComplianceDocumentInput[]): Promise<void> {
-  await controlPlanePool().query(`DELETE FROM tenant_compliance_documents WHERE tenant_id = $1 AND NOT (doc_type = ANY($2::text[]))`, [
+  await controlPlanePool().query(`DELETE FROM tenant_compliance_documents WHERE tenant_id = $1 AND category <> 'KYB' AND NOT (doc_type = ANY($2::text[]))`, [
     tenantId,
     docs.map(d => d.docType),
   ])
@@ -82,9 +82,10 @@ export async function submitComplianceDocument(tenantId: string, ownerId: string
   return row
 }
 
+/** The store's selling licences (KYB documents share the table under category KYB: lib/kyb/store.ts). */
 export async function listComplianceDocuments(tenantId: string): Promise<ComplianceDocumentRow[]> {
   const r = await controlPlanePool().query<ComplianceDocumentRow>(
-    `SELECT ${COLS} FROM tenant_compliance_documents WHERE tenant_id = $1 ORDER BY created_at, doc_type`,
+    `SELECT ${COLS} FROM tenant_compliance_documents WHERE tenant_id = $1 AND category <> 'KYB' ORDER BY created_at, doc_type`,
     [tenantId]
   )
   return r.rows

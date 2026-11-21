@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, getKyc, getOwnerBankAccount, controlPlanePool } from '@/lib/tenant-registry'
+import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, getOwnerBankAccount, controlPlanePool } from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
 import OnboardWizard from './OnboardWizard'
@@ -17,6 +17,8 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { addonPrices, getRequestedAddons } from '@/lib/billing/requested-addons'
 import { ADDON_INFO, type AddonId } from '@/lib/billing/addons'
 import { paymentRequired } from '@/lib/billing/payment-required'
+import { getKybRecord, listKybDocuments, type KybDocRow } from '@controller/lib/kyb/store'
+import type { KybUpload } from './kyb'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Launch your store' }
@@ -230,37 +232,9 @@ export default async function OnboardPage({
   // A submitted draft belongs to a store that already exists. Replaying it whole put the
   // PREVIOUS store's name, slug and plan into the form for a second store, with nothing to
   // say they were stale. Only what belongs to the owner rather than the store carries over:
-  // their legal entity, warehouse and bank. An in-progress draft is resumed as before.
+  // their legal entity (its KYB answers and documents), warehouse and bank. An in-progress draft is resumed as before.
   const submitted = draft?.status === 'submitted'
-  const carried = submitted
-    ? (({
-        bizName,
-        bizType,
-        pan,
-        bizAddress,
-        gstNumber,
-        gstS3Key,
-        gstFilename,
-        wh,
-        bank,
-        bankVerified,
-        mobile,
-        ownerName,
-      }: any) => ({
-        bizName,
-        bizType,
-        pan,
-        bizAddress,
-        gstNumber,
-        gstS3Key,
-        gstFilename,
-        wh,
-        bank,
-        bankVerified,
-        mobile,
-        ownerName,
-      }))(draft!.data ?? {})
-    : (draft?.data ?? {})
+  const carried = submitted ? pick(draft!.data ?? {}, OWNER_KEYS) : (draft?.data ?? {})
 
   // A plan picked on the pricing page starts the wizard on it, unless a draft is already in progress.
   const picked = !draft || submitted ? pickedPlan(plans, query) : null
@@ -283,8 +257,27 @@ export default async function OnboardPage({
   )
 }
 
+/** What a new application takes from a submitted draft: what belongs to the owner, not to the previous store. */
+const OWNER_KEYS = [
+  'bizName', 'bizType', 'pan', 'bizAddress', 'gstNumber', 'gstS3Key', 'gstFilename', 'wh', 'bank', 'bankVerified', 'mobile', 'ownerName',
+  'entityType', 'tradeName', 'addrLine', 'addrCity', 'addrState', 'addrPin', 'signatoryName', 'signatoryDesignation',
+  'gstRegistered', 'gstExemptReason', 'gstExemptNote', 'regDocType', 'kybDocs',
+]
+const pick = (data: Record<string, any>, keys: string[]) => Object.fromEntries(keys.filter(k => k in data).map(k => [k, data[k]]))
+
+/** A KYB document already on the store's record, as the wizard shows it: its file, check and review. */
+const onFileUpload = (r: KybDocRow): KybUpload => ({
+  s3Key: r.s3_key,
+  fileName: r.file_name ?? '',
+  ...(r.doc_number ? { number: r.doc_number } : {}),
+  ...(r.expires_on ? { expiresOn: r.expires_on } : {}),
+  ...(r.analysis ? { analysis: r.analysis } : {}),
+  ...(r.owner_note ? { ack: true, note: r.owner_note } : {}),
+  status: r.status,
+})
+
 // A services workspace applying for a store: the full wizard on its existing tenant, prefilled
-// with the business and bank details already on file.
+// with the business (KYB answers and documents) and bank details already on file.
 async function UpgradeWizard({
   ownerId,
   owner,
@@ -298,9 +291,10 @@ async function UpgradeWizard({
   const draft = await getDraft(ownerId)
   const reopened = draft?.status === 'submitted'
   if (reopened) await reopenDraft(ownerId)
-  const [allPlans, kyc, bank, addons] = await Promise.all([
+  const [allPlans, kyc, kybDocs, bank, addons] = await Promise.all([
     listPlans(),
-    getKyc(tenant.id),
+    getKybRecord(tenant.id),
+    listKybDocuments(tenant.id).catch(() => [] as KybDocRow[]),
     getOwnerBankAccount(ownerId).catch(() => null),
     addonPrices().catch(() => []),
   ])
@@ -317,6 +311,19 @@ async function UpgradeWizard({
     pan: saved.pan || kyc?.pan || '',
     bizAddress: saved.bizAddress || kyc?.business_address || '',
     gstNumber: saved.gstNumber || kyc?.gst_number || '',
+    // KYB answers the workspace gave on its Business verification page; a one-line address gives only its PIN code.
+    entityType: saved.entityType || kyc?.entity_type || '',
+    tradeName: saved.tradeName ?? kyc?.trade_name ?? '',
+    addrLine: saved.addrLine || kyc?.address_line || '',
+    addrCity: saved.addrCity || kyc?.address_city || '',
+    addrState: saved.addrState || kyc?.address_state || '',
+    addrPin: saved.addrPin || kyc?.address_pincode || '',
+    signatoryName: saved.signatoryName || kyc?.authorized_name || '',
+    signatoryDesignation: saved.signatoryDesignation || kyc?.authorized_designation || '',
+    gstRegistered: saved.gstRegistered ?? kyc?.gst_registered ?? undefined,
+    gstExemptReason: saved.gstExemptReason || kyc?.gst_exempt_reason || '',
+    gstExemptNote: saved.gstExemptNote || kyc?.gst_exempt_note || '',
+    kybDocs: { ...Object.fromEntries(kybDocs.map(r => [r.doc_type, onFileUpload(r)])), ...(saved.kybDocs ?? {}) },
     mobile: saved.mobile || kyc?.mobile || '',
     ownerName: saved.ownerName || ownerName || '',
     ...(bank && bankOk

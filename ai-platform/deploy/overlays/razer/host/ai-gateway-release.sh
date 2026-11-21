@@ -1,6 +1,6 @@
 #!/bin/bash
 # Release the AI gateway on the Razer box at a commit: fetch that commit's ai-platform/ from GitHub, build the
-# image into k3s containerd, apply the razer overlay, roll out and check it answers. Installed as
+# gateway and PaddleOCR images into k3s containerd, apply the razer overlay, roll out and check they answer. Installed as
 # /usr/local/sbin/ai-gateway-release; the pipeline reaches it over SSM -> the EC2 core -> Tailscale SSH with a
 # key whose authorized_keys entry forces this script (--ssh), so that key can do nothing else.
 #   ai-gateway-release release <sha> [--dry-run]   (dry run: kubectl diff only)
@@ -19,7 +19,9 @@ fi
 
 status() {
   echo "image: $(sudo -n ctr -n k8s.io images ls -q 2>/dev/null | grep -m1 'jeffi/ai-gateway:latest' || echo none)"
+  echo "ocr image: $(sudo -n ctr -n k8s.io images ls -q 2>/dev/null | grep -m1 'jeffi/paddleocr:latest' || echo none)"
   $KUBECTL -n ai-platform get deploy ai-gateway -o wide
+  $KUBECTL -n ai-platform get deploy paddleocr -o wide || true
   echo "healthz: $(curl -fsS --max-time 10 $GATEWAY/healthz || echo unreachable)"
 }
 
@@ -39,6 +41,8 @@ curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors --max-time 300 -o "$wor
 tar -xzf "$work/src.tar.gz" -C "$work" --strip-components=1 --wildcards '*/ai-platform/*'
 src=$work/ai-platform
 [ -f "$src/gateway/Dockerfile" ] || { echo "ai-platform not found at $SHA" >&2; exit 1; }
+# Commits before the PaddleOCR sidecar have no image to build; its running Deployment is left as it is.
+ocr=false; [ -f "$src/paddleocr/Dockerfile" ] && ocr=true
 
 if $DRY; then
   echo "== Dry run: kubectl diff (nothing is built or applied)"
@@ -54,17 +58,31 @@ pgrep buildkitd >/dev/null || {
 }
 (cd "$src" && sudo -n /opt/buildkit/bin/buildctl build --frontend dockerfile.v0 --local context=. --local dockerfile=gateway \
   --output type=image,name=docker.io/jeffi/ai-gateway:latest,unpack=true)
+if $ocr; then
+  # The first build fetches Paddle and the PP-OCRv5 models (a few minutes); later ones are cache hits.
+  echo "== Building jeffi/paddleocr:latest"
+  (cd "$src" && sudo -n /opt/buildkit/bin/buildctl build --frontend dockerfile.v0 --local context=. --local dockerfile=paddleocr \
+    --output type=image,name=docker.io/jeffi/paddleocr:latest,unpack=true)
+fi
 
 echo "== Applying the razer overlay and rolling out"
 $KUBECTL apply -k "$src/deploy/overlays/razer"
 $KUBECTL -n ai-platform rollout restart deploy/ai-gateway
+$ocr && $KUBECTL -n ai-platform rollout restart deploy/paddleocr
 $KUBECTL -n ai-platform rollout status deploy/ai-gateway --timeout=300s
+# Ready means the model is loaded; the old pod serves until then.
+$ocr && $KUBECTL -n ai-platform rollout status deploy/paddleocr --timeout=300s
 
 echo "== Smoke test"
 ok=false
 for _ in $(seq 1 20); do curl -fsS --max-time 5 $GATEWAY/healthz >/dev/null && { ok=true; break; }; sleep 3; done
 $ok || { echo "gateway not healthy after rollout" >&2; exit 1; }
 curl -fsS --max-time 10 $GATEWAY/v1/providers; echo
+if $ocr; then
+  # The sample through the gateway the way KYB reads a document: PaddleOCR only, 503 when it is down.
+  printf '{"data":"%s","mime_type":"image/png"}' "$(base64 -w0 "$src/paddleocr/sample.png")" \
+    | curl -fsS --max-time 60 -H 'Content-Type: application/json' --data-binary @- $GATEWAY/v1/ocr; echo
+fi
 
 echo "== Keeping the source as $LIVE (previous in $LIVE.prev)"
 rm -rf "$LIVE.prev"; [ -d "$LIVE" ] && mv "$LIVE" "$LIVE.prev"

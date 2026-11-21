@@ -7,22 +7,33 @@ import { createTenant, getOwnerTenants, linkOwnerTenant, updateOwnerName, saveKy
 import { sendServicesRequestedEmail } from '@/lib/shared/ecom-emails'
 import { parseBody } from '@/lib/shared/validate'
 import { GSTIN_MESSAGE, GSTIN_SHAPE, PAN_MESSAGE, PAN_SHAPE } from '@controller/lib/catalog/tax-ids'
+import { KybProfileFields } from '@controller/lib/catalog/onboard-schema'
+import { checkGstin, checkPan, kycBusinessType } from '@controller/lib/kyb/ids'
+import { saveKybProfile } from '@controller/lib/kyb/store'
 
 export const dynamic = 'force-dynamic'
 
-const Schema = z.object({
-  services: z.array(z.enum(['messaging', 'documents'])).min(1),
-  slug: z.string().min(3).max(63),
-  displayName: z.string().min(2).max(200),
-  businessName: z.string().min(2).max(200),
-  businessType: z.string().min(1).max(40),
-  pan: z.string().trim().toUpperCase().regex(PAN_SHAPE, PAN_MESSAGE),
-  businessAddress: z.string().min(5).max(1000),
-  gstNumber: z.string().trim().toUpperCase().refine(v => v === '' || GSTIN_SHAPE.test(v), GSTIN_MESSAGE).optional(),
-  ownerName: z.string().min(1).max(120),
-  mobile: z.string().regex(/^\+\d{8,15}$/, 'Enter the mobile with its country code'),
-  legalsAccepted: z.literal(true),
-})
+// The business details KYB needs (lib/kyb); its documents are uploaded later, on the console's Business verification page.
+const Schema = z
+  .object({
+    services: z.array(z.enum(['messaging', 'documents'])).min(1),
+    slug: z.string().min(3).max(63),
+    displayName: z.string().min(2).max(200),
+    businessName: z.string().trim().min(2).max(200),
+    ...KybProfileFields,
+    pan: z.string().trim().toUpperCase().regex(PAN_SHAPE, PAN_MESSAGE),
+    gstNumber: z.string().trim().toUpperCase().refine(v => v === '' || GSTIN_SHAPE.test(v), GSTIN_MESSAGE).optional(),
+    ownerName: z.string().min(1).max(120),
+    mobile: z.string().regex(/^\+\d{8,15}$/, 'Enter the mobile with its country code'),
+    legalsAccepted: z.literal(true),
+  })
+  .superRefine((d, ctx) => {
+    // The PAN suits the business type; a GSTIN carries that PAN and the address's state.
+    const pan = PAN_SHAPE.test(d.pan) ? checkPan(d.pan, d.entityType) : null
+    if (pan && !pan.ok) ctx.addIssue({ code: 'custom', path: ['pan'], message: pan.problem! })
+    const gst = d.gstNumber ? checkGstin(d.gstNumber, { pan: d.pan, state: d.state }) : null
+    if (gst && !gst.ok) ctx.addIssue({ code: 'custom', path: ['gstNumber'], message: gst.problem! })
+  })
 
 /**
  * Services-only onboarding (messaging / documents API, no store). Creates an ACTIVE tenant on the
@@ -48,11 +59,25 @@ export async function POST(request: NextRequest) {
     gst_number: d.gstNumber || null,
     pan: d.pan,
     business_name: d.businessName,
-    business_type: d.businessType,
-    business_address: d.businessAddress,
+    business_type: kycBusinessType(d.entityType),
+    business_address: [d.addressLine, d.city, `${d.state} ${d.pincode}`].join(', '),
     mobile: d.mobile,
     legals_accepted: true,
   })
+  // The KYB answers. Without a GSTIN the GST question stays open: the Business verification page asks it with the
+  // documents. A failed save must not lose the workspace; that page asks again.
+  await saveKybProfile(result.tenantId, owner.id, {
+    legalName: d.businessName,
+    entityType: d.entityType,
+    addressLine: d.addressLine,
+    city: d.city,
+    state: d.state,
+    pincode: d.pincode,
+    authorizedName: d.authorizedName,
+    authorizedDesignation: d.authorizedDesignation,
+    pan: d.pan,
+    ...(d.gstNumber ? { gstRegistered: true, gstin: d.gstNumber } : {}),
+  }).catch(e => console.error('[onboard] services KYB not saved', (e as Error)?.message || e))
   // KYC stays 'pending': Jeffi reviews API workspaces too. Until then they can explore but not send.
   await requestServiceApproval(result.tenantId, d.services)
   // New Messaging customers: Jeffi reviews their template changes before they are sent.
