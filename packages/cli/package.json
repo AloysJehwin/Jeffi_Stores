@@ -16,6 +16,6 @@
   "devDependencies": {
     "commander": "^14.0.3",
     "esbuild": "^0.28.2",
-    "undici": "^7.30.0"
+    "undici": "^7.30.2"
   }
 }
