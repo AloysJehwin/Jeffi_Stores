@@ -11,8 +11,8 @@ import { getStateCode } from '@/lib/catalog/gst'
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { PhoneInput, isValidPhone } from '../_ui/phone'
 import { ENTITY_TYPES, checkGstin, checkPan, idChars, type EntityType } from '@controller/lib/kyb/ids'
+import { SIGNATORY_TITLE } from '@controller/lib/kyb/requirements'
 import { StateSelect } from './BusinessSteps'
-import { SIGNATORY_TITLE } from './kyb'
 
 // Short onboarding for messaging/documents-only customers: no plan, warehouse or bank step. It asks for the business
 // details KYB needs (lib/kyb); the documents follow on the console's Business verification page, before anything is sent.

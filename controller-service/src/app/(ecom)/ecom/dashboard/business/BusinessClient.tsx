@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
-import { stateNameFromCode } from '@/lib/catalog/gst'
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { ENTITY_TYPES, PAN_HOLDERS, checkGstin, checkPan, gstinParts, idChars, isEntityType } from '@controller/lib/kyb/ids'
 import {
+  GST_EXEMPT_REASONS,
+  INDIAN_STATES,
   KYB_DOCS,
   MESSAGING_POLICY_VERSION,
   MESSAGING_PURPOSES,
   MESSAGING_VOLUMES,
   REGISTRATION_DOCS,
+  SIGNATORY_TITLE,
+  canonicalState,
   registrationDocsFor,
   websiteProblem,
   type ItemStatus,
@@ -40,18 +43,8 @@ const LOCKED = 'Verified by Jeffi. Contact support to change this.'
 const POLL_MS = 3000
 const MAX_POLLS = 60
 
-// Every state and union territory, from the GST state codes.
-const STATES = Array.from({ length: 38 }, (_, i) => stateNameFromCode(String(i + 1).padStart(2, '0')).replace(/ And /g, ' and '))
-  .filter(Boolean)
-  .sort((a, b) => a.localeCompare(b))
-const stateOption = (v: string) => STATES.find(s => s.toLowerCase() === v.trim().toLowerCase()) ?? v.trim()
-
-const GST_REASONS = [
-  { value: 'below_threshold', label: 'Turnover is below the GST registration limit' },
-  { value: 'exempt_supplies', label: 'We only supply goods or services exempt from GST' },
-  { value: 'applied', label: 'We have applied for GST registration' },
-  { value: 'other', label: 'Another reason' },
-]
+const stateOption = (v: string) => canonicalState(v) || v.trim()
+const GST_REASONS = GST_EXEMPT_REASONS.map(r => ({ value: r.id, label: r.label }))
 
 const POLICY = [
   'Message only people who agreed to hear from you, and stop when they ask you to.',
@@ -261,6 +254,15 @@ export default function BusinessClient({ initial, focus, slug, hasStore, today }
     setDetails(d => ({ ...d, [k]: v }))
     clear(k)
   }
+  // The usual title follows the business type until the owner types their own, as in the wizard.
+  const setEntity = (v: string) => {
+    setDetails(d => {
+      const usual = isEntityType(d.entityType) ? SIGNATORY_TITLE[d.entityType] : ''
+      const follows = isEntityType(v) && (!d.authorizedDesignation.trim() || d.authorizedDesignation === usual)
+      return { ...d, entityType: v, ...(follows ? { authorizedDesignation: SIGNATORY_TITLE[v] } : {}) }
+    })
+    clear('entityType', 'authorizedDesignation')
+  }
   async function saveDetails() {
     const bad = Object.fromEntries(changedDetails.flatMap(k => (DETAIL_RULES[k] && !DETAIL_RULES[k]![0](details[k]) ? [[k, DETAIL_RULES[k]![1]]] : [])))
     if (Object.keys(bad).length) return setErrs(e => ({ ...e, ...bad }))
@@ -429,7 +431,7 @@ export default function BusinessClient({ initial, focus, slug, hasStore, today }
               disabled={locked.has('entityType')}
               placeholder="Pick the business type"
               options={ENTITY_TYPES.map(e => ({ value: e.id, label: e.label }))}
-              onChange={v => setDetail('entityType', v)}
+              onChange={setEntity}
             />
           </Field>
           <Field id="kyb-mobile" label="Mobile" optional error={errs.mobile} hint="For calls about your verification.">
@@ -453,7 +455,7 @@ export default function BusinessClient({ initial, focus, slug, hasStore, today }
               id="kyb-state"
               value={details.state}
               placeholder="Pick the state"
-              options={[...(details.state && !STATES.includes(details.state) ? [details.state] : []), ...STATES].map(s => ({ value: s, label: s }))}
+              options={[...(details.state && !INDIAN_STATES.includes(details.state) ? [details.state] : []), ...INDIAN_STATES].map(s => ({ value: s, label: s }))}
               onChange={v => setDetail('state', v)}
             />
           </Field>

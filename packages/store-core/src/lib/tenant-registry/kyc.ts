@@ -32,6 +32,18 @@ export async function reopenDraft(ownerId: string): Promise<void> {
   await pool.query(`UPDATE onboarding_drafts SET status='draft', updated_at=now() WHERE owner_id=$1`, [ownerId])
 }
 
+/**
+ * A new application after a submitted one whose store is gone: editable again from the first step, holding only what
+ * carries over. saveDraft leaves a submitted draft alone, and the KYB checks and submit read the draft.
+ */
+export async function restartDraft(ownerId: string, data: Record<string, any>): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE onboarding_drafts SET status='draft', current_step=0, data=$2, updated_at=now() WHERE owner_id=$1 AND status='submitted'`,
+    [ownerId, JSON.stringify(data)]
+  )
+}
+
 export async function markDraftSubmitted(ownerId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(`UPDATE onboarding_drafts SET status='submitted', updated_at=now() WHERE owner_id=$1`, [ownerId])
