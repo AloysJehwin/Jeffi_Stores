@@ -5,6 +5,7 @@ import type {
   AiChatRequest, AiChatResponse, AiChatStreamEvent,
   EmbedRequest, EmbedResponse,
   VisionRequest, VisionResponse,
+  OcrRequest, OcrResponse,
   ImageGenerateRequest, ImageGenerateResponse,
   VideoGenerateRequest, VideoStartResponse, VideoJobResponse,
   ProvidersResponse,
@@ -56,6 +57,11 @@ export async function embed(req: EmbedRequest): Promise<EmbedResponse> {
 /** Vision / OCR over one or more base64 images. */
 export async function vision(req: VisionRequest): Promise<VisionResponse> {
   return post<VisionResponse>(cfg(), '/v1/vision', req)
+}
+
+/** PaddleOCR only, no model fallback: text, per-line scores, pages. Throws AiClientError on 400 / 503 (sidecar down). */
+export async function ocr(req: OcrRequest): Promise<OcrResponse> {
+  return post<OcrResponse>(cfg(), '/v1/ocr', req)
 }
 
 /** Text-to-image / image-edit. Returns short-lived gateway URLs the app persists itself. */

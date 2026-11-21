@@ -148,6 +148,10 @@ async function handle(request: NextRequest) {
   const hostname = pinnedHost(resolveTrustedHost(request))
   const pathname = request.nextUrl.pathname
 
+  // A router prefetch never needs an API route: a <Link> to a download made the server build one file per
+  // visible row and stalled the pod. 204 costs nothing; a real click still reaches the route.
+  if (pathname.startsWith('/api/') && request.headers.get('next-router-prefetch')) return new NextResponse(null, { status: 204 })
+
   // public.<domain> and public-{slug}.<domain> are served by public-api-service, not this app. In production
   // Traefik routes the hosts there; in dev the Next server proxies so public[-slug].localhost:3000 just works.
   if (hostname === 'public.localhost' || hostname.startsWith('public.') || /^public-[a-z0-9-]+\./.test(hostname)) {

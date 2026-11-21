@@ -72,17 +72,19 @@ patches:
       kind: PersistentVolumeClaim
       metadata: { name: ollama-models, namespace: ai-platform }
       $patch: delete
-  # No PaddleOCR image exists yet; vision falls back to the Ollama vision model.
-  - patch: |
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata: { name: paddleocr, namespace: ai-platform }
-      $patch: delete
-  - patch: |
-      apiVersion: v1
-      kind: Service
-      metadata: { name: paddleocr, namespace: ai-platform }
-      $patch: delete
+  # PaddleOCR (paddleocr/Dockerfile) is built on the box like the gateway (host/ai-gateway-release.sh). CPU only,
+  # next to the GPU work: 4 cores with as many inference threads; ~1.5 GiB resident with the models loaded.
+  - target: { kind: Deployment, name: paddleocr }
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: "4"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value: { requests: { cpu: 500m, memory: 1536Mi }, limits: { cpu: "4", memory: 4Gi } }
   # The Secret holds real keys set on the box (scripts/razer-set-secrets.sh); applying the base's
   # empty placeholders would wipe them, so it is never managed by apply.
   - patch: |

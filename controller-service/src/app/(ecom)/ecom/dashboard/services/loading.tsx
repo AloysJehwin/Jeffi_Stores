@@ -9,7 +9,7 @@ const CARDS = [
 
 export default function Loading() {
   return (
-    <ConsoleLoading eyebrow="Developers" title="Services" description="Messaging and Documents are pay-per-use APIs, billed from your wallet. Add one here; it goes live once Jeffi approves it.">
+    <ConsoleLoading eyebrow="Developers" title="Services" description="Messaging and Documents are pay-per-use APIs, billed from your wallet. Verify your business, then add one here; it goes live once Jeffi approves it.">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {CARDS.map(c => (
           <section key={c.title} className="flex flex-col rounded-2xl border border-border-default bg-surface-elevated p-6">

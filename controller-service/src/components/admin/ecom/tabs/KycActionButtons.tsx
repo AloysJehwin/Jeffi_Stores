@@ -4,30 +4,38 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Send, X } from 'lucide-react'
 import { ActionButton, useActionToast } from '@/components/admin/kit'
+import { KybBadge, KybBlocked, kybBlock, type KybBlock, type KybReadiness } from './KybGate'
 
 export default function KycActionButtons({
   tenantId,
   mode = 'pending',
+  kyb,
 }: {
   tenantId: string
   // 'pending' = show Approve+Reject; 'retry' = an approved Mandatory store with no payment link: retry it, or switch to Optional
   mode?: 'pending' | 'retry'
+  /** KYB of what approving switches on: the store, or an API workspace's pending services. */
+  kyb?: KybReadiness
 }) {
   const router = useRouter()
   const toast = useActionToast()
   const [showReject, setShowReject] = useState(false)
   const [note, setNote] = useState('')
   const [paymentRequired, setPaymentRequired] = useState(true)
+  const [blocked, setBlocked] = useState<KybBlock | null>(null)
 
-  // Approve, or re-run it for an approved store whose Razorpay step failed.
-  async function approve(retry: boolean) {
+  // Approve, or re-run it for an approved store whose Razorpay step failed. `force` goes past an incomplete KYB.
+  async function approve(retry: boolean, force = false) {
     const res = await fetch(`/api/admin/ecom/kyc/${tenantId}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentRequired }),
+      body: JSON.stringify({ paymentRequired, force: force || undefined }),
     }).catch(() => null)
     const data = await res?.json().catch(() => ({}))
+    const block = kybBlock(res?.status, data)
+    if (block) return setBlocked(block)
     if (!res?.ok || !data?.ok) return toast.error(data?.error || 'Failed')
+    setBlocked(null)
     toast.success(approvedMessage(data, retry))
     router.refresh()
   }
@@ -45,6 +53,19 @@ export default function KycActionButtons({
   }
 
   const choice = <PaymentChoice value={paymentRequired} onChange={setPaymentRequired} />
+
+  if (blocked) {
+    return (
+      <div className="w-full sm:w-96">
+        <KybBlocked
+          block={blocked}
+          forceLabel={mode === 'retry' ? 'Continue anyway' : 'Approve anyway'}
+          onForce={() => approve(mode === 'retry', true)}
+          onCancel={() => setBlocked(null)}
+        />
+      </div>
+    )
+  }
 
   if (mode === 'retry') {
     return (
@@ -86,6 +107,7 @@ export default function KycActionButtons({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <KybBadge readiness={kyb} />
       {choice}
       <ActionButton action={{ label: 'Reject', icon: X, danger: true, onClick: () => setShowReject(true) }} />
       <ActionButton

@@ -34,6 +34,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx',
   // Approve or reject one licence in the KYC tab: its review route checks isPlatformAdmin.
   'controller-service/src/components/admin/ecom/tabs/ComplianceDocRow.tsx',
+  // "Run checks again" in the KYC tab: its recheck route checks isPlatformAdmin.
+  'controller-service/src/components/admin/ecom/tabs/KybRecheckButton.tsx',
   'controller-service/src/components/admin/ecom/TenantActions.tsx',
   'controller-service/src/components/admin/ecom/PurgeCustomerButton.tsx',
   'controller-service/src/components/admin/ecom/detail/AccountModeToggle.tsx',

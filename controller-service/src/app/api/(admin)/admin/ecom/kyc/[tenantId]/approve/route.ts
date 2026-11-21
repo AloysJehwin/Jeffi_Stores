@@ -31,6 +31,8 @@ import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { tenantCapacityError } from '@controller/lib/k8s/capacity'
 import { startStore } from '@controller/lib/provisioning/start-store'
 import { approveComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
+import { listServiceApprovals } from '@/lib/tenant-registry'
+import { kybGate } from '@controller/lib/kyb/gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,11 +62,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // API-only workspace (Messaging/Documents): approve KYC + its pending services; no plan, no payment.
   // One applying for a store (store_request) goes through the store path below instead.
   if (!hasService(tenant, 'store') && !tenant.store_request) {
+    // Services switch on only once their KYB is complete (docs/KYB.md).
+    const pending = (await listServiceApprovals(tenantId)).filter(a => a.status === 'pending').map(a => a.service)
+    const gate = await kybGate(tenant, kyc.owner_id, pending)
+    if (!gate.ok && body?.force !== true) return NextResponse.json({ error: gate.message, missing: gate.missing, canForce: true }, { status: 409 })
     await controlPlanePool().query(`UPDATE tenant_kyc SET status='approved', reviewed_at=now(), reviewed_by=$2 WHERE tenant_id=$1`, [tenantId, admin.email ?? 'admin'])
     const approved = await reviewServiceApproval(tenantId, 'all-pending', 'approved', admin.email ?? 'admin')
     if (approved.length) sendServicesReviewedEmail({ email: owner.email, name: owner.name }, tenant.display_name, approved, 'approved').catch(() => {})
     return NextResponse.json({ ok: true, services: approved })
   }
+
+  // A store needs its KYB complete; `force` approves an application sent before the wizard asked for all of it.
+  const storeGate = await kybGate(tenant, kyc.owner_id, ['store'])
+  if (!storeGate.ok && body?.force !== true) return NextResponse.json({ error: storeGate.message, missing: storeGate.missing, canForce: true }, { status: 409 })
 
   // Don't start billing a plan we can't build yet.
   const capacityError = await tenantCapacityError(tenantId, tenant.plan)

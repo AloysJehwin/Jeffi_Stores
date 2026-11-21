@@ -57,6 +57,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'ecom/kyc/[tenantId]/reject',
   // Per-licence review (approve or reject one compliance document): isPlatformAdmin, like approve and reject.
   'ecom/kyc/[tenantId]/doc/[docId]/review',
+  // Run the automatic checks on a store's documents again: isPlatformAdmin, like approve and reject.
+  'ecom/kyc/[tenantId]/kyb/recheck',
   // Platform-admin tenant billing controls (admin.jeffistores.in): gated on isPlatformAdmin,
   // which is strictly stronger than any :write scope, so a read-only member can never reach them.
   'ecom/[tenantId]/account-mode',

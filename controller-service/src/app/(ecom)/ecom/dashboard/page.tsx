@@ -114,7 +114,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 : [
                     ['/dashboard/api-keys', 'API keys'],
                     ['/dashboard/wallet', 'Wallet & top-up'],
-                    ['/dashboard/business', 'Business details'],
+                    ['/dashboard/business', 'Business verification'],
                   ]
               ).map(([href, label]) => (
                 <li key={href}>

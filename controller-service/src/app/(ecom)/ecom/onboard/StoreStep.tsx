@@ -49,8 +49,6 @@ export default function StoreStep({
   onDetails,
   compliance,
   onCompliance,
-  gst,
-  onGst,
   domainPick,
   onDomainPick,
 }: {
@@ -69,8 +67,6 @@ export default function StoreStep({
   onDetails: Dispatch<SetStateAction<StoreDetails>>
   compliance: ComplianceState
   onCompliance: Dispatch<SetStateAction<ComplianceState>>
-  gst: { s3Key: string; fileName: string }
-  onGst: (s3Key: string, fileName: string) => void
   domainPick: DomainPick | null
   onDomainPick: (d: DomainPick | null) => void
 }) {
@@ -205,7 +201,7 @@ export default function StoreStep({
             {categories.length === 0 && <p className="text-xs text-foreground-muted mt-2">Select at least one category.</p>}
           </div>
           <div className="border-t border-border-default pt-5">
-            <CompliancePanel categories={categories} value={compliance} onChange={onCompliance} gst={gst} onGst={onGst} />
+            <CompliancePanel categories={categories} value={compliance} onChange={onCompliance} />
           </div>
         </div>
       </Card>

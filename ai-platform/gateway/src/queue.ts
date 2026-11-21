@@ -65,11 +65,18 @@ export function startWorker(process_: (data: JobData) => Promise<unknown>): Work
   )
 }
 
-export async function queueHealth(): Promise<boolean> {
+export async function queueHealth(timeoutMs = 1_000): Promise<boolean> {
+  // While ioredis reconnects, a command waits in its offline queue for good (maxRetriesPerRequest: null).
+  if (connection.status !== 'ready') return false
+  let timer: NodeJS.Timeout | undefined
   try {
-    await connection.ping()
-    return true
+    return await Promise.race([
+      connection.ping().then(() => true),
+      new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), timeoutMs) }),
+    ])
   } catch {
     return false
+  } finally {
+    clearTimeout(timer)
   }
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { cookies } from 'next/headers'
 import type { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
@@ -18,6 +18,7 @@ import {
   updateOwnerName,
   hasService,
   applyStoreUpgrade,
+  requestServiceApproval,
 } from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/shared/ecom-emails'
 import { OnboardSchema } from '@controller/lib/catalog/onboard-schema'
@@ -35,6 +36,10 @@ import { categoryList, cleanDocNumber, compliancePlan, requiredDocs } from '@con
 import { saveComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
 import { kycKeyPrefix } from '@controller/lib/catalog/kyc-upload'
 import { cleanSocials, whatsappDigits } from '@/lib/catalog/store-socials'
+import { kycBusinessType } from '@controller/lib/kyb/ids'
+import { formatDocNumber } from '@controller/lib/kyb/requirements'
+import { listKybDocuments, saveKybProfile, setGstCertKey, setOwnerNote, upsertKybDocument } from '@controller/lib/kyb/store'
+import { queueRecheck } from '@controller/lib/kyb/analyze'
 import { REVIEW_STEP } from '@controller/app/(ecom)/ecom/onboard/steps'
 
 export const dynamic = 'force-dynamic'
@@ -75,6 +80,12 @@ export async function POST(request: NextRequest) {
   }))
   if (licences.some(l => !l.upload?.s3Key.startsWith(kycKeyPrefix(owner.id, l.doc)))) {
     return NextResponse.json({ error: 'Upload your licences again in the Store step, then submit.' }, { status: 400 })
+  }
+  // The KYB documents (the schema checked which are needed), each this owner's upload. A GST certificate only with GST.
+  const kybDocs = Object.entries(d.kybDocs).filter(([docType]) => docType !== 'gst_cert' || d.gstRegistered)
+  const gstCert = d.gstRegistered ? d.kybDocs.gst_cert : undefined
+  if (kybDocs.some(([, doc]) => !doc.s3Key.startsWith(kycKeyPrefix(owner.id)))) {
+    return NextResponse.json({ error: 'Upload your PAN card and GST documents again in the Business and GST steps, then submit.' }, { status: 400 })
   }
 
   // A mistyped Delhivery token would otherwise only surface at the store's first shipment. Only a
@@ -132,6 +143,9 @@ export async function POST(request: NextRequest) {
 
   // 2. Link owner → tenant.
   if (!upgrade) await linkOwnerTenant(owner.id, result.tenantId)
+  // Messaging/Documents picked with the store wait for approval like any other request (docs/KYB.md); with no row
+  // they counted as approved and worked while the KYC was still pending.
+  if (!upgrade && d.extraServices.length) await requestServiceApproval(result.tenantId, d.extraServices)
   await saveDesiredCompute(result.tenantId, compute)
   // Charged from the wallet only once the store is live; a failed save must not lose the application.
   await setRequestedAddons(result.tenantId, d.addons).catch(e => console.warn('[onboard] add-ons not saved', e?.message || e))
@@ -173,11 +187,11 @@ export async function POST(request: NextRequest) {
 
   // 3. Save KYC details for admin review (an upgrade's auto-approved services KYC goes back to review).
   await saveKyc(result.tenantId, owner.id, {
-    gst_number: d.gstNumber || null,
-    gst_cert_s3_key: d.gstCertS3Key ?? null,
+    gst_number: (d.gstRegistered && d.gstNumber) || null,
+    gst_cert_s3_key: gstCert?.s3Key ?? null,
     pan: d.pan,
     business_name: d.businessName,
-    business_type: d.businessType,
+    business_type: kycBusinessType(d.entityType),
     business_address: d.businessAddress,
     product_categories: d.productCategories ?? null,
     mobile: d.mobile ?? null,
@@ -188,6 +202,43 @@ export async function POST(request: NextRequest) {
     legals_accepted: !!d.legalsAccepted,
     review_again: !!upgrade,
   })
+
+  // 3a. KYB: the structured answers and the documents, then their automatic checks against the saved record once the
+  //     response is sent. A failed save must not lose the application: the draft keeps them, and the console asks again.
+  try {
+    await saveKybProfile(result.tenantId, owner.id, {
+      legalName: d.businessName,
+      tradeName: d.tradeName || null,
+      entityType: d.entityType,
+      addressLine: d.addressLine,
+      city: d.city,
+      state: d.state,
+      pincode: d.pincode,
+      authorizedName: d.authorizedName,
+      authorizedDesignation: d.authorizedDesignation,
+      pan: d.pan,
+      gstRegistered: d.gstRegistered,
+      gstin: d.gstRegistered ? d.gstNumber : null,
+      gstExemptReason: d.gstRegistered ? null : (d.gstExemptReason ?? null),
+      gstExemptNote: d.gstRegistered ? null : d.gstExemptNote || null,
+    })
+    // A document already on file (a services workspace adding a store) keeps its review and check.
+    const onFile = new Map((await listKybDocuments(result.tenantId)).map(r => [r.doc_type, r.s3_key]))
+    for (const [docType, doc] of kybDocs) {
+      if (onFile.get(docType) !== doc.s3Key) {
+        // The PAN card and GST certificate carry the PAN and GSTIN given, as the console's uploads do.
+        const number = docType === 'pan_card' ? d.pan : docType === 'gst_cert' ? d.gstNumber : doc.number ? formatDocNumber(docType, doc.number) : null
+        await upsertKybDocument(result.tenantId, owner.id, { docType, number, expiresOn: doc.expiresOn || null, s3Key: doc.s3Key, fileName: doc.fileName ?? null })
+        if (docType === 'gst_cert') await setGstCertKey(result.tenantId, doc.s3Key)
+      }
+      if (doc.ownerNote) await setOwnerNote(result.tenantId, docType, doc.ownerNote)
+    }
+    // Fresh uploads have no check yet, so every one not approved is checked (queueRecheck's default skips them).
+    const job = await queueRecheck(result.tenantId, { all: true })
+    if (job.count) after(job.run)
+  } catch (e) {
+    console.error('[onboard] KYB not saved', (e as Error)?.message || e)
+  }
 
   // 3b. The licences, for review with the KYC. A failed save must not lose the application: the draft keeps them.
   await saveComplianceDocuments(
@@ -203,7 +254,7 @@ export async function POST(request: NextRequest) {
     }))
   ).catch(e => console.error('[onboard] licences not saved', e?.message || e))
 
-  // 3a. The domain the owner chose: bought from the wallet once the store is approved. Never blocks the application.
+  // 3c. The domain the owner chose: bought from the wallet once the store is approved. Never blocks the application.
   let domainError: string | undefined
   if (d.domain) {
     const r = await requestDomain({ tenantId: result.tenantId, domain: d.domain.name, contact: d.domain.contact }).catch(e => ({ ok: false as const, error: String(e?.message || e) }))

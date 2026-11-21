@@ -7,7 +7,10 @@ import { ActionButton, useActionToast } from '@/components/admin/kit'
 
 const link = 'text-accent-600 hover:underline text-xs whitespace-nowrap'
 
-/** One licence on the KYC tab: approve or reject it with an optional note the owner sees; a lapsed one can only be rejected. */
+/**
+ * One licence or KYB document on the KYC tab: approve or reject it with an optional note the owner sees; a lapsed one
+ * can only be rejected. `check` is its automatic check, shown under it.
+ */
 export default function ComplianceDocRow({
   tenantId,
   docId,
@@ -18,12 +21,13 @@ export default function ComplianceDocRow({
   badge,
   detail,
   review,
+  check,
   href,
 }: {
   tenantId: string
   docId: string
   /** The file shown (its S3 key): a copy the owner sends meanwhile is not decided unseen. */
-  version: string
+  version?: string
   name: string
   /** Not reviewed yet. */
   pending: boolean
@@ -33,6 +37,7 @@ export default function ComplianceDocRow({
   detail: ReactNode
   /** Who decided and when, with the note. */
   review?: ReactNode
+  check?: ReactNode
   href: string
 }) {
   const router = useRouter()
@@ -74,6 +79,7 @@ export default function ComplianceDocRow({
           )}
         </div>
       </div>
+      {check}
       {open && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input

@@ -26,7 +26,7 @@ export default function OnboardEntry(props: ComponentProps<typeof OnboardWizard>
     <OnboardShell
       owner={props.owner}
       heading="Your workspace"
-      subheading="Live as soon as you submit."
+      subheading="Ready to explore as soon as you submit."
       steps={ENTRY_STEPS}
       current={1}
       groupTitle="Get started"

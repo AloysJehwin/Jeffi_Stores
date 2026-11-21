@@ -22,5 +22,14 @@ CREATE TABLE IF NOT EXISTS public.tenant_compliance_documents (
     reviewed_at  timestamp with time zone,
     reviewed_by  character varying(255),                          -- the platform admin who approved or rejected it
     expiry_notice     smallint,                                   -- the last expiry email: 30, 7 or 0 (lapsed)
-    expiry_notice_for date                                        -- the expires_on that email was for
+    expiry_notice_for date,                                       -- the expires_on that email was for
+    -- The automatic check (lib/kyb/analyze.ts): the text read off the file (PDF text layer or OCR) against what the owner
+    -- typed. analysis holds the verdict, the checks and the fields read, never the raw text.
+    analysis          jsonb,
+    analysis_status   character varying(16),                      -- pending|done|failed
+    analyzed_at       timestamp with time zone,
+    owner_note        text                                        -- the owner's explanation when a check didn't match
 );
+
+-- KYB documents (PAN card, GST certificate, registration proof) share this table with category 'KYB'; the licence
+-- pages and the wizard's replace-all leave them alone.

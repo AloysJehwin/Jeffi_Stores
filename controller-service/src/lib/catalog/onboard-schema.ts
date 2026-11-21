@@ -3,11 +3,44 @@ import { ComputeSpecSchema } from '@controller/lib/compute/schema'
 import { ADDON_IDS } from '@/lib/billing/addons'
 import { ContactSchema } from '@controller/lib/domains/contact'
 import { STORE_SOCIAL_LABELS, STORE_SOCIAL_NETWORKS, socialUrl, whatsappDigits, type StoreSocialNetwork } from '@/lib/catalog/store-socials'
-import { categoryList, complianceProblem } from '@controller/lib/catalog/compliance'
+import { categoryList, complianceProblem, isIsoDate, todayIst } from '@controller/lib/catalog/compliance'
 import { GSTIN_MESSAGE, GSTIN_SHAPE, PAN_MESSAGE, PAN_SHAPE } from '@controller/lib/catalog/tax-ids'
+import { getStateCode } from '@/lib/catalog/gst'
+import { ENTITY_TYPES, checkGstin, checkPan, type EntityType } from '@controller/lib/kyb/ids'
+import { KYB_DOCS, docNumberProblem, registrationDocsFor } from '@controller/lib/kyb/requirements'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE = /^\+?\d{8,15}$/
+
+/**
+ * KYB business details (lib/kyb): the store wizard and the services sign-up both ask for them. tenant_kyc.business_type
+ * keeps its five values; entityType is one of the ten ENTITY_TYPES.
+ */
+export const KybProfileFields = {
+  entityType: z.enum(ENTITY_TYPES.map(e => e.id) as [EntityType, ...EntityType[]], { error: 'Pick the business type' }),
+  addressLine: z.string().trim().min(3, 'Enter the business address').max(300),
+  city: z.string().trim().min(2, 'Enter the city').max(100),
+  // A state GST knows, so a GSTIN's state code can be checked against it.
+  state: z
+    .string()
+    .trim()
+    .refine(s => !!getStateCode(s), 'Pick the state'),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^[1-9][0-9]{5}$/, 'Enter the 6-digit PIN code'),
+  authorizedName: z.string().trim().min(2, 'Enter who signs for the business').max(120),
+  authorizedDesignation: z.string().trim().min(2, 'Enter the signatory’s designation').max(80),
+}
+
+const KybDocUpload = z.object({
+  s3Key: z.string().min(1).max(512),
+  fileName: z.string().max(255).optional(),
+  number: z.string().trim().max(64).optional(),
+  expiresOn: z.string().max(10).optional(),
+  // The owner's word on a document whose check in the wizard didn't match: its owner_note.
+  ownerNote: z.string().trim().max(1000).optional(),
+})
 
 /**
  * Onboarding payload validation.
@@ -69,15 +102,24 @@ export const OnboardSchema = z
     businessType: z.enum(['proprietor', 'partnership', 'pvt_ltd', 'llp', 'other']),
     // A length check let a dummy like F6TRYCYT56 through.
     pan: z.string().trim().toUpperCase().regex(PAN_SHAPE, PAN_MESSAGE),
+    // The one-line address older readers keep; the wizard builds it from the KYB address parts.
     businessAddress: z.string().min(5),
-    // GST. Optional, as in the wizard: registration is not required below the turnover threshold.
+    // GST: required when the business is registered (gstRegistered, checked below); below the turnover threshold a
+    // business gives a reason and a registration proof instead.
     gstNumber: z
       .string()
       .trim()
       .toUpperCase()
       .default('')
       .refine(v => v === '' || GSTIN_SHAPE.test(v), GSTIN_MESSAGE),
-    gstCertS3Key: z.string().optional(),
+    // KYB (lib/kyb): the structured details, the GST answer and the documents (lib/kyb/requirements.ts KYB_DOCS): the PAN
+    // card, then the GST certificate or, without GST, a reason and a registration proof.
+    ...KybProfileFields,
+    tradeName: z.string().trim().max(200).optional(),
+    gstRegistered: z.boolean({ error: 'Tell us whether the business is registered for GST' }),
+    gstExemptReason: z.enum(['below_threshold', 'exempt_supplies', 'applied', 'other']).optional(),
+    gstExemptNote: z.string().trim().max(500).optional(),
+    kybDocs: z.record(z.string(), KybDocUpload).default({}),
     // Warehouse (optional)
     dailyPayout: z.boolean().optional(),
     ownDelhivery: z.boolean().optional(),
@@ -171,4 +213,31 @@ export const OnboardSchema = z
     // Licences: checked again here against the categories (the wizard checks as the owner types).
     const licences = complianceProblem(categoryList(d.productCategories), d.compliance ?? { answers: {}, docs: {} })
     if (licences) issue(['compliance'], `Licences & certificates: ${licences}`)
+
+    // KYB, as the wizard checks it: a PAN that suits the business type and its card; a registered business's GSTIN (its
+    // PAN and state) and certificate; otherwise a reason and a registration proof that suits the business type.
+    const docs = d.kybDocs ?? {}
+    for (const t of Object.keys(docs)) if (!Object.prototype.hasOwnProperty.call(KYB_DOCS, t)) issue(['kybDocs', t], 'Unknown document type')
+    if (PAN_SHAPE.test(d.pan)) {
+      const pan = checkPan(d.pan, d.entityType)
+      if (!pan.ok) issue(['pan'], pan.problem!)
+    }
+    if (!docs.pan_card) issue(['kybDocs', 'pan_card'], 'Upload your PAN card')
+    if (d.gstRegistered) {
+      const gst = d.gstNumber ? checkGstin(d.gstNumber, { pan: d.pan, state: d.state }) : { ok: false, problem: 'Enter your GSTIN' }
+      if (!gst.ok) issue(['gstNumber'], gst.problem!)
+      if (!docs.gst_cert) issue(['kybDocs', 'gst_cert'], 'Upload your GST registration certificate')
+    } else if (d.gstRegistered === false) {
+      if (!d.gstExemptReason) issue(['gstExemptReason'], 'Tell us why the business isn’t registered for GST')
+      else if (d.gstExemptReason === 'other' && (d.gstExemptNote ?? '').length < 10) issue(['gstExemptNote'], 'Tell us why the business isn’t registered for GST')
+      const options = registrationDocsFor(d.entityType)
+      const proof = options.find(t => docs[t])
+      if (!proof) issue(['kybDocs'], `Without GST, upload a registration proof: ${options.map(t => KYB_DOCS[t].label).join(', or ')}`)
+      else {
+        const number = docNumberProblem(proof, docs[proof].number)
+        if (number) issue(['kybDocs', proof, 'number'], number)
+        const exp = docs[proof].expiresOn
+        if (exp && (!isIsoDate(exp) || exp < todayIst())) issue(['kybDocs', proof, 'expiresOn'], 'Enter an expiry date that hasn’t passed')
+      }
+    }
   })

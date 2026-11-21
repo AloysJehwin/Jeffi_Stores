@@ -1,7 +1,7 @@
 import { controlPlanePool } from './shared'
 import { clearTenantCache } from './host-resolution'
 import { getTenant, type UpiMode } from './tenants'
-import { getDraft, reopenDraft } from './kyc'
+import { getTenantWarehouse, reopenDraft } from './kyc'
 import { PLATFORM_TENANT_ID, purgeBlocker } from './purge-rule'
 
 /** Set a tenant's status (e.g. provisioning->active) or instance_state (running/stopped). */
@@ -284,10 +284,11 @@ export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; erro
 
   // Delhivery has no delete for a client warehouse — deactivate the pickup address so the purged
   // store's origin stops being usable. Deprovision already does this; repeated here so a purge of
-  // a tenant deprovisioned before that change (or a partial teardown) still retires it.
+  // a tenant deprovisioned before that change (or a partial teardown) still retires it. The name is
+  // the store's own: once its owner applies again, their draft holds the new application's warehouse.
   if (ownerId) {
-    const draft = await getDraft(ownerId).catch(() => null)
-    const pickupName = (draft?.data as any)?.wh?.pickupLocation || tenant.slug
+    const wh = await getTenantWarehouse(tenantId).catch(() => null)
+    const pickupName = wh?.pickupLocation || tenant.slug
     const { deactivateDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
     await deactivateDelhiveryPickupLocation(pickupName).catch(() => {})
   }

@@ -4,11 +4,13 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { uploadKycDocument } from '@controller/lib/catalog/kyc-upload'
 import { DOCS } from '@controller/lib/catalog/compliance'
+import { KYB_DOCS } from '@controller/lib/kyb/requirements'
 
 export const dynamic = 'force-dynamic'
 
-// Accepts multipart/form-data with field "file" (a PDF/image) and, for a licence, "docType" (a
-// lib/catalog/compliance.ts DOCS id); without one it is the GST certificate. Returns { s3Key } for the draft.
+// Accepts multipart/form-data with field "file" (a PDF/image) and "docType": a licence (lib/catalog/compliance.ts DOCS)
+// or a KYB document (lib/kyb/requirements.ts KYB_DOCS), stored under kyc/{ownerId}/{docType}/. Without one it is a GST
+// certificate from an older draft. Returns { s3Key } for the draft.
 export async function POST(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   const rawType = formData.get('docType')
   const docType = typeof rawType === 'string' && rawType ? rawType : undefined
-  if (docType && !Object.prototype.hasOwnProperty.call(DOCS, docType))
+  if (docType && !Object.prototype.hasOwnProperty.call(DOCS, docType) && !Object.prototype.hasOwnProperty.call(KYB_DOCS, docType))
     return NextResponse.json({ error: 'Unknown document type' }, { status: 400 })
 
   const MAX_SIZE = 5 * 1024 * 1024 // 5 MB

@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "7d16ce478387e227eeef48bd8da57013e047df92c7b769ded40e1913f1cd7acb",
+ "manifestHash": "b06848b9fd0332a572c96e97653bd444958f1df0ffad0c6d19dc6b32ea4c016d",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -45917,6 +45917,9 @@
      "note": {
       "type": "string",
       "maxLength": 1000
+     },
+     "force": {
+      "type": "boolean"
      }
     },
     "required": [
@@ -46155,8 +46158,17 @@
       "examples": [
        false
       ]
+     },
+     "force": {
+      "type": "boolean",
+      "enum": [
+       true
+      ]
      }
-    }
+    },
+    "required": [
+     "force"
+    ]
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
@@ -46271,6 +46283,32 @@
    "bodyContentType": "application/json",
    "summary": "Approve or reject one licence or certificate (tenant_compliance_documents), with an optional note the owner sees on the console's Licences & certificates page. Who and when are kept on the row.",
    "command": "platform kyc-doc review"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/kyc/{tenantId}/kyb/recheck",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/kyc/{tenantId}/kyb/recheck",
+   "gatewayPath": "/v1/platform/ecom/kyc/{tenantId}/kyb/recheck",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/kyc/[tenantId]/kyb/recheck/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "noBody": true,
+   "summary": "The KYC tab's \"Run checks again\": every document the store has on file, KYB and licences, except approved ones, is marked as being checked and read again after the response.",
+   "command": "platform kyc-kyb recheck"
   },
   {
    "id": "platform POST /api/admin/ecom/kyc/{tenantId}/reject",

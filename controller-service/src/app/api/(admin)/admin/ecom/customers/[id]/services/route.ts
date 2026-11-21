@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, listServiceApprovals, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 import { sendServicesReviewedEmail } from '@/lib/shared/ecom-emails'
+import { kybGate, tenantOwnerId } from '@controller/lib/kyb/gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,13 +14,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const { id } = await params
-  const parsed = z.object({ service: z.enum(['messaging', 'documents']), decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional() })
+  const parsed = z.object({ service: z.enum(['messaging', 'documents']), decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional(), force: z.boolean().optional() })
     .refine(b => b.decision === 'approved' || !!b.note?.trim(), { message: 'A note is required to reject' })
     .safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' }, { status: 400 })
   const tenant = await getTenant(id)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
-  const { service, decision, note } = parsed.data
+  const { service, decision, note, force } = parsed.data
+  // Approving needs the service's KYB complete (docs/KYB.md); `force` approves one verified another way.
+  if (decision === 'approved' && !force) {
+    const gate = await kybGate(tenant, await tenantOwnerId(id), [service])
+    if (!gate.ok) return NextResponse.json({ error: gate.message, missing: gate.missing, canForce: true }, { status: 409 })
+  }
   const done = await reviewServiceApproval(id, [service], decision, admin.email ?? 'admin', note)
   if (!done.length) return NextResponse.json({ error: 'Nothing pending for that service' }, { status: 409 })
   const owner = (await controlPlanePool().query(

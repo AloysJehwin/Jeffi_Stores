@@ -28,7 +28,7 @@ const TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp'
 const errCls = 'text-xs text-[#8a2e1f]'
 
-// Also the console's Licences & certificates page (dashboard/licences), so both upload the same way.
+// Also the wizard's KYB documents and the console's Licences & certificates page (dashboard/licences), so all upload the same way.
 export async function uploadKyc(file: File, docType?: string): Promise<string> {
   if (file.size > MAX_BYTES) throw new Error('That file is over 5 MB.')
   if (!TYPES.includes(file.type)) throw new Error('Upload a PDF, JPG, PNG or WebP file.')
@@ -182,17 +182,11 @@ export default function CompliancePanel({
   categories,
   value,
   onChange,
-  gst,
-  onGst,
 }: {
   categories: string[]
   value: ComplianceState
   onChange: Dispatch<SetStateAction<ComplianceState>>
-  /** The GST registration certificate: optional, kept on the KYC record as before. */
-  gst: { s3Key: string; fileName: string }
-  onGst: (s3Key: string, fileName: string) => void
 }) {
-  const [gstErr, setGstErr] = useState<string | null>(null)
   const plan = compliancePlan(categories)
   const answers = value.answers ?? {}
   const answer = (id: string, yes: boolean) => onChange(v => ({ ...v, answers: { ...v.answers, [id]: yes } }))
@@ -226,23 +220,6 @@ export default function CompliancePanel({
 
       <section className="space-y-3 rounded-xl bg-surface-secondary/50 p-4">
         <h4 className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">Every store</h4>
-        <div>
-          <FileField
-            id="doc-gst-file"
-            label="GST registration certificate (optional)"
-            fileName={gst.s3Key ? gst.fileName || 'Uploaded' : null}
-            onRemove={() => onGst('', '')}
-            onFile={async f => {
-              setGstErr(null)
-              try {
-                onGst(await uploadKyc(f), f.name)
-              } catch (e) {
-                setGstErr((e as Error).message)
-              }
-            }}
-          />
-          {gstErr && <p className={`${errCls} mt-1`}>{gstErr}</p>}
-        </div>
         {plan.general.map(q => (
           <div key={q.id} className="space-y-3">
             <YesNo ask={q.ask} value={answers[q.id]} onChange={yes => answer(q.id, yes)} />

@@ -5,7 +5,7 @@ import { CONFIG, modelForHint, claudeModelForHint } from './config'
 import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
 import { startUsdInrRefresh } from './fx'
 import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicVision } from './providers/anthropic'
-import { runVision } from './providers/paddleocr'
+import { runVision, runOcr, parseOcrRequest, OcrError, OCR_MAX_BASE64, ocrStatus, startOcrProbe, type OcrHealth } from './providers/paddleocr'
 import { runJob, startWorker, queueHealth, pendingWaiters, type JobData } from './queue'
 import { policyFor } from './cache/policy'
 import { cacheKey, kvGet, kvSet } from './cache/kv'
@@ -24,7 +24,7 @@ import {
 } from './media'
 import type {
   AiChatRequest, AiChatResponse, AiChatStreamEvent, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse,
-  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse,
+  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse, OcrResponse, OcrErrorResponse,
 } from '../../sdk/types'
 
 const redis = new IORedis(CONFIG.redisUrl, { maxRetriesPerRequest: 3 })
@@ -82,6 +82,7 @@ async function processJob(data: JobData): Promise<unknown> {
 
 startWorker(processJob)
 ollamaPool.start()
+startOcrProbe()
 startUsdInrRefresh()
 
 class HttpError extends Error {
@@ -95,11 +96,12 @@ function assertOllamaUp(): void {
 }
 
 /** Truthful dependency check (cached ~probe interval). */
-async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boolean; ollama: Awaited<ReturnType<typeof ollamaPool.health>> }> {
+async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boolean; ollama: Awaited<ReturnType<typeof ollamaPool.health>>; ocr: OcrHealth }> {
   const [queue, ollama] = await Promise.all([queueHealth(), ollamaPool.health()])
   // With Claude configured, chat survives an Ollama outage, so Ollama alone does not fail readiness.
   const reasons = [!queue && 'redis queue unreachable', !ollama.ok && !anthropicConfigured() && (ollama.reason || 'Ollama unreachable')].filter(Boolean)
-  return { ok: reasons.length === 0, reason: reasons.join('; ') || undefined, queue, ollama }
+  // PaddleOCR is reported, never fails readiness: vision falls back to Ollama and /v1/ocr answers 503 on its own.
+  return { ok: reasons.length === 0, reason: reasons.join('; ') || undefined, queue, ollama, ocr: ocrStatus() }
 }
 
 // ── Chat: providers in route order; each answer goes through the two-tier cache ──────────────
@@ -195,6 +197,20 @@ async function handleVision(body: VisionRequest): Promise<VisionResponse> {
   return runJob<VisionResponse>({ kind: 'vision', payload: body })
 }
 
+/** PaddleOCR only, never a model, so a document reads the same every time (KYB). Not queued: an OCR call must not
+ *  wait behind long chat jobs, and the sidecar serialises its own inference. 400 bad input, 503 sidecar down. */
+async function handleOcr(req: import('node:http').IncomingMessage): Promise<{ status: number; body: OcrResponse | OcrErrorResponse }> {
+  try {
+    const { data, mime } = parseOcrRequest(await readBody(req, OCR_MAX_BASE64 + 64 * 1024))
+    return { status: 200, body: await runOcr(data, mime) }
+  } catch (err) {
+    const status = err instanceof OcrError || err instanceof HttpError ? err.status : err instanceof SyntaxError ? 400 : 500
+    const error = err instanceof SyntaxError ? 'body is not JSON' : err instanceof Error ? err.message : 'internal error'
+    if (status >= 500) console.warn(`[ai-gateway] PaddleOCR failed: ${error.slice(0, 300)}`)
+    return { status, body: { ok: false, error } }
+  }
+}
+
 function providersReport(): ProvidersResponse {
   const text: ProvidersResponse['text'] = [
     { name: 'anthropic', configured: anthropicConfigured(), keyFallback: !!CONFIG.anthropicApiKey },
@@ -204,6 +220,7 @@ function providersReport(): ProvidersResponse {
     text: [...TEXT_PROVIDER_ORDER.map(n => text.find(t => t.name === n)!), ...text.filter(t => !TEXT_PROVIDER_ORDER.includes(t.name))],
     image: providerStatus(imageDeps.order, imageDeps.providers),
     video: providerStatus(videoDeps.order, videoDeps.providers),
+    ocr: [{ name: 'paddleocr', configured: ocrStatus().ok }],
     defaults: { text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order },
   }
 }
@@ -249,11 +266,19 @@ const poller = setInterval(async () => {
 poller.unref()
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
-function readBody(req: import('node:http').IncomingMessage): Promise<any> {
+// Past `limit` chars the rest of the body is drained unread and the call fails with a 400.
+function readBody(req: import('node:http').IncomingMessage, limit = Infinity): Promise<any> {
   return new Promise((resolve, reject) => {
     let buf = ''
-    req.on('data', (c) => { buf += c })
-    req.on('end', () => { try { resolve(buf ? JSON.parse(buf) : {}) } catch (e) { reject(e) } })
+    req.on('data', (c) => {
+      if (buf.length > limit) return
+      buf += c
+      if (buf.length > limit) reject(new HttpError(400, `request body too large (max ${Math.round(limit / 1024 / 1024)} MB)`))
+    })
+    req.on('end', () => {
+      if (buf.length > limit) return
+      try { resolve(buf ? JSON.parse(buf) : {}) } catch (e) { reject(e) }
+    })
     req.on('error', reject)
   })
 }
@@ -338,6 +363,10 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && path === '/v1/vision') {
       const r = await handleVision(await readBody(req))
       return json(res, !r.ok && ollamaPool.knownDown() ? 503 : 200, r)
+    }
+    if (req.method === 'POST' && path === '/v1/ocr') {
+      const r = await handleOcr(req)
+      return json(res, r.status, r.body)
     }
     json(res, 404, { error: 'not found' })
   } catch (err) {
