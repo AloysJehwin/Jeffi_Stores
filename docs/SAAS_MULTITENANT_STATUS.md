@@ -395,6 +395,12 @@ Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an
 - Public API: `public.jeffistores.in` → `public-api-service/`; keys in control-plane `api_keys` / `api_key_usage_daily`. See `docs/MICROSERVICES_PLAN.md` addendum.
 - Hosts: `public.` is served by the gateway, not the Next app (`deploy/k8s/platform/47-public-api-service.yaml`).
 
+## KYB: business verification per service (added 2026-11-21)
+
+- Each service needs its own set of things verified (`SERVICE_ITEMS`, `controller-service/src/lib/kyb/requirements.ts`). Documents and Messaging need the business details, the PAN and PAN card, and GST (or a reason plus a registration proof); Messaging also needs a website and its use; a store adds the payout bank and its licences. Showcase needs nothing beyond its own onboarding. Runbook: `docs/KYB.md`.
+- Uploaded documents are checked automatically: the PDF text layer or PaddleOCR (`POST /v1/ocr` on the AI gateway; the vision model while it's down), compared with the number, name, constitution and expiry given. Results are on `tenant_compliance_documents.analysis`; KYB documents are rows with `category = 'KYB'`.
+- Gates: `POST /api/ecom/services/add` answers 409 `kyb_required` until the service's KYB is complete; the admin's service and KYC approvals answer 409 too (`force: true` to override). Messaging/Documents picked in the store wizard now get approval rows. Services approved before KYB stay approved.
+
 ## Platform ads and the ad-free add-on (added 2026-10-21)
 
 - Every store host (flagship, `{slug}.jeffistores.in`, custom domains) loads the platform's Google AdSense account `ca-pub-3028325011384102` as Auto ads (`components/visitor/AdSense.tsx`, mounted in `app/layout.tsx`). Never on admin, ecom, business, forms, document, certificate or vault hosts, and not on login, signup, cart, checkout, account, review, subscribe or staff pages (`lib/analytics/adsense.ts` `adsAllowedOn`). `/ads.txt` is served on every host. `ADSENSE_DISABLED=1` switches ads off platform-wide.

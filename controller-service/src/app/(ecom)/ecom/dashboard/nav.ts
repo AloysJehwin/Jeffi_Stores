@@ -58,7 +58,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Account',
     items: [
       { href: '/dashboard/billing', label: 'Billing', icon: CreditCard, requires: 'store' },
-      { href: '/dashboard/business', label: 'Business details', icon: Building2 },
+      { href: '/dashboard/business', label: 'Business verification', icon: Building2 },
       { href: '/dashboard/licences', label: 'Licences', icon: BadgeCheck, requires: 'store' },
     ],
   },

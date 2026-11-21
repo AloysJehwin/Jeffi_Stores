@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { ChoiceCards, Segmented } from '../_ui'
@@ -18,11 +18,30 @@ import ContactFields from '../_domains/ContactFields'
 import SiteStudio, { type StudioSummary } from './_studio/SiteStudio'
 import GiftCard, { FreeChip } from './_studio/GiftCard'
 import StoreStep, { type DomainPick } from './StoreStep'
+import { BusinessStep, GstStep } from './BusinessSteps'
+import KybDocField from './KybDocField'
+import { uploadKyc } from './CompliancePanel'
 import { initialStoreDetails, storeDetailsPayload, storeDetailsProblem, type StoreDetails } from './store-details'
+import {
+  GST_EXEMPT_REASONS,
+  businessIssue,
+  checkBlocked,
+  checkCurrent,
+  composeAddress,
+  docLabel,
+  gstIssue,
+  initialKyb,
+  kybPayload,
+  patchDoc,
+  prefillBusiness,
+  type KybState,
+  type KybUpload,
+} from './kyb'
 import { DOCS, complianceProblem, compliancePlan, planQuestions, requiredDocs, type ComplianceState } from '@controller/lib/catalog/compliance'
+import { ENTITY_TYPES, kycBusinessType } from '@controller/lib/kyb/ids'
+import { KYB_DOCS } from '@controller/lib/kyb/requirements'
 import { contactProblem, EMPTY_CONTACT, type DomainContact } from '../_domains/types'
 import { defaultContact } from '@controller/lib/domains/contact'
-import { GSTIN_MESSAGE, PAN_MESSAGE, isGstin, isPan, taxIdInput } from '@controller/lib/catalog/tax-ids'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -39,8 +58,8 @@ const HEAD: Record<WizardStepKey, { title: string; description: string }> = {
   plan: { title: 'Choose your plan', description: 'All plans include the full storefront. One subscription — plan and servers together. Cancel anytime.' },
   store: { title: 'Your store', description: 'What your customers see on your site, what you sell, and the licences it needs.' },
   site: { title: 'Your site', description: 'Describe your store and watch the AI design every page, on desktop and phone. It goes live with your store.' },
-  business: { title: 'Business details', description: 'Legal information for compliance and invoicing.' },
-  gst: { title: 'GST details', description: 'Only if your business is GST-registered. Leave blank if it is not.' },
+  business: { title: 'Business details', description: 'The business behind your store, as on its PAN and registration. We verify these details, and they go on your invoices.' },
+  gst: { title: 'GST', description: 'Your GST registration, or why the business isn’t registered and a document that shows it exists.' },
   warehouse: { title: 'Pickup warehouse', description: 'Where Delhivery will pick up your orders. You can edit this later.' },
   bank: { title: 'Payout bank account', description: 'Where your sales will be settled. We verify instantly via a ₹1 bank check.' },
   branding: { title: 'Branding & legals', description: 'Your seal goes on invoices and legal documents; your name and mobile are for your account.' },
@@ -52,14 +71,6 @@ const REVIEW = stepIndex('review')
 
 const HTTPS_URL = /^https:\/\/[^\s/$.?#][^\s]*$/i
 
-const BUSINESS_TYPES = [
-  { value: 'proprietor', label: 'Sole Proprietorship' },
-  { value: 'partnership', label: 'Partnership' },
-  { value: 'pvt_ltd', label: 'Private Limited' },
-  { value: 'llp', label: 'LLP' },
-  { value: 'other', label: 'Other' },
-]
-
 // ── Styles ────────────────────────────────────────────────────────────────────
 const inp = fieldInput
 const lbl = fieldLabel
@@ -67,7 +78,6 @@ const lbl = fieldLabel
 // Same shape check as the bank endpoint (lib/payments/bank-verify.ts).
 const UPI_ID_RE = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/
 const IN_MOBILE = /^\+91[6-9]\d{9}$/
-const errText = 'mt-1 text-xs text-[#8a2e1f]'
 
 // The Review step shows these partly hidden: AB•••••34F, ••••6741, 94••••99@ybl.
 const maskPan = (p: string) => (p.length > 5 ? `${p.slice(0, 2)}${'•'.repeat(p.length - 5)}${p.slice(-3)}` : '•'.repeat(p.length))
@@ -169,25 +179,15 @@ export default function OnboardWizard({
     docs: { ...(init.compliance?.docs ?? {}) },
   }))
 
-  // Business
-  const [bizName, setBizName] = useState(init.bizName ?? '')
-  const [bizType, setBizType] = useState(init.bizType ?? '')
-  const [pan, setPan] = useState<string>(init.pan ?? '')
-  const [bizAddress, setBizAddress] = useState(init.bizAddress ?? '')
-  // The PAN and GSTIN messages wait until the field is left or full, not while it is typed.
-  const [panLeft, setPanLeft] = useState(false)
-  const panError = !!pan && !isPan(pan) && (panLeft || pan.length >= 10)
-
-  // GST: the number here; the certificate is uploaded with the licences in the Store step.
-  const [gstNumber, setGstNumber] = useState<string>(init.gstNumber ?? '')
-  const [gstLeft, setGstLeft] = useState(false)
-  const gstError = !!gstNumber && !isGstin(gstNumber) && (gstLeft || gstNumber.length >= 15)
-  const [gstS3Key, setGstS3Key] = useState(init.gstS3Key ?? '')
-  const [gstFilename, setGstFilename] = useState(init.gstFilename ?? '')
-  const onGst = useCallback((s3Key: string, fileName: string) => {
-    setGstS3Key(s3Key)
-    setGstFilename(fileName)
-  }, [])
+  // Business and GST (KYB): the answers, the PAN card, and the GST certificate or a registration proof, each checked
+  // automatically as it is uploaded. The ref has the latest answers for a check started before a re-render.
+  const [kyb, setKyb] = useState<KybState>(() => initialKyb(init))
+  const kybRef = useRef(kyb)
+  kybRef.current = kyb
+  const [checking, setChecking] = useState<Record<string, boolean>>({})
+  const [checkErr, setCheckErr] = useState<Record<string, string>>({})
+  const bizType = kyb.entityType ? kycBusinessType(kyb.entityType) : ''
+  const bizAddress = composeAddress(kyb)
 
   // Warehouse
   const [dailyPayout, setDailyPayout] = useState(init.dailyPayout ?? false)
@@ -300,7 +300,7 @@ export default function OnboardWizard({
 
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(
-    async (nextStep: number) => {
+    async (nextStep: number, kybNow: KybState = kyb) => {
       setSaving(true)
       const data = {
         stepId: WIZARD_STEPS[nextStep].key,
@@ -317,13 +317,10 @@ export default function OnboardWizard({
         contact: details.contact,
         socials: details.socials,
         compliance,
-        bizName,
-        bizType,
-        pan,
-        bizAddress,
-        gstNumber,
-        gstS3Key,
-        gstFilename,
+        // KYB answers under their draft keys (kyb.ts); bizType and bizAddress for older readers.
+        ...kybNow,
+        bizType: kybNow.entityType ? kycBusinessType(kybNow.entityType) : '',
+        bizAddress: composeAddress(kybNow),
         dailyPayout,
         ownDelhivery,
         wh,
@@ -370,13 +367,7 @@ export default function OnboardWizard({
       productCats,
       details,
       compliance,
-      bizName,
-      bizType,
-      pan,
-      bizAddress,
-      gstNumber,
-      gstS3Key,
-      gstFilename,
+      kyb,
       dailyPayout,
       ownDelhivery,
       wh,
@@ -409,6 +400,74 @@ export default function OnboardWizard({
     await autosave(next)
     setStep(next)
     setFurthest(f => Math.max(f, next))
+  }
+
+  // ── KYB documents: uploaded, then checked against the answers (saved to the draft first, which the check reads) ──
+  const patchKybDoc = (docType: string, patch: Partial<KybUpload>) => setKyb(k => patchDoc(k, docType, patch))
+
+  async function runCheck(docType: string, upload: KybUpload, kybNow: KybState = kybRef.current) {
+    // Only for the file it checked: one replaced meanwhile gets its own check.
+    const settle = (patch: Partial<KybUpload>) =>
+      setKyb(k => {
+        const u = k.kybDocs[docType]
+        return u?.s3Key === upload.s3Key ? { ...k, kybDocs: { ...k.kybDocs, [docType]: { ...u, ...patch } } } : k
+      })
+    // A check that didn't run leaves the file unchecked (a reviewer looks), never blocked on an older result.
+    const failed = (msg: string) => {
+      settle({ analysis: undefined })
+      setCheckErr(e => ({ ...e, [docType]: msg }))
+    }
+    setChecking(c => ({ ...c, [docType]: true }))
+    setCheckErr(e => ({ ...e, [docType]: '' }))
+    try {
+      await autosave(step, kybNow)
+      const res = await fetch('/api/ecom/onboard/kyb-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key: upload.s3Key, docType, number: upload.number?.trim() || undefined, expiresOn: upload.expiresOn || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) settle({ analysis: data.analysis ?? null, ack: false })
+      else failed(data.error || 'The check didn’t run.')
+    } catch {
+      failed('Network error.')
+    } finally {
+      setChecking(c => ({ ...c, [docType]: false }))
+    }
+  }
+
+  async function uploadKybDoc(docType: string, file: File) {
+    const s3Key = await uploadKyc(file, docType)
+    const reset: Partial<KybUpload> = { s3Key, fileName: file.name, analysis: undefined, ack: false, status: undefined }
+    const next = patchDoc(kybRef.current, docType, reset)
+    patchKybDoc(docType, reset)
+    setCheckErr(e => ({ ...e, [docType]: '' }))
+    if (!checkBlocked(docType, next)) await runCheck(docType, next.kybDocs[docType], next)
+  }
+
+  const renderDoc = (docType: string, label: string) => {
+    const u = kyb.kybDocs[docType]
+    return (
+      <KybDocField
+        id={`kyb-${docType}`}
+        label={label}
+        hint={KYB_DOCS[docType]?.hint}
+        upload={u}
+        current={checkCurrent(docType, kyb)}
+        checking={!!checking[docType]}
+        error={checkErr[docType] || null}
+        blocked={checkBlocked(docType, kyb)}
+        onUpload={f => uploadKybDoc(docType, f)}
+        onRemove={() => {
+          patchKybDoc(docType, { s3Key: '', fileName: '', analysis: undefined, ack: false, note: '', status: undefined })
+          setCheckErr(e => ({ ...e, [docType]: '' }))
+        }}
+        onCheck={() => {
+          if (u?.s3Key) runCheck(docType, u)
+        }}
+        onPatch={p => patchKybDoc(docType, p)}
+      />
+    )
   }
 
   const onLogo = useCallback((l: { s3Key: string; url: string }) => {
@@ -518,12 +577,7 @@ export default function OnboardWizard({
           productCategories: productCats.join(', '),
           ...storeDetailsPayload(details),
           compliance: compliancePayload,
-          businessName: bizName,
-          businessType: bizType,
-          pan,
-          businessAddress: bizAddress,
-          gstNumber,
-          gstCertS3Key: gstS3Key || undefined,
+          ...kybPayload(kyb),
           dailyPayout,
           ownDelhivery,
           ownRazorpay,
@@ -565,16 +619,18 @@ export default function OnboardWizard({
     if (step !== REVIEW || !domainPick || domainContact.email) return
     setDomainContact({
       ...EMPTY_CONTACT,
-      ...defaultContact({ ownerName: ownerFullName, email: owner.email, mobile, businessName: bizName, businessType: bizType, businessAddress: bizAddress, warehouse: wh }),
+      ...defaultContact({ ownerName: ownerFullName, email: owner.email, mobile, businessName: kyb.bizName, businessType: bizType, businessAddress: bizAddress, warehouse: wh }),
     } as DomainContact)
-  }, [step, domainPick, domainContact.email, ownerFullName, owner.email, mobile, bizName, bizType, bizAddress, wh])
+  }, [step, domainPick, domainContact.email, ownerFullName, owner.email, mobile, kyb.bizName, bizType, bizAddress, wh])
 
   // The phone is typed once (Store step): an empty seller phone and owner's mobile start from it on entering their step.
+  // Likewise the store's name, address and the owner's name start the Business step's trade name, address and signatory.
   const storeMobile = IN_MOBILE.test(details.contact.phone) ? details.contact.phone : ''
   const sellerMobile = IN_MOBILE.test(wh.sellerPhone ?? '') ? (wh.sellerPhone as string) : ''
   useEffect(() => {
     if (key === 'warehouse' && storeMobile) setWh((w: typeof wh) => (w.sellerPhone ? w : { ...w, sellerPhone: storeMobile }))
     if (key === 'branding' && (storeMobile || sellerMobile)) setMobile((m: string) => m || storeMobile || sellerMobile)
+    if (key === 'business') setKyb(k => prefillBusiness(k, { storeName: displayName, ownerName: ownerFullName, address: details.contact }))
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps -- on entering a step only: a cleared field stays clear
 
   // ── Can proceed? ─────────────────────────────────────────────────────────────
@@ -625,12 +681,11 @@ export default function OnboardWizard({
       case 'site':
         return siteSkip || studio.ready || studio.description.trim().length >= 10
       case 'business':
-        return bizName.trim().length > 0 && !!bizType && isPan(pan) && bizAddress.trim().length > 5
-      // Optional: registration is not required below the turnover threshold, and Razorpay does
-      // not need a GSTIN to create a linked account. Forcing it made the one tenant who had none
-      // paste the platform's own GSTIN to get past this step.
+        return !businessIssue(kyb)
+      // A GSTIN only when registered: a business below the threshold says why and uploads a registration proof
+      // instead (one tenant without GST once pasted the platform's own GSTIN to get past this step).
       case 'gst':
-        return gstNumber.length === 0 || isGstin(gstNumber)
+        return !gstIssue(kyb)
       case 'warehouse':
         return (
           /^\d{6}$/.test(wh.originPincode.replace(/\D/g, '')) &&
@@ -647,6 +702,9 @@ export default function OnboardWizard({
     }
   }
   const canNext = () => stepDone(key)
+  /** What keeps a step from done, for the steps that can say. */
+  const issueOf = (k: WizardStepKey): string | null => (k === 'store' ? storeIssue : k === 'business' ? businessIssue(kyb) : k === 'gst' ? gstIssue(kyb) : null)
+  const stepIssue = issueOf(key)
 
   const isLast = step === REVIEW
   // At Review: earlier steps still missing something (a draft from before the Store step asked for licences, say).
@@ -802,120 +860,16 @@ export default function OnboardWizard({
               onDetails={setDetails}
               compliance={compliance}
               onCompliance={setCompliance}
-              gst={{ s3Key: gstS3Key, fileName: gstFilename }}
-              onGst={onGst}
               domainPick={domainPick}
               onDomainPick={setDomainPick}
             />
           )}
 
           {/* ── Business ── */}
-          {key === 'business' && (
-            <Card>
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div>
-                  <label htmlFor="biz-name" className={lbl}>Legal business name</label>
-                  <input
-                    id="biz-name"
-                    className={inp}
-                    value={bizName}
-                    onChange={e => setBizName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="biz-pan" className={lbl}>PAN number</label>
-                  <input
-                    id="biz-pan"
-                    className={inp}
-                    value={pan}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={panError}
-                    aria-describedby={panError ? 'biz-pan-error' : undefined}
-                    onChange={e => setPan(taxIdInput(e.target.value, 10))}
-                    onBlur={() => setPanLeft(true)}
-                  />
-                  {panError && <p id="biz-pan-error" className={errText}>{PAN_MESSAGE}</p>}
-                </div>
-                </div>
-                <div>
-                  <span className={lbl}>Business type</span>
-                  <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
-                    options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
-                </div>
-                <div>
-                  <label htmlFor="biz-address" className={lbl}>Business address</label>
-                  <textarea
-                    id="biz-address"
-                    className={`${inp} h-24 resize-none`}
-                    value={bizAddress}
-                    onChange={e => setBizAddress(e.target.value)}
-                  />
-                </div>
-              </div>
-            </Card>
-          )}
+          {key === 'business' && <BusinessStep value={kyb} onChange={setKyb} renderDoc={renderDoc} />}
 
           {/* ── GST ── */}
-          {key === 'gst' && (
-            <Card>
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div>
-                  <label htmlFor="gst-number" className={lbl}>
-                    GSTIN <span className="text-foreground-muted font-normal">(optional)</span>
-                  </label>
-                  <input
-                    id="gst-number"
-                    className={inp}
-                    value={gstNumber}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={gstError}
-                    aria-describedby="gst-number-hint"
-                    onChange={e => setGstNumber(taxIdInput(e.target.value, 15))}
-                    onBlur={() => setGstLeft(true)}
-                  />
-                  {gstError ? (
-                    <p id="gst-number-hint" className={errText}>{GSTIN_MESSAGE}</p>
-                  ) : (
-                    <p id="gst-number-hint" className="text-xs text-foreground-muted mt-1">
-                      15-character GST Identification Number. Leave blank if you are not registered — never enter another
-                      business&apos;s number.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <span className={lbl}>GST registration certificate</span>
-                  {gstS3Key ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-[var(--org-sage-deep)]/40 org-sage p-4">
-                      <CheckMark className="w-5 h-5 org-sage-text flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium org-sage-text">Uploaded with your licences</div>
-                        <div className="text-xs org-sage-text truncate">{gstFilename}</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border-default bg-surface p-4 text-sm text-foreground-secondary">
-                      Not uploaded. It is optional; add it under Licences &amp; certificates in the{' '}
-                      <button type="button" onClick={() => goTo(S.store)} className="font-medium text-foreground underline">
-                        Store step
-                      </button>
-                      .
-                    </div>
-                  )}
-                </div>
-                </div>
-                <div className={`${noteCls} org-peach`}>
-                  Your licences and certificates are reviewed by the Jeffi Commerce team before your store goes live. This
-                  usually takes 1–2 business days.
-                </div>
-              </div>
-            </Card>
-          )}
+          {key === 'gst' && <GstStep value={kyb} onChange={setKyb} renderDoc={renderDoc} />}
 
           {/* ── Warehouse ── */}
           {key === 'warehouse' && (
@@ -1344,7 +1298,14 @@ export default function OnboardWizard({
                       </button>
                     ))}
                   </div>
-                  {unfinished.some(s => s.key === 'store') && storeIssue && <p className="mt-2 text-xs text-foreground-secondary">Store: {storeIssue}</p>}
+                  {unfinished.map(s => {
+                    const issue = issueOf(s.key)
+                    return issue ? (
+                      <p key={s.key} className="mt-2 text-xs text-foreground-secondary">
+                        {s.label}: {issue}
+                      </p>
+                    ) : null
+                  })}
                 </div>
               )}
               <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:items-start gap-4">
@@ -1369,13 +1330,26 @@ export default function OnboardWizard({
                     : []),
                   ['Products', productCats.join(', ') || '—'],
                   ['Contact', [details.contact.phone, details.contact.email.trim()].filter(Boolean).join(' · ') || '—'],
+                  ['Licences & certificates', licences.map(l => DOCS[l.doc]?.name ?? l.doc).join(', ') || 'None needed'],
+                  ['Business', [kyb.bizName.trim(), ENTITY_TYPES.find(e => e.id === kyb.entityType)?.label].filter(Boolean).join(' · ') || '—'],
+                  ['Address', bizAddress || '—'],
+                  ['Signatory', [kyb.signatoryName.trim(), kyb.signatoryDesignation.trim()].filter(Boolean).join(', ') || '—'],
+                  ['PAN', kyb.pan ? maskPan(kyb.pan) : '—'],
                   [
-                    'Licences & certificates',
-                    [gstS3Key ? 'GST certificate' : '', ...licences.map(l => DOCS[l.doc]?.name ?? l.doc)].filter(Boolean).join(', ') || 'None needed',
+                    'GST',
+                    kyb.gstRegistered
+                      ? kyb.gstNumber || '—'
+                      : kyb.gstRegistered === false
+                        ? `Not registered${kyb.gstExemptReason ? ` · ${GST_EXEMPT_REASONS.find(r => r.id === kyb.gstExemptReason)?.label}` : ''}`
+                        : '—',
                   ],
-                  ['Business', `${bizName} · ${bizType}`],
-                  ['PAN', pan ? maskPan(pan) : '—'],
-                  ['GSTIN', gstNumber || 'Not registered'],
+                  [
+                    'Business documents',
+                    ['pan_card', kyb.gstRegistered ? 'gst_cert' : kyb.regDocType]
+                      .filter(t => !!t && !!kyb.kybDocs[t]?.s3Key)
+                      .map(docLabel)
+                      .join(', ') || '—',
+                  ],
                   ['Bank', bankVerified ? `${bank.holderName} · ${maskAccount(bank.accountNumber)}` : 'Not added'],
                   ['UPI ID', bankVerified && bank.upiId ? maskUpi(bank.upiId) : '—'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
@@ -1475,12 +1449,12 @@ export default function OnboardWizard({
           )}
 
           {/* ── Navigation ── */}
-          {key === 'store' && storeIssue && (
+          {stepIssue && (
             <p className="mt-6 text-right text-xs text-foreground-muted" aria-live="polite">
-              To continue: {storeIssue}
+              To continue: {stepIssue}
             </p>
           )}
-          <div className={`${key === 'store' && storeIssue ? 'mt-2' : 'mt-6'} flex items-center justify-between gap-3`}>
+          <div className={`${stepIssue ? 'mt-2' : 'mt-6'} flex items-center justify-between gap-3`}>
             <button
               type="button"
               onClick={() => goTo(step - 1)}

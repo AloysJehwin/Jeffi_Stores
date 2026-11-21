@@ -7,6 +7,8 @@ import {
   getTenantBankAccount,
   lookupTenantContextById,
   hasService,
+  type TenantDetail,
+  type TenantKyc,
 } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { queryMany } from '@/lib/shared/db'
@@ -22,6 +24,9 @@ import CommerceTab from '@controller/components/admin/ecom/tabs/CommerceTab'
 import ShipmentsTab from '@controller/components/admin/ecom/tabs/ShipmentsTab'
 import KycTab from '@controller/components/admin/ecom/tabs/KycTab'
 import { complianceAttention, listComplianceDocuments } from '@controller/lib/catalog/compliance-docs'
+import { tenantOwnerId } from '@controller/lib/kyb/gate'
+import { getKybRecord, listAllDocuments } from '@controller/lib/kyb/store'
+import { docView, loadKybView } from '@controller/lib/kyb/view'
 import AccessTab from '@controller/components/admin/ecom/tabs/AccessTab'
 import CertificatesTab from '@controller/components/admin/ecom/tabs/CertificatesTab'
 import MessagingTab from '@controller/components/admin/ecom/tabs/MessagingTab'
@@ -69,12 +74,31 @@ export default async function TenantObjectPage({ params, searchParams }: { param
         {tab === 'shipments' && <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />}
         {tab === 'access' && <AccessTab {...await accessData(id)} />}
         {tab === 'certificates' && <CertificatesTab tenant={t} {...await certificatesData(id)} />}
-        {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} documents={await listComplianceDocuments(id).catch(() => [])} />}
+        {tab === 'kyc' && <KycTab tenant={t} kyc={d.kyc} approvals={d.approvals} {...await kycData(t, d.kyc)} />}
         {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} storeName={t.display_name} />}
         {tab === 'numbers' && d.isStore && <NumbersTab tenantId={t.id} storeName={t.display_name || t.slug} />}
       </div>
     </div>
   )
+}
+
+// The licences, the business's KYB (answers, documents, where each service stands) and every document's file and
+// automatic check by id: the KYB view leaves out the file, the reviewer and the licences' checks.
+async function kycData(t: TenantDetail, kyc: TenantKyc | null) {
+  const ownerId = kyc?.owner_id ?? (await tenantOwnerId(t.id).catch(() => null))
+  const [documents, rows, record, kyb] = await Promise.all([
+    listComplianceDocuments(t.id).catch(() => []),
+    listAllDocuments(t.id).catch(() => []),
+    getKybRecord(t.id).catch(() => null),
+    ownerId
+      ? loadKybView(t, ownerId).catch(e => {
+          console.error('[kyb] admin view failed', t.id, e?.message || e)
+          return null
+        })
+      : null,
+  ])
+  const files = Object.fromEntries(rows.map(r => [r.id, { ...docView(r, record), version: r.s3_key, reviewedBy: r.reviewed_by, reviewedAt: r.reviewed_at }]))
+  return { documents, kyb, files }
 }
 
 async function accessData(id: string) {

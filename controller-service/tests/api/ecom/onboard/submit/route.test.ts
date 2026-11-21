@@ -15,6 +15,8 @@ const m = vi.hoisted(() => ({
   flag: vi.fn(() => false),
   quote: vi.fn(),
   docs: vi.fn(),
+  kybProfile: vi.fn(),
+  kybDoc: vi.fn(),
 }))
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'sid' }) }) }))
@@ -44,6 +46,14 @@ vi.mock('@controller/lib/compute/catalog', () => ({ computeSpecEnabled: m.flag, 
 vi.mock('@controller/lib/compute/quote', () => ({ quoteForPlan: m.quote }))
 vi.mock('@controller/lib/compute/store', () => ({ saveDesiredCompute: m.saveCompute }))
 vi.mock('@controller/lib/catalog/compliance-docs', () => ({ saveComplianceDocuments: m.docs }))
+vi.mock('@controller/lib/kyb/store', () => ({
+  saveKybProfile: m.kybProfile,
+  upsertKybDocument: m.kybDoc,
+  listKybDocuments: vi.fn().mockResolvedValue([]),
+  setOwnerNote: vi.fn(),
+  setGstCertKey: vi.fn(),
+}))
+vi.mock('@controller/lib/kyb/analyze', () => ({ queueRecheck: vi.fn().mockResolvedValue({ count: 0, run: vi.fn() }) }))
 
 import { POST } from '@controller/app/api/(ecom)/ecom/onboard/submit/route'
 import { presetSpec, withDedicatedDb } from '@/lib/compute/presets'
@@ -54,11 +64,20 @@ const BODY = {
   displayName: 'Acme',
   slug: 'acme',
   ownerName: 'Aloys',
-  businessName: 'Acme Pvt Ltd',
-  businessType: 'pvt_ltd',
-  pan: 'ABCDE1234F',
-  businessAddress: '1 MG Road, Bengaluru 560001',
-  gstNumber: '29ABCDE1234F1Z5',
+  businessName: 'Acme Traders',
+  businessType: 'partnership',
+  entityType: 'partnership',
+  pan: 'AAPFU0939F',
+  businessAddress: '1 MG Road, Mumbai, Maharashtra 400001',
+  addressLine: '1 MG Road',
+  city: 'Mumbai',
+  state: 'Maharashtra',
+  pincode: '400001',
+  authorizedName: 'Aloys',
+  authorizedDesignation: 'Partner',
+  gstRegistered: true,
+  gstNumber: '27AAPFU0939F1ZV',
+  kybDocs: { pan_card: { s3Key: 'kyc/o-1/pan_card/p.pdf', fileName: 'pan.pdf' }, gst_cert: { s3Key: 'kyc/o-1/gst_cert/g.pdf', fileName: 'gst.pdf' } },
   warehouse: { originPincode: '560001', sellerPhone: '9876543210', sellerAddress: '1 MG Road' },
   legalsAccepted: true,
   compliance: { answers: { restricted: false, import: false } },
@@ -88,7 +107,9 @@ describe('onboard submit — store upgrade on a services workspace', () => {
     expect(m.create).not.toHaveBeenCalled()
     expect(m.link).not.toHaveBeenCalled()
     expect(m.addServices).not.toHaveBeenCalled()
-    expect(m.kyc).toHaveBeenCalledWith('t-1', 'o-1', expect.objectContaining({ review_again: true, pan: 'ABCDE1234F' }))
+    expect(m.kyc).toHaveBeenCalledWith('t-1', 'o-1', expect.objectContaining({ review_again: true, pan: 'AAPFU0939F', gst_cert_s3_key: 'kyc/o-1/gst_cert/g.pdf' }))
+    expect(m.kybProfile).toHaveBeenCalledWith('t-1', 'o-1', expect.objectContaining({ entityType: 'partnership', gstRegistered: true, gstin: '27AAPFU0939F1ZV', state: 'Maharashtra' }))
+    expect(m.kybDoc).toHaveBeenCalledWith('t-1', 'o-1', expect.objectContaining({ docType: 'pan_card', number: 'AAPFU0939F', s3Key: 'kyc/o-1/pan_card/p.pdf' }))
   })
 
   it('always saves a priced compute row: Basic is the basic preset, even when a size was sent', async () => {

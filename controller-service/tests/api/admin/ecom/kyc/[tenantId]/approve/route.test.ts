@@ -27,9 +27,12 @@ vi.mock('@/lib/tenant-registry', () => ({
   setPaymentRequired: vi.fn(),
   hasService: vi.fn((t: { service_types?: string[] | null }, s: string) => (t?.service_types ?? ['store']).includes(s)),
   reviewServiceApproval: vi.fn(),
+  listServiceApprovals: vi.fn().mockResolvedValue([]),
   controlPlanePool: vi.fn(),
   setSubscriptionStatus: vi.fn(),
 }))
+
+vi.mock('@controller/lib/kyb/gate', () => ({ kybGate: vi.fn().mockResolvedValue({ ok: true }) }))
 
 vi.mock('@controller/lib/payments/razorpay-subscriptions', () => ({
   createRazorpaySubscription: vi.fn(),
@@ -103,6 +106,7 @@ import {
 } from '@/lib/payments/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
 import { startStore } from '@controller/lib/provisioning/start-store'
+import { kybGate } from '@controller/lib/kyb/gate'
 
 // ---------------------------------------------------------------------------
 // Helpers / fixtures
@@ -497,6 +501,19 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(opts.planSlug).toBe('basic')
     expect(opts.interval).toBe('monthly')
     expect(saveSubscriptionId).toHaveBeenCalledWith(TENANT_ID, 'sub_123', 'monthly', 'https://rzp.io/i/checkout')
+  })
+
+  it('holds a store whose KYB is incomplete, unless the admin approves it anyway', async () => {
+    vi.mocked(kybGate).mockResolvedValueOnce({ ok: false, message: 'Verify your business first.', missing: { store: [{ item: 'pan', label: 'PAN' }] } })
+    const held = await POST(postReq(), params)
+    expect(held.status).toBe(409)
+    expect((await held.json()).canForce).toBe(true)
+    expect(approveKyc).not.toHaveBeenCalled()
+
+    vi.mocked(kybGate).mockResolvedValueOnce({ ok: false, message: 'Verify your business first.', missing: { store: [{ item: 'pan', label: 'PAN' }] } })
+    const forced = await POST(postReq({ force: true }), params)
+    expect(forced.status).toBe(200)
+    expect(approveKyc).toHaveBeenCalled()
   })
 
   it('refuses to subscribe a store whose plan is not an active store plan (no fallback to another plan)', async () => {

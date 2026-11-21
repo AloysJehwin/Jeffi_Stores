@@ -4,12 +4,24 @@ import ConsoleShell from './ConsoleShell'
 import { hasService, listServiceApprovals } from '@/lib/tenant-registry'
 import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 import { complianceAttention } from '@controller/lib/catalog/compliance-docs'
+import { kybUnready } from '@controller/lib/ecom/service-states'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { owner, tenants, tenant } = await loadOwnerContext()
   const review = (await listServiceApprovals(tenant.id).catch(() => [])).filter(a => a.status !== 'approved')
+  // Jeffi can't approve a service until its business verification is complete.
+  const unverified = await kybUnready(tenant, owner.id, review.map(r => r.service))
+  const verify = (s: (typeof unverified)[number]) =>
+    unverified.includes(s) && (
+      <>
+        {' '}
+        <Link href={`/dashboard/business?for=${s}`} className="font-semibold underline underline-offset-2">
+          Verify your business
+        </Link>
+      </>
+    )
   // A rejected or expired licence puts the store's compliance in need of action (dashboard/licences).
   const licences = hasService(tenant, 'store') ? await complianceAttention(tenant.id).catch(() => null) : null
   const label = (s: string) => (s === 'messaging' ? 'Messaging' : 'Documents')
@@ -20,8 +32,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {review.length > 0 && (
           <div className={`mb-6 rounded-2xl px-5 py-3 text-sm ${review.some(r => r.status === 'rejected') ? 'bg-[#f6d5cc]/60 text-[#8a2e1f]' : 'org-peach'}`}>
             {review.map(r => r.status === 'pending'
-              ? <p key={r.service}><strong>{label(r.service)} API is under review.</strong> Explore the console, set up templates and create API keys — sending starts once we approve it (usually the same business day).</p>
-              : <p key={r.service}><strong>{label(r.service)} API was not approved.</strong> {r.note ? `${r.note} — ` : ''}reply to our email or write to support@jeffistores.in.</p>)}
+              ? <p key={r.service}><strong>{label(r.service)} API is under review.</strong> {verify(r.service) ? 'We can approve it once your business is verified.' : 'Explore the console, set up templates and create API keys — sending starts once we approve it (usually the same business day).'}{verify(r.service)}</p>
+              : <p key={r.service}><strong>{label(r.service)} API was not approved.</strong> {r.note ? `${r.note} — ` : ''}{verify(r.service) ? 'complete your business verification, then request it again.' : 'reply to our email or write to support@jeffistores.in.'}{verify(r.service)}</p>)}
           </div>
         )}
         {licences === 'action' && (

@@ -445,6 +445,26 @@ export interface AiVisionResult {
   fallbackUsed?: boolean
 }
 
+export interface AiOcrResult {
+  ok: boolean
+  text: string
+  lines?: { text: string; score?: number }[]
+  meanScore?: number | null
+  pages?: number
+  error?: string
+}
+
+/** Text read by the gateway's PaddleOCR (`/v1/ocr`), with no model in between: an image or a PDF as base64 (no
+ *  data: prefix). Never throws; `ok: false` when PaddleOCR is down or the gateway predates the route. */
+export async function aiOcr(data: string, mimeType: string): Promise<AiOcrResult> {
+  try {
+    const r = (await gatewayPost('/v1/ocr', { data, mime_type: mimeType }, 'ocr ', true)) as AiOcrResult
+    return r?.ok && typeof r.text === 'string' ? r : { ok: false, text: '', error: r?.error || 'OCR returned nothing' }
+  } catch (err) {
+    return { ok: false, text: '', error: err instanceof Error ? err.message : 'OCR request failed' }
+  }
+}
+
 /** Vision/OCR via the gateway. `images` are base64 (no data: prefix). Never throws. Usage is
  *  recorded under capability 'vision' (Claude by tokens, OCR/Ollama per call). */
 export async function aiVision(

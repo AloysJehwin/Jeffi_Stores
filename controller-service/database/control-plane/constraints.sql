@@ -66,6 +66,10 @@ ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_status_check
     CHECK (status IN ('pending','approved','rejected'));
 ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_business_type_check
     CHECK (business_type IN ('proprietor','partnership','pvt_ltd','llp','other'));
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_entity_type_check
+    CHECK (entity_type IN ('proprietor','partnership','llp','pvt_ltd','opc','public_ltd','huf','trust','society','other'));
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_gst_exempt_reason_check
+    CHECK (gst_exempt_reason IN ('below_threshold','exempt_supplies','applied','other'));
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_provider_key UNIQUE (tenant_id, provider);
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_provider_check
@@ -193,6 +197,8 @@ ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compli
     CHECK (status IN ('pending','approved','rejected','expired'));
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_expiry_notice_check
     CHECK (expiry_notice IN (0, 7, 30));
+ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_analysis_status_check
+    CHECK (analysis_status IN ('pending','done','failed'));
 ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_tenant_ref_key UNIQUE (tenant_id, external_ref);
 ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_amounts_check
