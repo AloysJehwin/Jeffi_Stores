@@ -13,6 +13,17 @@ const DELAY_MS = 1200
 
 export type SlugState = { state: 'idle' | 'checking' | 'ok' } | { state: 'taken'; error: string }
 
+/** The save request for the form as it stands, or null while it can't be saved. */
+function saveRequest(f: DetailsForm, cur: { site: ClientSite | null; slug: SlugState }, savedContent: DetailsForm['content']) {
+  if (!canSave(f)) return null
+  // A new site needs its address to be free; an existing one keeps its own until a free one is chosen.
+  const slugOk = cur.slug.state === 'ok'
+  if (!cur.site && !slugOk) return null
+  const sendContent = f.content !== savedContent || !cur.site
+  const body = JSON.stringify({ ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), ...(sendContent ? { content: f.content } : {}) })
+  return { body, sendContent }
+}
+
 export async function uploadShowcaseImage(file: File, kind: 'logo' | 'service' | 'work' | 'avatar'): Promise<string> {
   const fd = new FormData()
   fd.append('file', file)
@@ -32,6 +43,8 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
   const [slug, setSlug] = useState<SlugState>({ state: initialSite ? 'ok' : 'idle' })
   const latest = useRef(form)
   latest.current = form
+  const unsaved = useRef(dirty)
+  unsaved.current = dirty
   const current = useRef({ site, slug })
   current.current = { site, slug }
   const running = useRef<Promise<boolean> | null>(null)
@@ -73,18 +86,11 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
 
   const saveOnce = useCallback(async (): Promise<boolean> => {
     const f = latest.current
-    if (!canSave(f)) return false
-    // A new site needs its address to be free; an existing one keeps its own until a free one is chosen.
-    const slugOk = current.current.slug.state === 'ok'
-    if (!current.current.site && !slugOk) return false
+    const req = saveRequest(f, current.current, savedContent.current)
+    if (!req) return false
     setSaving(true)
-    const sendContent = f.content !== savedContent.current || !current.current.site
     try {
-      const res = await fetch(BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), ...(sendContent ? { content: f.content } : {}) }),
-      })
+      const res = await fetch(BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: req.body })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setSaveError({ error: data.error || 'Your changes could not be saved.', field: data.field })
@@ -93,7 +99,7 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
       }
       setSite(data.site)
       setSaveError(null)
-      if (sendContent) savedContent.current = f.content
+      if (req.sendContent) savedContent.current = f.content
       if (latest.current === f) setDirty(false)
       return true
     } catch {
@@ -154,14 +160,17 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
     }
   }, [form.slug, ownSlug])
 
-  // Unsaved changes when the tab closes.
+  // Closing the tab before the autosave runs: the last edit goes out with the page (keepalive), with no "Leave site?"
+  // prompt. Not while the first save is still creating the site, which would race it.
   useEffect(() => {
-    const warn = (e: BeforeUnloadEvent) => {
-      if (dirty && canSave(latest.current)) e.preventDefault()
+    const flush = () => {
+      if (!unsaved.current || (running.current && !current.current.site)) return
+      const req = saveRequest(latest.current, current.current, savedContent.current)
+      if (req) fetch(BASE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: req.body, keepalive: true }).catch(() => {})
     }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
+    window.addEventListener('pagehide', flush)
+    return () => window.removeEventListener('pagehide', flush)
+  }, [])
 
   return { form, setForm, site, setSite, saving, saveError, dirty, saveNow, slug, refresh }
 }
