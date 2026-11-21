@@ -31,9 +31,15 @@ const VARIANT_CLASSES: Record<Variant, string> = {
   danger: 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20',
 }
 
+// <Link> prefetches its target as soon as it scrolls into view. A download, an API route or a new tab
+// gets a plain <a>: prefetched, every visible row's file was built at once (the products list rendering
+// one ad image per row) and blocked the pod until Traefik had "no available server".
+const plainAnchor = (href: string, download?: boolean, target?: string) =>
+  !!download || !!target || href.startsWith('/api/') || /^[a-z][a-z0-9+.-]*:/i.test(href)
+
 /**
  * A single lucide-icon action button with an accessible label (aria-label + Tooltip).
- * Renders a <Link> when given `href`, otherwise a <button>.
+ * Renders a link when given `href` (<Link> for in-app pages, <a> otherwise), else a <button>.
  */
 const IconButton = forwardRef<HTMLElement, IconButtonProps>(function IconButton(props, ref) {
   const {
@@ -54,16 +60,23 @@ const IconButton = forwardRef<HTMLElement, IconButtonProps>(function IconButton(
 
   const control =
     'href' in props && props.href !== undefined && !isDisabled ? (
-      <Link
-        ref={ref as React.Ref<HTMLAnchorElement>}
-        href={props.href}
-        target={props.target}
-        download={props.download}
-        aria-label={label}
-        className={classes}
-      >
-        {inner}
-      </Link>
+      plainAnchor(props.href, props.download, props.target) ? (
+        <a
+          ref={ref as React.Ref<HTMLAnchorElement>}
+          href={props.href}
+          target={props.target}
+          rel={props.target === '_blank' ? 'noopener' : undefined}
+          download={props.download || undefined}
+          aria-label={label}
+          className={classes}
+        >
+          {inner}
+        </a>
+      ) : (
+        <Link ref={ref as React.Ref<HTMLAnchorElement>} href={props.href} aria-label={label} className={classes}>
+          {inner}
+        </Link>
+      )
     ) : (
       <button
         ref={ref as React.Ref<HTMLButtonElement>}
