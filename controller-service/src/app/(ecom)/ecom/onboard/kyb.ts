@@ -6,43 +6,16 @@ import { isIsoDate, todayIst } from '@controller/lib/catalog/compliance'
 import { isGstin, isPan } from '@controller/lib/catalog/tax-ids'
 import type { DocAnalysis, Expected } from '@controller/lib/kyb/extract'
 import { checkGstin, checkPan, idChars, isEntityType, kycBusinessType, type EntityType } from '@controller/lib/kyb/ids'
-import { KYB_DOCS, REGISTRATION_DOCS, docNumberProblem, formatDocNumber, registrationDocsFor } from '@controller/lib/kyb/requirements'
-
-/** The states and union territories as GST names them (lib/catalog/gst.ts), so a GSTIN's state code can be checked. */
-export const INDIAN_STATES = [
-  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh',
-  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
-  'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
-  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
-  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-]
-
-/** A state as typed elsewhere, in the list's spelling; '' when it isn't one. */
-export const canonicalState = (s: string | null | undefined) => INDIAN_STATES.find(x => x.toLowerCase() === String(s ?? '').trim().toLowerCase()) ?? ''
-
-/** tenant_kyc.gst_exempt_reason. */
-export const GST_EXEMPT_REASONS = [
-  { id: 'below_threshold', label: 'Turnover is below the GST limit' },
-  { id: 'exempt_supplies', label: 'Sells only goods exempt from GST' },
-  { id: 'applied', label: 'Applied for GST, not issued yet' },
-  { id: 'other', label: 'Another reason' },
-] as const
-export type GstExemptReason = (typeof GST_EXEMPT_REASONS)[number]['id']
-const isReason = (v: unknown): v is GstExemptReason => GST_EXEMPT_REASONS.some(r => r.id === v)
-
-/** Who usually signs for each type of business: filled in until the owner types their own. */
-export const SIGNATORY_TITLE: Record<EntityType, string> = {
-  proprietor: 'Proprietor',
-  partnership: 'Partner',
-  llp: 'Designated partner',
-  pvt_ltd: 'Director',
-  opc: 'Director',
-  public_ltd: 'Director',
-  huf: 'Karta',
-  trust: 'Trustee',
-  society: 'Secretary',
-  other: '',
-}
+import {
+  KYB_DOCS,
+  REGISTRATION_DOCS,
+  canonicalState,
+  docNumberProblem,
+  formatDocNumber,
+  isGstExemptReason,
+  registrationDocsFor,
+  type GstExemptReason,
+} from '@controller/lib/kyb/requirements'
 
 export const isKybDoc = (t: unknown): t is string => typeof t === 'string' && Object.prototype.hasOwnProperty.call(KYB_DOCS, t)
 
@@ -116,7 +89,7 @@ export function initialKyb(init: Record<string, any>): KybState {
     signatoryDesignation: str(init.signatoryDesignation),
     gstRegistered: typeof init.gstRegistered === 'boolean' ? init.gstRegistered : gstNumber ? true : null,
     gstNumber,
-    gstExemptReason: isReason(init.gstExemptReason) ? init.gstExemptReason : '',
+    gstExemptReason: isGstExemptReason(init.gstExemptReason) ? init.gstExemptReason : '',
     gstExemptNote: str(init.gstExemptNote),
     regDocType: isKybDoc(init.regDocType) ? init.regDocType : (REGISTRATION_DOCS.find(d => docs[d]?.s3Key) ?? ''),
     kybDocs: docs,

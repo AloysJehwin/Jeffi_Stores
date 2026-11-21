@@ -40,6 +40,44 @@ export const ITEM_LABEL: Record<KybItem, string> = {
   licences: 'Licences for what you sell',
 }
 
+// ── Business details: the wizard and the console offer the same choices ──
+
+/** The states and union territories as GST names them (lib/catalog/gst.ts), so a GSTIN's state code can be checked. */
+export const INDIAN_STATES: readonly string[] = [
+  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh',
+  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+]
+
+/** A state as typed elsewhere, in the list's spelling; '' when it isn't one. */
+export const canonicalState = (s: string | null | undefined) => INDIAN_STATES.find(x => x.toLowerCase() === String(s ?? '').trim().toLowerCase()) ?? ''
+
+/** tenant_kyc.gst_exempt_reason: the ids are tenant_kyc_gst_exempt_reason_check's. */
+export const GST_EXEMPT_REASONS = [
+  { id: 'below_threshold', label: 'Turnover is below the GST registration limit' },
+  { id: 'exempt_supplies', label: 'Sells only goods or services exempt from GST' },
+  { id: 'applied', label: 'Applied for GST, not issued yet' },
+  { id: 'other', label: 'Another reason' },
+] as const
+export type GstExemptReason = (typeof GST_EXEMPT_REASONS)[number]['id']
+export const isGstExemptReason = (v: unknown): v is GstExemptReason => GST_EXEMPT_REASONS.some(r => r.id === v)
+
+/** Who usually signs for each type of business: filled in until the owner types their own. */
+export const SIGNATORY_TITLE: Record<EntityType, string> = {
+  proprietor: 'Proprietor',
+  partnership: 'Partner',
+  llp: 'Designated partner',
+  pvt_ltd: 'Director',
+  opc: 'Director',
+  public_ltd: 'Director',
+  huf: 'Karta',
+  trust: 'Trustee',
+  society: 'Secretary',
+  other: '',
+}
+
 // ── Documents ──
 
 export interface KybDocType {

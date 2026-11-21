@@ -23,7 +23,6 @@ import KybDocField from './KybDocField'
 import { uploadKyc } from './CompliancePanel'
 import { initialStoreDetails, storeDetailsPayload, storeDetailsProblem, type StoreDetails } from './store-details'
 import {
-  GST_EXEMPT_REASONS,
   businessIssue,
   checkBlocked,
   checkCurrent,
@@ -39,7 +38,7 @@ import {
 } from './kyb'
 import { DOCS, complianceProblem, compliancePlan, planQuestions, requiredDocs, type ComplianceState } from '@controller/lib/catalog/compliance'
 import { ENTITY_TYPES, kycBusinessType } from '@controller/lib/kyb/ids'
-import { KYB_DOCS } from '@controller/lib/kyb/requirements'
+import { GST_EXEMPT_REASONS, KYB_DOCS } from '@controller/lib/kyb/requirements'
 import { contactProblem, EMPTY_CONTACT, type DomainContact } from '../_domains/types'
 import { defaultContact } from '@controller/lib/domains/contact'
 

@@ -9,8 +9,17 @@ import { Card } from '../dashboard/_components/Card'
 import { fieldInput, fieldLabel, noteCls } from './ui'
 import { todayIst } from '@controller/lib/catalog/compliance'
 import { ENTITY_TYPES, checkGstin, checkPan, idChars, type EntityType } from '@controller/lib/kyb/ids'
-import { KYB_DOCS, docNumberProblem, formatDocNumber, registrationDocsFor } from '@controller/lib/kyb/requirements'
-import { GST_EXEMPT_REASONS, INDIAN_STATES, SIGNATORY_TITLE, patchDoc, type GstExemptReason, type KybState, type KybUpload } from './kyb'
+import {
+  GST_EXEMPT_REASONS,
+  INDIAN_STATES,
+  KYB_DOCS,
+  SIGNATORY_TITLE,
+  docNumberProblem,
+  formatDocNumber,
+  registrationDocsFor,
+  type GstExemptReason,
+} from '@controller/lib/kyb/requirements'
+import { patchDoc, type KybState, type KybUpload } from './kyb'
 
 // The wizard's Business and GST steps: what KYB needs to know about the business (lib/kyb), checked as the owner types.
 // The documents are rendered by the wizard (renderDoc), which runs their automatic check.

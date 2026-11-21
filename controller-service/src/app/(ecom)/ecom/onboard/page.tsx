@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, getOwnerBankAccount, controlPlanePool } from '@/lib/tenant-registry'
+import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, restartDraft, getOwnerBankAccount, controlPlanePool } from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
 import OnboardWizard from './OnboardWizard'
@@ -243,6 +243,9 @@ export default async function OnboardPage({
     : picked
       ? { current_step: 0, data: picked }
       : null
+  // The new application gets an editable draft: autosave skips a submitted one, so the KYB checks read the previous
+  // application's answers and submit couldn't record a restore choice.
+  if (submitted && initialDraft) await restartDraft(owner.id, initialDraft.data)
 
   return (
     <OnboardEntry
