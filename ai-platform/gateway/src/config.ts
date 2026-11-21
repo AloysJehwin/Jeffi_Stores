@@ -7,6 +7,8 @@ export const CONFIG = {
   ollamaBaseUrls: parseUrls(process.env.OLLAMA_BASE_URLS || process.env.OLLAMA_BASE_URL || 'http://ollama:11434'),
   ollamaProbeIntervalMs: Number(process.env.OLLAMA_PROBE_INTERVAL_MS) || 15_000,
   paddleOcrUrl: (process.env.PADDLE_OCR_URL || 'http://paddleocr:8866').replace(/\/$/, ''),
+  // /v1/ocr's wait for the sidecar (a multi-page PDF on CPU); under the app's 130s.
+  paddleOcrTimeoutMs: Number(process.env.PADDLE_OCR_TIMEOUT_MS) || 120_000,
   ollamaHealthTimeoutMs: Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS) || 2_000,
   ollamaRequestTimeoutMs: Number(process.env.OLLAMA_REQUEST_TIMEOUT_MS) || 120_000,
   // How long an HTTP handler waits for its queued job before giving up (the app times out at 130s).

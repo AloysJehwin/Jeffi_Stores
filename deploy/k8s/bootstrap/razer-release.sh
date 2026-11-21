@@ -1,8 +1,10 @@
 #!/bin/bash
 # Release the AI gateway on the Razer box from the pipeline: SSM RunShellScript on the EC2 core, which SSHes over
 # Tailscale to the Razer box with a key that can only run /usr/local/sbin/ai-gateway-release (razer-trust.sh sets
-# that up once). Prints the remote output; fails when the remote release fails. `smoke` checks the gateway the way
-# the platform reaches it: from the core over Tailscale, /healthz and /v1/providers on :8080.
+# that up once). That script (ai-platform/deploy/overlays/razer/host/ai-gateway-release.sh) builds the gateway and
+# PaddleOCR images on the box, rolls both out and reads a sample through /v1/ocr. Prints the remote output; fails
+# when the remote release fails. `smoke` checks the gateway the way the platform reaches it: from the core over
+# Tailscale, /healthz and /v1/providers on :8080 (whose `ocr` entry shows the sidecar).
 # Usage: razer-release.sh <sha> [--dry-run] | razer-release.sh smoke
 source "$(dirname "$0")/../db/lib.sh"
 SHA=${1:?sha or smoke}

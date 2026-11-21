@@ -1,0 +1,12 @@
+# Top-level deps of the PaddleOCR sidecar. requirements.txt pins the whole tree, resolved as of the paddlex 3.7.2
+# release (--exclude-newer), so its dependencies are the versions it shipped against; regenerate with the command
+# at the top of requirements.txt.
+# paddlepaddle stays on 3.2: 3.3 breaks oneDNN CPU inference (NotImplementedError
+# ConvertPirAttribute2RuntimeAttribute, PaddlePaddle/Paddle#77340).
+paddlepaddle==3.2.2
+paddleocr==3.7.0
+paddlex[ocr-core]==3.7.2
+fastapi
+uvicorn
+# paddle imports setuptools (and distutils through it on 3.12) without declaring it.
+setuptools

@@ -1,3 +1,5 @@
+# PaddleOCR sidecar (ai-platform/paddleocr): POST /ocr {data, mime_type}, behind the gateway's /v1/ocr and
+# /v1/vision. One replica: it runs one inference at a time anyway.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,16 +13,29 @@ spec:
     metadata:
       labels: { app: paddleocr }
     spec:
+      securityContext: { runAsNonRoot: true }
       containers:
         - name: paddleocr
-          # Replace with the OCR sidecar image that serves POST /ocr {data, mime_type}.
-          image: jeffi/paddleocr-service:latest
+          image: jeffi/paddleocr:latest
           ports:
             - containerPort: 8866
+          env:
+            # Inference threads: keep equal to the CPU limit, or the extra threads only get throttled.
+            - { name: OCR_CPU_THREADS, value: "2" }
+          # Ready once the model is in memory (?ready=1); alive while the process answers. A model that failed to
+          # load fails both, so the pod restarts.
           readinessProbe:
+            httpGet: { path: "/health?ready=1", port: 8866 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
             httpGet: { path: /health, port: 8866 }
-            initialDelaySeconds: 15
-            periodSeconds: 15
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
           resources:
             requests: { cpu: "500m", memory: 1Gi }
             limits: { cpu: "2", memory: 4Gi }

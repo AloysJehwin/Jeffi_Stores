@@ -64,9 +64,12 @@ pgrep buildkitd || sudo /opt/buildkit/bin/buildkitd --oci-worker=false --contain
   --containerd-worker-addr=/run/k3s/containerd/containerd.sock --containerd-worker-namespace=k8s.io &
 sudo /opt/buildkit/bin/buildctl build --frontend dockerfile.v0 --local context=. --local dockerfile=gateway \
   --output type=image,name=docker.io/jeffi/ai-gateway:latest,unpack=true
+sudo /opt/buildkit/bin/buildctl build --frontend dockerfile.v0 --local context=. --local dockerfile=paddleocr \
+  --output type=image,name=docker.io/jeffi/paddleocr:latest,unpack=true
 kubectl apply -k deploy/overlays/razer                     # ConfigMap + manifests
-kubectl -n ai-platform rollout restart deploy/ai-gateway   # new image + new ConfigMap values
+kubectl -n ai-platform rollout restart deploy/ai-gateway deploy/paddleocr   # new images + new ConfigMap values
 kubectl -n ai-platform rollout status deploy/ai-gateway
+kubectl -n ai-platform rollout status deploy/paddleocr     # ready = PP-OCRv5 loaded
 kubectl -n ai-platform logs -l app=ai-gateway --tail=50 | grep -E 'listening|ollama'
 curl -s localhost:8080/readyz                              # 200 {"ok":true,...,"ollama":{"active":...}}
 ```
@@ -90,6 +93,21 @@ resolved to a stale address and took every AI feature down while `/healthz` stay
   check and mails the platform admin once per incident, then once on recovery.
 
 The gateway is published on `<host>:8080` (ServiceLB).
+
+### OCR (PaddleOCR)
+
+`POST /v1/ocr` `{data, mime_type?}` reads a document with PaddleOCR only (never a model, so the same file always
+reads the same): `data` is bare base64 up to 12 MB, `mime_type` one of `image/png|jpeg|webp` or `application/pdf`
+(default: sniffed from the bytes, else PNG; a PDF is read up to 10 pages). 200 `{ok: true, text, lines: [{text,
+score}], meanScore, pages, model: 'PP-OCRv5', provider: 'paddleocr'}`, with `text: ''` when nothing is legible;
+400 `{ok: false, error}` for a bad request, 503 when the sidecar is down or fails (`PADDLE_OCR_TIMEOUT_MS`, 120 s).
+`/v1/vision` still tries PaddleOCR first and falls back to the Ollama vision model. `/readyz` and `/v1/providers`
+report the sidecar (`ocr`); it never fails readiness.
+
+The sidecar is `paddleocr/` (FastAPI on :8866, CPU image with the models baked in). `requirements.txt` pins the
+whole tree (regenerate from `requirements.in` with the command at its top). Locally:
+`pip install -r paddleocr/requirements.txt && python paddleocr/ocr_service.py` (Python 3.11+), then point
+`PADDLE_OCR_URL` at `http://localhost:8866`.
 
 ### GPU guard (Razer only)
 

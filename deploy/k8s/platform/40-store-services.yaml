@@ -191,13 +191,22 @@ kind: HorizontalPodAutoscaler
 metadata: { name: jeffi-stores-admin-service, namespace: jeffi, labels: { jeffi.io/step: store } }
 spec:
   scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-admin-service }
-  minReplicas: 1
-  maxReplicas: 1
+  # Two copies: a rollout, restart or failed probe on one leaves the other serving (one copy left Traefik
+  # with "no available server").
+  minReplicas: 2
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
   behavior:
     scaleDown: { stabilizationWindowSeconds: 300 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: jeffi-stores-admin-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: admin-service, jeffi.io/tenant: jeffi-stores } }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -283,10 +292,18 @@ kind: HorizontalPodAutoscaler
 metadata: { name: jeffi-stores-business-service, namespace: jeffi, labels: { jeffi.io/step: store } }
 spec:
   scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-business-service }
-  minReplicas: 1
-  maxReplicas: 1
+  # Two copies, as the admin's.
+  minReplicas: 2
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
   behavior:
     scaleDown: { stabilizationWindowSeconds: 300 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: jeffi-stores-business-service, namespace: jeffi, labels: { jeffi.io/step: store } }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: business-service, jeffi.io/tenant: jeffi-stores } }

@@ -392,6 +392,21 @@ CREATE TABLE IF NOT EXISTS public.tenant_kyc (
     store_profile   jsonb,                     -- Store step, what the site shows {tagline,about,phone,whatsapp,email,address,city,state,pincode,socials}
     legals_accepted_version character varying(20),   -- POLICY_VERSION the owner agreed to at onboarding
     legals_accepted_at      timestamp with time zone,
+    -- KYB (controller-service/src/lib/kyb, docs/KYB.md): what each service needs verified. business_name is the legal name;
+    -- business_address is rebuilt from the address_* parts when they are set.
+    entity_type     character varying(16),     -- lib/kyb/ids.ts ENTITY_TYPES; business_type keeps its five values
+    trade_name      character varying(200),
+    address_line    text,
+    address_city    character varying(100),
+    address_state   character varying(64),
+    address_pincode character varying(10),
+    authorized_name        character varying(120),  -- who signs for the business
+    authorized_designation character varying(80),
+    website         character varying(255),
+    gst_registered  boolean,                    -- null until answered; false needs a registration proof instead
+    gst_exempt_reason character varying(32),    -- below_threshold|exempt_supplies|applied|other
+    gst_exempt_note text,
+    messaging_use   jsonb,                      -- {purposes, volume, optIn, sample, policyVersion, acceptedAt}
     status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
     reviewer_note   text,
     reviewed_by     character varying(200),   -- admin email

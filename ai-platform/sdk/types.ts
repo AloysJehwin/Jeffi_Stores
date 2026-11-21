@@ -220,6 +220,8 @@ export interface ProvidersResponse {
   text: ProviderStatus<TextProviderName>[]
   image: ProviderStatus<ImageProviderName>[]
   video: ProviderStatus<VideoProviderName>[]
+  /** configured = the sidecar answered its last probe with the model loaded. */
+  ocr: ProviderStatus<OcrProviderName>[]
   /** The gateway's own default order per capability. */
   defaults: { text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[] }
 }
@@ -244,6 +246,42 @@ export interface VisionResponse {
   pages?: number
   error?: string
   hint?: string
+}
+
+// ── OCR (POST /v1/ocr): PaddleOCR only, never a model, so a document reads the same every time ──
+export type OcrProviderName = 'paddleocr'
+export type OcrMimeType = 'image/png' | 'image/jpeg' | 'image/webp' | 'application/pdf'
+
+export interface OcrRequest {
+  /** Base64 file (no data: prefix), at most 12 MB of base64. */
+  data: string
+  /** Default: sniffed from the bytes, else image/png. A PDF is read up to 10 pages. */
+  mime_type?: OcrMimeType
+}
+
+export interface OcrLine {
+  text: string
+  /** Recognition confidence 0..1, 3 decimals. */
+  score: number
+}
+
+/** 200. A document with nothing legible is still ok: text '' and lines []. */
+export interface OcrResponse {
+  ok: true
+  /** The lines joined with \n, pages in order. */
+  text: string
+  lines: OcrLine[]
+  /** Mean line score; null when nothing was read. */
+  meanScore: number | null
+  pages: number
+  model: string
+  provider: OcrProviderName
+}
+
+/** 400: bad request (missing, oversized or non-base64 data, unsupported type). 503: PaddleOCR down or failed. */
+export interface OcrErrorResponse {
+  ok: false
+  error: string
 }
 
 export class AiClientError extends Error {

@@ -172,46 +172,66 @@ function getPool(explicitTenant?: TenantContextType | null): Pool {
   return tp
 }
 
+// Readiness: a pool with every connection out is busy, not down. Queued behind those queries the probe
+// timed out under load and dropped a single-copy pod from its Service ("no available server").
+async function pingPool(p: Pool): Promise<'ok' | 'busy'> {
+  if (p.totalCount > 0 && p.idleCount === 0) return 'busy'
+  await p.query('SELECT 1')
+  return 'ok'
+}
+
+/** SELECT 1 on the database this request would use, through its pool; 'busy' when the pool is fully in use. */
+export async function pingDb(): Promise<'ok' | 'busy'> {
+  return pingPool(getPool(await ensureTenantContext()))
+}
+
 // The pinned store's infra for the readiness probe: any status (a store being built is probed too).
 let storeInfra: { slug: string; ctx: TenantContextType | null; at: number } | null = null
 
+async function lookupStoreInfra(slug: string): Promise<TenantContextType | null> {
+  const { controlPlanePool } = await import('@/lib/tenant-registry')
+  const r = (
+    await controlPlanePool().query(
+      `SELECT t.id, t.slug, t.display_name, i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
+         FROM tenants t LEFT JOIN tenant_infra i ON i.tenant_id = t.id WHERE t.slug = $1 LIMIT 1`,
+      [slug]
+    )
+  ).rows[0]
+  return r?.rds_endpoint
+    ? {
+        tenantId: r.id,
+        slug: r.slug,
+        displayName: r.display_name ?? null,
+        plan: null,
+        infra: {
+          rdsEndpoint: r.rds_endpoint,
+          rdsDb: r.rds_db || 'jeffi_stores',
+          rdsPort: r.rds_port || 5432,
+          rdsUser: r.rds_user ?? null,
+          dbSecretRef: r.db_secret_ref ?? null,
+          iamAuth: r.iam_auth !== false,
+          s3Bucket: r.s3_bucket ?? null,
+          region: r.region || 'us-east-1',
+        },
+      }
+    : null
+}
+
 /**
  * SELECT 1 on the database of the store `slug` through the pool its requests use. 'pending' while the
- * store has no database recorded yet.
+ * store has no database recorded yet, 'busy' when that pool is fully in use.
  */
-export async function pingStoreDb(slug: string): Promise<'ok' | 'pending'> {
+export async function pingStoreDb(slug: string): Promise<'ok' | 'busy' | 'pending'> {
   if (!storeInfra || storeInfra.slug !== slug || Date.now() - storeInfra.at > 30_000) {
-    const { controlPlanePool } = await import('@/lib/tenant-registry')
-    const r = (
-      await controlPlanePool().query(
-        `SELECT t.id, t.slug, t.display_name, i.rds_endpoint, i.rds_db, i.rds_port, i.rds_user, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
-           FROM tenants t LEFT JOIN tenant_infra i ON i.tenant_id = t.id WHERE t.slug = $1 LIMIT 1`,
-        [slug]
-      )
-    ).rows[0]
-    const ctx: TenantContextType | null = r?.rds_endpoint
-      ? {
-          tenantId: r.id,
-          slug: r.slug,
-          displayName: r.display_name ?? null,
-          plan: null,
-          infra: {
-            rdsEndpoint: r.rds_endpoint,
-            rdsDb: r.rds_db || 'jeffi_stores',
-            rdsPort: r.rds_port || 5432,
-            rdsUser: r.rds_user ?? null,
-            dbSecretRef: r.db_secret_ref ?? null,
-            iamAuth: r.iam_auth !== false,
-            s3Bucket: r.s3_bucket ?? null,
-            region: r.region || 'us-east-1',
-          },
-        }
-      : null
-    storeInfra = { slug, ctx, at: Date.now() }
+    try {
+      storeInfra = { slug, ctx: await lookupStoreInfra(slug), at: Date.now() }
+    } catch (e) {
+      // A slow control plane keeps the last answer: it's the store's own database being probed.
+      if (storeInfra?.slug !== slug) throw e
+    }
   }
   if (!storeInfra.ctx) return 'pending'
-  await getPool(storeInfra.ctx).query('SELECT 1')
-  return 'ok'
+  return pingPool(getPool(storeInfra.ctx))
 }
 
 /**

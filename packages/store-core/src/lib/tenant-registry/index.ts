@@ -122,6 +122,7 @@ export {
   getDraft,
   markDraftSubmitted,
   reopenDraft,
+  restartDraft,
   saveKyc,
   getKyc,
   getTenantWarehouse,
