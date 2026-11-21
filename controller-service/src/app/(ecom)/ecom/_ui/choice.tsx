@@ -58,20 +58,25 @@ function useRoving<T extends string>(options: Choice<T>[], onPick: (v: T) => voi
   return { refs, onKeyDown }
 }
 
-/** Page-level tabs: sand track, ink active pill; scrolls sideways on narrow screens instead of wrapping. */
-export function Segmented<T extends string>({ options, value, onChange, ariaLabel, size = 'md', className = '' }: {
+/** Page-level tabs: sand track, ink active pill; scrolls sideways on narrow screens instead of wrapping. For options that
+ *  don't fit a phone, `wrap`: 'fill' shares the width and wraps long labels (two or three options), 'rows' flows onto
+ *  more rows (many options). */
+export function Segmented<T extends string>({ options, value, onChange, ariaLabel, size = 'md', wrap, className = '' }: {
   options: Choice<T>[]
   value: T
   onChange: (v: T) => void
   ariaLabel?: string
   size?: 'sm' | 'md'
+  wrap?: 'fill' | 'rows'
   className?: string
 }) {
   const { refs, onKeyDown } = useRoving(options, onChange)
-  const pad = size === 'sm' ? 'px-3 py-1.5 text-xs max-sm:min-h-10' : 'px-4 py-1.5 text-sm max-sm:min-h-11'
+  const pad = size === 'sm' ? 'px-3 py-1.5 text-xs max-sm:min-h-10' : 'px-4 py-1.5 text-sm max-sm:min-h-11 max-sm:px-3'
+  const fit = wrap === 'fill' ? 'max-sm:min-w-0 max-sm:flex-1 max-sm:basis-0 max-sm:shrink max-sm:justify-center max-sm:whitespace-normal max-sm:text-center max-sm:leading-tight' : ''
+  const track = wrap === 'fill' ? 'max-sm:flex max-sm:w-full' : wrap === 'rows' ? 'max-sm:flex-wrap max-sm:rounded-3xl' : ''
   return (
     <div role="tablist" aria-label={ariaLabel}
-      className={`ecom-scroll-x inline-flex max-w-full snap-x gap-0.5 overflow-x-auto rounded-full org-sand p-1 ${className}`}>
+      className={`ecom-scroll-x inline-flex max-w-full snap-x gap-0.5 overflow-x-auto rounded-full org-sand p-1 ${track} ${className}`}>
       {options.map((o, i) => {
         const on = o.value === value
         const Icon = o.icon
@@ -79,7 +84,7 @@ export function Segmented<T extends string>({ options, value, onChange, ariaLabe
           <button key={o.value} ref={el => { refs.current[i] = el }} type="button" role="tab" aria-selected={on}
             tabIndex={on ? 0 : -1} disabled={o.disabled} title={o.title}
             onClick={() => onChange(o.value)} onKeyDown={e => onKeyDown(e, i)}
-            className={`inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-colors disabled:opacity-40 ${pad} ${focusRing} ${on ? 'ecom-sel shadow-sm' : 'text-foreground-secondary hover:bg-[var(--org-sand-deep)] hover:text-foreground'}`}>
+            className={`inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-colors disabled:opacity-40 ${pad} ${fit} ${focusRing} ${on ? 'ecom-sel shadow-sm' : 'text-foreground-secondary hover:bg-[var(--org-sand-deep)] hover:text-foreground'}`}>
             {Icon && <Icon className="h-4 w-4" />}
             {o.label}
             {o.count != null && <span className={`text-xs font-medium tabular-nums ${on ? 'opacity-70' : 'text-foreground-muted'}`}>{o.count}</span>}

@@ -143,7 +143,7 @@ export default function BulkDocuments({ seller, prices, balance }: { seller: Sel
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs text-foreground-muted">Type when the CSV has none</span>
-            <Segmented ariaLabel="Default document type" size="sm" value={type} onChange={setType} options={TYPES.map(([k, l]) => ({ value: k, label: l }))} />
+            <Segmented ariaLabel="Default document type" size="sm" wrap="rows" value={type} onChange={setType} options={TYPES.map(([k, l]) => ({ value: k, label: l }))} />
           </div>
           <label className="block text-xs text-foreground-muted">Job name
             <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className={`block h-9 w-full rounded-lg bg-surface-elevated px-3 text-sm text-foreground ${fieldCls}`} />

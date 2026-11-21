@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Search } from 'lucide-react'
-import { fieldInput, primaryBtn } from '../onboard/ui'
+import { fieldInput, fieldRow, primaryBtn } from '../onboard/ui'
 import { inr, type SearchResult } from './types'
 
 const pickBtn = 'inline-flex items-center rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors disabled:opacity-40'
@@ -60,9 +60,9 @@ export default function DomainSearch({ onPick, picked, pickLabel = 'Choose' }: {
 
   return (
     <div className="space-y-3">
-      <form onSubmit={search} className="flex gap-2">
+      <form noValidate onSubmit={search} className="flex gap-2">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="yourbrand or yourbrand.in" aria-label="Domain name" className={`${fieldInput} min-w-0 flex-1`} />
-        <button type="submit" disabled={busy || q.trim().length < 2} className={primaryBtn}>
+        <button type="submit" disabled={busy || q.trim().length < 2} className={`${primaryBtn} ${fieldRow}`}>
           <Search className="h-4 w-4" />
           {busy ? 'Searching…' : 'Search'}
         </button>

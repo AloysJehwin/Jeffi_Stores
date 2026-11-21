@@ -197,6 +197,7 @@ export default function ComputeClient({
                 {what?.classChange && (
                   <Segmented
                     ariaLabel="When to change the database size"
+                    wrap="fill"
                     options={[
                       { value: 'window', label: 'In the maintenance window' },
                       { value: 'now', label: 'Now' },

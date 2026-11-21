@@ -229,7 +229,7 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
       </div>
 
       <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
-        <Segmented ariaLabel="Document type" size="sm" value={type} onChange={setType} options={TYPES.map(t => ({ value: t.key, label: t.label }))} />
+        <Segmented ariaLabel="Document type" size="sm" wrap="rows" value={type} onChange={setType} options={TYPES.map(t => ({ value: t.key, label: t.label }))} />
         <div className="max-h-[80vh] overflow-y-auto rounded-2xl border border-border-default bg-zinc-100 p-3">
           <PdfPreview url={previewUrl} />
         </div>

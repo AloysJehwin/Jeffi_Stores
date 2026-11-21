@@ -4,7 +4,7 @@ export default function Loading() {
   return (
     <ConsoleLoading eyebrow="Finance" title="Payouts" description="Where your sales settle. Changes here are sent to the payment provider straight away.">
       <div className="max-w-xl">
-        <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
+        <div className="rounded-xl border border-border-default bg-surface-elevated p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground mb-2">Settlement account</p>

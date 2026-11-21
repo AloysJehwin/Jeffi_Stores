@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ChoiceCards, Segmented, fieldCls } from '../_ui'
+import { fieldRow } from '../onboard/ui'
 import { BASIC_DB_CLASSES, DEDICATED_PRESETS, PRESETS, PRESET_DB_CLASS, TRAFFIC_BANDS, presetOf, presetSpec, recommendedPresetKey, specKey, withDedicatedDb, withHighAvailability } from '@/lib/compute/presets'
 import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pricing'
 import { LIMITS, PRESET_RANK, fitOf, fittingServers, nodeTier, planCompatibilityError, serverFitErrors, validateSpec, type Fit, type Validation } from '@/lib/compute/validate'
@@ -384,6 +385,7 @@ export function ComputeConfigurator({
             <Segmented<DbMode>
               ariaLabel="Database"
               size="sm"
+              wrap="fill"
               value={dbMode}
               onChange={m => set(shapeOf('basic', m, false, current))}
               options={[
@@ -487,6 +489,7 @@ export function ComputeConfigurator({
             <Segmented<DbMode>
               ariaLabel="Database"
               size="sm"
+              wrap="fill"
               value={dbMode}
               onChange={setDbMode}
               options={[
@@ -529,7 +532,7 @@ export function ComputeConfigurator({
             ) : (
               <div className="min-w-0">
                 <span className="mb-1 block text-xs text-foreground-secondary">Database</span>
-                <div className="rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground-secondary">On your server (included)</div>
+                <div className={`flex items-center rounded-xl border border-border-default bg-surface px-3 text-sm text-foreground-secondary ${fieldRow}`}>On your server (included)</div>
               </div>
             )}
             <label className="block min-w-0">

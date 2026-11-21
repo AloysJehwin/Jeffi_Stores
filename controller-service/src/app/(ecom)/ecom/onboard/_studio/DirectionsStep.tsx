@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ArrowLeft, Loader2, RefreshCw, Shuffle, Sparkles } from 'lucide-react'
 import { paletteFrom } from '@jeffi/site-blocks'
 import { choiceCardCls, SelectedMark } from '../../_ui'
-import { fieldInput, ghostBtn, secondaryBtn } from '../ui'
+import { fieldInput, fieldRow, ghostBtn, secondaryBtn } from '../ui'
 import type { DesignDirection } from '@/lib/site/studio/types'
 import { MiniUi } from './StylePreview'
 
@@ -132,6 +132,7 @@ export default function DirectionsStep({
 
       {!locked && (
         <form
+          noValidate
           className="mt-5 flex flex-col gap-2 sm:flex-row"
           onSubmit={async e => {
             e.preventDefault()
@@ -155,7 +156,7 @@ export default function DirectionsStep({
             onChange={e => setAsk(e.target.value)}
             placeholder="Or say what you want: darker, a serif, more green…"
           />
-          <button type="submit" disabled={asking || !ask.trim()} className={secondaryBtn}>
+          <button type="submit" disabled={asking || !ask.trim()} className={`${secondaryBtn} ${fieldRow}`}>
             {asking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {asking ? 'Designing…' : 'Show new looks'}
           </button>

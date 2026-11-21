@@ -73,7 +73,7 @@ function DocForm({ docType, today, number, onSave, onCancel }: { docType: string
   const id = `lic-${docType}`
   return (
     <div className="mt-3 space-y-3 rounded-xl border border-border-default bg-surface p-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <FileField
           id={`${id}-file`}
           label="Document"

@@ -37,6 +37,8 @@
   --cur-bar: var(--org-terracotta);
   --hover-bg: var(--org-sand);
   --focus-halo: 0 0 0 3px rgb(196 106 70 / 0.25);
+  /* the one field height: AdminSelect's trigger, so typed fields, selects and date pickers line up */
+  --ecom-control-h: theme('height.control');
 
   /* legacy aliases used by the dashboard console */
   --console-terracotta: var(--org-terracotta);
@@ -141,6 +143,19 @@
 /* Shape language: pill buttons, rounded inputs */
 .ecom-scope button:not(.org-square):not([class*='rounded']) { border-radius: 9999px; }
 .ecom-scope input:not([type='checkbox']):not([type='radio']), .ecom-scope select, .ecom-scope textarea { border-radius: 0.75rem; }
+
+/* Every single-line field is one height, whatever padding its classes carry: typed inputs (the phone number too), select
+   triggers and date-picker triggers (.field-xs ones stay compact, as in the admin). Textareas still grow with their rows.
+   .ecom-control (fieldRow in onboard/ui) gives a button or box that sits in a row with fields the same height. */
+.ecom-scope input:not(.field-xs):where(:not([type]), [type='text'], [type='search'], [type='email'], [type='url'], [type='tel'], [type='number'], [type='password']),
+.ecom-scope select,
+.ecom-scope button[role='combobox']:not(.field-xs),
+.ecom-scope [data-datepicker-trigger],
+.ecom-scope .ecom-control {
+  height: var(--ecom-control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+}
 
 /* Pages in the console frame (dashboard, onboarding) have their own rail, so the marketing top nav steps aside. */
 .ecom-scope:has(> main .ecom-console) > header { display: none; }

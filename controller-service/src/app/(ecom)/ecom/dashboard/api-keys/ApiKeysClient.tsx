@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { SandTableLoading } from '../_components/Skeleton'
 import { Card } from '../_components/Card'
 import { ChoiceChips, fieldCls } from '../../_ui'
+import { fieldRow } from '../../onboard/ui'
 
 const KEY_COLUMNS = ['Name', 'Key', 'Scopes', '30-day use', 'Last used', '']
 
@@ -94,7 +95,7 @@ export default function ApiKeysClient({ services, docsUrl }: { services: { messa
         <Card title="Create a key">
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-end">
             <label className="block"><span className="text-xs text-foreground-muted">Name</span><input value={name} onChange={e => setName(e.target.value)} placeholder="Production backend" className={`mt-1 w-full rounded-xl bg-surface-elevated px-4 py-2.5 text-sm ${fieldCls}`} /></label>
-            <button onClick={create} disabled={busy || name.length < 1 || scopes.length === 0} className="ecom-accent-bg rounded-full px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Create key</button>
+            <button onClick={create} disabled={busy || name.length < 1 || scopes.length === 0} className={`ecom-accent-bg rounded-full px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40 ${fieldRow}`}>Create key</button>
           </div>
           <ChoiceChips multiple ariaLabel="Scopes" className="mt-4" value={scopes} onChange={setScopes}
             options={SCOPES.filter(([, , s]) => !s || services[s]).map(([k, l]) => ({ value: k, label: l }))} />

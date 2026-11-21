@@ -123,7 +123,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
   return (
     <div className="max-w-xl space-y-6">
       {bank && !editing && (
-        <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
+        <div className="rounded-xl border border-border-default bg-surface-elevated p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-foreground">Settlement account</p>
@@ -201,7 +201,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
       )}
 
       {editing && (
-        <div className="rounded-xl border border-border-default bg-surface-elevated p-5 space-y-4">
+        <div className="rounded-xl border border-border-default bg-surface-elevated p-6 space-y-4">
           <p className="text-sm font-semibold text-foreground">
             {bank ? 'Update settlement account' : 'Add a settlement account'}
           </p>

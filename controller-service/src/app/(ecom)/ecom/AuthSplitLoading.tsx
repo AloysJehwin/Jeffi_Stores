@@ -43,8 +43,8 @@ export default function AuthSplitLoading({ mode }: { mode: 'signup' | 'signin' }
             {mode === 'signup' ? 'Start selling on your own Jeffi-powered store.' : 'Sign in to your store dashboard.'}
           </p>
           <div className="mt-6 space-y-4">
-            {mode === 'signup' && <Sk className="h-12 w-full rounded-xl" />}
-            <Sk className="h-12 w-full rounded-xl" />
+            {mode === 'signup' && <Sk className="h-control w-full rounded-xl" />}
+            <Sk className="h-control w-full rounded-xl" />
             <Sk className="h-12 w-full rounded-full" />
             <Sk className="h-12 w-full rounded-full" />
           </div>

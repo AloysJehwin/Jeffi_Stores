@@ -108,7 +108,7 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
   const form = (
     <Card title="New bulk send">
       <div className="space-y-5">
-        <Segmented<Channel> ariaLabel="Channel" value={channel} onChange={k => { setChannel(k); setFile(null) }}
+        <Segmented<Channel> ariaLabel="Channel" size="sm" value={channel} onChange={k => { setChannel(k); setFile(null) }}
           options={CHANNELS.map(c => ({ value: c.key, label: c.label, icon: c.icon }))} />
 
         <div>
