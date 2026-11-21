@@ -11,19 +11,19 @@
     "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/mobile/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs"
   },
   "dependencies": {
-    "@jeffi/tenancy": "*",
-    "fastify": "^5.2.1",
+    "@aws-sdk/client-secrets-manager": "^3.1110.0",
     "@fastify/rate-limit": "^10.2.1",
+    "@jeffi/tenancy": "*",
+    "fastify": "^5.12.8",
     "ioredis": "^5.4.1",
     "pg": "^8.13.0",
-    "undici": "^7.1.0",
     "tsx": "^4.19.2",
-    "@aws-sdk/client-secrets-manager": "^3.1110.0"
+    "undici": "^7.30.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/pg": "^8.11.10",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.12"
   }
 }

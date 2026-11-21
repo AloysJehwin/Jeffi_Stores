@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { ZodError } from 'zod'
 import { RenderDocumentRequest, DocumentType, DocumentSettingsUpdate, DocumentFont, BulkDocumentsRequest } from '@jeffi/api-contracts'
 import { createJob, getJob, listJobs, listItems, cancelJob, retryJob, jobToApi, startWorker, BulkItemError, type BulkJobRow } from '@jeffi/bulk'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { documentPriceInr } from '@jeffi/pricing'
 import { getFinancialYear, generateInvoiceNumber } from '@jeffi/gst'
@@ -215,7 +215,7 @@ app.get<{ Params: { id: string } }>('/documents/bulk/:id/zip', async (req, reply
   const docs = (await db.query<DocRow>(
     `SELECT d.* FROM bulk_job_items i JOIN documents d ON d.id = i.result_id WHERE i.job_id=$1 AND i.status='done' ORDER BY i.seq`, [job.id])).rows
   if (!docs.length) return reply.code(404).send({ error: 'not_found', message: 'No documents in this job yet' })
-  const zip = archiver('zip', { zlib: { level: 1 } })
+  const zip = new ZipArchive({ zlib: { level: 1 } })
   reply.header('content-type', 'application/zip').header('content-disposition', `attachment; filename="documents-${job.id.slice(0, 8)}.zip"`)
   void (async () => {
     const used = new Set<string>()
