@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import { Linking, Pressable, View } from 'react-native'
+import { Linking, Pressable, View, type HostInstance } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -129,7 +129,7 @@ export default function ProductReviews({
 }: {
   productId: string
   productSlug: string
-  sectionRef: RefObject<View | null>
+  sectionRef: RefObject<HostInstance | null>
 }) {
   const router = useRouter()
   const user = useAuthStore(s => s.user)

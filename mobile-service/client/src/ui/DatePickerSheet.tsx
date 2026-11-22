@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Keyboard, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { Keyboard, Modal, Pressable, ScrollView, Text, View, type ScrollViewInstance } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, { FadeIn, FadeInLeft, FadeInRight, ZoomIn } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -305,7 +305,7 @@ function DayGrid({
 }
 
 function YearGrid({ from, to, view, sel, onPick }: { from: number; to: number; view: number; sel: number | null; onPick: (y: number) => void }) {
-  const ref = useRef<ScrollView>(null)
+  const ref = useRef<ScrollViewInstance>(null)
   const jumped = useRef(false)
   const years = Array.from({ length: to - from + 1 }, (_, i) => from + i)
   const rows = Array.from({ length: Math.ceil(years.length / 4) }, (_, r) => years.slice(r * 4, r * 4 + 4))

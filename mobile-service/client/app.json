@@ -6,13 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "scheme": "jeffistores",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a1b23"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.jeffistores.app",
@@ -25,7 +19,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#8CC84C"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.jeffistores.app",
       "googleServicesFile": "./google-services.json"
@@ -110,7 +103,16 @@
       ],
       "expo-document-picker",
       "expo-web-browser",
-      "./plugins/withUpiQueries"
+      "./plugins/withUpiQueries",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#1a1b23"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

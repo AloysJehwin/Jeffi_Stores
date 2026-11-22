@@ -126,12 +126,12 @@ export default function TransactionsScreen() {
           />
         )}
       </ChipGroup>
-    ) : null
+    ) : undefined
 
   return (
     <Screen title="Transactions" mode="none">
       {!user || list.loading ? (
-        <FlatList data={[]} renderItem={null} ListHeaderComponent={<TransactionsLoading />} />
+        <FlatList data={[]} renderItem={() => null} ListHeaderComponent={<TransactionsLoading />} />
       ) : (
         <FlatList
           data={filtered}
@@ -150,7 +150,7 @@ export default function TransactionsScreen() {
                 actionLabel="Browse products"
                 onAction={() => router.navigate('/(tabs)/products')}
               />
-            ) : null
+            ) : undefined
           }
           ListFooterComponent={
             <View className="px-4">

@@ -1,5 +1,5 @@
 import { useEffect, useState, type Ref } from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
+import { StyleSheet, TextInput, View, type TextInputInstance } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated'
 import { Text } from './Text'
 import { useMotion } from './motion'
@@ -16,7 +16,7 @@ export function OtpField({
 }: {
   value: string
   onChange: (v: string) => void
-  inputRef?: Ref<TextInput>
+  inputRef?: Ref<TextInputInstance>
   /** Bump to wobble the row (a wrong code). */
   shake?: number
   length?: number

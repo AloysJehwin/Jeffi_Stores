@@ -348,7 +348,7 @@ export default function WishlistScreen() {
   }
 
   const refreshControl = (
-    <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={t.accent500} colors={[t.accent500]} progressBackgroundColor={t.surfaceElevated} />
+    <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} tintColor={t.accent500} colors={[t.accent500]} progressBackgroundColor={t.surfaceElevated} />
   )
 
   if (items.length === 0) {
@@ -384,7 +384,7 @@ export default function WishlistScreen() {
         maxToRenderPerBatch={2}
         windowSize={9}
         refreshing={isRefetching}
-        onRefresh={refetch}
+        onRefresh={() => void refetch()}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 0 }}
         ListHeaderComponent={

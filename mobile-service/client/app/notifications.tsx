@@ -157,7 +157,7 @@ export default function NotificationsScreen() {
           ItemSeparatorComponent={() => <View className="h-3" />}
           contentContainerStyle={{ paddingTop: 16, paddingBottom: bottom, flexGrow: items.length ? undefined : 1 }}
           ListEmptyComponent={<EmptyState fill icon={BellOff} title="No notifications yet" message="Order updates, account alerts and offers will show up here." />}
-          ListFooterComponent={q.isFetchingNextPage ? <Spinner fill={false} className="py-6" /> : null}
+          ListFooterComponent={q.isFetchingNextPage ? <Spinner fill={false} className="py-6" /> : undefined}
           onEndReached={() => {
             if (q.hasNextPage && !q.isFetchingNextPage) void q.fetchNextPage()
           }}

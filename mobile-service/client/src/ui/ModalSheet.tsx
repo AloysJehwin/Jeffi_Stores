@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type Ref } from 'react'
-import { Modal, View, type ScrollView } from 'react-native'
+import { Modal, View, type ScrollView, type ScrollViewInstance } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { X } from 'lucide-react-native'
 import { BottomSheet, SheetFooter } from './BottomSheet'
@@ -21,7 +21,7 @@ export interface ModalSheetProps {
   /** After the slide-out (a parent that mounts the sheet only while open can unmount it then). */
   onClosed?: () => void
   dismissible?: boolean
-  scrollRef?: Ref<ScrollView>
+  scrollRef?: Ref<ScrollViewInstance>
 }
 
 export function ModalSheet({ open, onClose, title, subtitle, children, footer, maxHeightRatio, onClosed, dismissible, scrollRef }: ModalSheetProps) {

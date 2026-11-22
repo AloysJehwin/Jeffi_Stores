@@ -170,12 +170,13 @@ jobs:
           - { app: public-api, run: npm --prefix public-api-service run typecheck }
           - { app: mobile, run: npm --prefix mobile-service run typecheck }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform run typecheck }
-          - { app: mobile-app, install: npm --prefix mobile-service/client ci, run: npm --prefix mobile-service/client run typecheck }
+          - { app: mobile-app, node: 22, install: npm --prefix mobile-service/client ci, run: npm --prefix mobile-service/client run typecheck }
           - { app: cli, run: npx tsc --noEmit -p packages/cli/tsconfig.json }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
         with:
+          node-version: ${{ matrix.node || 20 }}
           install: ${{ matrix.install }}
       # The apps' checks load store-core's site themes and blocks; tsc outgrows Node's default heap.
       - run: ${{ matrix.run }}
@@ -190,14 +191,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # A PR may not add or upgrade to a dependency with a known vulnerability, of any severity, in any manifest
-      # (npm lockfiles, the PaddleOCR requirements). The allowed GHSAs are .github/audit-allowlist.json's.
+      # (npm lockfiles, the PaddleOCR requirements). An exception goes in .github/audit-allowlist.json and in allow-ghsas.
       - name: No new vulnerable dependencies
         if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: low
           comment-summary-in-pr: on-failure
-          allow-ghsas: GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr, GHSA-qr28-fpjm-wq7f, GHSA-vcc3-ghjq-m6fr
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       # Every lockfile stays clean, whatever the change: an advisory outside the allowlist fails the run.
@@ -602,7 +602,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # Expo SDK 58 needs Node 22.13+
           cache: npm
           cache-dependency-path: mobile-service/client/package-lock.json
       - run: npm --prefix mobile-service/client ci

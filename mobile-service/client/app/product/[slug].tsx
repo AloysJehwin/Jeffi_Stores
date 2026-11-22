@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { ScrollView, Share, View } from 'react-native'
+import { ScrollView, Share, View, type HostInstance } from 'react-native'
 import { CircleCheck, Heart, Share2 } from 'lucide-react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
@@ -48,6 +48,7 @@ import FeaturedForYou from '../../src/components/pdp/FeaturedForYou'
 import { RequestQuoteSheet } from '../../src/components/business/RequestQuoteSheet'
 import { useBusiness } from '../../src/components/account/hooks'
 import { resolveReturnPolicy } from '../../src/lib/return-policy'
+import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller'
 
 // Mirror of controller-service app/(storefront)/products/[slug]/page.tsx + ProductDetailClient at the mobile breakpoint.
 
@@ -155,11 +156,11 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
   const compareCount = useCompareStore(s => s.compareList.length)
   const wishlist = useWishlistToggle(product.id)
 
-  const scrollRef = useRef<ScrollView>(null)
-  const contentRef = useRef<View>(null)
-  const optionsRef = useRef<View>(null)
-  const buyRef = useRef<View>(null)
-  const reviewsRef = useRef<View>(null)
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null)
+  const contentRef = useRef<HostInstance>(null)
+  const optionsRef = useRef<HostInstance>(null)
+  const buyRef = useRef<HostInstance>(null)
+  const reviewsRef = useRef<HostInstance>(null)
   const [viewportH, setViewportH] = useState(0)
   const [buyBottom, setBuyBottom] = useState<number | null>(null)
   const [pastControls, setPastControls] = useState(false)
@@ -239,14 +240,14 @@ function ProductDetail({ product, initialSku }: { product: PdpProduct; initialSk
     })
   }, [product.id])
 
-  const measure = (ref: RefObject<View | null>, cb: (y: number, h: number) => void) => {
+  const measure = (ref: RefObject<HostInstance | null>, cb: (y: number, h: number) => void) => {
     const node = ref.current
     const content = contentRef.current
     if (!node || !content) return
     node.measureLayout(content, (_x, y, _w, h) => cb(y, h), () => {})
   }
   const remeasure = () => measure(buyRef, (y, h) => setBuyBottom(y + h))
-  const scrollToRef = (ref: RefObject<View | null>, center = false) =>
+  const scrollToRef = (ref: RefObject<HostInstance | null>, center = false) =>
     measure(ref, (y, h) => scrollRef.current?.scrollTo({ y: Math.max(0, center ? y - (viewportH - h) / 2 : y - 8), animated: true }))
 
   const handleShare = async () => {

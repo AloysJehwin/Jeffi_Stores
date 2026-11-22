@@ -1,5 +1,5 @@
 import { createContext, forwardRef, useContext } from 'react'
-import { Text as RNText, type TextProps as RNTextProps } from 'react-native'
+import { Text as RNText, type HostInstance, type TextProps as RNTextProps } from 'react-native'
 import { cn } from './cn'
 
 export type TextProps = RNTextProps & { className?: string }
@@ -23,7 +23,7 @@ function withDefaults(className = '', colour = 'text-foreground', family = 'font
 const Nested = createContext(false)
 
 /** React Native's Text in the app's body face (Inter). Use it wherever a raw Text would go. */
-export const Text = forwardRef<RNText, TextProps>(function Text({ className, children, ...props }, ref) {
+export const Text = forwardRef<HostInstance, TextProps>(function Text({ className, children, ...props }, ref) {
   const nested = useContext(Nested)
   return (
     <RNText ref={ref} className={nested ? className : withDefaults(className)} {...props}>
@@ -33,7 +33,7 @@ export const Text = forwardRef<RNText, TextProps>(function Text({ className, chi
 })
 
 function preset(base: string, opts: { colour?: string; family?: string; header?: boolean } = {}) {
-  return forwardRef<RNText, TextProps>(function Preset({ className, children, ...props }, ref) {
+  return forwardRef<HostInstance, TextProps>(function Preset({ className, children, ...props }, ref) {
     return (
       <RNText
         ref={ref}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AccessibilityInfo, Dimensions, View } from 'react-native'
+import { AccessibilityInfo, Dimensions, View, type HostInstance } from 'react-native'
 import { Card, Overline, Text } from '../../ui'
 import { Grid } from './layout'
 import { num } from '../../lib/format'
@@ -21,7 +21,7 @@ function friendlyCount(n: number): string {
 
 export default function ValueStats({ section, data }: SectionProps) {
   const stats = (data.extras[section.id] as ValueStat[] | undefined) ?? []
-  const ref = useRef<View>(null)
+  const ref = useRef<HostInstance>(null)
   // Final figures first; the count-up only replays for a band still below the fold (30% visible starts it).
   const [progress, setProgress] = useState(1)
   const armed = useRef(false)

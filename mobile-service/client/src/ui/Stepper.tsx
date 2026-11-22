@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { TextInput, View, type AccessibilityActionEvent, type NativeSyntheticEvent, type TextInputEndEditingEventData } from 'react-native'
+import { TextInput, View, type AccessibilityActionEvent, type TextInputEndEditingEvent, type TextInputInstance } from 'react-native'
 import { Minus, Plus } from 'lucide-react-native'
 import { useTokens } from '../theme'
 import { IconButton } from './Button'
@@ -28,7 +28,7 @@ export function Stepper({
   /** Uncontrolled; pair with `inputKey` to reset it when the committed value changes. */
   defaultValue?: string
   onChangeText?: (raw: string) => void
-  onEndEditing?: (e: NativeSyntheticEvent<TextInputEndEditingEventData>) => void
+  onEndEditing?: (e: TextInputEndEditingEvent) => void
   onDecrement?: () => void
   onIncrement?: () => void
   canDecrement?: boolean
@@ -46,7 +46,7 @@ export function Stepper({
 }) {
   const t = useTokens()
   const [focused, setFocused] = useState(false)
-  const input = useRef<TextInput>(null)
+  const input = useRef<TextInputInstance>(null)
   const suffix = itemName ? ` for ${itemName}` : ''
   const steps = !!(onDecrement || onIncrement)
   const locked = !!(disabled || busy)

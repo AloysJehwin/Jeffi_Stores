@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BackHandler, InteractionManager, NativeModules, Platform, View } from 'react-native'
+import { BackHandler, NativeModules, Platform, View } from 'react-native'
 import { Button, Card, Notice, Screen, ScreenHeader, Spinner, Text } from '../../src/ui'
 import { Stack, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -225,7 +225,7 @@ export default function CheckoutPaymentScreen() {
       return
     }
     // Let the push transition settle before the native sheet opens.
-    InteractionManager.runAfterInteractions(() => {
+    requestIdleCallback(() => {
       const run = request.method === 'razorpay' ? payOnline(request) : payOnDelivery(request)
       run.catch((e: unknown) => abort(e instanceof Error && e.message ? e.message : 'Could not reach the server. Please try again.'))
     })

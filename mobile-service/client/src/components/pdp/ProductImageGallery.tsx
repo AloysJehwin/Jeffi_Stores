@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { Pressable, ScrollView, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react-native'
@@ -50,7 +50,7 @@ export default function ProductImageGallery({
   const [index, setIndex] = useState(0)
   const [width, setWidth] = useState(0)
   const [lightbox, setLightbox] = useState(false)
-  const mainRef = useRef<ScrollView>(null)
+  const mainRef = useRef<ScrollViewInstance>(null)
 
   useEffect(() => {
     setIndex(0)
@@ -164,7 +164,7 @@ function GalleryLightbox({
 }) {
   const { width, height } = useWindowDimensions()
   const insets = useSafeAreaInsets()
-  const ref = useRef<ScrollView>(null)
+  const ref = useRef<ScrollViewInstance>(null)
   const go = (i: number) => {
     onIndex(i)
     ref.current?.scrollTo({ x: i * width, animated: true })

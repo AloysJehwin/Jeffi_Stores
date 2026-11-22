@@ -41,9 +41,9 @@ function view(i: Item, lang: string | null): SupportMessage {
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`
 
 export function useAppState(): AppStateStatus {
-  const [state, setState] = useState<AppStateStatus>(AppState.currentState)
+  const [state, setState] = useState<AppStateStatus>((AppState.currentState ?? 'active') as AppStateStatus)
   useEffect(() => {
-    const sub = AppState.addEventListener('change', setState)
+    const sub = AppState.addEventListener('change', s => { if (s) setState(s as AppStateStatus) })
     return () => sub.remove()
   }, [])
   return state
