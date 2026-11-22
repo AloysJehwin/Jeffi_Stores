@@ -7,11 +7,11 @@ const r = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
-    // Own 80% gate (the coverage effort). Measured 2026-11-22; floored; ratchet toward 80 — only goes UP.
+    // Own 80% gate (the coverage effort). Reached 80 on all four 2026-11-22 (measured 88.5/81/83.2/90.1); LOCKED at 80.
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      thresholds: { lines: 57, branches: 48, statements: 59, functions: 47 },
+      thresholds: { lines: 80, branches: 80, statements: 80, functions: 80 },
     },
   },
   resolve: {
