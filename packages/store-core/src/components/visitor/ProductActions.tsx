@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
+import { useFlyToCart } from '@/contexts/FlyToCartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -175,6 +176,7 @@ export function useProductPurchase({
   const isDiscontinued = !!discontinueDate && new Date(discontinueDate) <= today
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const { addToCart, cartItems } = useCart()
+  const fly = useFlyToCart()
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
@@ -553,7 +555,7 @@ export function useProductPurchase({
     trackViewItem({ sku: displaySku, name: productName, price: effectivePrice, variant: selectedOptionName })
   }, [displaySku, productName, effectivePrice, selectedOptionName])
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (origin?: HTMLElement | null) => {
     if (addBlocked) {
       showToast(unitCapError(qtyMax, cartCap.inCart, quantity) ?? 'Max quantity already in cart', 'error')
       return
@@ -572,6 +574,7 @@ export function useProductPurchase({
         effectiveUnitKey,
         selectedSubVariantId || undefined
       )
+      fly?.flyToCart(origin ?? null)
       trackAddToCart({
         sku: displaySku,
         name: productName,
@@ -1165,7 +1168,7 @@ export function BuyNowButton({ s, label = 'Buy Now' }: { s: ProductPurchase; lab
 export function AddToCartButton({ s, label = 'Add to Cart' }: { s: ProductPurchase; label?: string }) {
   return (
     <button
-      onClick={s.handleAddToCart}
+      onClick={e => s.handleAddToCart(e.currentTarget)}
       disabled={!s.is_active || s.effectiveStock === 0 || s.isAddingToCart || s.isPreLaunch || s.isDiscontinued || s.addBlocked}
       className={ADD_CLS}
     >

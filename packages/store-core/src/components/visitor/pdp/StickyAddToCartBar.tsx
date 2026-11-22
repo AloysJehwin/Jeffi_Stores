@@ -19,7 +19,7 @@ interface StickyAddToCartBarProps {
   unitLabel?: string | null
   quantity: number
   adding: boolean
-  onAdd: () => void
+  onAdd: (origin?: HTMLElement | null) => void
   /** Digital products: the primary action is Buy Now, never Add to Cart. */
   buyNow?: boolean
 }
@@ -87,7 +87,7 @@ export default function StickyAddToCartBar({
         {action === 'add' ? (
           <button
             type="button"
-            onClick={onAdd}
+            onClick={e => onAdd(e.currentTarget)}
             disabled={adding}
             className="shrink-0 inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 sm:px-6 py-2.5 min-h-[44px] lg:min-h-0 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >

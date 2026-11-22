@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { getScopeForPath, hasScope, TENANT_SCOPE_KEYS, ADMIN_SCOPES } from '@/lib/auth/scopes'
 import { canUseAi } from '@/lib/auth/ai-scope'
@@ -7,7 +7,9 @@ import { COMPARISON_ROWS } from '@/lib/tenant-registry/owners'
 import { MANAGE_SCOPE } from '@/lib/google-ads/manage-route'
 
 const seed = readFileSync(join(__dirname, '../../../../../controller-service/database/seeds/seed-plans.sql'), 'utf8')
-const matrix = readFileSync(join(__dirname, '../../../../../docs/PLAN_FEATURE_MATRIX.md'), 'utf8')
+// Lives at the workspace root, outside this repo; absent when store-core is checked out on its own (CI).
+const matrixPath = join(__dirname, '../../../../../docs/PLAN_FEATURE_MATRIX.md')
+const matrix = existsSync(matrixPath) ? readFileSync(matrixPath, 'utf8') : null
 
 describe('google_ads_campaigns:write (campaign management)', () => {
   it('is a tenant scope in the Marketing group', () => {
@@ -43,6 +45,7 @@ describe('google_ads_campaigns:write (campaign management)', () => {
 
   it('shows in the plan comparison and the feature matrix', () => {
     expect(COMPARISON_ROWS.some(r => r.scopeKey === MANAGE_SCOPE)).toBe(true)
-    expect(matrix).toMatch(/`google_ads_campaigns:write` \| ❌ \| ❌ \| ✅ \| ✅/)
+    // The feature-matrix doc lives at the workspace root; assert only when it is present (not in store-core's standalone CI).
+    if (matrix) expect(matrix).toMatch(/`google_ads_campaigns:write` \| ❌ \| ❌ \| ✅ \| ✅/)
   })
 })

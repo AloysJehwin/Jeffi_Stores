@@ -13,9 +13,11 @@ import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { StoreLogoMark } from './site/code/parts/chrome/marks'
 import CartLink from './site/code/parts/chrome/CartLink'
+import { useCartPulse } from '@/lib/client/use-cart-pulse'
 
 export default function Header() {
   const { cartCount } = useCart()
+  const cartPulse = useCartPulse(cartCount)
   const { count: wishlistCount } = useWishlist()
   const { identity, storefront, chrome } = useStoreConfig()
   // Site Builder's menu links when set; the first three always show, the rest from xl up so no label wraps.
@@ -106,7 +108,7 @@ export default function Header() {
                 </svg>
                 {/* Phones keep the cart in the drawer, so its count rides on the menu button. */}
                 {cartCount > 0 && (
-                  <span className="sm:hidden absolute top-0.5 right-0.5 bg-accent-500 text-white text-xs font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center">
+                  <span className={`sm:hidden absolute top-0.5 right-0.5 bg-accent-500 text-white text-xs font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center transition-transform duration-300 ${cartPulse ? 'animate-cart-pulse' : ''}`}>
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
                 )}

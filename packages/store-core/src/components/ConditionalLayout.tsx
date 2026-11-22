@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Header from './visitor/Header'
 import { CartProvider } from '@/contexts/CartContext'
+import { FlyToCartProvider } from '@/contexts/FlyToCartContext'
 import { WishlistProvider } from '@/contexts/WishlistContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -82,7 +83,8 @@ export default function ConditionalLayout({
       <ThemeProvider>
         <AuthProvider>
           <CartProvider>
-            <WishlistProvider>
+            <FlyToCartProvider>
+              <WishlistProvider>
               <ToastProvider>
                 <ConfirmProvider>
                   <CompareProvider>
@@ -114,6 +116,7 @@ export default function ConditionalLayout({
                 </ConfirmProvider>
               </ToastProvider>
             </WishlistProvider>
+            </FlyToCartProvider>
           </CartProvider>
         </AuthProvider>
       </ThemeProvider>
