@@ -1,0 +1,32 @@
+{
+  "advisories": [
+    {
+      "id": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "project": "mobile-service/client",
+      "reason": "Metro (Expo SDK 54) passes image-size file paths, which the fixed 2.x no longer accepts. Build-time only; fixed by the Expo SDK upgrade.",
+      "review_by": "2027-02-28"
+    },
+    {
+      "id": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "project": "mobile-service/client",
+      "reason": "Metro (Expo SDK 54) passes image-size file paths, which the fixed 2.x no longer accepts. Build-time only; fixed by the Expo SDK upgrade.",
+      "review_by": "2027-02-28"
+    },
+    {
+      "id": "GHSA-qr28-fpjm-wq7f",
+      "package": "decode-uri-component",
+      "project": "mobile-service/client",
+      "reason": "The fix (0.5.1) is ESM-only and expo-router's query-string 7 require()s it. Fixed by the Expo SDK upgrade.",
+      "review_by": "2027-02-28"
+    },
+    {
+      "id": "GHSA-vcc3-ghjq-m6fr",
+      "package": "decode-uri-component",
+      "project": "mobile-service/client",
+      "reason": "The fix (0.5.1) is ESM-only and expo-router's query-string 7 require()s it. Fixed by the Expo SDK upgrade.",
+      "review_by": "2027-02-28"
+    }
+  ]
+}

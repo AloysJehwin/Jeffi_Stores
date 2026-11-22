@@ -186,12 +186,25 @@ jobs:
     name: Security
     runs-on: ubuntu-latest
     needs: init
+    permissions: { contents: read, pull-requests: write } # pull-requests: the dependency review's comment
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/node-setup
-      - name: Dependency audit (advisory)
-        run: npm audit --audit-level=high
-        continue-on-error: true
+      # A PR may not add or upgrade to a dependency with a known vulnerability, of any severity, in any manifest
+      # (npm lockfiles, the PaddleOCR requirements). The allowed GHSAs are .github/audit-allowlist.json's.
+      - name: No new vulnerable dependencies
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: on-failure
+          allow-ghsas: GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr, GHSA-qr28-fpjm-wq7f, GHSA-vcc3-ghjq-m6fr
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      # Every lockfile stays clean, whatever the change: an advisory outside the allowlist fails the run.
+      - name: npm audit (root, ai-platform, mobile app)
+        run: node scripts/audit-gate.mjs
+      - name: pip-audit (PaddleOCR)
+        run: pipx run pip-audit==2.10.1 --requirement ai-platform/paddleocr/requirements.txt --no-deps --disable-pip --progress-spinner off
 
   test:
     name: Unit tests · ${{ matrix.app }}
