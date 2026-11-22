@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1794952001.3128855,
-    "ast_hash": "20c6c31c07b48f9d88b0f9c9fcdd6e8f",
+    "mtime": 1795324821.1668272,
+    "ast_hash": "4879a517426a638ec38907df6e6df0c6",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -32607,6 +32607,11 @@
   "ai-platform/paddleocr/sample.png": {
     "mtime": 1795203837.6847026,
     "ast_hash": "68d59c759fabf87da2b6dd362f350809",
+    "semantic_hash": ""
+  },
+  ".github/audit-allowlist.json": {
+    "mtime": 1795324804.3346772,
+    "ast_hash": "2313f98c00db6951dfafc8c9a881a0a4",
     "semantic_hash": ""
   }
 }
