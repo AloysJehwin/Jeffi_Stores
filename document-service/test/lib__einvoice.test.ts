@@ -3,10 +3,10 @@ import { generateIRN, cancelIRN, isEInvoiceConfigured, __resetTokenCacheForTests
 import type { EInvoicePayload } from '../src/lib/einvoice.js'
 
 const CREDS = {
-  EINVOICE_CLIENT_ID: 'cid',
-  EINVOICE_CLIENT_SECRET: 'secret',
-  EINVOICE_USERNAME: 'user',
-  EINVOICE_PASSWORD: 'pass',
+  EINVOICE_CLIENT_ID: 'test-cid',
+  EINVOICE_CLIENT_SECRET: 'test-fake-value-not-a-secret',
+  EINVOICE_USERNAME: 'test-user',
+  EINVOICE_PASSWORD: 'test-fake-value-not-a-password',
   EINVOICE_GSTIN: '22AAAAA0000A1Z5',
 }
 
