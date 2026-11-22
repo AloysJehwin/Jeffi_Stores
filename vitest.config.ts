@@ -26,26 +26,29 @@ const APP_PROJECTS: [string, string][] = [
 // Pure-logic packages (node env, their own 80% gate). Seeded at the measured floor (a point under) and
 // ratcheted toward 80 as tests land — these only ever go UP. mail-shell/list-filters/site-blocks already
 // get high incidental coverage from store-core tests; the near-zero ones climb with their own suites.
+// design-tokens is handled separately (prebuilt index.js, no src/) — see DESIGN_TOKENS_* below.
 const LOGIC_PACKAGES = [
   'service-auth', 'tenancy', 'wallet', 'pricing', 'gst', 'bulk',
-  'draft-locks', 'list-filters', 'push', 'mail-shell', 'site-blocks', 'api-contracts', 'design-tokens',
+  'draft-locks', 'list-filters', 'push', 'mail-shell', 'site-blocks', 'api-contracts',
 ]
-// Measured 2026-11-22 (floored): per-package {lines,branches,statements,functions}. design-tokens has no
-// executable lines yet → stays 0. Any package not listed defaults to 0.
+// design-tokens ships compiled (index.js, no TypeScript src/). Its gate targets the built file.
+const DESIGN_TOKENS_GLOB = 'packages/design-tokens/index.js'
+const DESIGN_TOKENS_FLOOR = { lines: 0, branches: 0, statements: 0, functions: 0 }
+// Per-package {lines,branches,statements,functions}. Gate = 80 (target, LOCKED) once a package's suite lands
+// and clears it; the rest stay at their measured 2026-11-22 floor and ratchet up. Only ever goes UP.
 const PACKAGE_FLOORS: Record<string, [number, number, number, number]> = {
-  'service-auth': [56, 42, 45, 43],
-  tenancy: [16, 9, 15, 5],
-  wallet: [3, 0, 3, 0],
-  pricing: [57, 27, 52, 33],
-  gst: [0, 0, 0, 0],
-  bulk: [0, 0, 0, 0],
-  'draft-locks': [23, 11, 21, 19],
-  'list-filters': [85, 74, 83, 74],
-  push: [18, 6, 16, 11],
-  'mail-shell': [95, 85, 92, 88],
-  'site-blocks': [68, 53, 64, 56],
-  'api-contracts': [40, 8, 32, 17],
-  'design-tokens': [0, 0, 0, 0],
+  'service-auth': [80, 80, 80, 80],
+  tenancy: [80, 80, 80, 80],
+  wallet: [80, 80, 80, 80],
+  pricing: [80, 80, 80, 80],
+  gst: [80, 80, 80, 80],
+  bulk: [80, 80, 80, 80],
+  'draft-locks': [80, 80, 80, 80],
+  'list-filters': [80, 80, 80, 80],
+  push: [80, 80, 80, 80],
+  'mail-shell': [80, 80, 80, 80],
+  'site-blocks': [80, 80, 80, 80],
+  'api-contracts': [80, 80, 80, 80],
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,6 +81,7 @@ export default defineConfig({
         extends: true as const,
         test: { name: pkg, include: [`packages/${pkg}/tests/**/*.test.{ts,tsx}`], environment: 'node' as const },
       })),
+      { extends: true as const, test: { name: 'design-tokens', include: ['packages/design-tokens/tests/**/*.test.{ts,tsx}'], environment: 'node' } },
     ],
     coverage: {
       provider: 'v8',
@@ -86,6 +90,7 @@ export default defineConfig({
         '{controller,storefront,admin,business,showcase}-service/src/**/*.{ts,tsx}',
         'packages/store-core/src/**/*.{ts,tsx}',
         ...LOGIC_PACKAGES.map((pkg) => `packages/${pkg}/src/**/*.{ts,tsx}`),
+        DESIGN_TOKENS_GLOB,
       ],
       // Per-service glob gates live in SERVICE_GATES (above). Package gates are generated below, seeded at 0 and
       // ratcheted toward 80 as their tests land. The bare lines/branches/... keys are the global floor over any
@@ -100,6 +105,7 @@ export default defineConfig({
                 return [`packages/${pkg}/src/**`, { lines, branches, statements, functions }]
               }),
             ),
+            [DESIGN_TOKENS_GLOB]: DESIGN_TOKENS_FLOOR,
             lines: 36,
             branches: 27,
             statements: 34,
