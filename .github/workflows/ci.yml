@@ -229,11 +229,26 @@ jobs:
           - { app: showcase, part: showcase }
           - { app: store-core, part: store-core }
           - { app: cli, part: cli }
-          - { app: messaging, run: npm --prefix messaging-service test }
-          - { app: documents, run: npm --prefix document-service test }
-          - { app: public-api, run: npm --prefix public-api-service test -- --passWithNoTests }
-          - { app: mobile, run: npm --prefix mobile-service test -- --passWithNoTests }
-          - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform test }
+          # Each package is its own project + glob gate (the 80% effort). Parts merge into Coverage like the apps.
+          - { app: service-auth, part: service-auth }
+          - { app: tenancy, part: tenancy }
+          - { app: wallet, part: wallet }
+          - { app: pricing, part: pricing }
+          - { app: gst, part: gst }
+          - { app: bulk, part: bulk }
+          - { app: draft-locks, part: draft-locks }
+          - { app: list-filters, part: list-filters }
+          - { app: push, part: push }
+          - { app: mail-shell, part: mail-shell }
+          - { app: site-blocks, part: site-blocks }
+          - { app: api-contracts, part: api-contracts }
+          - { app: design-tokens, part: design-tokens }
+          # Standalone services run their own vitest with their own coverage gate (not merged into the root parts).
+          - { app: messaging, run: npm --prefix messaging-service test -- --coverage }
+          - { app: documents, run: npm --prefix document-service test -- --coverage }
+          - { app: public-api, run: npm --prefix public-api-service test -- --coverage --passWithNoTests }
+          - { app: mobile, run: npm --prefix mobile-service test -- --coverage --passWithNoTests }
+          - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform test -- --coverage }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup

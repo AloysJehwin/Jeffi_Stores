@@ -12,6 +12,10 @@
     "typecheck": "tsc -p sdk/tsconfig.json --noEmit && tsc -p gateway/tsconfig.json --noEmit",
     "test": "vitest run --config vitest.config.mts"
   },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.12",
+    "vitest": "^4.1.12"
+  },
   "engines": {
     "node": ">=20"
   }

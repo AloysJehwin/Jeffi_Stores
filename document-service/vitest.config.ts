@@ -5,7 +5,15 @@ const r = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 
 // Lifted monolith tests keep their `@/...` module ids; map them onto the service's layout.
 export default defineConfig({
-  test: { include: ['test/**/*.test.ts'] },
+  test: {
+    include: ['test/**/*.test.ts'],
+    // Own 80% gate (the coverage effort). Measured 2026-11-22; floored; ratchet toward 80 — only goes UP.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      thresholds: { lines: 57, branches: 48, statements: 59, functions: 47 },
+    },
+  },
   resolve: {
     alias: [
       { find: 'next/server', replacement: r('./src/next.ts') },

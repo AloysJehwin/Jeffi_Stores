@@ -5,6 +5,9 @@
 
 # Testing
 /coverage
+# per-service / per-package vitest coverage output
+coverage/
+.vitest-reports/
 
 # Next.js
 /.next/
