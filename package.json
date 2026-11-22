@@ -30,7 +30,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:db": "API_DB=1 vitest run --config vitest.integration.config.ts",
+    "test:db": "API_DB=1 vitest run --config vitest.db.config.ts",
     "setup:test-db": "bash scripts/setup-test-db.sh",
     "sweep:responsive": "playwright test --config playwright.config.ts",
     "format": "prettier --write .",
