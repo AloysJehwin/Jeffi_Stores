@@ -11,7 +11,7 @@ const part = !!process.env.VITEST_PART
 // Untested packages/standalone services start at 0 and climb. `perFile: false` (default): the glob is the aggregate.
 const SERVICE_GATES: Record<string, { lines: number; branches: number; statements: number; functions: number }> = {
   '{controller,storefront,admin,business,showcase}-service/src/**': { lines: 28, branches: 21, statements: 27, functions: 12 },
-  'packages/store-core/src/**': { lines: 44, branches: 34, statements: 42, functions: 33 },
+  'packages/store-core/src/**': { lines: 46, branches: 36, statements: 45, functions: 36 },
 }
 
 // Root projects: apps + every package gets its own, so `npx vitest --project <name> --coverage` is a real per-unit gate.
