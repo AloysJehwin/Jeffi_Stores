@@ -3,6 +3,7 @@ import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenan
 import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
+import { appForSource } from '@/lib/integrations/own-apps'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,9 +23,10 @@ export async function GET(request: NextRequest) {
   const code = params.get('spapi_oauth_code')
   if (!code) return fail('missing_params')
 
-  const clientId = process.env.AMAZON_LWA_APP_CLIENT_ID
-  const clientSecret = process.env.AMAZON_LWA_APP_CLIENT_SECRET
-  if (!clientId || !clientSecret) return fail('not_configured')
+  // The app that opened the consent screen; its LWA client is stored with the token, as before.
+  const app = await appForSource(state.tenantId, 'amazon_seller', state.app)
+  if (!app) return fail('not_configured')
+  const { clientId, clientSecret } = app
 
   try {
     const res = await fetch('https://api.amazon.com/auth/o2/token', {

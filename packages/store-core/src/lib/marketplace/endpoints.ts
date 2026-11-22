@@ -81,6 +81,32 @@ const DEFAULTS: Record<MarketplaceChannel, ChannelEndpoints> = {
     rateLimit: { perSecond: 5 },
     tokenTtlSecs: 3600,
   },
+  // Flipkart Marketplace Seller API v3 (seller.flipkart.com/api-docs). The token is a client-credentials
+  // GET with Basic app id:secret; orders are shipments. Ack, listing tasks and settlements have no
+  // Flipkart call (settlements come from the Seller Hub report). Sandbox host unconfirmed in the docs.
+  flipkart: {
+    baseUrl: 'https://api.flipkart.net',
+    sandboxBaseUrl: 'https://sandbox-api.flipkart.net',
+    paths: {
+      token: '/oauth-service/oauth/token',
+      inventory: '/sellers/listings/v3/update/inventory',
+      orderAction: '/sellers/v3/shipments/{action}',
+      ack: '/sellers/v3/shipments/filter/',
+      label: '/sellers/v3/shipments/{packetId}/labels',
+      invoice: '/sellers/v3/shipments/{packetId}/labels',
+      manifest: '/sellers/v3/shipments/manifest',
+      manifestDocument: '/sellers/v3/shipments/manifest',
+      invoiceUpload: '/sellers/v3/shipments/labels',
+      listings: '/sellers/listings/v3',
+      listingTask: '/sellers/listings/v3/details',
+      returns: '/sellers/v2/returns/{action}',
+      settlements: '/sellers/v2/returns',
+    },
+    headers: { pushToken: 'x-push-token', auth: 'Authorization', authScheme: 'Bearer' },
+    batch: { inventory: 10, listings: 10, manifest: 100 },
+    rateLimit: { perSecond: 5 },
+    tokenTtlSecs: 3600,
+  },
 }
 
 const url = z.string().url().refine(u => u.startsWith('https://'), 'must be https')
@@ -94,7 +120,7 @@ const channelOverride = z.object({
   rateLimit: z.object({ perSecond: z.number().positive() }).partial().optional(),
   tokenTtlSecs: z.number().int().positive().optional(),
 })
-export const endpointsOverrideSchema = z.object({ myntra: channelOverride.optional(), ajio: channelOverride.optional() })
+export const endpointsOverrideSchema = z.object({ myntra: channelOverride.optional(), ajio: channelOverride.optional(), flipkart: channelOverride.optional() })
 export type EndpointsOverride = z.infer<typeof endpointsOverrideSchema>
 
 let cached: { raw: string | undefined; value: EndpointsOverride } | null = null

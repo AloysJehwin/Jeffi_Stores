@@ -100,3 +100,21 @@ CREATE SEQUENCE public.channel_change_log_id_seq
 
 ALTER SEQUENCE public.channel_change_log_id_seq OWNED BY public.channel_change_log.id;
 ALTER TABLE ONLY public.channel_change_log ALTER COLUMN id SET DEFAULT nextval('public.channel_change_log_id_seq'::regclass);
+
+--
+-- Name: channel_brand_approvals; Type: TABLE; Schema: public; Owner: -
+-- Whether a brand may be pushed to a sales channel (Amazon brand gating, a marketplace's brand
+-- authorisation, or a brand the store keeps off Google). Pushes skip brands that aren't allowed.
+--
+
+CREATE TABLE public.channel_brand_approvals (
+    channel character varying(16) NOT NULL,
+    brand_id uuid NOT NULL,
+    status character varying(16) NOT NULL,
+    source character varying(24) DEFAULT 'manual'::character varying NOT NULL,
+    note text,
+    approval_url text,
+    checked_at timestamp with time zone,
+    updated_by text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);

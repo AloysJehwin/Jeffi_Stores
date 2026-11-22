@@ -8,6 +8,7 @@ import {
   MerchantSyncInProgressError,
 } from '@/lib/merchant/sync'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
+import { parsePushScope } from '@/lib/channels/brand-approvals'
 
 function isSameOriginRequest(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const productId: string | undefined = body.productId
+  // `brandIds` / `categoryIds` push only those brands or categories (a category includes its sub-categories).
+  const scope = parsePushScope(body)
 
   try {
     if (productId) {
@@ -49,11 +52,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, mode: 'single' })
     }
 
-    const result = await syncAllProductsToMerchant()
+    const result = await syncAllProductsToMerchant(scope)
     if (result.errors.length > 0) {
       await sendSyncFailureEmail(result)
     }
-    return NextResponse.json({ success: true, mode: 'full', ...result })
+    return NextResponse.json({ success: true, mode: scope ? 'scoped' : 'full', ...result })
   } catch (err: any) {
     if (err instanceof MerchantSyncInProgressError) {
       return NextResponse.json({ error: err.message, inProgress: true }, { status: 409 })

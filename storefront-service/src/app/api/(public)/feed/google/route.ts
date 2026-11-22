@@ -7,6 +7,7 @@ import { getStorefrontContent } from '@/lib/catalog/site-controls'
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
 import { gmcAgeGroup, gmcCondition, gmcGender, gmcMultipack } from '@/lib/merchant/attributes'
 import { clipTitle, hasIdentifiers, listedPrices } from '@/lib/merchant/item-rules'
+import { loadBrandGate } from '@/lib/channels/brand-approvals'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,9 @@ function escapeXml(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const idList = (v: string | null) => [...new Set((v ?? '').split(',').map(x => x.trim()).filter(x => UUID.test(x)))].slice(0, 500)
 
 function priceXml(selling: number, mrp: number | null): string {
   const { price, salePrice } = listedPrices(selling, mrp)
@@ -37,8 +41,18 @@ export async function GET(request: NextRequest) {
   }
 
   const baseUrl = await catalogBaseUrl()
+  // ?channel=meta_ads serves the Meta catalogue (its own brand approvals); ?brands= / ?categories=
+  // (comma-separated ids, categories include their sub-categories) narrow the feed.
+  const params = new URL(request.url).searchParams
+  const gate = await loadBrandGate(params.get('channel') === 'meta_ads' ? 'meta_ads' : 'gmc')
+  const brandIds = idList(params.get('brands'))
+  const categoryIds = idList(params.get('categories'))
 
-  const products = await queryMany(`
+  const rows = await queryMany(`
+    WITH RECURSIVE picked AS (
+      SELECT id FROM categories WHERE id = ANY($2::uuid[])
+      UNION SELECT c.id FROM categories c JOIN picked ON c.parent_category_id = picked.id
+    )
     SELECT p.*,
       json_build_object(
         'id', c.id, 'name', c.name, 'slug', c.slug,
@@ -62,8 +76,11 @@ export async function GET(request: NextRequest) {
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.is_draft = false AND p.is_digital = false
+      AND (cardinality($1::uuid[]) = 0 OR p.brand_id = ANY($1::uuid[]))
+      AND (cardinality($2::uuid[]) = 0 OR p.category_id IN (SELECT id FROM picked))
     ORDER BY p.created_at DESC
-  `)
+  `, [brandIds, categoryIds])
+  const products = rows.filter((p: any) => gate.allows(p.brand_id))
 
   const items: string[] = []
   // product_media images (primary first), with variant / sub-variant inheritance.

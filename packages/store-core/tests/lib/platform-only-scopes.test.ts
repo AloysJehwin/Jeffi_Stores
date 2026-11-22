@@ -51,7 +51,7 @@ describe('control-plane scopes belong to the platform operator alone', () => {
 // +2 with setup_guide:read/write, the setup guide, on every plan.)
 describe('the plan ladder never exceeds what a tenant may hold', () => {
   it('caps the top tier at the full tenant scope set', () => {
-    expect(TENANT_SCOPE_KEYS.length).toBe(107)
+    expect(TENANT_SCOPE_KEYS.length).toBe(112)
   })
 
   it('keeps every control-plane scope out of the tenant set', () => {

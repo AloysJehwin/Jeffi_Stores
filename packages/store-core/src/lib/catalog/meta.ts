@@ -137,12 +137,18 @@ export async function ownMetaAppsById(appId?: string | null): Promise<Array<OwnM
  * The Meta app a store signs in with: its own when it has one, else the platform's. `source` pins
  * one of them (a callback exchanges the code with the app the dialog was opened for). Null when none.
  */
+// The flagship's credentials sit under this sentinel tenant (lib/import/jobs PLATFORM_TENANT_ID).
+const FLAGSHIP_TENANT_ID = '00000000-0000-0000-0000-000000000000'
+
 export async function findMetaConfig(tenantId?: string | null, source?: MetaAppSource): Promise<MetaConfig | null> {
   if (source !== 'platform' && tenantId) {
     const own = await readOwnMetaApp(tenantId)
     if (own) return { ...own, source: 'own' }
   }
-  return source === 'own' ? null : platformMetaConfig()
+  if (source === 'own') return null
+  // Every store's default: the Meta app the flagship saved in its portal, else env keys.
+  const flagship = await readOwnMetaApp(FLAGSHIP_TENANT_ID)
+  return flagship ? { ...flagship, source: 'platform' } : platformMetaConfig()
 }
 
 /** As findMetaConfig, but throws when there is no app. */

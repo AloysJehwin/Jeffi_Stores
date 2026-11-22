@@ -8,9 +8,9 @@ import { ap } from '@/lib/shared/admin-path'
 import type { ChannelSummary, MarketplaceSettlementsOverview, RecentSettlement, SettlementChannel } from '@/lib/marketplace/settlements'
 import { FinancePeriodBar, useFinancePeriod } from './finance'
 
-const PATH: Record<SettlementChannel, string> = { myntra: '/admin/myntra?tab=settlements', ajio: '/admin/ajio?tab=settlements', amazon: '/admin/amazon' }
-const TONE: Record<SettlementChannel, Tone> = { myntra: 'red', ajio: 'blue', amazon: 'amber' }
-const LABEL: Record<SettlementChannel, string> = { myntra: 'Myntra', ajio: 'AJIO', amazon: 'Amazon' }
+const PATH: Record<SettlementChannel, string> = { myntra: '/admin/myntra?tab=settlements', ajio: '/admin/ajio?tab=settlements', flipkart: '/admin/flipkart?tab=settlements', amazon: '/admin/amazon' }
+const TONE: Record<SettlementChannel, Tone> = { myntra: 'red', ajio: 'blue', flipkart: 'blue', amazon: 'amber' }
+const LABEL: Record<SettlementChannel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart', amazon: 'Amazon' }
 
 const fmtDate = (v: string | null) => (v ? new Date(`${v}T00:00:00+05:30`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-')
 

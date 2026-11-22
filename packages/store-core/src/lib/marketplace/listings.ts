@@ -224,6 +224,7 @@ export async function submitUnits(
   const skipped: SubmitOutcome['skipped'] = []
   const ready = units.filter(u => {
     if (!u.listing?.marketplaceSku && !u.ourSku) skipped.push({ key: u.key, reason: 'No SKU' })
+    else if (u.brandBlocked) skipped.push({ key: u.key, reason: `Brand not approved for ${CHANNEL_LABEL[channel]}` })
     else if (u.listing?.status === 'submitted') skipped.push({ key: u.key, reason: 'Already submitted; waiting for the result' })
     else return true
     return false

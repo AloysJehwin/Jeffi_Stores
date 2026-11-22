@@ -170,12 +170,13 @@ jobs:
           - { app: public-api, run: npm --prefix public-api-service run typecheck }
           - { app: mobile, run: npm --prefix mobile-service run typecheck }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform run typecheck }
-          - { app: mobile-app, install: npm --prefix mobile-service/client ci, run: npm --prefix mobile-service/client run typecheck }
+          - { app: mobile-app, node: 22, install: npm --prefix mobile-service/client ci, run: npm --prefix mobile-service/client run typecheck }
           - { app: cli, run: npx tsc --noEmit -p packages/cli/tsconfig.json }
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
         with:
+          node-version: ${{ matrix.node || 20 }}
           install: ${{ matrix.install }}
       # The apps' checks load store-core's site themes and blocks; tsc outgrows Node's default heap.
       - run: ${{ matrix.run }}
@@ -186,12 +187,24 @@ jobs:
     name: Security
     runs-on: ubuntu-latest
     needs: init
+    permissions: { contents: read, pull-requests: write } # pull-requests: the dependency review's comment
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/node-setup
-      - name: Dependency audit (advisory)
-        run: npm audit --audit-level=high
-        continue-on-error: true
+      # A PR may not add or upgrade to a dependency with a known vulnerability, of any severity, in any manifest
+      # (npm lockfiles, the PaddleOCR requirements). An exception goes in .github/audit-allowlist.json and in allow-ghsas.
+      - name: No new vulnerable dependencies
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: on-failure
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      # Every lockfile stays clean, whatever the change: an advisory outside the allowlist fails the run.
+      - name: npm audit (root, ai-platform, mobile app)
+        run: node scripts/audit-gate.mjs
+      - name: pip-audit (PaddleOCR)
+        run: pipx run pip-audit==2.10.1 --requirement ai-platform/paddleocr/requirements.txt --no-deps --disable-pip --progress-spinner off
 
   test:
     name: Unit tests · ${{ matrix.app }}
@@ -589,7 +602,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # Expo SDK 58 needs Node 22.13+
           cache: npm
           cache-dependency-path: mobile-service/client/package-lock.json
       - run: npm --prefix mobile-service/client ci

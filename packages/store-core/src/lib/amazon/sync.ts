@@ -1,5 +1,6 @@
 import { queryOne, query, getClient } from '@/lib/shared/db'
-import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
+import { fetchProductsForPush, fetchProduct } from '@/lib/merchant/product-fetch'
+import { loadBrandGate, type PushScope } from '@/lib/channels/brand-approvals'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
 import {
   putListingsItem,
@@ -33,6 +34,8 @@ export class AmazonSyncInProgressError extends Error {
 interface SyncResult {
   synced: number
   deleted: number
+  /** Products held back because their brand isn't approved for Amazon (brand gating). */
+  skipped?: number
   errors: Array<{ sku: string; error: string }>
   startedAt: string
   finishedAt: string
@@ -114,7 +117,8 @@ async function runPool<T>(items: T[], worker: (item: T) => Promise<void>): Promi
   await Promise.all(workers)
 }
 
-export async function syncAllProductsToAmazon(): Promise<SyncResult> {
+/** Push the catalogue (or, with a scope, only some brands/categories) to Amazon; unapproved brands are held back. */
+export async function syncAllProductsToAmazon(scope: PushScope | null = null): Promise<SyncResult> {
   if (AMAZON_PUSH_DISABLED) {
     const now = new Date().toISOString()
     return {
@@ -146,7 +150,7 @@ export async function syncAllProductsToAmazon(): Promise<SyncResult> {
     ])
     locked = !!lockRes.rows[0]?.acquired
     if (!locked) throw new AmazonSyncInProgressError()
-    return await runFullSync()
+    return await runFullSync(scope)
   } finally {
     if (locked) {
       await client.query(`SELECT pg_advisory_unlock($1)`, [SYNC_LOCK_KEY]).catch(() => {
@@ -237,16 +241,22 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
   return productToAmazonListings(product, marketplaceId, contactText)
 }
 
-async function runFullSync(): Promise<SyncResult> {
+async function runFullSync(scope: PushScope | null): Promise<SyncResult> {
   const startedAt = new Date().toISOString()
   const errors: Array<{ sku: string; error: string }> = []
   let synced = 0
+  let skipped = 0
   const deleted = 0
 
-  const products = await fetchAllActiveProducts()
+  const products = await fetchProductsForPush(scope)
+  const gate = await loadBrandGate('amazon')
   const listings: Array<{ sku: string; listing: unknown }> = []
 
   for (const product of products) {
+    if (!gate.allows(product.brand_id)) {
+      skipped++
+      continue
+    }
     try {
       for (const l of await resolveListingsForProduct(product)) {
         listings.push({ sku: l.sku, listing: l })
@@ -266,7 +276,7 @@ async function runFullSync(): Promise<SyncResult> {
   })
 
   const finishedAt = new Date().toISOString()
-  const result: SyncResult = { synced, deleted, errors, startedAt, finishedAt }
+  const result: SyncResult = { synced, deleted, skipped, errors, startedAt, finishedAt }
   await saveSyncStatus({ ...result, status: errors.length ? 'error' : 'success' })
   return result
 }
@@ -275,6 +285,7 @@ export async function syncProductToAmazon(productId: string): Promise<void> {
   if (AMAZON_PUSH_DISABLED || !(await amazonConfigured())) return
   const product = await fetchProduct(productId)
   if (!product) return
+  if (!(await loadBrandGate('amazon')).allows(product.brand_id)) return
 
   const listings = await resolveListingsForProduct(product)
   for (const l of listings) {
@@ -350,12 +361,27 @@ export interface AmazonDryRunReport {
 // DRY RUN: for up to `limit` active products, report whether each matches an existing ASIN
 // (=> offer-only) or would be full-create, whether the matched ASIN is listable, and whether an
 // offer VALIDATION_PREVIEW actually passes (postable). Writes NOTHING to Amazon.
-export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport> {
-  const products = await fetchAllActiveProducts()
+export async function dryRunAmazonSync(limit = 100, scope: PushScope | null = null): Promise<AmazonDryRunReport> {
+  const products = await fetchProductsForPush(scope)
   const slice = products.slice(0, limit)
+  const gate = await loadBrandGate('amazon')
   const rows: AmazonDryRunRow[] = []
 
   for (const product of slice) {
+    if (!gate.allows(product.brand_id)) {
+      rows.push({
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        brand: product.brands?.name || '',
+        strategy: 'create',
+        asin: null,
+        listable: false,
+        postable: false,
+        blockReason: 'Brand not approved for Amazon',
+      })
+      continue
+    }
     try {
       const listings = await resolveListingsForProduct(product)
       const l = listings[0]

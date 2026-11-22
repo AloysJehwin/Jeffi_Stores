@@ -8,6 +8,7 @@ import {
   type InboxItem,
   type Network,
   type SocialAuth,
+  type SignInApp,
   type SocialProvider,
   type TokenSet,
 } from './types'
@@ -49,9 +50,9 @@ export async function googleJson<T>(
 // A confidential web client with a signed state, so no PKCE. No include_granted_scopes: it merges the
 // account's earlier grants to this client (e.g. drive.file from the Sheets data source) into the
 // request, and Google refuses drive.file together with the YouTube scopes (invalid_request).
-export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state: string, _codeChallenge?: string): string {
+export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state: string, app: SignInApp): string {
   const p = new URLSearchParams({
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
+    client_id: app.clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: scopes.join(' '),
@@ -96,13 +97,13 @@ export async function googleExchange(
   label: string,
   code: string,
   redirectUri: string,
-  _codeVerifier?: string
+  app: SignInApp
 ): Promise<TokenSet> {
   const t = await googleToken(network, label, {
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
-  })
+  }, app)
   return { accessToken: t.access_token, refreshToken: t.refresh_token ?? null, expiresAt: expiresAtFrom(t.expires_in) }
 }
 
@@ -153,8 +154,8 @@ export const gbpProvider: SocialProvider = {
   requires: {},
   oauth: {
     env: GOOGLE_ENV,
-    authorizeUrl: (redirectUri, state, challenge) => googleAuthorizeUrl([GBP_SCOPE], redirectUri, state, challenge),
-    exchange: (code, redirectUri, verifier) => googleExchange('gbp', LABEL, code, redirectUri, verifier),
+    authorizeUrl: (redirectUri, state, _challenge, app) => googleAuthorizeUrl([GBP_SCOPE], redirectUri, state, app),
+    exchange: (code, redirectUri, _verifier, app) => googleExchange('gbp', LABEL, code, redirectUri, app),
     refresh: auth => googleRefresh('gbp', LABEL, auth),
     async listTargets(token) {
       const accounts = await gbp<{ accounts?: { name: string }[] }>(

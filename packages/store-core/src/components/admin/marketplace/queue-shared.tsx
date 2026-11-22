@@ -5,8 +5,8 @@ import { Badge, type Tone } from '@/components/admin/kit/core'
 
 // Shared bits of the marketplace Orders / Returns / Overview tabs (client-safe: no server imports).
 
-export type Channel = 'myntra' | 'ajio'
-export const CHANNEL_NAME: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
+export type Channel = 'myntra' | 'ajio' | 'flipkart'
+export const CHANNEL_NAME: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart' }
 
 export const MARKET_STATUS: Record<string, { label: string; tone: Tone }> = {
   created: { label: 'New', tone: 'amber' },

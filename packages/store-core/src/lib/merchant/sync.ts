@@ -1,6 +1,7 @@
 import { queryOne, query, getClient } from '@/lib/shared/db'
 import { productToGmcItems, gmcItemProblem } from './mapper'
-import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
+import { fetchProductsForPush, fetchProduct } from './product-fetch'
+import { loadBrandGate, type PushScope } from '@/lib/channels/brand-approvals'
 import { loadSalesVelocity } from './sales-velocity'
 import {
   insertProductInput,
@@ -32,6 +33,8 @@ export class MerchantSyncInProgressError extends Error {
 interface SyncResult {
   synced: number
   deleted: number
+  /** Products held back because their brand isn't allowed on Google (Merchant → brand approvals). */
+  skipped?: number
   errors: MerchantSyncError[]
   startedAt: string
   finishedAt: string
@@ -86,7 +89,8 @@ async function saveSyncStatus(
   } catch (_) {}
 }
 
-export async function syncAllProductsToMerchant(): Promise<SyncResult> {
+/** Push the catalogue (or, with a scope, only some brands/categories) to Google Merchant Center. */
+export async function syncAllProductsToMerchant(scope: PushScope | null = null): Promise<SyncResult> {
   if (GMC_PUSH_DISABLED) {
     const now = new Date().toISOString()
     return {
@@ -118,7 +122,7 @@ export async function syncAllProductsToMerchant(): Promise<SyncResult> {
     ])
     locked = !!lockRes.rows[0]?.acquired
     if (!locked) throw new MerchantSyncInProgressError()
-    return await runFullSync()
+    return await runFullSync(scope)
   } finally {
     if (locked) {
       await client.query(`SELECT pg_advisory_unlock($1)`, [SYNC_LOCK_KEY]).catch(() => {
@@ -146,14 +150,15 @@ export async function isMerchantSyncRunning(): Promise<boolean> {
   }
 }
 
-async function runFullSync(): Promise<SyncResult> {
+async function runFullSync(scope: PushScope | null): Promise<SyncResult> {
   const startedAt = new Date().toISOString()
   const errors: MerchantSyncError[] = []
   let synced = 0
   let deleted = 0
+  let skipped = 0
 
   const finish = async () => {
-    const result: SyncResult = { synced, deleted, errors, startedAt, finishedAt: new Date().toISOString() }
+    const result: SyncResult = { synced, deleted, skipped, errors, startedAt, finishedAt: new Date().toISOString() }
     await saveSyncStatus({ ...result, status: errors.length ? 'error' : 'success' })
     return result
   }
@@ -167,14 +172,22 @@ async function runFullSync(): Promise<SyncResult> {
   }
 
   const baseUrl = await catalogBaseUrl()
-  const products = await fetchAllActiveProducts()
+  const products = await fetchProductsForPush(scope)
   const velocity = await loadSalesVelocity()
+  const gate = await loadBrandGate('gmc')
   const allItems: any[] = []
   const activeOfferIds = new Set<string>()
+  // Offers of products whose brand isn't allowed: never pushed, and taken down if Google has them.
+  const blockedOfferIds = new Set<string>()
 
   for (const product of products) {
     try {
       const items = productToGmcItems(product, baseUrl, { velocity })
+      if (!gate.allows(product.brand_id)) {
+        skipped++
+        for (const item of items) if (item.offerId) blockedOfferIds.add(item.offerId)
+        continue
+      }
       for (const item of items) {
         activeOfferIds.add(item.offerId)
         const problem = gmcItemProblem(item)
@@ -224,7 +237,9 @@ async function runFullSync(): Promise<SyncResult> {
   try {
     const existingIds = await getExistingGmcOfferIds(dataSource)
     for (const offerId of existingIds) {
-      if (!activeOfferIds.has(offerId)) {
+      // A brand/category push only takes down its own held-back offers; a full push also removes
+      // offers for products that are gone.
+      if (scope ? blockedOfferIds.has(offerId) : !activeOfferIds.has(offerId)) {
         try {
           await deleteProductByOfferId(offerId, dataSource)
           deleted++
@@ -245,6 +260,7 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
   const product = await fetchProduct(productId)
 
   if (!product) return
+  if (!(await loadBrandGate('gmc')).allows(product.brand_id)) return
 
   // Inactive products stay in the feed as out_of_stock (handled by productToGmcItems),
   // so we upsert them rather than delete.

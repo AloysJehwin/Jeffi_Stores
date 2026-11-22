@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plug } from 'lucide-react'
 import ConnectionsGear, { type ConnectionState } from '@/components/admin/ConnectionsGear'
+import BrandApprovalsPanel from '@/components/admin/channels/BrandApprovalsPanel'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import { Section, Tabs, api, btnGhost, when } from '@/components/admin/channels/ui'
 import { CopyValue } from '@/components/admin/kit/actions'
@@ -24,13 +25,14 @@ import SettlementsPanel from './SettlementsPanel'
 import { MarketplaceBodyLoading } from './skeletons'
 
 type Channel = MarketplaceConnectionStatus['channel']
-type Tab = 'overview' | 'orders' | 'returns' | 'listings' | 'inventory' | 'settlements' | 'alerts' | 'changes' | 'runs'
+type Tab = 'overview' | 'orders' | 'returns' | 'listings' | 'brands' | 'inventory' | 'settlements' | 'alerts' | 'changes' | 'runs'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'orders', label: 'Orders' },
   { id: 'returns', label: 'Returns' },
   { id: 'listings', label: 'Listings' },
+  { id: 'brands', label: 'Brands' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'settlements', label: 'Settlements' },
   { id: 'alerts', label: 'Alerts' },
@@ -41,6 +43,7 @@ const TABS: { id: Tab; label: string }[] = [
 const INFO: Record<Channel, { title: string; description: string }> = {
   myntra: { title: 'Myntra', description: 'Orders pushed by Myntra, listings, stock, returns and settlements' },
   ajio: { title: 'AJIO', description: 'Orders pushed by AJIO, purchase orders, listings, stock, returns and settlements' },
+  flipkart: { title: 'Flipkart', description: 'Flipkart shipments, labels and dispatch, listings, stock, returns and settlements' },
 }
 
 const COMING: Partial<Record<Tab, string>> = {
@@ -159,6 +162,7 @@ function Body({
   if (tab === 'orders') return <OrdersQueue channel={channel} />
   if (tab === 'returns') return <MarketplaceReturns channel={channel} />
   if (tab === 'listings') return <ListingsMapper channel={channel} />
+  if (tab === 'brands') return <BrandApprovalsPanel channel={channel} />
   if (tab === 'inventory') return <InventoryPanel channel={channel} />
   if (tab === 'settlements') return <SettlementsPanel channel={channel} />
   if (tab !== 'overview') return <EmptyState title="Nothing here yet" body={`${name} ${COMING[tab]}`} />

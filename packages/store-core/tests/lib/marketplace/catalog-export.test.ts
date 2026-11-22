@@ -31,6 +31,8 @@ function unit(over: Partial<SellableUnit> = {}): SellableUnit {
     variantId: 'v1',
     subVariantId: 's1',
     name: 'Crew Tee',
+    brandId: null,
+    brandBlocked: false,
     variantName: 'Red',
     subVariantName: 'M',
     ourSku: 'TEE-RED-M',

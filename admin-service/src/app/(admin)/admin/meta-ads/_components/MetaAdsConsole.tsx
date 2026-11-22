@@ -37,21 +37,26 @@ import {
   when,
 } from '@/components/admin/channels/ui'
 import type { MadsTab } from '@/lib/meta-ads/console'
+import BrandApprovalsPanel from '@/components/admin/channels/BrandApprovalsPanel'
 import { ChangeImageDialog, NewAdDialog } from './AdCreativeDialogs'
 import { MetaAdsBodyLoading, MetaAdsTabLoading } from './skeletons'
 
-const TABS: { id: MadsTab; label: string }[] = [
+// 'brands' is rendered here, not loaded from the console API.
+type Tab = MadsTab | 'brands'
+
+const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'campaigns', label: 'Campaigns' },
   { id: 'adsets', label: 'Ad sets' },
   { id: 'ads', label: 'Ads' },
   { id: 'breakdowns', label: 'Audience & placement' },
   { id: 'capi', label: 'Conversions API' },
+  { id: 'brands', label: 'Catalogue brands' },
   { id: 'alerts', label: 'Alerts' },
   { id: 'changes', label: 'Change history' },
   { id: 'runs', label: 'Job runs' },
 ]
-const DATA_TABS = new Set<MadsTab>(['overview', 'campaigns', 'adsets', 'ads', 'breakdowns', 'capi'])
+const DATA_TABS = new Set<Tab>(['overview', 'campaigns', 'adsets', 'ads', 'breakdowns', 'capi'])
 const ACTIONS = '/api/admin/meta-ads/console/actions'
 const ALERT_PARAMS = { minRoas: 'min ROAS', minSpend: 'minimum spend', days: 'days' }
 const SERIES: SeriesDef[] = [
@@ -68,8 +73,8 @@ const ERRORS: Record<string, string> = {
 export default function MetaAdsConsole() {
   const router = useRouter()
   const sp = useSearchParams()
-  const tabParam = sp.get('tab') as MadsTab | null
-  const [tab, setTabState] = useState<MadsTab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
+  const tabParam = sp.get('tab') as Tab | null
+  const [tab, setTabState] = useState<Tab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
   const [status, setStatus] = useState<any>(null)
   const [range, setRange] = useState(() => lastDays(30))
   const [loaded, setLoaded] = useState<{ tab: string; data: any } | null>(null)
@@ -121,7 +126,7 @@ export default function MetaAdsConsole() {
     )
   }, [tab, range, status?.connected, reloadKey])
 
-  function setTab(next: MadsTab) {
+  function setTab(next: Tab) {
     setTabState(next)
     const params = new URLSearchParams(sp.toString())
     params.set('tab', next)
@@ -217,7 +222,9 @@ export default function MetaAdsConsole() {
               }}
             />
           )}
-          {error ? (
+          {tab === 'brands' ? (
+            <BrandApprovalsPanel channel="meta_ads" />
+          ) : error ? (
             <ErrorState body={error} />
           ) : DATA_TABS.has(tab) && !data ? (
             <MetaAdsTabLoading tab={tab} />

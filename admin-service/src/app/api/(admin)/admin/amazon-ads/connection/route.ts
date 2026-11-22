@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { query } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { channelError, readJson, withPlan } from '@/lib/channels/route'
-import { oauthProviderInfo } from '@/lib/integrations/oauth'
+import { storeOAuthInfo } from '@/lib/integrations/oauth'
 import { adsApp, adsAppReady, adsEnvReady, amazonAdsTenantKey, disconnectAmazonAds, listProfiles, readAmazonAdsConfig, saveAmazonAdsConfig } from '@/lib/amazon-ads/client'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     appReady: adsAppReady(cfg),
     ownApp: !!(cfg?.client_id && cfg.client_secret),
     clientId: cfg?.client_id ?? null,
-    oauth: oauthProviderInfo('amazon_ads'),
+    oauth: await storeOAuthInfo('amazon_ads', await amazonAdsTenantKey()),
     connected: !!cfg?.profile_id,
     pending: !!cfg && !cfg.profile_id,
     profileId: cfg?.profile_id ?? null,

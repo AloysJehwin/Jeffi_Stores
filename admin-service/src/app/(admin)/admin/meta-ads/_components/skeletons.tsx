@@ -10,6 +10,7 @@ export const META_ADS_TABS = [
   { id: 'ads', label: 'Ads' },
   { id: 'breakdowns', label: 'Audience & placement' },
   { id: 'capi', label: 'Conversions API' },
+  { id: 'brands', label: 'Catalogue brands' },
   { id: 'alerts', label: 'Alerts' },
   { id: 'changes', label: 'Change history' },
   { id: 'runs', label: 'Job runs' },
@@ -28,6 +29,8 @@ export function MetaAdsTabLoading({ tab }: { tab: string }) {
           columns={['Name', 'Status', ...(tab === 'ads' ? [] : ['Daily budget']), ...KPI_COLS]}
         />
       )
+    case 'brands':
+      return <TableSectionLoading title="Brand approvals" columns={['Brand', 'Products', 'Status', 'Set', '']} />
     case 'breakdowns':
       return (
         <div className="space-y-5">

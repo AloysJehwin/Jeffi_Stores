@@ -40,6 +40,23 @@ export async function fetchAllActiveProducts() {
   return queryMany(`${PRODUCT_SELECT} ORDER BY p.created_at DESC`)
 }
 
+/** Products for a push, limited to some brands and/or categories (a category includes its sub-categories). */
+export async function fetchProductsForPush(scope?: { brandIds?: string[]; categoryIds?: string[] } | null) {
+  const brandIds = scope?.brandIds?.length ? scope.brandIds : null
+  const categoryIds = scope?.categoryIds?.length ? scope.categoryIds : null
+  if (!brandIds && !categoryIds) return fetchAllActiveProducts()
+  return queryMany(
+    `${PRODUCT_SELECT}
+     WHERE ($1::uuid[] IS NULL OR p.brand_id = ANY($1::uuid[]))
+       AND ($2::uuid[] IS NULL OR p.category_id IN (
+         WITH RECURSIVE d AS (SELECT id FROM categories WHERE id = ANY($2::uuid[])
+                              UNION SELECT k.id FROM categories k JOIN d ON k.parent_category_id = d.id)
+         SELECT id FROM d))
+     ORDER BY p.created_at DESC`,
+    [brandIds, categoryIds]
+  )
+}
+
 export async function fetchProduct(productId: string) {
   return queryOne(`${PRODUCT_SELECT} WHERE p.id = $1`, [productId])
 }

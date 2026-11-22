@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { BackHandler, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { BackHandler, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type ScrollViewInstance } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, { Extrapolation, interpolate, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -39,7 +39,7 @@ export function BottomSheet({
   maxHeightRatio?: number
   /** false: the backdrop and the drag don't close it (a required step); back still calls onClose. */
   dismissible?: boolean
-  scrollRef?: Ref<ScrollView>
+  scrollRef?: Ref<ScrollViewInstance>
 }) {
   const { height: winH } = useWindowDimensions()
   const insets = useSafeAreaInsets()

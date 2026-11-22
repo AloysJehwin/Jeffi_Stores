@@ -121,10 +121,10 @@ export async function sendCapiEvents(): Promise<RunResult> {
     const record = (o: CapiOrder, status: string, matched: string[], error: string | null, trace: string | null) =>
       db.query(
         `INSERT INTO mads_capi_events (order_id, value, status, attempts, matched_keys, error, fbtrace_id, event_time, sent_at)
-         VALUES ($1,$2,$3,1,$4,$5,$6,$7, CASE WHEN $3 = 'sent' THEN now() END)
+         VALUES ($1,$2,$3,1,$4,$5,$6,$7,$8)
          ON CONFLICT (order_id, event_name) DO UPDATE SET status = EXCLUDED.status, attempts = mads_capi_events.attempts + 1,
            matched_keys = EXCLUDED.matched_keys, error = EXCLUDED.error, fbtrace_id = EXCLUDED.fbtrace_id, sent_at = EXCLUDED.sent_at`,
-        [o.id, Number(o.total_amount), status, matched, error, trace, o.paid_at ?? o.created_at]
+        [o.id, Number(o.total_amount), status, matched, error, trace, o.paid_at ?? o.created_at, status === 'sent' ? new Date() : null]
       )
     const built = orders.map(o => ({ o, ...buildPurchaseEvent(o, site) }))
     await step('skipped', async () => {

@@ -71,6 +71,7 @@ const MARKETPLACE_COLOR: Record<MarketplaceSource, string> = {
   amazon: 'rgb(249 115 22)',
   myntra: 'rgb(219 39 119)',
   ajio: 'rgb(202 138 4)',
+  flipkart: 'rgb(37 99 235)',
 }
 const CHANNEL: Record<string, { label: string; color: string }> = {
   website: { label: 'Website', color: 'rgb(59 130 246)' },

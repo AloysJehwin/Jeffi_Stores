@@ -94,7 +94,7 @@ export default function BrandsScreen() {
           </>
         }
         ListEmptyComponent={
-          isLoading ? null : error ? (
+          isLoading ? undefined : error ? (
             <View className="px-4">
               <ErrorState message={error.message || 'Failed to load'} onRetry={refetch} />
             </View>

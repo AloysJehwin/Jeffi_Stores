@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import BrandApprovalsPanel from '@/components/admin/channels/BrandApprovalsPanel'
+import ScopedPushPanel, { type ScopedPushResult } from '@/components/admin/channels/ScopedPushPanel'
 import { useToast } from '@/contexts/ToastContext'
 import { groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 import { DataTable, fetchJson, useInfiniteList, useListSort, Kpi, LoadingKpis, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
@@ -150,6 +152,11 @@ export default function GoogleMerchantPanel() {
     }
   }
 
+  const onScopedPush = (data: ScopedPushResult) => {
+    setSyncStatus({ status: data.errors?.length ? 'error' : 'success', synced: data.synced, errors: data.errors, finished_at: data.finishedAt })
+    setSyncRunning(false)
+  }
+
   const syncNow = async () => {
     setSyncing(true)
     try {
@@ -193,6 +200,7 @@ export default function GoogleMerchantPanel() {
     'control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
   return (
+    <div className="space-y-4">
     <section className="rounded-xl border border-border-default bg-surface-elevated">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default px-4 py-3">
         <div className="flex items-center gap-2">
@@ -229,6 +237,15 @@ export default function GoogleMerchantPanel() {
           <p className="text-xs text-foreground-muted">A sync is running. This updates when it finishes.</p>
         ) : null}
         {syncStatus?.status === 'error' && syncStatus.errors?.length ? <SyncErrors errors={syncStatus.errors} /> : null}
+
+        <ScopedPushPanel
+          channel="gmc"
+          endpoint="/api/admin/merchant/sync"
+          writeScope="merchant_sync:write"
+          running={syncing || syncRunning}
+          onPushed={onScopedPush}
+          onRunning={() => setSyncRunning(true)}
+        />
 
         {list.loading && !summary ? (
           <LoadingKpis labels={['Total in feed', 'Approved', 'Pending', 'Disapproved']} />
@@ -290,5 +307,7 @@ export default function GoogleMerchantPanel() {
 
       </div>
     </section>
+    <BrandApprovalsPanel channel="gmc" />
+    </div>
   )
 }

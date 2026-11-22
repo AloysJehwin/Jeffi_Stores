@@ -9,7 +9,7 @@ import { chunk } from './listings'
 import { getAdapter } from './registry'
 import { MARKETPLACE_CHANNELS, type MarketplaceChannel } from './types'
 
-// Stock to Myntra and AJIO. Our catalogue is the source of truth: the marketplace gets the unit's
+// Stock to Myntra, AJIO and Flipkart. Our catalogue is the source of truth: the marketplace gets the unit's
 // quantity minus units held by marketplace orders not yet accepted, minus a safety buffer, never
 // below zero (0 for inactive or out-of-stock units). Only rows whose number changed (or whose last
 // push failed) are sent, in the endpoint config's batch size, paced to its rate limit. Runs from
@@ -166,7 +166,7 @@ export async function pushMarketplaceStock(channel: MarketplaceChannel, opts: Pu
   const ep = resolveEndpoints(channel, creds)
   const wait = opts.wait ?? sleep
   const gapMs = Math.ceil(1000 / Math.max(0.1, ep.rateLimit.perSecond))
-  return withChannelLock(channel, channel === 'myntra' ? 'myntra_stock' : 'ajio_stock', 'stock', async ({ step, counts, errors }) => {
+  return withChannelLock(channel, `${channel}_stock`, 'stock', async ({ step, counts, errors }) => {
     const plan = planPush(await marketStockRows(channel, warehouse), buffer)
     await recordAvailable(channel, warehouse, plan)
     const changed = plan.filter(p => p.changed)

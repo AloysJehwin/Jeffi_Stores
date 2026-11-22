@@ -22,6 +22,8 @@ export interface AdminOAuthState {
   keepAccount?: boolean
   // Meta: which app opened the dialog (the store's own or the platform's); the code is exchanged with it.
   metaApp?: 'own' | 'platform'
+  // Every other provider: which app opened the consent screen (lib/integrations/own-apps).
+  app?: 'own' | 'platform'
   // Issued-at (unix seconds); stamped by signAdminState and checked by verifyAdminState.
   iat?: number
 }

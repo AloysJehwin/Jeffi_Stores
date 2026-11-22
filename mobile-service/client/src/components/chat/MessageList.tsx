@@ -99,7 +99,7 @@ export default function MessageList({ messages, isMine, labelFor, showTicks, onR
         data={data}
         keyExtractor={keyOf}
         renderItem={renderItem}
-        ListHeaderComponent={footer}
+        ListHeaderComponent={footer ?? undefined}
         contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10 }}
         onScroll={onScroll}
         scrollEventThrottle={64}

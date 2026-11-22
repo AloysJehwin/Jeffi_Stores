@@ -18,6 +18,7 @@ import { NewCampaignButton } from './_components/CampaignWizard'
 import PageDrafts, { DraftsTabLabel } from '@/components/admin/drafts/PageDrafts'
 import WizardDrafts from '@/components/admin/drafts/WizardDrafts'
 import ConnectPanel, { NotConfigured } from './_components/ConnectPanel'
+import OwnAppPanel from '@/components/admin/integrations/OwnAppPanel'
 import ConversionsView from './_components/ConversionsView'
 import ExperimentsView from './_components/ExperimentsView'
 import AudiencesView from './_components/AudiencesView'
@@ -275,6 +276,7 @@ export default function GoogleAdsClient({
                 Google Ads is not connected yet. An admin with Google Ads write access can connect it.
               </p>
             )}
+            <OwnAppPanel family="google" onChange={refreshStatus} />
           </ConnectionsGear>
         </div>
       </div>

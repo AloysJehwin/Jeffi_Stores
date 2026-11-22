@@ -2,6 +2,7 @@ import { platformOAuthBaseUrl, currentAdminBaseUrl } from '@/lib/catalog/brand'
 import { getTenant } from '@/lib/tenant-registry'
 import type { AdminOAuthState } from '@/lib/shared/oauth-state'
 import { readOwnMetaApp } from '@/lib/catalog/meta'
+import { PLATFORM_APP_ENV, readOwnApp, type OwnAppFamily } from './own-apps'
 
 // Store-admin OAuth connect flows. Every provider redirects to ONE fixed platform host (one URI
 // registered per provider covers every tenant); the signed state carries the tenant, and the
@@ -49,13 +50,33 @@ export function oauthProviderInfo(provider: OAuthProvider, ownKeys: string[] = [
   return { enabled: missing.length === 0, redirectUri: oauthRedirectUri(provider), missing }
 }
 
+const PROVIDER_FAMILY: Partial<Record<OAuthProvider, OwnAppFamily>> = {
+  google_merchant: 'google',
+  google_ads: 'google',
+  amazon_seller: 'amazon_seller',
+  amazon_ads: 'amazon_ads',
+}
+
+/** Sign-in for a store on any provider with an own-app family: enabled when the store saved its own
+ * app or the platform keys are set (Meta has metaOAuthInfo). */
+export async function storeOAuthInfo(provider: OAuthProvider, tenantId: string | null | undefined, ownKeys: string[] = []): Promise<OAuthProviderInfo & { ownApp: boolean }> {
+  const family = PROVIDER_FAMILY[provider]
+  // The store's own app, or the flagship's portal-saved default, satisfies the app keys.
+  const ownApp = family && tenantId ? !!(await readOwnApp(tenantId, family)) : false
+  const portalDefault = family && !ownApp ? !!(await readOwnApp(PLATFORM_TENANT_ID, family)) : false
+  const appKeys = family && (ownApp || portalDefault) ? [PLATFORM_APP_ENV[family].clientId, PLATFORM_APP_ENV[family].clientSecret, PLATFORM_APP_ENV[family].applicationId ?? ''] : []
+  return { ...oauthProviderInfo(provider, [...ownKeys, ...appKeys]), ownApp }
+}
+
 /** Meta sign-in for a store: enabled when it has its own Meta app or the platform keys are set. */
 export async function metaOAuthInfo(
   provider: 'meta' | 'meta_ads',
   tenantId: string | null | undefined
 ): Promise<OAuthProviderInfo & { ownApp: boolean }> {
   const ownApp = tenantId ? !!(await readOwnMetaApp(tenantId)) : false
-  return { ...oauthProviderInfo(provider, ownApp ? ['META_APP_ID', 'META_APP_SECRET'] : []), ownApp }
+  // The flagship's portal-saved Meta app is every store's default.
+  const portalDefault = ownApp || !!(await readOwnMetaApp(PLATFORM_TENANT_ID))
+  return { ...oauthProviderInfo(provider, portalDefault ? ['META_APP_ID', 'META_APP_SECRET'] : []), ownApp }
 }
 
 /** admin-{slug} on the same root and scheme as the platform callback host: https://admin-acme.jeffistores.in

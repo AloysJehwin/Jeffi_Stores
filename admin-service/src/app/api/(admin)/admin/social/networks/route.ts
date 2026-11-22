@@ -5,6 +5,7 @@ import { listConnections } from '@/lib/social/data'
 
 export const dynamic = 'force-dynamic'
 
+// configured: sign-in is available with the platform app or the store's own app (ownAppSaved).
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'social:read')
   if (admin instanceof NextResponse) return admin

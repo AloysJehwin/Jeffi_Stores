@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/admin/kit/states'
 import { LoadingLines } from '@/components/admin/kit/skeleton'
 import { useActionToast } from '@/components/admin/kit/toast'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
+import OwnAppPanel from '@/components/admin/integrations/OwnAppPanel'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import {
   Badge,
@@ -382,6 +383,7 @@ function ConnectPanel({
         </p>
       )}
       {msg && <p className="text-sm text-red-500">{msg}</p>}
+      <OwnAppPanel family="amazon_ads" onChange={() => onChanged()} />
     </div>
   )
 }

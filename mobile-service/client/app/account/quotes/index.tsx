@@ -174,7 +174,7 @@ export default function QuotesScreen() {
                 <Chip key={s} label={s === 'all' ? 'All' : RFQ_STATUS_SHORT[s]} selected={filterStatus === s} onPress={() => setFilterStatus(s)} />
               ))}
             </ChipGroup>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           rfqs.length === 0 ? (

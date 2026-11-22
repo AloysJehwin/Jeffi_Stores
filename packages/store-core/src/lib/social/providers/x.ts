@@ -83,10 +83,10 @@ export const xProvider: SocialProvider = {
   requires: {},
   oauth: {
     env: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
-    authorizeUrl(redirectUri, state, codeChallenge) {
+    authorizeUrl(redirectUri, state, codeChallenge, app) {
       const p = new URLSearchParams({
         response_type: 'code',
-        client_id: process.env.X_CLIENT_ID ?? '',
+        client_id: app.clientId,
         redirect_uri: redirectUri,
         scope: 'tweet.read tweet.write users.read media.write offline.access',
         state,
@@ -95,8 +95,8 @@ export const xProvider: SocialProvider = {
       })
       return `https://x.com/i/oauth2/authorize?${p}`
     },
-    exchange: (code, redirectUri, verifier) =>
-      token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: verifier }),
+    exchange: (code, redirectUri, verifier, app) =>
+      token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: verifier }, app),
     async refresh(auth) {
       if (!auth.refreshToken) throw new SocialApiError('x', 401, `${LABEL}: no refresh token, sign in again`)
       return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))

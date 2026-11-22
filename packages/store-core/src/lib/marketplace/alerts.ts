@@ -228,4 +228,5 @@ function rulesFor(channel: MarketplaceChannel): RuleSet<MarketplaceAlertConfig, 
 
 export const MYNTRA_RULES = rulesFor('myntra')
 export const AJIO_RULES = rulesFor('ajio')
-export const marketplaceRules = (channel: MarketplaceChannel) => (channel === 'myntra' ? MYNTRA_RULES : AJIO_RULES)
+export const FLIPKART_RULES = rulesFor('flipkart')
+export const marketplaceRules = (channel: MarketplaceChannel) => (channel === 'myntra' ? MYNTRA_RULES : channel === 'flipkart' ? FLIPKART_RULES : AJIO_RULES)

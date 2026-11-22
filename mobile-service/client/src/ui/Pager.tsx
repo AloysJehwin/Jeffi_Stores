@@ -19,6 +19,9 @@ import { GUTTER } from './Screen'
 import { useMotion } from './motion'
 import { useAutoplay, useSwipe } from './paging'
 
+// React Native 0.88 moved onAccessibilityAction out of AccessibilityProps; the pages still pass it through.
+type A11yProps = AccessibilityProps & { onAccessibilityAction?: (e: AccessibilityActionEvent) => void }
+
 // Horizontal pagers that snap one page at a time. Pager: full-width pages (the motion hero). PeekPager:
 // centred cards whose neighbours peek in, shrunk, dimmed and faded at both edges (offer cards).
 // FadePager: full-width pages that crossfade in place.
@@ -154,7 +157,7 @@ function pageA11y({
   many: boolean
   extra: PageAction[]
   step: (d: 1 | -1) => void
-}): AccessibilityProps {
+}): A11yProps {
   const actions = [...(many ? (pressable ? NEXT_PREV : INC_DEC) : []), ...extra.map(a => ({ name: a.name, label: a.label }))]
   return {
     accessible: true,
@@ -172,7 +175,7 @@ function pageA11y({
   }
 }
 
-function PageBody({ onPress, a11y, children }: { onPress?: () => void; a11y: AccessibilityProps; children: ReactNode }) {
+function PageBody({ onPress, a11y, children }: { onPress?: () => void; a11y: A11yProps; children: ReactNode }) {
   return onPress ? (
     <Pressable style={{ flex: 1 }} onPress={onPress} {...a11y}>
       {children}
@@ -325,7 +328,7 @@ function Page({
   peek: boolean
   still: boolean
   onPress?: () => void
-  a11y: AccessibilityProps
+  a11y: A11yProps
   children: ReactNode
 }) {
   const range = pageRange(i, page)

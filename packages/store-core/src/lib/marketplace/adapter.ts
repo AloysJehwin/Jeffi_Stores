@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import type { MarketplaceChannel, MarketplaceMode, MarketStatus, NormalizedOrder, ShipmentInfo } from './types'
+import { CHANNEL_LABEL, type MarketplaceChannel, type MarketplaceMode, type MarketStatus, type NormalizedOrder, type ShipmentInfo } from './types'
 
 // What every marketplace integration provides. Required methods cover orders and stock; listings,
 // manifests, returns and settlements are optional because a marketplace may not offer the API.
@@ -107,6 +107,10 @@ export interface MarketplaceAdapter {
   listingTask?(taskId: string): Promise<ListingTaskResult>
   returnAction?(input: ReturnActionInput): Promise<{ ok: boolean; message?: string; raw?: unknown }>
   settlements?(range: { from: string; to: string }): Promise<SettlementRow[]>
+  /** Verifies a push by the marketplace's own signature (Flipkart) instead of the push token we issue. */
+  verifyPush?(input: { headers: Headers; url: string; method: string }): boolean
+  /** Orders fetched by polling (Flipkart), recorded like pushes; for marketplaces whose push needs separate enrolment. */
+  pollOrders?(since: Date): Promise<PushEvent[]>
   /** Sends our B2B invoice for a purchase order (AJIO), where the marketplace wants it uploaded. */
   uploadInvoice?(input: InvoiceUpload): Promise<{ ok: boolean; message?: string }>
 }
@@ -125,7 +129,7 @@ export interface InvoiceUpload {
 export class AdapterUnavailableError extends Error {
   constructor(
     readonly channel: MarketplaceChannel,
-    message = `The ${channel === 'myntra' ? 'Myntra' : 'AJIO'} API is not available until the partner API docs arrive. Use mock mode until then.`
+    message = `The ${CHANNEL_LABEL[channel]} API is not available until the partner API docs arrive. Use mock mode until then.`
   ) {
     super(message)
     this.name = 'AdapterUnavailableError'

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from 'react-native'
+import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View, type TextInputInstance } from 'react-native'
 import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller'
@@ -59,7 +59,7 @@ export default function Composer({ onSend, upload, onTyping, disabled, placehold
   const [pending, setPending] = useState<Pending[]>([])
   const [sheet, setSheet] = useState(false)
   const choice = useRef<Source | null>(null)
-  const input = useRef<TextInput>(null)
+  const input = useRef<TextInputInstance>(null)
 
   const room = Math.max(0, maxFiles - pending.length)
 

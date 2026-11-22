@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Pressable, View, type ScrollView } from 'react-native'
+import { Pressable, View, type ScrollView, type ScrollViewInstance } from 'react-native'
 import { Image } from 'expo-image'
 import { X, Zap } from 'lucide-react-native'
 import { generateReview, postForm, type OrderReview } from '../../api/account'
@@ -126,7 +126,7 @@ export default function ReviewModal({
   }
 
   // The sheet shrinks above the keyboard; with several items, bring the one being typed in to the top.
-  const scrollRef = useRef<ScrollView>(null)
+  const scrollRef = useRef<ScrollViewInstance>(null)
   const itemY = useRef<number[]>([])
   const fieldY = useRef<number[]>([])
   const reveal = (i: number) => {

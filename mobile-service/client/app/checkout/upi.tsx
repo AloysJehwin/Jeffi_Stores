@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppState, BackHandler, InteractionManager, Linking, Platform, View } from 'react-native'
+import { AppState, BackHandler, Linking, Platform, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Image } from 'expo-image'
@@ -355,7 +355,7 @@ export default function CheckoutUpiScreen() {
       await begin({ purpose: 'order_draft', draftToken: draft.draftToken, resetCart: r.mode !== 'buyNow' })
     }
     // Let the push transition settle before the browser opens.
-    InteractionManager.runAfterInteractions(() => {
+    requestIdleCallback(() => {
       run().catch((e: unknown) => {
         if (params.orderId || params.intentId) fail(errorMessage(e, 'Could not reach the server. Please try again.'))
         else abortToReview(errorMessage(e, 'Could not reach the server. Please try again.'))

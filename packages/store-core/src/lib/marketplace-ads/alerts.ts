@@ -31,7 +31,7 @@ export interface MadsSnapshot extends Pick<AadsSnapshot, 'campaigns' | 'noSales'
   coveredTo: string | null
 }
 
-const LABEL: Record<AdsChannel, string> = { myntra_ads: 'Myntra Ads', ajio_ads: 'AJIO Ads' }
+const LABEL: Record<AdsChannel, string> = { myntra_ads: 'Myntra Ads', ajio_ads: 'AJIO Ads', flipkart_ads: 'Flipkart Ads' }
 
 export function evaluateMads(channel: AdsChannel, s: MadsSnapshot, cfg: MadsAlertConfig, now = new Date()): Finding[] {
   const aads: AadsAlertConfig = {

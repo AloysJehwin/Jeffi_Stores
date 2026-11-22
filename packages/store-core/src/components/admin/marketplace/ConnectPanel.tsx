@@ -13,7 +13,7 @@ import type { MarketplaceConnectionStatus } from '@/lib/marketplace/connection-r
 type Channel = MarketplaceConnectionStatus['channel']
 type Mode = 'mock' | 'sandbox' | 'live'
 
-const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
+const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart' }
 const MODE_OPTIONS = [
   { value: 'mock', label: 'Mock', hint: 'Simulated orders for trying the flow; nothing is sent' },
   { value: 'sandbox', label: 'Sandbox', hint: 'The marketplace test environment' },

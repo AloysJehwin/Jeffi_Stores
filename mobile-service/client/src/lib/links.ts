@@ -1,5 +1,5 @@
 import { Linking, PixelRatio } from 'react-native'
-import type { Router } from 'expo-router'
+import type { useRouter } from 'expo-router'
 
 // Storefront assets (/images/…) are served by the web host, not the API host.
 export const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL || 'https://jeffistores.in').replace(/\/$/, '')
@@ -64,7 +64,7 @@ const SORT_PARAMS = ['sort', 'dir', 'order']
  * Open a storefront href in the app: product, category and listing paths map to app screens;
  * anything else opens in the browser on the storefront.
  */
-export function openHref(router: Router, href: string | null | undefined) {
+export function openHref(router: ReturnType<typeof useRouter>, href: string | null | undefined) {
   const raw = (href ?? '').trim()
   if (!raw) return
   let url: URL

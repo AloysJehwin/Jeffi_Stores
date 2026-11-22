@@ -28,8 +28,8 @@ export interface Detected {
 }
 
 type CredRow = { provider: string; status: string; meta: Record<string, any> | null }
-type MarketChannel = 'myntra' | 'ajio'
-type AlertChannel = 'gmc' | 'amazon' | 'amazon_ads' | 'meta_ads' | 'myntra' | 'ajio' | 'myntra_ads' | 'ajio_ads'
+type MarketChannel = 'myntra' | 'ajio' | 'flipkart'
+type AlertChannel = 'gmc' | 'amazon' | 'amazon_ads' | 'meta_ads' | 'myntra' | 'ajio' | 'flipkart' | 'myntra_ads' | 'ajio_ads' | 'flipkart_ads'
 
 export interface StatusContext {
   tenantId: string | null
@@ -56,7 +56,7 @@ export interface StatusContext {
   merchant(): Promise<{ connected: boolean; lastStatus: string | null }>
   amazon(): Promise<boolean>
   marketplace(c: MarketChannel): Promise<{ mode: string } | null>
-  lastImport(c: 'myntra_ads' | 'ajio_ads'): Promise<string | null>
+  lastImport(c: 'myntra_ads' | 'ajio_ads' | 'flipkart_ads'): Promise<string | null>
   googleAds(): Promise<{ connected: boolean; pendingAccount: boolean }>
   amazonAds(): Promise<{ profileId: string | null } | null>
   metaAds(): Promise<{ adAccountId: string | null; tokenExpiresAt: string | null; capi: boolean } | null>
@@ -128,7 +128,7 @@ async function marketplaceStep(ctx: StatusContext, c: MarketChannel): Promise<De
   return creds.mode === 'live' ? done() : waiting(`Connected in ${creds.mode} mode; goes live after the first successful test call`)
 }
 
-async function adsImportStep(ctx: StatusContext, c: 'myntra_ads' | 'ajio_ads'): Promise<Detected> {
+async function adsImportStep(ctx: StatusContext, c: 'myntra_ads' | 'ajio_ads' | 'flipkart_ads'): Promise<Detected> {
   const alert = await criticalAlert(ctx, c)
   if (alert) return alert
   const last = await ctx.lastImport(c)
@@ -288,6 +288,7 @@ export const RESOLVERS: Record<string, (ctx: StatusContext) => Promise<Detected>
   },
   myntra: ctx => marketplaceStep(ctx, 'myntra'),
   ajio: ctx => marketplaceStep(ctx, 'ajio'),
+  flipkart: ctx => marketplaceStep(ctx, 'flipkart'),
 
   async 'google-ads'(ctx) {
     const g = await ctx.googleAds()
@@ -312,6 +313,7 @@ export const RESOLVERS: Record<string, (ctx: StatusContext) => Promise<Detected>
   },
   'myntra-ads': ctx => adsImportStep(ctx, 'myntra_ads'),
   'ajio-ads': ctx => adsImportStep(ctx, 'ajio_ads'),
+  'flipkart-ads': ctx => adsImportStep(ctx, 'flipkart_ads'),
 
   'facebook-instagram': ctx => socialStep(ctx, ['facebook', 'instagram']),
   gbp: ctx => socialStep(ctx, ['gbp']),
@@ -479,7 +481,7 @@ export async function buildContext(tenantId: string | null): Promise<StatusConte
       const creds = await resolveMarketplaceCreds(c, credKey).catch(() => null)
       return creds ? { mode: creds.mode } : null
     }),
-    lastImport: memoBy(async (c: 'myntra_ads' | 'ajio_ads') => {
+    lastImport: memoBy(async (c: 'myntra_ads' | 'ajio_ads' | 'flipkart_ads') => {
       const r = await queryOne<{ at: string | null }>(
         `SELECT max(finished_at)::text AS at FROM channel_sync_log WHERE channel = $1 AND status IN ('success','partial')`,
         [c]

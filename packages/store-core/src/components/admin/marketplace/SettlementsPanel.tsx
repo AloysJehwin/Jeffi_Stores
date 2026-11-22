@@ -14,8 +14,8 @@ import { postForm } from './files'
 import { Sk } from '@/components/admin/kit/skeleton'
 import { SettlementsLoading } from './skeletons'
 
-type Channel = 'myntra' | 'ajio'
-const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
+type Channel = 'myntra' | 'ajio' | 'flipkart'
+const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart' }
 const OVERDUE_DAYS = 20
 
 const fmtDate = (v: string | null) => (v ? new Date(`${v.slice(0, 10)}T00:00:00+05:30`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-')

@@ -150,7 +150,7 @@ export default function PagedProductGrid({
           <View className="px-4">
             <InfiniteFooter shown={0} control={control} />
           </View>
-        ) : null
+        ) : undefined
       }
       ListFooterComponent={
         <View className="px-4" style={{ paddingBottom: 32 + bottomInset }}>

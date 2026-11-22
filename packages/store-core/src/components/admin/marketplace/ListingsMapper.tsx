@@ -16,8 +16,8 @@ import type { ListingTaskRow, SkuReportField, SkuReportMatch } from '@/lib/marke
 import { download, postForm } from './files'
 import { ListingsLoading } from './skeletons'
 
-type Channel = 'myntra' | 'ajio'
-const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
+type Channel = 'myntra' | 'ajio' | 'flipkart'
+const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart' }
 const PAGE = 60
 
 const STATUS_TONE: Record<ListingStatus, Tone> = { unmapped: 'muted', mapped: 'blue', submitted: 'amber', live: 'green', rejected: 'red', inactive: 'muted' }

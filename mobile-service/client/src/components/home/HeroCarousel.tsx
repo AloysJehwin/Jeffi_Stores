@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { Pressable, View, useWindowDimensions, type TextLayoutEventData, type NativeSyntheticEvent } from 'react-native'
+import { Pressable, View, useWindowDimensions, type TextLayoutEvent } from 'react-native'
 import { Gradient, Media, PagerDots, Text, elevationClass, useAutoplay, useElevation, useMotion, useSwipe } from '../../ui'
 import { useRouter } from 'expo-router'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
@@ -170,7 +170,7 @@ function HeroTitle({ text, maxWidth, fullWidth, fontSize }: { text: string; maxW
   const [measured, setMeasured] = useState<{ probe: string; fontSize: number; widths: number[] | null } | null>(null)
   const ready = measured && measured.probe === probe && measured.fontSize === fontSize
 
-  const onProbe = (e: NativeSyntheticEvent<TextLayoutEventData>) => {
+  const onProbe = (e: TextLayoutEvent) => {
     const widths = e.nativeEvent.lines.map(l => l.width)
     setMeasured({ probe, fontSize, widths: widths.length === words.length + 2 ? widths : null })
   }

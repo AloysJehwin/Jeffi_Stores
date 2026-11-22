@@ -1,5 +1,5 @@
 import { forwardRef, useState, type ReactNode } from 'react'
-import { Pressable, TextInput, View, type TextInputProps } from 'react-native'
+import { Pressable, TextInput, View, type TextInputProps, type TextInputInstance } from 'react-native'
 import { X } from 'lucide-react-native'
 import { useTokens } from '../theme'
 import { Text } from './Text'
@@ -65,7 +65,7 @@ export function FieldFrame({
 }
 
 /** What a field's ref points at (focus(), blur()). */
-export type FieldRef = TextInput
+export type FieldRef = TextInputInstance
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string
@@ -81,7 +81,7 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   className?: string
 }
 
-export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function TextField(
   { label, required, helper, error, prefix, suffix, icon: Icon, clearable, containerClassName, className, onFocus, onBlur, editable = true, multiline, ...props },
   ref,
 ) {
@@ -129,7 +129,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
 })
 
 /** +91 and a 10-digit number. */
-export const PhoneField = forwardRef<TextInput, Omit<TextFieldProps, 'onChangeText' | 'onChange' | 'value'> & { value: string; onChange: (v: string) => void }>(
+export const PhoneField = forwardRef<TextInputInstance, Omit<TextFieldProps, 'onChangeText' | 'onChange' | 'value'> & { value: string; onChange: (v: string) => void }>(
   function PhoneField({ value, onChange, ...props }, ref) {
     return (
       <TextField

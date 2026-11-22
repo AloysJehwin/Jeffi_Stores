@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import { View, useWindowDimensions } from 'react-native'
+import { View, useWindowDimensions, type HostInstance } from 'react-native'
 import { Badge, Button, IconButton, Text } from '../../ui'
 import { Image } from 'expo-image'
 import { useFocusEffect, useRouter } from 'expo-router'
@@ -48,7 +48,7 @@ function Card({ spot, copy }: { spot: SpotlightData; copy: SectionCopy }) {
 
   // Window Y of the card at measure time, paired with the scroll offset then: the current window Y
   // is top0 − (scrollY − scroll0), with no need to know what sits above the feed.
-  const ref = useRef<View>(null)
+  const ref = useRef<HostInstance>(null)
   const top0 = useSharedValue(UNMEASURED)
   const scroll0 = useSharedValue(0)
   const calloutsTop = useSharedValue(0)

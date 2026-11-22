@@ -73,9 +73,9 @@ export const pinterestProvider: SocialProvider = {
   requires: { image: true },
   oauth: {
     env: ['PINTEREST_APP_ID', 'PINTEREST_APP_SECRET'],
-    authorizeUrl(redirectUri, state) {
+    authorizeUrl(redirectUri, state, _challenge, app) {
       const p = new URLSearchParams({
-        client_id: process.env.PINTEREST_APP_ID ?? '',
+        client_id: app.clientId,
         redirect_uri: redirectUri,
         response_type: 'code',
         scope: 'boards:read,pins:read,pins:write,user_accounts:read',
@@ -83,7 +83,7 @@ export const pinterestProvider: SocialProvider = {
       })
       return `https://www.pinterest.com/oauth/?${p}`
     },
-    exchange: (code, redirectUri) => token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
+    exchange: (code, redirectUri, _verifier, app) => token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }, app),
     async refresh(auth) {
       if (!auth.refreshToken) throw new SocialApiError('pinterest', 401, `${LABEL}: no refresh token, sign in again`)
       return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))

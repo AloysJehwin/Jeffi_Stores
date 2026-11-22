@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Settings, X } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import MetaAppCard from './MetaAppCard'
+import OwnAppPanel from './integrations/OwnAppPanel'
 import AdminSelect from './AdminSelect'
 import { SP_API_HOSTS } from '@/lib/amazon/sp-api-hosts'
 
@@ -525,6 +526,7 @@ function GoogleCard({
           )}
         </>
       )}
+      <OwnAppPanel family="google" onChange={onDone} />
     </CardShell>
   )
 }
@@ -649,6 +651,7 @@ function AmazonCard({
           )}
         </>
       )}
+      <OwnAppPanel family="amazon_seller" onChange={onDone} />
     </CardShell>
   )
 }

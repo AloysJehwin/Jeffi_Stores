@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from 'react'
-import { Linking, View } from 'react-native'
+import { Linking, View, type HostInstance } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Check, CircleCheck, CircleX, FileText, ShoppingCart, Zap } from 'lucide-react-native'
 import { Badge, Button, Chip, ChipGroup, ListRow, ModalSheet, Text } from '../../ui'
@@ -41,8 +41,8 @@ export default function ProductActions({
   extraDeliveryDays: number
   gstEnabled: boolean
   launchDate: string | null
-  optionsRef: RefObject<View | null>
-  buyRef: RefObject<View | null>
+  optionsRef: RefObject<HostInstance | null>
+  buyRef: RefObject<HostInstance | null>
   /** An approved business account can ask for a quote instead of buying. */
   onRequestQuote?: () => void
 }) {
