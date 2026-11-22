@@ -5,7 +5,7 @@ import { Loader2, Upload } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import { CheckMark } from '@controller/app/(ecom)/ecom/Shapes'
 import { ChoiceChips } from '../_ui'
-import { fieldInput, fieldLabel, noteCls } from './ui'
+import { fieldInput, fieldLabel, fieldRow, noteCls } from './ui'
 import {
   DOCS,
   RESTRICTED_ASK,
@@ -47,7 +47,7 @@ export function FileField({ id, label, fileName, onFile, onRemove }: { id: strin
     return (
       <div>
         <span className={fieldLabel}>{label}</span>
-        <div className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--org-sage-deep)]/40 org-sage px-3 py-2">
+        <div className={`flex items-center gap-2 rounded-xl border border-[var(--org-sage-deep)]/40 org-sage px-3 ${fieldRow}`}>
           <CheckMark className="h-4 w-4 shrink-0 org-sage-text" />
           <span className="min-w-0 flex-1 truncate text-sm org-sage-text">{fileName}</span>
           <button type="button" onClick={onRemove} className="shrink-0 text-xs text-foreground-muted hover:text-foreground">
@@ -61,9 +61,9 @@ export function FileField({ id, label, fileName, onFile, onRemove }: { id: strin
       <label htmlFor={id} className={fieldLabel}>
         {label}
       </label>
-      <label className="ecom-focus flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface px-3 py-2 text-sm text-foreground-secondary transition-colors hover:border-accent-400">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        {busy ? 'Uploading…' : 'Upload PDF or image'}
+      <label className={`ecom-focus flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface px-3 text-sm text-foreground-secondary transition-colors hover:border-accent-400 ${fieldRow}`}>
+        {busy ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Upload className="h-4 w-4 shrink-0" />}
+        <span className="min-w-0 truncate">{busy ? 'Uploading…' : 'Upload PDF or image'}</span>
         <input
           id={id}
           type="file"
@@ -138,7 +138,7 @@ function DocCard({ docId, value, onPatch }: { docId: string; value: ComplianceUp
           )}
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <FileField
           id={`doc-${docId}-file`}
           label="Document"

@@ -17,7 +17,7 @@ export default function Loading() {
             ))}
           </div>
         </CardLoading>
-        <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+        <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
           <div className="text-xs text-foreground-secondary uppercase tracking-widest mb-3">Custom domains</div>
           <SkeletonRows rows={2} cols={3} />
         </div>

@@ -194,7 +194,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
 
         <div className="mt-5 space-y-4">
           <Field label="API key">
-            {keys === null ? <div className="h-9 animate-pulse rounded-lg org-sand" />
+            {keys === null ? <div className="h-control animate-pulse rounded-lg org-sand" />
               : keys.length === 0 ? <p className="text-sm text-foreground-secondary">No active key with <code>{scope}</code>. <Link href="/dashboard/api-keys" className="font-semibold ecom-accent-text underline">Create one</Link>.</p>
               : <AdminSelect value={keyId} onChange={setKeyId} options={keys.map(k => ({ value: k.id, label: k.name, hint: `${k.key_prefix}…` }))} />}
           </Field>
@@ -206,7 +206,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
                   ? <input className={input} type="email" value={to} onChange={e => setTo(e.target.value)} placeholder="you@example.com" />
                   : <PhoneInput value={to} onChange={setTo} inputClassName={`${input} min-w-0 flex-1`} />}
               </Field>
-              {missing === null && <div className="h-9 animate-pulse rounded-lg org-sand" />}
+              {missing === null && <div className="h-control animate-pulse rounded-lg org-sand" />}
               {varNames.length > 0 && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {varNames.map(k => (

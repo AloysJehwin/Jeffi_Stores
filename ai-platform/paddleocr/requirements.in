@@ -10,3 +10,12 @@ fastapi
 uvicorn
 # paddle imports setuptools (and distutils through it on 3.12) without declaring it.
 setuptools
+# Security floors: fixed releases newer than --exclude-newer, let through per package by the compile command.
+aiohttp>=3.14.4
+anyio>=4.14.2
+certifi>=2026.10.18
+filelock>=4.2.1
+multidict>=6.9.1,<7
+pillow>=13.0.0
+setuptools>=84.1.0
+urllib3>=2.8.0

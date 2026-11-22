@@ -83,7 +83,7 @@ function ServiceCard({ service, state, prices, compact, kyb }: { service: ApiSer
     <section className="flex flex-col rounded-2xl border border-border-default bg-surface-elevated p-6">
       <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full org-sand"><Icon className="h-5 w-5 text-foreground" /></span>
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full org-sand"><Icon className="h-5 w-5 text-foreground" /></span>
           <div>
             <h2 className="font-display text-lg font-black text-foreground">{info.title}</h2>
             <p className="text-sm text-foreground-secondary">{info.blurb}</p>

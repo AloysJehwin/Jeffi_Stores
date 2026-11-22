@@ -11,7 +11,7 @@ export default function Loading() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="space-y-1.5">
                 <Sk className="h-3.5 w-24" />
-                <Sk className="h-10 w-full rounded-xl" />
+                <Sk className="h-control w-full rounded-xl" />
               </div>
             ))}
           </div>

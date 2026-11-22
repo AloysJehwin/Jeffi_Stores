@@ -6,7 +6,7 @@ import { PhoneInput } from '../_ui/phone'
 import { Card } from '../dashboard/_components/Card'
 import DomainSearch from '../_domains/DomainSearch'
 import CompliancePanel from './CompliancePanel'
-import { fieldInput, fieldLabel, ghostBtn } from './ui'
+import { fieldInput, fieldLabel, fieldRow, ghostBtn } from './ui'
 import { ABOUT_MAX, TAGLINE_MAX, type StoreContact, type StoreDetails } from './store-details'
 import { SELLING_CATEGORIES, type ComplianceState } from '@controller/lib/catalog/compliance'
 import { STORE_SOCIAL_LABELS, STORE_SOCIAL_NETWORKS, socialUrl, type StoreSocialNetwork } from '@/lib/catalog/store-socials'
@@ -221,7 +221,7 @@ export default function StoreStep({
                 WhatsApp {optional}
               </label>
               {c.whatsappSame ? (
-                <div className="flex min-h-11 items-center rounded-xl border border-border-default bg-surface-secondary/60 px-3.5 text-sm text-foreground-secondary">
+                <div className={`flex items-center rounded-xl border border-border-default bg-surface-secondary/60 px-3.5 text-sm text-foreground-secondary ${fieldRow}`}>
                   {c.phone || 'Same as the phone number'}
                 </div>
               ) : (

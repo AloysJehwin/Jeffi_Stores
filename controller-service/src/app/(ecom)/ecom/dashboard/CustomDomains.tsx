@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { SkeletonRows } from './_components/Skeleton'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { fieldRow } from '../onboard/ui'
 
 interface Domain {
   id: string
@@ -92,7 +93,7 @@ export default function CustomDomains({
 
   if (maxDomains === 0) {
     return (
-      <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+      <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest mb-2">Custom domain</div>
         <p className="text-sm text-foreground-secondary">
           Available on Pro plan and above. Upgrade to connect your own domain.
@@ -123,7 +124,7 @@ export default function CustomDomains({
   }
 
   return (
-    <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+    <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest">Custom domains</div>
         <span className="text-xs text-foreground-secondary">
@@ -197,7 +198,7 @@ export default function CustomDomains({
             <button
               onClick={addDomain}
               disabled={busy || !newDomain}
-              className="px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium"
+              className={`px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium ${fieldRow}`}
             >
               Add
             </button>

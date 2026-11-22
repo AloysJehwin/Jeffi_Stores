@@ -41,7 +41,7 @@ vi.mock('pdfkit', () => {
     }
     return doc
   }
-  return { default: vi.fn().mockImplementation(() => makeMockDoc()) }
+  return { default: vi.fn().mockImplementation(function () { return makeMockDoc() }) }
 })
 
 import { generatePurchaseOrderPDF } from '../src/lib/po-pdf'

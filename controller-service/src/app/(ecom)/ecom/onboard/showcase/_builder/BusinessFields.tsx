@@ -3,7 +3,7 @@
 import { Check, Loader2 } from 'lucide-react'
 import { PhoneInput } from '../../../_ui/phone'
 import { Card } from '../../../dashboard/_components/Card'
-import { fieldInput, fieldLabel } from '../../ui'
+import { fieldInput, fieldLabel, fieldRow } from '../../ui'
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { SHOWCASE_SOCIALS, showcaseSocialUrl } from '@/lib/showcase/clean'
 import { SOCIAL_NETWORK_LABELS } from '@/lib/showcase/views'
@@ -172,7 +172,7 @@ export default function BusinessFields({
                 WhatsApp
               </label>
               {b.whatsappSame ? (
-                <div className="flex min-h-11 items-center rounded-xl border border-border-default bg-surface-secondary px-3.5 text-sm text-foreground-secondary">{b.phone || 'Same as the phone number'}</div>
+                <div className={`flex items-center rounded-xl border border-border-default bg-surface-secondary px-3.5 text-sm text-foreground-secondary ${fieldRow}`}>{b.phone || 'Same as the phone number'}</div>
               ) : (
                 <PhoneInput id="sc-whatsapp" value={b.whatsapp} onChange={v => set({ whatsapp: v })} inputClassName={`${inp} min-w-0 flex-1`} />
               )}

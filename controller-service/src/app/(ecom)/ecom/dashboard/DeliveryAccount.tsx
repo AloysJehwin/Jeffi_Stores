@@ -40,7 +40,7 @@ export default function DeliveryAccount({
   }
 
   return (
-    <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+    <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest">Delivery account</div>
         {ownDelhivery && (

@@ -18,6 +18,8 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
   const [name, setName] = useState('')
   const [otp, setOtp] = useState('')
   const [busy, setBusy] = useState(false)
+  // The forms are noValidate: these replace the browser's own "fill out this field" bubbles.
+  const [errors, setErrors] = useState<{ name?: string; email?: string; otp?: string }>({})
   const { leaving, go } = useLeaveTo()
 
   const field = 'w-full rounded-xl bg-surface-elevated px-4 py-3 text-foreground ecom-field border-transparent'
@@ -25,6 +27,12 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault()
+    const found = {
+      name: mode === 'signup' && !name.trim() ? 'Enter your name' : undefined,
+      email: !email.trim() ? 'Enter your email address' : !EMAIL_RE.test(email.trim()) ? 'Enter a valid email address' : undefined,
+    }
+    setErrors(found)
+    if (found.name || found.email) return
     setBusy(true)
     try {
       const res = await fetch('/api/ecom/auth/send-otp', {
@@ -45,6 +53,11 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
 
   async function verify(e: React.FormEvent) {
     e.preventDefault()
+    if (!/^\d{6}$/.test(otp)) {
+      setErrors({ otp: 'Enter the 6-digit code' })
+      return
+    }
+    setErrors({})
     setBusy(true)
     try {
       const res = await fetch('/api/ecom/auth/verify-otp', {
@@ -79,24 +92,40 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
         </p>
 
         {step === 'email' ? (
-          <form onSubmit={sendOtp} className="mt-6 space-y-4">
+          <form noValidate onSubmit={sendOtp} className="mt-6 space-y-4">
             {mode === 'signup' && (
+              <div>
+                <input
+                  className={input}
+                  placeholder="Your name"
+                  aria-label="Your name"
+                  value={name}
+                  onChange={e => {
+                    setName(e.target.value)
+                    setErrors(v => ({ ...v, name: undefined }))
+                  }}
+                  aria-invalid={!!errors.name || undefined}
+                  aria-describedby={errors.name ? 'owner-name-error' : undefined}
+                />
+                <FieldError id="owner-name-error" message={errors.name} />
+              </div>
+            )}
+            <div>
               <input
                 className={input}
-                placeholder="Your name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
+                type="email"
+                placeholder="you@business.com"
+                aria-label="Email"
+                value={email}
+                onChange={e => {
+                  setEmail(e.target.value)
+                  setErrors(v => ({ ...v, email: undefined }))
+                }}
+                aria-invalid={!!errors.email || undefined}
+                aria-describedby={errors.email ? 'owner-email-error' : undefined}
               />
-            )}
-            <input
-              className={input}
-              type="email"
-              placeholder="you@business.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
+              <FieldError id="owner-email-error" message={errors.email} />
+            </div>
             <button
               disabled={busy}
               className="ecom-accent-bg w-full rounded-full disabled:opacity-50 text-white font-display font-bold py-3 transition-colors"
@@ -105,19 +134,27 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
             </button>
           </form>
         ) : (
-          <form onSubmit={verify} className="mt-6 space-y-4">
+          <form noValidate onSubmit={verify} className="mt-6 space-y-4">
             <p className="text-sm text-foreground-secondary break-words">
               Enter the 6-digit code sent to <span className="font-medium">{email}</span>
             </p>
-            <input
-              className={`${field} tracking-[0.4em] text-center text-lg`}
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="••••••"
-              value={otp}
-              onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-              required
-            />
+            <div>
+              <input
+                className={`${field} tracking-[0.4em] text-center text-lg`}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="••••••"
+                aria-label="6-digit code"
+                value={otp}
+                onChange={e => {
+                  setOtp(e.target.value.replace(/\D/g, ''))
+                  setErrors({})
+                }}
+                aria-invalid={!!errors.otp || undefined}
+                aria-describedby={errors.otp ? 'owner-otp-error' : undefined}
+              />
+              <FieldError id="owner-otp-error" message={errors.otp} />
+            </div>
             <button
               disabled={busy || leaving}
               className="ecom-accent-bg w-full inline-flex items-center justify-center gap-2 rounded-full disabled:opacity-50 text-white font-display font-bold py-3 transition-colors"
@@ -127,7 +164,10 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
             </button>
             <button
               type="button"
-              onClick={() => setStep('email')}
+              onClick={() => {
+                setErrors({})
+                setStep('email')
+              }}
               className="w-full min-h-11 sm:min-h-0 text-sm text-foreground-muted hover:text-foreground"
             >
               ← Use a different email
@@ -252,6 +292,18 @@ function GoogleButton({
         {busy || leaving ? 'Signing in…' : 'Continue with Google'}
       </button>
     </>
+  )
+}
+
+// The server's check (lib/auth/social/account.ts).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={id} role="alert" className="mt-1 text-xs text-[#8a2e1f]">
+      {message}
+    </p>
   )
 }
 

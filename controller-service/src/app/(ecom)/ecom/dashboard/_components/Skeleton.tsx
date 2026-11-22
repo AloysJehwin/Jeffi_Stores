@@ -70,7 +70,7 @@ export function FieldLoading({ label, className = '' }: { label: string; classNa
   return (
     <div className={className}>
       <span className="block text-xs text-foreground-muted mb-1">{label}</span>
-      <Sk className="h-10 w-full rounded-xl" />
+      <Sk className="h-control w-full rounded-xl" />
     </div>
   )
 }

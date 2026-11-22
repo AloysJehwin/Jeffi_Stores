@@ -664,6 +664,7 @@ export default function BuildStep({
           />
           {picked && !aiDown && (
             <form
+              noValidate
               className="mt-3 rounded-2xl border border-border-default bg-surface-elevated p-4"
               onSubmit={e => {
                 e.preventDefault()

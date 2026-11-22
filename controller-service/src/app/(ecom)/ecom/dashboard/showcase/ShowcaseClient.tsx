@@ -236,7 +236,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
 
         <Card title="Enquiries">
           <div className="flex flex-wrap items-center gap-4">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full org-sand">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full org-sand">
               <Inbox className="h-5 w-5 text-foreground" />
             </span>
             <p className="min-w-0 flex-1 text-sm text-foreground-secondary">

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '../_components/Card'
 import { ChoiceChips, fieldCls } from '../../_ui'
+import { fieldRow } from '../../onboard/ui'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import Pager from '../_components/Pager'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
@@ -61,11 +62,13 @@ export default function WalletClient({ initial, keyId, tenantName, upiEnabled = 
         ))}
       </div>
       <Card title="Top up">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="space-y-3">
           <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
             options={AMOUNTS.map(a => ({ value: String(a), label: fmt(a) }))} />
-          <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} aria-label="Custom amount" className={`w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm ${fieldCls}`} />
-          <button onClick={topUp} disabled={busy || upi.busy || amount < 100} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy || upi.busy ? 'Opening…' : viaUpi ? 'Pay with UPI' : upiEnabled ? 'Pay' : 'Pay with Razorpay'}</button>
+          <div className="flex items-center gap-3">
+            <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} aria-label="Custom amount" className={`w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm ${fieldCls}`} />
+            <button onClick={topUp} disabled={busy || upi.busy || amount < 100} className={`ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40 ${fieldRow}`}>{busy || upi.busy ? 'Opening…' : viaUpi ? 'Pay with UPI' : upiEnabled ? 'Pay' : 'Pay with Razorpay'}</button>
+          </div>
         </div>
         {upiEnabled && (
           <div className="mt-4 max-w-md">
