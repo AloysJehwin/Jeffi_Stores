@@ -48,6 +48,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 const auth = (targetId: string, extra: Partial<SocialAuth> = {}): SocialAuth => ({ accessToken: 'tok', targetId, ...extra })
+const GOOGLE_APP = { clientId: 'gid', clientSecret: 'test-secret-google' }
 
 describe('Google Business Profile', () => {
   it('maps star ratings', () => {
@@ -58,7 +59,7 @@ describe('Google Business Profile', () => {
   })
 
   it('builds the Google authorize URL with offline access and no PKCE (same as the Merchant sign-in)', () => {
-    const u = new URL(gbpProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal'))
+    const u = new URL(gbpProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal', GOOGLE_APP))
     expect(u.origin + u.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
     expect(u.searchParams.get('client_id')).toBe('gid')
     expect(u.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/business.manage')
@@ -72,7 +73,7 @@ describe('Google Business Profile', () => {
 
   it('exchanges and refreshes tokens', async () => {
     on('https://oauth2.googleapis.com/token', () => json({ access_token: 'a1', refresh_token: 'r1', expires_in: 3600 }))
-    const t = await gbpProvider.oauth!.exchange('code', 'https://a/cb', 'ver')
+    const t = await gbpProvider.oauth!.exchange('code', 'https://a/cb', 'ver', GOOGLE_APP)
     expect(t.accessToken).toBe('a1')
     expect(t.refreshToken).toBe('r1')
     expect(Date.parse(t.expiresAt!)).toBeGreaterThan(Date.now())
@@ -174,7 +175,7 @@ describe('YouTube Shorts', () => {
   })
 
   it('uses the YouTube scopes', () => {
-    const u = new URL(youtubeProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal'))
+    const u = new URL(youtubeProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal', GOOGLE_APP))
     expect(u.searchParams.get('scope')!.split(' ')).toEqual([
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',
@@ -243,7 +244,7 @@ describe('YouTube Shorts', () => {
 
 describe('Pinterest', () => {
   it('builds the authorize URL', () => {
-    const u = new URL(pinterestProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal'))
+    const u = new URL(pinterestProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal', { clientId: 'pid', clientSecret: 'test-secret-pinterest' }))
     expect(u.origin + u.pathname).toBe('https://www.pinterest.com/oauth/')
     expect(u.searchParams.get('scope')).toBe('boards:read,pins:read,pins:write,user_accounts:read')
     expect(u.searchParams.get('client_id')).toBe('pid')
@@ -252,7 +253,7 @@ describe('Pinterest', () => {
 
   it('exchanges with Basic auth and refreshes', async () => {
     on('https://api.pinterest.com/v5/oauth/token', () => json({ access_token: 'pa', refresh_token: 'pr', expires_in: 60 }))
-    const t = await pinterestProvider.oauth!.exchange('c', 'https://a/cb', '')
+    const t = await pinterestProvider.oauth!.exchange('c', 'https://a/cb', '', { clientId: 'pid', clientSecret: 'test-secret-pinterest' })
     expect(t).toMatchObject({ accessToken: 'pa', refreshToken: 'pr' })
     expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('pid:test-secret-pinterest').toString('base64')}`)
     expect(formOf(0).get('grant_type')).toBe('authorization_code')
@@ -313,14 +314,14 @@ describe('LinkedIn', () => {
   })
 
   it('builds the authorize URL', () => {
-    const u = new URL(linkedinProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal'))
+    const u = new URL(linkedinProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal', { clientId: 'lid', clientSecret: 'test-secret-linkedin' }))
     expect(u.origin + u.pathname).toBe('https://www.linkedin.com/oauth/v2/authorization')
     expect(u.searchParams.get('scope')).toBe('r_organization_social w_organization_social rw_organization_admin')
   })
 
   it('exchanges tokens', async () => {
     on('https://www.linkedin.com/oauth/v2/accessToken', () => json({ access_token: 'la', expires_in: 5184000, refresh_token: 'lr' }))
-    const t = await linkedinProvider.oauth!.exchange('c', 'https://a/cb', '')
+    const t = await linkedinProvider.oauth!.exchange('c', 'https://a/cb', '', { clientId: 'lid', clientSecret: 'test-secret-linkedin' })
     expect(t).toMatchObject({ accessToken: 'la', refreshToken: 'lr' })
     expect(formOf(0).get('client_secret')).toBe('test-secret-linkedin')
   })
@@ -395,7 +396,7 @@ describe('X', () => {
   })
 
   it('builds the PKCE authorize URL', () => {
-    const u = new URL(xProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal'))
+    const u = new URL(xProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal', { clientId: 'xid', clientSecret: 'test-secret-x' }))
     expect(u.origin + u.pathname).toBe('https://x.com/i/oauth2/authorize')
     expect(u.searchParams.get('scope')).toBe('tweet.read tweet.write users.read media.write offline.access')
     expect(u.searchParams.get('code_challenge')).toBe('chal')
@@ -404,7 +405,7 @@ describe('X', () => {
 
   it('exchanges and rotates refresh tokens', async () => {
     on('https://api.x.com/2/oauth2/token', () => json({ access_token: 'xa', refresh_token: 'xr2', expires_in: 7200 }))
-    const t = await xProvider.oauth!.exchange('c', 'https://a/cb', 'ver')
+    const t = await xProvider.oauth!.exchange('c', 'https://a/cb', 'ver', { clientId: 'xid', clientSecret: 'test-secret-x' })
     expect(t.accessToken).toBe('xa')
     expect(formOf(0).get('code_verifier')).toBe('ver')
     expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('xid:test-secret-x').toString('base64')}`)

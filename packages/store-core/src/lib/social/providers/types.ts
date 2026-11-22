@@ -71,12 +71,18 @@ export interface TokenSet {
   expiresAt?: string | null
 }
 
+/** The OAuth app a sign-in goes through: the store's own or the platform's (lib/integrations/own-apps). */
+export interface SignInApp {
+  clientId: string
+  clientSecret: string
+}
+
 export interface OAuthSupport {
-  /** Env vars the platform needs for this network's sign-in. */
+  /** Env vars of the platform app for this network's sign-in. */
   env: string[]
   /** PKCE: the challenge is passed when the network needs one. */
-  authorizeUrl(redirectUri: string, state: string, codeChallenge: string): string
-  exchange(code: string, redirectUri: string, codeVerifier: string): Promise<TokenSet>
+  authorizeUrl(redirectUri: string, state: string, codeChallenge: string, app: SignInApp): string
+  exchange(code: string, redirectUri: string, codeVerifier: string, app: SignInApp): Promise<TokenSet>
   /** New tokens from the refresh token; networks that rotate return the new refresh token too. */
   refresh?(auth: SocialAuth): Promise<TokenSet>
   /** Where a post can go for this sign-in, for the picker. */
@@ -96,7 +102,7 @@ export interface SocialProvider {
   reply?(auth: SocialAuth, item: { externalId: string; kind: 'comment' | 'review' }, text: string): Promise<void>
 }
 
-/** The store's own app (client id and secret saved with a manual connection), used only for its own tokens. */
+/** The store's own app saved with its tokens (manual connection or own-app sign-in), used only for those tokens. */
 export function ownApp(auth: Pick<SocialAuth, 'extra'>): { clientId: string; clientSecret: string } | null {
   const clientId = auth.extra?.clientId
   const clientSecret = auth.extra?.clientSecret

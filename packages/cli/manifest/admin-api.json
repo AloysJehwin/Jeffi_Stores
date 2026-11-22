@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "823c58daae1f46310e7bf62420f62e54706abf251cd896a84bb4f6fd97c23b99",
+ "manifestHash": "179ed9e673bb9a7e340dccb0c0d1a85d4cc060df55515590dfc380665e7e0535",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -19520,7 +19520,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "\"Connect with Amazon\" for Amazon Ads. The advertising profile is picked after consent.",
+   "summary": "\"Connect with Amazon\" for Amazon Ads, with the store's own LWA app when it saved one, else the platform's. The advertising profile is picked after consent.",
    "command": "integrations-amazon-ads connect"
   },
   {
@@ -19750,6 +19750,120 @@
    "noBody": true,
    "summary": "Delete meta app (integrations)",
    "command": "integrations meta-app-delete"
+  },
+  {
+   "id": "admin GET /api/admin/integrations/oauth-app/{family}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/integrations/oauth-app/{family}",
+   "gatewayPath": "/v1/admin/integrations/oauth-app/{family}",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/oauth-app/[family]/route.ts",
+   "pathParams": [
+    {
+     "name": "family",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "owner",
+   "body": null,
+   "summary": "Get an oauth app (integrations)",
+   "command": "integrations-oauth-app get"
+  },
+  {
+   "id": "admin POST /api/admin/integrations/oauth-app/{family}",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/integrations/oauth-app/{family}",
+   "gatewayPath": "/v1/admin/integrations/oauth-app/{family}",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/oauth-app/[family]/route.ts",
+   "pathParams": [
+    {
+     "name": "family",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "clientId": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 256
+     },
+     "clientSecret": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 512
+       },
+       {
+        "const": "",
+        "type": "string"
+       }
+      ]
+     },
+     "applicationId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 256
+       },
+       {
+        "const": "",
+        "type": "string"
+       }
+      ]
+     }
+    },
+    "required": [
+     "clientId"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Save the app. Leaving the secret blank keeps the saved one for the same client id.",
+   "command": "integrations-oauth-app post"
+  },
+  {
+   "id": "admin DELETE /api/admin/integrations/oauth-app/{family}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/integrations/oauth-app/{family}",
+   "gatewayPath": "/v1/admin/integrations/oauth-app/{family}",
+   "file": "admin-service/src/app/api/(admin)/admin/integrations/oauth-app/[family]/route.ts",
+   "pathParams": [
+    {
+     "name": "family",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Back to the platform app. Connections made with the own app keep working until they are reconnected.",
+   "command": "integrations-oauth-app delete"
   },
   {
    "id": "admin GET /api/admin/integrations/phonepe",
@@ -42927,7 +43041,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "List networks (social)",
+   "summary": "configured: sign-in is available with the platform app or the store's own app (ownAppSaved).",
    "command": "social-networks list"
   },
   {
@@ -43051,7 +43165,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Sign in to Business Profile, YouTube, Pinterest, LinkedIn or X. The state carries the network and store; the PKCE verifier is derived from its nonce on the callback.",
+   "summary": "Sign in to Business Profile, YouTube, Pinterest, LinkedIn or X with the store's own app when it saved one, else the platform's. The state carries the network, store and app; the PKCE verifier is derived from its nonce on the callback.",
    "command": "social-networks connect"
   },
   {

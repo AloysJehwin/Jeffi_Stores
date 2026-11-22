@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
+import { appForSource, appFieldsForTokens } from '@/lib/integrations/own-apps'
 import { LWA_TOKEN, saveAmazonAdsConfig } from '@/lib/amazon-ads/client'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
   if (!state || state.provider !== 'amazon_ads') return fail('bad_state')
   const code = params.get('code')
   if (!code) return fail('missing_params')
+  const app = await appForSource(state.tenantId, 'amazon_ads', state.app)
+  if (!app) return fail('not_configured')
   try {
     const res = await fetch(LWA_TOKEN, {
       method: 'POST',
@@ -26,13 +29,13 @@ export async function GET(request: NextRequest) {
         grant_type: 'authorization_code',
         code,
         redirect_uri: oauthRedirectUri('amazon_ads'),
-        client_id: process.env.AMAZON_ADS_CLIENT_ID ?? '',
-        client_secret: process.env.AMAZON_ADS_CLIENT_SECRET ?? '',
+        client_id: app.clientId,
+        client_secret: app.clientSecret,
       }),
     })
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.refresh_token) return fail(errorParam(data?.error_description || data?.error || 'exchange_failed'))
-    await saveAmazonAdsConfig(state.tenantId, { refresh_token: data.refresh_token, connected_via: 'oauth' })
+    await saveAmazonAdsConfig(state.tenantId, { refresh_token: data.refresh_token, ...appFieldsForTokens(app, state.app), connected_via: 'oauth' })
     return returnToAdmin(`${backTo}?connected=1&pick=1`)
   } catch (e) {
     return fail(errorParam(e))

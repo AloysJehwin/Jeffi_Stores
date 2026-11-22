@@ -9,6 +9,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Section, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
 import type { NetworkInfo } from './shared'
 import { LoadingSection, LoadingLines } from '@/components/admin/kit/skeleton'
+import OwnAppPanel, { type OwnAppFamily } from '@/components/admin/integrations/OwnAppPanel'
 
 const STATUS_TONE: Record<string, 'green' | 'amber' | 'red' | 'muted'> = {
   connected: 'green',
@@ -26,6 +27,9 @@ const TARGET_FIELD: Record<string, { label: string; placeholder: string }> = {
   x: { label: 'User ID', placeholder: '1234567890' },
 }
 const targetField = (network: string) => TARGET_FIELD[network] ?? { label: 'Target ID', placeholder: '' }
+
+/** The own-app family each network signs in with; Business Profile and YouTube share one Google client. */
+const APP_FAMILY: Record<string, OwnAppFamily> = { gbp: 'google', youtube: 'google', pinterest: 'pinterest', linkedin: 'linkedin', x: 'x' }
 
 export default function Accounts({
   networks,
@@ -60,6 +64,8 @@ export default function Accounts({
   }
 
   if (!networks) return <LoadingSection title="Connected accounts" lines={7} />
+  // One shared Google panel, under the last Google-signed network row.
+  const lastGoogle = networks.filter(n => APP_FAMILY[n.network] === 'google').pop()?.network
 
   return (
     <Section title="Connected accounts">
@@ -129,7 +135,7 @@ export default function Accounts({
                 <div className="text-xs text-foreground-muted rounded-lg bg-surface-secondary p-2 space-y-1">
                   <p>
                     {n.label} sign-in is not set up on this platform yet. It needs:{' '}
-                    <span className="font-mono">{n.missing.join(', ')}</span>.
+                    <span className="font-mono">{n.missing.join(', ')}</span>. Or add your own app below.
                   </p>
                   {n.redirectUri && (
                     <p>
@@ -168,6 +174,13 @@ export default function Accounts({
                     setPicking(null)
                     if (chosen) onChange()
                   }}
+                />
+              )}
+              {APP_FAMILY[n.network] && (APP_FAMILY[n.network] !== 'google' || n.network === lastGoogle) && (
+                <OwnAppPanel
+                  family={APP_FAMILY[n.network]}
+                  title={APP_FAMILY[n.network] === 'google' ? 'Your own Google OAuth client (Business Profile and YouTube)' : undefined}
+                  onChange={onChange}
                 />
               )}
             </li>

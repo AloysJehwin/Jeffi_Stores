@@ -1,6 +1,7 @@
 import type { NextResponse } from 'next/server'
 import { returnToAdmin, type AdminOAuthState } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
+import { appForSource, appFieldsForTokens } from '@/lib/integrations/own-apps'
 import { readAdsConfig, saveAdsConfig, ownAdsAuth, type GoogleAdsConfig } from './credentials'
 import { GoogleAdsClient } from './client'
 import { verifyAccount } from './accounts'
@@ -19,9 +20,9 @@ export async function completeGoogleAdsOAuth(params: URLSearchParams, state: Adm
   const code = params.get('code')
   if (!code) return fail('missing_params')
 
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-  if (!clientId || !clientSecret) return fail('not_configured')
+  // The app that opened the consent screen (the store's own or the platform's).
+  const app = await appForSource(state.tenantId, 'google', state.app)
+  if (!app) return fail('not_configured')
 
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -29,8 +30,8 @@ export async function completeGoogleAdsOAuth(params: URLSearchParams, state: Adm
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: app.clientId,
+        client_secret: app.clientSecret,
         redirect_uri: oauthRedirectUri('google_ads'),
         grant_type: 'authorization_code',
       }),
@@ -42,8 +43,9 @@ export async function completeGoogleAdsOAuth(params: URLSearchParams, state: Adm
     if (typeof data.scope === 'string' && !data.scope.includes('auth/adwords')) return fail('scope_not_granted')
     // Granular consent can drop the Data Manager scope; Google Ads still works, uploads ask again.
     const scopes = typeof data.scope === 'string' ? data.scope.split(/\s+/).filter(Boolean) : undefined
-    // The token belongs to the platform client, so an own client is dropped; the store's own
-    // developer token is kept only where the platform has none (that is what enabled sign-in).
+    // The token belongs to the client that signed in: the store's own app is stored with it, any other
+    // client is dropped. The store's own developer token is kept only where the platform has none
+    // (that is what enabled sign-in).
     const ownToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN
       ? undefined
       : (await readAdsConfig(state.tenantId).catch(() => null))?.developer_token
@@ -52,6 +54,7 @@ export async function completeGoogleAdsOAuth(params: URLSearchParams, state: Adm
       connected_via: 'oauth',
       ...(scopes ? { scopes } : {}),
       ...(ownToken ? { developer_token: ownToken } : {}),
+      ...appFieldsForTokens(app, state.app),
     }
 
     if (state.keepAccount && (await keepAccount(state.tenantId, base))) {

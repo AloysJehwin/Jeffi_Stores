@@ -3,6 +3,7 @@ import { saveIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
+import { appForSource, appFieldsForTokens } from '@/lib/integrations/own-apps'
 import { completeGoogleAdsOAuth } from '@/lib/google-ads/oauth-callback'
 import { emailFromIdToken, registerMerchantApi } from '@/lib/merchant/registration'
 
@@ -26,9 +27,9 @@ export async function GET(request: NextRequest) {
   const code = params.get('code')
   if (!code) return fail('missing_params')
 
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-  if (!clientId || !clientSecret) return fail('not_configured')
+  // The app that opened the consent screen (the store's own or the platform's).
+  const app = await appForSource(state.tenantId, 'google', state.app)
+  if (!app) return fail('not_configured')
 
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -36,8 +37,8 @@ export async function GET(request: NextRequest) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: app.clientId,
+        client_secret: app.clientSecret,
         redirect_uri: oauthRedirectUri('google_merchant'),
         grant_type: 'authorization_code',
       }),
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       provider: 'google_merchant',
       label: 'Google Merchant Center',
       configEnc: encryptToken(
-        JSON.stringify({ oauth_refresh_token: data.refresh_token, merchant_id: state.merchantId })
+        JSON.stringify({ oauth_refresh_token: data.refresh_token, merchant_id: state.merchantId, ...appFieldsForTokens(app, state.app) })
       ),
       meta: { merchant_id: state.merchantId, connected_via: 'oauth' },
     })

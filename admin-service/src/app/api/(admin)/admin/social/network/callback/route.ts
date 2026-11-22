@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
+import { NETWORK_APP_FAMILY, appFieldsForTokens, appForSource } from '@/lib/integrations/own-apps'
 import { saveNetworkAccount } from '@/lib/social/accounts'
 import { NETWORKS, providerFor, type Network } from '@/lib/social/providers'
 import { pkceVerifier, socialRedirectUri } from '@/lib/social/oauth'
@@ -9,8 +10,9 @@ import { pkceVerifier, socialRedirectUri } from '@/lib/social/oauth'
 export const dynamic = 'force-dynamic'
 
 // One callback for every non-Meta network: cookieless and cross-site, trusted through the signed
-// state. Saves the tokens as pending; the admin then picks the page, board or channel. When the
-// sign-in reaches exactly one target it is chosen straight away.
+// state. Exchanges the code with the app that opened the consent screen; a store's own app is kept
+// with the tokens so refresh uses it too. Saves the tokens as pending; the admin then picks the
+// page, board or channel. When the sign-in reaches exactly one target it is chosen straight away.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const rawState = params.get('state')
@@ -24,8 +26,12 @@ export async function GET(request: NextRequest) {
   const oauth = providerFor(network).oauth
   const code = params.get('code')
   if (!oauth || !code) return fail('missing_params')
+  const app = await appForSource(state.tenantId, NETWORK_APP_FAMILY[network as keyof typeof NETWORK_APP_FAMILY], state.app)
+  if (!app) return fail('not_configured')
   try {
-    const tokens = await oauth.exchange(code, socialRedirectUri(), pkceVerifier(state.nonce))
+    const exchanged = await oauth.exchange(code, socialRedirectUri(), pkceVerifier(state.nonce), app)
+    // Store a portal-saved app (the store's or the flagship's) with the tokens so refresh uses it.
+    const tokens = appFieldsForTokens(app).client_id ? { ...exchanged, extra: { via: 'signin', clientId: app.clientId, clientSecret: app.clientSecret } } : exchanged
     const tenantId = state.tenantId === PLATFORM_TENANT_ID ? null : state.tenantId
     const targets = await oauth.listTargets(tokens.accessToken).catch(() => [])
     await saveNetworkAccount(tenantId, network, tokens, targets.length === 1 ? targets[0] : null)

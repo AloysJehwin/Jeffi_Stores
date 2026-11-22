@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/admin/kit/layout'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
 import { credentialOwnerId } from '@/lib/integrations/owner'
 import { listIntegrationCredentials } from '@/lib/tenant-registry'
-import { oauthProviderInfo } from '@/lib/integrations/oauth'
+import { storeOAuthInfo } from '@/lib/integrations/oauth'
 import { merchantConfigured, getMerchantId } from '@/lib/merchant/client'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,8 @@ export const revalidate = 0
 
 export default async function MerchantPage() {
   // Stores and the flagship connect through the same gear; the flagship's creds sit under the platform id.
-  const integrations = await listIntegrationCredentials(await credentialOwnerId())
+  const owner = await credentialOwnerId()
+  const integrations = await listIntegrationCredentials(owner)
   const connected = await merchantConfigured()
   const merchantId = connected ? await getMerchantId().catch(() => null) : null
 
@@ -26,8 +27,8 @@ export default async function MerchantPage() {
             integrations={integrations}
             socialAccounts={[]}
             oauth={{
-              google_merchant: oauthProviderInfo('google_merchant'),
-              amazon_seller: oauthProviderInfo('amazon_seller'),
+              google_merchant: await storeOAuthInfo('google_merchant', owner),
+              amazon_seller: await storeOAuthInfo('amazon_seller', owner),
             }}
           />
         }

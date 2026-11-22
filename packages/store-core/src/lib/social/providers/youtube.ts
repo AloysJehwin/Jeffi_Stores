@@ -30,8 +30,8 @@ export const youtubeProvider: SocialProvider = {
   requires: { video: true },
   oauth: {
     env: GOOGLE_ENV,
-    authorizeUrl: (redirectUri, state, challenge) => googleAuthorizeUrl(SCOPES, redirectUri, state, challenge),
-    exchange: (code, redirectUri, verifier) => googleExchange('youtube', LABEL, code, redirectUri, verifier),
+    authorizeUrl: (redirectUri, state, _challenge, app) => googleAuthorizeUrl(SCOPES, redirectUri, state, app),
+    exchange: (code, redirectUri, _verifier, app) => googleExchange('youtube', LABEL, code, redirectUri, app),
     refresh: auth => googleRefresh('youtube', LABEL, auth),
     async listTargets(token) {
       const res = await yt<{ items?: { id: string; snippet?: { title?: string } }[] }>(

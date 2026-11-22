@@ -1,3 +1,4 @@
+import { NETWORK_APP_FAMILY, readOwnApp } from '@/lib/integrations/own-apps'
 import { controlPlanePool } from '@/lib/tenant-registry/shared'
 import { queryMany } from '@/lib/shared/db'
 import { metaOAuthInfo } from '@/lib/integrations/oauth'
@@ -120,8 +121,13 @@ export async function listAutopostRules(tenantId: string | null) {
 
 /** Every network with its connection state and whether the platform has its app credentials. */
 export async function listConnections(tenantId: string | null) {
-  const rows = await listAccounts(tenantId)
-  const meta = await metaOAuthInfo('meta', tenantId ?? PLATFORM_TENANT_ID)
+  const owner = tenantId ?? PLATFORM_TENANT_ID
+  const [rows, meta] = await Promise.all([listAccounts(tenantId), metaOAuthInfo('meta', owner)])
+  // A store's own app for the network's family also makes sign-in available (ownApp: this connection carries one).
+  const families = [...new Set(Object.values(NETWORK_APP_FAMILY))]
+  const saved = new Map(await Promise.all(families.map(async f => [f, !!(await readOwnApp(owner, f))] as const)))
+  // The flagship's portal-saved app is every store's default.
+  const portalDefault = new Map(await Promise.all(families.map(async f => [f, !!(await readOwnApp(PLATFORM_TENANT_ID, f))] as const)))
   return NETWORKS.map(network => {
     const p = providerFor(network)
     const row = rows.find(a => a.provider === network)
@@ -129,6 +135,8 @@ export async function listConnections(tenantId: string | null) {
     const isMeta = network === 'facebook' || network === 'instagram'
     const platformEnv = !tenantId && !row && isMeta && !!process.env.META_JEFFI_PAGE_TOKEN
     const info = row && !isMeta ? connectionInfo(row) : null
+    const family = NETWORK_APP_FAMILY[network as keyof typeof NETWORK_APP_FAMILY]
+    const ownAppSaved = family ? !!saved.get(family) : false
     return {
       network,
       label: NETWORK_LABEL[network],
@@ -137,7 +145,8 @@ export async function listConnections(tenantId: string | null) {
       tokenExpiry: row?.token_expiry ?? null,
       via: info?.via ?? null,
       ownApp: info?.ownApp ?? false,
-      configured: missing.length === 0,
+      ownAppSaved,
+      configured: missing.length === 0 || ownAppSaved || (family ? !!portalDefault.get(family) : false),
       missing,
       redirectUri: network === 'facebook' || network === 'instagram' ? meta.redirectUri : socialRedirectUri(),
       limits: p.limits,

@@ -83,17 +83,17 @@ export const linkedinProvider: SocialProvider = {
   requires: {},
   oauth: {
     env: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
-    authorizeUrl(redirectUri, state) {
+    authorizeUrl(redirectUri, state, _challenge, app) {
       const p = new URLSearchParams({
         response_type: 'code',
-        client_id: process.env.LINKEDIN_CLIENT_ID ?? '',
+        client_id: app.clientId,
         redirect_uri: redirectUri,
         state,
         scope: 'r_organization_social w_organization_social rw_organization_admin',
       })
       return `https://www.linkedin.com/oauth/v2/authorization?${p}`
     },
-    exchange: (code, redirectUri) => token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
+    exchange: (code, redirectUri, _verifier, app) => token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }, app),
     async refresh(auth) {
       if (!auth.refreshToken) throw new SocialApiError('linkedin', 401, `${LABEL}: no refresh token, sign in again`)
       return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))

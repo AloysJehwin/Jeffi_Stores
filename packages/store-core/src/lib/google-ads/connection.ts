@@ -1,5 +1,5 @@
 import { getIntegrationCredential } from '@/lib/tenant-registry'
-import { oauthProviderInfo, type OAuthProviderInfo } from '@/lib/integrations/oauth'
+import { storeOAuthInfo, type OAuthProviderInfo } from '@/lib/integrations/oauth'
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 import { GOOGLE_ADS_PROVIDER, googleAdsEnvStatus, type GoogleAdsEnvStatus, type AdsConnectedVia } from './credentials'
@@ -41,8 +41,9 @@ export async function getAdsConnectionStatus(tenantKey: string): Promise<AdsConn
   const ownCredentials = { developerToken: meta.own_developer_token === true, oauthClient: meta.own_oauth_client === true }
   const base = {
     env,
-    // Sign-in uses the platform OAuth client; the store's own developer token stands in for the platform's.
-    oauth: oauthProviderInfo('google_ads', ownCredentials.developerToken ? ['GOOGLE_ADS_DEVELOPER_TOKEN'] : []),
+    // Sign-in uses the store's own Google OAuth client when saved, else the platform's; the store's own
+    // developer token stands in for the platform's.
+    oauth: await storeOAuthInfo('google_ads', tenantKey, ownCredentials.developerToken ? ['GOOGLE_ADS_DEVELOPER_TOKEN'] : []),
     ownCredentials,
     flagship,
     serviceAccountEmail: flagship ? serviceAccountEmail() : null,

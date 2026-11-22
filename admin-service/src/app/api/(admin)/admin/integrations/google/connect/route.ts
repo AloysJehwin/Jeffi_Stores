@@ -4,7 +4,8 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { credentialOwnerId } from '@/lib/integrations/owner'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
-import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
+import { oauthRedirectUri } from '@/lib/integrations/oauth'
+import { resolveOAuthApp } from '@/lib/integrations/own-apps'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ const GMC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/content openid email'
 
 // Store-admin "Connect Google Merchant Center" with Google sign-in. The merchant id is chosen
 // before consent and carried in the signed state; the callback stores a refresh token for it.
+// Signs in with the store's own Google OAuth client when it saved one, else the platform's.
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
@@ -23,7 +25,8 @@ export async function GET(request: NextRequest) {
   if (!/^\d{5,20}$/.test(merchantId)) {
     return NextResponse.redirect(`${back}?connected=0&provider=google&error=invalid_merchant_id`)
   }
-  if (!oauthProviderInfo('google_merchant').enabled) {
+  const r = await resolveOAuthApp(tenant.tenantId, 'google')
+  if (!r || !process.env.CRON_SECRET) {
     return NextResponse.redirect(`${back}?connected=0&provider=google&error=not_configured`)
   }
 
@@ -32,10 +35,11 @@ export async function GET(request: NextRequest) {
     provider: 'google_merchant',
     nonce: crypto.randomBytes(8).toString('hex'),
     merchantId,
+    app: r.source,
   })
 
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-  url.searchParams.set('client_id', process.env.GOOGLE_OAUTH_CLIENT_ID!)
+  url.searchParams.set('client_id', r.app.clientId)
   url.searchParams.set('redirect_uri', oauthRedirectUri('google_merchant'))
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', GMC_OAUTH_SCOPE)
