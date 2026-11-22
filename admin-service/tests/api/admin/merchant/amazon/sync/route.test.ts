@@ -194,13 +194,13 @@ describe('POST /api/admin/merchant/amazon/sync — modes', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.mode).toBe('dryrun')
-    expect(mockDryRun).toHaveBeenCalledWith(500) // clamped to max 500
+    expect(mockDryRun).toHaveBeenCalledWith(500, null) // clamped to max 500
   })
 
   it('dryrun defaults limit to 100 when not a number', async () => {
     mockDryRun.mockResolvedValue({} as any)
     await POST(makePost({ body: { mode: 'dryrun' } }))
-    expect(mockDryRun).toHaveBeenCalledWith(100)
+    expect(mockDryRun).toHaveBeenCalledWith(100, null)
   })
 
   it('single-product sync when productId given (no mode)', async () => {

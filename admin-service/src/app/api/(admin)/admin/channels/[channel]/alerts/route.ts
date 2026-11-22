@@ -17,8 +17,10 @@ const WRITE_SCOPE: Record<Channel, string> = {
   razorpay: 'financial:write',
   myntra: 'myntra:write',
   ajio: 'ajio:write',
+  flipkart: 'flipkart:write',
   myntra_ads: 'myntra_ads:write',
   ajio_ads: 'ajio_ads:write',
+  flipkart_ads: 'flipkart_ads:write',
 }
 
 type Ctx = { params: Promise<{ channel: string }> }

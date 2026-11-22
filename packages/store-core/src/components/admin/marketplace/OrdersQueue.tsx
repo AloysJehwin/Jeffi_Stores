@@ -122,7 +122,7 @@ export default function OrdersQueue({ channel }: { channel: Channel }) {
     const docs = r.status !== 'created' && r.status !== 'rejected'
     return [
       { key: 'accept', label: 'Accept', icon: Check, variant: 'accent', scope, hidden: r.status !== 'created', busy: busy === `accept:${r.id}`, onSelect: () => void act('accept', [r]) },
-      { key: 'pack', label: 'Mark packed', icon: Package, scope, hidden: channel !== 'ajio' || r.status !== 'accepted', busy: busy === `pack:${r.id}`, onSelect: () => void act('pack', [r]) },
+      { key: 'pack', label: 'Mark packed', icon: Package, scope, hidden: channel === 'myntra' || r.status !== 'accepted', busy: busy === `pack:${r.id}`, onSelect: () => void act('pack', [r]) },
       {
         key: 'rtd',
         label: 'Ready to dispatch',
@@ -203,15 +203,15 @@ export default function OrdersQueue({ channel }: { channel: Channel }) {
     bulk.push({ key: 'accept', label: 'Accept', icon: <Check className="h-3.5 w-3.5" />, scope, onRun: rows => void act('accept', rows) })
     bulk.push({ key: 'reject', label: 'Reject', icon: <X className="h-3.5 w-3.5" />, danger: true, scope, onRun: rows => setRejecting(rows) })
   } else if (bucket === 'to_pack') {
-    if (channel === 'ajio') bulk.push({ key: 'pack', label: 'Mark packed', icon: <Package className="h-3.5 w-3.5" />, scope, onRun: rows => void act('pack', rows.filter(r => r.status === 'accepted')) })
+    if (channel !== 'myntra') bulk.push({ key: 'pack', label: 'Mark packed', icon: <Package className="h-3.5 w-3.5" />, scope, onRun: rows => void act('pack', rows.filter(r => r.status === 'accepted')) })
     bulk.push({
       key: 'rtd',
       label: 'Ready to dispatch',
       icon: <Truck className="h-3.5 w-3.5" />,
       scope,
-      onRun: rows => void act('ready_to_dispatch', channel === 'ajio' ? rows.filter(r => r.status === 'packed') : rows),
+      onRun: rows => void act('ready_to_dispatch', channel !== 'myntra' ? rows.filter(r => r.status === 'packed') : rows),
     })
-  } else if (bucket === 'rtd' && channel === 'ajio') {
+  } else if (bucket === 'rtd' && channel !== 'myntra') {
     bulk.push({ key: 'manifest', label: `Create manifest (max ${MANIFEST_MAX})`, icon: <ClipboardList className="h-3.5 w-3.5" />, scope, onRun: rows => manifest(rows.filter(r => !r.manifest_id)) })
   }
 
@@ -254,7 +254,11 @@ export default function OrdersQueue({ channel }: { channel: Channel }) {
       {bucket === 'rtd' && channel === 'ajio' && (
         <p className="text-xs text-foreground-muted">Select up to {MANIFEST_MAX} packets and create a manifest, then hand the packets and the manifest to AJIO&apos;s courier.</p>
       )}
+      {bucket === 'rtd' && channel === 'flipkart' && (
+        <p className="text-xs text-foreground-muted">Create the manifest for today&apos;s ready-to-dispatch shipments, then hand the packets and the manifest to Flipkart&apos;s courier.</p>
+      )}
       {bucket === 'to_pack' && channel === 'ajio' && <p className="text-xs text-foreground-muted">Mark orders packed first: AJIO raises its purchase order then, and we invoice AJIO for it.</p>}
+      {bucket === 'to_pack' && channel === 'flipkart' && <p className="text-xs text-foreground-muted">Mark shipments packed first: Flipkart then generates the label and invoice (Label download), and the shipment can be marked ready to dispatch.</p>}
 
       <DataTable<QueueOrderRow>
         rows={rows}

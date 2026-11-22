@@ -2,14 +2,16 @@ import { runChannelAlerts } from '@/lib/channels/alerts-engine'
 import { errorText, withChannelLock } from '@/lib/channels/sync-run'
 import { resolveMarketplaceCreds } from '@/lib/integrations/resolve'
 import { marketplaceRules } from './alerts'
-import { retryPendingEvents } from './ingest'
+import { processEvents, recordEvents, retryPendingEvents } from './ingest'
 import { pollListingTasks } from './listings'
 import { getAdapter } from './registry'
 import { pushMarketplaceStock } from './stock'
 import type { MarketplaceChannel } from './types'
 
-// The {myntra,ajio}-sync cron (every 10 min): retry order events the push didn't finish, poll
-// listing submissions, push stock, then run the alert rules.
+// The {myntra,ajio,flipkart}-sync cron (every 10 min): poll orders where the adapter polls (Flipkart),
+// retry order events the push didn't finish, poll listing submissions, push stock, then run the alert rules.
+
+const POLL_LOOKBACK_MS = 3 * 86_400_000
 
 export async function marketplaceSyncSkip(channel: MarketplaceChannel): Promise<string | null> {
   return (await resolveMarketplaceCreds(channel)) ? null : 'not_connected'
@@ -19,7 +21,16 @@ export async function runMarketplaceSync(channel: MarketplaceChannel) {
   const creds = await resolveMarketplaceCreds(channel)
   if (!creds) return { skipped: 'not_connected' }
   const adapter = getAdapter(channel, creds)
-  const sync = await withChannelLock(channel, channel === 'myntra' ? 'myntra_sync' : 'ajio_sync', 'sync', async ({ step, counts, errors }) => {
+  const sync = await withChannelLock(channel, `${channel}_sync`, 'sync', async ({ step, counts, errors }) => {
+    if (adapter.pollOrders) {
+      await step('poll_orders', async () => {
+        const events = await adapter.pollOrders!(new Date(Date.now() - POLL_LOOKBACK_MS))
+        if (!events.length) return 0
+        const { ids } = await recordEvents(channel, events, 'poll')
+        await processEvents(ids, 30_000)
+        return ids.length
+      })
+    }
     await step('events', async () => {
       const t = await retryPendingEvents(channel, { budgetMs: 60_000 })
       if (t.failed) {

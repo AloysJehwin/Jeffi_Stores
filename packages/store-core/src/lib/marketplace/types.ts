@@ -1,17 +1,17 @@
-// Shared shapes for the Myntra and AJIO integrations. Adapters turn each marketplace's payloads into
+// Shared shapes for the Myntra, AJIO and Flipkart integrations. Adapters turn each marketplace's payloads into
 // these; everything downstream (upsert, stock, pages) only sees the normalised form.
 
-export type MarketplaceChannel = 'myntra' | 'ajio'
+export type MarketplaceChannel = 'myntra' | 'ajio' | 'flipkart'
 export type MarketplaceMode = 'live' | 'sandbox' | 'mock'
 
-export const MARKETPLACE_CHANNELS: readonly MarketplaceChannel[] = ['myntra', 'ajio']
+export const MARKETPLACE_CHANNELS: readonly MarketplaceChannel[] = ['myntra', 'ajio', 'flipkart']
 
-export const isMarketplaceChannel = (s: unknown): s is MarketplaceChannel => s === 'myntra' || s === 'ajio'
+export const isMarketplaceChannel = (s: unknown): s is MarketplaceChannel => s === 'myntra' || s === 'ajio' || s === 'flipkart'
 
-export const CHANNEL_LABEL: Record<MarketplaceChannel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
+export const CHANNEL_LABEL: Record<MarketplaceChannel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart' }
 
-/** Order number prefix on our orders (MYN-…, AJI-…). */
-export const ORDER_PREFIX: Record<MarketplaceChannel, string> = { myntra: 'MYN', ajio: 'AJI' }
+/** Order number prefix on our orders (MYN-…, AJI-…, FKT-…). */
+export const ORDER_PREFIX: Record<MarketplaceChannel, string> = { myntra: 'MYN', ajio: 'AJI', flipkart: 'FKT' }
 
 export const MARKET_STATUSES = [
   'created',

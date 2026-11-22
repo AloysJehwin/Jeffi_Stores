@@ -1,12 +1,12 @@
 // Ads report columns: the canonical fields, per-marketplace header synonyms, and the cell parsers
 // (rupee amounts with Indian commas, percentages, dd-mm-yyyy and other date forms). Client-safe.
 
-export type AdsMarket = 'myntra' | 'ajio'
-export type AdsChannel = 'myntra_ads' | 'ajio_ads'
+export type AdsMarket = 'myntra' | 'ajio' | 'flipkart'
+export type AdsChannel = 'myntra_ads' | 'ajio_ads' | 'flipkart_ads'
 
-export const ADS_MARKET: Record<AdsChannel, AdsMarket> = { myntra_ads: 'myntra', ajio_ads: 'ajio' }
-export const adsChannelOf = (m: AdsMarket): AdsChannel => (m === 'myntra' ? 'myntra_ads' : 'ajio_ads')
-export const isAdsChannel = (v: unknown): v is AdsChannel => v === 'myntra_ads' || v === 'ajio_ads'
+export const ADS_MARKET: Record<AdsChannel, AdsMarket> = { myntra_ads: 'myntra', ajio_ads: 'ajio', flipkart_ads: 'flipkart' }
+export const adsChannelOf = (m: AdsMarket): AdsChannel => (m === 'myntra' ? 'myntra_ads' : m === 'flipkart' ? 'flipkart_ads' : 'ajio_ads')
+export const isAdsChannel = (v: unknown): v is AdsChannel => v === 'myntra_ads' || v === 'ajio_ads' || v === 'flipkart_ads'
 
 export type AdField =
   | 'date'
@@ -82,6 +82,14 @@ const BY_MARKET: Record<AdsMarket, Partial<Record<AdField, string[]>>> = {
     spend: ['ad spends', 'campaign spend'],
     sales: ['ad gmv', 'revenue generated'],
     orders: ['converted orders'],
+  },
+  flipkart: {
+    style_id: ['fsn', 'product id', 'listing id'],
+    sku: ['seller sku', 'sku id'],
+    spend: ['ad spend', 'budget spent'],
+    sales: ['direct revenue', 'total revenue', 'revenue'],
+    units: ['direct units', 'units sold', 'total units'],
+    orders: ['direct converted units'],
   },
 }
 

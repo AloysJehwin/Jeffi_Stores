@@ -15,10 +15,11 @@ vi.mock('nodemailer', () => ({
     })),
   },
 }))
-vi.mock('@/lib/merchant/product-fetch', () => ({
-  fetchAllActiveProducts: vi.fn(),
-  fetchProduct: vi.fn(),
-}))
+vi.mock('@/lib/merchant/product-fetch', () => {
+  const fetchAllActiveProducts = vi.fn()
+  return { fetchAllActiveProducts, fetchProductsForPush: vi.fn(() => fetchAllActiveProducts()), fetchProduct: vi.fn() }
+})
+vi.mock('@/lib/channels/brand-approvals', () => ({ loadBrandGate: vi.fn(async () => ({ allows: () => true })) }))
 vi.mock('@/lib/amazon/mapper', () => ({
   productToAmazonListings: vi.fn(),
   productToAmazonOfferListing: vi.fn(),

@@ -4,25 +4,27 @@ import { ChannelPanelLoading, RangeLoading, TableSectionLoading } from '@/compon
 // Loading shapes for the Myntra / AJIO consoles and their ads consoles. Server-safe (no client
 // imports), so the routes' loading.tsx and the client panels share them.
 
-type Channel = 'myntra' | 'ajio'
-type AdsChannel = 'myntra_ads' | 'ajio_ads'
+type Channel = 'myntra' | 'ajio' | 'flipkart'
+type AdsChannel = 'myntra_ads' | 'ajio_ads' | 'flipkart_ads'
 
 export const MARKETPLACE_INFO: Record<Channel, { title: string; description: string }> = {
   myntra: { title: 'Myntra', description: 'Orders pushed by Myntra, listings, stock, returns and settlements' },
   ajio: { title: 'AJIO', description: 'Orders pushed by AJIO, purchase orders, listings, stock, returns and settlements' },
+  flipkart: { title: 'Flipkart', description: 'Flipkart shipments, labels and dispatch, listings, stock, returns and settlements' },
 }
 export const MARKETPLACE_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'orders', label: 'Orders' },
   { id: 'returns', label: 'Returns' },
   { id: 'listings', label: 'Listings' },
+  { id: 'brands', label: 'Brands' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'settlements', label: 'Settlements' },
   { id: 'alerts', label: 'Alerts' },
   { id: 'changes', label: 'Changes' },
   { id: 'runs', label: 'Runs' },
 ]
-export const ADS_TITLE: Record<AdsChannel, string> = { myntra_ads: 'Myntra Ads', ajio_ads: 'AJIO Ads' }
+export const ADS_TITLE: Record<AdsChannel, string> = { myntra_ads: 'Myntra Ads', ajio_ads: 'AJIO Ads', flipkart_ads: 'Flipkart Ads' }
 export const ADS_DESCRIPTION = 'Spend, sales, campaigns and products from the reports you import'
 export const ADS_TABS = ['Overview', 'Campaigns', 'Products', 'Import', 'Alerts']
 export const IMPORT_HISTORY_COLUMNS = ['Imported', 'File', 'Kind', 'Period', 'Rows', 'Replaced', 'Spend', 'By']
@@ -122,6 +124,8 @@ export function MarketplaceTabLoading({ tab }: { tab: string }) {
       return <LoadingTable toolbar={0} columns={['Return', 'Order', 'Type', 'Reason', 'Refund', 'Status', 'Stock', 'Updated']} />
     case 'listings':
       return <ListingsLoading />
+    case 'brands':
+      return <LoadingTable toolbar={0} columns={['Brand', 'Products', 'Status', 'Set', '']} />
     case 'inventory':
       return <InventoryLoading />
     case 'settlements':

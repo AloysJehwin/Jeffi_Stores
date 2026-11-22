@@ -22,6 +22,8 @@ export interface ImageSpec {
 export const IMAGE_SPECS: Record<MarketplaceChannel, ImageSpec> = {
   myntra: { width: 1080, height: 1440, minBytes: 500 * 1024, maxBytes: 1_000_000, maxImages: 10, publicUrls: false },
   ajio: { width: 1000, height: null, minBytes: 0, maxBytes: 2_000_000, maxImages: 14, publicUrls: true },
+  // Flipkart: at least 500 px on the long side, up to 10 MB; 1500 px square is what Seller Hub recommends.
+  flipkart: { width: 1500, height: 1500, minBytes: 0, maxBytes: 10_000_000, maxImages: 10, publicUrls: true },
 }
 
 export const MAX_PACK_IMAGES = 150

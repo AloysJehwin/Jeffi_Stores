@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import CopySku from '@/components/ui/CopySku'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import BrandApprovalsPanel from '@/components/admin/channels/BrandApprovalsPanel'
+import ScopedPushPanel, { type ScopedPushResult } from '@/components/admin/channels/ScopedPushPanel'
 import { useToast } from '@/contexts/ToastContext'
 import { countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 import { groupAmazonSyncErrors } from '@/lib/amazon/sync-errors'
@@ -155,6 +157,11 @@ export default function AmazonMerchantPanel() {
     }
   }
 
+  const onScopedPush = (data: ScopedPushResult) => {
+    setSyncStatus({ status: data.errors?.length ? 'error' : 'success', synced: data.synced, errors: data.errors, finished_at: data.finishedAt })
+    setSyncRunning(false)
+  }
+
   const syncNow = async () => {
     setSyncing(true)
     try {
@@ -193,6 +200,7 @@ export default function AmazonMerchantPanel() {
   }
 
   return (
+    <div className="space-y-4">
     <section className="rounded-xl border border-border-default bg-surface-elevated">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default px-4 py-3">
         <div className="flex items-center gap-2">
@@ -229,6 +237,16 @@ export default function AmazonMerchantPanel() {
           <p className="text-xs text-foreground-muted">A sync is running. This updates when it finishes.</p>
         ) : null}
         {syncStatus?.status === 'error' && syncStatus.errors?.length ? <SyncErrors errors={syncStatus.errors} /> : null}
+
+        <ScopedPushPanel
+          channel="amazon"
+          endpoint="/api/admin/merchant/amazon/sync"
+          writeScope="merchant_sync:write"
+          dryRun
+          running={syncing || syncRunning}
+          onPushed={onScopedPush}
+          onRunning={() => setSyncRunning(true)}
+        />
 
         {list.loading && !summary ? (
           <LoadingKpis labels={['Total listings', 'Approved', 'Pending', 'Blocked']} />
@@ -273,5 +291,7 @@ export default function AmazonMerchantPanel() {
 
       </div>
     </section>
+    <BrandApprovalsPanel channel="amazon" />
+    </div>
   )
 }

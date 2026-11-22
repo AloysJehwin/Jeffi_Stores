@@ -56,6 +56,7 @@ const COMMON: Record<SettlementField, string[]> = {
 export const SETTLEMENT_SYNONYMS: Record<MarketplaceChannel, Record<SettlementField, string[]>> = {
   myntra: { ...COMMON, order_id: ['order release id', 'store order id', ...COMMON.order_id], line_id: ['order line id', 'packet id', ...COMMON.line_id] },
   ajio: { ...COMMON, order_id: ['cust order no', 'customer order number', 'customer order no', ...COMMON.order_id], line_id: ['shipment id', ...COMMON.line_id] },
+  flipkart: { ...COMMON, order_id: ['order id', 'order_id', ...COMMON.order_id], line_id: ['order item id', 'order_item_id', ...COMMON.line_id] },
 }
 
 export function suggestSettlementColumns(channel: MarketplaceChannel, headers: string[]): SettlementMapping {
@@ -471,11 +472,11 @@ export interface MarketplaceSettlementsOverview {
 }
 
 export async function loadMarketplaceSettlementsOverview(range: { from: string; to: string }): Promise<MarketplaceSettlementsOverview> {
-  const [ours, amazon, recentOurs, recentAmazon, myntraRec, ajioRec] = await Promise.all([
+  const [ours, amazon, recentOurs, recentAmazon, myntraRec, ajioRec, flipkartRec] = await Promise.all([
     queryMany<any>(
       `SELECT channel, count(*) AS count, SUM(gross) AS gross, SUM(commission + fees) AS charges, SUM(tax_withheld) AS tax, SUM(refunds) AS refunds,
               SUM(net_amount) AS net, MAX(settled_on) AS last
-         FROM marketplace_settlements WHERE channel IN ('myntra', 'ajio') AND COALESCE(settled_on, imported_at::date) BETWEEN $1::date AND $2::date
+         FROM marketplace_settlements WHERE channel IN ('myntra', 'ajio', 'flipkart') AND COALESCE(settled_on, imported_at::date) BETWEEN $1::date AND $2::date
         GROUP BY channel`,
       [range.from, range.to]
     ).catch(() => []),
@@ -487,7 +488,7 @@ export async function loadMarketplaceSettlementsOverview(range: { from: string; 
     ).catch(() => null),
     queryMany<any>(
       `SELECT channel, settlement_ref AS ref, settled_on, gross, commission + fees AS charges, net_amount AS net FROM marketplace_settlements
-        WHERE channel IN ('myntra', 'ajio') AND COALESCE(settled_on, imported_at::date) BETWEEN $1::date AND $2::date
+        WHERE channel IN ('myntra', 'ajio', 'flipkart') AND COALESCE(settled_on, imported_at::date) BETWEEN $1::date AND $2::date
         ORDER BY settled_on DESC NULLS LAST LIMIT 30`,
       [range.from, range.to]
     ).catch(() => []),
@@ -499,6 +500,7 @@ export async function loadMarketplaceSettlementsOverview(range: { from: string; 
     ).catch(() => []),
     receivableFor('myntra'),
     receivableFor('ajio'),
+    receivableFor('flipkart'),
   ])
   const day = (v: unknown) => (v ? String(v instanceof Date ? v.toISOString() : v).slice(0, 10) : null)
   const summary = (channel: SettlementChannel, label: string, r: any, receivable: Receivable | null): ChannelSummary => ({
@@ -516,6 +518,7 @@ export async function loadMarketplaceSettlementsOverview(range: { from: string; 
   const channels = [
     summary('myntra', CHANNEL_LABEL.myntra, ours.find((r: any) => r.channel === 'myntra'), myntraRec),
     summary('ajio', CHANNEL_LABEL.ajio, ours.find((r: any) => r.channel === 'ajio'), ajioRec),
+    summary('flipkart', CHANNEL_LABEL.flipkart, ours.find((r: any) => r.channel === 'flipkart'), flipkartRec),
     summary('amazon', 'Amazon', amazon, null),
   ]
   const recent = [...recentOurs, ...recentAmazon]
@@ -529,8 +532,8 @@ export async function loadMarketplaceSettlementsOverview(range: { from: string; 
     totals: {
       net: channels.reduce((s, c) => s + c.net, 0),
       charges: channels.reduce((s, c) => s + c.charges, 0),
-      receivable: myntraRec.unsettledValue + ajioRec.unsettledValue,
-      overdue: myntraRec.overdueOrders + ajioRec.overdueOrders,
+      receivable: myntraRec.unsettledValue + ajioRec.unsettledValue + flipkartRec.unsettledValue,
+      overdue: myntraRec.overdueOrders + ajioRec.overdueOrders + flipkartRec.overdueOrders,
     },
   }
 }

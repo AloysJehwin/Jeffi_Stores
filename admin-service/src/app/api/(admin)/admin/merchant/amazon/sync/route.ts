@@ -10,6 +10,7 @@ import {
   AmazonSyncInProgressError,
 } from '@/lib/amazon/sync'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
+import { parsePushScope } from '@/lib/channels/brand-approvals'
 
 // Full push pages one PUT per SKU (~3000 variants) with backoff — allow up to 5 min.
 export const maxDuration = 300
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const productId: string | undefined = body.productId
   const mode: string | undefined = body.mode
+  // `brandIds` / `categoryIds` push only those brands or categories (a category includes its sub-categories).
+  const scope = parsePushScope(body)
 
   try {
     // Validation preview: map one product and check it against Amazon's schema WITHOUT
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Dry run: report ASIN-match + listability across a sample of products. Writes nothing.
     if (mode === 'dryrun') {
       const limit = Math.min(500, Math.max(1, Number(body.limit) || 100))
-      const report = await dryRunAmazonSync(limit)
+      const report = await dryRunAmazonSync(limit, scope)
       return NextResponse.json({ success: true, mode: 'dryrun', report })
     }
 
@@ -70,11 +73,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, mode: 'single' })
     }
 
-    const result = await syncAllProductsToAmazon()
+    const result = await syncAllProductsToAmazon(scope)
     if (result.errors.length > 0) {
       await sendAmazonSyncFailureEmail(result)
     }
-    return NextResponse.json({ success: true, mode: 'full', ...result })
+    return NextResponse.json({ success: true, mode: scope ? 'scoped' : 'full', ...result })
   } catch (err: any) {
     if (err instanceof AmazonSyncInProgressError) {
       return NextResponse.json({ error: err.message, inProgress: true }, { status: 409 })

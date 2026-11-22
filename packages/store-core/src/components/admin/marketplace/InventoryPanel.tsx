@@ -9,8 +9,8 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { InventoryRow, InventoryView } from '@/lib/marketplace/stock'
 import { InventoryLoading } from './skeletons'
 
-type Channel = 'myntra' | 'ajio'
-const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO' }
+type Channel = 'myntra' | 'ajio' | 'flipkart'
+const LABEL: Record<Channel, string> = { myntra: 'Myntra', ajio: 'AJIO', flipkart: 'Flipkart' }
 
 const drifted = (r: InventoryRow) => r.ourPrice != null && r.listedPrice != null && Math.abs(r.ourPrice - r.listedPrice) >= 0.01
 

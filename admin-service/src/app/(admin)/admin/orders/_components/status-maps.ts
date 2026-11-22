@@ -23,10 +23,11 @@ export const SOURCE_LABEL: Record<string, string> = {
   amazon: 'Amazon',
   myntra: 'Myntra',
   ajio: 'AJIO',
+  flipkart: 'Flipkart',
   business: 'Business',
   cash_sale: 'Cash Sale',
 }
-export const SOURCE_TONE: Record<string, Tone> = { online: 'blue', business: 'green', amazon: 'amber', myntra: 'amber', ajio: 'amber' }
+export const SOURCE_TONE: Record<string, Tone> = { online: 'blue', business: 'green', amazon: 'amber', myntra: 'amber', ajio: 'amber', flipkart: 'amber' }
 export const sourceLabel = (s: string) => SOURCE_LABEL[s] || 'Offline'
 export const sourceTone = (s: string): Tone => SOURCE_TONE[s] ?? 'muted'
 

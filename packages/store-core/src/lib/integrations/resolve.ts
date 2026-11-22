@@ -3,7 +3,7 @@ import { createSign } from 'crypto'
 import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { controlPlanePool, getIntegrationCredential, saveIntegrationCredential, deleteIntegrationCredential } from '../tenant-registry'
 import { decryptToken, encryptToken } from '../crypto/token-cipher'
-import type { MarketplaceChannel, MarketplaceMode } from '@/lib/marketplace/types'
+import { CHANNEL_LABEL, type MarketplaceChannel, type MarketplaceMode } from '@/lib/marketplace/types'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 
 // Runtime credential resolution for external integrations. The rule is uniform: if there is a
@@ -349,7 +349,7 @@ export async function resolveRazorpayCreds(tenantId?: string): Promise<RazorpayC
   }
 }
 
-// ── Marketplaces (Myntra, AJIO) ──────────────────────────────────────────────
+// ── Marketplaces (Myntra, AJIO, Flipkart) ──────────────────────────────────────────────
 // The seller's own partner credentials only; there is no platform account to fall back to. The
 // flagship's sit under the platform tenant id. The blob also carries the push token we gave the
 // marketplace (the previous one stays valid for 24 h after a rotate) and an optional IP allowlist.
@@ -364,7 +364,7 @@ export interface MarketplaceCreds {
   endpoints?: Record<string, string>
 }
 
-export const MARKETPLACE_PROVIDER: Record<MarketplaceChannel, string> = { myntra: 'myntra_seller', ajio: 'ajio_seller' }
+export const MARKETPLACE_PROVIDER: Record<MarketplaceChannel, string> = { myntra: 'myntra_seller', ajio: 'ajio_seller', flipkart: 'flipkart_seller' }
 const MARKETPLACE_MODES: MarketplaceMode[] = ['live', 'sandbox', 'mock']
 
 const strRecord = (v: unknown): Record<string, string> => {
@@ -399,7 +399,7 @@ export async function saveMarketplaceCreds(channel: MarketplaceChannel, creds: M
   await saveIntegrationCredential({
     tenantId: await marketplaceTenant(tenantId),
     provider: MARKETPLACE_PROVIDER[channel],
-    label: channel === 'myntra' ? 'Myntra' : 'AJIO',
+    label: CHANNEL_LABEL[channel],
     configEnc: encryptToken(JSON.stringify(clean)),
     meta: { mode: clean.mode, has_push_token: !!clean.push_token, push_token_rotated_at: clean.push_token_rotated_at ?? null },
   })

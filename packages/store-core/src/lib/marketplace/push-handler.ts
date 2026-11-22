@@ -100,10 +100,19 @@ async function handleForStore(channel: MarketplaceChannel, request: Request, raw
   } catch {
     return json({ error: 'retry' }, 503)
   }
-  if (!creds?.push_token) return json({ error: 'Not connected' }, 404)
+  if (!creds) return json({ error: 'Not connected' }, 404)
+  const adapter = getAdapter(channel, creds)
 
-  const header = resolveEndpoints(channel, creds).headers.pushToken
-  if (!pushTokenValid(request.headers.get(header), creds)) return json({ error: 'Invalid token' }, 401)
+  // Flipkart signs its notifications against the URL it was given; the rest send our push token.
+  if (adapter.verifyPush) {
+    const host = request.headers.get('host') || new URL(request.url).host
+    const { pathname, search } = new URL(request.url)
+    if (!adapter.verifyPush({ headers: request.headers, url: `https://${host}${pathname}${search}`, method: request.method })) return json({ error: 'Invalid signature' }, 401)
+  } else {
+    if (!creds.push_token) return json({ error: 'Not connected' }, 404)
+    const header = resolveEndpoints(channel, creds).headers.pushToken
+    if (!pushTokenValid(request.headers.get(header), creds)) return json({ error: 'Invalid token' }, 401)
+  }
   if (creds.ip_allowlist?.length && !ipAllowed(clientIp(request.headers), creds.ip_allowlist)) return json({ error: 'Forbidden' }, 403)
 
   let body: unknown
@@ -115,7 +124,7 @@ async function handleForStore(channel: MarketplaceChannel, request: Request, raw
 
   let events: PushEvent[]
   try {
-    events = getAdapter(channel, creds).parsePush(body, request.headers)
+    events = adapter.parsePush(body, request.headers)
   } catch (e) {
     if (!(e instanceof AdapterUnavailableError)) return json({ error: 'Invalid payload' }, 400)
     events = [rawEvent(channel, raw, body)]

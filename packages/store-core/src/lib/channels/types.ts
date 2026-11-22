@@ -1,4 +1,4 @@
-export const CHANNELS = ['gmc', 'amazon', 'amazon_ads', 'meta_ads', 'social', 'razorpay', 'myntra', 'ajio', 'myntra_ads', 'ajio_ads'] as const
+export const CHANNELS = ['gmc', 'amazon', 'amazon_ads', 'meta_ads', 'social', 'razorpay', 'myntra', 'ajio', 'flipkart', 'myntra_ads', 'ajio_ads', 'flipkart_ads'] as const
 export type Channel = (typeof CHANNELS)[number]
 
 export type Severity = 'info' | 'warning' | 'critical'
@@ -18,8 +18,10 @@ export const CHANNEL_INFO: Record<Channel, { label: string; path: string; readSc
   razorpay: { label: 'Razorpay', path: '/financial?tab=razorpay', readScope: 'financial:read' },
   myntra: { label: 'Myntra', path: '/myntra', readScope: 'myntra:read' },
   ajio: { label: 'AJIO', path: '/ajio', readScope: 'ajio:read' },
+  flipkart: { label: 'Flipkart', path: '/flipkart', readScope: 'flipkart:read' },
   myntra_ads: { label: 'Myntra Ads', path: '/myntra-ads', readScope: 'myntra_ads:read' },
   ajio_ads: { label: 'AJIO Ads', path: '/ajio-ads', readScope: 'ajio_ads:read' },
+  flipkart_ads: { label: 'Flipkart Ads', path: '/flipkart-ads', readScope: 'flipkart_ads:read' },
 }
 
 // Advisory lock keys, one per channel job. Existing keys elsewhere: 84219575/6 (Amazon push and
@@ -49,5 +51,9 @@ export const CHANNEL_LOCKS = {
   ajio_stock: 84219673,
   myntra_ads_import: 84219681,
   ajio_ads_import: 84219682,
+  flipkart_ads_import: 84219683,
+  flipkart_sync: 84219691,
+  flipkart_settlements: 84219692,
+  flipkart_stock: 84219693,
 } as const
 export type ChannelLock = keyof typeof CHANNEL_LOCKS

@@ -33,6 +33,7 @@ const DATA_TABS = new Set<Tab>(['overview', 'campaigns', 'products'])
 const INFO: Record<AdsChannel, { title: string; path: string; api: string; portal: string; portalUrl: string }> = {
   myntra_ads: { title: 'Myntra Ads', path: '/admin/myntra-ads', api: '/api/admin/myntra-ads', portal: 'Myntra Partner Portal', portalUrl: 'https://partners.myntrainfo.com' },
   ajio_ads: { title: 'AJIO Ads', path: '/admin/ajio-ads', api: '/api/admin/ajio-ads', portal: 'AJIO Seller Central', portalUrl: 'https://seller.ajio.com' },
+  flipkart_ads: { title: 'Flipkart Ads', path: '/admin/flipkart-ads', api: '/api/admin/flipkart-ads', portal: 'Flipkart Ads', portalUrl: 'https://advertising.flipkart.com' },
 }
 
 const SERIES: SeriesDef[] = [

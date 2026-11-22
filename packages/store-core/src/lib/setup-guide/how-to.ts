@@ -66,7 +66,7 @@ export const HOW_TO: Record<string, HowTo> = {
     links: [GST_PORTAL, { label: 'New registration (GST portal)', url: 'https://reg.gst.gov.in/registration/' }],
     wait: 'about 7 working days; up to 30 if an officer orders a site visit',
     notes: [
-      'Registration is required once turnover crosses ₹40 lakh for goods in most states (₹20 lakh for services). Selling on Amazon, Myntra or AJIO generally needs a GSTIN from the first sale; ask your accountant about exemptions.',
+      'Registration is required once turnover crosses ₹40 lakh for goods in most states (₹20 lakh for services). Selling on Amazon, Flipkart, Myntra or AJIO generally needs a GSTIN from the first sale; ask your accountant about exemptions.',
       'Upload the same GST certificate to the owner portal for KYC.',
     ],
   },
@@ -312,6 +312,17 @@ export const HOW_TO: Record<string, HowTo> = {
     links: [{ label: 'AJIO seller (VMS)', url: 'https://seller.ajio.com/ajiocommerce/' }],
     wait: 'onboarding usually takes a few weeks',
   },
+  flipkart: {
+    before: ['GSTIN, PAN and a bank account', 'Brand authorisation or trademark documents for brands Flipkart restricts', 'A pickup address (your warehouse location)'],
+    steps: [
+      'Register on Flipkart Seller Hub and finish the GST, bank and pickup address checks.',
+      'Apply for approval of restricted brands in Seller Hub; until a brand is approved, mark it under Brands here so it is never pushed.',
+      'Create a Seller API application and connect here: see "Use your own credentials".',
+      'List against existing Flipkart products (FSN) from the Listings tab, then pack and dispatch shipments from the Orders tab.',
+    ],
+    links: [{ label: 'Flipkart Seller Hub', url: 'https://seller.flipkart.com/' }],
+    wait: 'account verification: a few days; brand approvals vary',
+  },
 
   // ── Advertise ──────────────────────────────────────────────────────────
   'google-ads': {
@@ -362,6 +373,15 @@ export const HOW_TO: Record<string, HowTo> = {
     steps: [
       'In AJIO’s seller portal, open the advertising reports and download the campaign performance report for a date range, as CSV or Excel.',
       'In the admin, open AJIO Ads → Import and upload the file.',
+      'The first time, map the columns: date, campaign, spend, impressions, clicks, orders and revenue. The mapping is remembered.',
+      'Check the preview, then import. Uploading the same dates again replaces them.',
+      'Import weekly. An alert appears after 7 days without a report.',
+    ],
+  },
+  'flipkart-ads': {
+    steps: [
+      'In the Flipkart Ads console, open Reports and download the campaign (or product) performance report for a date range, as CSV or Excel.',
+      'In the admin, open Flipkart Ads → Import and upload the file.',
       'The first time, map the columns: date, campaign, spend, impressions, clicks, orders and revenue. The mapping is remembered.',
       'Check the preview, then import. Uploading the same dates again replaces them.',
       'Import weekly. An alert appears after 7 days without a report.',

@@ -191,6 +191,27 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/ajio'],
     group: 'Orders',
   },
+  {
+    key: 'flipkart:read',
+    label: 'Flipkart (Read)',
+    description: 'View Flipkart shipments, returns, listings, stock, settlements and alerts',
+    routes: ['/admin/flipkart'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'flipkart:write',
+    label: 'Flipkart (Write)',
+    description: 'Connect Flipkart, map and submit listings, push stock and import settlements',
+    routes: ['/admin/flipkart'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'flipkart_orders:write',
+    label: 'Flipkart Orders (Write)',
+    description: 'Pack, dispatch and cancel Flipkart shipments, and handle Flipkart returns',
+    routes: ['/admin/flipkart'],
+    group: 'Orders',
+  },
 
   // Sales
   {
@@ -575,6 +596,20 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Marketing',
   },
   {
+    key: 'flipkart_ads:read',
+    label: 'Flipkart Ads (Read)',
+    description: 'View Flipkart Ads spend, sales, campaigns and products from imported reports',
+    routes: ['/admin/flipkart-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'flipkart_ads:write',
+    label: 'Flipkart Ads (Write)',
+    description: 'Import Flipkart Ads reports from the Flipkart Ads console',
+    routes: ['/admin/flipkart-ads'],
+    group: 'Marketing',
+  },
+  {
     key: 'meta_ads:read',
     label: 'Meta Ads (Read)',
     description: 'View Facebook and Instagram ads performance and Conversions API health',
@@ -927,6 +962,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/myntra')) return 'myntra:read'
   if (pathname.startsWith('/api/admin/ajio-ads')) return 'ajio_ads:read'
   if (pathname.startsWith('/api/admin/ajio')) return 'ajio:read'
+  if (pathname.startsWith('/api/admin/flipkart-ads')) return 'flipkart_ads:read'
+  if (pathname.startsWith('/api/admin/flipkart')) return 'flipkart:read'
   if (pathname.startsWith('/api/admin/meta-ads')) return 'meta_ads:read'
   if (pathname.startsWith('/api/admin/integrations/meta-ads')) return 'meta_ads:read'
   if (pathname.startsWith('/api/admin/social')) return 'social:read'

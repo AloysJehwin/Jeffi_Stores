@@ -2,6 +2,7 @@ import { queryOne } from '@/lib/shared/db'
 import { resolveMarketplaceCreds, type MarketplaceCreds } from '@/lib/integrations/resolve'
 import type { MarketplaceAdapter } from './adapter'
 import { ajioAdapter } from './ajio'
+import { flipkartAdapter } from './flipkart'
 import { mockAdapter, mockTestOrder } from './mock'
 import { myntraAdapter } from './myntra'
 import { orderNumberFor } from './upsert'
@@ -29,13 +30,18 @@ export const MARKETPLACE_FIELDS: Record<MarketplaceChannel, MarketplaceField[]> 
     { key: 'password', label: 'Password', secret: true },
     { key: 'pob_id', label: 'POB ID', placeholder: 'DV…' },
   ],
+  flipkart: [
+    { key: 'app_id', label: 'Application ID', placeholder: 'Seller Hub › Manage Profile › Developer Access' },
+    { key: 'app_secret', label: 'Application Secret', secret: true },
+    { key: 'location_id', label: 'Location ID', placeholder: 'LOC…' },
+  ],
 }
 
 /** Mock, or the live/sandbox adapter driven by endpoints.ts and the store's credentials. */
 export function getAdapter(channel: MarketplaceChannel, creds: Pick<MarketplaceCreds, 'mode'> & Partial<Pick<MarketplaceCreds, 'fields' | 'endpoints'>>): MarketplaceAdapter {
   if (creds.mode === 'mock') return mockAdapter(channel)
   const c = { mode: creds.mode, fields: creds.fields ?? {}, endpoints: creds.endpoints }
-  return channel === 'myntra' ? myntraAdapter(c) : ajioAdapter(c)
+  return channel === 'myntra' ? myntraAdapter(c) : channel === 'flipkart' ? flipkartAdapter(c) : ajioAdapter(c)
 }
 
 /** A sellable unit with stock and a SKU: a mapped listing first, then any leaf unit. */

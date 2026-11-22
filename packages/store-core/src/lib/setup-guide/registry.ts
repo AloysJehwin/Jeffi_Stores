@@ -486,6 +486,31 @@ export const STEPS: SetupStep[] = [
       paste: { fields: ['Seller ID', 'Password', 'POB ID'], href: '/admin/ajio?connect=1', label: 'Open the AJIO connect panel' },
     },
   },
+  {
+    id: 'flipkart',
+    section: 'marketplaces',
+    title: 'Flipkart',
+    why: 'Pulls Flipkart shipments in, prints labels, marks them ready to dispatch and keeps stock in sync.',
+    scope: 'flipkart:read',
+    href: '/admin/flipkart',
+    connect: '/admin/flipkart?connect=1',
+    optional: true,
+    ownCredentials: {
+      summary: 'Flipkart uses your own Seller API application, created in Seller Hub.',
+      consoles: [{ label: 'Flipkart Seller Hub', url: 'https://seller.flipkart.com/' }, { label: 'Seller API docs', url: 'https://seller.flipkart.com/api-docs/FMSAPI.html' }],
+      create: ['A self-access Seller API application: Application ID and Application Secret'],
+      steps: [
+        'In Seller Hub, open Manage Profile → Developer Access and create a self-access application.',
+        'Copy the Application ID and Application Secret, and note your warehouse Location ID (LOC…) from Seller Hub → Listings → Location.',
+        'In the admin, open Flipkart → connect panel, paste them and set the Mode.',
+        'Click Test. Shipments are then fetched every 10 minutes; nothing else is needed for orders to arrive.',
+        'Optional, for instant updates: raise a Seller Hub ticket to enrol for order notifications (Flipkart asks for VAPT and NDA certificates) and give them the notification URL below.',
+      ],
+      register: [{ label: 'Notification URL', value: { kind: 'store', path: '/api/webhooks/flipkart' }, hint: 'Flipkart signs each notification with your Application Secret.' }],
+      approval: [{ step: 'Notification enrolment (optional)', wait: 'varies' }],
+      paste: { fields: ['Application ID', 'Application Secret', 'Location ID'], href: '/admin/flipkart?connect=1', label: 'Open the Flipkart connect panel' },
+    },
+  },
 
   // ── Advertise ────────────────────────────────────────────────────────────
   {
@@ -624,6 +649,15 @@ export const STEPS: SetupStep[] = [
     why: 'Import AJIO ad reports to see spend, sales and ACoS next to your orders.',
     scope: 'ajio_ads:read',
     href: '/admin/ajio-ads',
+    optional: true,
+  },
+  {
+    id: 'flipkart-ads',
+    section: 'advertise',
+    title: 'Flipkart Ads',
+    why: 'Import Flipkart Ads reports to see spend, sales and ACoS next to your orders.',
+    scope: 'flipkart_ads:read',
+    href: '/admin/flipkart-ads',
     optional: true,
   },
 

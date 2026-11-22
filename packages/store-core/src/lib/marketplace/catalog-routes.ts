@@ -183,12 +183,17 @@ export async function listingsReport(request: NextRequest, channel: MarketplaceC
 
 const KeysBody = z.object({ keys: z.array(z.string().max(120)).min(1).max(2000) })
 
-async function unitsFor(channel: MarketplaceChannel, keys: string[], images = true): Promise<SellableUnit[]> {
+/** The picked units, minus those whose brand isn't approved for the marketplace (counted in `blocked`). */
+async function unitsFor(channel: MarketplaceChannel, keys: string[], images = true): Promise<{ units: SellableUnit[]; blocked: number }> {
   const parsed = keys.map(parseUnitKey).filter((k): k is NonNullable<typeof k> => !!k)
   const wanted = new Set(keys)
-  const units = await loadSellableUnits(channel, { productIds: [...new Set(parsed.map(k => k.productId))], images })
-  return units.filter(u => wanted.has(u.key))
+  const picked = (await loadSellableUnits(channel, { productIds: [...new Set(parsed.map(k => k.productId))], images })).filter(u => wanted.has(u.key))
+  const units = picked.filter(u => !u.brandBlocked)
+  return { units, blocked: picked.length - units.length }
 }
+
+const blockedOnly = (channel: MarketplaceChannel, blocked: number) =>
+  bad(`The picked products' brands aren't approved for ${CHANNEL_LABEL[channel]} (${blocked} unit(s)). Approve the brand under Brand approvals first.`)
 
 /** POST ?action=inspect on export: the template's sheets, suggested columns and any saved mapping. */
 export async function exportInspect(request: NextRequest, channel: MarketplaceChannel): Promise<NextResponse> {
@@ -221,8 +226,8 @@ export async function exportFill(request: NextRequest, channel: MarketplaceChann
     const keys = KeysBody.safeParse({ keys: jsonField<string[]>(up.form, 'keys') ?? [] })
     if (!keys.success) return bad('Pick the products to export.')
     const category = String(up.form.get('category') ?? '').trim()
-    const units = await unitsFor(channel, keys.data.keys)
-    if (!units.length) return bad('None of the picked products are sellable units.')
+    const { units, blocked } = await unitsFor(channel, keys.data.keys)
+    if (!units.length) return blocked ? blockedOnly(channel, blocked) : bad('None of the picked products are sellable units.')
     const outcome = await runChange(
       {
         channel,
@@ -245,6 +250,7 @@ export async function exportFill(request: NextRequest, channel: MarketplaceChann
     const res = attachment(outcome.result.buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', name)
     res.headers.set('X-Rows', String(outcome.result.rows))
     res.headers.set('X-Blank-Columns', encodeURIComponent(JSON.stringify(outcome.result.blanks)))
+    if (blocked) res.headers.set('X-Skipped-Brand', String(blocked))
     return res
   } catch (e) {
     return channelError(e)
@@ -256,8 +262,8 @@ export async function imagesPack(request: NextRequest, channel: MarketplaceChann
   try {
     const parsed = KeysBody.safeParse(await readJson(request))
     if (!parsed.success) return bad('Pick the products for the image pack.')
-    const units = await unitsFor(channel, parsed.data.keys)
-    if (!units.length) return bad('None of the picked products are sellable units.')
+    const { units, blocked } = await unitsFor(channel, parsed.data.keys)
+    if (!units.length) return blocked ? blockedOnly(channel, blocked) : bad('None of the picked products are sellable units.')
     const outcome = await runChange(
       {
         channel,

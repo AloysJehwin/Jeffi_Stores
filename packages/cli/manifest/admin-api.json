@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "b06848b9fd0332a572c96e97653bd444958f1df0ffad0c6d19dc6b32ea4c016d",
+ "manifestHash": "823c58daae1f46310e7bf62420f62e54706abf251cd896a84bb4f6fd97c23b99",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -6694,6 +6694,138 @@
    "command": "channels-alerts delete"
   },
   {
+   "id": "admin GET /api/admin/channels/{channel}/brand-approvals",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/channels/{channel}/brand-approvals",
+   "gatewayPath": "/v1/admin/channels/{channel}/brand-approvals",
+   "file": "admin-service/src/app/api/(admin)/admin/channels/[channel]/brand-approvals/route.ts",
+   "pathParams": [
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "delegated",
+   "platform": null,
+   "body": null,
+   "summary": "Every brand with its product count and whether it may be pushed to this channel.",
+   "command": "channels brand-approvals"
+  },
+  {
+   "id": "admin PUT /api/admin/channels/{channel}/brand-approvals",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/channels/{channel}/brand-approvals",
+   "gatewayPath": "/v1/admin/channels/{channel}/brand-approvals",
+   "file": "admin-service/src/app/api/(admin)/admin/channels/[channel]/brand-approvals/route.ts",
+   "pathParams": [
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "delegated",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "brandId": {
+      "type": "string"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "approved",
+         "pending",
+         "not_approved"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "note": {
+      "type": "string"
+     },
+     "approvalUrl": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "brandId",
+     "status"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Set a brand's approval for this channel ({ brandId, status: approved | pending | not_approved | null, note?, approvalUrl? }).",
+   "command": "channels brand-approvals-update"
+  },
+  {
+   "id": "admin POST /api/admin/channels/{channel}/brand-approvals/check",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/channels/{channel}/brand-approvals/check",
+   "gatewayPath": "/v1/admin/channels/{channel}/brand-approvals/check",
+   "file": "admin-service/src/app/api/(admin)/admin/channels/[channel]/brand-approvals/check/route.ts",
+   "pathParams": [
+    {
+     "name": "channel",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "amazon:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "amazon:read",
+    "amazon:write"
+   ],
+   "guard": "delegated",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "brandIds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     "categoryIds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      }
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Ask Amazon (Listings Restrictions API) which brands need approval, using one matched ASIN per brand. Brands set by hand keep their status; `brandIds` limits the check. Amazon only.",
+   "command": "channels-brand-approvals check"
+  },
+  {
    "id": "admin GET /api/admin/channels/{channel}/changes",
    "host": "admin",
    "method": "GET",
@@ -12818,6 +12950,958 @@
    "bodyContentType": "application/json",
    "summary": "Verifies a wallet top-up collected on the PLATFORM Razorpay account, then credits the tenant wallet. HMAC uses the platform key_secret (env).",
    "command": "financial-wallet-topup verify"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart-ads/console",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart-ads/console",
+   "gatewayPath": "/v1/admin/flipkart-ads/console",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart-ads/console/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "tab",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "tab",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "overview",
+       "campaigns",
+       "products",
+       "imports"
+      ]
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "flipkart_ads:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart_ads:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "?tab=overview|campaigns|products|imports&from&to",
+   "command": "flipkart-ads console"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart-ads/import",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart-ads/import",
+   "gatewayPath": "/v1/admin/flipkart-ads/import",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart-ads/import/route.ts",
+   "pathParams": [],
+   "query": [
+    "step"
+   ],
+   "queryParams": [
+    {
+     "name": "step",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "preview",
+       "commit"
+      ],
+      "default": "preview"
+     }
+    }
+   ],
+   "scope": "flipkart_ads:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart_ads:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary"
+     },
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string"
+     },
+     "allowErrors": {
+      "type": "string"
+     },
+     "mapping": {
+      "type": "string",
+      "description": "JSON-encoded"
+     }
+    },
+    "required": [
+     "file"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "Report upload: ?step=preview (map and check) or ?step=commit (replace the report's period).",
+   "command": "flipkart-ads import"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/connection",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/connection",
+   "gatewayPath": "/v1/admin/flipkart/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/connection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Connection status; credential values and the push token are never returned here.",
+   "command": "flipkart connection"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/connection",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/connection",
+   "gatewayPath": "/v1/admin/flipkart/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/connection/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "test",
+       "rotate-token",
+       "test-order"
+      ]
+     }
+    }
+   ],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "mode": {
+      "type": "string",
+      "enum": [
+       "mock",
+       "sandbox",
+       "live"
+      ]
+     },
+     "fields": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "maxLength": 2000
+      }
+     }
+    },
+    "required": [
+     "mode"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Save + test, or ?action=test | rotate-token | test-order.",
+   "command": "flipkart connection-create"
+  },
+  {
+   "id": "admin DELETE /api/admin/flipkart/connection",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/flipkart/connection",
+   "gatewayPath": "/v1/admin/flipkart/connection",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/connection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete connection (flipkart)",
+   "command": "flipkart connection-delete"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/console",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/console",
+   "gatewayPath": "/v1/admin/flipkart/console",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/console/route.ts",
+   "pathParams": [],
+   "query": [
+    "bucket",
+    "q",
+    "scope",
+    "view"
+   ],
+   "queryParams": [
+    {
+     "name": "bucket",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "new",
+       "to_pack",
+       "rtd",
+       "shipped",
+       "closed"
+      ]
+     }
+    },
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "scope",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "all"
+      ]
+     }
+    },
+    {
+     "name": "view",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "orders",
+       "returns",
+       "overview"
+      ],
+      "default": "overview"
+     }
+    }
+   ],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Overview KPIs and queue counts; ?view=orders&bucket= or ?view=returns for the lists.",
+   "command": "flipkart console"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/listings",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/listings",
+   "gatewayPath": "/v1/admin/flipkart/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Every sellable unit with its Flipkart listing.",
+   "command": "flipkart listings"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/listings",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/listings",
+   "gatewayPath": "/v1/admin/flipkart/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "report"
+      ]
+     }
+    }
+   ],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "?action=report: a SKU report upload (preview, or apply=1).",
+   "command": "flipkart listings-create"
+  },
+  {
+   "id": "admin PUT /api/admin/flipkart/listings",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/flipkart/listings",
+   "gatewayPath": "/v1/admin/flipkart/listings",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "rows": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "key": {
+         "type": "string",
+         "maxLength": 120
+        },
+        "marketplaceSku": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "styleId": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "category": {
+         "anyOf": [
+          {
+           "type": "string",
+           "maxLength": 120
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "listedPrice": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "listedMrp": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "key",
+        "marketplaceSku",
+        "styleId"
+       ]
+      },
+      "minItems": 1,
+      "maxItems": 5000
+     }
+    },
+    "required": [
+     "rows"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Saves mappings typed in the table.",
+   "command": "flipkart listings-update"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/listings/export",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/listings/export",
+   "gatewayPath": "/v1/admin/flipkart/listings/export",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/export/route.ts",
+   "pathParams": [],
+   "query": [
+    "action"
+   ],
+   "queryParams": [
+    {
+     "name": "action",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "inspect"
+      ]
+     }
+    }
+   ],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read",
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "?action=inspect reads the template's columns; otherwise fills it for the picked units.",
+   "command": "flipkart-listings export"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/listings/images",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/listings/images",
+   "gatewayPath": "/v1/admin/flipkart/listings/images",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/images/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 2000
+     }
+    },
+    "required": [
+     "keys"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The zip of photos shaped to Flipkart's spec for the picked units.",
+   "command": "flipkart-listings images"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/listings/submit",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/listings/submit",
+   "gatewayPath": "/v1/admin/flipkart/listings/submit",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/submit/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get submit (flipkart listings)",
+   "command": "flipkart-listings submit"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/listings/submit",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/listings/submit",
+   "gatewayPath": "/v1/admin/flipkart/listings/submit",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/listings/submit/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "keys": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 120
+      },
+      "minItems": 1,
+      "maxItems": 2000
+     }
+    },
+    "required": [
+     "keys"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submits the picked units through the Flipkart API (the sync cron polls the result).",
+   "command": "flipkart-listings submit-create"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/manifest",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/manifest",
+   "gatewayPath": "/v1/admin/flipkart/manifest",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/manifest/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "minItems": 1,
+      "maxItems": 1000
+     }
+    },
+    "required": [
+     "ids"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Flipkart's manifest for the location's ready-to-dispatch shipments.",
+   "command": "flipkart manifest"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/orders/{id}/document",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/orders/{id}/document",
+   "gatewayPath": "/v1/admin/flipkart/orders/{id}/document",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/orders/[id]/document/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "inline",
+    "kind"
+   ],
+   "queryParams": [
+    {
+     "name": "inline",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    },
+    {
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "enum": [
+       "label",
+       "invoice",
+       "manifest"
+      ]
+     }
+    }
+   ],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "?kind=label|invoice|manifest: the PDF for a Flipkart order.",
+   "command": "flipkart-orders document"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/orders/action",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/orders/action",
+   "gatewayPath": "/v1/admin/flipkart/orders/action",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/orders/action/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "accept",
+       "reject",
+       "pack",
+       "ready_to_dispatch"
+      ]
+     },
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "minItems": 1,
+      "maxItems": 100
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "packet": {
+      "type": "object",
+      "properties": {
+       "weightGrams": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 100000
+       },
+       "lengthCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       },
+       "breadthCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       },
+       "heightCm": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 500
+       }
+      }
+     }
+    },
+    "required": [
+     "action",
+     "ids"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Accept, reject (with a reason), pack or mark ready to dispatch, one order or many.",
+   "command": "flipkart-orders action"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/returns/action",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/returns/action",
+   "gatewayPath": "/v1/admin/flipkart/returns/action",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/returns/action/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart_orders:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart_orders:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "action": {
+      "type": "string",
+      "enum": [
+       "receive",
+       "qc_pass",
+       "qc_fail"
+      ]
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "id",
+     "action"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Received / QC passed (restocks once) / QC failed for a Flipkart return.",
+   "command": "flipkart-returns action"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/settlements",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/settlements",
+   "gatewayPath": "/v1/admin/flipkart/settlements",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/settlements/route.ts",
+   "pathParams": [],
+   "query": [
+    "from",
+    "to"
+   ],
+   "queryParams": [
+    {
+     "name": "from",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "to",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Imported Flipkart settlements in ?from..to, the receivable and unsettled orders.",
+   "command": "flipkart settlements"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/settlements/import",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/settlements/import",
+   "gatewayPath": "/v1/admin/flipkart/settlements/import",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/settlements/import/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "format": "binary",
+      "type": "string"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "A settlement report: preview with the saved column mapping, or commit=1 to import.",
+   "command": "flipkart-settlements import"
+  },
+  {
+   "id": "admin GET /api/admin/flipkart/stock",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/flipkart/stock",
+   "gatewayPath": "/v1/admin/flipkart/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Our stock vs what was pushed to Flipkart, errors and price drift.",
+   "command": "flipkart stock"
+  },
+  {
+   "id": "admin POST /api/admin/flipkart/stock",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/flipkart/stock",
+   "gatewayPath": "/v1/admin/flipkart/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Push now.",
+   "command": "flipkart stock-create"
+  },
+  {
+   "id": "admin PUT /api/admin/flipkart/stock",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/flipkart/stock",
+   "gatewayPath": "/v1/admin/flipkart/stock",
+   "file": "admin-service/src/app/api/(admin)/admin/flipkart/stock/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "flipkart:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "flipkart:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "buffer": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+     }
+    },
+    "required": [
+     "buffer"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "The safety buffer.",
+   "command": "flipkart stock-update"
   },
   {
    "id": "admin POST /api/admin/google-ads/account",
@@ -24297,6 +25381,20 @@
      "mode": {
       "type": "string"
      },
+     "brandIds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     "categoryIds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
      "limit": {
       "type": "number"
      }
@@ -24984,6 +26082,20 @@
     "properties": {
      "productId": {
       "type": "string"
+     },
+     "brandIds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     "categoryIds": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      }
      }
     }
    },

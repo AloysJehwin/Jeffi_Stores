@@ -624,6 +624,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'ajio:read',
   },
   {
+    id: 'flipkart_sync',
+    name: 'Flipkart orders, listings, stock and alerts',
+    path: '/api/cron/flipkart-sync',
+    method: 'GET',
+    intervalMs: 10 * MIN,
+    intervalLabel: 'every 10 min',
+    startDelayMs: 780 * SEC,
+    lockTtlMs: 10 * MIN - 30 * SEC,
+    tenantScope: 'flipkart:read',
+  },
+  {
     // Platform jobs over every Route store's ledger (control plane).
     id: 'reconcile_settlements',
     name: 'Reconcile Route transfers',

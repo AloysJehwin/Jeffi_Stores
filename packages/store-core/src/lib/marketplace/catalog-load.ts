@@ -1,3 +1,4 @@
+import { loadBrandGate } from '@/lib/channels/brand-approvals'
 import { queryMany } from '@/lib/shared/db'
 import type { MarketplaceChannel } from './types'
 
@@ -34,6 +35,9 @@ export interface SellableUnit {
   size: string | null
   colour: string | null
   brand: string | null
+  brandId: string | null
+  /** The brand isn't approved for this marketplace (Brand approvals): never exported or submitted. */
+  brandBlocked: boolean
   category: string | null
   description: string | null
   shortDescription: string | null
@@ -147,7 +151,7 @@ const UNITS_SQL = `
   )
   SELECT u.*, p.name, p.description, p.short_description, p.material, p.hsn_code, p.gst_percentage, p.size AS product_size,
          p.color AS product_color, p.specifications AS p_specs, ${DETAIL_COLS},
-         b.name AS brand, c.name AS category,
+         b.name AS brand, p.brand_id::text AS brand_id, c.name AS category,
          l.id AS listing_id, l.marketplace_sku, l.style_id, l.status AS listing_status, l.issues, l.category AS listing_category,
          l.listing_ref, l.listed_price, l.listed_mrp, l.last_task_id, l.synced_at
     FROM u JOIN products p ON p.id = u.product_id
@@ -168,6 +172,7 @@ export async function loadSellableUnits(
 ): Promise<SellableUnit[]> {
   const rows = await queryMany<any>(UNITS_SQL, [channel, opts.productIds?.length ? opts.productIds : null, Math.min(opts.limit ?? MAX_UNITS, MAX_UNITS)])
   const images = opts.images === false ? null : await loadImages(rows)
+  const gate = await loadBrandGate(channel)
   return rows.map(r => {
     const unitAttrs = flatAttrs(r.v_attrs, r.sv_attrs)
     const sc = sizeAndColour({ ...r, attributes: unitAttrs })
@@ -191,6 +196,8 @@ export async function loadSellableUnits(
       size,
       colour,
       brand: r.brand ?? null,
+      brandId: r.brand_id ?? null,
+      brandBlocked: !gate.allows(r.brand_id),
       category: r.category ?? null,
       description: r.description ?? null,
       shortDescription: r.short_description ?? null,
