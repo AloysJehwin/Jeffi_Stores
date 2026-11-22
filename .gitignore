@@ -137,3 +137,4 @@ document-service/.documents/
 
 # Publishing helper (deploy/k8s/bootstrap/npm-token.sh stores its token)
 !packages/cli/publish.sh
+tests/ui-output/
