@@ -33,17 +33,32 @@ export async function makeAdminSession(
   return { sid, id }
 }
 
+// A store-owner session (ecom control-plane routes gated by ownerApi → resolveOwnerSession).
+// Calls the real issueOwnerSession (upserts owners row + auth_sessions principal_type='owner').
+// Returns the cookie sid; pass it via apiRequest's `cookies: { owner_sid: sid }`.
+export async function makeOwnerSession(
+  ownerSession: typeof import('@/lib/auth/owner-session'),
+  email: string,
+  name = 'API Test Owner'
+): Promise<{ sid: string; owner: { id: string } }> {
+  const { sid, owner } = await ownerSession.issueOwnerSession({ email, name })
+  return { sid, owner }
+}
+
 // Build a NextRequest with a Bearer session token (the opaque sid) + optional JSON body.
 // NextRequest (not plain Request) so handlers that read req.cookies / req.nextUrl work.
 export async function apiRequest(
   method: string,
   url: string,
-  opts: { sid?: string; body?: unknown; headers?: Record<string, string> } = {}
+  opts: { sid?: string; body?: unknown; headers?: Record<string, string>; cookies?: Record<string, string> } = {}
 ): Promise<import('next/server').NextRequest> {
   const { NextRequest } = await import('next/server')
   const headers: Record<string, string> = { ...(opts.headers ?? {}) }
   if (opts.sid) headers['Authorization'] = `Bearer ${opts.sid}`
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (opts.cookies) {
+    headers['cookie'] = Object.entries(opts.cookies).map(([k, v]) => `${k}=${v}`).join('; ')
+  }
   return new NextRequest(url, {
     method,
     headers,
