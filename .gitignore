@@ -5,6 +5,9 @@
 
 # Testing
 /coverage
+# per-service / per-package vitest coverage output
+coverage/
+.vitest-reports/
 
 # Next.js
 /.next/
@@ -51,6 +54,9 @@ next-env.d.ts
 !/scripts/db-files.mjs
 !/scripts/db-split-by-service.mjs
 !/scripts/db-ownership-evidence.mjs
+# DB-backed API test tier: the jeffi_test bootstrap + seed (CI api-db-tests job runs the seed).
+!/scripts/setup-test-db.sh
+!/scripts/seed-test-db.sql
 # Operator tools: set a key in every Secrets Manager secret; rebuild the Google taxonomy snapshot.
 !/scripts/set-secret.sh
 !/scripts/refresh-google-taxonomy.mjs
@@ -131,3 +137,4 @@ document-service/.documents/
 
 # Publishing helper (deploy/k8s/bootstrap/npm-token.sh stores its token)
 !packages/cli/publish.sh
+tests/ui-output/
