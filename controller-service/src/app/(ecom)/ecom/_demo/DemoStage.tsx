@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
 import { Play, Pause } from 'lucide-react'
@@ -35,26 +35,49 @@ function SurfaceFade({ surfaceKey, reduced, children }: { surfaceKey: string; re
 
 function FlowTabs() {
   const { flow, flows, isPlaying, actions } = useDemo()
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [more, setMore] = useState(false)
+  // Fade the right edge while chips are hidden past it, so narrow screens see the row scrolls.
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const update = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    ro?.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro?.disconnect()
+    }
+  }, [])
   return (
     <div className="flex items-center gap-3 h-14">
-      <div className="flex gap-2 overflow-x-auto min-w-0 flex-1 pb-1">
-        {flows.map(f => {
-          const active = f.id === flow
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => actions.setFlow(f.id)}
-              aria-current={active ? 'true' : undefined}
-              className={clsx(
-                'shrink-0 whitespace-nowrap rounded-full px-4 py-2 min-h-11 sm:min-h-0 text-sm font-semibold transition-colors',
-                active ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover text-foreground'
-              )}
-            >
-              {f.title}
-            </button>
-          )
-        })}
+      <div className="relative min-w-0 flex-1">
+        <div ref={rowRef} className="flex gap-2 overflow-x-auto pb-1">
+          {flows.map(f => {
+            const active = f.id === flow
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => actions.setFlow(f.id)}
+                aria-current={active ? 'true' : undefined}
+                className={clsx(
+                  'shrink-0 whitespace-nowrap rounded-full px-4 py-2 min-h-11 sm:min-h-0 text-sm font-semibold transition-colors',
+                  active ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover text-foreground'
+                )}
+              >
+                {f.title}
+              </button>
+            )
+          })}
+        </div>
+        <div
+          aria-hidden
+          className={clsx('pointer-events-none absolute inset-y-0 right-0 w-12 transition-opacity', more ? 'opacity-100' : 'opacity-0')}
+          style={{ background: 'linear-gradient(to left, var(--color-surface), transparent)' }}
+        />
       </div>
       <button
         type="button"

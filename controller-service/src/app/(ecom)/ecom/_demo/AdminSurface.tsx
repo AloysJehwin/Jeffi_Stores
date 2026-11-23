@@ -134,9 +134,9 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
   const aov = Math.round(m.revenue / Math.max(1, m.orderCount))
   const lowStock = STOCK_ROWS.filter(r => r.status !== 'In Stock').length
   const cards = [
-    { label: 'Revenue', node: <CountUp value={m.revenue} prefix="Rs. " animate={!reducedMotion} /> },
+    { label: 'Revenue', node: <CountUp value={m.revenue} prefix="₹" animate={!reducedMotion} /> },
     { label: 'Orders', node: <CountUp value={m.orderCount} animate={!reducedMotion} /> },
-    { label: 'AOV', node: <CountUp value={aov} prefix="Rs. " animate={!reducedMotion} /> },
+    { label: 'AOV', node: <CountUp value={aov} prefix="₹" animate={!reducedMotion} /> },
     { label: 'Customers', node: <CountUp value={CUSTOMERS.length * 261} animate={!reducedMotion} /> },
     { label: 'Gross margin', node: '38%' },
   ]

@@ -19,11 +19,13 @@ export default function CustomDomains({
   slug,
   maxDomains,
   siteId,
+  ownDomainFrom = null,
 }: {
   tenantId: string
   slug: string
   maxDomains: number
   siteId?: string
+  ownDomainFrom?: string | null
 }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -99,7 +101,7 @@ export default function CustomDomains({
       <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest mb-2">Custom domain</div>
         <p className="text-sm text-foreground-secondary">
-          Available on Pro plan and above. Upgrade to connect your own domain.
+          {ownDomainFrom ? `Connecting a domain you already own is available on the ${ownDomainFrom}. ` : 'Your plan can\'t connect a domain you already own. '}You can buy a domain through Jeffi on any plan.
         </p>
       </div>
     )

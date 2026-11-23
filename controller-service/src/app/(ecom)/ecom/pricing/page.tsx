@@ -1,33 +1,19 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import Link from 'next/link'
-import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
+import { MessageSquare, PanelsTopLeft } from 'lucide-react'
+import {
+  listPlans,
+  planFeatureMatrix,
+  COMPARISON_ROWS,
+  domainAllowance,
+  domainFaqAnswer,
+  SIGNUP_CREDIT_INR,
+} from '@/lib/tenant-registry'
+import { addonPrices } from '@/lib/billing/requested-addons'
+import type { AddonPrice } from '@/lib/billing/addons'
+import { SHOWCASE_FREE_DAYS, SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
 import PricingCards from './PricingCards'
-import { computePlans, getCatalog } from '@controller/lib/compute/catalog'
-import { presetSpec, withDedicatedDb } from '@/lib/compute/presets'
-import { quoteSpec, monthlyTotal } from '@controller/lib/compute/pricing'
-
-/**
- * Each plan's "from" price: its minPreset at its own margin, GST on the servers, plus the plan fee.
- * Shown whether or not owners can pick a size yet: every plan runs on its own server either way.
- * `rdsExtra`: what moving Basic's database to RDS adds per month.
- */
-async function floorPrices(): Promise<{ floors: Record<string, number>; rdsExtra: Record<string, number> } | null> {
-  try {
-    const [catalog, plans] = await Promise.all([getCatalog(), computePlans()])
-    const total = (spec: ReturnType<typeof presetSpec>, p: (typeof plans)[number]) =>
-      Math.round(monthlyTotal(quoteSpec(spec, catalog, p), p.monthlyPriceInr, catalog.settings.gstRate).total)
-    const floors: Record<string, number> = {}
-    const rdsExtra: Record<string, number> = {}
-    for (const p of plans) {
-      const key = p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')
-      floors[p.slug] = total(presetSpec(key), p)
-      if (key === 'basic') rdsExtra[p.slug] = total(withDedicatedDb(presetSpec('basic'), 'basic'), p) - floors[p.slug]
-    }
-    return { floors, rdsExtra }
-  } catch {
-    return null
-  }
-}
+import { floorPrices } from '@controller/lib/compute/floor-prices'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Pricing' }
@@ -50,7 +36,12 @@ function Dash() {
 }
 
 export default async function PricingPage() {
-  const [plans, matrix, prices] = await Promise.all([listPlans(), planFeatureMatrix(), floorPrices()])
+  const [plans, matrix, prices, addons] = await Promise.all([
+    listPlans(),
+    planFeatureMatrix(),
+    floorPrices(),
+    addonPrices().catch((): AddonPrice[] => []),
+  ])
   const floors = prices?.floors ?? null
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
@@ -69,6 +60,29 @@ export default async function PricingPage() {
     const extra = rdsExtra(slug)
     return extra == null ? <Check /> : <span className={`text-xs text-foreground-muted ${cls}`}>+₹{extra.toLocaleString('en-IN')}/mo</span>
   }
+  const addonPrice = (id: string) => addons.find(a => a.id === id)?.priceInr
+  const perMonth = (inr: number | undefined) => (inr == null ? null : `₹${inr.toLocaleString('en-IN')}/mo`)
+
+  // Rows outside the plan features: `cell` differs by plan, `all` is the same on every plan.
+  type Extra = { label: string; cell?: (p: (typeof ordered)[number], cls: string) => ReactNode; all?: string | null }
+  const extraGroups: { group: string; rows: Extra[] }[] = [
+    {
+      group: 'Domain & hosting',
+      rows: [
+        { label: 'Custom domain', cell: p => domainAllowance(p.max_custom_domains) },
+        { label: 'Your own server, with its database', cell: () => <Check /> },
+        { label: 'Separate managed database (optional)', cell: (p, cls) => dedicatedDb(p.slug, cls) },
+      ],
+    },
+    {
+      group: 'Add-ons',
+      rows: [
+        { label: 'Daily payouts', all: '+5% of each sale' },
+        { label: 'Remove ads from your store', all: perMonth(addonPrice('ad_free')) },
+        { label: 'Your own SMS & WhatsApp numbers', all: perMonth(addonPrice('messaging')) },
+      ].filter(r => r.all),
+    },
+  ]
 
   return (
     <div className="text-foreground">
@@ -126,51 +140,29 @@ export default async function PricingPage() {
               </ul>
             </div>
           ))}
-          <div className="mt-6">
-            <div className="px-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Add-ons</div>
-            <ul className="mt-2 rounded-2xl bg-surface-elevated divide-y divide-border-default/60">
-              <li className="px-2 py-3">
-                <div className="px-1 text-sm text-foreground-secondary">Custom domain</div>
-                <div style={cols} className="mt-2 grid">
-                  {ordered.map(p => (
-                    <div key={p.slug} className="min-w-0 text-center text-xs text-foreground-muted break-words">
-                      {p.slug === 'enterprise' ? 'Included' : 'Add-on'}
+          {extraGroups.map(({ group, rows }) => (
+            <div key={group} className="mt-6">
+              <div className="px-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">{group}</div>
+              <ul className="mt-2 rounded-2xl bg-surface-elevated divide-y divide-border-default/60">
+                {rows.map(({ label, cell, all }) => (
+                  <li key={label} className="px-2 py-3">
+                    <div className="px-1 text-sm text-foreground-secondary">{label}</div>
+                    <div style={cols} className="mt-2 grid">
+                      {cell ? (
+                        ordered.map(p => (
+                          <div key={p.slug} className="flex min-w-0 justify-center text-center text-xs text-foreground-muted break-words">
+                            {cell(p, 'break-words')}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center text-xs text-foreground-muted">{all} on every plan</div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </li>
-              <li className="px-2 py-3">
-                <div className="px-1 text-sm text-foreground-secondary">Daily payouts</div>
-                <div style={cols} className="mt-2 grid">
-                  {ordered.map(p => (
-                    <div key={p.slug} className="text-center text-xs text-foreground-muted">
-                      +5%
-                    </div>
-                  ))}
-                </div>
-              </li>
-              <li className="px-2 py-3">
-                <div className="px-1 text-sm text-foreground-secondary">Own server (database included)</div>
-                <div style={cols} className="mt-2 grid">
-                  {ordered.map(p => (
-                    <div key={p.slug} className="flex justify-center">
-                      <Check />
-                    </div>
-                  ))}
-                </div>
-              </li>
-              <li className="px-2 py-3">
-                <div className="px-1 text-sm text-foreground-secondary">Dedicated database (optional)</div>
-                <div style={cols} className="mt-2 grid">
-                  {ordered.map(p => (
-                    <div key={p.slug} className="flex min-w-0 justify-center text-center">
-                      {dedicatedDb(p.slug, 'break-words')}
-                    </div>
-                  ))}
-                </div>
-              </li>
-            </ul>
-          </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
         <div className="hidden md:block w-full overflow-x-auto rounded-[2rem] bg-surface-elevated">
           <table className="w-full text-sm min-w-[720px]">
@@ -211,46 +203,34 @@ export default async function PricingPage() {
                   ))}
                 </Fragment>
               ))}
-              <tr className="bg-surface-secondary/50">
-                <td
-                  colSpan={ordered.length + 1}
-                  className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-foreground-muted"
-                >
-                  Add-ons
-                </td>
-              </tr>
-              <tr className="border-t border-border-default/60">
-                <td className="px-5 py-3 text-foreground-secondary">Custom domain</td>
-                {ordered.map(p => (
-                  <td key={p.slug} className="px-4 py-3 text-center text-xs text-foreground-muted">
-                    {p.slug === 'enterprise' ? 'Included' : 'Add-on'}
-                  </td>
-                ))}
-              </tr>
-              <tr className="border-t border-border-default/60">
-                <td className="px-5 py-3 text-foreground-secondary">Daily payouts</td>
-                {ordered.map(p => (
-                  <td key={p.slug} className="px-4 py-3 text-center text-xs text-foreground-muted">
-                    +5%
-                  </td>
-                ))}
-              </tr>
-              <tr className="border-t border-border-default/60">
-                <td className="px-5 py-3 text-foreground-secondary">Own server (database included)</td>
-                {ordered.map(p => (
-                  <td key={p.slug} className="px-4 py-3 text-center">
-                    <Check />
-                  </td>
-                ))}
-              </tr>
-              <tr className="border-t border-border-default/60">
-                <td className="px-5 py-3 text-foreground-secondary">Dedicated database (optional)</td>
-                {ordered.map(p => (
-                  <td key={p.slug} className="px-4 py-3 text-center">
-                    {dedicatedDb(p.slug, '')}
-                  </td>
-                ))}
-              </tr>
+              {extraGroups.map(({ group, rows }) => (
+                <Fragment key={group}>
+                  <tr className="bg-surface-secondary/50">
+                    <td
+                      colSpan={ordered.length + 1}
+                      className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-foreground-muted"
+                    >
+                      {group}
+                    </td>
+                  </tr>
+                  {rows.map(({ label, cell, all }) => (
+                    <tr key={label} className="border-t border-border-default/60 hover:bg-surface-secondary/30">
+                      <td className="px-5 py-3 text-foreground-secondary">{label}</td>
+                      {cell ? (
+                        ordered.map(p => (
+                          <td key={p.slug} className="px-4 py-3 text-center text-xs text-foreground-muted">
+                            {cell(p, '')}
+                          </td>
+                        ))
+                      ) : (
+                        <td colSpan={ordered.length} className="px-4 py-3 text-center text-xs text-foreground-muted">
+                          {all} on every plan
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
             </tbody>
           </table>
         </div>
@@ -264,6 +244,45 @@ export default async function PricingPage() {
         </div>
       </section>
 
+      {/* The products that don't need a store */}
+      <section className="w-full px-4 sm:px-6 lg:px-12 pb-16 sm:pb-24">
+        <h2 className="font-display font-black text-3xl lg:text-4xl">No store needed</h2>
+        <p className="mt-3 text-foreground-secondary max-w-2xl">Both run on their own, without a store plan.</p>
+        <div className="mt-6 sm:mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-5">
+          {[
+            {
+              title: 'Showcase',
+              icon: PanelsTopLeft,
+              copy: 'A one-page website for your business, with your work, reviews and contact details. Enquiries come straight to you.',
+              price: `${SHOWCASE_FREE_DAYS}-day free trial, then ₹${SHOWCASE_PRICE_INR.toLocaleString('en-IN')}/month from your wallet`,
+              cta: 'Make a Showcase site',
+            },
+            {
+              title: 'Messaging & Documents API',
+              icon: MessageSquare,
+              copy: 'Send email, SMS and WhatsApp, and make GST invoices, quotations and labels as PDFs, from your own app.',
+              price: `Pay as you go from your wallet, with a ₹${SIGNUP_CREDIT_INR.toLocaleString('en-IN')} welcome credit to start`,
+              cta: 'Get an API key',
+            },
+          ].map(({ title, icon: Icon, copy, price, cta }) => (
+            <div key={title} className="min-w-0 rounded-3xl sm:rounded-[2rem] bg-surface-elevated p-6 sm:p-8 flex flex-col">
+              <span className="grid place-items-center w-10 h-10 rounded-full org-sage org-sage-text">
+                <Icon className="w-5 h-5" aria-hidden />
+              </span>
+              <h3 className="mt-4 font-display font-black text-2xl">{title}</h3>
+              <p className="mt-2 text-sm text-foreground-secondary flex-1">{copy}</p>
+              <p className="mt-4 text-sm font-semibold text-foreground">{price}</p>
+              <Link
+                href="/signup"
+                className="mt-6 self-stretch sm:self-start text-center px-6 py-3 sm:py-2.5 rounded-full text-sm font-display font-bold org-sand org-sand-hover text-foreground transition-colors"
+              >
+                {cta}
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="w-full px-4 sm:px-6 lg:px-12 pb-16 sm:pb-24 pt-4 sm:pt-8">
         <h2 className="font-display font-black text-3xl lg:text-4xl mb-6 sm:mb-10">Frequently asked</h2>
@@ -271,24 +290,21 @@ export default async function PricingPage() {
           {[
             [
               'Is the storefront limited on cheaper plans?',
-              'No. Every plan — including Basic — ships with the complete storefront: full catalogue, cart, checkout, wishlist, compare and COD. Plans differ only in how much of the admin platform you unlock.',
+              'No. Every plan — including Basic — ships with the complete storefront: full catalogue, cart, checkout, wishlist, compare and cash on delivery. Plans differ only in how much of the admin platform you unlock.',
             ],
             [
               'What does the price include?',
-              "One subscription for the plan and your store's own server. The plan fee (₹0 on Basic) includes GST; the server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise — with 18% GST on top. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server, or on any plan you can move it to a dedicated database; on Basic that prices your servers at AWS cost plus 20%.",
+              "One subscription for the plan and your store's own server. The plan fee (₹0 on Basic) includes GST; the server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise — with 18% GST on top. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server, or on any plan you can move it to a separate managed database; on Basic that prices your servers at AWS cost plus 20%.",
             ],
             [
               "Monthly vs yearly — what's the difference?",
-              'Yearly is charged once a year at 10× the monthly price (effectively 2 months free). You can switch between monthly and yearly anytime from your billing dashboard — a downgrade takes effect at the next renewal, an upgrade is applied immediately with a prorated credit.',
+              'Yearly is charged once a year at 10× the monthly price, so you get 12 months for the price of 10. You can switch between monthly and yearly anytime from your billing dashboard — a downgrade takes effect at the next renewal, an upgrade is applied immediately with a prorated credit.',
             ],
             [
               'How do payouts work?',
-              'Payments from your customers are split at checkout and settled to your verified bank account, minus platform + gateway fees. Weekly by default, or daily for +5%.',
+              'Payments from your customers are split at checkout and settled to your verified bank account, minus platform + gateway fees. Weekly by default, or daily for an extra 5% of each sale.',
             ],
-            [
-              'Can I use my own domain?',
-              'Yes — a custom domain is an add-on on all plans and included on Enterprise. We handle the certificate and DNS.',
-            ],
+            ['Can I use my own domain?', domainFaqAnswer(plans)],
             [
               'Can I upgrade or downgrade later?',
               "Anytime. Upgrading is immediate — you're charged the difference with a prorated credit. Downgrading takes effect at your next renewal so you keep your current features until then.",

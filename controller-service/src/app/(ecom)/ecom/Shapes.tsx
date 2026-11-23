@@ -1,8 +1,18 @@
 // Decorative SVG shapes + device mockups for the ecom landing. No emojis anywhere —
 // all icons/accents are inline SVG so they respect currentColor and the theme.
 
-// A phone frame with an illustrated in-screen UI (shapes, not a real screenshot).
-// Used in the bento section for a lively, product-y feel.
+import { Search, ShoppingBag } from 'lucide-react'
+import ProductArt from './_demo/ProductArt'
+import { PRODUCTS } from './_demo/data'
+
+// The phone screen stays light in both themes, so its contents use fixed colours.
+const INK = 'text-[#3d3a35]'
+const MUTED = 'text-[#8a8275]'
+const TILE = 'rounded-lg bg-[#fffdf7]'
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
+
+// A phone frame with a small, realistic in-screen UI built from the demo store's data (not a screenshot).
+// Used in the bento section.
 export function PhoneMock({
   variant = 'store',
   src,
@@ -15,7 +25,7 @@ export function PhoneMock({
   className?: string
 }) {
   return (
-    <div className={`relative mx-auto w-[190px] max-w-full ${className}`}>
+    <div className={`relative mx-auto w-[190px] max-w-full ${className}`} aria-hidden={src ? undefined : true}>
       <div
         className={`rounded-[2.5rem] border-[5px] border-[#3d3a35] bg-[#f8f3ea] overflow-hidden ${src ? 'aspect-[390/844]' : 'aspect-[9/19]'}`}
       >
@@ -27,52 +37,112 @@ export function PhoneMock({
             <div className="h-6 flex items-center justify-center">
               <span className="w-16 h-2 rounded-full bg-[#d9d2c3]" />
             </div>
-            <div className="px-3 pb-3 space-y-2.5">
-              {variant === 'store' && (
-                <>
-                  <div className="h-4 rounded-full bg-[#e8e1d3]" />
-                  <div className="grid grid-cols-2 gap-2">
-                    {['var(--org-peach)', 'var(--org-sage)', 'var(--org-sage)', 'var(--org-apricot)'].map((c, i) => (
-                      <div key={i} className="aspect-square rounded-xl" style={{ background: c }} />
-                    ))}
-                  </div>
-                </>
-              )}
-              {variant === 'chart' && (
-                <>
-                  <div className="rounded-xl border border-border-default p-2.5">
-                    <div className="h-1.5 w-1/3 rounded bg-foreground/10 mb-2" />
-                    <div className="h-16 flex items-end gap-1">
-                      {[40, 65, 50, 80, 60, 90, 70].map((h, i) => (
-                        <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: i === 5 ? 'var(--org-terracotta)' : i % 2 ? 'var(--org-apricot)' : 'var(--org-peach)' }} />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border-default p-2.5 space-y-1.5">
-                    <div className="h-1.5 w-2/3 rounded bg-foreground/10" />
-                    <div className="h-1.5 w-1/2 rounded bg-foreground/10" />
-                  </div>
-                </>
-              )}
-              {variant === 'card' && (
-                <>
-                  <div className="rounded-xl bg-gradient-to-br from-accent-600 to-primary-600 p-3 h-24 flex flex-col justify-between">
-                    <div className="h-4 w-8 rounded bg-white/40" />
-                    <div className="h-2 w-3/4 rounded bg-white/60" />
-                  </div>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-accent-500/30" />
-                      <div className="flex-1 h-1.5 rounded bg-foreground/10" />
-                    </div>
-                  ))}
-                </>
-              )}
+            <div className="px-3 pb-3 space-y-2">
+              {variant === 'store' && <StoreScreen />}
+              {variant === 'card' && <PaymentsScreen />}
+              {variant === 'chart' && <InsightsScreen />}
             </div>
           </>
         )}
       </div>
     </div>
+  )
+}
+
+function StoreScreen() {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <span className={`text-[10px] font-black tracking-tight ${INK}`}>Nova Store</span>
+        <ShoppingBag className={`h-3 w-3 ${INK}`} />
+      </div>
+      <div className={`flex items-center gap-1 rounded-full bg-[#ece5d7] px-2 py-1 text-[8px] ${MUTED}`}>
+        <Search className="h-2.5 w-2.5 shrink-0" />
+        Search products
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {PRODUCTS.slice(0, 4).map(p => (
+          <div key={p.id} className={`${TILE} p-1`}>
+            <div className="aspect-square overflow-hidden rounded-md">
+              <ProductArt category={p.category} />
+            </div>
+            <div className={`mt-1 truncate text-[8px] font-semibold ${INK}`}>{p.name}</div>
+            <div className="text-[8px] font-bold tabular-nums" style={{ color: 'var(--org-terracotta-deep)' }}>{inr(p.price)}</div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+const PAYMENTS: [string, string, number, string][] = [
+  ['1041', 'UPI', 1099, 'Settled'],
+  ['1040', 'Cash on delivery', 649, 'Collected'],
+  ['1039', 'Card', 2147, 'Captured'],
+]
+
+function PaymentsScreen() {
+  return (
+    <>
+      <div className={`text-[10px] font-black tracking-tight ${INK}`}>Payments</div>
+      <div className="rounded-xl p-2.5 text-white" style={{ background: 'var(--org-terracotta-deep)' }}>
+        <div className="text-[8px] opacity-80">Settled this week</div>
+        <div className="mt-0.5 text-sm font-black tabular-nums">{inr(14280)}</div>
+        <div className="mt-1 text-[8px] opacity-80">Online and COD, reconciled</div>
+      </div>
+      {PAYMENTS.map(([n, method, amount, status]) => (
+        <div key={n} className={`${TILE} flex items-center justify-between gap-2 px-2 py-1.5`}>
+          <div className="min-w-0">
+            <div className={`text-[8px] font-semibold ${INK}`}>Order #{n}</div>
+            <div className={`truncate text-[8px] ${MUTED}`}>{method}</div>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className={`text-[8px] font-bold tabular-nums ${INK}`}>{inr(amount)}</div>
+            <div className="text-[8px]" style={{ color: 'var(--org-sage-deep)' }}>{status}</div>
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
+const WEEK = [40, 65, 50, 80, 60, 90, 70]
+
+function InsightsScreen() {
+  return (
+    <>
+      <div className="flex items-baseline justify-between">
+        <span className={`text-[10px] font-black tracking-tight ${INK}`}>Insights</span>
+        <span className={`text-[8px] ${MUTED}`}>Last 7 days</span>
+      </div>
+      <div className={`${TILE} rounded-xl p-2.5`}>
+        <div className={`text-[8px] ${MUTED}`}>Revenue</div>
+        <div className="flex items-baseline gap-1">
+          <span className={`text-sm font-black tabular-nums ${INK}`}>{inr(48920)}</span>
+          <span className="text-[8px] font-semibold" style={{ color: 'var(--org-sage-deep)' }}>+12%</span>
+        </div>
+        <div className="mt-2 h-14 flex items-end gap-1">
+          {WEEK.map((h, i) => (
+            <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: i === 5 ? 'var(--org-terracotta)' : i % 2 ? 'var(--org-apricot)' : 'var(--org-peach)' }} />
+          ))}
+        </div>
+        <div className={`mt-1 flex gap-1 text-[8px] ${MUTED}`}>
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <span key={i} className="flex-1 text-center">{d}</span>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className={`${TILE} p-2`}>
+          <div className={`text-[8px] ${MUTED}`}>Orders</div>
+          <div className={`text-xs font-black tabular-nums ${INK}`}>64</div>
+        </div>
+        <div className={`${TILE} p-2`}>
+          <div className={`text-[8px] ${MUTED}`}>Low stock</div>
+          <div className="text-xs font-black tabular-nums" style={{ color: 'var(--org-terracotta-deep)' }}>3 items</div>
+        </div>
+      </div>
+    </>
   )
 }
 

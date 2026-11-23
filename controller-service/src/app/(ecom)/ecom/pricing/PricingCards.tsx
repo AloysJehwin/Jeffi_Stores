@@ -16,7 +16,7 @@ const PLAN_BLURB: Record<string, string> = {
   basic: 'Everything to launch — full storefront + core admin.',
   growth: 'Quotations, CRM, returns, coupons, inventory.',
   pro: 'Marketing, AI assistant, B2B portal, channel sync.',
-  enterprise: 'Large servers from the start, custom domains included, priority support.',
+  enterprise: 'Large servers from the start and priority support.',
 }
 
 /**
@@ -32,7 +32,7 @@ export default function PricingCards({ plans, fromInr }: { plans: Plan[]; fromIn
       {/* Interval toggle */}
       <div className="flex justify-center mb-8 sm:mb-10">
         <Segmented<Interval> ariaLabel="Billing interval" value={interval} onChange={setInterval}
-          options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">2 months free</span> }]} />
+          options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">Save 2 months</span> }]} />
       </div>
 
       {/* Plan cards */}
@@ -65,7 +65,7 @@ export default function PricingCards({ plans, fromInr }: { plans: Plan[]; fromIn
                 </div>
                 {interval === 'yearly' && (
                   <div className="text-xs org-sage-text font-semibold mt-0.5">
-                    2 months free
+                    12 months for the price of 10
                   </div>
                 )}
                 <div className="text-xs text-foreground-secondary mt-1">

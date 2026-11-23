@@ -10,14 +10,12 @@ interface QA {
   a: string
 }
 
-const FAQS: QA[] = [
-  {
-    q: 'Do I get my own domain?',
-    a: 'Every store launches on its own subdomain, ready to use straight away. You can also connect a custom domain you already own on the higher plans.',
-  },
+// The domain and pricing answers come from the plans (the page passes them in).
+const faqs = (domainAnswer: string, pricingNote: string): QA[] => [
+  { q: 'Do I get my own domain?', a: domainAnswer },
   {
     q: 'How does pricing work?',
-    a: 'We offer plans from Basic to Enterprise, so you can start small and move up as you grow. Every plan includes the storefront and admin — you only step up for more capacity and advanced features.',
+    a: `We offer plans from Basic to Enterprise, so you can start small and move up as you grow. Every plan includes the storefront and admin — you only step up for more capacity and advanced features. ${pricingNote}`,
   },
   {
     q: 'Which payment methods are supported?',
@@ -41,8 +39,9 @@ const FAQS: QA[] = [
   },
 ]
 
-export default function Faq() {
+export default function Faq({ domainAnswer, pricingNote }: { domainAnswer: string; pricingNote: string }) {
   const [open, setOpen] = useState<number | null>(0)
+  const FAQS = faqs(domainAnswer, pricingNote)
   return (
     <section className="w-full px-4 sm:px-6 lg:px-12 py-12 sm:py-20">
       <Eyebrow>Questions</Eyebrow>

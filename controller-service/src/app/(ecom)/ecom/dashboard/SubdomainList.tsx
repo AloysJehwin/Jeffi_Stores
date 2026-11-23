@@ -32,11 +32,14 @@ export default function SubdomainList({
   plan,
   maxCustomDomains,
   rdsReady,
+  ownDomainFrom = null,
 }: {
   slug: string
   plan: string | null
   maxCustomDomains: number
   rdsReady: boolean
+  /** Which plans can connect an owned domain, from the plans (ownDomainFrom). */
+  ownDomainFrom?: string | null
 }) {
   const p = plan ?? 'basic'
 
@@ -118,7 +121,7 @@ export default function SubdomainList({
       )}
       {maxCustomDomains === 0 && (
         <div className="px-4 py-2 text-xs text-foreground-secondary">
-          Custom domains available on Pro plan and above.
+          {ownDomainFrom ? `Connecting a domain you already own is available on the ${ownDomainFrom}. ` : ''}You can buy a domain through Jeffi on any plan.
         </div>
       )}
     </div>

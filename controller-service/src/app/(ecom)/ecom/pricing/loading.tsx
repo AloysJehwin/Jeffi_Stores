@@ -23,13 +23,13 @@ export default function Loading() {
           <div className="inline-flex gap-0.5 rounded-full org-sand p-1">
             <span className="rounded-full px-4 py-1.5 text-sm font-semibold ecom-sel shadow-sm">Monthly</span>
             <span className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-foreground-secondary">
-              Yearly <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">2 months free</span>
+              Yearly <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">Save 2 months</span>
             </span>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-5 w-full">
           {Array.from({ length: PLANS }).map((_, i) => (
-            <div key={i} className={`min-w-0 rounded-3xl sm:rounded-[2rem] p-6 sm:p-7 flex flex-col ${i === 2 ? 'org-peach' : 'org-sand'}`}>
+            <div key={i} className={`min-w-0 rounded-3xl sm:rounded-[2rem] p-6 sm:p-7 flex flex-col ${i === 1 ? 'org-peach' : 'org-sand'}`}>
               <Sk className="h-7 w-24" />
               <Sk className="mt-3 h-10 w-36" />
               <div className="text-xs text-foreground-secondary mt-2">Incl. GST · plan &amp; servers in one subscription</div>
