@@ -62,6 +62,7 @@ export default function WalletClient({ initial, keyId, tenantName, upiEnabled = 
         ))}
       </div>
       <Card title="Top up">
+        <p className="mb-4 text-sm text-foreground-secondary">The wallet pays for usage only: messages, documents, AI and shipping. Your plan, Showcase sites and add-ons are billed on your subscription.</p>
         <div className="space-y-3">
           <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
             options={AMOUNTS.map(a => ({ value: String(a), label: fmt(a) }))} />

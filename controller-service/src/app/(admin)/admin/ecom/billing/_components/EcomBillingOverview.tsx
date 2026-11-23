@@ -5,6 +5,7 @@ import { AttentionList } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, type Col } from '@/components/admin/channels/ui'
 import { TrendChart, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import type { EcomBillingOverview as Data } from '@controller/lib/overviews/ecom-billing'
+import { LINE_KIND_LABEL } from '@controller/components/admin/ecom/detail/BillingTables'
 import { OverviewShell, Grid2, dateIn, useEcomOverview } from '../../_components/overview-shell'
 import { BillingOverviewLoading } from '../../_components/skeletons'
 
@@ -33,7 +34,11 @@ const RENEWAL_COLS: Col<Renewal>[] = [
       </Link>
     ),
   },
-  { key: 'plan', label: 'Plan', render: r => <span className="capitalize">{r.plan}</span> },
+  {
+    key: 'for',
+    label: 'For',
+    render: r => (r.what ? <span className="break-words">{r.what}</span> : <span className="capitalize">{r.plan ? `${r.plan} plan` : '-'}</span>),
+  },
   { key: 'interval', label: 'Billing', render: r => <span className="capitalize">{r.interval}</span> },
   { key: 'due', label: 'Due', render: r => dateIn(r.due), sort: r => r.due },
   { key: 'amount', label: 'Amount', num: true, render: r => money(r.amount), sort: r => r.amount },
@@ -48,6 +53,35 @@ const PLAN_COLS: Col<Plan>[] = [
   { key: 'arr', label: 'ARR', num: true, render: r => money(r.arr), sort: r => r.arr },
 ]
 
+type Kind = Data['by_kind'][number]
+const KIND_COLS: Col<Kind>[] = [
+  { key: 'kind', label: 'Line', render: r => LINE_KIND_LABEL[r.kind] ?? r.kind },
+  { key: 'active', label: 'Active', num: true, render: r => count(r.lines.active), sort: r => r.lines.active },
+  { key: 'trial', label: 'Trial', num: true, render: r => count(r.lines.trial), sort: r => r.lines.trial },
+  { key: 'awaiting', label: 'Not paid yet', num: true, render: r => count(r.lines.awaiting), sort: r => r.lines.awaiting },
+  { key: 'legacy', label: 'Wallet (legacy)', num: true, render: r => count(r.lines.legacy), sort: r => r.lines.legacy },
+  { key: 'mrr', label: 'MRR', num: true, render: r => money(r.mrr), sort: r => r.mrr },
+  { key: 'collected', label: 'Collected', num: true, render: r => money(r.collected), sort: r => r.collected },
+  { key: 'change', label: 'vs before', num: true, render: r => pct(r.delta, 0), sort: r => r.delta ?? 0 },
+]
+
+const WORKSPACE_STATES = [
+  ['active', 'Active', 'green'],
+  ['authenticated', 'Authorised', 'blue'],
+  ['created', 'Not paid yet', 'amber'],
+  ['pending', 'Retrying', 'amber'],
+  ['halted', 'Payment failed', 'red'],
+  ['cancelled', 'Cancelled', 'muted'],
+] as const
+
+const STORE_STATES = [
+  ['active', 'Active', 'green'],
+  ['authenticated', 'Authorised', 'blue'],
+  ['created', 'Not paid yet', 'amber'],
+  ['halted', 'Payment failed', 'red'],
+  ['cancelled', 'Cancelled', 'muted'],
+] as const
+
 export default function EcomBillingOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/billing/overview')
   return (
@@ -59,9 +93,9 @@ export default function EcomBillingOverview() {
             <KpiGrid>
               <Kpi label="MRR" value={money(d.snapshot.mrr)} sub={`ARR ${money(d.snapshot.arr)}`} highlight />
               <Kpi
-                label="Paying stores"
+                label="Paying workspaces"
                 value={count(d.snapshot.paying)}
-                sub={d.snapshot.arpa == null ? undefined : `${money(d.snapshot.arpa)} per store`}
+                sub={[`${count(d.snapshot.paying_stores)} stores`, d.snapshot.arpa == null ? null : `${money(d.snapshot.arpa)} each`].filter(Boolean).join(' · ')}
               />
               <Kpi label="New MRR" value={money(d.current.new_mrr)} delta={d.deltas.new_mrr} />
               <Kpi
@@ -81,7 +115,7 @@ export default function EcomBillingOverview() {
                 label="Subscriptions collected"
                 value={money(d.current.collected)}
                 delta={d.deltas.collected}
-                sub={`${count(d.current.charges)} charges`}
+                sub={`${count(d.current.charges)} charges${d.current.subscription_refunds ? `, ${money(d.current.subscription_refunds)} refunded` : ''}`}
               />
               <Kpi
                 label="Store GMV"
@@ -135,26 +169,30 @@ export default function EcomBillingOverview() {
 
             <Grid2>
               <Section title="Subscriptions">
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
-                  {(
-                    [
-                      ['active', 'Active', 'green'],
-                      ['authenticated', 'Authorised', 'blue'],
-                      ['created', 'Not paid yet', 'amber'],
-                      ['halted', 'Payment failed', 'red'],
-                      ['cancelled', 'Cancelled', 'muted'],
-                    ] as const
-                  ).map(([k, l, tone]) => (
-                    <div key={k} className="rounded-lg bg-surface-secondary p-2 last:col-span-2 sm:last:col-span-1">
-                      <p className="text-lg font-semibold text-foreground tabular-nums">{count(d.subscriptions[k])}</p>
-                      <Badge tone={tone}>{l}</Badge>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-foreground-muted mt-3">
-                  Paid store plans, by Razorpay subscription status. Refunds on store orders this period:{' '}
-                  {money(d.current.refunds)}.
-                </p>
+                {(() => {
+                  const ws = d.workspace_subscriptions
+                  const onBilling = WORKSPACE_STATES.some(([k]) => ws[k] > 0)
+                  const states = onBilling ? WORKSPACE_STATES : STORE_STATES
+                  const counts: Record<string, number> = onBilling ? ws : d.subscriptions
+                  return (
+                    <>
+                      <div className={`grid grid-cols-2 ${onBilling ? 'sm:grid-cols-6' : 'sm:grid-cols-5'} gap-2 text-center text-xs`}>
+                        {states.map(([k, l, tone]) => (
+                          <div key={k} className={`rounded-lg bg-surface-secondary p-2 ${onBilling ? '' : 'last:col-span-2 sm:last:col-span-1'}`}>
+                            <p className="text-lg font-semibold text-foreground tabular-nums">{count(counts[k])}</p>
+                            <Badge tone={tone}>{l}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-foreground-muted mt-3">
+                        {onBilling
+                          ? `Workspace subscriptions by Razorpay status. ${count(ws.in_grace)} in grace after a failed payment, ${count(ws.replacements)} changes waiting for the owner.`
+                          : 'Paid store plans, by Razorpay subscription status.'}{' '}
+                        Refunds on store orders this period: {money(d.current.refunds)}.
+                      </p>
+                    </>
+                  )
+                })()}
               </Section>
               <Section title="MRR by plan">
                 <RankedBars
@@ -163,6 +201,14 @@ export default function EcomBillingOverview() {
                 />
               </Section>
             </Grid2>
+
+            <Section title="Subscription lines">
+              <Table rows={d.by_kind} cols={KIND_COLS} rowKey={r => r.kind} empty="No subscription lines" />
+              <p className="text-xs text-foreground-muted mt-3">
+                MRR from current workspace subscriptions; a paying store not on one yet counts under Store plan. Collected splits each charge over the
+                lines it paid for; charges from before the switch count as Store plan.
+              </p>
+            </Section>
 
             <Section title="Plans">
               <Table rows={d.by_plan} cols={PLAN_COLS} rowKey={r => r.plan} empty="No paying stores" />
