@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1795408164.1647701,
-    "ast_hash": "c1ff454d99b3a168b7487f5a405effa5",
+    "mtime": 1795461896.8088517,
+    "ast_hash": "f6ac18f3b8348644a8cc3057d61832c4",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -280,8 +280,8 @@
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/config.ts": {
-    "mtime": 1795334783.1128674,
-    "ast_hash": "e564bde855c4443096324d5f6c64b097",
+    "mtime": 1795461897.1447377,
+    "ast_hash": "08ce879e00c99ec373c8813d64bb0a7f",
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/providers/ollama.ts": {
@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "ai-platform/gateway/src/server.ts": {
-    "mtime": 1795334783.1163568,
-    "ast_hash": "92b549e2a68a80a92af10e69e4dbb0a6",
+    "mtime": 1795461897.1456394,
+    "ast_hash": "84778149545dd727807b74512396a94f",
     "semantic_hash": ""
   },
   "ai-platform/gateway/tsconfig.json": {
@@ -315,13 +315,13 @@
     "semantic_hash": ""
   },
   "ai-platform/sdk/config.ts": {
-    "mtime": 1790931247.5928805,
-    "ast_hash": "d4ccdd28d3cf2c5d4cd28d0362ffa12a",
+    "mtime": 1795461897.1471627,
+    "ast_hash": "a5a05a0f7dcc6b723dd5b408fd100219",
     "semantic_hash": ""
   },
   "ai-platform/sdk/index.ts": {
-    "mtime": 1795334783.1272445,
-    "ast_hash": "888589c8f4d280d14b92a58dd5cd63c0",
+    "mtime": 1795461897.147657,
+    "ast_hash": "fe7c14bed60c542e0da572db3b36e270",
     "semantic_hash": ""
   },
   "ai-platform/sdk/package.json": {
@@ -330,8 +330,8 @@
     "semantic_hash": ""
   },
   "ai-platform/sdk/transport.ts": {
-    "mtime": 1794518173.290488,
-    "ast_hash": "cc2e23bf37405dd8a5c7bbe975677d45",
+    "mtime": 1795461897.1484754,
+    "ast_hash": "8cf77896a0268a59710416c11bfba99b",
     "semantic_hash": ""
   },
   "ai-platform/sdk/tsconfig.json": {
@@ -340,8 +340,8 @@
     "semantic_hash": ""
   },
   "ai-platform/sdk/types.ts": {
-    "mtime": 1795334783.1276822,
-    "ast_hash": "26ec3cb2c66c57f2152dd7e063de9c78",
+    "mtime": 1795461897.149476,
+    "ast_hash": "1209172be712a89e6cf9c7da0afcec3f",
     "semantic_hash": ""
   },
   ".claude/plans/issues-draft.md": {
@@ -380,13 +380,13 @@
     "semantic_hash": ""
   },
   "ai-platform/README.md": {
-    "mtime": 1795459619.971192,
-    "ast_hash": "8edb97a2bdbafe783c7c9864f3bda3ac",
+    "mtime": 1795461897.1408408,
+    "ast_hash": "2afbe5e2fbab9a90f4b72b254422b774",
     "semantic_hash": ""
   },
   "ai-platform/deploy/base/config.yaml": {
-    "mtime": 1795334783.1082525,
-    "ast_hash": "990c18e7e3113eec058a8e832c518dfb",
+    "mtime": 1795461897.1413994,
+    "ast_hash": "e048adab5ef506d0a84b0c32497be02f",
     "semantic_hash": ""
   },
   "ai-platform/deploy/base/gateway.yaml": {
@@ -570,8 +570,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/README.md": {
-    "mtime": 1795334783.3192024,
-    "ast_hash": "b1e5601b2a2aeab9195caebbc4a3c7f5",
+    "mtime": 1795461896.809547,
+    "ast_hash": "28b489a56655681ed633cfa50b18593b",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/00-namespaces.yaml": {
@@ -640,8 +640,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/build-push-ecr.sh": {
-    "mtime": 1794925329.6431673,
-    "ast_hash": "9ebfed6cd0f6f5f618b4f2e1a451f29a",
+    "mtime": 1795461896.8102272,
+    "ast_hash": "49466894e2b88a108f8529e1159124aa",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/deploy-local.sh": {
@@ -2860,8 +2860,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/github-oidc.sh": {
-    "mtime": 1794925342.2816405,
-    "ast_hash": "296710b86d7095fe7e5b81c620dc2626",
+    "mtime": 1795461896.8115044,
+    "ast_hash": "fcc83f11c2c6eeb1c3f3f0d3fb84eac3",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/image-tag.sh": {
@@ -3145,8 +3145,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/razer-release.sh": {
-    "mtime": 1795334783.319999,
-    "ast_hash": "66e8ca8071e3041fad31371c7b3ee6e8",
+    "mtime": 1795461897.1510873,
+    "ast_hash": "e513c5f027423121317713704c103370",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/razer-trust.sh": {
@@ -7590,8 +7590,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/ai/media.ts": {
-    "mtime": 1794857642.3717153,
-    "ast_hash": "8863566032b9537893f9d04928c10a26",
+    "mtime": 1795461897.1524255,
+    "ast_hash": "a8ca19e200155b951a3684e19d508496",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/ai/preset-prompts.ts": {
@@ -10225,8 +10225,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/ai-client.ts": {
-    "mtime": 1795334783.526435,
-    "ast_hash": "6425df23c35b35e0ccc0b0eade07449f",
+    "mtime": 1795461897.15351,
+    "ast_hash": "e27f117576a7ecee2639c46128e82e5c",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/ai-direct-ollama.ts": {
@@ -10350,8 +10350,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/db.ts": {
-    "mtime": 1795334783.5270116,
-    "ast_hash": "2b9d8855e2957f6425a77a89d66075ba",
+    "mtime": 1795461996.835701,
+    "ast_hash": "4e76d2d11fe1021edca0e364938ff63c",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/shared/ec2-client.ts": {
@@ -11030,8 +11030,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/tenant-registry/host-resolution.ts": {
-    "mtime": 1794564703.6682193,
-    "ast_hash": "f005ffee2dfb3e35eb66832da2b4124c",
+    "mtime": 1795461996.8362267,
+    "ast_hash": "6faf8635d7480937df897887d81c8b83",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/tenant-registry/index.ts": {
@@ -16345,8 +16345,8 @@
     "semantic_hash": ""
   },
   "admin-service/src/app/api/(admin)/admin/settings/providers/route.ts": {
-    "mtime": 1795063726.5505357,
-    "ast_hash": "79cdcbbfcee2c9e9b17e89858286bcdc",
+    "mtime": 1795461897.1373885,
+    "ast_hash": "9e2fdd616b2e44d15ebabf282ad08507",
     "semantic_hash": ""
   },
   "admin-service/src/app/api/(admin)/admin/settings/route.ts": {
@@ -21175,8 +21175,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/ai/media.test.ts": {
-    "mtime": 1794518176.033185,
-    "ast_hash": "7537f952c8bcfb2deecd0fb30d97b336",
+    "mtime": 1795461897.1543481,
+    "ast_hash": "491e0759002e6290be7e05cd402bc2d7",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/amazon-ads/amazon-ads.test.ts": {
@@ -21565,8 +21565,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/db.test.ts": {
-    "mtime": 1794518176.074336,
-    "ast_hash": "932e5ffa632bc8426b215d40c928245d",
+    "mtime": 1795461996.836939,
+    "ast_hash": "296839d906caa0c7b3eeec017ac3c5ee",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/delhivery-pincode.test.ts": {
@@ -22660,13 +22660,13 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/tenant-registry.accessors-and-billing.test.ts": {
-    "mtime": 1794518176.2157526,
-    "ast_hash": "a75c19fc11a5972a4ea66342633017d5",
+    "mtime": 1795461996.8376768,
+    "ast_hash": "9d75022dc23562263b5afa4630dd8429",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/tenant-registry.lookup-and-kyc-branches.test.ts": {
-    "mtime": 1794518176.2159944,
-    "ast_hash": "2d39dfb6261ce3914d80646b885e9283",
+    "mtime": 1795461996.8382185,
+    "ast_hash": "6f5a6b3ac39c2677f4d0f06d1602a774",
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/tenant-registry.test.ts": {
@@ -23775,8 +23775,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/ai-health.ts": {
-    "mtime": 1794518173.7442248,
-    "ast_hash": "a5933127d4276a240ce1986145d5a31e",
+    "mtime": 1795461897.1502874,
+    "ast_hash": "1d14061e69995bbf93f09e90f9fcb174",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/messaging/delivery-status.ts": {
@@ -34127,6 +34127,36 @@
   "storefront-service/ui-tests/README.md": {
     "mtime": 1795359065.5656452,
     "ast_hash": "c3a6d2231a6c79cd88ea136306c91422",
+    "semantic_hash": ""
+  },
+  "ai-platform/deploy/overlays/razer/host/ai-gateway-release.sh": {
+    "mtime": 1795461916.9561002,
+    "ast_hash": "0b2456a0ca6422ca9eea12b21127b7f2",
+    "semantic_hash": ""
+  },
+  "ai-platform/deploy/overlays/razer/host/install-guard.sh": {
+    "mtime": 1795459619.933591,
+    "ast_hash": "450ce0bcd38d82f9b88b07c578a912de",
+    "semantic_hash": ""
+  },
+  "ai-platform/deploy/overlays/razer/host/k3s-ip-guard.sh": {
+    "mtime": 1795459827.3226988,
+    "ast_hash": "0c3aefd312631d6dcecfeb833e897ac8",
+    "semantic_hash": ""
+  },
+  "ai-platform/deploy/overlays/razer/host/ollama-gpu-guard.sh": {
+    "mtime": 1792943291.3640358,
+    "ast_hash": "677a002e64be1fba66c4f3cc77a9143f",
+    "semantic_hash": ""
+  },
+  "ai-platform/gateway/src/auth.ts": {
+    "mtime": 1795461897.1442063,
+    "ast_hash": "c0fcf2a627fbaf992f1a38e2332faef4",
+    "semantic_hash": ""
+  },
+  "ai-platform/gateway/test/auth.test.ts": {
+    "mtime": 1795461897.1462665,
+    "ast_hash": "cd409bf839373632aef59d239757a1e9",
     "semantic_hash": ""
   }
 }
