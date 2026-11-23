@@ -162,6 +162,9 @@
   .control-md {
     @apply h-control inline-flex items-center justify-center gap-2 px-4 text-sm rounded-lg;
   }
+  .control-lg {
+    @apply h-10 inline-flex items-center justify-center gap-2 px-5 text-sm font-medium rounded-lg;
+  }
   .control-sm {
     @apply h-control-sm inline-flex items-center justify-center gap-1.5 px-3 text-sm rounded-lg;
   }
