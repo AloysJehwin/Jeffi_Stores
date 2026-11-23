@@ -98,8 +98,8 @@ describe('rdsSslOption', () => {
 describe('rdsIamPassword', () => {
   it('builds a Signer and returns a token-producing fn', async () => {
     const m = await load()
-    const fn = m.rdsIamPassword('h.rds.amazonaws.com', 5432, 'app_user', 'us-east-1')
-    expect(SignerCtor).toHaveBeenCalledWith({ hostname: 'h.rds.amazonaws.com', port: 5432, region: 'us-east-1', username: 'app_user' })
+    const fn = m.rdsIamPassword('test-host.invalid', 5432, 'test_role', 'us-east-1')
+    expect(SignerCtor).toHaveBeenCalledWith({ hostname: 'test-host.invalid', port: 5432, region: 'us-east-1', username: 'test_role' })
     await expect(fn()).resolves.toBe('iam-token')
   })
 })
@@ -267,12 +267,12 @@ describe('tenantPool / buildTenantPool', () => {
 
   it('password auth: uses the pod env password for the named slug', async () => {
     process.env.NODE_ENV = 'production'
-    process.env.TENANT_DB_PASSWORD = 'pod-pw'
+    process.env.TENANT_DB_PASSWORD = 'test-fake-not-real'
     process.env.TENANT_DB_SLUG = 'acme'
     const m = await load()
     m.tenantPool(tenant({ infra: infra({ iamAuth: false }) }) as any)
     const cfg = pgCtorCalls.at(-1)
-    expect(cfg.password).toBe('pod-pw')
+    expect(cfg.password).toBe('test-fake-not-real')
     expect(cfg.user).toBe('jeffi')
     expect(cfg.ssl).toEqual({ rejectUnauthorized: false })
   })
