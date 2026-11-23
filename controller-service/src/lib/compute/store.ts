@@ -61,11 +61,15 @@ export async function storeLayouts(tenantIds: string[]): Promise<Map<string, Sto
   return out
 }
 
-/** Stores whose compute change is due to be worked on. */
+/**
+ * Stores whose compute change is due to be worked on. A store still being built is provisioning's: a services
+ * workspace stays active while its store request is open, and reconciling it wrote an applied spec for a store
+ * that didn't exist yet.
+ */
 export async function dueComputeChanges(): Promise<string[]> {
   const r = await controlPlanePool().query<{ tenant_id: string }>(
     `SELECT c.tenant_id FROM tenant_compute c JOIN tenants t ON t.id = c.tenant_id
-     WHERE ((c.status IN ('pending','applying') AND t.status = 'active') OR c.progress ? 'oldDb')
+     WHERE ((c.status IN ('pending','applying') AND t.status = 'active' AND t.store_request IS NULL) OR c.progress ? 'oldDb')
        AND (c.next_at IS NULL OR c.next_at <= now())
        AND NOT COALESCE(c.progress ? 'layout' AND NOT c.progress->'layout' ? 'failed', false)
      ORDER BY c.updated_at LIMIT 20`

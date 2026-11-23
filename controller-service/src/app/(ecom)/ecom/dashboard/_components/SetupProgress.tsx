@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, CheckCircle2, Circle, Clock, Loader2, MinusCircle, XCircle } from 'lucide-react'
 import type { OwnerPipelineView, StepStatus } from '@controller/lib/provisioning/pipeline-view'
+import type { SetupOutcome } from '@/lib/tenant-registry/provisioning'
+import StoreClosed from './StoreClosed'
 
 const ICON: Record<StepStatus, { icon: typeof Circle; cls: string }> = {
   queued: { icon: Circle, cls: 'text-foreground-muted' },
@@ -17,10 +19,11 @@ const ICON: Record<StepStatus, { icon: typeof Circle; cls: string }> = {
 
 const minutes = (ms: number | null) => (ms == null ? '' : ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}s` : `${Math.round(ms / 60_000)} min`)
 
-/** The owner's live view of their store being set up. Polls until it is done, then refreshes the page. */
-export default function SetupProgress({ tenantId }: { tenantId: string }) {
+/** The owner's live view of their store being set up. Polls until it is done, stopped or closed, then refreshes the page. */
+export default function SetupProgress({ tenantId, slug }: { tenantId: string; slug: string }) {
   const router = useRouter()
   const [p, setP] = useState<OwnerPipelineView | null>(null)
+  const [outcome, setOutcome] = useState<SetupOutcome | null>(null)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -32,7 +35,13 @@ export default function SetupProgress({ tenantId }: { tenantId: string }) {
         const d = res.ok ? await res.json() : null
         if (stop) return
         setP(d?.pipeline ?? null)
+        setOutcome(d?.outcome ?? null)
         setLoaded(true)
+        // Stopped: keep polling until its teardown has closed it.
+        if (d?.outcome?.closed) {
+          router.refresh()
+          return
+        }
         if (d?.pipeline?.status === 'success') {
           router.refresh()
           return
@@ -49,6 +58,8 @@ export default function SetupProgress({ tenantId }: { tenantId: string }) {
       if (timer) clearTimeout(timer)
     }
   }, [tenantId, router])
+
+  if (outcome) return <StoreClosed outcome={outcome} slug={slug} />
 
   if (!p) {
     return (

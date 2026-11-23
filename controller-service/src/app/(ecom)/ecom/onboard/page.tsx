@@ -9,6 +9,8 @@ import OnboardShell from './OnboardShell'
 import PageHeader from '../dashboard/_components/PageHeader'
 import { Card, Row } from '../dashboard/_components/Card'
 import SetupProgress from '../dashboard/_components/SetupProgress'
+import StoreClosed, { outcomeHeading } from '../dashboard/_components/StoreClosed'
+import { loadSetupOutcome } from '@/lib/tenant-registry/provisioning'
 import { statusSteps, REVIEW_STEP, FINAL_STEP } from './steps'
 import { Badge, primaryBtn, secondaryBtn } from './ui'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
@@ -65,7 +67,7 @@ function StatusLayout({
 export default async function OnboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; plan?: string; interval?: string }>
+  searchParams: Promise<{ mode?: string; plan?: string; interval?: string; again?: string }>
 }) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
@@ -80,7 +82,8 @@ export default async function OnboardPage({
 
   // A terminated (deprovisioned) store does not hold its owner here: they may apply again, and the
   // wizard offers what the deprovision kept for them.
-  const existing = (await getOwnerTenants(owner.id)).filter(t => t.status !== 'terminated')
+  const all = await getOwnerTenants(owner.id)
+  const existing = all.filter(t => t.status !== 'terminated')
   if (existing.length > 0) {
     const t = existing[0]
     if (!hasService(t, 'store') && !t.store_request) {
@@ -148,7 +151,7 @@ export default async function OnboardPage({
               </p>
             </div>
             <div className="mt-5 border-t border-border-default pt-4">
-              <SetupProgress tenantId={t.id} />
+              <SetupProgress tenantId={t.id} slug={t.slug} />
             </div>
             <a href="/dashboard" className={`${primaryBtn} mt-5 w-full sm:w-auto`}>
               Go to dashboard →
@@ -228,6 +231,23 @@ export default async function OnboardPage({
   }
 
   const [plans, draft, query, addons] = await Promise.all([listPlans(), getDraft(owner.id), searchParams, addonPrices().catch(() => [])])
+
+  // The store the last application made was stopped or closed: say so, and what comes next, until they start again.
+  const last = all[0]
+  if (last && draft?.status === 'submitted' && query.again !== '1') {
+    const outcome = await loadSetupOutcome(last, owner.id, all).catch(() => null)
+    if (outcome) {
+      const h = outcomeHeading(outcome)
+      return (
+        <StatusLayout owner={who} tenant={last} currentStep={FINAL_STEP} payment={paymentRequired(last)}>
+          <PageHeader eyebrow="Store application" title={h.title} actions={<Badge tone={h.tone}>{h.badge}</Badge>} />
+          <Card>
+            <StoreClosed outcome={outcome} slug={last.slug} heading={false} />
+          </Card>
+        </StatusLayout>
+      )
+    }
+  }
 
   // A submitted draft belongs to a store that already exists. Replaying it whole put the
   // PREVIOUS store's name, slug and plan into the form for a second store, with nothing to

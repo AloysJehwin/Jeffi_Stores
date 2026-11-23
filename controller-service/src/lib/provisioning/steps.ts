@@ -689,6 +689,8 @@ const HANDLERS: Record<Step, Handler> = {
         // Guard the write_infra→activate invariant: never mark a tenant active without a
         // persisted RDS endpoint (else getPool would silently fall back to the platform DB).
         const fresh = await getTenant(job.tenant_id)
+        // Deprovisioned while the build ran: never bring the store back online, email the owner or buy add-ons.
+        if (fresh?.status === 'terminated') return skip('the store was deprovisioned')
         if (!fresh?.rds_endpoint) {
           throw new Error('activate blocked: tenant_infra.rds_endpoint not persisted')
         }
@@ -942,18 +944,16 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     await updateProvisioningJob(job.id, { status: 'failed', last_error: 'tenant not found' })
     return 'failed'
   }
-  // Deprovisioned while the build was going (Stop & deprovision): nothing more is built, the teardown has the rest.
-  if (tenant.status === 'terminated') {
-    await updateProvisioningJob(job.id, { status: 'failed', last_error: 'stopped: the store was deprovisioned', clearNextAttempt: true })
-    return 'failed'
-  }
   const slug = tenant.slug
   const res: Record<string, any> = { ...(job.created_resources || {}) }
+  // Deprovisioned while the build was going (Stop & deprovision): nothing more is built, the teardown has the rest.
+  if (tenant.status === 'terminated') return stopForTeardown(job, res)
   // A job that started before pipelines were pinned carries on with the legacy steps.
   let pipeline = pipelineOf(job.pipeline)
 
   try {
-    await updateProvisioningJob(job.id, { status: 'running', bumpAttempts: true })
+    // Stopped since the caller read it: a stopped job stays failed, so build nothing.
+    if ((await updateProvisioningJob(job.id, { status: 'running', bumpAttempts: true })) === 'failed') return 'failed'
     const step = job.step as Step
     if (step === 'preflight') pipeline = await pinPipeline(job, tenant.plan, res)
 
@@ -963,11 +963,15 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
       return 'failed'
     }
     const result = await handler({ job, tenant, slug, res, provider })
+    // Deprovisioned while this step ran: go no further, the teardown has the rest.
+    if ((await getTenant(job.tenant_id))?.status === 'terminated') return await stopForTeardown(job, res)
     if ('wait' in result) return await waitOn(job, step, res, result.detail)
     if ('skip' in result) return await advance(job, pipeline, res, 'skipped', result.skip)
     if ('warn' in result) return await advance(job, pipeline, res, 'warning', result.warn)
     return await advance(job, pipeline, res, 'ok', result.message ?? null)
   } catch (e: any) {
+    // Deprovisioned while this step ran: no retry, and no rollback (it would mark the store suspended).
+    if ((await getTenant(job.tenant_id).catch(() => null))?.status === 'terminated') return await stopForTeardown(job, res)
     const msg = e?.message || String(e) || 'error'
     // Errors on THIS step: job.attempts counts every tick, polls included, so a long wait for a
     // server or database would leave a later step no retries at all.
@@ -1138,13 +1142,16 @@ async function advance(
   delete res.stepDetail
   delete res.stepWaitStartedAt
   const nextStep = nextStepAfter(pipeline, job.step)
-  if (!nextStep) {
-    await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
-    return 'done'
-  }
+  // The status written: a job stopped meanwhile stays failed, so callers never treat it as done.
+  if (!nextStep) return (await updateProvisioningJob(job.id, { status: 'done', created_resources: res })) ?? 'done'
   // Clear any backoff timer on a successful step transition (prior retries are resolved).
-  await updateProvisioningJob(job.id, { step: nextStep, status: 'pending', created_resources: res, clearNextAttempt: true, stepStarted: true })
-  return 'pending'
+  return (await updateProvisioningJob(job.id, { step: nextStep, status: 'pending', created_resources: res, clearNextAttempt: true, stepStarted: true })) ?? 'pending'
+}
+
+/** The store was deprovisioned under the build: fail the job as stopped (never retried, rolled back or resumed). */
+async function stopForTeardown(job: ProvisioningJob, res: Record<string, any>): Promise<string> {
+  await updateProvisioningJob(job.id, { status: 'failed', last_error: 'stopped: the store was deprovisioned', created_resources: res, clearNextAttempt: true })
+  return 'failed'
 }
 
 /**
@@ -1203,6 +1210,13 @@ function onK8sCompute(r: Record<string, any>): boolean {
 async function jobCompute(tenantId: string, plan: string | null, res: Record<string, any>) {
   const { resolveCompute } = await import('@controller/lib/compute/resolve')
   const c = await resolveCompute(tenantId, plan, { spec: res.computeSpec })
+  // An applied spec saying 'controller' (or naming no layout) keeps the old app only where one runs; any other
+  // store is built on its own services, else every render fails with "runs no all-in-one app to keep".
+  if (c.spec.layout === 'controller' && onK8sCompute(res)) {
+    const t = await getTenant(tenantId)
+    const k8s = await import('@/lib/k8s/tenant-compute')
+    if (t && !(await k8s.runsAllInOneApp(t.slug))) c.spec = { ...c.spec, layout: 'services' }
+  }
   res.computeSpec = c.spec
   return c
 }
@@ -1887,8 +1901,10 @@ export async function deprovisionTenant(
     }
 
     if (job) {
+      // The build keeps its own outcome (done stays done, failed stays failed); one still in flight is stopped.
+      const building = job.status === 'pending' || job.status === 'running'
       await updateProvisioningJob(job.id, {
-        status: 'done',
+        ...(building ? { status: 'failed', last_error: 'stopped: the store was deprovisioned', clearNextAttempt: true as const } : {}),
         created_resources: {
           ...created,
           k8sPendingPlan: undefined,
@@ -1943,14 +1959,16 @@ export async function reconcileK8sPlan(
     job ? updateProvisioningJob(job.id, { created_resources: { ...created, ...extra } }) : Promise.resolve()
   const now = Date.now()
 
-  // A deprovisioned/suspended store must never get a node launched for it.
-  if (tenant.status !== 'active') {
+  // A deprovisioned/suspended store must never get a node launched for it, nor one still being built (a
+  // services workspace stays active meanwhile): its own job applies the plan it has when it gets there.
+  const building = !!tenant.store_request
+  if (tenant.status !== 'active' || building) {
     if (created.k8sPendingPlan) {
       delete created.k8sPendingPlan
       delete created.k8sPlanNextAt
       await save({})
     }
-    return { ok: false, added: [], removed: [], error: 'tenant not active' }
+    return { ok: false, added: [], removed: [], error: building ? 'store still being built' : 'tenant not active' }
   }
   if (!opts.force && created.k8sPlanNextAt && now < created.k8sPlanNextAt) {
     return { ok: true, added, removed, error: 'pending: backing off' }

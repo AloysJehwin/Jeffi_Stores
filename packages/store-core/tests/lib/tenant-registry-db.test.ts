@@ -251,8 +251,70 @@ describe('tenant-registry (database layer)', () => {
       await mod.updateProvisioningJob('job-1', { step: 'create_bucket', status: 'pending' })
       const sql = String(poolQuery.mock.calls[0][0])
       expect(sql).toMatch(/step=\$1/)
-      expect(sql).toMatch(/status=\$2/)
+      expect(sql).toMatch(/ELSE \$2 END/)
       expect(sql).not.toMatch(/last_error=/)
+    })
+
+    it('updateProvisioningJob never moves a stopped job off failed', async () => {
+      const mod = await importRegistry()
+      queueRows({ rows: [{ status: 'failed' }] })
+      // The status it left, so the engine does not report done.
+      await expect(mod.updateProvisioningJob('job-1', { status: 'done', created_resources: { deprovisioned: true } })).resolves.toBe('failed')
+      const sql = String(poolQuery.mock.calls[0][0])
+      expect(sql).toMatch(/status=CASE WHEN provisioning_jobs\.status = 'failed' AND .*last_error LIKE 'stopped%'.*step = 'stopped'.* THEN 'failed' ELSE \$1 END/)
+      expect(sql).toMatch(/created_resources=\$2::jsonb/)
+    })
+
+    it('stopProvisioningJob fails the build with a stopped reason and records the stop', async () => {
+      const mod = await importRegistry()
+      queueRows({ rows: [{ id: 'job-1', status: 'pending' }] }, { rows: [{ id: 'job-1' }], rowCount: 1 }, { rows: [] })
+      await expect(mod.stopProvisioningJob('t-1', 'by ops: deprovisioned')).resolves.toBe(true)
+      expect(poolQuery.mock.calls[1][1]).toEqual(['job-1', 'stopped: by ops: deprovisioned'])
+      expect(String(poolQuery.mock.calls[2][0])).toMatch(/INSERT INTO provisioning_step_events/)
+      expect(poolQuery.mock.calls[2][1]).toEqual(['job-1', 't-1', 'stopped', 'stopped: by ops: deprovisioned'])
+    })
+
+    it('resumeProvisioningJob refuses a stopped build', async () => {
+      const mod = await importRegistry()
+      queueRows({ rows: [{ id: 'job-1', status: 'failed', step: 'ensure_compute', stopped: true, tenant_status: 'terminated', created_resources: {} }] })
+      await expect(mod.resumeProvisioningJob('t-1')).resolves.toMatchObject({ ok: false, reason: 'stopped' })
+      expect(poolQuery).toHaveBeenCalledTimes(1)
+    })
+
+    it('setupOutcome: a stopped build marked done reads stopped, never finished', async () => {
+      await importRegistry()
+      const { setupOutcome } = await import('@/lib/tenant-registry/provisioning')
+      const job = { status: 'done', last_error: 'stopped by ops: deprovisioned', updated_at: '2026-11-20T10:00:00Z' }
+      expect(setupOutcome({ tenantStatus: 'terminated', job, archive: null, reapply: true })).toMatchObject({
+        state: 'stopped',
+        wentLive: false,
+        closed: true,
+        archive: null,
+        reapply: true,
+      })
+      const archive = {
+        id: 'a-1',
+        status: 'available' as const,
+        keep_database: true,
+        keep_media: false,
+        keep_config: true,
+        expires_at: '2026-12-20T10:00:00Z',
+        created_at: '2026-11-20T10:00:00Z',
+      }
+      const now = Date.parse('2026-11-24T00:00:00Z')
+      expect(setupOutcome({ tenantStatus: 'terminated', job, archive, reapply: true }, now)).toMatchObject({
+        state: 'archived',
+        closedAt: '2026-11-20T10:00:00.000Z',
+        archive: { id: 'a-1', database: true, media: false, config: true },
+      })
+      // Past its date, or a store that went live and was closed.
+      expect(setupOutcome({ tenantStatus: 'terminated', job, archive, reapply: true }, Date.parse('2027-01-01T00:00:00Z'))?.state).toBe('stopped')
+      expect(setupOutcome({ tenantStatus: 'terminated', job: { status: 'done', activated: true }, archive: null, reapply: false })).toMatchObject({
+        state: 'deprovisioned',
+        wentLive: true,
+      })
+      // Building, or live: nothing to say.
+      expect(setupOutcome({ tenantStatus: 'provisioning', job: { status: 'running' }, archive: null, reapply: true })).toBeNull()
     })
 
     it('updateProvisioningJob increments attempts when asked', async () => {
