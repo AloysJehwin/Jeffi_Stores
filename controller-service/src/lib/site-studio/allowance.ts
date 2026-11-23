@@ -8,9 +8,11 @@ import type { StudioProduct, StudioSession } from './sessions'
 // charged to the AI wallet: lib/site/site-generation.ts).
 
 /** Free AI corrections per owner per IST day, across their studios: a section changed, a page designed again (COST). */
-export const CORRECTIONS_FREE_PER_DAY = 5
-/** Each correction past the day's free ones, charged to the AI wallet (₹). */
-export const CORRECTION_PRICE_INR = 10
+export const CORRECTIONS_FREE_PER_DAY = 3
+/** Each correction past the day's free ones, charged to the AI wallet (₹). One correction is usually one Opus section
+ *  call: ₹8.5 median, ₹12 p90, ₹14 for the largest section (2026-11-17 studio calls at ₹94/$); ₹20 is that largest
+ *  × 1.4 (PUBLIC_MARGIN), so a repair round still stays at or above cost. */
+export const CORRECTION_PRICE_INR = 20
 
 /** Design help before the build (AI hints, a fresh set of directions), per session per day. */
 export const HELP_PER_DAY = Number(process.env.SITE_STUDIO_TWEAKS_PER_DAY || 30)
