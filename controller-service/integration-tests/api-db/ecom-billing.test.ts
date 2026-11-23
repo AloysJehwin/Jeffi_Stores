@@ -121,6 +121,7 @@ describe.skipIf(!API_DB_ENABLED)('controller ecom billing API (real DB, owner se
       `UPDATE platform_infra SET value = (SELECT COALESCE(jsonb_object_agg(k, v), '{}'::jsonb) FROM jsonb_each(value::jsonb) e(k, v) WHERE v::text NOT LIKE '"plan_dbt_%')::text
         WHERE key = 'razorpay_plans'`
     ).catch(() => {})
+    await cp.query(`DELETE FROM platform_infra WHERE key = 'razorpay_plans' AND value = '{}'`).catch(() => {})
     await cp.query(`DELETE FROM settlement_ledger WHERE tenant_id=$1`, [tenantId]).catch(() => {})
     await cp.query(`DELETE FROM razorpay_subscription_index WHERE tenant_id=$1`, [tenantId]).catch(() => {})
     await cp.query(`DELETE FROM billing_charges WHERE tenant_id=$1`, [tenantId]).catch(() => {})

@@ -96,6 +96,7 @@ describe.skipIf(!API_DB_ENABLED)('billing engine flows (real DB)', () => {
       `UPDATE platform_infra SET value = (SELECT COALESCE(jsonb_object_agg(k, v), '{}'::jsonb) FROM jsonb_each(value::jsonb) e(k, v) WHERE v::text NOT LIKE '"plan_flow_%')::text
         WHERE key = 'razorpay_plans'`
     ).catch(() => {})
+    await cp.query(`DELETE FROM platform_infra WHERE key = 'razorpay_plans' AND value = '{}'`).catch(() => {})
     await cp.query(`DELETE FROM showcase_sites WHERE id = $1`, [siteId]).catch(() => {})
     await cp.query(`DELETE FROM razorpay_subscription_index WHERE tenant_id = $1`, [tenantId]).catch(() => {})
     await cp.query(`DELETE FROM billing_charges WHERE tenant_id = $1`, [tenantId]).catch(() => {})
