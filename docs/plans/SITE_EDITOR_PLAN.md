@@ -39,6 +39,11 @@ AI-generated pages must be editable with it.
    name, a lock on needed parts, a mark on what store data draws). Rows drag among their siblings with dnd-kit
    (pointer or keyboard): elements as a design `move`, sections as a block-list step. Nodes filling a slot (a
    condition's branch, a render function's body) stay put; their contents move. Selecting a row selects on the canvas.
+4. Add, duplicate, delete and pictures. Elements: duplicate and delete (Delete key too), add a heading, paragraph,
+   button, picture, box or divider after the selection (`nodes.ts` `newNode`, all compiler-checked in tests).
+   Sections: add a starter code section, duplicate, delete (at least one stays). Parts the page needs (`locked`,
+   or a classic block the registry locks) can't be duplicated or removed. Pictures swap through the host's own picker
+   (`renderImagePicker`; admin: the media library field), with their description; links get a "goes to" field.
 
 ## What exists
 

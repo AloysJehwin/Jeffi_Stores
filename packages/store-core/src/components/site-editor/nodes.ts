@@ -93,3 +93,102 @@ export function insideData(tree: CodeNode, id: string): boolean {
   }
   return false
 }
+
+/** The node holding `id` in its children, and where; null for the root or a node filling a slot. */
+export function parentOf(tree: CodeNode, id: string): { parent: CodeNode; index: number } | null {
+  const loc = findNode(tree, id)
+  const last = loc?.path[loc.path.length - 1]
+  if (!loc || last === undefined || last < 0) return null
+  let at: CodeNode = tree
+  for (const step of loc.path.slice(0, -1)) {
+    const next: CodeNode | undefined =
+      step >= 0 ? (at.t === 'el' || at.t === 'cmp' || at.t === 'frag' ? at.children[step] : undefined) : at.t === 'cond' ? (step === -1 ? at.then : at.else) : at.t === 'cmp' && at.render ? at.render.body : at.t === 'each' ? at.body : undefined
+    if (!next) return null
+    at = next
+  }
+  return { parent: at, index: last }
+}
+
+const holds = (n: CodeNode) => (n.t === 'el' && !['img', 'br', 'hr', 'input'].includes(n.tag)) || n.t === 'frag'
+
+/**
+ * Where a new element goes: right after the selected one, or at the end of the selected container when that is the
+ * section itself or fills a slot (a branch, a render function's body).
+ */
+export function insertPlace(tree: CodeNode, selected: string | null): { parent: string; index: number } | null {
+  const at = selected ? findNode(tree, selected)?.node : tree
+  if (!at) return null
+  const p = selected && selected !== tree.id ? parentOf(tree, selected) : null
+  if (p?.parent.id) return { parent: p.parent.id, index: p.index + 1 }
+  const host = holds(at) ? at : holds(tree) ? tree : null
+  return host?.id && (host.t === 'el' || host.t === 'frag') ? { parent: host.id, index: host.children.length } : null
+}
+
+export type NewKind = 'heading' | 'paragraph' | 'button' | 'picture' | 'box' | 'divider'
+export const NEW_KINDS: { kind: NewKind; label: string }[] = [
+  { kind: 'heading', label: 'Heading' },
+  { kind: 'paragraph', label: 'Paragraph' },
+  { kind: 'button', label: 'Button' },
+  { kind: 'picture', label: 'Picture' },
+  { kind: 'box', label: 'Box' },
+  { kind: 'divider', label: 'Divider' },
+]
+
+const lit = (v: string) => ({ k: 'lit' as const, v })
+const words = (id: string, value: string): CodeNode[] => [{ t: 'text', value, id: `${id}.0` }]
+
+/** A new element in the theme's look, with the given id (its words take `<id>.0`). */
+export function newNode(kind: NewKind, id: string): CodeNode {
+  switch (kind) {
+    case 'heading':
+      return { t: 'el', tag: 'h2', id, props: { className: lit('font-display text-3xl font-semibold text-foreground') }, children: words(id, 'A new heading') }
+    case 'paragraph':
+      return { t: 'el', tag: 'p', id, props: { className: lit('text-base text-foreground-secondary') }, children: words(id, 'Write a few words here.') }
+    case 'button':
+      return {
+        t: 'cmp',
+        name: 'Link',
+        id,
+        props: { href: lit('/products'), className: lit('inline-flex items-center justify-center rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700') },
+        children: words(id, 'Shop now'),
+      }
+    case 'picture':
+      return { t: 'cmp', name: 'Image', id, props: { alt: lit(''), aspect: lit('4:3'), className: lit('w-full rounded-xl') }, children: [] }
+    case 'box':
+      return { t: 'el', tag: 'div', id, props: { className: lit('flex flex-col gap-4') }, children: [] }
+    case 'divider':
+      return { t: 'el', tag: 'hr', id, props: { className: lit('border-border-default') }, children: [] }
+  }
+}
+
+/** A new code section's tree: a heading and a line of text in the page's width. */
+export const newSectionTree = (): CodeNode => ({
+  t: 'el',
+  tag: 'section',
+  id: 'e1',
+  props: { className: lit('py-16') },
+  children: [
+    {
+      t: 'el',
+      tag: 'div',
+      id: 'e2',
+      props: { className: lit('mx-auto max-w-7xl px-4 sm:px-6 lg:px-8') },
+      children: [newNode('heading', 'e3'), { ...(newNode('paragraph', 'e4') as Extract<CodeNode, { t: 'el' }>), props: { className: lit('mt-3 text-base text-foreground-secondary') } }],
+    },
+  ],
+})
+
+/** A node's literal prop, when it is written out. */
+export const litProp = (n: CodeNode, name: string): string | null => {
+  if (!isTagNode(n)) return null
+  const v = n.props[name]
+  return v && v.k === 'lit' && typeof v.v === 'string' ? v.v : v ? null : ''
+}
+
+/** Whether a subtree holds a part the page can't lose. */
+export function hasLocked(n: CodeNode): boolean {
+  if (isTagNode(n) && n.locked) return true
+  const kids = n.t === 'el' || n.t === 'cmp' || n.t === 'frag' ? n.children : []
+  const slots = n.t === 'cmp' && n.render ? [n.render.body] : n.t === 'cond' ? [n.then, ...(n.else ? [n.else] : [])] : n.t === 'each' ? [n.body] : []
+  return [...kids, ...slots].some(hasLocked)
+}

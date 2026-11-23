@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react'
 import type { PageDoc, ThemeTokens } from '@jeffi/site-blocks'
 
 // What a host (the admin Site Builder, the Showcase studio) gives the visual editor for one page. The editor never
-// fetches on its own: loading, saving, the canvas address, uploads and publishing are the host's.
+// fetches on its own: loading, saving, the canvas address, picture uploads and publishing are the host's.
 
 export type SaveResult = { ok: true; doc: PageDoc } | { ok: false; error: string }
 
@@ -20,8 +21,10 @@ export interface SiteEditorHost {
   canWrite: boolean
   /** The theme, for the style panel's colours and fonts. */
   theme?: ThemeTokens | null
-  /** Uploads a picture through the host's own path; its URL, or null when it failed (the host says why). */
-  upload?(file: File): Promise<string | null>
+  /** The host's own picture picker (its uploads, its library), reporting the chosen URL. */
+  renderImagePicker?(p: { value: string; disabled: boolean; onPick: (url: string) => void }): ReactNode
+  /** A classic block the page can't lose (its core block), so it can't be duplicated or removed. */
+  blockLocked?(type: string): boolean
   /** Publishes (the host confirms first). */
   publish?(): Promise<void>
   /** Back to the host's own editor. */

@@ -118,3 +118,75 @@ describe('SiteEditor layers', () => {
     expect(post).toHaveBeenLastCalledWith({ type: 'site-editor:select', block: 'a', id: 'e2' }, '*')
   })
 })
+
+describe('SiteEditor adding and removing', () => {
+  const lastTree = (save: ReturnType<typeof vi.fn>) => JSON.stringify((save.mock.calls.at(-1)![0] as PageDoc).blocks.a.props.tree)
+
+  it('duplicates, deletes and adds elements, saving each as the tree', async () => {
+    const { save } = setup()
+    await screen.findByRole('button', { name: 'Hero' })
+    await fromCanvas({ type: 'select', block: 'a', id: 'e2' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicate' }))
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    expect(lastTree(save).match(/"tag":"h2"/g)).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Heading' }))
+    await waitFor(() => expect(lastTree(save)).toContain('A new heading'), { timeout: 3000 })
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(lastTree(save)).not.toContain('A new heading'), { timeout: 3000 })
+  })
+
+  it('adds, duplicates and deletes sections, keeping at least one', async () => {
+    const { save } = setup()
+    await screen.findByRole('button', { name: 'Hero' })
+    fireEvent.click(screen.getByRole('button', { name: 'Hero' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate section' }))
+    expect(await screen.findByRole('button', { name: 'Hero (copy)' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Add section after/ }))
+    expect(await screen.findByRole('button', { name: 'New section' })).toBeInTheDocument()
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    const doc = save.mock.calls.at(-1)![0] as PageDoc
+    expect(doc.order).toHaveLength(4)
+    const added = Object.values(doc.blocks).find(b => b.props.label === 'New section')!
+    expect(added.props).toMatchObject({ source: '' })
+    // The section selected now is the new one; delete it.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete section' }))
+    expect(screen.queryByRole('button', { name: 'New section' })).toBeNull()
+  })
+})
+
+describe('SiteEditor pictures and links', () => {
+  it("swaps a picture through the host's picker and edits a link's target", async () => {
+    const pic: CodeNode = {
+      t: 'el',
+      tag: 'section',
+      props: {},
+      id: 'e1',
+      children: [
+        { t: 'cmp', name: 'Image', props: { alt: { k: 'lit', v: 'Old' } }, children: [], id: 'e2' },
+        { t: 'cmp', name: 'Link', props: { href: { k: 'lit', v: '/a' } }, children: [{ t: 'text', value: 'Go', id: 'e3.0' }], id: 'e3' },
+      ],
+    }
+    const page = doc()
+    page.blocks.a.props.tree = pic
+    const { save } = setup({
+      load: async () => page,
+      renderImagePicker: ({ onPick }) => (
+        <button type="button" onClick={() => onPick('https://cdn.example.com/new.jpg')}>
+          Pick
+        </button>
+      ),
+    })
+    await screen.findByRole('button', { name: 'Hero' })
+    const post = (await fromCanvas({ type: 'select', block: 'a', id: 'e2' })).postMessage
+    fireEvent.click(await screen.findByRole('button', { name: 'Pick' }))
+    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ ops: [{ op: 'attr', id: 'e2', name: 'src', value: 'https://cdn.example.com/new.jpg' }] }), '*')
+    await fromCanvas({ type: 'select', block: 'a', id: 'e3' })
+    const href = await screen.findByDisplayValue('/a')
+    fireEvent.change(href, { target: { value: '/b' } })
+    fireEvent.blur(href)
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    const sent = JSON.stringify((save.mock.calls.at(-1)![0] as PageDoc).blocks.a.props.tree)
+    expect(sent).toContain('https://cdn.example.com/new.jpg')
+    expect(sent).toContain('"/b"')
+  })
+})

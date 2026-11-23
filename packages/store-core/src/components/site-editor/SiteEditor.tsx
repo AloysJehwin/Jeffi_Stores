@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Monitor, Redo2, Rocket, Smartphone, Tablet, Undo2, X } from 'lucide-react'
-import { isTagNode, moveBlock, type CodeNode } from '@jeffi/site-blocks'
-import { DesignError, findNode, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
+import { Copy, Monitor, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, X } from 'lucide-react'
+import { insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
+import { DesignError, findNode, freshId, treeIds, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
 import Layers from './Layers'
+import { hasLocked, insertPlace, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
 import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
 
@@ -18,6 +19,7 @@ import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, ed
 // for changes it can't show by itself.
 
 const P = 'site-editor:'
+const CODE_SECTION = 'code_section'
 const SAVE_AFTER_MS = 800
 /** The canvas per breakpoint (Tailwind's base, md and lg). */
 const WIDTH: Partial<Record<Breakpoint, number>> = { base: 390, md: 768, lg: 1280 }
@@ -131,8 +133,86 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }
 
   // ── Editing ────────────────────────────────────────────────────────────────────────────────────
-  const edit = (block: string, ops: DesignOp[], gesture?: string) => {
-    if (update(s => editSection(s, block, ops, gesture))) applyOnCanvas(block, ops)
+  const edit = (block: string, ops: DesignOp[], gesture?: string): boolean => {
+    if (!update(s => editSection(s, block, ops, gesture))) return false
+    applyOnCanvas(block, ops)
+    return true
+  }
+  const treeAt = (block: string) => latest.current.state?.trees[block]?.tree ?? null
+  const say = (message: string) => setStatus({ kind: 'error', message })
+
+  // ── Elements and sections: add, duplicate, delete (parts the page needs stay; design.ts refuses them too) ──
+  const addNode = (block: string, kind: NewKind) => {
+    const tree = treeAt(block)
+    const place = tree && insertPlace(tree, latest.current.sel?.block === block ? latest.current.sel.id : null)
+    if (!tree || !place) return say('Select an element beside where the new one should go')
+    const id = freshId(treeIds(tree))
+    if (!edit(block, [{ op: 'insert', parent: place.parent, index: place.index, node: newNode(kind, id) }])) return
+    requestReload()
+    select(block, id)
+  }
+  const duplicateNode = (block: string, id: string) => {
+    const tree = treeAt(block)
+    const node = tree && findNode(tree, id)?.node
+    if (!tree || !node) return
+    const as = isTagNode(node) ? freshId(treeIds(tree)) : undefined
+    if (!edit(block, [{ op: 'duplicate', id, ...(as ? { as } : {}) }])) return
+    requestReload()
+    if (as) select(block, as)
+  }
+  const deleteNode = (block: string, id: string) => {
+    const tree = treeAt(block)
+    if (!tree || id === tree.id) return
+    const up = parentOf(tree, id)?.parent.id ?? tree.id ?? null
+    if (!edit(block, [{ op: 'remove', id }])) return
+    requestReload()
+    select(block, up)
+  }
+  const sectionLocked = (id: string) => {
+    const tree = treeAt(id)
+    return tree ? hasLocked(tree) : !!hostRef.current.blockLocked?.(latest.current.state?.doc.blocks[id]?.type ?? '')
+  }
+  const changePage = (fn: (s: EditorState) => EditorState, then?: () => void) => {
+    if (!update(fn)) return
+    requestReload()
+    then?.()
+  }
+  const addSection = () => {
+    const doc = latest.current.state?.doc
+    if (!doc) return
+    const at = latest.current.sel ? doc.order.indexOf(latest.current.sel.block) + 1 || doc.order.length : doc.order.length
+    const id = crypto.randomUUID()
+    const v = Object.values(doc.blocks).find(b => b.type === CODE_SECTION)?.v ?? 1
+    const tree = newSectionTree()
+    changePage(
+      s => editDoc(s, d => insertBlock(d, { id, type: CODE_SECTION, v, props: { label: 'New section', source: '', tree, compiled: null } }, at)),
+      () => select(id, tree.id ?? null)
+    )
+  }
+  const duplicateSection = (id: string) => {
+    if (sectionLocked(id)) return say('This section holds a part a page has only once')
+    const copy = crypto.randomUUID()
+    changePage(
+      s =>
+        editDoc(s, d => {
+          const b = d.blocks[id]
+          const tree = s.trees[id]?.tree
+          const name = typeof b.props.label === 'string' && b.props.label ? b.props.label : 'Section'
+          const props = tree ? { ...structuredClone(b.props), label: `${name} (copy)`.slice(0, 80), tree: structuredClone(tree), source: '' } : structuredClone(b.props)
+          return insertBlock(d, { ...structuredClone(b), id: copy, children: undefined, props }, d.order.indexOf(id) + 1)
+        }),
+      () => select(copy, treeAt(copy)?.id ?? null)
+    )
+  }
+  const deleteSection = (id: string) => {
+    const doc = latest.current.state?.doc
+    if (!doc) return
+    if (sectionLocked(id)) return say('The page needs this section to work')
+    if (doc.order.length <= 1) return say('A page keeps at least one section')
+    changePage(
+      s => editDoc(s, d => removeBlock(d, id)),
+      () => setSel(null)
+    )
   }
   const show = (shown: Shown) => {
     if (shown === 'reload') requestReload()
@@ -185,6 +265,8 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     else if (kind === 'key') {
       if (m.action === 'undo' || m.action === 'redo') step(m.action)
       if (m.action === 'escape') setSel(null)
+      const at = latest.current.sel
+      if (m.action === 'delete' && at?.id && hostRef.current.canWrite) deleteNode(at.block, at.id)
     }
   }
   useEffect(() => {
@@ -196,6 +278,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       const t = e.target as HTMLElement | null
       if (t?.closest('input, textarea, select, [contenteditable]')) return
       const mod = e.metaKey || e.ctrlKey
+      if (!mod && (e.key === 'Delete' || e.key === 'Backspace') && t?.closest('[data-site-editor]')) {
+        e.preventDefault()
+        return handlers.current({ type: `${P}key`, action: 'delete' })
+      }
       if (!mod) return
       const k = e.key.toLowerCase()
       if (k === 'z' || k === 'y') {
@@ -233,11 +319,12 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     return (typeof b?.props?.label === 'string' && b.props.label) || hostRef.current.blockLabel?.(b?.type ?? '') || b?.type || 'Block'
   }
   const iconBtn = 'p-1.5 rounded-md border border-border-default text-foreground-muted hover:text-foreground disabled:opacity-40'
+  const smallBtn = 'inline-flex items-center gap-1 rounded-md border border-border-default px-2 h-7 text-xs text-foreground-secondary hover:text-foreground disabled:opacity-40'
   const statusText = status.kind === 'pending' ? 'Unsaved changes…' : status.kind === 'saving' ? 'Saving…' : status.kind === 'saved' ? 'Saved to draft' : status.kind === 'error' ? status.message : ''
   const busy = status.kind === 'pending' || status.kind === 'saving'
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-site-editor="">
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
         <p className="px-1 text-sm font-semibold text-foreground">{host.title}</p>
         <span className="rounded-full bg-accent-500/10 px-2 py-0.5 text-[11px] font-medium text-accent-600">Visual editor · beta</span>
@@ -326,7 +413,23 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
           )}
         </div>
 
-        <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 min-w-0 xl:min-h-0 xl:overflow-y-auto [scrollbar-width:thin]">
+        <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-4 min-w-0 xl:min-h-0 xl:overflow-y-auto [scrollbar-width:thin]">
+          {block && host.canWrite && (
+            <div className="space-y-2 border-b border-border-default pb-3">
+              <p className="truncate text-xs font-semibold uppercase tracking-wide text-foreground-muted">Section · {label(block.id)}</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" className={smallBtn} onClick={addSection}>
+                  <Plus className="h-3.5 w-3.5" /> Add section after
+                </button>
+                <button type="button" className={smallBtn} aria-label="Duplicate section" disabled={sectionLocked(block.id)} onClick={() => duplicateSection(block.id)}>
+                  <Copy className="h-3.5 w-3.5" /> Duplicate
+                </button>
+                <button type="button" className={smallBtn} aria-label="Delete section" disabled={sectionLocked(block.id) || doc.order.length <= 1} onClick={() => deleteSection(block.id)}>
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </button>
+              </div>
+            </div>
+          )}
           {sel && tree && sel.id ? (
             <Inspector
               key={`${sel.block}:${sel.id}`}
@@ -336,6 +439,11 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onSelect={id => select(sel.block, id)}
               onText={(id, value) => edit(sel.block, [{ op: 'text', id, value }], `text:${id}`)}
               onDone={() => update(endGestures)}
+              onAttr={(id, name, value) => edit(sel.block, [{ op: 'attr', id, name, value }])}
+              onAdd={kind => addNode(sel.block, kind)}
+              onDuplicate={() => duplicateNode(sel.block, sel.id!)}
+              onDelete={() => deleteNode(sel.block, sel.id!)}
+              renderImagePicker={host.renderImagePicker}
             >
               {styleable(tree, sel.id) !== null && (
                 <StylePanel key={bp} className={styleable(tree, sel.id) ?? ''} bp={bp} theme={host.theme} canWrite={host.canWrite} onChange={(prop, value) => style(sel.block, sel.id!, prop, value)} />
@@ -347,7 +455,14 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               <p className="text-sm text-foreground-muted">This block is set up with its own fields. Open it in the forms editor to change it; here it can be moved with the page.</p>
             </div>
           ) : (
-            <p className="text-sm text-foreground-muted">Click anything on the canvas to select it. Double-click words to type in place.</p>
+            <div className="space-y-3">
+              <p className="text-sm text-foreground-muted">Click anything on the canvas to select it. Double-click words to type in place.</p>
+              {host.canWrite && (
+                <button type="button" className={smallBtn} onClick={addSection}>
+                  <Plus className="h-3.5 w-3.5" /> Add a section
+                </button>
+              )}
+            </div>
           )}
         </aside>
       </div>

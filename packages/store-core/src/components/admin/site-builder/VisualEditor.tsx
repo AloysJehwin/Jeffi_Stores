@@ -6,6 +6,7 @@ import { api } from '@/components/admin/kit/core'
 import SiteEditor from '@/components/site-editor/SiteEditor'
 import type { SaveResult, SiteEditorHost } from '@/components/site-editor/host'
 import { siteRegistry } from '@/lib/site/blocks'
+import { Image as MediaImage } from '@/components/admin/homepage/editors/fields'
 
 // The admin Site Builder's host for the visual editor (components/site-editor), behind site_settings
 // site_editor_enabled. One responsive document per page: it edits the desktop web layout, and saves the phone layout
@@ -53,6 +54,9 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       publish: onPublish,
       onClose,
       blockLabel: type => siteRegistry.get(type)?.label ?? type,
+      blockLocked: type => !!siteRegistry.get(type)?.locked,
+      // The forms editor's picker: the media library, uploads and AI pictures.
+      renderImagePicker: ({ value, disabled, onPick }) => <MediaImage label="Picture" value={value} size="wide" disabled={disabled} onCommit={url => onPick(url)} />,
     }),
     [title, previewUrl, canWrite, theme, draftId, key, web, onClose, onPublish]
   )
