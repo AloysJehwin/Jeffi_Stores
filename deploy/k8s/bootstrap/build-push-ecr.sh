@@ -2,7 +2,7 @@
 # Build one service image (arm64) and push it to ECR; skipped when the tag is already there.
 # Usage: build-push-ecr.sh <controller|storefront|admin|business|showcase|messaging|documents|public-api|mobile> <tag> [context-dir]
 #   context-dir defaults to the repo root (release.sh passes a `git archive` copy).
-# Only NEXT_PUBLIC_* values are read from Secrets Manager (they ship in the browser bundle anyway).
+# The NEXT_PUBLIC_* build args come from jeffi/production/build (build-secret.sh), never from jeffi/production.
 set -euo pipefail
 SERVICE=${1:?service}; TAG=${2:?tag}
 CTX=${3:-$(git rev-parse --show-toplevel)}
@@ -30,10 +30,11 @@ fi
 
 ARGS=()
 if [ -n "${NEXT:-}" ]; then
-  PUBLIC=$(aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production --query SecretString --output text |
+  PUBLIC=$(aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production/build --query SecretString --output text |
     python3 -c 'import json,sys
 for k,v in json.load(sys.stdin).items():
-    if k.startswith("NEXT_PUBLIC_") and isinstance(v,str): print(f"{k}={v}")')
+    if k.startswith("NEXT_PUBLIC_") and isinstance(v,str): print(f"{k}={v}")') ||
+    { echo "cannot read jeffi/production/build: run bash deploy/k8s/bootstrap/build-secret.sh" >&2; exit 1; }
   while IFS= read -r line; do ARGS+=(--build-arg "$line"); done <<<"$PUBLIC"
   # The on-device summary pair may live in the environment (CI repo vars) rather than the secret.
   for k in NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY NEXT_PUBLIC_ONDEVICE_MODEL_BASE; do
