@@ -1,14 +1,15 @@
 #!/bin/bash
 # One-time: let this repo's GitHub Actions assume IAM roles over OIDC (no long-lived keys), each with only what
 # its ci.yml job needs:
-#   jeffi-github-build   any branch's images job: push the four images to ECR, read jeffi/production for the
-#                        NEXT_PUBLIC_* build args. It cannot reach the cluster or the database.
+#   jeffi-github-build   the images job, on the RELEASE_REFS only (PR builds never assume it): push the nine images
+#                        to ECR, read jeffi/production/build (just the NEXT_PUBLIC_* build args; build-secret.sh fills
+#                        it first). It cannot read jeffi/production or reach the cluster or the database.
 #   jeffi-github-deploy  only jobs in the `production` (approval) and `production-release` (the stages after it)
 #                        environments: read jeffi/production (the RDS
 #                        master password for 05-table-owner.sh), SSM tunnels to the core and through it to RDS,
 #                        log in to RDS as app_user (schema diff, migrations), invalidate CloudFront, and run one
 #                        SSM command on the core to release the AI gateway on the Razer box (razer-release.sh).
-# Idempotent; --dry-run prints the policies. Then set the secrets it prints.
+# Idempotent; --dry-run prints the policies and what build-secret.sh would write. Then set the secrets it prints.
 # Usage: bash deploy/k8s/bootstrap/github-oidc.sh [--dry-run]
 source "$(dirname "$0")/../db/lib.sh"
 GH_REPO=${GH_REPO:-AloysJehwin/Jeffi_Stores}
@@ -27,26 +28,30 @@ trust() { # <subject suffix>..., e.g. environment:production
 JSON
 }
 repos() { for r in controller storefront admin business messaging document public-api mobile showcase; do printf '"arn:aws:ecr:%s:%s:repository/jeffi-stores-%s-service",' "$AWS_REGION" "$ACCOUNT" "$r"; done; }
-SECRET="{\"Sid\":\"ReadProductionSecret\",\"Effect\":\"Allow\",\"Action\":\"secretsmanager:GetSecretValue\",\"Resource\":\"arn:aws:secretsmanager:$AWS_REGION:$ACCOUNT:secret:jeffi/production*\"}"
+SECRETS=arn:aws:secretsmanager:$AWS_REGION:$ACCOUNT:secret
+# Only a release builds images (push to main, or a dispatch with deploy=true), and only from the branches the
+# production and production-release environments allow: keep this equal to their deployment branch policy.
+RELEASE_REFS=(main release/k8s-local)
 
-BUILD_TRUST=$(trust "ref:refs/heads/*")
+BUILD_TRUST=$(trust "${RELEASE_REFS[@]/#/ref:refs/heads/}")
 BUILD_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  {"Sid":"EcrLogin","Effect":"Allow","Action":"ecr:GetAuthorizationToken","Resource":"*"},
  {"Sid":"EcrPush","Effect":"Allow","Action":["ecr:DescribeRepositories","ecr:CreateRepository","ecr:DescribeImages","ecr:BatchGetImage",
    "ecr:BatchCheckLayerAvailability","ecr:InitiateLayerUpload","ecr:UploadLayerPart","ecr:CompleteLayerUpload","ecr:PutImage"],
   "Resource":[$(repos)"arn:aws:ecr:$AWS_REGION:$ACCOUNT:repository/jeffi-stores-*"]},
- $SECRET
+ {"Sid":"ReadBuildArgs","Effect":"Allow","Action":"secretsmanager:GetSecretValue","Resource":"$SECRETS:jeffi/production/build-??????"}
 ]}
 JSON
 )
 DEPLOY_TRUST=$(trust "environment:production" "environment:production-release")
 # OwnSessions: SSM names a session <role session name>-<id>, and CI assumes this role as GitHubActions
 # (.github/actions/release-setup), so the role may close its own tunnels and no one else's.
+# ReadProductionSecret also covers jeffi/production/build (build-secret.sh --check in Deploy · prepare).
 DEPLOY_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
- $SECRET,
- {"Sid":"SyncStoreSecret","Effect":"Allow","Action":["secretsmanager:DescribeSecret","secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"],"Resource":"arn:aws:secretsmanager:$AWS_REGION:$ACCOUNT:secret:jeffi/store-??????"},
+ {"Sid":"ReadProductionSecret","Effect":"Allow","Action":"secretsmanager:GetSecretValue","Resource":"$SECRETS:jeffi/production*"},
+ {"Sid":"SyncStoreSecret","Effect":"Allow","Action":["secretsmanager:DescribeSecret","secretsmanager:GetSecretValue","secretsmanager:PutSecretValue"],"Resource":"$SECRETS:jeffi/store-??????"},
  {"Sid":"FindCore","Effect":"Allow","Action":"ec2:DescribeAddresses","Resource":"*"},
  {"Sid":"DbLogin","Effect":"Allow","Action":"rds-db:connect","Resource":"arn:aws:rds-db:$AWS_REGION:$ACCOUNT:dbuser:$DB_RESOURCE/app_user"},
  {"Sid":"TunnelToCore","Effect":"Allow","Action":"ssm:StartSession",
@@ -64,6 +69,7 @@ JSON
 say "GitHub OIDC roles in account $ACCOUNT (core $CORE_ID, database $DB_RESOURCE)"
 if $DRY_RUN; then
   for r in BUILD DEPLOY; do t=${r}_TRUST p=${r}_POLICY; echo "$r trust policy:"; echo "${!t}"; echo "$r permissions:"; echo "${!p}"; done
+  bash "$(dirname "$0")/build-secret.sh" --dry-run
   exit 0
 fi
 aws iam get-open-id-connect-provider --open-id-connect-provider-arn "$PROVIDER" >/dev/null 2>&1 ||
@@ -79,6 +85,7 @@ role() { # <name> <trust> <policy>; prints the ARN
   aws iam put-role-policy --role-name "$1" --policy-name JeffiRelease --policy-document "$3"
   aws iam get-role --role-name "$1" --query Role.Arn --output text
 }
+bash "$(dirname "$0")/build-secret.sh" # before the build role is narrowed to it
 BUILD_ARN=$(role jeffi-github-build "$BUILD_TRUST" "$BUILD_POLICY")
 DEPLOY_ARN=$(role jeffi-github-deploy "$DEPLOY_TRUST" "$DEPLOY_POLICY")
 echo "build role:  $BUILD_ARN"

@@ -13,6 +13,7 @@
 #   jeffi/production            controller; the source of jeffi/store
 #   jeffi/store                 storefront, admin, business (flagship + every tenant), rebuilt from production by
 #                               deploy/k8s/bootstrap/store-secret.sh (control-plane-only keys left out)
+#   jeffi/production/build      image build args: the NEXT_PUBLIC_* keys of production, rebuilt by build-secret.sh
 #   jeffi/<svc>/production      messaging, documents, public-api, mobile services
 #   jeffi/local                 local dev (deploy/load-secrets.mjs)
 set -euo pipefail
@@ -41,7 +42,7 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY=true ;;
     --yes) YES=true ;;
     --no-restart) RESTART=no ;;
-    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
     -*) echo "Unknown flag: $1" >&2; exit 1 ;;
     *) KEY=$1 ;;
   esac
@@ -108,9 +109,10 @@ print("unset" if k not in d or d[k] in (None, "") else ("same" if d[k] == os.env
 TARGETS=()
 if [ -n "$ONLY" ]; then
   IFS=, read -ra pick <<< "$ONLY"
-  for t in "${pick[@]}"; do case $t in production|local|store) TARGETS+=("jeffi/$t") ;; *) TARGETS+=("$(svc_id "$t")") ;; esac; done
+  for t in "${pick[@]}"; do case $t in production|local|store) TARGETS+=("jeffi/$t") ;; build) TARGETS+=(jeffi/production/build) ;; *) TARGETS+=("$(svc_id "$t")") ;; esac; done
 else
   TARGETS=(jeffi/production jeffi/store jeffi/local)
+  [[ $KEY == NEXT_PUBLIC_* ]] && TARGETS+=(jeffi/production/build)
   extra=" $(key_services "$KEY") ${ALSO//,/ } "
   for s in "${SERVICES[@]}"; do
     st=$(state_of "$(svc_id "$s")")
@@ -134,6 +136,11 @@ for id in "${TARGETS[@]}"; do
     [ "$EXCLUDED" = yes ] && { echo "  jeffi/store                  skipped: $KEY is a control-plane-only key (store-secret-exclude.txt)"; continue; }
     set_state "$id" "$(state_of "$id")"
     echo "  jeffi/store                  $(get_state "$id") → rebuilt from jeffi/production (store-secret.sh)"
+    continue
+  fi
+  if [ "$id" = jeffi/production/build ]; then
+    set_state "$id" "$(state_of "$id")"
+    echo "  jeffi/production/build       $(get_state "$id") → rebuilt from jeffi/production's NEXT_PUBLIC_* keys (build-secret.sh)"
     continue
   fi
   set_state "$id" "$(state_of "$id")"
@@ -171,13 +178,18 @@ json.dump(d, open(sys.argv[1], "w"))' "$TMP/new.json"
   echo "  $id written"
 }
 for id in "${TARGETS[@]}"; do
-  [ "$id" = jeffi/store ] && continue
+  case $id in jeffi/store|jeffi/production/build) continue ;; esac
   case $(get_state "$id") in unset|differs) put "$id" ;; esac
 done
 if [[ " ${TARGETS[*]} " == *" jeffi/store "* ]] && [ "$EXCLUDED" = no ]; then
   out=$(bash deploy/k8s/bootstrap/store-secret.sh 2>&1) || { echo "$out" >&2; exit 1; }
   echo "  $(echo "$out" | tail -1)"
   [[ "$out" == *unchanged* ]] || CHANGED+=(jeffi/store)
+fi
+if [[ " ${TARGETS[*]} " == *" jeffi/production/build "* ]]; then
+  out=$(bash deploy/k8s/bootstrap/build-secret.sh 2>&1) || { echo "$out" >&2; exit 1; }
+  echo "  $(echo "$out" | tail -1)"
+  [[ "$out" == *unchanged* ]] || { CHANGED+=(jeffi/production/build); echo "  NEXT_PUBLIC_* values are baked into the images: they ship with the next release's image build."; }
 fi
 [ ${#CHANGED[@]} -gt 0 ] || { echo "Nothing changed."; rm -f "$ROLLBACK"; exit 0; }
 echo "Rollback commands: $ROLLBACK"
@@ -192,7 +204,7 @@ for id in "${CHANGED[@]}"; do
     jeffi/*/production) s=${id#jeffi/}; SEL+=("${s%/production}") ;;
   esac
 done
-[ ${#SEL[@]} -gt 0 ] || { echo "Only jeffi/local changed: restart your dev server (npm run dev) to pick it up."; exit 0; }
+[ ${#SEL[@]} -gt 0 ] || { [[ " ${CHANGED[*]} " != *" jeffi/local "* ]] || echo "jeffi/local changed: restart your dev server (npm run dev) to pick it up."; exit 0; }
 LIST=$(IFS=,; echo "${SEL[*]}")
 echo
 echo "Pods to restart (every namespace): jeffi.io/service in ($LIST)"
