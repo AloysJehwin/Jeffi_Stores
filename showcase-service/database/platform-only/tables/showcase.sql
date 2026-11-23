@@ -40,5 +40,6 @@ CREATE TABLE IF NOT EXISTS public.showcase_leads (
     email       character varying(254),
     message     text,
     created_at  timestamp with time zone NOT NULL DEFAULT now(),
-    read_at     timestamp with time zone
+    read_at     timestamp with time zone,
+    session_id  character varying(64)                -- the showcase_sessions visit it came from, when one matched
 );

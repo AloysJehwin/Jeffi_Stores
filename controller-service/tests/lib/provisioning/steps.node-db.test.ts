@@ -17,7 +17,7 @@ const reg = vi.hoisted(() => ({
   controlPlanePool: vi.fn(),
 }))
 vi.mock('@/lib/tenant-registry', () => reg)
-const k8s = vi.hoisted(() => ({ ensureTenantNodes: vi.fn(), ensureNodeDbVolume: vi.fn(), postgresPodReady: vi.fn() }))
+const k8s = vi.hoisted(() => ({ ensureTenantNodes: vi.fn(), ensureNodeDbVolume: vi.fn(), postgresPodReady: vi.fn(), applyTenantWorkload: vi.fn(), runsAllInOneApp: vi.fn() }))
 vi.mock('@/lib/k8s/tenant-compute', () => k8s)
 const ec2 = vi.hoisted(() => ({ describeTenantDbVolume: vi.fn() }))
 vi.mock('@/lib/shared/ec2-client', () => ec2)
@@ -178,5 +178,19 @@ describe('runner: a node step’s wait is bounded from step_started_at', () => {
     const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
     expect(await advanceProvisioningJob(job() as any, new StubProvisioningProvider(0))).toBe('pending')
     expect(lastPatch()).toMatchObject({ step: 'attach_db_disk', stepStarted: true, created_resources: { computeMode: 'k8s' } })
+  })
+
+  it('start_postgres builds the store’s own services when its applied spec names no layout and no old app runs', async () => {
+    // As compute-reconcile once wrote it, from Basic's legacy spec: a stored spec with no layout reads as the old app.
+    reg.controlPlanePool.mockReturnValue({
+      query: vi.fn(async (sql: string) => ({ rows: /FROM tenant_compute/.test(sql) ? [{ tenant_id: 't-1', desired: SPEC, applied: SPEC, node_gen: 0 }] : [] })),
+    })
+    k8s.runsAllInOneApp.mockResolvedValue(false)
+    k8s.applyTenantWorkload.mockResolvedValue(true)
+    k8s.postgresPodReady.mockResolvedValue(false)
+    const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+    const startPg = { v: 2, jobs: [{ id: 'database', label: 'Database', steps: [{ id: 'start_postgres', label: 'start_postgres' }] }] }
+    await advanceProvisioningJob(job({ step: 'start_postgres', pipeline: startPg }) as any, new StubProvisioningProvider(0))
+    expect(k8s.applyTenantWorkload.mock.calls[0][0].compute.layout).toBe('services')
   })
 })

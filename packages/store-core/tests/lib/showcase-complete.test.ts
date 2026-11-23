@@ -293,6 +293,8 @@ describe('a page like the live Latte one, drawn again', () => {
     expect(root.textContent).toContain('Daily 8–8')
     expect(root.textContent).toContain('12 Beach Road')
     expect(root.textContent).toContain('Lovely mornings here.')
+    // A grid's testimonial fills its cell: the slide width is the carousel's only.
+    expect(root.querySelector('#reviews [class*="w-[85%]"]')).toBeNull()
     expect(root.querySelector('a[href="#services"]')).not.toBeNull()
     expect(root.querySelector('a[href="#faq"]')).not.toBeNull()
     expect(deadLinks(root)).toEqual([])

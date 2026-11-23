@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { ownerOrderView, ownerStore } from '@controller/lib/domains/owner-api'
 import { advanceOrder, cancelOrder, getOrder, setOrderAutoRenew } from '@controller/lib/domains/orders'
 import { advanceRenewal, currentRenewal } from '@controller/lib/domains/renewal'
+import { getOwnedShowcase } from '@/lib/showcase/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!order) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
   const auth = await ownerStore(request, order.tenant_id)
   if (auth instanceof NextResponse) return auth
+  if (order.showcase_site_id && !(await getOwnedShowcase(order.showcase_site_id, auth.owner.id))) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
 
   const a = parsed.data
   let out = order

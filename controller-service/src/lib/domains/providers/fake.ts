@@ -107,4 +107,10 @@ export class FakeHosting implements DomainHosting {
   async certReady(_slug: string, _host: string, requestedAt: Date) {
     return Date.now() - requestedAt.getTime() >= (opSeconds() / 2) * 1000
   }
+
+  async applyShowcaseRoutes() {}
+
+  async showcaseCertReady(_host: string, requestedAt: Date) {
+    return Date.now() - requestedAt.getTime() >= (opSeconds() / 2) * 1000
+  }
 }

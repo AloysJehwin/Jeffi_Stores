@@ -56,7 +56,7 @@ describe('emailLeadToOwner', () => {
     expect(html).toContain('href="mailto:priya@example.com"')
     expect(html).toContain('A cake for Sunday?<br>Around 2 kg.')
     expect(html).toContain('18 Nov 2026')
-    expect(html).toContain('https://ecom.jeffistores.in/dashboard/showcase/leads?tenant=latte-ws')
+    expect(html).toContain('https://ecom.jeffistores.in/dashboard/showcase/site-1/leads?tenant=latte-ws')
     expect(html).not.toContain('Reply to this email or write to')
   })
 
@@ -89,7 +89,7 @@ describe('emailLeadToOwner', () => {
   it('names the site by its address when the business has no name, and opens the console without a workspace', async () => {
     const mail = await mailFor(LEAD, { ...SITE, tenantId: null, business: { name: '' } } as unknown as ShowcaseSiteRow)
     expect(mail.subject).toBe('New enquiry from Priya Sharma · site-latte.jeffistores.in')
-    expect(mail.html).toContain('href="https://ecom.jeffistores.in/dashboard/showcase/leads"')
+    expect(mail.html).toContain('href="https://ecom.jeffistores.in/dashboard/showcase/site-1/leads"')
     expect(query).not.toHaveBeenCalled()
   })
 

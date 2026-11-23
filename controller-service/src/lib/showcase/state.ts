@@ -1,6 +1,6 @@
 import 'server-only'
 import { getWalletBalance, isFlagshipTenant } from '@/lib/payments/wallet'
-import { countUnreadShowcaseLeads, getShowcaseByOwner, getShowcaseByTenant, type ShowcaseSiteRow } from '@/lib/showcase/store'
+import { countUnreadShowcaseLeads, listShowcasesByOwner, type ShowcaseSiteRow } from '@/lib/showcase/store'
 import { showcaseHost, showcaseUrl } from '@/lib/showcase/host'
 import type { ShowcaseStatus } from '@/lib/showcase/types'
 import { showcaseBilling, showcaseLine, showcaseWalletTenant, type ShowcaseBilling } from './billing'
@@ -27,10 +27,8 @@ export interface ShowcaseConsoleState extends ShowcaseBilling {
   subscriptionStatus: string | null
 }
 
-/** The workspace's site, else the owner's (the builder keeps one Showcase per owner). */
-export async function consoleShowcase(ownerId: string, tenantId: string): Promise<ShowcaseSiteRow | null> {
-  return (await getShowcaseByTenant(tenantId)) ?? (await getShowcaseByOwner(ownerId))
-}
+/** The sites the console lists: the owner's, newest first, whichever workspace pays (a site's pages check ownership). */
+export const consoleShowcases = (ownerId: string): Promise<ShowcaseSiteRow[]> => listShowcasesByOwner(ownerId)
 
 export async function showcaseConsoleState(site: ShowcaseSiteRow): Promise<ShowcaseConsoleState> {
   const tenantId = await showcaseWalletTenant(site)

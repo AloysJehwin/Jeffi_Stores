@@ -4,9 +4,9 @@ import type { PageDoc, ThemeTokens } from '@jeffi/site-blocks'
 import type { StudioProduct } from '@/lib/site/studio/types'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 
-// One AI Site Studio per owner and product (site_studio_sessions): the onboarding "Your site" step writes the store's,
-// the preview reads it and the build_site provisioning step installs it; the Showcase signup writes the owner's
-// 'showcase' one, which is published with the Showcase. JSON columns hold the pipeline's own types
+// The AI Site Studio (site_studio_sessions): the onboarding "Your site" step writes the store's (one per owner), the
+// preview reads it and the build_site provisioning step installs it; the Showcase builder writes one per site
+// (product 'showcase', site_id), published with that site. JSON columns hold the pipeline's own types
 // (packages/store-core/src/lib/site/studio); this module only stores them.
 
 export type { StudioProduct }
@@ -32,6 +32,8 @@ export interface StudioSession {
   id: string
   owner_id: string
   product: StudioProduct
+  /** A Showcase's site; null for the store's studio. */
+  site_id: string | null
   status: StudioStatus
   answers: Record<string, unknown>
   brief: unknown | null
@@ -49,15 +51,29 @@ export interface StudioSession {
   generated_at: string | null
   tweaks_today: number
   tweaks_day: string | null
+  /** The owner's free corrections used today, across their studios (site_studio_corrections). */
+  corrections_today?: number
+  /** A Showcase's free generation, still unclaimed, is held back: the owner has another site never paid for. */
+  free_blocked?: boolean
   tenant_id: string | null
   installed_at: string | null
   created_at: string
   updated_at: string
 }
 
-const COLS = `id, owner_id, product, status, answers, brief, plan, directions, direction, catalog, pages, theme, progress, error,
+// A Showcase's free generation is per site, only while the owner has no other site never paid for (decision 13): a
+// draft, or a live or paused one whose paid time ends within this of publishing (the old 30-day free month or a trial,
+// with no paid month after it).
+const NEVER_PAID = '31 days'
+
+const COLS = `id, owner_id, product, site_id, status, answers, brief, plan, directions, direction, catalog, pages, theme, progress, error,
   spent_inr::float8 AS spent_inr, free_used_at, generated_at, tweaks_today, to_char(tweaks_day, 'YYYY-MM-DD') AS tweaks_day, tenant_id, installed_at,
-  created_at, updated_at`
+  created_at, updated_at,
+  COALESCE((SELECT c.used FROM site_studio_corrections c WHERE c.owner_id = site_studio_sessions.owner_id
+    AND c.day = (now() AT TIME ZONE 'Asia/Kolkata')::date), 0) AS corrections_today,
+  (product = 'showcase' AND free_used_at IS NULL AND EXISTS (SELECT 1 FROM showcase_sites o
+    WHERE o.owner_id = site_studio_sessions.owner_id AND o.id IS DISTINCT FROM site_studio_sessions.site_id
+      AND (o.status = 'draft' OR o.paid_until IS NULL OR o.published_at IS NULL OR o.paid_until < o.published_at + interval '${NEVER_PAID}'))) AS free_blocked`
 
 /** homeKeyOf in SQL, for the row's own product. */
 const HOME_SQL = `(CASE WHEN product = 'showcase' THEN '${SHOWCASE_PAGE_KEY}' ELSE 'store:home' END)`
@@ -67,8 +83,17 @@ export const BUILD_STALE_MS = 10 * 60_000
 
 const pool = () => controlPlanePool()
 
-export async function getStudioSession(ownerId: string, product: StudioProduct = 'store'): Promise<StudioSession | null> {
-  const r = await pool().query<StudioSession>(`SELECT ${COLS} FROM site_studio_sessions WHERE owner_id = $1 AND product = $2`, [ownerId, product])
+/** NULL-safe site key, as the unique index has it (uq_site_studio_sessions_owner_site). */
+const SITE_KEY = `COALESCE(site_id, '00000000-0000-0000-0000-000000000000'::uuid)`
+
+/** The owner's store studio, or a Showcase site's (`siteId`; a Showcase without one has none). */
+export async function getStudioSession(ownerId: string, product: StudioProduct = 'store', siteId: string | null = null): Promise<StudioSession | null> {
+  if (product === 'showcase' && !siteId) return null
+  const r = await pool().query<StudioSession>(`SELECT ${COLS} FROM site_studio_sessions WHERE owner_id = $1 AND product = $2 AND site_id IS NOT DISTINCT FROM $3`, [
+    ownerId,
+    product,
+    product === 'showcase' ? siteId : null,
+  ])
   return r.rows[0] ?? null
 }
 
@@ -97,21 +122,23 @@ export async function claimPictures(id: string): Promise<boolean> {
 }
 
 /**
- * The owner's studio, created on first use. `restart` clears the brief and everything after it; the free generation
- * and the day's tweak count stay with the owner, and a site already installed into a store stays installed there.
+ * The owner's store studio, or a Showcase site's (`siteId`), created on first use. `restart` clears the brief and
+ * everything after it; the free generation and the day's help count stay, and a site already installed into a store
+ * stays installed there.
  */
-export async function startStudioSession(ownerId: string, restart = false, product: StudioProduct = 'store'): Promise<StudioSession> {
+export async function startStudioSession(ownerId: string, restart = false, product: StudioProduct = 'store', siteId: string | null = null): Promise<StudioSession> {
+  if (product === 'showcase' && !siteId) throw new Error('A Showcase studio needs its site')
   const r = await pool().query<StudioSession>(
-    `INSERT INTO site_studio_sessions (owner_id, product) VALUES ($1, $3)
-     ON CONFLICT (owner_id, product) DO UPDATE SET
+    `INSERT INTO site_studio_sessions (owner_id, product, site_id) VALUES ($1, $3, $4)
+     ON CONFLICT (owner_id, product, ${SITE_KEY}) DO UPDATE SET
        status = 'brief', answers = '{}'::jsonb, brief = NULL, plan = NULL, directions = '[]'::jsonb, direction = NULL,
        catalog = NULL, pages = '{}'::jsonb, theme = NULL, progress = NULL, error = NULL, tenant_id = NULL,
        installed_at = NULL, updated_at = now()
      WHERE $2::boolean
      RETURNING ${COLS}`,
-    [ownerId, restart, product]
+    [ownerId, restart, product, product === 'showcase' ? siteId : null]
   )
-  return r.rows[0] ?? (await getStudioSession(ownerId, product))!
+  return r.rows[0] ?? (await getStudioSession(ownerId, product, siteId))!
 }
 
 type Patch = Partial<
@@ -223,7 +250,7 @@ export async function settleRebuild(id: string, error?: string, opts: { complete
   return r.rows[0] ?? null
 }
 
-/** Counts `cost` against today's free tweaks (IST day); false when the day's allowance is spent. */
+/** Counts `cost` against today's design help (IST day); false when the day's allowance is spent. */
 export async function spendTweaks(id: string, cost: number, perDay: number): Promise<boolean> {
   const r = await pool().query(
     `UPDATE site_studio_sessions

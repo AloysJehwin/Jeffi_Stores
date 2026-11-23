@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fail, studioOwner } from '@controller/lib/site-studio/http'
+import { ownedShowcase } from '@controller/lib/showcase-builder/site'
 import { SHOWCASE_IMAGE_MAX_BYTES, SHOWCASE_IMAGE_TYPES, uploadShowcaseImage, type ShowcaseImageKind } from '@controller/lib/showcase-builder/uploads'
 
 export const dynamic = 'force-dynamic'
 
 const KINDS: ShowcaseImageKind[] = ['logo', 'service', 'work', 'avatar']
 
-// A picture for the owner's Showcase (multipart: file, kind = logo | service | work | avatar) → { url }. Resized and
-// stored as WebP; the Details step and the editor save the URL with the site.
+// A picture for a Showcase (multipart: file, kind = logo | service | work | avatar, siteId? — absent while a new site
+// has no draft yet) → { url }. Resized and stored as WebP; the Details step and the editor save the URL with the site.
 export async function POST(request: NextRequest) {
   const owner = await studioOwner(request)
   if (owner instanceof NextResponse) return owner
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
   if (!form) return fail('Invalid form data')
   const file = form.get('file')
   const kind = form.get('kind')
+  const siteId = form.get('siteId')
+  if (siteId && !(await ownedShowcase(owner.id, siteId))) return fail('That site could not be found.', 404)
   if (!file || typeof file === 'string') return fail('Choose a picture to upload.')
   if (typeof kind !== 'string' || !KINDS.includes(kind as ShowcaseImageKind)) return fail('Unknown picture kind.')
   if (file.size > SHOWCASE_IMAGE_MAX_BYTES) return fail(`That picture is too large (up to ${SHOWCASE_IMAGE_MAX_BYTES / 1024 / 1024} MB).`)

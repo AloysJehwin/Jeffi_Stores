@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { normalizeDoc, pageRefKey, type PageDoc, type SiteAudience, type SiteSurface } from '@jeffi/site-blocks'
-import { getPublishedPage, getSiteDraft, siteBuilderEnabled } from '@/lib/site/store'
+import { canvasDoc, getPublishedPage, getSiteDraft, siteBuilderEnabled } from '@/lib/site/store'
 import { codeComponents } from '../cart/page-parts'
 
 // The AI-written header, footer and announcement bar, for the layout to render in place of the built-in ones. Only a
@@ -25,7 +25,7 @@ export async function loadCodeChrome(audience: SiteAudience, surface: SiteSurfac
       (await getPublishedPage({ ...ref, surface }))?.doc ??
       (surface === 'web_mobile' ? (own('web') ?? (await getPublishedPage({ ...ref, surface: 'web' }))?.doc) : undefined)
     const d = doc ? normalizeDoc(doc) : null
-    return d && codeComponents(d) ? d : null
+    return d && codeComponents(d) ? (draft ? canvasDoc(d, page) : d) : null
   }
   const [header, footer, announcement] = await Promise.all([at('header'), at('footer'), at('announcement')])
   if (!header && !footer && !announcement) return null

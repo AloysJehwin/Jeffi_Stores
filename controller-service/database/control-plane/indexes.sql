@@ -97,6 +97,8 @@ CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_inflight ON public.tenant_do
 CREATE INDEX IF NOT EXISTS idx_tenant_domain_renewals_open ON public.tenant_domain_renewals USING btree (next_at) WHERE (status IN ('due','renewing'));
 CREATE INDEX IF NOT EXISTS idx_tcd_order ON public.tenant_custom_domains USING btree (order_id) WHERE (order_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_site_studio_sessions_tenant ON public.site_studio_sessions USING btree (tenant_id) WHERE (tenant_id IS NOT NULL);
+-- One studio per owner and product, and per site for a Showcase (the store's has no site).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_site_studio_sessions_owner_site ON public.site_studio_sessions USING btree (owner_id, product, COALESCE(site_id, '00000000-0000-0000-0000-000000000000'::uuid));
 CREATE INDEX IF NOT EXISTS idx_tenant_compliance_documents_owner ON public.tenant_compliance_documents USING btree (owner_id);
 -- The daily compliance_expiry job's scan.
 CREATE INDEX IF NOT EXISTS idx_tenant_compliance_documents_expiry ON public.tenant_compliance_documents USING btree (expires_on) WHERE (expires_on IS NOT NULL);
@@ -113,3 +115,6 @@ CREATE INDEX IF NOT EXISTS idx_billing_lines_trial ON public.billing_lines USING
 CREATE INDEX IF NOT EXISTS idx_billing_lines_ends ON public.billing_lines USING btree (ends_at) WHERE (status = 'ending');
 CREATE INDEX IF NOT EXISTS idx_billing_charges_tenant ON public.billing_charges USING btree (tenant_id, charged_at DESC);
 CREATE INDEX IF NOT EXISTS idx_billing_charges_charged ON public.billing_charges USING btree (charged_at);
+-- Showcase custom domains: a site's domains and orders, and the hosts showcase-service routes.
+CREATE INDEX IF NOT EXISTS idx_tcd_showcase_site ON public.tenant_custom_domains USING btree (showcase_site_id) WHERE (showcase_site_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_showcase_site ON public.tenant_domain_orders USING btree (showcase_site_id) WHERE (showcase_site_id IS NOT NULL);

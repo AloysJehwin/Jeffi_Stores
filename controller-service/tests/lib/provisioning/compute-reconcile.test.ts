@@ -55,6 +55,8 @@ const k8s = vi.hoisted(() => ({
   postgresPodReady: vi.fn(),
   growNodeDbVolume: vi.fn(),
   retireNodeDb: vi.fn(),
+  k8sComputeEnabled: () => true,
+  runsAllInOneApp: vi.fn(async () => false),
 }))
 vi.mock('@/lib/k8s/tenant-compute', () => k8s)
 

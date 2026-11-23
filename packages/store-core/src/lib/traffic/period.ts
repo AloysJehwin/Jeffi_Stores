@@ -1,5 +1,6 @@
 import { addDays, parsePeriod, previousPeriod, spanDays, type Period } from '@/lib/overview/period'
 import { istDate } from '@/lib/channels/report-store'
+import type { PeriodInfo } from './types'
 
 // Traffic report periods: IST days (shared overview maths) plus the trend bucket and query bounds.
 
@@ -15,6 +16,12 @@ export function trafficPeriod(from: string | null, to: string | null, now = new 
 
 /** Daily trend up to 60 days, weekly beyond. */
 export const trendBucket = (p: Period): TrendBucket => (spanDays(p) > 60 ? 'week' : 'day')
+
+/** The period, its comparison period and trend bucket, as every report returns them. */
+export function periodInfo(p: Period): PeriodInfo {
+  const prev = previousPeriod(p)
+  return { from: p.from, to: p.to, prevFrom: prev.from, prevTo: prev.to, bucket: trendBucket(p) }
+}
 
 /** Timestamptz bounds [start, end) for the period's IST days. */
 export function istBounds(p: Period): [string, string] {

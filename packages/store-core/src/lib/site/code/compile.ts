@@ -1,6 +1,6 @@
 import { parse } from '@babel/parser'
 import type * as t from '@babel/types'
-import type { PageDoc, PageKey } from '@jeffi/site-blocks'
+import { NODE_ID, type PageDoc, type PageKey } from '@jeffi/site-blocks'
 import { CARD_PAGE, CARD_PRODUCT, type CodeNode, type CodeValue } from './ast'
 import {
   BLOCKED_TAGS,
@@ -24,6 +24,8 @@ import type { CodeComponentDef } from './registry'
 import { PRODUCT_FIELDS } from './parts/common'
 import { cardScope, compileSectionCss } from './css'
 import { codeSkeleton } from './skeleton'
+import { canonTree } from './ids'
+import { printFitting, printSection } from './print'
 import { coreBlockFor } from '../blocks'
 
 // A code section's TSX checked against the allowlist and turned into a JSON AST. Nothing here runs the code: Babel
@@ -66,6 +68,8 @@ interface Ctx {
   uid: number
   once: Map<string, number>
   capped: Set<string>
+  /** `data-e` ids taken so far: a copy's goes. */
+  ids: Set<string>
 }
 
 const lit = (v: Extract<CodeValue, { k: 'lit' }>['v']): CodeValue => ({ k: 'lit', v })
@@ -387,6 +391,16 @@ function badAttr(ctx: Ctx, a: t.JSXAttribute, name: string): boolean {
   return true
 }
 
+/** A tag's `data-e`: its node id (never a prop). Malformed or repeated ones are dropped. */
+function nodeId(ctx: Ctx, a: t.JSXAttribute): string | undefined {
+  const v = a.value
+  const raw = v?.type === 'StringLiteral' ? v.value : v?.type === 'JSXExpressionContainer' && v.expression.type === 'StringLiteral' ? v.expression.value : null
+  if (!raw || !NODE_ID.test(raw) || ctx.ids.has(raw)) return undefined
+  ctx.ids.add(raw)
+  return raw
+}
+const withId = <N extends CodeNode>(n: N, id: string | undefined): N => (id ? { ...n, id } : n)
+
 /** React's JSX text rule: lines trimmed, line breaks collapsed to one space, blank lines dropped. */
 function jsxText(raw: string): string {
   const lines = raw.split(/\r\n|\n|\r/)
@@ -552,6 +566,7 @@ function htmlElement(ctx: Ctx, e: t.JSXElement, tag: string, scope: Scope, w: Wa
     return null
   }
   const props: Record<string, CodeValue> = {}
+  let id: string | undefined
   for (const a of e.openingElement.attributes) {
     if (a.type === 'JSXSpreadAttribute') {
       issue(ctx, a, "Spread props ({...x}) aren't allowed")
@@ -562,6 +577,10 @@ function htmlElement(ctx: Ctx, e: t.JSXElement, tag: string, scope: Scope, w: Wa
       continue
     }
     const name = a.name.name === 'class' ? 'className' : a.name.name
+    if (name === 'data-e') {
+      id = nodeId(ctx, a) ?? id
+      continue
+    }
     if (badAttr(ctx, a, name)) continue
     if (name === 'className') {
       if (a.value) props.className = a.value.type === 'StringLiteral' ? classValue(ctx, a.value, scope) : classValue(ctx, a.value as t.Node, scope)
@@ -587,9 +606,9 @@ function htmlElement(ctx: Ctx, e: t.JSXElement, tag: string, scope: Scope, w: Wa
   }
   if (VOID_TAGS.has(tag)) {
     if (e.children.some(c => c.type !== 'JSXText' || c.value.trim())) issue(ctx, e, `<${tag}> can't have children`)
-    return { t: 'el', tag, props, children: [] }
+    return withId({ t: 'el', tag, props, children: [] }, id)
   }
-  return { t: 'el', tag, props, children: children(ctx, e.children, scope, w) }
+  return withId({ t: 'el', tag, props, children: children(ctx, e.children, scope, w) }, id)
 }
 
 const MOSAIC_OWN = /(^|:)(grid-cols-|grid-rows-|grid-flow-|col-span-|row-span-|col-start-|col-end-|row-start-|row-end-)/
@@ -627,6 +646,7 @@ function component(ctx: Ctx, e: t.JSXElement, name: string, scope: Scope, w: Wal
   }
   const keys = propKeys(def)
   const props: Record<string, CodeValue> = {}
+  let id: string | undefined
   for (const a of e.openingElement.attributes) {
     if (a.type === 'JSXSpreadAttribute') {
       issue(ctx, a, "Spread props ({...x}) aren't allowed")
@@ -637,6 +657,10 @@ function component(ctx: Ctx, e: t.JSXElement, name: string, scope: Scope, w: Wal
       continue
     }
     const pn = a.name.name === 'class' ? 'className' : a.name.name
+    if (pn === 'data-e') {
+      id = nodeId(ctx, a) ?? id
+      continue
+    }
     if (badAttr(ctx, a, pn) || pn === 'key') continue
     if (pn === 'className') {
       if (a.value) props.className = classValue(ctx, a.value as t.Node, scope)
@@ -688,21 +712,21 @@ function component(ctx: Ctx, e: t.JSXElement, name: string, scope: Scope, w: Wal
     const fn = unwrap(fnChild.expression)
     if (!def.binding) {
       issue(ctx, fnChild, `<${name}> doesn't take a render function`)
-      return { t: 'cmp', name, props, children: [] }
+      return withId({ t: 'cmp', name, props, children: [] }, id)
     }
     if (fn.type !== 'ArrowFunctionExpression') {
       issue(ctx, fn, `Write the render function as an arrow: {p => <…/>}`)
-      return { t: 'cmp', name, props, children: [] }
+      return withId({ t: 'cmp', name, props, children: [] }, id)
     }
     if (meaningful.length > 1) issue(ctx, e, `Put only the render function inside <${name}>`)
     const b = arrowScope(ctx, fn, scope, new Set(Object.keys(def.binding)), `<${name}>`)
-    if (!b) return { t: 'cmp', name, props, children: [] }
+    if (!b) return withId({ t: 'cmp', name, props, children: [] }, id)
     const body = arrowBody(ctx, fn, b.scope, { ...w, guarded: true })
     if (layout?.k === 'lit' && layout.v === 'mosaic' && (body.t === 'el' || body.t === 'cmp')) {
       const own = classStrings(body.props.className).flatMap(splitClasses).filter(c => MOSAIC_OWN.test(c))
       if (own.length) issue(ctx, fnChild, `<${name} layout="mosaic"> places its items itself: drop ${own.slice(0, 4).map(c => `"${c}"`).join(', ')} from the item's className`)
     }
-    return { t: 'cmp', name, props, children: [], render: { param: b.param, ...(b.index ? { index: b.index } : {}), body } }
+    return withId({ t: 'cmp', name, props, children: [], render: { param: b.param, ...(b.index ? { index: b.index } : {}), body } }, id)
   }
   if (SLIDERS.has(name)) {
     const kids = meaningful.filter(c => c.type === 'JSXElement')
@@ -710,7 +734,7 @@ function component(ctx: Ctx, e: t.JSXElement, name: string, scope: Scope, w: Wal
     if (only?.type === 'JSXIdentifier' && DATA_LISTS.has(only.name))
       issue(ctx, e, `To slide ${only.name.toLowerCase()}, put layout="carousel" on <${only.name}> instead of wrapping it in <${name}>`)
   }
-  return { t: 'cmp', name, props, children: children(ctx, e.children, scope, w) }
+  return withId({ t: 'cmp', name, props, children: children(ctx, e.children, scope, w) }, id)
 }
 
 /** FNV-1a, for a stable scope id per source. */
@@ -794,8 +818,13 @@ function cardScopeOf(ctx: Ctx, fn: t.ArrowFunctionExpression | t.FunctionExpress
   return scope
 }
 
-/** Parses and checks the source, without building CSS. */
-export function checkSection(source: string, ctx0: { page: PageKey | null }): { ok: true; ast: CodeNode; classes: string[]; components: string[]; id: string } | { ok: false; issues: CompileIssue[] } {
+export type CheckResult = { ok: true; ast: CodeNode; classes: string[]; components: string[]; id: string; tree?: CodeNode } | { ok: false; issues: CompileIssue[] }
+
+/**
+ * Parses and checks the source, without building CSS. `ids` adds the visual editor's tree (ids.ts): `.map` over literal
+ * lists unrolled unless `unroll: false`, every node with an id.
+ */
+export function checkSection(source: string, ctx0: { page: PageKey | null; ids?: boolean | { unroll?: boolean } }): CheckResult {
   if (typeof source !== 'string' || !source.trim()) return { ok: false, issues: [{ message: 'The section has no code' }] }
   if (new TextEncoder().encode(source).length > MAX_SOURCE_BYTES)
     return { ok: false, issues: [{ message: `The section is over ${MAX_SOURCE_BYTES / 1024} KB: shorten it` }] }
@@ -817,6 +846,7 @@ export function checkSection(source: string, ctx0: { page: PageKey | null }): { 
     uid: 0,
     once: new Map(),
     capped: new Set(),
+    ids: new Set(),
   }
 
   const fns = new Map<string, t.Node>()
@@ -892,15 +922,25 @@ export function checkSection(source: string, ctx0: { page: PageKey | null }): { 
   for (const [n, count] of ctx.once) if (count > 1) issue(ctx, null, `<${n} /> must appear exactly once (found ${count})`)
   if (ctx.classes.size > MAX_CLASSES) issue(ctx, null, `Too many distinct classes (${ctx.classes.size}, max ${MAX_CLASSES})`)
   if (ctx.issues.length) return { ok: false, issues: ctx.issues }
-  return { ok: true, ast, classes: [...ctx.classes].sort(), components: [...ctx.components].sort(), id: `cs-${hash(source)}` }
+  const out: CheckResult = { ok: true, ast, classes: [...ctx.classes].sort(), components: [...ctx.components].sort(), id: `cs-${hash(source)}` }
+  if (ctx0.ids) {
+    const unroll = typeof ctx0.ids === 'object' ? ctx0.ids.unroll !== false : true
+    const page = ctx.page
+    out.tree = canonTree(ast, { unroll, locked: name => ONCE_COMPONENTS.has(name) || (!!page && !!ctx.lib.get(name)?.required?.includes(page)) })
+  }
+  return out
 }
 
 export async function compileSection(source: string, ctx: { page: PageKey | null }): Promise<CompileResult> {
-  const r = checkSection(source, ctx)
+  return built(checkSection(source, ctx), ctx.page)
+}
+
+/** A checked section with its CSS and skeleton. */
+async function built(r: CheckResult, page: PageKey | null): Promise<CompileResult> {
   if (!r.ok) return r
   let css: string
   try {
-    css = await compileSectionCss(r.classes, ctx.page === CARD_PAGE ? cardScope(r.id) : r.id, r.id)
+    css = await compileSectionCss(r.classes, page === CARD_PAGE ? cardScope(r.id) : r.id, r.id)
   } catch (err) {
     console.error('[code-section] css', err)
     return { ok: false, issues: [{ message: `The section's styles could not be built (${err instanceof Error ? err.message : String(err)})` }] }
@@ -908,9 +948,129 @@ export async function compileSection(source: string, ctx: { page: PageKey | null
   return { ok: true, section: { id: r.id, ast: r.ast, classes: r.classes, css, components: r.components, skeleton: codeSkeleton(r.ast) } }
 }
 
+// ── The visual editor's tree (code_section v2) ─────────────────────────────────────────────────
+
+/** Key-sorted JSON, so two trees compare by content. */
+const canonical = (v: unknown): string =>
+  JSON.stringify(v ?? null, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x))
+
+/** v2 props hold the editor's tree beside the source: `{ label, tree, source, compiled }`. */
+export const isTreeSection = (props: unknown): boolean => {
+  const tree = (props as { tree?: unknown } | null)?.tree
+  return !!tree && typeof tree === 'object'
+}
+
+export type SectionTree = { ok: true; tree: CodeNode; source: string; check: Extract<CheckResult, { ok: true }> } | { ok: false; issues: CompileIssue[] }
+
+/**
+ * A source as the editor's tree and that tree printed (with `data-e` ids), checked to round-trip: the printed source
+ * compiles back to the same tree. Lists are unrolled when the unrolled section still fits the limits. Null when the
+ * section has no such form (it stays a v1 section); issues when the source doesn't compile at all.
+ */
+export function sectionTree(source: string, page: PageKey | null): SectionTree | null {
+  for (const unroll of [true, false]) {
+    const first = checkSection(source, { page, ids: { unroll } })
+    if (!first.ok) return unroll ? first : null
+    let printed: string | null = null
+    try {
+      printed = printFitting(first.tree!, { card: page === CARD_PAGE })
+    } catch {
+      printed = null
+    }
+    if (!printed) continue
+    const again = checkSection(printed, { page, ids: { unroll } })
+    if (again.ok && canonical(again.tree) === canonical(first.tree)) return { ok: true, tree: again.tree!, source: printed, check: again }
+  }
+  return null
+}
+
+/**
+ * The source a v2 section is saved from: its own source, which the source-level editors (literals.ts, the AI) write,
+ * else its tree printed. The visual editor saves its tree with the source left empty, so either way what is stored is
+ * the compile's, never the browser's.
+ */
+function treeSource(props: Record<string, unknown>, page: PageKey | null): string {
+  const source = typeof props.source === 'string' ? props.source : ''
+  if (source.trim()) return source
+  try {
+    return printSection(props.tree as CodeNode, { card: page === CARD_PAGE })
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * One code section's props compiled for saving. v1 (no tree): the source compiled, as always. v2: the one validator
+ * path, compileSection(print(tree)) with the tree the compile's own; a v2 section whose tree can't round-trip is saved
+ * as v1.
+ */
+export async function compileCodeProps(props: Record<string, unknown>, page: PageKey | null): Promise<{ ok: true; props: Record<string, unknown> } | { ok: false; issues: CompileIssue[] }> {
+  if (!isTreeSection(props)) {
+    const r = await compileSection(typeof props.source === 'string' ? props.source : '', { page })
+    return r.ok ? { ok: true, props: { ...props, compiled: r.section } } : r
+  }
+  const source = treeSource(props, page)
+  const t = sectionTree(source, page)
+  if (t && !t.ok) return t
+  const { tree: _stale, ...rest } = props
+  if (!t) {
+    const r = await compileSection(source, { page })
+    return r.ok ? { ok: true, props: { ...rest, source, compiled: r.section } } : r
+  }
+  const r = await built(t.check, page)
+  return r.ok ? { ok: true, props: { ...rest, source: t.source, tree: t.tree, compiled: r.section } } : r
+}
+
+/**
+ * A section's props as v2, as the editor loads them: the tree and its printed source, both from the source (a path
+ * that rewrote the source but kept an old tree is caught here). `compiled` stays as it was until the next save
+ * recompiles it, so a published page keeps rendering from its own. Unchanged when they already match; without the
+ * tree when the source has no tree form.
+ */
+export function upgradeCodeProps(props: Record<string, unknown>, page: PageKey | null): Record<string, unknown> {
+  const source = treeSource(props, page)
+  const t = source ? sectionTree(source, page) : null
+  if (!t?.ok) {
+    if (!isTreeSection(props)) return props
+    const { tree: _stale, ...rest } = props
+    return rest
+  }
+  if (props.source === t.source && canonical(props.tree) === canonical(t.tree)) return props
+  return { ...props, source: t.source, tree: t.tree }
+}
+
 // ── Whole pages ────────────────────────────────────────────────────────────────────────────────
 
 export const CODE_SECTION = 'code_section'
+
+/** Every code section of a page upgraded to v2 (upgradeCodeProps); the visual editor's load. */
+export function upgradeCodeSections(doc: PageDoc, page: PageKey | null): PageDoc {
+  const blocks = Object.fromEntries(Object.entries(doc.blocks ?? {}).map(([id, b]) => [id, b.type === CODE_SECTION ? { ...b, props: upgradeCodeProps(b.props ?? {}, page) } : b]))
+  return { ...doc, blocks }
+}
+
+/**
+ * A page as the editor's canvas draws it (a preview token, the editor on): each code section renders from its tree's
+ * AST, which draws the same as the stored one (tests/lib/site-code-roundtrip.test.ts) and carries the node ids the
+ * editor loaded (upgradeCodeProps), also on v1 sections not saved since. Styles and scope stay the stored ones; nothing
+ * is saved.
+ */
+export function canvasCodeSections(doc: PageDoc, page: PageKey | null): PageDoc {
+  const blocks = Object.fromEntries(
+    Object.entries(doc.blocks ?? {}).map(([id, b]) => {
+      const compiled = b.type === CODE_SECTION ? (b.props?.compiled as CompiledSection | null | undefined) : null
+      if (!compiled?.ast) return [id, b]
+      try {
+        const source = treeSource(b.props ?? {}, page)
+        const t = source ? sectionTree(source, page) : null
+        return [id, t?.ok ? { ...b, props: { ...b.props, compiled: { ...compiled, ast: t.check.ast } } } : b]
+      } catch {
+        return [id, b]
+      }
+    })
+  )
+  return { ...doc, blocks }
+}
 
 export class CodeSectionInvalid extends Error {
   constructor(readonly issues: { blockId?: string; message: string }[]) {
@@ -965,14 +1125,13 @@ export async function recompileCodeSections(doc: PageDoc, ctx: { page?: PageKey 
   const issues: { blockId?: string; message: string }[] = []
   for (const b of Object.values(doc.blocks)) {
     if (b.type !== CODE_SECTION) continue
-    const source = typeof b.props?.source === 'string' ? (b.props.source as string) : ''
     const label = typeof b.props?.label === 'string' && b.props.label ? (b.props.label as string) : 'Code section'
-    const r = await compileSection(source, { page: ctx.page ?? null })
+    const r = await compileCodeProps(b.props ?? {}, ctx.page ?? null)
     if (!r.ok) {
       issues.push(...r.issues.map(i => ({ blockId: b.id, message: `${label}: ${i.line ? `line ${i.line}: ` : ''}${i.message}` })))
       continue
     }
-    blocks[b.id] = { ...b, props: { ...b.props, compiled: r.section } }
+    blocks[b.id] = { ...b, props: r.props }
   }
   const next = { ...doc, blocks }
   const coreType = ctx.coreType !== undefined ? ctx.coreType : ctx.page ? (coreBlockFor(ctx.page)?.type ?? null) : null

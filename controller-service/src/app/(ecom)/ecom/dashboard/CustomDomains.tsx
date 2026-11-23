@@ -13,14 +13,17 @@ interface Domain {
   verification_token: string | null
 }
 
+/** The owner's own domains for the store, or with siteId the one for that Showcase site (slug is then its site- label). */
 export default function CustomDomains({
   tenantId,
   slug,
   maxDomains,
+  siteId,
 }: {
   tenantId: string
   slug: string
   maxDomains: number
+  siteId?: string
 }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -34,7 +37,7 @@ export default function CustomDomains({
   async function del(id: string, domain: string) {
     const ok = await confirm({
       title: 'Remove this domain?',
-      message: `Your store stops using ${domain}. You can add it again later.`,
+      message: `Your ${siteId ? 'site' : 'store'} stops using ${domain}. You can add it again later.`,
       confirmLabel: 'Remove',
       variant: 'danger',
     })
@@ -48,7 +51,7 @@ export default function CustomDomains({
   }
 
   async function load() {
-    const res = await fetch(`/api/ecom/domains?tenantId=${tenantId}`)
+    const res = await fetch(`/api/ecom/domains?tenantId=${tenantId}${siteId ? `&siteId=${siteId}` : ''}`)
       .then(r => r.json())
       .catch(() => null)
     setLoaded(true)
@@ -60,14 +63,14 @@ export default function CustomDomains({
   }
   useEffect(() => {
     load()
-  }, [tenantId]) // eslint-disable-line react-hooks/exhaustive-deps -- reload per store
+  }, [tenantId, siteId]) // eslint-disable-line react-hooks/exhaustive-deps -- reload per store
 
   async function addDomain() {
     setBusy(true)
     const res = await fetch('/api/ecom/domains', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantId, domain: newDomain }),
+      body: JSON.stringify(siteId ? { siteId, domain: newDomain } : { tenantId, domain: newDomain }),
     })
     const data = await res.json()
     if (!res.ok) {
@@ -126,7 +129,7 @@ export default function CustomDomains({
   return (
     <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs text-foreground-secondary uppercase tracking-widest">Custom domains</div>
+        <div className="text-xs text-foreground-secondary uppercase tracking-widest">{siteId ? 'A domain you own' : 'Custom domains'}</div>
         <span className="text-xs text-foreground-secondary">
           {used}/{maxDomains} used
         </span>

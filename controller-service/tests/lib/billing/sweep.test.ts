@@ -17,7 +17,7 @@ const query = vi.hoisted(() =>
     return { rows: a.rows, rowCount: a.rows.length }
   })
 )
-vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }), setSubscriptionStatus: vi.fn() }))
+vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }), setSubscriptionStatus: vi.fn(), stopProvisioningJob: vi.fn().mockResolvedValue(true) }))
 vi.mock('@/lib/payments/wallet', () => ({ FLAGSHIP_TENANT_ID: '00000000-0000-0000-0000-000000000000' }))
 vi.mock('@/lib/billing/ad-free', () => ({ AD_FREE_PRICE_INR: 500 }))
 vi.mock('@/lib/billing/messaging-addon', () => ({ getMessagingAddonPricing: vi.fn().mockResolvedValue({ priceInr: 500 }) }))
@@ -115,6 +115,7 @@ describe('grace and ends', () => {
     expect(r).toEqual({ ended: 2, stores: 1 })
     expect(pauseShowcase).toHaveBeenCalledWith('site-3', 'unpaid')
     expect(setSubscriptionStatus).toHaveBeenCalledWith(T, 'cancelled', 'terminated')
+    await vi.waitFor(() => expect(trigger).toHaveBeenCalled())
     expect(trigger).toHaveBeenCalledWith(expect.objectContaining({ action: 'deprovision', tenantId: T, reason: 'missed_payment' }))
     // Lowered prices whose date has come apply first.
     expect(st.calls[0].sql).toContain('amount_paise = next_amount_paise')

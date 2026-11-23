@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { directions, newDirection, shuffleColours, type DesignDirection, type StudioBrief } from '@/lib/site/studio'
 import { aiDownFrom, aiUnavailable, fail, readJson, studioOf, studioView } from '@controller/lib/site-studio/http'
 import { refundTweaks, spendTweaks, updateStudioSession } from '@controller/lib/site-studio/sessions'
-import { COST, TWEAKS_PER_DAY } from '@controller/lib/site-studio/allowance'
+import { COST, HELP_PER_DAY } from '@controller/lib/site-studio/allowance'
 import { funded, preBuildBudget } from '@controller/lib/site-studio/funded'
 import { designLocked } from '@controller/lib/site-studio/rules'
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     let next: DesignDirection
     if (action === 'shuffle') next = shuffleColours(b, old)
     else {
-      if (!(await spendTweaks(session.id, COST.help, TWEAKS_PER_DAY))) return fail('You have asked for a lot of new directions today. Pick one of these, or come back tomorrow.', 429)
+      if (!(await spendTweaks(session.id, COST.help, HELP_PER_DAY))) return fail('You have asked for a lot of new directions today. Pick one of these, or come back tomorrow.', 429)
       try {
         next = await funded(session.id, preBuildBudget(session), () => newDirection(b, shown, ask))
       } catch (err) {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
   if (action !== 'generate') return fail('Unknown action')
   const charge = shown.length > 0
-  if (charge && !(await spendTweaks(session.id, COST.directions, TWEAKS_PER_DAY))) return fail('You have asked for a lot of directions today. Pick one of these, or come back tomorrow.', 429)
+  if (charge && !(await spendTweaks(session.id, COST.directions, HELP_PER_DAY))) return fail('You have asked for a lot of directions today. Pick one of these, or come back tomorrow.', 429)
   try {
     const list = await funded(session.id, preBuildBudget(session), () => directions(b, 3, { avoid: ask ? undefined : shown.length ? shown : undefined, ask }))
     const saved = await updateStudioSession(session.id, { directions: list, direction: null, theme: null, status: 'direction' })

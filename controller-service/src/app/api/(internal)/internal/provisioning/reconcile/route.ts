@@ -14,9 +14,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const reconciled = await reconcileOrphanedTenants().catch(() => [] as string[])
-  const { alertStuckJobs } = await import('@controller/lib/provisioning/alerts')
-  const alerted = await alertStuckJobs().catch(() => 0)
+  // Backstop for the worker's per-tick incident sweep, should the worker stop firing (it skips while one runs).
+  const { sweepProvisioningIncidents } = await import('@controller/lib/provisioning/alerts')
+  const incidents = await sweepProvisioningIncidents().catch(() => null)
   // Kept data of deprovisioned stores whose retention period is over.
   const archives = await expireTenantArchives().catch(() => ({ expired: 0, failed: 0 }))
-  return NextResponse.json({ success: true, reconciled, alerted, archives })
+  return NextResponse.json({ success: true, reconciled, incidents, archives })
 }

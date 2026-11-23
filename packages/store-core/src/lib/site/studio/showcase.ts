@@ -1,5 +1,5 @@
 import { isPageKey, type PageKey } from '@jeffi/site-blocks'
-import { generateImage } from '@/lib/ai/media'
+import { pictureFor, searchTerms } from '@/lib/ai/stock'
 import { SHOWCASE_PAGE_KEY, type ShowcaseBusiness, type ShowcaseFaq, type ShowcasePagePicture, type ShowcaseService } from '../../showcase/types'
 import { cleanStarter, reachText } from '../../showcase/starter'
 import { askJson, newSeed, orNull, str, studioBudgetLeft } from './ai'
@@ -26,7 +26,7 @@ export async function showcaseBrief(input: StudioAnswers | Record<string, unknow
   const references = await readRefs(a.references ?? [])
   const out = await askJson(
     `You write the creative brief for the one-page website of an Indian business or professional (a photographer, a clinic, a tutor, a salon, an architect, a caterer…). It shows their work, proof and reviews and gets them enquiries; it sells nothing online. Read the owner's answers and return JSON:
-{"storeName": the business's name (keep theirs), "summary": one sentence on the business, "category": what they do in a few words, "vocabulary": [8-12 specific words their clients use, e.g. "candid, pre-wedding, haldi" rather than "quality services"], "audience": who their clients are and why they come, "priceTier": "value"|"mid"|"premium"|"luxury", "voice": the copy voice in a few words, "mood": the visual mood in a few words, "artDirection": one sentence on the look of every picture (light, setting, colours)}.
+{"storeName": the business's name (keep theirs), "summary": one sentence on the business, "category": what they do in a few words, "vocabulary": [8-12 specific words their clients use, e.g. "candid, pre-wedding, haldi" rather than "quality services"], "audience": who their clients are and why they come, "priceTier": "value"|"mid"|"premium"|"luxury", "voice": the copy voice in a few words, "mood": the visual mood in a few words, "artDirection": one sentence on the look of every picture (light, setting, colours), "stockQueries": [3 stock-photo searches of 2-4 plain words, in order: the kind of place this business works in, a close detail of its craft (tools, materials), the setting where its clients enjoy the result; places and objects only, never people or brand names, e.g. "bakery counter", "flour dough", "cafe table"]}.
 Be specific to this business; never generic.`,
     `Business name: ${a.storeName || '(not given)'}
 ${a.tagline ? `Their tagline: ${a.tagline}\n` : ''}${a.about ? `About the business, in their words: ${a.about}\n` : ''}What they do: ${a.sell || '(not given)'}
@@ -36,6 +36,7 @@ ${uiStyle(a.uiStyle) ? `Design style they picked: ${uiStyle(a.uiStyle)!.rules}\n
     { maxTokens: 1200, temperature: 0.6 }
   ).catch(orNull)
   const vocab = Array.isArray(out?.vocabulary) ? out.vocabulary : typeof out?.vocabulary === 'string' ? out.vocabulary.split(',') : []
+  const stockQueries = (Array.isArray(out?.stockQueries) ? out.stockQueries : []).map(q => searchTerms(String(q ?? ''))).filter(Boolean).slice(0, SCENES.length)
   return {
     storeName: str(a.storeName, 80) || str(out?.storeName, 80, 'Our business'),
     summary: str(out?.summary, 300, a.about?.slice(0, 300) || a.sell.slice(0, 300) || 'A local business.'),
@@ -54,6 +55,7 @@ ${uiStyle(a.uiStyle) ? `Design style they picked: ${uiStyle(a.uiStyle)!.rules}\n
     contact: a.contact,
     socials: a.socials,
     seed: newSeed(),
+    ...(stockQueries.length ? { stockQueries } : {}),
     kind: 'showcase',
   }
 }
@@ -97,32 +99,43 @@ What they do: ${b.category}. Clients: ${b.audience || 'not given'}. Words their 
 
 // Mood pictures: the place, the craft and the setting of a business of this kind, never its work, people or brands.
 const SCENES = ['the place and its atmosphere, wide', 'a close detail of the craft: tools, materials and textures', 'the setting where clients enjoy the result, calm and inviting']
+/** Searches when the brief has none, per scene. */
+const SCENE_SEARCH = ['interior', 'tools', 'table']
 
 /**
- * Up to `max` mood pictures for a Showcase's page at draft quality, while the budget lasts (BusinessPicture shows
- * them after the owner's own work photos and never as their work). Stops at the first failure and says why.
+ * Up to `max` mood pictures for a Showcase's page (BusinessPicture shows them after the owner's own work photos and
+ * never as their work): a stock photo (credited) when one is found, else one made at draft quality while the budget
+ * lasts. After the first generation failure the rest are stock only, and it says why.
  */
 export async function showcasePictures(b: StudioBrief, max: number): Promise<{ pictures: ShowcasePagePicture[]; error?: string }> {
   const pictures: ShowcasePagePicture[] = []
-  for (const scene of SCENES.slice(0, Math.max(0, max))) {
-    if (studioBudgetLeft() <= 0) break
+  const used = new Set<string>()
+  const category = searchTerms(b.category || 'local business', 3)
+  let error: string | undefined
+  for (const [i, scene] of SCENES.slice(0, Math.max(0, max)).entries()) {
     try {
-      const r = await generateImage({
-        prompt: `A mood photograph for the website of a ${b.category || 'local business'} in India: ${scene}. ${b.mood ? `Mood: ${b.mood}. ` : ''}${b.artDirection}. No people's faces, no text, no logos, no brand names, no watermarks.`,
-        negativePrompt: 'text, letters, watermark, logo, brand, faces, people, distorted hands',
-        width: 1024,
-        height: 1024,
-        feature: 'homepage_image',
-        // Site generation always uses the cheapest image model.
-        quality: 'draft',
-        ref: 'site-studio:showcase-mood',
-        skipGallery: true,
+      const p = await pictureFor({
+        stock: { queries: [b.stockQueries?.[i] || `${category} ${SCENE_SEARCH[i]}`], shape: 'square', seed: b.seed, used, skipGallery: true },
+        ai: error
+          ? null
+          : {
+              prompt: `A mood photograph for the website of a ${b.category || 'local business'} in India: ${scene}. ${b.mood ? `Mood: ${b.mood}. ` : ''}${b.artDirection}. No people's faces, no text, no logos, no brand names, no watermarks.`,
+              negativePrompt: 'text, letters, watermark, logo, brand, faces, people, distorted hands',
+              width: 1024,
+              height: 1024,
+              feature: 'homepage_image',
+              // Site generation always uses the cheapest image model.
+              quality: 'draft',
+              ref: 'site-studio:showcase-mood',
+              skipGallery: true,
+            },
+        aiAllowed: () => studioBudgetLeft() > 0,
       })
-      const url = r.images[0]?.url
-      if (url) pictures.push({ image: url, ai: true })
+      if (p?.credit) pictures.push({ image: p.url, ...(p.alt ? { alt: p.alt.slice(0, 120) } : {}), credit: p.credit })
+      else if (p) pictures.push({ image: p.url, ai: true })
     } catch (err) {
-      return { pictures, error: (err as Error)?.message?.slice(0, 400) || 'image generation failed' }
+      error = (err as Error)?.message?.slice(0, 400) || 'image generation failed'
     }
   }
-  return { pictures }
+  return error ? { pictures, error } : { pictures }
 }

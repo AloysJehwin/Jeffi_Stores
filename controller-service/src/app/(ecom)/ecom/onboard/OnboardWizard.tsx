@@ -15,7 +15,7 @@ import { WIZARD_STEPS, resumeStep, stepIndex, type WizardStepKey } from './steps
 import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
 import { ADDON_INFO, cleanAddonIds, type AddonId, type AddonPrice } from '@/lib/billing/addons'
 import ContactFields from '../_domains/ContactFields'
-import SiteStudio, { type StudioSummary } from './_studio/SiteStudio'
+import SiteStudio, { type SiteMode, type StudioSummary } from './_studio/SiteStudio'
 import GiftCard, { FreeChip } from './_studio/GiftCard'
 import StoreStep, { type DomainPick } from './StoreStep'
 import { BusinessStep, GstStep } from './BusinessSteps'
@@ -53,10 +53,17 @@ type Interval = 'monthly' | 'yearly'
 
 const STEPS = WIZARD_STEPS
 
+/** A draft's site choice. Drafts from before it was saved: skipped → self, an AI site or brief → ai, else the theme. */
+function initSiteMode(s: { mode?: string; skip?: boolean; description?: string; studio?: unknown }): SiteMode {
+  if (s.mode === 'ai' || s.mode === 'theme' || s.mode === 'self') return s.mode
+  if (s.skip) return 'self'
+  return s.studio || (s.description ?? '').trim().length >= 10 ? 'ai' : 'theme'
+}
+
 const HEAD: Record<WizardStepKey, { title: string; description: string }> = {
   plan: { title: 'Choose your plan', description: 'All plans include the full storefront. One subscription — plan and servers together. Cancel anytime.' },
   store: { title: 'Your store', description: 'What your customers see on your site, what you sell, and the licences it needs.' },
-  site: { title: 'Your site', description: 'Describe your store and watch the AI design every page, on desktop and phone. It goes live with your store.' },
+  site: { title: 'Your site', description: 'Start with a ready-made theme, or have the AI design every page, on desktop and phone. It goes live with your store.' },
   business: { title: 'Business details', description: 'The business behind your store, as on its PAN and registration. We verify these details, and they go on your invoices.' },
   gst: { title: 'GST', description: 'Your GST registration, or why the business isn’t registered and a document that shows it exists.' },
   warehouse: { title: 'Pickup warehouse', description: 'Where Delhivery will pick up your orders. You can edit this later.' },
@@ -228,16 +235,18 @@ export default function OnboardWizard({
   const [brandErr, setBrandErr] = useState<string | null>(null)
   const [legalsAccepted, setLegalsAccepted] = useState(init.legalsAccepted ?? false)
 
-  // Your site: designed live in the AI Site Studio (site_studio_sessions) and installed after go-live. The brief is
-  // kept on the draft too: without a built site, the store's AI builds one from it once live. A site already built
-  // stays on the draft (site.studio), so the Review row reads it before the studio is opened again.
-  const initSite = (init.site ?? {}) as { skip?: boolean; description?: string; references?: string[]; studio?: { pages?: number; style?: string | null } }
-  const [siteSkip, setSiteSkip] = useState<boolean>(initSite.skip ?? false)
+  // Your site (site.mode): a ready-made theme (the default; one not applied here is the default theme once live), the
+  // AI Site Studio (site_studio_sessions), or our standard pages. A studio site is installed after go-live. The brief is
+  // kept on the draft too: in AI mode without a built site, the store's AI builds one from it once live. A site
+  // already built stays on the draft (site.studio), so the Review row reads it before the studio is opened again.
+  const initSite = (init.site ?? {}) as { mode?: string; skip?: boolean; description?: string; references?: string[]; studio?: { pages?: number; style?: string | null; theme?: boolean } }
+  const [siteMode, setSiteMode] = useState<SiteMode>(() => initSiteMode(initSite))
   const [studio, setStudio] = useState<StudioSummary>({
     free: null,
     ready: !!initSite.studio,
     pages: Number(initSite.studio?.pages) || 0,
     style: initSite.studio?.style ?? null,
+    themed: !!initSite.studio?.theme,
     description: initSite.description ?? '',
     references: (initSite.references ?? []).filter(r => HTTPS_URL.test(r)),
   })
@@ -335,12 +344,13 @@ export default function OnboardWizard({
         sealUrl,
         legalsAccepted,
         site: {
-          skip: siteSkip,
+          mode: siteMode,
+          skip: siteMode === 'self',
           description: studio.description.trim(),
           style: 'auto',
           references: studio.references.filter(r => HTTPS_URL.test(r)).slice(0, 3),
           images: true,
-          ...(studio.ready ? { studio: { pages: studio.pages, style: studio.style } } : {}),
+          ...(studio.ready ? { studio: { pages: studio.pages, style: studio.style, ...(studio.themed ? { theme: true } : {}) } } : {}),
         },
         studioGiftSeen: giftSeen,
         restorePreviousData: restoreBackup && !restoreBackup.archive ? restoreOptIn : false,
@@ -381,7 +391,7 @@ export default function OnboardWizard({
       sealS3Key,
       sealUrl,
       legalsAccepted,
-      siteSkip,
+      siteMode,
       studio,
       giftSeen,
       restoreBackup,
@@ -678,7 +688,7 @@ export default function OnboardWizard({
       case 'store':
         return !storeIssue
       case 'site':
-        return siteSkip || studio.ready || studio.description.trim().length >= 10
+        return siteMode !== 'ai' || studio.ready || studio.description.trim().length >= 10
       case 'business':
         return !businessIssue(kyb)
       // A GSTIN only when registered: a business below the threshold says why and uploads a registration proof
@@ -725,7 +735,7 @@ export default function OnboardWizard({
           eyebrow={`Step ${step + 1} of ${STEPS.length}`}
           title={HEAD[key].title}
           description={HEAD[key].description}
-          actions={key === 'site' && !siteSkip ? <FreeChip free={studio.free} /> : undefined}
+          actions={key === 'site' && siteMode === 'ai' ? <FreeChip free={studio.free} /> : undefined}
         />
         <GiftCard seen={giftSeen} onSeen={onGiftSeen} />
 
@@ -1276,8 +1286,8 @@ export default function OnboardWizard({
 
           {key === 'site' && (
             <SiteStudio
-              skip={siteSkip}
-              onSkipChange={setSiteSkip}
+              mode={siteMode}
+              onModeChange={setSiteMode}
               storeName={displayName}
               logoUrl={logoUrl || null}
               categories={productCats}
@@ -1361,11 +1371,15 @@ export default function OnboardWizard({
                   ['Legal terms', legalsAccepted ? 'Accepted' : 'Not accepted'],
                   [
                     'Your site',
-                    siteSkip
+                    siteMode === 'self'
                       ? 'You design it in Site Builder'
                       : studio.ready
-                        ? `Designed in the AI Site Studio · ${studio.pages} pages${studio.style ? ` · ${studio.style}` : ''}`
-                        : 'Built by AI from your answers once live',
+                        ? studio.themed
+                          ? `Made from the ${studio.style ?? 'ready-made'} theme · ${studio.pages} pages`
+                          : `Designed in the AI Site Studio · ${studio.pages} pages${studio.style ? ` · ${studio.style}` : ''}`
+                        : siteMode === 'theme'
+                          ? 'Opens with our default ready-made theme · change it any time in Site Builder'
+                          : 'Built by AI from your answers once live',
                   ],
                   ...(restoreBackup
                     ? [

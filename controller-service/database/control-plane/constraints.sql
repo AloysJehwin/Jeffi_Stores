@@ -184,13 +184,15 @@ ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_rene
 ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_status_check
     CHECK (status IN ('due','renewing','done','lapsed','off'));
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_owner_product_key UNIQUE (owner_id, product);
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_product_check
     CHECK (product IN ('store','showcase'));
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_status_check
     CHECK (status IN ('brief','plan','direction','building','ready','failed'));
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_tweaks_today_check
     CHECK (tweaks_today >= 0);
+ALTER TABLE ONLY public.site_studio_corrections ADD CONSTRAINT site_studio_corrections_pkey PRIMARY KEY (owner_id, day);
+ALTER TABLE ONLY public.site_studio_corrections ADD CONSTRAINT site_studio_corrections_used_check
+    CHECK (used >= 0);
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_tenant_doc_key UNIQUE (tenant_id, doc_type);
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_status_check

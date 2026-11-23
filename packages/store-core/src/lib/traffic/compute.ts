@@ -32,6 +32,8 @@ export interface SessionTuple {
   medium: string | null
   campaign: string | null
   gclick: boolean
+  /** A Meta ad click id on landing (Showcase visits; storefront sessions leave it unset). */
+  mclick?: boolean
   refHost: string | null
   sessions: number
   newVisitors: number
@@ -46,14 +48,16 @@ export interface OrderTuple {
   campaign: string | null
   gclick: boolean
   mclick: boolean
+  /** The referring host of the visit it came from (Showcase leads; storefront orders carry none). */
+  refHost?: string | null
   orders: number
   revenue: number
 }
 
 const sessionChannel = (t: SessionTuple, self: string[]) =>
-  classifyChannel({ source: t.source, medium: t.medium, campaign: t.campaign, googleClick: t.gclick, referrerHost: t.refHost }, self)
-const orderChannel = (t: OrderTuple) =>
-  classifyChannel({ source: t.source, medium: t.medium, campaign: t.campaign, googleClick: t.gclick, metaClick: t.mclick })
+  classifyChannel({ source: t.source, medium: t.medium, campaign: t.campaign, googleClick: t.gclick, metaClick: t.mclick, referrerHost: t.refHost }, self)
+const orderChannel = (t: OrderTuple, self: string[]) =>
+  classifyChannel({ source: t.source, medium: t.medium, campaign: t.campaign, googleClick: t.gclick, metaClick: t.mclick, referrerHost: t.refHost }, self)
 
 /** Sessions by their landing attribution, orders by the order's own click / UTM record. */
 export function channelRows(sessions: SessionTuple[], orders: OrderTuple[], self: string[] = []): ChannelRow[] {
@@ -74,7 +78,7 @@ export function channelRows(sessions: SessionTuple[], orders: OrderTuple[], self
     r.convertedSessions += t.converted
   }
   for (const t of orders) {
-    const r = get(orderChannel(t))
+    const r = get(orderChannel(t, self))
     r.orders += t.orders
     r.revenue += t.revenue
   }

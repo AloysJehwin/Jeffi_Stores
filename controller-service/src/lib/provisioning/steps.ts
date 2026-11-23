@@ -39,9 +39,11 @@ import {
   wait,
   warn,
   type PipelineDef,
+  type SiteChoice,
   type StepId,
   type StepResult,
 } from './pipeline'
+import type { StudioSession } from '@controller/lib/site-studio/sessions'
 import { attachDbDisk, createDatabase, launchServer, startPostgres, type NodeDbCtx } from './node-db-steps'
 
 // Provisioning steps. The worker advances a job one step per tick; each step is idempotent so a
@@ -687,6 +689,8 @@ const HANDLERS: Record<Step, Handler> = {
         // Guard the write_infra→activate invariant: never mark a tenant active without a
         // persisted RDS endpoint (else getPool would silently fall back to the platform DB).
         const fresh = await getTenant(job.tenant_id)
+        // Deprovisioned while the build ran: never bring the store back online, email the owner or buy add-ons.
+        if (fresh?.status === 'terminated') return skip('the store was deprovisioned')
         if (!fresh?.rds_endpoint) {
           throw new Error('activate blocked: tenant_infra.rds_endpoint not persisted')
         }
@@ -739,16 +743,18 @@ const HANDLERS: Record<Step, Handler> = {
   },
 
   async build_site({ job, slug, res }) {
-    // The store's first site. When the owner built it in the onboarding AI Site Studio, the store's admin installs
-    // that session's pages and theme (lib/site/studio installStudioSite); otherwise it builds one from the "Your
-    // site" brief on a platform-funded budget (lib/site/onboarding-build.ts). Each tick asks again (the store starts
-    // it once) until it is live. Non-fatal: the store is already serving its standard pages.
+    // The store's first site, as the owner chose it in onboarding (onboardingSite). A site made in the Site Studio
+    // (a ready-made theme or the AI's design) is installed by the store's admin as it is (lib/site/studio
+    // installStudioSite); the default pre-built site is the default theme applied to the owner's studio, then
+    // installed the same way; a brief is built by the AI on a platform-funded budget (lib/site/onboarding-build.ts).
+    // Each tick asks again (the store starts it once) until it is live. Non-fatal: the store is already serving its
+    // standard pages.
     if (res.restored) return skip('store restored from a backup: it keeps its own site')
-    const site = await onboardingSite(job.tenant_id)
-    if (!site) return skip('the owner chose to design the site themselves')
+    const choice = await onboardingSite(job.tenant_id)
+    if (!choice) return skip('the owner chose to design the site themselves')
     if (process.env.PROVISIONING_PROVIDER !== 'aws') return skip('stub provider: no store pods to reach')
     if (!onK8sCompute(res)) return skip('not on k8s: the store has no Site Builder service')
-    if (!site.studio) {
+    if (choice.kind === 'brief') {
       const { siteAiAvailable } = await import('@/lib/site/ai-status')
       if (!(await siteAiAvailable('platform'))) return skip('AI site generation is not available (Claude is not connected): the store keeps its standard pages')
     }
@@ -759,13 +765,17 @@ const HANDLERS: Record<Step, Handler> = {
     const layout = (await storeLayouts([job.tenant_id]).catch(() => new Map())).get(job.tenant_id) ?? 'services'
     const target = storeCronTarget(slug, layout, SITE_BUILD_PATH)
     if ('skip' in target) return skip(target.skip)
+    // Applied once: from the next tick the theme's site is in the studio and onboardingSite returns it as such.
+    const site = choice.kind === 'theme' ? await defaultThemeSite(choice.ownerId, job.tenant_id) : choice
+    if ('error' in site) return warn(`the pre-built site could not be set up: ${site.error} The store keeps its standard pages.`)
+    const studio = site.kind === 'studio' ? site.studio : null
     const { internalRequest } = await import('@/lib/shared/internal-http')
     const r = await internalRequest(target.base + SITE_BUILD_PATH, {
       method: 'POST',
       host: storeCronHost(slug),
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...(site.studio ? { studio: site.studio.input } : site.brief),
+        ...(site.kind === 'studio' ? { studio: site.studio.input } : site.brief),
         budgetInr: Number(process.env.SITE_BUILD_BUDGET_INR || 1000),
       }),
       timeoutMs: 20_000,
@@ -780,22 +790,54 @@ const HANDLERS: Record<Step, Handler> = {
       pages: build.pages,
       pictures: build.pictures,
       spentInr: build.spentInr,
-      ...(site.studio ? { studio: site.studio.id } : {}),
+      ...(studio ? { studio: studio.id } : {}),
     }
-    if (site.studio && (build.status === 'running' || build.status === 'done'))
-      await site.studio.installed(build.status === 'done').catch(() => {})
-    if (build.status === 'running') return wait(build.step ?? (site.studio ? 'Installing your site' : 'Building your site'))
-    if (build.status !== 'done') return warn(`the AI could not build the site: ${build.error ?? 'unknown error'}`)
-    if (site.studio) return ok(`studio site installed${build.style ? ` (${build.style})` : ''}: ${build.pages ?? 0} pages`)
+    if (studio && (build.status === 'running' || build.status === 'done'))
+      await studio.installed(build.status === 'done').catch(() => {})
+    if (build.status === 'running') return wait(build.step ?? (studio ? 'Installing your site' : 'Building your site'))
+    if (build.status !== 'done') return warn(`${studio ? 'the store could not install the site' : 'the AI could not build the site'}: ${build.error ?? 'unknown error'}`)
+    if (studio) return ok(`studio site installed${build.style ? ` (${build.style})` : ''}: ${build.pages ?? 0} pages`)
     return ok(`site built in the ${build.style} style: ${build.pages} pages, ${build.pictures ?? 0} pictures`)
   },
 }
 
+type StudioSite = {
+  kind: 'studio'
+  /** Designed by the AI (not made from a ready-made theme). */
+  ai: boolean
+  studio: { id: string; input: Record<string, unknown>; installed: (done: boolean) => Promise<void> }
+}
+type OnboardingSite =
+  | StudioSite
+  | { kind: 'theme'; ownerId: string }
+  | { kind: 'brief'; brief: { description: string; style: string; references: string[]; images: boolean } }
+  | null
+
+/** A finished studio session as build_site installs it. */
+async function studioSite(studio: StudioSession, tenantId: string): Promise<StudioSite> {
+  const { markStudioInstalled } = await import('@controller/lib/site-studio/sessions')
+  const { themeOfDirection } = await import('@/lib/site/themes/catalog')
+  const style = (studio.direction as { name?: string } | null)?.name
+  return {
+    kind: 'studio',
+    ai: !themeOfDirection(studio.direction),
+    studio: {
+      id: studio.id,
+      // The brief, plan and direction go along so the store's Site Builder can change sections the studio way.
+      // freeUsed: a ready-made theme's site (no AI) leaves the store's free generation for Site Builder, unless the
+      // owner's free generation was used in the studio before it.
+      input: { pages: studio.pages, theme: studio.theme, ...(style ? { style } : {}), brief: studio.brief, plan: studio.plan, direction: studio.direction, freeUsed: !!studio.free_used_at },
+      installed: (done: boolean) => markStudioInstalled(studio.id, tenantId, done),
+    },
+  }
+}
+
 /**
- * What build_site installs: the owner's finished AI Site Studio session, else their "Your site" brief from the
- * onboarding draft; null when they chose to design the site themselves.
+ * What build_site installs, by the owner's "Your site" choice (site.mode on the onboarding draft): nothing when they
+ * design it themselves; else a site finished in the studio (whatever the mode); their brief for the AI; else the
+ * default pre-built site. Drafts from before site.mode: skip is "themselves", a brief of 10+ characters goes to the AI.
  */
-async function onboardingSite(tenantId: string) {
+async function onboardingSite(tenantId: string): Promise<OnboardingSite> {
   const { controlPlanePool, getDraft } = await import('@/lib/tenant-registry')
   const owner = await controlPlanePool()
     .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
@@ -803,35 +845,48 @@ async function onboardingSite(tenantId: string) {
   const ownerId = owner?.rows?.[0]?.owner_id
   if (!ownerId) return null
   const site = (await getDraft(ownerId).catch(() => null))?.data?.site as
-    | { skip?: boolean; description?: string; style?: string; references?: unknown[]; images?: boolean }
+    | { mode?: string; skip?: boolean; description?: string; style?: string; references?: unknown[]; images?: boolean }
     | undefined
-  if (site?.skip) return null
-  const { studioSiteForTenant, markStudioInstalled } = await import('@controller/lib/site-studio/sessions')
+  const mode = site?.mode === 'ai' || site?.mode === 'theme' || site?.mode === 'self' ? site.mode : null
+  if (mode === 'self' || (!mode && site?.skip)) return null
+  const { studioSiteForTenant } = await import('@controller/lib/site-studio/sessions')
   const studio = await studioSiteForTenant(tenantId).catch(() => null)
-  if (studio) {
-    const style = (studio.direction as { name?: string } | null)?.name
+  if (studio) return studioSite(studio, tenantId)
+  const description = String(site?.description ?? '').trim()
+  if (site && mode !== 'theme' && description.length >= 10) {
+    const { SITE_STYLE_IDS } = await import('@/lib/site/styles')
     return {
-      studio: {
-        id: studio.id,
-        // The brief, plan and direction go along so the store's Site Builder can change sections the studio way.
-        // freeUsed: a ready-made theme's site (no AI) leaves the store's free generation for Site Builder, unless the
-        // owner's free generation was used in the studio before it.
-        input: { pages: studio.pages, theme: studio.theme, ...(style ? { style } : {}), brief: studio.brief, plan: studio.plan, direction: studio.direction, freeUsed: !!studio.free_used_at },
-        installed: (done: boolean) => markStudioInstalled(studio.id, tenantId, done),
+      kind: 'brief',
+      brief: {
+        description: description.slice(0, 2000),
+        style: (SITE_STYLE_IDS as string[]).includes(String(site.style)) ? String(site.style) : 'auto',
+        references: (site.references ?? []).map(String).filter(u => /^https:\/\//i.test(u)).slice(0, 3),
+        images: site.images !== false,
       },
     }
   }
-  const description = String(site?.description ?? '').trim()
-  if (!site || description.length < 10) return null
-  const { SITE_STYLE_IDS } = await import('@/lib/site/styles')
-  return {
-    brief: {
-      description: description.slice(0, 2000),
-      style: (SITE_STYLE_IDS as string[]).includes(String(site.style)) ? String(site.style) : 'auto',
-      references: (site.references ?? []).map(String).filter(u => /^https:\/\//i.test(u)).slice(0, 3),
-      images: site.images !== false,
-    },
-  }
+  return { kind: 'theme', ownerId }
+}
+
+/** The default pre-built site: the default theme applied to the owner's studio (no AI), read back as a studio site. */
+async function defaultThemeSite(ownerId: string, tenantId: string): Promise<StudioSite | { error: string }> {
+  const { DEFAULT_THEME_ID } = await import('@/lib/site/themes/catalog')
+  const { applyTheme, openThemeStudio } = await import('@controller/lib/site-studio/themes')
+  const { studioSiteForTenant } = await import('@controller/lib/site-studio/sessions')
+  const opened = await openThemeStudio(ownerId, 'store')
+  if (!opened.ok) return { error: opened.error }
+  // Never over a site already there (built, building or installed): applyTheme refuses without replace.
+  const applied = await applyTheme(opened.session, DEFAULT_THEME_ID)
+  if (!applied.ok) return { error: `${DEFAULT_THEME_ID}: ${applied.error}` }
+  const studio = await studioSiteForTenant(tenantId)
+  return studio ? studioSite(studio, tenantId) : { error: 'the owner’s studio belongs to another store.' }
+}
+
+/** build_site's label (pipeline.ts SiteChoice): what onboardingSite says now, the pre-built site when it can't tell. */
+async function siteChoice(tenantId: string): Promise<SiteChoice> {
+  const site = await onboardingSite(tenantId).catch(() => ({ kind: 'theme' }) as const)
+  if (!site) return 'none'
+  return site.kind === 'studio' ? (site.ai ? 'studio-ai' : 'studio-theme') : site.kind === 'brief' ? 'ai' : 'theme'
 }
 
 /** One ping of the store's cron route; null when every check passes, else what failed. */
@@ -864,11 +919,16 @@ async function pingStoreCrons(url: string, host: string, slug: string, res: Reco
  */
 async function pinPipeline(job: ProvisioningJob, plan: string | null, res: Record<string, any>): Promise<PipelineDef> {
   const c = await jobCompute(job.tenant_id, plan, res)
+  const engine = process.env.PROVISIONING_COMPUTE === 'k8s' ? 'k8s' : 'ec2'
+  const provider = process.env.PROVISIONING_PROVIDER === 'aws' ? 'aws' : 'stub'
+  const restore = !!res.restoreFromKey
   const pipeline = buildPipeline(c.spec, plan, {
-    engine: process.env.PROVISIONING_COMPUTE === 'k8s' ? 'k8s' : 'ec2',
-    provider: process.env.PROVISIONING_PROVIDER === 'aws' ? 'aws' : 'stub',
-    restore: !!res.restoreFromKey,
+    engine,
+    provider,
+    restore,
     seed: !!res.seedProfile && !res.restoreFromKey,
+    // Only a pipeline with build_site needs to know.
+    ...(engine === 'k8s' && provider === 'aws' && !restore ? { site: await siteChoice(job.tenant_id) } : {}),
   })
   if (JSON.stringify(pipeline) !== JSON.stringify(job.pipeline ?? null)) await updateProvisioningJob(job.id, { pipeline })
   return pipeline
@@ -884,18 +944,16 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     await updateProvisioningJob(job.id, { status: 'failed', last_error: 'tenant not found' })
     return 'failed'
   }
-  // Deprovisioned while the build was going (Stop & deprovision): nothing more is built, the teardown has the rest.
-  if (tenant.status === 'terminated') {
-    await updateProvisioningJob(job.id, { status: 'failed', last_error: 'stopped: the store was deprovisioned', clearNextAttempt: true })
-    return 'failed'
-  }
   const slug = tenant.slug
   const res: Record<string, any> = { ...(job.created_resources || {}) }
+  // Deprovisioned while the build was going (Stop & deprovision): nothing more is built, the teardown has the rest.
+  if (tenant.status === 'terminated') return stopForTeardown(job, res)
   // A job that started before pipelines were pinned carries on with the legacy steps.
   let pipeline = pipelineOf(job.pipeline)
 
   try {
-    await updateProvisioningJob(job.id, { status: 'running', bumpAttempts: true })
+    // Stopped since the caller read it: a stopped job stays failed, so build nothing.
+    if ((await updateProvisioningJob(job.id, { status: 'running', bumpAttempts: true })) === 'failed') return 'failed'
     const step = job.step as Step
     if (step === 'preflight') pipeline = await pinPipeline(job, tenant.plan, res)
 
@@ -905,11 +963,15 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
       return 'failed'
     }
     const result = await handler({ job, tenant, slug, res, provider })
+    // Deprovisioned while this step ran: go no further, the teardown has the rest.
+    if ((await getTenant(job.tenant_id))?.status === 'terminated') return await stopForTeardown(job, res)
     if ('wait' in result) return await waitOn(job, step, res, result.detail)
     if ('skip' in result) return await advance(job, pipeline, res, 'skipped', result.skip)
     if ('warn' in result) return await advance(job, pipeline, res, 'warning', result.warn)
     return await advance(job, pipeline, res, 'ok', result.message ?? null)
   } catch (e: any) {
+    // Deprovisioned while this step ran: no retry, and no rollback (it would mark the store suspended).
+    if ((await getTenant(job.tenant_id).catch(() => null))?.status === 'terminated') return await stopForTeardown(job, res)
     const msg = e?.message || String(e) || 'error'
     // Errors on THIS step: job.attempts counts every tick, polls included, so a long wait for a
     // server or database would leave a later step no retries at all.
@@ -956,12 +1018,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     } catch {
       /* rollback failure already recorded; original failure stands */
     }
-    try {
-      const { alertProvisioningFailure } = await import('./alerts')
-      await alertProvisioningFailure(slug, job.step, msg, job.tenant_id)
-    } catch {
-      /* alerting must never mask the failure */
-    }
+    // The worker's incident sweep (alerts.ts) mails this once, and again when it recovers.
     return 'failed'
   }
 }
@@ -1080,13 +1137,16 @@ async function advance(
   delete res.stepDetail
   delete res.stepWaitStartedAt
   const nextStep = nextStepAfter(pipeline, job.step)
-  if (!nextStep) {
-    await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
-    return 'done'
-  }
+  // The status written: a job stopped meanwhile stays failed, so callers never treat it as done.
+  if (!nextStep) return (await updateProvisioningJob(job.id, { status: 'done', created_resources: res })) ?? 'done'
   // Clear any backoff timer on a successful step transition (prior retries are resolved).
-  await updateProvisioningJob(job.id, { step: nextStep, status: 'pending', created_resources: res, clearNextAttempt: true, stepStarted: true })
-  return 'pending'
+  return (await updateProvisioningJob(job.id, { step: nextStep, status: 'pending', created_resources: res, clearNextAttempt: true, stepStarted: true })) ?? 'pending'
+}
+
+/** The store was deprovisioned under the build: fail the job as stopped (never retried, rolled back or resumed). */
+async function stopForTeardown(job: ProvisioningJob, res: Record<string, any>): Promise<string> {
+  await updateProvisioningJob(job.id, { status: 'failed', last_error: 'stopped: the store was deprovisioned', created_resources: res, clearNextAttempt: true })
+  return 'failed'
 }
 
 /**
@@ -1145,6 +1205,13 @@ function onK8sCompute(r: Record<string, any>): boolean {
 async function jobCompute(tenantId: string, plan: string | null, res: Record<string, any>) {
   const { resolveCompute } = await import('@controller/lib/compute/resolve')
   const c = await resolveCompute(tenantId, plan, { spec: res.computeSpec })
+  // An applied spec saying 'controller' (or naming no layout) keeps the old app only where one runs; any other
+  // store is built on its own services, else every render fails with "runs no all-in-one app to keep".
+  if (c.spec.layout === 'controller' && onK8sCompute(res)) {
+    const t = await getTenant(tenantId)
+    const k8s = await import('@/lib/k8s/tenant-compute')
+    if (t && !(await k8s.runsAllInOneApp(t.slug))) c.spec = { ...c.spec, layout: 'services' }
+  }
   res.computeSpec = c.spec
   return c
 }
@@ -1829,8 +1896,10 @@ export async function deprovisionTenant(
     }
 
     if (job) {
+      // The build keeps its own outcome (done stays done, failed stays failed); one still in flight is stopped.
+      const building = job.status === 'pending' || job.status === 'running'
       await updateProvisioningJob(job.id, {
-        status: 'done',
+        ...(building ? { status: 'failed', last_error: 'stopped: the store was deprovisioned', clearNextAttempt: true as const } : {}),
         created_resources: {
           ...created,
           k8sPendingPlan: undefined,
@@ -1885,14 +1954,16 @@ export async function reconcileK8sPlan(
     job ? updateProvisioningJob(job.id, { created_resources: { ...created, ...extra } }) : Promise.resolve()
   const now = Date.now()
 
-  // A deprovisioned/suspended store must never get a node launched for it.
-  if (tenant.status !== 'active') {
+  // A deprovisioned/suspended store must never get a node launched for it, nor one still being built (a
+  // services workspace stays active meanwhile): its own job applies the plan it has when it gets there.
+  const building = !!tenant.store_request
+  if (tenant.status !== 'active' || building) {
     if (created.k8sPendingPlan) {
       delete created.k8sPendingPlan
       delete created.k8sPlanNextAt
       await save({})
     }
-    return { ok: false, added: [], removed: [], error: 'tenant not active' }
+    return { ok: false, added: [], removed: [], error: building ? 'store still being built' : 'tenant not active' }
   }
   if (!opts.force && created.k8sPlanNextAt && now < created.k8sPlanNextAt) {
     return { ok: true, added, removed, error: 'pending: backing off' }

@@ -24,7 +24,7 @@ Site Builder (page documents, blocks, theme, drafts, publish).
 - **Studio (onboarding):**
   - Brief (5 questions) → pages → look (3 directions) → live build (SSE) → preview and tweak.
   - The free generation is once per owner, capped at ₹1,000 across requests (every page, including category, brand, account and policy pages, plus the site product card; later full generations from Site Builder are charged to the AI wallet, at most ₹1,500) (`site_studio_sessions.spent_inr`). Site generation runs on Opus (gateway hint `deep`; copy work on Haiku) and its pictures on the cheapest image model (`quality: draft`: the Razer box, else `gemini-3.1-flash-lite-image`).
-  - Tweaks are free up to 30 a day (`SITE_STUDIO_TWEAKS_PER_DAY`).
+  - Corrections once the site is built (a section changed = 1, a page designed again = 5) are free up to `CORRECTIONS_FREE_PER_DAY` per owner per day, then `CORRECTION_PRICE_INR` each from the AI wallet (`controller-service/src/lib/site-studio/allowance.ts`, `corrections.ts`). Design help before the build stays capped at `SITE_STUDIO_TWEAKS_PER_DAY` (30) a day.
   - Up to 6 sample product pictures are made, with `generateImage({ skipGallery: true })` so they never enter a
     gallery.
   - Preview URL: `/ecom/onboard/studio/preview/<session>/<page>?surface=…&preview=1`.
@@ -59,7 +59,7 @@ right there. It covers every page, on desktop and phone, with sample products so
    and goes live with the store; the sample products are dropped and real ones replace them.
 
 **Free generation.** Every new owner gets one free full-site generation. An animated, non-blocking "gift" pop-up
-announces it: a card that springs in at the corner, not a page blur. Small tweaks stay free (capped per day). Another
+announces it: a card that springs in at the corner, not a page blur. A few corrections a day stay free, then each is charged. Another
 full generation needs the subscription and is paid from the AI wallet. Decided by the owner, 2026-11-17.
 
 ## 2. Engaging vs non-engaging pages

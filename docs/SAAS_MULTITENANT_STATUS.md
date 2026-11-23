@@ -353,7 +353,7 @@ controller-service/database/control-plane/
 
 | # | Item | Notes |
 |---|------|-------|
-| 🟡 **3** | **Add alerting on failed/stuck provisioning jobs** | Query `provisioning_jobs WHERE status='failed'` or `updated_at < now()-interval '30min' AND status IN ('pending','running')` |
+| 🟡 **3** | ~~Add alerting on failed/stuck provisioning jobs~~ | **Done (2026-11-24).** `sweepProvisioningIncidents()` (`controller-service/src/lib/provisioning/alerts.ts`) runs at the end of every provisioning worker tick, with the hourly reconcile as a backstop (an advisory lock stops two sweeps double-mailing). An incident is a tenant's latest job that is `failed`, or sits on one step past its `STEP_CATALOG.timeoutMs` (30 min for steps that bound their own wait) + a 15-min margin, from `step_started_at`. The admin gets one mail when it opens (slug, step, `last_error`, rollback status, link to `/ecom/customers/{id}?tab=provisioning`), one escalation if a stuck job then fails, and one recovery once the job moves past that step or finishes; nothing while it lasts. A stopped build or a deprovisioned store never alerts. State is a pair of `provisioning_step_events` rows (`alert_incident` / `alert_recovered`); no new table. Failures older than 7 days with no incident open are not mailed. This replaced the hourly `alertStuckJobs` digest, and the runner no longer mails a terminal failure itself. |
 | 🟡 **4** | **Document the deprovision multi-minute reality** | RDS delete takes several minutes; deprovision returns before the DB is actually gone. Operators should know to wait before re-provisioning the same slug. |
 | 🟡 **5** | **Wildcard cert renewal is now a fleet-wide SPOF** | Cert expires **2026-11-15**. Every tenant's HTTPS depends on it. Wildcards need DNS-01, so certbot auto-renew must retain working `dns-route53` creds on the box — a silent renewal failure takes down *all* tenants at once. Verify `certbot renew --dry-run` + add an expiry alert. |
 | 🟡 **6** | ~~Release the idle EIP `32.196.38.130`~~ | **Reused (2026-10-08)** as the k3s core node's address — see `deploy/k8s/README.md`. |
@@ -374,7 +374,7 @@ controller-service/database/control-plane/
 
 ### Code quality (P1 items left in the analysis — not started)
 These are nice-to-have improvements beyond what was built:
-- `wait_db_available` stuck-job alert (the 25-min deadline terminates the job, but no notification is sent)
+- ~~`wait_db_available` stuck-job alert~~: done (2026-11-24); the incident sweep mails a failed or stuck job once, plus once on recovery (Known issue #3).
 - Seed catalog profiles in `seed.ts` (currently the seam exists but no profiles are implemented)
 - `aws-provider.ts` uses 5 **extensionless dynamic imports** (`await import('../tenant-migrations-schema')`,
   `'../tenant-db-backup')`, `'../tenant-dns')`). Fine under Next's bundler (how the app runs), but they
@@ -405,7 +405,7 @@ Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an
 
 - Every store host (flagship, `{slug}.jeffistores.in`, custom domains) loads the platform's Google AdSense account `ca-pub-3028325011384102` as Auto ads (`components/visitor/AdSense.tsx`, mounted in `app/layout.tsx`). Never on admin, ecom, business, forms, document, certificate or vault hosts, and not on login, signup, cart, checkout, account, review, subscribe or staff pages (`lib/analytics/adsense.ts` `adsAllowedOn`). `/ads.txt` is served on every host. `ADSENSE_DISABLED=1` switches ads off platform-wide.
 - Without marketing-cookie consent only non-personalised ads are requested; the consent banner now shows on any store with ads, even one without its own Google tag.
-- **Remove ads: Rs 500 / month** from the tenant wallet (top-ups already carry GST). Owner console → Billing → "Ads on your store" (`/api/ecom/billing/ad-free`, `lib/billing/ad-free.ts`). Stored on `tenants.ad_free_until` / `ad_free_renew`; the charge and the date extension run in one transaction, keyed `ad_free:<tenant>:<period start>`. The platform cron `ad_free_renew` (daily 05:00 IST) renews a day before the month ends and retries a short wallet for a week; ads come back as soon as `ad_free_until` passes (storefront cache 60 s).
+- **Remove ads: Rs 500 / month** from the tenant wallet (top-ups already carry GST). Owner console → Billing → "Ads on your store" (`/api/ecom/billing/ad-free`, `lib/billing/ad-free.ts`). Stored on `tenants.ad_free_until` / `ad_free_renew`; the charge and the date extension run in one transaction, keyed `ad_free:<tenant>:<period start>`. The platform cron `ad_free_renew` (daily 05:00 IST) renews a day before the month ends and retries a short wallet for a week; ads come back as soon as `ad_free_until` passes (storefront cache 60 s). The storefront reads the store from middleware's `x-tenant-id`, and on a control-plane error keeps the store's last known answer (with none, it hides ads), so a paying store never shows one.
 - Custom domains need their own AdSense site approval before ads serve on them.
 
 ## Showcase sites: hosting and AI design prices (added 2026-11-18)

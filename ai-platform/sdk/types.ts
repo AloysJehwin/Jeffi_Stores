@@ -159,6 +159,43 @@ export interface ImageGenerateResponse {
   cache?: 'kv' | null
 }
 
+// ── Stock photos (POST /v1/images/stock) ────────────────────────────────────
+export type StockProviderName = 'pexels' | 'pixabay'
+export type StockOrientation = 'landscape' | 'portrait' | 'square'
+
+export interface StockSearchRequest {
+  /** A short keyword search ("indian sweet shop"), not an image-model prompt. */
+  query: string
+  orientation?: StockOrientation
+  /** Hits narrower than this are dropped (after the 24 h cache). */
+  minWidth?: number
+  /** 1..30, default 15. */
+  perPage?: number
+  /** Allowed providers in order; overrides AI_STOCK_PROVIDERS. */
+  providers?: StockProviderName[]
+}
+
+/** One hit, the same shape for every provider. `url` is the file to copy (never hotlink it). */
+export interface StockImage {
+  provider: StockProviderName
+  id: string
+  url: string
+  width: number
+  height: number
+  alt: string
+  photographer: string
+  photographerUrl: string | null
+  pageUrl: string
+}
+
+/** Empty `results` when no provider is keyed or none found anything; `tried` names the ones that failed. */
+export interface StockSearchResponse {
+  results: StockImage[]
+  provider: StockProviderName | null
+  cache: 'kv' | null
+  tried?: { provider: string; error: string }[]
+}
+
 // ── Video generation (async) ────────────────────────────────────────────────
 export type VideoProviderName = 'google' | 'replicate'
 export type VideoAspect = '9:16' | '16:9' | '1:1'
@@ -222,8 +259,10 @@ export interface ProvidersResponse {
   video: ProviderStatus<VideoProviderName>[]
   /** configured = the sidecar answered its last probe with the model loaded. */
   ocr: ProviderStatus<OcrProviderName>[]
+  /** configured = its API key is set. */
+  stock?: ProviderStatus<StockProviderName>[]
   /** The gateway's own default order per capability. */
-  defaults: { text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[] }
+  defaults: { text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[]; stock?: StockProviderName[] }
 }
 
 export interface VisionRequest {

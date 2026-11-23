@@ -1,5 +1,5 @@
 import 'server-only'
-import { controlPlanePool, setSubscriptionStatus } from '@/lib/tenant-registry'
+import { controlPlanePool, setSubscriptionStatus, stopProvisioningJob } from '@/lib/tenant-registry'
 import { pauseShowcase } from '@/lib/showcase/store'
 import { SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
 import { cancelSubscription, getSubscription, listSubscriptionInvoices } from '@controller/lib/payments/razorpay-subscriptions'
@@ -40,7 +40,11 @@ export async function closeStore(tenantId: string, status = 'cancelled'): Promis
   if (!t || t.status === 'terminated') return false
   await setSubscriptionStatus(tenantId, status, 'terminated')
   const owner = (await pool().query<{ owner_id: string }>(`SELECT owner_id FROM owner_tenants WHERE tenant_id = $1 LIMIT 1`, [tenantId]).catch(() => null))?.rows[0]
-  triggerProvisioning({ action: 'deprovision', tenantId, slug: t.slug, plan: null, ownerId: owner?.owner_id ?? null, reason: 'missed_payment' }).catch(() => {})
+  // A build still going is stopped first (it can take a minute), so the teardown never reads as a finished build.
+  void (async () => {
+    await stopProvisioningJob(tenantId, 'stopped: the subscription ended').catch(() => false)
+    await triggerProvisioning({ action: 'deprovision', tenantId, slug: t.slug, plan: null, ownerId: owner?.owner_id ?? null, reason: 'missed_payment' })
+  })().catch(() => {})
   return true
 }
 

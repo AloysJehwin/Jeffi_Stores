@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { controlPlanePool, getOwnerTenants, type TenantRow } from '@/lib/tenant-registry'
+import { getOwnedShowcase } from '@/lib/showcase/store'
 import { getWalletBalance } from '@/lib/payments/wallet'
 import { defaultContact } from './contact'
 import { getDomainPricing, quoteTld, tldOf, tldPrices } from './pricing'
@@ -20,6 +21,22 @@ export async function ownerStore(request: NextRequest, tenantId: string | null |
   const tenant = (await getOwnerTenants(owner.id)).find(t => t.id === tenantId)
   if (!tenant) return NextResponse.json({ error: 'Store not found' }, { status: 404 })
   return { owner, tenant }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The signed-in owner, one of their Showcase sites and the workspace it bills to, or the error response. */
+export async function ownerSite(request: NextRequest, siteId: string | null | undefined) {
+  const sid = (await cookies()).get(OWNER_COOKIE)?.value
+  const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
+  if (!owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+  const site = siteId && UUID_RE.test(siteId) ? await getOwnedShowcase(siteId, owner.id) : null
+  if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+  // The workspace (and its wallet) comes with the first publish.
+  if (!site.tenantId) return NextResponse.json({ error: 'Publish the site before adding a domain.' }, { status: 409 })
+  const tenant = (await getOwnerTenants(owner.id)).find(t => t.id === site.tenantId)
+  if (!tenant) return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+  return { owner, tenant, site }
 }
 
 export type OwnerOrderView = Omit<DomainOrder, 'contact' | 'charge_ref' | 'operation_id' | 'hosted_zone_id' | 'cost_usd' | 'renewal_cost_usd' | 'usd_inr' | 'margin'> & {
@@ -46,10 +63,10 @@ export async function ownerOrderView(o: DomainOrder): Promise<OwnerOrderView> {
   }
 }
 
-/** Everything the owner's Domains card needs. */
-export async function ownerDomainsState(tenant: TenantRow, owner: { email: string; name?: string | null }) {
+/** Everything the owner's Domains card needs: the store's orders, or with siteId that Showcase site's. */
+export async function ownerDomainsState(tenant: TenantRow, owner: { email: string; name?: string | null }, siteId: string | null = null) {
   const [orders, wallet, settings, kyc] = await Promise.all([
-    listOrders(tenant.id),
+    listOrders(tenant.id, siteId),
     getWalletBalance(tenant.id),
     getDomainPricing(),
     controlPlanePool()

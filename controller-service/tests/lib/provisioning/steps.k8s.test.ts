@@ -42,6 +42,10 @@ vi.mock('@/lib/shared/ec2-client', () => ec2)
 const http = vi.hoisted(() => ({ internalRequest: vi.fn() }))
 vi.mock('@/lib/shared/internal-http', () => http)
 vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: vi.fn(async () => ({ plan: 'basic', scopes: new Set(['orders:read', 'merchant_sync:read']) })) }))
+const studios = vi.hoisted(() => ({ studioSiteForTenant: vi.fn(), markStudioInstalled: vi.fn() }))
+vi.mock('@controller/lib/site-studio/sessions', () => studios)
+const themes = vi.hoisted(() => ({ openThemeStudio: vi.fn(), applyTheme: vi.fn() }))
+vi.mock('@controller/lib/site-studio/themes', () => themes)
 
 const TENANT = { id: 't-1', slug: 'acme', plan: 'basic', status: 'active', rds_endpoint: 'db', ec2_instance_id: null }
 const job = (over: any = {}) => ({
@@ -212,6 +216,56 @@ describe('connect_crons (k8s)', () => {
     expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('pending')
     delete process.env.PROVISIONING_PROVIDER
     expect(await advanceProvisioningJob((await cronJob()) as any, null as any)).toBe('pending')
+    expect(http.internalRequest).not.toHaveBeenCalled()
+  })
+})
+
+describe('build_site (k8s)', () => {
+  const session = { id: 's-1', direction: { id: 'theme:minimalist.mono-ink', name: 'Minimalist · Mono Ink' }, pages: { 'store:home': {} }, theme: {}, brief: null, plan: null, free_used_at: null }
+  const siteJob = async () => {
+    const { buildPipeline } = await import('@controller/lib/provisioning/pipeline')
+    const pipeline = buildPipeline({ db: { mode: 'node' } }, 'basic', { engine: 'k8s', provider: 'aws', restore: false, seed: false })
+    return job({ step: 'build_site', step_started_at: new Date().toISOString(), pipeline, created_resources: { computeMode: 'k8s' } })
+  }
+
+  beforeEach(() => {
+    process.env.PROVISIONING_PROVIDER = 'aws'
+    process.env.CRON_SECRET = 's3cret'
+    process.env.CRON_STORE_BASE = 'http://{slug}-{service}.tenant-{slug}.svc.cluster.local:3000'
+    reg.controlPlanePool.mockReturnValue({ query: vi.fn(async (sql: string) => ({ rows: sql.includes('owner_tenants') ? [{ owner_id: 'o-1' }] : [] })) })
+    studios.markStudioInstalled.mockResolvedValue(undefined)
+    themes.openThemeStudio.mockResolvedValue({ ok: true, session: { id: 's-1', pages: {} } })
+    themes.applyTheme.mockResolvedValue({ ok: true, session })
+    http.internalRequest.mockResolvedValue({ status: 200, ok: true, body: JSON.stringify({ build: { status: 'running', step: 'Installing your site' } }) })
+  })
+  afterEach(() => {
+    delete process.env.CRON_SECRET
+    delete process.env.CRON_STORE_BASE
+  })
+
+  it('the default: applies the default theme to the owner’s studio once, then installs it as a studio site', async () => {
+    reg.getDraft.mockResolvedValue({ data: { site: { mode: 'theme', description: 'Handmade candles and soaps' } } })
+    studios.studioSiteForTenant.mockResolvedValueOnce(null).mockResolvedValue(session)
+    const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+    expect(await advanceProvisioningJob((await siteJob()) as any, null as any)).toBe('pending')
+    expect(themes.applyTheme).toHaveBeenCalledWith(expect.objectContaining({ id: 's-1' }), 'minimalist.mono-ink')
+    const [url, req] = http.internalRequest.mock.calls[0]
+    expect(url).toContain('/api/cron/site-build')
+    expect(JSON.parse(req.body).studio).toMatchObject({ pages: session.pages, style: 'Minimalist · Mono Ink' })
+    expect(studios.markStudioInstalled).toHaveBeenCalledWith('s-1', 't-1', false)
+    // The next tick finds the theme's site in the studio: sent as it is, never applied again.
+    themes.applyTheme.mockClear()
+    await advanceProvisioningJob((await siteJob()) as any, null as any)
+    expect(themes.applyTheme).not.toHaveBeenCalled()
+    expect(http.internalRequest).toHaveBeenCalledTimes(2)
+  })
+
+  it('the owner designing it themselves: nothing applied or sent, even with a studio site', async () => {
+    reg.getDraft.mockResolvedValue({ data: { site: { mode: 'self', description: 'Handmade candles and soaps' } } })
+    studios.studioSiteForTenant.mockResolvedValue(session)
+    const { advanceProvisioningJob } = await import('@controller/lib/provisioning/steps')
+    await advanceProvisioningJob((await siteJob()) as any, null as any)
+    expect(themes.applyTheme).not.toHaveBeenCalled()
     expect(http.internalRequest).not.toHaveBeenCalled()
   })
 })

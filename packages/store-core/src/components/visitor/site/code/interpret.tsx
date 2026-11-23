@@ -1,6 +1,6 @@
 import { Fragment, createElement, type Key, type ReactNode } from 'react'
 import Link from 'next/link'
-import type { PageKey } from '@jeffi/site-blocks'
+import { NODE_ID, type PageKey } from '@jeffi/site-blocks'
 import { carouselList, type CodeNode, type CodeValue } from '@/lib/site/code/ast'
 import { FORBIDDEN_KEYS, HTML_TAGS, MAX_DEPTH, MAX_EACH, VOID_TAGS, attrAllowed, safeHref, safeSrc, taxonomyOf } from '@/lib/site/code/allow'
 import { codeMark } from '@/lib/site/code/css'
@@ -33,6 +33,8 @@ export interface Env {
   anchors: Anchors | null
   /** Rows that show a typed stand-in for a missing business detail (lib/site/code/placeholders.ts). */
   rows: Map<object, CodeValue[]> | null
+  /** The editor's canvas (a preview token): elements carry their node id as `data-e`. Never on a live page. */
+  preview: boolean
 }
 
 export type Taxonomy = { categories: Set<string>; brands: Set<string> }
@@ -52,6 +54,7 @@ export function makeEnv(opts: {
   taxonomy?: Taxonomy | null
   anchors?: Anchors | null
   rows?: Map<object, CodeValue[]> | null
+  preview?: boolean
 }): Env {
   return {
     vars: new Map(),
@@ -67,6 +70,7 @@ export function makeEnv(opts: {
     taxonomy: opts.taxonomy ?? null,
     anchors: opts.anchors ?? null,
     rows: opts.rows?.size ? opts.rows : null,
+    preview: !!opts.preview,
   }
 }
 
@@ -323,6 +327,11 @@ function renderEl(node: Extract<CodeNode, { t: 'el' }>, env: Env, key?: Key): Re
   }
   // The section's own CSS styles only what carries its mark (lib/site/code/css.ts).
   if (typeof props.className === 'string') props.className = marked(props.className, env)
+  // The editor's canvas only: the node id, and `data-e-text` where the words are written out (editable in place).
+  if (env.preview && typeof node.id === 'string' && NODE_ID.test(node.id)) {
+    props['data-e'] = node.id
+    if (!VOID_TAGS.has(tag) && (node.children ?? []).every(c => c.t === 'text')) props['data-e-text'] = ''
+  }
   if (tag === 'img') {
     if (typeof props.src !== 'string') return null
     return createElement('img', { ...props, ...responsiveImg(props.src, '(min-width: 768px) 50vw, 100vw'), alt: props.alt ?? '', loading: props.loading ?? 'lazy', decoding: 'async' })
@@ -370,12 +379,12 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
       className = s ? marked(s, env) : undefined
     } else raw[k] = k === 'href' && typeof val === 'string' ? liveHref(val, env) : liveLinks(val, env)
   }
-  // Its class props (itemClassName, inputClassName…) carry the mark too, unless that takes one past its length cap.
-  const classProps = env.mark ? Object.keys(raw).filter(k => k.endsWith('ClassName') && typeof raw[k] === 'string' && raw[k] !== '') : []
-  let parsed = classProps.length ? def.props.safeParse({ ...raw, ...Object.fromEntries(classProps.map(k => [k, marked(raw[k] as string, env)])) }) : null
-  if (!parsed?.success) parsed = def.props.safeParse(raw)
+  const parsed = def.props.safeParse(raw)
   if (!parsed.success) return null
-  if (def.name === 'Link' && deadAnchor((parsed.data as { href?: unknown }).href, env.anchors)) return null
+  // Its class props (itemClassName…) take the mark too, after the length caps, so one near its cap keeps its styles.
+  const own: Record<string, unknown> = { ...(parsed.data as Record<string, unknown>) }
+  if (env.mark) for (const [k, v] of Object.entries(own)) if (k.endsWith('ClassName') && typeof v === 'string' && v !== '') own[k] = marked(v, env)
+  if (def.name === 'Link' && deadAnchor(own.href, env.anchors)) return null
   const children = kids(node.children, env)
   if (def.name === 'Link' && Array.isArray(node.children) && node.children.some(c => holdsLink(c)))
     return createElement('span', { ...(key != null ? { key } : {}), ...(className ? { className } : {}) }, ...children)
@@ -392,7 +401,7 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
   }
   let out: ReactNode | Promise<ReactNode>
   try {
-    out = def.render({ ...(parsed.data as Record<string, unknown>), ...(className ? { className } : {}) }, ctx)
+    out = def.render({ ...own, ...(className ? { className } : {}) }, ctx)
   } catch (err) {
     console.error('[code-section]', def.name, err)
     return null

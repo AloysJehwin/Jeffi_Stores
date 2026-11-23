@@ -14,7 +14,7 @@ import { parseAiJson } from '@/lib/auth/ai-scope'
 import { fetchPublic } from '@/lib/shared/safe-fetch'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
-import { generateImage } from '@/lib/ai/media'
+import { pictureFor, searchTerms, seedOf, type StockShape } from '@/lib/ai/stock'
 import { platformFunding } from '@/lib/ai/billing'
 import { metered } from '@/lib/ai/cost-meter'
 import { isSectionBlock, siteRegistry } from './blocks'
@@ -199,30 +199,38 @@ Page copy: ${JSON.stringify(copy).slice(0, 7000)}`,
 }
 
 const IMAGE_SIZE: Record<string, [number, number]> = { hero: [1600, 700], wide: [1600, 900], portrait: [896, 1120], square: [1024, 1024], landscape: [1280, 960], story: [768, 1366] }
+// The stock search for a slot: the store's category plus a noun for the block, never its marketing heading.
+const BLOCK_NOUN: Record<string, string> = { image_banner: 'shop', image_text: 'close up', login_main: 'lifestyle', signup_main: 'lifestyle' }
 
-/** Pictures for the empty image slots of a page, in one art direction; returns how many were made. */
-async function fillImages(doc: PageDoc, brief: SiteBrief, budget: { left: number }, draftId: string): Promise<number> {
+/** Pictures for the empty image slots of a page, in one art direction: a stock photo, else one made within the budget. */
+async function fillImages(doc: PageDoc, brief: SiteBrief, budget: { left: number }, draftId: string, used: Set<string>): Promise<number> {
   let made = 0
+  const category = searchTerms(brief.category || brief.vocabulary[0] || 'shop', 3)
   for (const b of topBlocks(doc)) {
     const fields = Object.entries(siteRegistry.get(b.type)?.fields ?? {}) as [string, FieldMeta][]
     for (const [k, f] of fields) {
-      if (f.kind !== 'image' || b.props[k] || budget.left <= 0 || budgetLeft() <= 0 || k === 'mobileImage') continue
-      const [width, height] = IMAGE_SIZE[f.size ?? 'wide'] ?? IMAGE_SIZE.wide
+      if (f.kind !== 'image' || b.props[k] || budget.left <= 0 || k === 'mobileImage') continue
+      const shape: StockShape = f.size ?? 'wide'
+      const [width, height] = IMAGE_SIZE[shape] ?? IMAGE_SIZE.wide
       const subject = String(b.props.heading ?? b.props.sideHeading ?? brief.category)
       budget.left--
       try {
-        const r = await generateImage({
-          prompt: `${subject}. For an online store selling ${brief.category}. ${brief.artDirection}. Photographic, no text, no logos, no watermarks.`,
-          negativePrompt: 'text, letters, watermark, logo, distorted hands',
-          width,
-          height,
-          feature: 'homepage_image',
-          // Site generation always uses the cheapest image model.
-          quality: 'draft',
-          ref: `site:${draftId}`,
+        const pic = await pictureFor({
+          stock: { queries: [`${category} ${BLOCK_NOUN[b.type] ?? 'products'}`, category], shape, seed: seedOf(draftId), used },
+          ai: {
+            prompt: `${subject}. For an online store selling ${brief.category}. ${brief.artDirection}. Photographic, no text, no logos, no watermarks.`,
+            negativePrompt: 'text, letters, watermark, logo, distorted hands',
+            width,
+            height,
+            feature: 'homepage_image',
+            // Site generation always uses the cheapest image model.
+            quality: 'draft',
+            ref: `site:${draftId}`,
+          },
+          aiAllowed: () => budgetLeft() > 0,
         })
-        if (r.images[0]?.url) {
-          b.props[k] = r.images[0].url
+        if (pic) {
+          b.props[k] = pic.url
           made++
         }
       } catch {
@@ -287,13 +295,15 @@ export async function buildSiteInDraft(draftId: string, input: SiteAgentInput, a
       ...(brief.palette?.accent ? { accent: brief.palette.accent } : {}),
     }
     const budget = { left: input.images ? MAX_IMAGES : 0 }
+    // Stock photos this site already shows, so no two slots get the same one.
+    const used = new Set<string>()
     let pictures = 0
     const queue = [...pages]
     const workers = Array.from({ length: 4 }, async () => {
       for (let p = queue.shift(); p; p = queue.shift()) {
         let doc = cloneDoc(p.doc, () => crypto.randomUUID())
         if (budgetLeft() > 0) doc = await rewritePage(doc, p, brief, catalog).catch(() => doc)
-        if (budget.left > 0 && p.surface === 'web') pictures += await fillImages(doc, brief, budget, draftId)
+        if (budget.left > 0 && p.surface === 'web') pictures += await fillImages(doc, brief, budget, draftId, used)
         await saveDraftPage(draftId, { audience: p.audience, surface: p.surface, page: p.page, slug: '' }, doc, adminId)
       }
     })

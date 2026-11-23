@@ -79,6 +79,8 @@ export default function ShowcaseStudio({
   const locked = !!s && (s.status === 'building' || built)
   const aiDown = aiOff || view?.ai?.available === false
   const paid = view?.allowance.paid ?? null
+  // The free design is held back: another of the owner's sites was never paid for.
+  const freeBlocked = !!view?.allowance.freeBlocked
 
   const apply = useCallback((v: StudioView, follow = true) => {
     setView(prev => ({ ...v, site: v.site ?? prev?.site, ai: v.ai ?? prev?.ai }))
@@ -246,6 +248,14 @@ export default function ShowcaseStudio({
             <CloudOff className="h-4 w-4 shrink-0 org-brown" aria-hidden /> AI changes aren’t available right now. Your page is kept.
           </p>
         )}
+        {freeBlocked && s?.status !== 'building' && (
+          <p role="status" className={`${noteCls} org-peach mb-5 flex items-start gap-2 text-foreground`}>
+            <Wallet className="mt-0.5 h-4 w-4 shrink-0 org-brown" aria-hidden />
+            <span>
+              <strong className="font-semibold">This site’s AI design isn’t free.</strong> The free AI design is for one unpaid site at a time, and another of your sites hasn’t been paid for yet. To design this one free, publish and pay for that site, or finish it; or design this one now for {paid ? priceText(paid) : 'the redesign price from your wallet'}.
+            </span>
+          </p>
+        )}
         {loadErr ? (
           <p className="text-sm text-red-600">{loadErr}</p>
         ) : !view ? (
@@ -260,7 +270,7 @@ export default function ShowcaseStudio({
             <div className="min-w-0 flex-1">
               <h3 className="font-display text-xl font-black text-foreground">Design your page with AI</h3>
               <p className="mt-1 text-sm text-foreground-secondary">
-                Answer a few questions, pick a look, and the AI designs your page around your details, work and reviews, live on desktop and phone. Your first design is free.
+                Answer a few questions, pick a look, and the AI designs your page around your details, work and reviews, live on desktop and phone.{freeBlocked ? '' : ' Your first design is free.'}
               </p>
             </div>
             <button type="button" onClick={() => void call('start', 'start', {}, () => go('brief'))} disabled={!!busy || aiDown} className={`${primaryBtn} max-sm:w-full`}>

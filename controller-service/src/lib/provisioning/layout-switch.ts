@@ -52,7 +52,7 @@ async function advance(tenantId: string, retry: boolean): Promise<LayoutResult> 
   let sw = p.layout as LayoutSwitch | undefined
   if ((row.applied.layout ?? 'controller') === 'services' && !sw) return { ok: true, status: 'services' }
   if (sw?.failed && !retry) return { ok: false, status: 'failed', detail: sw.failed }
-  if (tenant.status !== 'active') return { ok: true, status: 'waiting', detail: 'the store is not active' }
+  if (tenant.status !== 'active' || tenant.store_request) return { ok: true, status: 'waiting', detail: 'the store is not active' }
   if (row.status === 'pending' || row.status === 'applying') return { ok: true, status: 'waiting', detail: 'a compute change is running' }
   if (row.status === 'paused') return { ok: true, status: 'waiting', detail: 'the store is paused' }
 
