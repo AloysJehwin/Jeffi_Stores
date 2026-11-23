@@ -1,7 +1,7 @@
 import { emptyDoc, normalizeDoc, pageRefKey, type PageDoc, type PageKey, type SiteAudience, type SiteSurface } from '@jeffi/site-blocks'
 import { verifyHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
 import { getWebSurface } from '@/lib/catalog/web-surface'
-import { getPublishedPage, getSiteDraft, siteBuilderEnabled } from './store'
+import { canvasDoc, getPublishedPage, getSiteDraft, siteBuilderEnabled } from './store'
 
 export interface SitePageRef {
   audience: SiteAudience
@@ -29,7 +29,7 @@ export async function loadSitePage(
       own(surface) ??
       (await getPublishedPage(at(surface)))?.doc ??
       (surface === 'web_mobile' ? (own('web') ?? (await getPublishedPage(at('web')))?.doc) : undefined)
-    return { doc: normalizeDoc(doc ?? emptyDoc()), surface, selectable: true, title: null }
+    return { doc: await canvasDoc(normalizeDoc(doc ?? emptyDoc()), ref.page), surface, selectable: true, title: null }
   }
   if (!(await siteBuilderEnabled())) return null
   const surface: SiteSurface = (await getWebSurface()) === 'web' ? 'web' : 'web_mobile'
