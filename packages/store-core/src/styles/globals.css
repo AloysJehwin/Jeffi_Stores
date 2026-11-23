@@ -492,6 +492,10 @@ body:has([data-bottom-bar='cart'], [data-bottom-bar='checkout']):has([data-botto
   .sk::after {
     animation: none;
   }
+  .animate-cart-pulse,
+  .animate-heart-pulse {
+    animation: none;
+  }
 }
 
 /* Theme style hooks for the pages that take the theme instead of an AI design (account, orders, sign-in/up, legal,

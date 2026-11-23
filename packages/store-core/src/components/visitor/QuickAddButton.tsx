@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCartOptional } from '@/contexts/CartContext'
+import { useFlyToCart } from '@/contexts/FlyToCartContext'
 import { useToast } from '@/contexts/ToastContext'
 import QuickAddPicker, { QuickAddHeaderActions } from '@/components/visitor/QuickAddPicker'
 import { startBuyNow } from '@/lib/client/buy-now'
@@ -65,11 +66,13 @@ export default function QuickAddButton({
 }: QuickAddButtonProps) {
   // No cart outside the storefront (the AI Site Studio preview): the button shows, adding says it is a preview.
   const addToCart = useCartOptional()?.addToCart
+  const fly = useFlyToCart()
   const router = useRouter()
   const productHref = portal === 'business' ? bp(`/business/products/${slug}`) : `/products/${slug}`
   const { showToast } = useToast()
   const prefersReduced = useReducedMotion()
 
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
   const [open, setOpen] = useState(false)
   const [qty, setQty] = useState(1)
   const [adding, setAdding] = useState(false)
@@ -90,6 +93,7 @@ export default function QuickAddButton({
       setAdding(true)
       try {
         await addToCart(productId, quantity)
+        fly?.flyToCart(triggerRef.current)
         showToast(quantity === 1 ? 'Added to cart!' : `${quantity} added to cart!`, 'success')
         setOpen(false)
         setQty(1)
@@ -99,7 +103,7 @@ export default function QuickAddButton({
         setAdding(false)
       }
     },
-    [adding, addToCart, productId, showToast]
+    [adding, addToCart, fly, productId, showToast]
   )
 
   const buySimple = useCallback(async () => {
@@ -172,6 +176,7 @@ export default function QuickAddButton({
     <div className={`relative ${triggerClassName}`}>
       <button
         type="button"
+        ref={triggerRef}
         onClick={onButtonClick}
         aria-label={ariaLabel ?? label}
         {...(direct ? { 'aria-busy': adding, disabled: adding } : { 'aria-haspopup': 'dialog' as const, 'aria-expanded': open })}
