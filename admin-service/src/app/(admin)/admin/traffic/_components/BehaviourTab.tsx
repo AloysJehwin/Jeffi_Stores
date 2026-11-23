@@ -2,7 +2,7 @@
 
 import { Empty, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
 import type { BehaviourData, PageRow } from '@/lib/traffic/types'
-import { Donut, HBars, Heatmap, PALETTE } from './charts'
+import { Donut, HBars, Heatmap, PALETTE } from '@/components/admin/traffic/charts'
 import { Note, rateText, ratio } from './shared'
 
 const PAGE_LABELS: Record<string, string> = {

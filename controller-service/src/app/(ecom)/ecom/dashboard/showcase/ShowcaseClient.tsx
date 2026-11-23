@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Check, Copy, ExternalLink, Inbox, Loader2, Pencil } from 'lucide-react'
+import { BarChart3, Check, Copy, ExternalLink, Inbox, Loader2, Pencil } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import type { ShowcaseConsoleState } from '@controller/lib/showcase/state'
 import PageHeader from '../_components/PageHeader'
@@ -55,6 +55,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
   const [confirmPay, setConfirmPay] = useState(false)
   const short = s.balanceInr !== null && s.balanceInr < s.priceInr
   const walletHref = `/dashboard/wallet?tenant=${encodeURIComponent(tenantSlug)}`
+  const analyticsHref = `/dashboard/showcase/${s.id}/analytics?tenant=${encodeURIComponent(tenantSlug)}`
 
   async function act(action: Action, done?: string) {
     setBusy(action)
@@ -93,6 +94,11 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             <Link href="/dashboard/showcase/edit" className={secondary}>
               <Pencil className="h-4 w-4" /> Edit site
             </Link>
+            {s.status !== 'draft' && (
+              <Link href={analyticsHref} className={secondary}>
+                <BarChart3 className="h-4 w-4" /> Analytics
+              </Link>
+            )}
             {s.status === 'live' && (
               <a href={s.url} target="_blank" rel="noopener noreferrer" className={primary}>
                 Open site <ExternalLink className="h-3.5 w-3.5" />
@@ -249,6 +255,22 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             </Link>
           </div>
         </Card>
+
+        {s.status !== 'draft' && (
+          <Card title="Visitors">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full org-sand">
+                <BarChart3 className="h-5 w-5 text-foreground" />
+              </span>
+              <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
+                Who visits your site, where they come from, what they tap and which visits bring enquiries.
+              </p>
+              <Link href={analyticsHref} className={secondary}>
+                Open analytics
+              </Link>
+            </div>
+          </Card>
+        )}
       </div>
     </>
   )

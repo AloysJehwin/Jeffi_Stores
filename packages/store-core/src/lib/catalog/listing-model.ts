@@ -10,7 +10,7 @@ import { round2 } from '@/lib/catalog/gst'
 import { positiveInt, productOrderBy, productSortSql } from '@/lib/catalog/product-sort'
 import { publicProducts } from '@/lib/catalog/public-product'
 
-// The storefront /products listing: everything app/(storefront)/products/page.tsx reads before it
+// The storefront /products listing: everything app/(storefront)/products/(index)/page.tsx reads before it
 // renders, built once for the page and for GET /api/products/listing (the mobile app).
 
 export const LISTING_PAGE_SIZE = 60

@@ -17,6 +17,9 @@ import { createVideoJobStore } from './video-jobs'
 import { sdWebuiProvider } from './providers/sd-webui'
 import { googleProvider } from './providers/google'
 import { replicateProvider } from './providers/replicate'
+import { pexelsProvider } from './providers/pexels'
+import { pixabayProvider } from './providers/pixabay'
+import { handleStockSearch, parseStockProviders, type StockDeps } from './stock'
 import {
   handleImageGenerate, handleVideoStart, readVideoJob, advanceVideoJob, readImageCache,
   parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, providerStatus, TEXT_PROVIDER_ORDER,
@@ -48,6 +51,11 @@ const videoDeps: VideoRouterDeps = {
   jobs: createVideoJobStore(redis),
   files,
   fileBaseUrl: CONFIG.publicUrl,
+}
+const stockDeps: StockDeps = {
+  providers: { pexels: pexelsProvider, pixabay: pixabayProvider },
+  order: parseStockProviders(CONFIG.stockProviders),
+  redis,
 }
 
 // ── Model work (runs inside the queue worker) ────────────────────────────────
@@ -222,7 +230,8 @@ function providersReport(): ProvidersResponse {
     image: providerStatus(imageDeps.order, imageDeps.providers),
     video: providerStatus(videoDeps.order, videoDeps.providers),
     ocr: [{ name: 'paddleocr', configured: ocrStatus().ok }],
-    defaults: { text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order },
+    stock: providerStatus(stockDeps.order, stockDeps.providers),
+    defaults: { text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order, stock: stockDeps.order },
   }
 }
 
@@ -346,6 +355,10 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && path === '/v1/images/generate') {
       return json(res, 200, await handleImage(await readBody(req)))
+    }
+    // Not queued: a search is one cached HTTP call, never model work.
+    if (req.method === 'POST' && path === '/v1/images/stock') {
+      return json(res, 200, await handleStockSearch(await readBody(req, 64 * 1024), stockDeps))
     }
     if (req.method === 'POST' && path === '/v1/video/generate') {
       return json(res, 200, await handleVideoStart(await readBody(req), videoDeps))

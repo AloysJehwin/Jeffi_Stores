@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
   const { rows } = await controlPlanePool().query<{ id: string; slug: string }>(
     `SELECT t.id, t.slug FROM tenants t JOIN tenant_infra i ON i.tenant_id = t.id
       WHERE t.status = 'active' AND 'store' = ANY(t.service_types) AND i.rds_endpoint IS NOT NULL
+        -- A services workspace whose store is still being built is active too: its job applies it.
+        AND t.store_request IS NULL
         AND ($1::text IS NULL OR t.slug = $1)
       ORDER BY t.slug`,
     [slug]

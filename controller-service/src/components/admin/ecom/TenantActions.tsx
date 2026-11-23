@@ -51,7 +51,8 @@ export default function TenantActions({
   const inFlight = jobStatus === 'pending' || jobStatus === 'running'
   const failed = jobStatus === 'failed'
   // Rollback deleted what the run had built, so resuming mid-way is not available, only a fresh provision.
-  const canResume = failed && !rolledBack
+  // A deprovisioned store's build (stopped, it stays failed) is never resumed.
+  const canResume = failed && !rolledBack && status !== 'terminated'
   // A live, half-built or rolled-back store can be torn down; a build still going is stopped first.
   const canDeprovision = status === 'active' || status === 'provisioning' || status === 'suspended'
   const base = `/api/admin/ecom/customers/${tenantId}`

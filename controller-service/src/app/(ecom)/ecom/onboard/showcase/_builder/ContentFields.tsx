@@ -254,7 +254,7 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
 
       <ListCard<ShowcasePagePicture>
         title="Pictures for your page"
-        hint="Pictures that set the mood, shown after your work photos (never as your work). When you have few work photos, designing your page adds some made by AI."
+        hint="Pictures that set the mood, shown after your work photos (never as your work). When you have few work photos, designing your page adds some: free stock photos (credited at the foot of your page) or ones made by AI."
         items={c.pictures ?? []}
         limit={SHOWCASE_LIMITS.pictures}
         update={fn => setForm(f => ({ ...f, content: { ...f.content, pictures: fn(f.content.pictures ?? []) } }))}

@@ -49,6 +49,8 @@ export interface StudioSession {
   generated_at: string | null
   tweaks_today: number
   tweaks_day: string | null
+  /** The owner's free corrections used today, across their studios (site_studio_corrections). */
+  corrections_today?: number
   tenant_id: string | null
   installed_at: string | null
   created_at: string
@@ -57,7 +59,9 @@ export interface StudioSession {
 
 const COLS = `id, owner_id, product, status, answers, brief, plan, directions, direction, catalog, pages, theme, progress, error,
   spent_inr::float8 AS spent_inr, free_used_at, generated_at, tweaks_today, to_char(tweaks_day, 'YYYY-MM-DD') AS tweaks_day, tenant_id, installed_at,
-  created_at, updated_at`
+  created_at, updated_at,
+  COALESCE((SELECT c.used FROM site_studio_corrections c WHERE c.owner_id = site_studio_sessions.owner_id
+    AND c.day = (now() AT TIME ZONE 'Asia/Kolkata')::date), 0) AS corrections_today`
 
 /** homeKeyOf in SQL, for the row's own product. */
 const HOME_SQL = `(CASE WHEN product = 'showcase' THEN '${SHOWCASE_PAGE_KEY}' ELSE 'store:home' END)`
@@ -223,7 +227,7 @@ export async function settleRebuild(id: string, error?: string, opts: { complete
   return r.rows[0] ?? null
 }
 
-/** Counts `cost` against today's free tweaks (IST day); false when the day's allowance is spent. */
+/** Counts `cost` against today's design help (IST day); false when the day's allowance is spent. */
 export async function spendTweaks(id: string, cost: number, perDay: number): Promise<boolean> {
   const r = await pool().query(
     `UPDATE site_studio_sessions

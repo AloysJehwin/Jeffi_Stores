@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getTenantBilling, listPlans, controlPlanePool } from '@/lib/tenant-registry'
+import { loadSetupOutcome } from '@/lib/tenant-registry/provisioning'
 import { getSubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import SiteReachabilityBadge from './SiteReachabilityBadge'
 import PageHeader from './_components/PageHeader'
 import { Card, Row } from './_components/Card'
 import SetupProgress from './_components/SetupProgress'
+import StoreClosed from './_components/StoreClosed'
 import { MoneyTiles, STATUS_PILL, fmt } from './_components/finance'
 import AddStoreClient from './add-store/AddStoreClient'
 import ServicesClient from './services/ServicesClient'
@@ -18,9 +20,11 @@ export const metadata = { title: 'Dashboard' }
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams
-  const { tenant } = await loadOwnerContext({ tenantSlug })
+  const { owner, tenants, tenant } = await loadOwnerContext({ tenantSlug })
+  const isLive = tenant.status === 'active' && tenant.store_request !== 'provisioning'
+  const isStore = (tenant.service_types ?? ['store']).includes('store')
 
-  const [billing, rzpSub, services, plans, priceRow] = await Promise.all([
+  const [billing, rzpSub, services, plans, priceRow, outcome] = await Promise.all([
     getTenantBilling(tenant.id, { transactions: { limit: 5 }, ledger: { limit: 0 } }),
     tenant.razorpay_subscription_id && tenant.subscription_status === 'active'
       ? getSubscription(tenant.razorpay_subscription_id).catch(() => null)
@@ -30,12 +34,12 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     controlPlanePool()
       .query<{ price: string | null }>(`SELECT price_inr_month AS price FROM tenant_compute WHERE tenant_id = $1`, [tenant.id])
       .catch(() => ({ rows: [] as { price: string | null }[] })),
+    // Stopped or deprovisioned: say so and what comes next, never a finished build.
+    isStore && !isLive ? loadSetupOutcome(tenant, owner.id, tenants).catch(() => null) : Promise.resolve(null),
   ])
   const fmtDay = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   const renewalDate = rzpSub?.current_end ? fmtDay(new Date(rzpSub.current_end * 1000)) : null
 
-  const isLive = tenant.status === 'active' && tenant.store_request !== 'provisioning'
-  const isStore = (tenant.service_types ?? ['store']).includes('store')
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
   // The subscription price: plan fee + servers + GST on servers (tenant_compute.price_inr_month). Yearly is 10× the month.
   const monthly = Number(priceRow.rows[0]?.price ?? 0)
@@ -60,7 +64,13 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       />
 
       <div className="space-y-6">
-        {(!isStore || tenant.store_request) && <AddStoreClient tenant={tenant} />}
+        {outcome ? (
+          <Card>
+            <StoreClosed outcome={outcome} slug={tenant.slug} />
+          </Card>
+        ) : (
+          (!isStore || tenant.store_request) && <AddStoreClient tenant={tenant} />
+        )}
 
         <ServicesClient states={services} prices={priceList()} compact />
 
@@ -82,9 +92,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               <Row label="Created" value={fmtDay(new Date(tenant.created_at))} />
               {tenant.region && <Row label="Region" value={tenant.region} />}
             </div>
-            {isStore && !isLive && (
+            {isStore && !isLive && !outcome && (
               <div className="mt-4">
-                <SetupProgress tenantId={tenant.id} />
+                <SetupProgress tenantId={tenant.id} slug={tenant.slug} />
               </div>
             )}
           </Card>

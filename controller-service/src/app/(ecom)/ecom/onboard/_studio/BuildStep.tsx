@@ -203,6 +203,12 @@ export default function BuildStep({
   const showcase = s.product === 'showcase'
   const home = showcase ? SHOWCASE_PAGE_KEY : 'store:home'
   const paid = view.allowance.paid
+  // Corrections: a few free a day, then each charged to the AI wallet (the price is sent back so a charge is never a surprise).
+  const { correctionsLeft, correctionPriceInr: fixInr, correctionUnits } = view.allowance
+  const chargeFor = (units: number) => Math.max(0, units - correctionsLeft) * fixInr
+  const freeNote = correctionsLeft
+    ? `${correctionsLeft} free change${correctionsLeft === 1 ? '' : 's'} left today`
+    : `No free changes left today · ₹${fixInr} each from your AI wallet`
   const charged = useCallback((inr: unknown) => {
     if (Number(inr) > 0) showToast(`Your new page is ready. ₹${Number(inr)} was charged to your wallet.`, 'success')
   }, [showToast])
@@ -320,13 +326,14 @@ export default function BuildStep({
     if (!picked || instruction.trim().length < 3) return
     setWorking('tweak')
     try {
-      const v = await studioPost<StudioView>('tweak', { page: picked.page, blockId: picked.blockId, instruction: instruction.trim() })
+      const charge = chargeFor(correctionUnits.tweak)
+      const v = await studioPost<StudioView & { chargedInr?: number }>('tweak', { page: picked.page, blockId: picked.blockId, instruction: instruction.trim(), ...(charge ? { priceInr: fixInr } : {}) })
       onView(v)
       setInstruction('')
       setVersion(n => n + 1)
       // The section's code changed: read its words and pictures again.
       setPicked(p => (p ? { ...p } : p))
-      showToast(`Changed “${picked.label}”`, 'success')
+      showToast(Number(v.chargedInr) > 0 ? `Changed “${picked.label}”. ₹${Number(v.chargedInr)} was charged to your wallet.` : `Changed “${picked.label}”`, 'success')
     } catch (e) {
       report(e)
     } finally {
@@ -336,16 +343,25 @@ export default function BuildStep({
 
   async function rebuild() {
     if (!currentPage || currentPage.themed) return
+    const units = correctionUnits.page
+    const charge = showcase ? 0 : chargeFor(units)
+    const free = Math.min(units, correctionsLeft)
     const ask = paid
       ? { title: 'Design your page again?', message: `It costs ₹${paid.priceInr} from your wallet. If the new page can’t be made, you aren’t charged. Your current page stays until the new one is ready.`, confirmLabel: `Design again · ₹${paid.priceInr}` }
       : showcase
         ? { title: 'Design your page with AI?', message: 'This is your free design. Your current page stays until the new one is ready.', confirmLabel: 'Design my page' }
-        : { title: `Design the ${currentPage.label} page again?`, message: 'It counts as 5 of today’s free changes.', confirmLabel: 'Design again' }
+        : charge
+          ? {
+              title: `Design the ${currentPage.label} page again?`,
+              message: `It counts as ${units} changes${free ? `, ${free} of them free today, the rest` : ''} at ₹${fixInr} each: ₹${charge} from your AI wallet. If the page can’t be made, you aren’t charged. Your current page stays until the new one is ready.`,
+              confirmLabel: `Design again · ₹${charge}`,
+            }
+          : { title: `Design the ${currentPage.label} page again?`, message: `It counts as ${units} of today’s free changes.`, confirmLabel: 'Design again' }
     if (!(await confirm(ask))) return
     setWorking('rebuild')
     setPicked(null)
     try {
-      await studioStream('regenerate-page', { page: current, ...(paid ? { expect: 'paid', priceInr: paid.priceInr } : {}) }, (event, data) => {
+      await studioStream('regenerate-page', { page: current, ...(paid ? { expect: 'paid', priceInr: paid.priceInr } : charge ? { priceInr: fixInr } : {}) }, (event, data) => {
         if (event === 'progress' && data.type === 'section') setMessage(`Writing ${data.label} (${data.index + 1} of ${data.total})`)
         else if (event === 'page-done') charged(data.chargedInr)
         else if (event === 'page-failed') showToast(data.error || 'That page could not be designed again', 'error')
@@ -508,7 +524,6 @@ export default function BuildStep({
     previewWindow()?.postMessage({ type: 'studio-preview', arrange }, window.location.origin)
   }, [arrange, version])
 
-  const tweaksLeft = view.allowance.tweaksLeft
   const overlay = working ? (
     <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-foreground shadow">
       <Loader2 className="h-4 w-4 animate-spin" /> {working === 'tweak' ? 'Making your change…' : message ?? (working === 'retry' ? 'Trying again…' : 'Designing this page again…')}
@@ -539,7 +554,7 @@ export default function BuildStep({
             {building ? `Building your site · ${built} of ${total} pages` : s.status === 'ready' ? 'Your site is ready' : built ? `${built} of ${total} pages built` : 'Your site'}
           </div>
           <div className="mt-0.5 text-xs text-foreground-secondary" aria-live="polite">
-            {building ? message ?? 'Working…' : s.status === 'ready' ? `${tweaksLeft} free change${tweaksLeft === 1 ? '' : 's'} left today` : s.error ?? ''}
+            {building ? message ?? 'Working…' : s.status === 'ready' ? freeNote : s.error ?? ''}
           </div>
         </div>
         <DeviceToggle value={device} onChange={setDevice} />
@@ -634,8 +649,8 @@ export default function BuildStep({
                 <MousePointerClick className="h-4 w-4" /> {picking ? 'Click a section…' : 'Change a section'}
               </button>
               {/* A Showcase's design is free once, then a redesign from the wallet: neither spends the day's changes. */}
-              <button type="button" onClick={rebuild} disabled={!canTweak || !!working || (!showcase && tweaksLeft < 5)} className={`${ghostBtn} px-3 py-2`}>
-                <RefreshCw className="h-4 w-4" /> {paid ? `Design this page again · ₹${paid.priceInr}` : showcase ? 'Design this page again · Free' : 'Design this page again'}
+              <button type="button" onClick={rebuild} disabled={!canTweak || !!working} className={`${ghostBtn} px-3 py-2`}>
+                <RefreshCw className="h-4 w-4" /> {paid ? `Design this page again · ₹${paid.priceInr}` : showcase ? 'Design this page again · Free' : chargeFor(correctionUnits.page) ? `Design this page again · ₹${chargeFor(correctionUnits.page)}` : 'Design this page again'}
               </button>
               {currentPage?.themed && <span className="text-xs text-foreground-muted">Themed page: it takes your look; the AI designs the main pages.</span>}
             </div>
@@ -689,9 +704,9 @@ export default function BuildStep({
                 placeholder="e.g. Make the headline shorter and put the picture on the left"
               />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-foreground-muted">{tweaksLeft} free change{tweaksLeft === 1 ? '' : 's'} left today</span>
-                <button type="submit" disabled={!!working || instruction.trim().length < 3 || tweaksLeft < 1} className={primaryBtn}>
-                  {working === 'tweak' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Apply change
+                <span className="text-xs text-foreground-muted">{freeNote}</span>
+                <button type="submit" disabled={!!working || instruction.trim().length < 3} className={primaryBtn}>
+                  {working === 'tweak' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Apply change{chargeFor(correctionUnits.tweak) ? ` · ₹${chargeFor(correctionUnits.tweak)}` : ''}
                 </button>
               </div>
             </form>

@@ -22,6 +22,7 @@ import type { SseSend } from './http'
 import { AI_UNAVAILABLE_CODE } from '@/lib/site/ai-status'
 import { BUDGET_INR } from './allowance'
 import { freeBudgetLeft, funded } from './funded'
+import { PaidGenerationError } from '@/lib/ai/paid-generation'
 import {
   finishBuild,
   getStudioSessionById,
@@ -44,7 +45,7 @@ export { buildOrder }
 
 /** A photo for every sample product (the new store is seeded with them), made last from what the free budget has left. */
 const PICTURES = Number(process.env.SITE_STUDIO_SAMPLE_PICTURES ?? Infinity) // a cap; 0 turns them off
-/** Photos are skipped when less than this (₹) is left, so the budget goes to pages first. */
+/** Made (AI) photos are skipped when less than this (₹) is left, so the budget goes to pages first; stock ones are free. */
 const PICTURE_RESERVE_INR = 15
 /** A sample product the photo step can still make a photo for. */
 const unpictured = (p: SampleCatalog['products'][number]) => !p.images?.length && !!p.imagePrompt
@@ -117,13 +118,13 @@ export async function runStudioBuild(session: StudioSession, send: SseSend): Pro
           send('page-failed', { key: p.key, label: p.label, error: 'This page could not be designed. You can rebuild it once the rest is done.' })
         }
       }
-      // Kept out of the store's gallery (skipGallery); a failure or a low budget leaves the placeholders.
-      if (PICTURES > 0 && done.includes('store:home') && studioBudgetLeft() > PICTURE_RESERVE_INR) {
+      // Kept out of the store's gallery (skipGallery); stock photos are free, so a low budget only stops made ones.
+      if (PICTURES > 0 && done.includes('store:home')) {
         const catalog = (await getStudioSessionById(id))?.catalog as SampleCatalog | null
         if (catalog && catalog.products.some(unpictured)) {
           send('status', { message: 'Adding product photos' })
           await updateStudioSession(id, { progress: progress(undefined, 'Adding product photos') })
-          pictures = await addPictures(catalog, ctx.brief, PICTURES).catch(err => ({ made: 0, error: errText(err) }))
+          pictures = await addPictures(catalog, ctx.brief, PICTURES, { ai: studioBudgetLeft() > PICTURE_RESERVE_INR }).catch(err => ({ made: 0, error: errText(err) }))
           if (pictures.made > 0) {
             await updateStudioSession(id, { catalog })
             send('catalog', { products: catalog.products.length, pictures: true })
@@ -171,9 +172,13 @@ export async function runPictures(session: StudioSession): Promise<{ made: numbe
 export const FREE_RETRIES = 2
 
 /** One page planned and designed again (the owner's "regenerate page", or a free retry of a page that failed). */
-export async function runPageRebuild(session: StudioSession, key: string, send: SseSend, opts: { retry?: boolean } = {}): Promise<StudioSession | null> {
+/** Runs a rebuild's AI work and save on a budget; a paid correction (./corrections.ts) charges the wallet instead. */
+export type RebuildRunner = <T>(budgetInr: number, fn: () => Promise<T>) => Promise<{ result: T; chargedInr: number }>
+
+export async function runPageRebuild(session: StudioSession, key: string, send: SseSend, opts: { retry?: boolean; run?: RebuildRunner } = {}): Promise<StudioSession | null> {
   const ctx = studioCtx(session)
-  if (key === CARD_KEY) return rebuildCard(session, ctx, send)
+  const run: RebuildRunner = opts.run ?? (async (budgetInr, fn) => ({ result: await funded(session.id, budgetInr, fn), chargedInr: 0 }))
+  if (key === CARD_KEY) return rebuildCard(session, ctx, send, run)
   const current = ctx.plan.pages.find(p => p.key === key)
   if (!current) {
     await settleRebuild(session.id)
@@ -191,34 +196,37 @@ export async function runPageRebuild(session: StudioSession, key: string, send: 
       : { ...p, retries }
   }
   try {
-    const { page, doc } = await funded(session.id, budget, () => regeneratePage(ctx, current, e => send('progress', slim(e))))
-    if (!doc.order.length) throw new Error('no section could be written')
-    await updateStudioSession(session.id, { plan: { ...ctx.plan, pages: ctx.plan.pages.map(p => (p.key === key ? page : p)) }, ...(tried(true) ? { progress: tried(true) } : {}) })
-    await saveStudioPage(session.id, key, doc)
-    send('page-done', { key, label: current.label })
+    // Saved inside the run, so a page that can't be saved isn't charged.
+    const { chargedInr } = await run(budget, async () => {
+      const { page, doc } = await regeneratePage(ctx, current, e => send('progress', slim(e)))
+      if (!doc.order.length) throw new Error('no section could be written')
+      await updateStudioSession(session.id, { plan: { ...ctx.plan, pages: ctx.plan.pages.map(p => (p.key === key ? page : p)) }, ...(tried(true) ? { progress: tried(true) } : {}) })
+      await saveStudioPage(session.id, key, doc)
+    })
+    send('page-done', { key, label: current.label, chargedInr })
     return settleRebuild(session.id, undefined, { completes: opts.retry })
   } catch (err) {
     console.error(`[studio] ${opts.retry ? 'retry' : 'rebuild'} ${key} failed:`, errText(err))
     const p = tried(false)
     if (p) await updateStudioSession(session.id, { progress: p })
     await settleRebuild(session.id)
-    if (err instanceof StudioAiDownError) throw err
+    if (err instanceof StudioAiDownError || err instanceof PaidGenerationError) throw err
     throw new Error(opts.retry ? 'This page could not be designed this time. Your other pages are kept.' : 'This page could not be designed again right now. Your current version is kept.')
   }
 }
 
 /** The product card designed again, on a page's budget; the current one is kept when it fails. */
-async function rebuildCard(session: StudioSession, ctx: StudioCtx, send: SseSend): Promise<StudioSession | null> {
+async function rebuildCard(session: StudioSession, ctx: StudioCtx, send: SseSend, run: RebuildRunner): Promise<StudioSession | null> {
   const label = 'Product card'
   send('page', { key: CARD_KEY, label, sections: 1 })
   try {
-    await saveStudioPage(session.id, CARD_KEY, await funded(session.id, BUDGET_INR.page, () => generateCard(ctx)))
-    send('page-done', { key: CARD_KEY, label })
+    const { chargedInr } = await run(BUDGET_INR.page, async () => saveStudioPage(session.id, CARD_KEY, await generateCard(ctx)))
+    send('page-done', { key: CARD_KEY, label, chargedInr })
     return settleRebuild(session.id)
   } catch (err) {
     console.error('[studio] rebuild product card failed:', errText(err))
     await settleRebuild(session.id)
-    if (err instanceof StudioAiDownError) throw err
+    if (err instanceof StudioAiDownError || err instanceof PaidGenerationError) throw err
     throw new Error('The product card could not be designed again right now. Your current card is kept.')
   }
 }
