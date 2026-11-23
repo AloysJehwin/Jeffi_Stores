@@ -544,9 +544,9 @@ jobs:
     steps:
       - name: Every check succeeded
         run: |
-          r="${{ needs.init.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.security.result }} ${{ needs.test.result }} ${{ needs.coverage.result }} ${{ needs.integration.result }} ${{ needs.build.result }}"
-          echo "Init, Lint, Type check, Security, Unit tests, Coverage, Integration tests, Build: $r"
-          [ "$r" = "success success success success success success success success" ] || { echo "::error::Checks failed"; exit 1; }
+          r="${{ needs.init.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.security.result }} ${{ needs.test.result }} ${{ needs.coverage.result }} ${{ needs.integration.result }} ${{ needs.api-db-tests.result }} ${{ needs.ui-tests.result }} ${{ needs.build.result }}"
+          echo "Init, Lint, Type check, Security, Unit tests, Coverage, Integration tests, API DB tests, UI tests, Build: $r"
+          [ "$r" = "success success success success success success success success success success" ] || { echo "::error::Checks failed"; exit 1; }
       - name: Approved for release
         if: needs.init.outputs.release == 'true'
         run: echo "Approved ${GITHUB_SHA::8} ${{ env.DRY_FLAG }}"
