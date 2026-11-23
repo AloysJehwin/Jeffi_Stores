@@ -1,15 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const query = vi.fn()
-const debitWallet = vi.fn()
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }) }))
 vi.mock('@/lib/payments/wallet', () => ({
-  debitWallet: (o: unknown) => debitWallet(o),
   isFlagshipTenant: (id: string | null | undefined) => !id || id === '00000000-0000-0000-0000-000000000000',
 }))
 
 import {
-  buyMessagingAddonMonth,
+  getMessagingAddon,
   invalidateMessagingEntitlement,
   messagingAddonRef,
   messagingEntitlement,
@@ -51,34 +49,14 @@ describe('messagingEntitlement', () => {
   })
 })
 
-describe('buyMessagingAddonMonth', () => {
-  const status = (o: Record<string, unknown>) => ({ rows: [{ messaging_addon: 'none', messaging_addon_until: null, messaging_addon_renew: false, active: false, ...o }] })
-
-  it('keys the charge on tenant, tier and the period start', async () => {
-    query.mockResolvedValue(status({}))
-    debitWallet.mockResolvedValue({ ok: true, charged: true, balance: 0 })
-    const r = await buyMessagingAddonMonth(T, { tier: 'both', renew: true, reason: 'purchase' })
-    expect(r.ok).toBe(true)
-    const today = new Date().toISOString().slice(0, 10)
-    expect(debitWallet).toHaveBeenCalledWith(
-      expect.objectContaining({ amountInr: 500, category: 'messaging_addon', externalRef: messagingAddonRef(T, 'both', today), floorInr: 0 })
-    )
-  })
-
-  it('extends the same tier from the current end, and starts a changed tier from today', async () => {
+describe('getMessagingAddon', () => {
+  it('reads the tier and period the billing handler wrote (no renew flag: it is a subscription line)', async () => {
     const until = new Date(Date.now() + 10 * 86_400_000)
-    query.mockResolvedValue(status({ messaging_addon: 'sms', messaging_addon_until: until, active: true }))
-    debitWallet.mockResolvedValue({ ok: true, charged: true, balance: 0 })
-    await buyMessagingAddonMonth(T, { tier: 'sms', renew: true, reason: 'renewal' })
-    expect(debitWallet.mock.calls[0][0].externalRef).toBe(messagingAddonRef(T, 'sms', until.toISOString().slice(0, 10)))
-    await buyMessagingAddonMonth(T, { tier: 'both', renew: true, reason: 'purchase' })
-    expect(debitWallet.mock.calls[1][0].externalRef).toBe(messagingAddonRef(T, 'both', new Date().toISOString().slice(0, 10)))
+    query.mockResolvedValueOnce({ rows: [{ messaging_addon: 'both', messaging_addon_until: until, active: true }] })
+    expect(await getMessagingAddon(T)).toEqual({ tier: 'both', active: true, until: until.toISOString() })
   })
 
-  it('refuses the flagship and passes a short wallet through', async () => {
-    expect((await buyMessagingAddonMonth('00000000-0000-0000-0000-000000000000', { tier: 'sms', renew: true, reason: 'purchase' })).ok).toBe(false)
-    query.mockResolvedValue(status({}))
-    debitWallet.mockResolvedValue({ ok: false, error: 'short' })
-    expect(await buyMessagingAddonMonth(T, { tier: 'sms', renew: true, reason: 'purchase' })).toEqual({ ok: false, error: 'short' })
+  it('keys a wallet-paid month from before the switch (the migration credits from it)', () => {
+    expect(messagingAddonRef(T, 'both', '2026-12-01')).toBe(`messaging_addon:${T}:both:2026-12-01`)
   })
 })
