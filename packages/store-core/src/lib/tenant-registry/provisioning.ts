@@ -5,7 +5,7 @@ import type { TenantArchive } from './archives'
 export const STOPPED_STEP = 'stopped'
 
 // A stopped job: its stop event, or a last_error starting "stopped" (the engine's deprovisioned-store guard writes only that).
-const stoppedSql = (j: string) =>
+export const stoppedSql = (j: string) =>
   `(${j}.last_error LIKE 'stopped%' OR EXISTS (SELECT 1 FROM provisioning_step_events se WHERE se.job_id = ${j}.id AND se.step = '${STOPPED_STEP}'))`
 
 export interface ProvisioningJob {
