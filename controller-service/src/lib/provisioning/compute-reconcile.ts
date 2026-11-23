@@ -109,8 +109,15 @@ export async function reconcileCompute(tenantId: string, provider: ProvisioningP
   }
   if (row.status !== 'pending' && row.status !== 'applying') return { ok: true, status: row.status }
   if (!tenant || tenant.status !== 'active') return { ok: true, status: 'waiting for the store' }
+  // A store still being built (a services workspace stays active meanwhile) is provisioning's to build.
+  if (tenant.store_request) return { ok: true, status: 'waiting for the store to be built' }
 
   const applied: ComputeSpec = JSON.parse(JSON.stringify(row.applied ?? legacySpecFor(tenant.plan)))
+  // Basic's legacy spec names no layout, and a render of none keeps an old app that may not exist: name the one it runs.
+  if (!applied.layout) {
+    const k8s = await import('@/lib/k8s/tenant-compute')
+    applied.layout = k8s.k8sComputeEnabled() && !(await k8s.runsAllInOneApp(tenant.slug)) ? 'services' : 'controller'
+  }
   const ctx: Ctx = {
     tenantId,
     tenant,

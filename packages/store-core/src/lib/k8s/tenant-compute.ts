@@ -425,6 +425,11 @@ export async function releaseImages(): Promise<Partial<Record<TenantService, str
 
 const PART_KINDS = new Set(['Deployment', 'Service', 'HorizontalPodAutoscaler', 'PodDisruptionBudget'])
 
+/** Whether the store still runs the old all-in-one app: only then can a render keep it (it can't be started anew). */
+export async function runsAllInOneApp(slug: string): Promise<boolean> {
+  return !!(await get('Deployment', tenantAppName(slug), tenantNamespace(slug)))
+}
+
 /**
  * Apply (create or reconcile) the tenant's whole namespace. Safe to call on plan change.
  * `keepApps` leaves the app pods this render no longer has running (a layout switch drains them first).
