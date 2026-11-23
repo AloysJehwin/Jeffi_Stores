@@ -1,6 +1,7 @@
 // Gateway config — this is where all host/model/provider knowledge now lives (moved
 // out of the Next.js app). On the Razer cluster these come from a k8s ConfigMap/Secret;
 // in cloud, the same keys point at managed endpoints. The app never sees any of this.
+import { parseTokens } from './auth'
 
 export const CONFIG = {
   // Tried in order; the first healthy one is used (see providers/ollama-pool.ts).
@@ -22,6 +23,8 @@ export const CONFIG = {
   embedModel: process.env.RAG_EMBED_MODEL || 'nomic-embed-text',
 
   port: Number(process.env.PORT) || 8080,
+  // Bearer token(s) every /v1 call must carry (comma-separated during a rotation). Empty = no auth.
+  gatewayTokens: parseTokens(process.env.AI_GATEWAY_TOKEN || ''),
 
   // Media: provider order, public base for /v1/files URLs (empty = relative; the SDK absolutises).
   imageProviders: process.env.AI_IMAGE_PROVIDERS || '',

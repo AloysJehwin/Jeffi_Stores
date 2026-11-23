@@ -19,7 +19,7 @@ const h = vi.hoisted(() => {
 })
 
 vi.mock('@/lib/ai/billing', () => ({ preauthorize: h.preauthorize, settle: h.settle, AiWalletError: h.AiWalletError }))
-vi.mock('@/lib/shared/ai-client', () => ({ aiGatewayUrl: () => 'http://gw:8080' }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiGatewayUrl: () => 'http://gw:8080', aiGatewayHeaders: () => ({}) }))
 vi.mock('@/lib/shared/s3', () => ({
   uploadGalleryImage: h.upload,
   putObjectBuffer: h.putObject,

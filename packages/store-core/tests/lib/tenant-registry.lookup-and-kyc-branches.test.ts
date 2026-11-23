@@ -218,11 +218,13 @@ describe('tenant-registry (data layer, extended)', () => {
       expect(poolQuery.mock.calls.length).toBe(afterFirst) // cached
     })
 
-    it('fails open to null on error', async () => {
+    it('throws on error and does not cache it', async () => {
       const mod = await importRegistry()
       poolQuery.mockReset()
       poolQuery.mockRejectedValue(new Error('boom'))
-      await expect(mod.lookupTenantContextBySlug('acme')).resolves.toBeNull()
+      await expect(mod.lookupTenantContextBySlug('acme')).rejects.toThrow('boom')
+      await expect(mod.lookupTenantContextBySlug('acme')).rejects.toThrow('boom')
+      expect(poolQuery).toHaveBeenCalledTimes(2)
     })
   })
 

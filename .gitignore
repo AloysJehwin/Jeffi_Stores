@@ -46,6 +46,8 @@ next-env.d.ts
 # run them on the runner, so an ignored script means "No such file" in Actions.
 !.github/scripts/*.sh
 !deploy/k8s/**/*.sh
+# Razer host scripts: the box installs them from the release's GitHub tarball.
+!ai-platform/deploy/**/*.sh
 /scripts/*
 # CI runs the CLI manifest generator (npm run cli:check).
 !/scripts/gen-admin-manifest.ts

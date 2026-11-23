@@ -1,0 +1,7 @@
+[Unit]
+Description=Restart k3s when the box's LAN address no longer matches its node IP
+After=k3s.service network-online.target
+[Service]
+Type=oneshot
+TimeoutStartSec=10min
+ExecStart=/usr/local/sbin/k3s-ip-guard.sh
