@@ -1,14 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Monitor, Redo2, Rocket, Smartphone, Tablet, Undo2, X } from 'lucide-react'
-import { isTagNode, type CodeNode } from '@jeffi/site-blocks'
+import { isTagNode, moveBlock, type CodeNode } from '@jeffi/site-blocks'
 import { DesignError, findNode, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
+import Layers from './Layers'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
-import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editSection, endGestures, redo, treeOf, undo, type EditorState, type Shown } from './state'
+import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
 
 // The visual site editor (docs/plans/SITE_EDITOR_PLAN.md, phase 2): the real page on a canvas (an iframe with a
 // preview token, where components/visitor/site/editor/SiteEditorBridge selects and edits in place), the page's
@@ -211,6 +212,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }, [])
 
   const ready = !!state
+  const trees = useMemo(() => (state ? currentTrees(state) : {}), [state])
   useEffect(() => {
     const el = box.current
     if (!el) return
@@ -290,17 +292,22 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
 
       <div className="grid grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)_320px] gap-3 items-start xl:items-stretch xl:h-[calc(100dvh-8.5rem)] xl:min-h-[34rem]">
         <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1 min-w-0 xl:min-h-0 xl:overflow-y-auto [scrollbar-width:thin]">
-          <p className="pb-1 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Sections</p>
-          {doc.order.map(id => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => select(id, treeOf(doc.blocks[id]) ? (state.trees[id]?.tree.id ?? null) : null)}
-              className={`w-full truncate rounded-lg px-2.5 py-2 text-left text-sm ${sel?.block === id ? 'bg-accent-500/10 text-accent-700' : 'text-foreground hover:bg-surface-secondary'}`}
-            >
-              {label(id)}
-            </button>
-          ))}
+          <p className="pb-1 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Layers</p>
+          <Layers
+            doc={doc}
+            trees={trees}
+            sel={sel}
+            canWrite={host.canWrite}
+            label={label}
+            onSelect={select}
+            onMoveSection={(id, to) => {
+              if (update(s => editDoc(s, d => moveBlock(d, id, to)))) requestReload()
+            }}
+            onMoveNode={(id, node, parent, index) => {
+              edit(id, [{ op: 'move', id: node, parent, index }])
+              requestReload()
+            }}
+          />
         </aside>
 
         <div ref={box} className="relative min-w-0 overflow-hidden rounded-xl border border-border-default bg-surface-secondary xl:min-h-0">

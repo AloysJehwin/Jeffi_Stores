@@ -35,6 +35,10 @@ AI-generated pages must be editable with it.
    background colour (theme scales from `paletteFrom` plus any hex), padding, margins, gap, width, max width, min
    height, rounding; each shows where its value comes from and clears this breakpoint's. Changes go through
    `setPanelValue` / `classOps`, so wider breakpoints keep their look; the canvas reloads after the save for the CSS.
+3. Layers and reorder. `Layers.tsx`: the page's sections, each code section's elements as a tree (words beside the
+   name, a lock on needed parts, a mark on what store data draws). Rows drag among their siblings with dnd-kit
+   (pointer or keyboard): elements as a design `move`, sections as a block-list step. Nodes filling a slot (a
+   condition's branch, a render function's body) stay put; their contents move. Selecting a row selects on the canvas.
 
 ## What exists
 

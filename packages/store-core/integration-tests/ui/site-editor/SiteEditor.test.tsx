@@ -106,3 +106,15 @@ describe('SiteEditor', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
   })
 })
+
+describe('SiteEditor layers', () => {
+  it('opens a section into its elements and selects one for the inspector and the canvas', async () => {
+    setup()
+    await screen.findByRole('button', { name: 'Hero' })
+    const post = (await canvas()).postMessage
+    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0])
+    fireEvent.click(await screen.findByRole('button', { name: /Heading 2\s*Hello/ }))
+    expect(await screen.findByDisplayValue('Hello')).toBeInTheDocument()
+    expect(post).toHaveBeenLastCalledWith({ type: 'site-editor:select', block: 'a', id: 'e2' }, '*')
+  })
+})
