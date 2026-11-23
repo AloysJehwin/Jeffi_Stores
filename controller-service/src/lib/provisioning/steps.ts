@@ -39,9 +39,11 @@ import {
   wait,
   warn,
   type PipelineDef,
+  type SiteChoice,
   type StepId,
   type StepResult,
 } from './pipeline'
+import type { StudioSession } from '@controller/lib/site-studio/sessions'
 import { attachDbDisk, createDatabase, launchServer, startPostgres, type NodeDbCtx } from './node-db-steps'
 
 // Provisioning steps. The worker advances a job one step per tick; each step is idempotent so a
@@ -739,16 +741,18 @@ const HANDLERS: Record<Step, Handler> = {
   },
 
   async build_site({ job, slug, res }) {
-    // The store's first site. When the owner built it in the onboarding AI Site Studio, the store's admin installs
-    // that session's pages and theme (lib/site/studio installStudioSite); otherwise it builds one from the "Your
-    // site" brief on a platform-funded budget (lib/site/onboarding-build.ts). Each tick asks again (the store starts
-    // it once) until it is live. Non-fatal: the store is already serving its standard pages.
+    // The store's first site, as the owner chose it in onboarding (onboardingSite). A site made in the Site Studio
+    // (a ready-made theme or the AI's design) is installed by the store's admin as it is (lib/site/studio
+    // installStudioSite); the default pre-built site is the default theme applied to the owner's studio, then
+    // installed the same way; a brief is built by the AI on a platform-funded budget (lib/site/onboarding-build.ts).
+    // Each tick asks again (the store starts it once) until it is live. Non-fatal: the store is already serving its
+    // standard pages.
     if (res.restored) return skip('store restored from a backup: it keeps its own site')
-    const site = await onboardingSite(job.tenant_id)
-    if (!site) return skip('the owner chose to design the site themselves')
+    const choice = await onboardingSite(job.tenant_id)
+    if (!choice) return skip('the owner chose to design the site themselves')
     if (process.env.PROVISIONING_PROVIDER !== 'aws') return skip('stub provider: no store pods to reach')
     if (!onK8sCompute(res)) return skip('not on k8s: the store has no Site Builder service')
-    if (!site.studio) {
+    if (choice.kind === 'brief') {
       const { siteAiAvailable } = await import('@/lib/site/ai-status')
       if (!(await siteAiAvailable('platform'))) return skip('AI site generation is not available (Claude is not connected): the store keeps its standard pages')
     }
@@ -759,13 +763,17 @@ const HANDLERS: Record<Step, Handler> = {
     const layout = (await storeLayouts([job.tenant_id]).catch(() => new Map())).get(job.tenant_id) ?? 'services'
     const target = storeCronTarget(slug, layout, SITE_BUILD_PATH)
     if ('skip' in target) return skip(target.skip)
+    // Applied once: from the next tick the theme's site is in the studio and onboardingSite returns it as such.
+    const site = choice.kind === 'theme' ? await defaultThemeSite(choice.ownerId, job.tenant_id) : choice
+    if ('error' in site) return warn(`the pre-built site could not be set up: ${site.error} The store keeps its standard pages.`)
+    const studio = site.kind === 'studio' ? site.studio : null
     const { internalRequest } = await import('@/lib/shared/internal-http')
     const r = await internalRequest(target.base + SITE_BUILD_PATH, {
       method: 'POST',
       host: storeCronHost(slug),
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...(site.studio ? { studio: site.studio.input } : site.brief),
+        ...(site.kind === 'studio' ? { studio: site.studio.input } : site.brief),
         budgetInr: Number(process.env.SITE_BUILD_BUDGET_INR || 1000),
       }),
       timeoutMs: 20_000,
@@ -780,22 +788,54 @@ const HANDLERS: Record<Step, Handler> = {
       pages: build.pages,
       pictures: build.pictures,
       spentInr: build.spentInr,
-      ...(site.studio ? { studio: site.studio.id } : {}),
+      ...(studio ? { studio: studio.id } : {}),
     }
-    if (site.studio && (build.status === 'running' || build.status === 'done'))
-      await site.studio.installed(build.status === 'done').catch(() => {})
-    if (build.status === 'running') return wait(build.step ?? (site.studio ? 'Installing your site' : 'Building your site'))
-    if (build.status !== 'done') return warn(`the AI could not build the site: ${build.error ?? 'unknown error'}`)
-    if (site.studio) return ok(`studio site installed${build.style ? ` (${build.style})` : ''}: ${build.pages ?? 0} pages`)
+    if (studio && (build.status === 'running' || build.status === 'done'))
+      await studio.installed(build.status === 'done').catch(() => {})
+    if (build.status === 'running') return wait(build.step ?? (studio ? 'Installing your site' : 'Building your site'))
+    if (build.status !== 'done') return warn(`${studio ? 'the store could not install the site' : 'the AI could not build the site'}: ${build.error ?? 'unknown error'}`)
+    if (studio) return ok(`studio site installed${build.style ? ` (${build.style})` : ''}: ${build.pages ?? 0} pages`)
     return ok(`site built in the ${build.style} style: ${build.pages} pages, ${build.pictures ?? 0} pictures`)
   },
 }
 
+type StudioSite = {
+  kind: 'studio'
+  /** Designed by the AI (not made from a ready-made theme). */
+  ai: boolean
+  studio: { id: string; input: Record<string, unknown>; installed: (done: boolean) => Promise<void> }
+}
+type OnboardingSite =
+  | StudioSite
+  | { kind: 'theme'; ownerId: string }
+  | { kind: 'brief'; brief: { description: string; style: string; references: string[]; images: boolean } }
+  | null
+
+/** A finished studio session as build_site installs it. */
+async function studioSite(studio: StudioSession, tenantId: string): Promise<StudioSite> {
+  const { markStudioInstalled } = await import('@controller/lib/site-studio/sessions')
+  const { themeOfDirection } = await import('@/lib/site/themes/catalog')
+  const style = (studio.direction as { name?: string } | null)?.name
+  return {
+    kind: 'studio',
+    ai: !themeOfDirection(studio.direction),
+    studio: {
+      id: studio.id,
+      // The brief, plan and direction go along so the store's Site Builder can change sections the studio way.
+      // freeUsed: a ready-made theme's site (no AI) leaves the store's free generation for Site Builder, unless the
+      // owner's free generation was used in the studio before it.
+      input: { pages: studio.pages, theme: studio.theme, ...(style ? { style } : {}), brief: studio.brief, plan: studio.plan, direction: studio.direction, freeUsed: !!studio.free_used_at },
+      installed: (done: boolean) => markStudioInstalled(studio.id, tenantId, done),
+    },
+  }
+}
+
 /**
- * What build_site installs: the owner's finished AI Site Studio session, else their "Your site" brief from the
- * onboarding draft; null when they chose to design the site themselves.
+ * What build_site installs, by the owner's "Your site" choice (site.mode on the onboarding draft): nothing when they
+ * design it themselves; else a site finished in the studio (whatever the mode); their brief for the AI; else the
+ * default pre-built site. Drafts from before site.mode: skip is "themselves", a brief of 10+ characters goes to the AI.
  */
-async function onboardingSite(tenantId: string) {
+async function onboardingSite(tenantId: string): Promise<OnboardingSite> {
   const { controlPlanePool, getDraft } = await import('@/lib/tenant-registry')
   const owner = await controlPlanePool()
     .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
@@ -803,35 +843,48 @@ async function onboardingSite(tenantId: string) {
   const ownerId = owner?.rows?.[0]?.owner_id
   if (!ownerId) return null
   const site = (await getDraft(ownerId).catch(() => null))?.data?.site as
-    | { skip?: boolean; description?: string; style?: string; references?: unknown[]; images?: boolean }
+    | { mode?: string; skip?: boolean; description?: string; style?: string; references?: unknown[]; images?: boolean }
     | undefined
-  if (site?.skip) return null
-  const { studioSiteForTenant, markStudioInstalled } = await import('@controller/lib/site-studio/sessions')
+  const mode = site?.mode === 'ai' || site?.mode === 'theme' || site?.mode === 'self' ? site.mode : null
+  if (mode === 'self' || (!mode && site?.skip)) return null
+  const { studioSiteForTenant } = await import('@controller/lib/site-studio/sessions')
   const studio = await studioSiteForTenant(tenantId).catch(() => null)
-  if (studio) {
-    const style = (studio.direction as { name?: string } | null)?.name
+  if (studio) return studioSite(studio, tenantId)
+  const description = String(site?.description ?? '').trim()
+  if (site && mode !== 'theme' && description.length >= 10) {
+    const { SITE_STYLE_IDS } = await import('@/lib/site/styles')
     return {
-      studio: {
-        id: studio.id,
-        // The brief, plan and direction go along so the store's Site Builder can change sections the studio way.
-        // freeUsed: a ready-made theme's site (no AI) leaves the store's free generation for Site Builder, unless the
-        // owner's free generation was used in the studio before it.
-        input: { pages: studio.pages, theme: studio.theme, ...(style ? { style } : {}), brief: studio.brief, plan: studio.plan, direction: studio.direction, freeUsed: !!studio.free_used_at },
-        installed: (done: boolean) => markStudioInstalled(studio.id, tenantId, done),
+      kind: 'brief',
+      brief: {
+        description: description.slice(0, 2000),
+        style: (SITE_STYLE_IDS as string[]).includes(String(site.style)) ? String(site.style) : 'auto',
+        references: (site.references ?? []).map(String).filter(u => /^https:\/\//i.test(u)).slice(0, 3),
+        images: site.images !== false,
       },
     }
   }
-  const description = String(site?.description ?? '').trim()
-  if (!site || description.length < 10) return null
-  const { SITE_STYLE_IDS } = await import('@/lib/site/styles')
-  return {
-    brief: {
-      description: description.slice(0, 2000),
-      style: (SITE_STYLE_IDS as string[]).includes(String(site.style)) ? String(site.style) : 'auto',
-      references: (site.references ?? []).map(String).filter(u => /^https:\/\//i.test(u)).slice(0, 3),
-      images: site.images !== false,
-    },
-  }
+  return { kind: 'theme', ownerId }
+}
+
+/** The default pre-built site: the default theme applied to the owner's studio (no AI), read back as a studio site. */
+async function defaultThemeSite(ownerId: string, tenantId: string): Promise<StudioSite | { error: string }> {
+  const { DEFAULT_THEME_ID } = await import('@/lib/site/themes/catalog')
+  const { applyTheme, openThemeStudio } = await import('@controller/lib/site-studio/themes')
+  const { studioSiteForTenant } = await import('@controller/lib/site-studio/sessions')
+  const opened = await openThemeStudio(ownerId, 'store')
+  if (!opened.ok) return { error: opened.error }
+  // Never over a site already there (built, building or installed): applyTheme refuses without replace.
+  const applied = await applyTheme(opened.session, DEFAULT_THEME_ID)
+  if (!applied.ok) return { error: `${DEFAULT_THEME_ID}: ${applied.error}` }
+  const studio = await studioSiteForTenant(tenantId)
+  return studio ? studioSite(studio, tenantId) : { error: 'the owner’s studio belongs to another store.' }
+}
+
+/** build_site's label (pipeline.ts SiteChoice): what onboardingSite says now, the pre-built site when it can't tell. */
+async function siteChoice(tenantId: string): Promise<SiteChoice> {
+  const site = await onboardingSite(tenantId).catch(() => ({ kind: 'theme' }) as const)
+  if (!site) return 'none'
+  return site.kind === 'studio' ? (site.ai ? 'studio-ai' : 'studio-theme') : site.kind === 'brief' ? 'ai' : 'theme'
 }
 
 /** One ping of the store's cron route; null when every check passes, else what failed. */
@@ -864,11 +917,16 @@ async function pingStoreCrons(url: string, host: string, slug: string, res: Reco
  */
 async function pinPipeline(job: ProvisioningJob, plan: string | null, res: Record<string, any>): Promise<PipelineDef> {
   const c = await jobCompute(job.tenant_id, plan, res)
+  const engine = process.env.PROVISIONING_COMPUTE === 'k8s' ? 'k8s' : 'ec2'
+  const provider = process.env.PROVISIONING_PROVIDER === 'aws' ? 'aws' : 'stub'
+  const restore = !!res.restoreFromKey
   const pipeline = buildPipeline(c.spec, plan, {
-    engine: process.env.PROVISIONING_COMPUTE === 'k8s' ? 'k8s' : 'ec2',
-    provider: process.env.PROVISIONING_PROVIDER === 'aws' ? 'aws' : 'stub',
-    restore: !!res.restoreFromKey,
+    engine,
+    provider,
+    restore,
     seed: !!res.seedProfile && !res.restoreFromKey,
+    // Only a pipeline with build_site needs to know.
+    ...(engine === 'k8s' && provider === 'aws' && !restore ? { site: await siteChoice(job.tenant_id) } : {}),
   })
   if (JSON.stringify(pipeline) !== JSON.stringify(job.pipeline ?? null)) await updateProvisioningJob(job.id, { pipeline })
   return pipeline

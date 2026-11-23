@@ -31,3 +31,15 @@ CREATE TABLE IF NOT EXISTS public.site_studio_sessions (
     created_at    timestamp with time zone NOT NULL DEFAULT now(),
     updated_at    timestamp with time zone NOT NULL DEFAULT now()
 );
+
+--
+-- site_studio_corrections: an owner's AI changes after their studio site is built (a section changed, a page
+-- designed again), counted per IST day across their studios. The first CORRECTIONS_FREE_PER_DAY are free; the rest
+-- are charged per correction to the AI wallet (controller-service/src/lib/site-studio/corrections.ts).
+--
+CREATE TABLE IF NOT EXISTS public.site_studio_corrections (
+    owner_id  uuid NOT NULL,
+    day       date NOT NULL,
+    used      integer NOT NULL DEFAULT 0, -- free corrections used that day
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
