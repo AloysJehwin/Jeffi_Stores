@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { controlPlanePool, getOwnerTenants, getProvisioningJob } from '@/lib/tenant-registry'
-import { cancelSubscription } from '@controller/lib/payments/razorpay-subscriptions'
+import { closeStoreLines } from '@controller/lib/billing/subscription'
 import { triggerProvisioning, resolveRestoreKey } from '@controller/lib/provisioning/trigger'
 import { describePipeline, ownerPipelineView } from '@controller/lib/provisioning/pipeline-view'
 
@@ -18,9 +18,10 @@ export const dynamic = 'force-dynamic'
 //
 //  provision    — (re)run the engine to stand up infra (first provision / operator retry)
 //  reprovision  — DNS-only re-apply after a plan change (never recreates infra)
-//  deprovision  — owner cancel: cancel the Razorpay subscription; the resulting
-//                 subscription.cancelled webhook performs the actual teardown so we never
-//                 tear down while the sub is still charging.
+//  deprovision  — owner cancel: the store's lines (plan and store add-ons) leave the workspace's
+//                 subscription at cycle end (lib/billing closeStoreLines); Showcase sites stay on it.
+//                 The store is torn down when its plan line ends (billing sweep / webhook), never
+//                 while it is still paid for.
 
 const Schema = z.object({
   action: z.enum(['provision', 'reprovision', 'deprovision']),
@@ -70,17 +71,19 @@ export async function POST(request: NextRequest) {
     if (!tenant.razorpay_subscription_id) {
       return NextResponse.json({ error: 'No active subscription to cancel' }, { status: 400 })
     }
-    const result = await cancelSubscription(tenant.razorpay_subscription_id, { cancelAtCycleEnd: true }).catch(
-      (e: any) => ({ error: e?.message }) as any
-    )
-    if ((result as any)?.error) {
-      return NextResponse.json({ error: (result as any).error || 'Failed to cancel subscription' }, { status: 500 })
+    try {
+      const r = await closeStoreLines(tenantId, { email: owner.email, name: owner.name })
+      const endsAt = r.status === 'cancelled' ? r.endsAt : r.status === 'scheduled' ? r.effectiveAt : r.quote.current?.currentEnd ?? null
+      return NextResponse.json({
+        status: 'cancellation_scheduled',
+        subscriptionStatus: r.status,
+        endsAt: endsAt ? Math.floor(Date.parse(endsAt) / 1000) : null,
+        // Showcase sites stay: the lower amount for them is approved here.
+        checkoutUrl: r.status === 'scheduled' ? r.checkoutUrl : null,
+      })
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Failed to cancel subscription' }, { status: 500 })
     }
-    return NextResponse.json({
-      status: 'cancellation_scheduled',
-      subscriptionStatus: (result as any).status,
-      endsAt: (result as any).endsAt,
-    })
   }
 
   const restoreFromKey = action === 'provision' ? await resolveRestoreKey(tenantId, tenant.slug) : undefined

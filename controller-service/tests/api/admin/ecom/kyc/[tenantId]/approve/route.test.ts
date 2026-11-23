@@ -34,8 +34,9 @@ vi.mock('@/lib/tenant-registry', () => ({
 
 vi.mock('@controller/lib/kyb/gate', () => ({ kybGate: vi.fn().mockResolvedValue({ ok: true }) }))
 
-vi.mock('@controller/lib/payments/razorpay-subscriptions', () => ({
-  createRazorpaySubscription: vi.fn(),
+vi.mock('@controller/lib/billing/subscription', () => ({
+  startStoreSubscription: vi.fn(),
+  currentSubscription: vi.fn(),
 }))
 
 vi.mock('@/lib/payments/razorpay-route', () => ({
@@ -86,7 +87,6 @@ import {
   getKyc,
   getOwnerById,
   getDraft,
-  saveSubscriptionId,
   saveLinkedAccountId,
   getOwnerBankAccount,
   getOwnerBankWithRoute,
@@ -95,7 +95,7 @@ import {
   reviewServiceApproval,
   controlPlanePool,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
+import { currentSubscription, startStoreSubscription } from '@controller/lib/billing/subscription'
 import {
   createLinkedAccount,
   createRouteStakeholder,
@@ -178,11 +178,14 @@ function primeHappyPath() {
   vi.mocked(persistLinkedAccountToOwnerBank).mockResolvedValue(undefined)
   vi.mocked(configureRouteSettlement).mockResolvedValue({ ok: true } as any)
   vi.mocked(listPlans).mockResolvedValue([{ slug: 'basic', name: 'Basic', tier: 1, monthly_price_inr: '499' }] as any)
-  vi.mocked(createRazorpaySubscription).mockResolvedValue({
-    subscriptionId: 'sub_123',
-    shortUrl: 'https://rzp.io/i/checkout',
+  vi.mocked(startStoreSubscription).mockResolvedValue({
+    status: 'checkout',
+    checkoutUrl: 'https://rzp.io/i/checkout',
+    subscriptionId: 'bs-1',
+    razorpaySubscriptionId: 'sub_123',
+    quote: {},
   } as any)
-  vi.mocked(saveSubscriptionId).mockResolvedValue(undefined)
+  vi.mocked(currentSubscription).mockResolvedValue(null)
   vi.mocked(startStore).mockResolvedValue(undefined)
   // controlPlanePool().query() is used for KYC status update and price lookup
   vi.mocked(controlPlanePool).mockReturnValue({
@@ -247,8 +250,7 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(createLinkedAccount).toHaveBeenCalled()
     expect(saveLinkedAccountId).toHaveBeenCalledWith(TENANT_ID, 'acc_link_123')
     expect(configureRouteSettlement).toHaveBeenCalled()
-    expect(createRazorpaySubscription).toHaveBeenCalled()
-    expect(saveSubscriptionId).toHaveBeenCalled()
+    expect(startStoreSubscription).toHaveBeenCalled()
     expect(sendKycApprovedEmail).toHaveBeenCalled()
   })
 
@@ -265,7 +267,7 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(setPaymentRequired).toHaveBeenCalledWith(TENANT_ID, false)
     expect(createLinkedAccount).toHaveBeenCalled()
     expect(startStore).toHaveBeenCalledWith({ id: TENANT_ID, store_request: null })
-    expect(createRazorpaySubscription).not.toHaveBeenCalled()
+    expect(startStoreSubscription).not.toHaveBeenCalled()
     expect(json.checkoutUrl).toBeUndefined()
     // Approved email without a checkout link ("we're building your store").
     expect(sendKycApprovedEmail).toHaveBeenCalledWith(
@@ -323,7 +325,7 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(json.ok).toBe(true)
     expect(json.linkedAccountId).toBeNull()
     expect(createLinkedAccount).not.toHaveBeenCalled()
-    expect(createRazorpaySubscription).toHaveBeenCalled()
+    expect(startStoreSubscription).toHaveBeenCalled()
   })
 
   it('continues when getDraft rejects (draft fetch is caught)', async () => {
@@ -341,7 +343,7 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(res.status).toBe(200)
     expect(json.ok).toBe(true)
     expect(json.linkedAccountId).toBeNull()
-    expect(createRazorpaySubscription).toHaveBeenCalled()
+    expect(startStoreSubscription).toHaveBeenCalled()
   })
 
   it('logs but continues when createRouteStakeholder throws', async () => {
@@ -389,7 +391,7 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
   // --- Subscription failure ---
 
   it('returns 500 with kycApproved:true when the subscription creation fails', async () => {
-    vi.mocked(createRazorpaySubscription).mockRejectedValue(new Error('Razorpay 5xx'))
+    vi.mocked(startStoreSubscription).mockRejectedValue(new Error('Razorpay 5xx'))
     const res = await POST(postReq(), params)
     const json = await res.json()
     expect(res.status).toBe(500)
@@ -399,12 +401,11 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(json.error).toMatch(/Razorpay subscription failed/)
     // approveKyc already ran before the subscription attempt
     expect(approveKyc).toHaveBeenCalled()
-    expect(saveSubscriptionId).not.toHaveBeenCalled()
   })
 
   it('surfaces the raw thrown value when the subscription error has no message', async () => {
     // err?.message ?? err → falls back to stringifying the thrown value
-    vi.mocked(createRazorpaySubscription).mockRejectedValue('plain string failure')
+    vi.mocked(startStoreSubscription).mockRejectedValue('plain string failure')
     const res = await POST(postReq(), params)
     const json = await res.json()
     expect(res.status).toBe(500)
@@ -490,17 +491,15 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(linkArg.gstNumber).toBeUndefined()
     expect(linkArg.city).toBe('India')
     // subscription still created with plan/interval fallbacks
-    expect(createRazorpaySubscription).toHaveBeenCalled()
+    expect(startStoreSubscription).toHaveBeenCalled()
   })
 
   it('defaults the billing interval to monthly when the tenant has none', async () => {
     vi.mocked(getTenant).mockResolvedValue({ ...TENANT, billing_interval: null } as any)
     const res = await POST(postReq(), params)
     expect(res.status).toBe(200)
-    const opts = vi.mocked(createRazorpaySubscription).mock.calls[0][0] as any
-    expect(opts.planSlug).toBe('basic')
-    expect(opts.interval).toBe('monthly')
-    expect(saveSubscriptionId).toHaveBeenCalledWith(TENANT_ID, 'sub_123', 'monthly', 'https://rzp.io/i/checkout')
+    // The engine reads the interval from the tenant row; the route passes the saved price.
+    expect(startStoreSubscription).toHaveBeenCalledWith(TENANT_ID, { email: expect.any(String), name: expect.anything() }, 499)
   })
 
   it('holds a store whose KYB is incomplete, unless the admin approves it anyway', async () => {
@@ -523,20 +522,22 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(res.status).toBe(409)
     expect(json.kycApproved).toBe(true)
     expect(json.error).toContain("'starter'")
-    expect(createRazorpaySubscription).not.toHaveBeenCalled()
+    expect(startStoreSubscription).not.toHaveBeenCalled()
   })
 
-  it('uses the default ECOM base url for the callback when env var is unset', async () => {
-    const prev = process.env.NEXT_PUBLIC_ECOM_URL
-    delete process.env.NEXT_PUBLIC_ECOM_URL
-    try {
-      const res = await POST(postReq(), params)
-      expect(res.status).toBe(200)
-      const opts = vi.mocked(createRazorpaySubscription).mock.calls[0][0] as any
-      expect(opts.callbackUrl).toContain('https://ecom.jeffistores.in/onboard/success')
-    } finally {
-      if (prev !== undefined) process.env.NEXT_PUBLIC_ECOM_URL = prev
-    }
+  it('answers a repeat approval with the checkout still open', async () => {
+    vi.mocked(startStoreSubscription).mockResolvedValue({ status: 'unchanged', quote: {} } as any)
+    vi.mocked(currentSubscription).mockResolvedValue({ checkoutUrl: 'https://rzp.io/i/open' } as any)
+    const res = await POST(postReq(), params)
+    expect(res.status).toBe(200)
+    expect((await res.json()).checkoutUrl).toBe('https://rzp.io/i/open')
+  })
+
+  it('fails when there is nothing to check out', async () => {
+    vi.mocked(startStoreSubscription).mockResolvedValue({ status: 'unchanged', quote: {} } as any)
+    const res = await POST(postReq(), params)
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/nothing to subscribe to/)
   })
 
   it('still returns 200 when the approval email send rejects (fire-and-forget, caught)', async () => {
