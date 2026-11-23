@@ -37,7 +37,7 @@ export type DesignOp =
 
 export class DesignError extends Error {}
 
-const fail = (msg: string): never => {
+function fail(msg: string): never {
   throw new DesignError(msg)
 }
 

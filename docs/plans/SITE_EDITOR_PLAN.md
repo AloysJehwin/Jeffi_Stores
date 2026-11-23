@@ -1,7 +1,24 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **proposed, awaiting decisions** (end of this doc). This replaces the form-based block editor with direct
-manipulation, Canva-style, for Showcase sites and the store's own site. AI-generated pages must be editable with it.
+Status: **phases 0–1 built** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
+per page with Phone/Tablet/Desktop breakpoints (2), a per-tenant rollout flag (8); the rest stay open. This replaces
+the form-based block editor with direct manipulation, Canva-style, for Showcase sites and the store's own site.
+AI-generated pages must be editable with it.
+
+**Built so far**
+- Model: `@jeffi/site-blocks` `code.ts` (tree types, `NODE_ID`); store-core `lib/site/code/ids.ts` (the compile's ids
+  mode), `print.ts`, and in `compile.ts` `sectionTree`, `compileCodeProps` (the one save path), `upgradeCodeProps` /
+  `upgradeCodeSections` (load), `canvasCodeSections` (the canvas draws ids on v1 sections too).
+- Operations and history: `@jeffi/site-blocks/design` (a subpath, so rendering never loads it). Panel classes:
+  `lib/site/code/classes.ts`.
+- Flag: `site_settings.site_editor_enabled = 'true'` (`siteEditorEnabled`). It turns on the canvas bridge and the v2
+  load (`GET /api/admin/site-builder/drafts/[id]?tree=1`).
+- Spike: `components/visitor/site/editor/SiteEditorBridge.tsx`, loaded lazily by `SiteEditorGate` with a preview token.
+  Messages are `site-editor:*` (see the file). Components (`<Link>`, parts) carry no `data-e` yet.
+- Tests: `tests/lib/site-code-roundtrip.test.ts` (225 template sections), `site-code-classes`, `site-editor-imports`,
+  `packages/site-blocks/tests/design.test.ts`.
+- Contract for phase 2: the visual editor saves a section's tree with `source` empty; source-level editors
+  (`literals.ts`, the AI) write `source`, which wins and rebuilds the tree.
 
 ## What exists
 

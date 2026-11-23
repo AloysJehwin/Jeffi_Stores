@@ -56,17 +56,22 @@ export default function SiteEditorBridge() {
       // Typed line breaks read as spaces, as JSX text does.
       const value = (el.textContent ?? '').replace(/\s*\n\s*/g, ' ')
       el.textContent = value
-      if (value !== before) send({ type: 'ops', block: blockOf(el), ops: [{ op: 'text', id: el.dataset.e, value } satisfies DesignOp] })
+      const id = el.dataset.e
+      if (id && value !== before) send({ type: 'ops', block: blockOf(el), ops: [{ op: 'text', id, value } satisfies DesignOp] })
     }
 
     /** One operation shown on the page; false when it isn't one the canvas can show (the soft refresh will). */
     const show = (block: unknown, op: DesignOp): boolean => {
       const els = 'id' in op ? findAll(block, op.id) : []
       if (!els.length) return false
-      if (op.op === 'text' && typeof op.value === 'string' && els.every(textOnly)) els.forEach(el => (el.textContent = op.value as string))
-      else if (op.op === 'classes' && Array.isArray(op.value)) els.forEach(el => setOwn(el, withBreakpoint(own(el), op.bp, op.value as string[])))
-      else if (op.op === 'attr' && op.name === 'className') els.forEach(el => setOwn(el, typeof op.value === 'string' ? op.value : ''))
-      else return false
+      try {
+        if (op.op === 'text' && typeof op.value === 'string' && els.every(textOnly)) els.forEach(el => (el.textContent = op.value as string))
+        else if (op.op === 'classes' && Array.isArray(op.value)) els.forEach(el => setOwn(el, withBreakpoint(own(el), op.bp, op.value as string[])))
+        else if (op.op === 'attr' && op.name === 'className') els.forEach(el => setOwn(el, typeof op.value === 'string' ? op.value : ''))
+        else return false
+      } catch {
+        return false
+      }
       return true
     }
 
