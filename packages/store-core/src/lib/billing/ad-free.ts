@@ -29,19 +29,21 @@ export async function getAdFree(tenantId: string): Promise<AdFreeStatus> {
   }
 }
 
-/** Whether a store hides ads. A control-plane error hides them (a paying store never shows one) and isn't cached. */
+/**
+ * Whether a store hides ads. On a control-plane error it keeps the store's last known answer, however old; with
+ * none it hides ads, so a paying store never shows one.
+ */
 export async function storeIsAdFree(tenantId: string | null | undefined): Promise<boolean> {
   if (isFlagshipTenant(tenantId)) return false
   const hit = cache.get(tenantId!)
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.adFree
-  let adFree: boolean
   try {
-    adFree = (await getAdFree(tenantId!)).active
+    const adFree = (await getAdFree(tenantId!)).active
+    cache.set(tenantId!, { at: Date.now(), adFree })
+    return adFree
   } catch {
-    return true
+    return hit ? hit.adFree : true
   }
-  cache.set(tenantId!, { at: Date.now(), adFree })
-  return adFree
 }
 
 /**
