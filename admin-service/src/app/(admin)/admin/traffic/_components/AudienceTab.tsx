@@ -2,7 +2,7 @@
 
 import { Empty, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
 import type { AudienceData, ShareRow } from '@/lib/traffic/types'
-import { Donut, HBars, PALETTE } from './charts'
+import { Donut, HBars, PALETTE } from '@/components/admin/traffic/charts'
 import { Note, rateText, ratio } from './shared'
 
 const DEVICE_COLORS: Record<string, string> = { Mobile: '#3b82f6', Tablet: '#8b5cf6', Desktop: '#22c55e', Bot: '#6b7280' }

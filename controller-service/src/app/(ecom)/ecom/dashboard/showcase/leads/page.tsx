@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { BarChart3 } from 'lucide-react'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { consoleShowcase } from '@controller/lib/showcase/state'
 import { listShowcaseLeads } from '@/lib/showcase/store'
@@ -31,7 +32,19 @@ export default async function ShowcaseLeadsPage({ searchParams }: { searchParams
   const first = await listShowcaseLeads(site.id, { limit: PAGE })
   return (
     <>
-      <PageHeader eyebrow="Showcase" title="Enquiries" description={`Messages from the contact form on ${showcaseHost(site.slug)}. Each one is also emailed to you; mark it handled once you have answered.`} />
+      <PageHeader
+        eyebrow="Showcase"
+        title="Enquiries"
+        description={`Messages from the contact form on ${showcaseHost(site.slug)}. Each one is also emailed to you; mark it handled once you have answered.`}
+        actions={
+          <Link
+            href={`/dashboard/showcase/${site.id}/analytics?tab=leads&tenant=${encodeURIComponent(tenant.slug)}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border-default px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-secondary"
+          >
+            <BarChart3 className="h-4 w-4" /> Where they come from
+          </Link>
+        }
+      />
       <LeadsClient initial={first} pageSize={PAGE} tenantSlug={tenant.slug} />
     </>
   )

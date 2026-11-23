@@ -5,12 +5,13 @@ import { NextRequest } from 'next/server'
 // The Showcase contact form's endpoint: what it keeps, who it refuses, the field it names and where a no-script
 // visitor lands.
 
-const { after, insertShowcaseLead, siteForHost, hit, emailLeadToOwner } = vi.hoisted(() => ({
+const { after, insertShowcaseLead, siteForHost, hit, emailLeadToOwner, visitForLead } = vi.hoisted(() => ({
   after: vi.fn(),
   insertShowcaseLead: vi.fn(),
   siteForHost: vi.fn(),
   hit: vi.fn(),
   emailLeadToOwner: vi.fn(),
+  visitForLead: vi.fn(),
 }))
 
 vi.mock('next/server', async importOriginal => ({ ...(await importOriginal<typeof import('next/server')>()), after }))
@@ -18,6 +19,7 @@ vi.mock('@/lib/showcase/store', () => ({ insertShowcaseLead }))
 vi.mock('@showcase/lib/site', () => ({ siteForHost }))
 vi.mock('@showcase/lib/rate-limit', () => ({ hit }))
 vi.mock('@showcase/lib/notify', () => ({ emailLeadToOwner }))
+vi.mock('@showcase/lib/track', () => ({ visitForLead, visitorKey: (site: string, ip: string, ua: string) => `key:${site}:${ip}:${ua}` }))
 
 import { POST } from '@showcase/app/api/leads/route'
 
@@ -39,6 +41,7 @@ describe('POST /api/leads (Showcase)', () => {
     hit.mockResolvedValue(1)
     insertShowcaseLead.mockResolvedValue(SAVED)
     emailLeadToOwner.mockResolvedValue(undefined)
+    visitForLead.mockResolvedValue(null)
   })
 
   it('saves the enquiry, cleaned, and emails the owner once it has answered', async () => {
@@ -53,6 +56,14 @@ describe('POST /api/leads (Showcase)', () => {
     expect(after).toHaveBeenCalledOnce()
     await after.mock.calls[0][0]()
     expect(emailLeadToOwner).toHaveBeenCalledWith(SITE, SAVED)
+  })
+
+  it('credits the enquiry to the visit it came from, when one matches', async () => {
+    visitForLead.mockResolvedValueOnce('visit-1')
+    const res = await POST(json({ name: 'Priya', phone: '9876543210' }, { 'user-agent': 'Safari' }))
+    expect(res.status).toBe(201)
+    expect(visitForLead).toHaveBeenCalledWith('site-1', `key:site-1:${IP}:Safari`)
+    expect(insertShowcaseLead).toHaveBeenCalledWith('site-1', { name: 'Priya', phone: '9876543210', email: '', message: '', sessionId: 'visit-1' })
   })
 
   it('answers a filled honeypot as sent and keeps nothing', async () => {

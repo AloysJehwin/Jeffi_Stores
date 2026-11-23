@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Badge, Kpi, KpiGrid, Section, Table, count, money, when, type Col } from '@/components/admin/channels/ui'
 import type { RealtimeData } from '@/lib/traffic/types'
 import { ap } from '@/lib/shared/admin-path'
-import { BarSeries, HBars } from './charts'
+import { BarSeries, HBars } from '@/components/admin/traffic/charts'
 import { Note } from './shared'
 
 type Sess = RealtimeData['sessions'][number]
