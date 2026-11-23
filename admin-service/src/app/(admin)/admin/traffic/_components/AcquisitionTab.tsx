@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, Tabs, change, count, money, pct, type Col } from '@/components/admin/channels/ui'
 import type { AcquisitionData, ChannelRow, DrillRow } from '@/lib/traffic/types'
-import { BarSeries } from './charts'
+import { BarSeries } from '@/components/admin/traffic/charts'
 import { Change, Note, bucketLabel, rateText, ratio } from './shared'
 
 type Drill = 'source' | 'campaign' | 'referrer'

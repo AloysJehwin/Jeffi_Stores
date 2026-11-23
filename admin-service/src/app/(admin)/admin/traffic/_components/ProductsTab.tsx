@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Empty, Kpi, KpiGrid, Section, Table, count, inputCls, money, type Col } from '@/components/admin/channels/ui'
 import type { ProductRow, ProductsData } from '@/lib/traffic/types'
-import { HBars } from './charts'
+import { HBars } from '@/components/admin/traffic/charts'
 import { Note, productHref, rateText, ratio } from './shared'
 
 const name = (id: string, n: string) => (
