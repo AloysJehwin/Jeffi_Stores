@@ -178,8 +178,11 @@ async function ContactDetails({ p }: { p: P }) {
 }
 
 /** One content block, or null when the type is not a content block. */
-/** `always`: a code section draws even when its store data is empty (the page's first block, the Site Builder editor). */
-export function ContentBlock({ block, priority = false, always = false, page = null }: { block: Block; priority?: boolean; always?: boolean; page?: PageKey | null }) {
+/**
+ * `always`: a code section draws even when its store data is empty (the page's first block, the Site Builder editor).
+ * `preview`: the Site Builder canvas (a preview token), where code sections carry their `data-e` node ids.
+ */
+export function ContentBlock({ block, priority = false, always = false, page = null, preview = false }: { block: Block; priority?: boolean; always?: boolean; page?: PageKey | null; preview?: boolean }) {
   const p = block.props
   switch (block.type) {
     case 'rich_text':
@@ -195,7 +198,7 @@ export function ContentBlock({ block, priority = false, always = false, page = n
     case 'composed':
       return <ComposedBlock props={p} priority={priority} />
     case 'code_section':
-      return <CodeSection section={p.compiled as CompiledSection | null} page={page} priority={priority} always={always} />
+      return <CodeSection section={p.compiled as CompiledSection | null} page={page} priority={priority} always={always} preview={preview} />
     default:
       return null
   }

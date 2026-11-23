@@ -374,6 +374,8 @@ export const CodeSectionProps = z.object({
   source: z.string().max(MAX_SOURCE_BYTES).default(DEFAULT_CODE),
   /** Built from `source` by recompileCodeSections on save; never trusted from a client. */
   compiled: z.unknown().nullable().default(null),
+  /** v2: the visual editor's tree (code/ids.ts), rebuilt by the compile on save; absent on v1 sections. */
+  tree: z.unknown().optional(),
 })
 export const CODE_BLOCKS = [
   defineBlock<z.infer<typeof CodeSectionProps>>({

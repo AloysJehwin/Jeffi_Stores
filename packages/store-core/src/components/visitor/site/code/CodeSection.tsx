@@ -144,6 +144,7 @@ export default async function CodeSection({
   priority = false,
   always = false,
   anchors = null,
+  preview = false,
 }: {
   section: CompiledSection | null | undefined
   id?: string
@@ -153,6 +154,8 @@ export default async function CodeSection({
   always?: boolean
   /** A one-page site's ids (planSections): links to a section the page does not draw are left out. */
   anchors?: Anchors | null
+  /** The editor's canvas, with a preview token: elements carry `data-e` node ids. */
+  preview?: boolean
 }) {
   const s = section as Partial<CompiledSection> | null | undefined
   if (!s || typeof s !== 'object' || !s.ast || typeof s.ast !== 'object') return null
@@ -171,7 +174,7 @@ export default async function CodeSection({
   // CSS saved in an earlier format gets this section's mark here, once per process.
   const css = inertCss(currentCss(s.css, id))
   const rows = page === 'showcase' ? placeholderRows(s.ast) : null
-  const env = makeEnv({ data: src, page, sectionId: id, priority, empty, taxonomy, anchors, rows })
+  const env = makeEnv({ data: src, page, sectionId: id, priority, empty, taxonomy, anchors, rows, preview })
   return (
     <div data-code-section={id} id={blockId && /^[A-Za-z0-9_-]{1,64}$/.test(blockId) ? blockId : undefined}>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}

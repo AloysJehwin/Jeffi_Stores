@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { PAGE_KEYS, SITE_AUDIENCES, SITE_SURFACES } from '@jeffi/site-blocks'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
-import { discardSiteDraft, getSiteDraft, publishSiteDraft, saveDraftPage, saveDraftTheme, SiteDocInvalid } from '@/lib/site/store'
+import { discardSiteDraft, editorDraft, getSiteDraft, publishSiteDraft, saveDraftPage, saveDraftTheme, SiteDocInvalid } from '@/lib/site/store'
 import { afterSiteChange } from '@/lib/site/after-publish'
 import { saveStudioContext } from '@/lib/site/studio/context'
 import { draftStudioContext } from '@/lib/site/studio/redesign'
@@ -27,7 +27,9 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   const admin = await requireAdminScope(request, 'settings:read')
   if (admin instanceof NextResponse) return admin
   const draft = await getSiteDraft((await params).id)
-  return draft ? NextResponse.json({ draft }) : NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+  if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+  // ?tree=1: the visual editor's load, with code sections as v2 trees where the store has the editor on.
+  return NextResponse.json({ draft: request.nextUrl.searchParams.get('tree') === '1' ? await editorDraft(draft) : draft })
 }
 
 /** Saves one page's document and/or a theme into the draft. */
