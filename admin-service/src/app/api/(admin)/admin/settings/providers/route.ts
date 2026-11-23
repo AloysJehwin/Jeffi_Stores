@@ -12,6 +12,7 @@ import {
   setProviderSetting,
 } from '@/lib/providers/policy'
 import { messagingProviderReadiness } from '@/lib/shared/messaging'
+import { aiGatewayHeaders } from '@/lib/shared/ai-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +39,7 @@ async function gatewayProviders(): Promise<unknown | null> {
   const base = (process.env.AI_GATEWAY_URL || '').replace(/\/$/, '')
   if (!base) return null
   try {
-    const r = await fetch(`${base}/v1/providers`, { signal: AbortSignal.timeout(2500), cache: 'no-store' })
+    const r = await fetch(`${base}/v1/providers`, { headers: aiGatewayHeaders(), signal: AbortSignal.timeout(2500), cache: 'no-store' })
     return r.ok ? await r.json() : null
   } catch {
     return null

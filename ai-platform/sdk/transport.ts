@@ -5,13 +5,18 @@ import type { SdkConfig } from './config'
 // returns the final JSON, so the SDK stays synchronous (await) while durability
 // (queue + retries) lives entirely server-side. The caller never manages jobIds.
 
+/** Bearer auth for /v1 calls; empty when no token is configured. */
+export function authHeaders(config: SdkConfig): Record<string, string> {
+  return config.token ? { Authorization: `Bearer ${config.token}` } : {}
+}
+
 export async function post<T>(config: SdkConfig, path: string, body: unknown): Promise<T> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), config.requestTimeoutMs)
   try {
     const res = await fetch(`${config.gatewayUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(config) },
       signal: ctrl.signal,
       body: JSON.stringify(body),
     })
@@ -32,7 +37,7 @@ export async function get<T>(config: SdkConfig, path: string): Promise<T> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), config.requestTimeoutMs)
   try {
-    const res = await fetch(`${config.gatewayUrl}${path}`, { signal: ctrl.signal })
+    const res = await fetch(`${config.gatewayUrl}${path}`, { headers: authHeaders(config), signal: ctrl.signal })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
       throw new AiClientError(`AI gateway HTTP ${res.status}: ${detail}`, 'gateway')
@@ -68,7 +73,7 @@ export async function* postNdjson<T>(config: SdkConfig, path: string, body: unkn
   try {
     const res = await fetch(`${config.gatewayUrl}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(config) },
       signal: ctrl.signal,
       body: JSON.stringify(body),
     })

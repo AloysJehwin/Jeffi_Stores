@@ -1,5 +1,5 @@
 import { loadConfig, type SdkConfig } from './config'
-import { post, get, getHealth, postNdjson } from './transport'
+import { post, get, getHealth, postNdjson, authHeaders } from './transport'
 import { AiClientError } from './types'
 import type {
   AiChatRequest, AiChatResponse, AiChatStreamEvent,
@@ -84,6 +84,11 @@ export async function videoJob(jobId: string): Promise<VideoJobResponse> {
 /** Which providers the gateway can route to, and its default order per capability. */
 export async function providers(): Promise<ProvidersResponse> {
   return get<ProvidersResponse>(cfg(), '/v1/providers')
+}
+
+/** Headers to send when fetching a returned gateway file URL (/v1/files/<id>) yourself. */
+export function fileHeaders(): Record<string, string> {
+  return authHeaders(cfg())
 }
 
 // The gateway returns /v1/files/<id> unless AI_PUBLIC_URL is set; resolve against the gateway URL.

@@ -77,11 +77,18 @@ echo "== Smoke test"
 ok=false
 for _ in $(seq 1 20); do curl -fsS --max-time 5 $GATEWAY/healthz >/dev/null && { ok=true; break; }; sleep 3; done
 $ok || { echo "gateway not healthy after rollout" >&2; exit 1; }
-curl -fsS --max-time 10 $GATEWAY/v1/providers; echo
+# /v1 needs the gateway's bearer token once AI_GATEWAY_TOKEN is set; read from its Secret into a 0600 header file
+# (never argv). Empty file = no header. A "new,old" rotation value sends the first.
+auth=$work/auth.header
+(umask 077
+ tok=$($KUBECTL -n ai-platform get secret ai-gateway-secret -o jsonpath='{.data.AI_GATEWAY_TOKEN}' 2>/dev/null | base64 -d 2>/dev/null || true)
+ tok=${tok%%,*}
+ if [ -n "$tok" ]; then printf 'Authorization: Bearer %s\n' "$tok" > "$auth"; else : > "$auth"; fi)
+curl -fsS --max-time 10 -H "@$auth" $GATEWAY/v1/providers; echo
 if $ocr; then
   # The sample through the gateway the way KYB reads a document: PaddleOCR only, 503 when it is down.
   printf '{"data":"%s","mime_type":"image/png"}' "$(base64 -w0 "$src/paddleocr/sample.png")" \
-    | curl -fsS --max-time 60 -H 'Content-Type: application/json' --data-binary @- $GATEWAY/v1/ocr; echo
+    | curl -fsS --max-time 60 -H 'Content-Type: application/json' -H "@$auth" --data-binary @- $GATEWAY/v1/ocr; echo
 fi
 
 echo "== Keeping the source as $LIVE (previous in $LIVE.prev)"

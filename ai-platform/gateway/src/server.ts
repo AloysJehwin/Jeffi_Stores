@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import IORedis from 'ioredis'
 import pg from 'pg'
 import { CONFIG, modelForHint, claudeModelForHint } from './config'
+import { authorized } from './auth'
 import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
 import { startUsdInrRefresh } from './fx'
 import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicVision } from './providers/anthropic'
@@ -316,6 +317,10 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', 'http://gateway')
     const path = url.pathname
+    if (!authorized(path, req.headers.authorization, CONFIG.gatewayTokens)) {
+      res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer' })
+      return void res.end(JSON.stringify({ error: 'unauthorized' }))
+    }
     if (req.method === 'GET' && (path === '/readyz' || (path === '/healthz' && url.searchParams.has('deep')))) {
       const r = await readiness()
       return json(res, r.ok ? 200 : 503, r)
@@ -379,5 +384,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(CONFIG.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}]`)
+  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}], auth ${CONFIG.gatewayTokens.length ? 'on' : 'OFF (AI_GATEWAY_TOKEN unset)'}`)
 })
