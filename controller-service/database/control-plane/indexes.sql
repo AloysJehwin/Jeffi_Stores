@@ -102,3 +102,14 @@ CREATE INDEX IF NOT EXISTS idx_tenant_compliance_documents_owner ON public.tenan
 CREATE INDEX IF NOT EXISTS idx_tenant_compliance_documents_expiry ON public.tenant_compliance_documents USING btree (expires_on) WHERE (expires_on IS NOT NULL);
 -- The ai_hold_sweep cron's scan: open holds by age.
 CREATE INDEX IF NOT EXISTS idx_ai_wallet_holds_open ON public.ai_wallet_holds USING btree (started_at) WHERE (settled_at IS NULL);
+-- One subscription a workspace is billed on; one open line per thing billed.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_billing_subscriptions_current ON public.billing_subscriptions USING btree (tenant_id) WHERE is_current;
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_tenant ON public.billing_subscriptions USING btree (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_grace ON public.billing_subscriptions USING btree (grace_until) WHERE (grace_until IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_billing_lines_open ON public.billing_lines USING btree (tenant_id, kind, ref) WHERE (status <> 'ended');
+-- The billing_sweep cron's scans.
+CREATE INDEX IF NOT EXISTS idx_billing_lines_grace ON public.billing_lines USING btree (grace_until) WHERE (grace_until IS NOT NULL AND status <> 'ended');
+CREATE INDEX IF NOT EXISTS idx_billing_lines_trial ON public.billing_lines USING btree (trial_ends_at) WHERE (status = 'trial');
+CREATE INDEX IF NOT EXISTS idx_billing_lines_ends ON public.billing_lines USING btree (ends_at) WHERE (status = 'ending');
+CREATE INDEX IF NOT EXISTS idx_billing_charges_tenant ON public.billing_charges USING btree (tenant_id, charged_at DESC);
+CREATE INDEX IF NOT EXISTS idx_billing_charges_charged ON public.billing_charges USING btree (charged_at);
