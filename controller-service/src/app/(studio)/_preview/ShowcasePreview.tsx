@@ -1,6 +1,8 @@
 import { cssVarsRule, googleFontsHref, normalizeTheme, themeCssVars, topBlocks } from '@jeffi/site-blocks'
 import type { CompiledSection } from '@/lib/site/code/compile'
 import CodeSection, { planSections } from '@/components/visitor/site/code/CodeSection'
+import PhotoCredits from '@/components/visitor/site/PhotoCredits'
+import { pictureCredits } from '@/lib/ai/stock-credits'
 import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
 import { getShowcaseByOwner } from '@/lib/showcase/store'
@@ -48,7 +50,10 @@ html{scroll-behavior:smooth}`
     <>
       <link rel="stylesheet" href={googleFontsHref(theme)} />
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <div className="studio-preview">{body}</div>
+      <div className="studio-preview">
+        {body}
+        <PhotoCredits credits={pictureCredits(site?.content.pictures)} className="px-4 py-4 text-center text-xs text-foreground-muted" />
+      </div>
       <PreviewBridge audience="store" pages={[SHOWCASE_PAGE_KEY]} />
     </>
   )

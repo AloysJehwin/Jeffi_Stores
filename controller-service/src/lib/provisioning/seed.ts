@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { catalogFor, SEED_PROFILES } from './seed-catalog'
 import { DEFAULT_SECTIONS, HOMEPAGE_SURFACES } from '@/lib/catalog/homepage-sections'
 import type { SampleCatalog } from '@/lib/site/data/types'
+import { cleanStockCredit, isStockImageUrl, STOCK_CREDITS_SETTING, type StockCredit } from '@/lib/ai/stock-credits'
 import { dbTarget, tenantAdminPool, type DbAuth } from './tenant-admin-pool'
 
 /**
@@ -236,6 +237,21 @@ export async function seedStudioCatalog(
         )
         counts.images++
       }
+    }
+
+    // Stock photos keep their credits (the store's footer draws them while a product or category uses the photo).
+    const credits: Record<string, StockCredit> = {}
+    for (const p of catalog.products ?? []) {
+      const url = (p.images ?? []).find(isUrl)
+      const credit = url && isStockImageUrl(url) ? cleanStockCredit(p.imageCredit) : null
+      if (url && credit) credits[url] = credit
+    }
+    if (Object.keys(credits).length) {
+      await client.query(
+        `INSERT INTO site_settings (key, value, data_type, description, updated_at) VALUES ($1, $2, 'json', 'Credits for stock photos by image URL (lib/site/photo-credits.ts)', now())
+         ON CONFLICT (key) DO UPDATE SET value = (CASE WHEN site_settings.value ~ '^\\s*\\{' THEN site_settings.value::jsonb ELSE '{}'::jsonb END || EXCLUDED.value::jsonb)::text, updated_at = now()`,
+        [STOCK_CREDITS_SETTING, JSON.stringify(credits)]
+      )
     }
 
     const first = (catalog.categories ?? []).find(c => catIds.has(c.slug))

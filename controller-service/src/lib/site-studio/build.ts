@@ -44,7 +44,7 @@ export { buildOrder }
 
 /** A photo for every sample product (the new store is seeded with them), made last from what the free budget has left. */
 const PICTURES = Number(process.env.SITE_STUDIO_SAMPLE_PICTURES ?? Infinity) // a cap; 0 turns them off
-/** Photos are skipped when less than this (₹) is left, so the budget goes to pages first. */
+/** Made (AI) photos are skipped when less than this (₹) is left, so the budget goes to pages first; stock ones are free. */
 const PICTURE_RESERVE_INR = 15
 /** A sample product the photo step can still make a photo for. */
 const unpictured = (p: SampleCatalog['products'][number]) => !p.images?.length && !!p.imagePrompt
@@ -117,13 +117,13 @@ export async function runStudioBuild(session: StudioSession, send: SseSend): Pro
           send('page-failed', { key: p.key, label: p.label, error: 'This page could not be designed. You can rebuild it once the rest is done.' })
         }
       }
-      // Kept out of the store's gallery (skipGallery); a failure or a low budget leaves the placeholders.
-      if (PICTURES > 0 && done.includes('store:home') && studioBudgetLeft() > PICTURE_RESERVE_INR) {
+      // Kept out of the store's gallery (skipGallery); stock photos are free, so a low budget only stops made ones.
+      if (PICTURES > 0 && done.includes('store:home')) {
         const catalog = (await getStudioSessionById(id))?.catalog as SampleCatalog | null
         if (catalog && catalog.products.some(unpictured)) {
           send('status', { message: 'Adding product photos' })
           await updateStudioSession(id, { progress: progress(undefined, 'Adding product photos') })
-          pictures = await addPictures(catalog, ctx.brief, PICTURES).catch(err => ({ made: 0, error: errText(err) }))
+          pictures = await addPictures(catalog, ctx.brief, PICTURES, { ai: studioBudgetLeft() > PICTURE_RESERVE_INR }).catch(err => ({ made: 0, error: errText(err) }))
           if (pictures.made > 0) {
             await updateStudioSession(id, { catalog })
             send('catalog', { products: catalog.products.length, pictures: true })

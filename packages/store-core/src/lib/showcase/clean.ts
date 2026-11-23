@@ -1,4 +1,5 @@
 import { socialUrl, whatsappDigits } from '@/lib/catalog/store-socials'
+import { cleanStockCredit, isStockImageUrl } from '@/lib/ai/stock-credits'
 import type { ShowcaseBusiness, ShowcaseContent, ShowcaseFaq, ShowcasePagePicture, ShowcaseReview, ShowcaseService, ShowcaseStat, ShowcaseWork, SocialNetwork } from './types'
 
 // What an owner types into a Showcase (the signup's Details step, the dashboard editor), trimmed, capped and checked:
@@ -88,9 +89,10 @@ export function cleanContent(input: unknown): ShowcaseContent {
     .map(x => ({ q: text(x.q ?? x.question, 200), a: para(x.a ?? x.answer, 1500), ...ai(x) }))
     .filter(x => x.q && x.a)
     .slice(0, SHOWCASE_LIMITS.faqs)
+  // A credit stays only while the picture is still the stock file it names (a replaced picture loses it).
   const pictures: ShowcasePagePicture[] = list(c.pictures)
     .map(rec)
-    .map(x => opt({ image: https(x.image), alt: text(x.alt, 120), ...ai(x) }) as ShowcasePagePicture)
+    .map(x => opt({ image: https(x.image), alt: text(x.alt, 120), ...ai(x), credit: isStockImageUrl(x.image) ? cleanStockCredit(x.credit) : null }) as ShowcasePagePicture)
     .filter(x => x.image)
     .slice(0, SHOWCASE_LIMITS.pictures)
   return { services, work, reviews, stats, faqs, ...(pictures.length ? { pictures } : {}) }
