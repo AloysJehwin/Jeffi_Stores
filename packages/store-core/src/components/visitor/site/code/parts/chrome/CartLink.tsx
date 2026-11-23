@@ -1,29 +1,27 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { CART_GLYPH } from './marks'
+import { useFlyToCart } from '@/contexts/FlyToCartContext'
+import { useCartPulse } from '@/lib/client/use-cart-pulse'
 
 export const HEADER_CART_CLASS =
   'hidden sm:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group'
 
 /** The cart icon with its count, which pulses when something is added; the header's and the AI's <CartIcon>. */
 export default function CartLink({ count, showCount = true, className = HEADER_CART_CLASS }: { count: number; showCount?: boolean; className?: string }) {
-  const [pulseBadge, setPulseBadge] = useState(false)
-  const prevCount = useRef(count)
+  const pulseBadge = useCartPulse(count)
+  const linkRef = useRef<HTMLAnchorElement | null>(null)
+  const fly = useFlyToCart()
 
   useEffect(() => {
-    if (count > prevCount.current) {
-      setPulseBadge(true)
-      const t = setTimeout(() => setPulseBadge(false), 500)
-      prevCount.current = count
-      return () => clearTimeout(t)
-    }
-    prevCount.current = count
-  }, [count])
+    fly?.setCartTarget(linkRef.current)
+    return () => fly?.setCartTarget(null)
+  }, [fly])
 
   return (
-    <Link href="/cart" aria-label={count > 0 ? `Cart, ${count} items` : 'Cart'} className={className}>
+    <Link ref={linkRef} href="/cart" aria-label={count > 0 ? `Cart, ${count} items` : 'Cart'} className={className}>
       <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={CART_GLYPH} />
       </svg>
