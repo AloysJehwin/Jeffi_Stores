@@ -5,6 +5,7 @@ import { getLayoutSections } from '@/lib/catalog/homepage-layout'
 import { LISTING_PAGE_SIZE } from '@/lib/catalog/listing-model'
 import { getWebSurface } from '@/lib/catalog/web-surface'
 
+// In (index) so this skeleton covers /products only: above [slug] it was sent first on every detail page.
 export default async function Loading() {
   const studio = await studioSkeleton('products', <ProductsListingSkeleton />)
   if (studio) return studio
