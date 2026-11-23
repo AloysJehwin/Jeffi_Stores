@@ -4,9 +4,20 @@
 // Real Postgres: catalog list/detail/variants/primary-image reads, product_views insert,
 // admin-gated PATCH (401/403/400/200 + row), buy-now-quote resolve, affinity validation,
 // listing model, ILIKE search. Opt-in via API_DB=1.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { API_DB_ENABLED, requireTestDb, FIXTURES, uniqueSuffix } from '../../../packages/store-core/integration-tests/db/harness'
 import { makeCustomerSession, makeAdminSession, apiRequest, endPool } from '../../../packages/store-core/integration-tests/db/helpers'
+
+// The /products/search route awaits embed() (AI gateway) for a semantic pass before responding; there is no
+// gateway in the test env, so stub rag.embed to throw fast — semanticSearch() swallows it and returns [],
+// and the route falls back to its real Postgres ILIKE query (what these tests assert). DB stays real.
+// embed() throws before runWithHnswTuning is reached, so only embed needs stubbing; the real one is re-exported.
+vi.mock('@/lib/shared/rag', async (orig) => ({
+  ...(await orig<typeof import('@/lib/shared/rag')>()),
+  embed: vi.fn(async () => {
+    throw new Error('embed disabled in api-db tests')
+  }),
+}))
 
 describe.skipIf(!API_DB_ENABLED)('products (public) API (real DB)', () => {
   let db: typeof import('@/lib/shared/db')
