@@ -103,6 +103,9 @@ export const isThemeStyle = (v: unknown): v is ThemeStyleId => (THEME_STYLES as 
 /** `minimalist.ocean` */
 export const themeIdOf = (style: ThemeStyleId, palette: string) => `${style}.${palette}`
 
+/** The pre-built site provisioning applies when the owner chose a theme but applied none: the first style's first palette. */
+export const DEFAULT_THEME_ID = themeIdOf(THEME_STYLES[0], THEME_PALETTES[THEME_STYLES[0]][0].id)
+
 export function parseThemeId(id: unknown): { style: ThemeStyleId; palette: ThemePalette } | null {
   if (typeof id !== 'string') return null
   const [style, paletteId] = id.split('.')

@@ -75,6 +75,15 @@ describe('buildPipeline', () => {
     expect(jobIds(buildPipeline(spec('dedicated'), 'pro', opts({ engine: 'ec2' })))).not.toContain('crons')
   })
 
+  it('labels the site step by what it installs, the pre-built site by default', () => {
+    const label = (site?: PipelineOptions['site']) => buildPipeline(spec('node'), 'basic', opts({ site })).jobs.find(j => j.id === 'site')?.steps[0].label
+    expect(label()).toBe('Set up your pre-built site')
+    expect(label('studio-theme')).toBe('Set up your pre-built site')
+    expect(label('studio-ai')).toBe('Install your AI-designed site')
+    expect(label('ai')).toBe('Build your site with AI')
+    expect(label('none')).toBe('Keep the standard pages')
+  })
+
   it('every step is unique and has a catalog policy', () => {
     for (const mode of ['node', 'shared', 'dedicated'] as const)
       for (const engine of ['k8s', 'ec2'] as const) {

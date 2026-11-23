@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { brief, cleanAnswers, plan, planShowcase, showcaseBrief, suggestAnswer, suggestShowcaseAnswer } from '@/lib/site/studio'
 import { aiDownFrom, aiUnavailable, fail, readJson, studioOf, studioView } from '@controller/lib/site-studio/http'
 import { refundTweaks, spendTweaks, updateStudioSession } from '@controller/lib/site-studio/sessions'
-import { allowanceOf, COST, TWEAKS_PER_DAY } from '@controller/lib/site-studio/allowance'
+import { allowanceOf, COST, HELP_PER_DAY } from '@controller/lib/site-studio/allowance'
 import { funded, preBuildBudget } from '@controller/lib/site-studio/funded'
 import { designLocked } from '@controller/lib/site-studio/rules'
 import { studioStoreContext } from '@controller/lib/site-studio/context'
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   let current = (await updateStudioSession(session.id, { answers: answers as unknown as Record<string, unknown> })) ?? session
 
   if (help) {
-    if (!(await spendTweaks(session.id, COST.help, TWEAKS_PER_DAY))) return fail('You have used today’s free AI help. Write it in your own words, or come back tomorrow.', 429)
+    if (!(await spendTweaks(session.id, COST.help, HELP_PER_DAY))) return fail('You have used today’s free AI help. Write it in your own words, or come back tomorrow.', 429)
     try {
       const suggestion = await funded(session.id, preBuildBudget(session), () => (showcase ? suggestShowcaseAnswer(help, answers) : suggestAnswer(help, answers)))
       if (!suggestion) throw new Error('empty')
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if ((answers.sell ?? '').length < 3) return fail(showcase ? 'Tell us what you do first.' : 'Tell us what you sell first.')
     // The first brief is part of the free flow; writing it again counts against the day's tweaks.
     const again = !!session.brief
-    if (again && !(await spendTweaks(session.id, COST.directions, TWEAKS_PER_DAY))) return fail('You have changed the brief a lot today. Come back tomorrow, or carry on with this one.', 429)
+    if (again && !(await spendTweaks(session.id, COST.directions, HELP_PER_DAY))) return fail('You have changed the brief a lot today. Come back tomorrow, or carry on with this one.', 429)
     try {
       const { b, p } = await funded(session.id, preBuildBudget(session), async () => {
         // A Showcase plans its one page; a store plans its pages for the audiences its plan has.
