@@ -184,7 +184,6 @@ ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_rene
 ALTER TABLE ONLY public.tenant_domain_renewals ADD CONSTRAINT tenant_domain_renewals_status_check
     CHECK (status IN ('due','renewing','done','lapsed','off'));
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_owner_product_key UNIQUE (owner_id, product);
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_product_check
     CHECK (product IN ('store','showcase'));
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_status_check

@@ -85,10 +85,10 @@ export { formsHostForSlug, formsHostForHost } from '@/lib/tenancy/forms-host'
 
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()
-  // A custom domain resolves only once verified (DNS proven, certificate issued).
+  // A custom domain resolves only once verified (DNS proven, certificate issued); a Showcase's is never the store's.
   const whereClause =
     where === 'custom_domain'
-      ? `t.id = (SELECT tenant_id FROM tenant_custom_domains WHERE domain = $1 AND status = 'verified')`
+      ? `t.id = (SELECT tenant_id FROM tenant_custom_domains WHERE domain = $1 AND status = 'verified' AND showcase_site_id IS NULL)`
       : `t.${where} = $1`
   const res = await pool.query(
     `SELECT t.id, t.slug, t.display_name, t.status, t.instance_state, p.slug AS plan,

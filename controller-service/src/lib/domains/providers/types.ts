@@ -61,12 +61,15 @@ export interface DomainDns {
   pointAtCluster(zoneId: string, hosts: string[]): Promise<void>
 }
 
-/** The cluster: IngressRoutes and cert-manager Certificates for a store's routed domains. */
+/** The cluster: IngressRoutes and cert-manager Certificates for a store's routed domains, and every Showcase's. */
 export interface DomainHosting {
   readonly live: boolean
   applyRoutes(tenantId: string): Promise<void>
   /** Whether the host's certificate is issued; requestedAt is when its route was rendered. */
   certReady(tenantSlug: string, host: string, requestedAt: Date): Promise<boolean>
+  /** Every Showcase domain's route to showcase-service and its certificate (one set for all sites). */
+  applyShowcaseRoutes(): Promise<void>
+  showcaseCertReady(host: string, requestedAt: Date): Promise<boolean>
 }
 
 export class RegistrarError extends Error {

@@ -1,13 +1,15 @@
 import Link from 'next/link'
-import { Check } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { consoleShowcase, showcaseConsoleState } from '@controller/lib/showcase/state'
+import { consoleShowcases, showcaseConsoleState } from '@controller/lib/showcase/state'
 import { SHOWCASE_FREE_DAYS, SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
 import PageHeader from '../_components/PageHeader'
-import ShowcaseClient from './ShowcaseClient'
+import SitesList from './SitesList'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Showcase' }
+
+const NEW_SITE = '/onboard/showcase?new=1'
 
 const POINTS = [
   'Your work, services, reviews and contacts on one page, at site-yourname.jeffistores.in',
@@ -18,9 +20,9 @@ const POINTS = [
 export default async function ShowcasePage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams
   const { owner, tenant } = await loadOwnerContext({ tenantSlug })
-  const site = await consoleShowcase(owner.id, tenant.id)
+  const sites = await consoleShowcases(owner.id)
 
-  if (!site) {
+  if (!sites.length) {
     return (
       <>
         <PageHeader eyebrow="Showcase" title="A website for your business" description="A one-page site that shows what you do and brings you enquiries. Made with AI in a few minutes; you can change anything after." />
@@ -33,7 +35,7 @@ export default async function ShowcasePage({ searchParams }: { searchParams: Pro
               </li>
             ))}
           </ul>
-          <Link href="/onboard/showcase" className="mt-6 inline-flex rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white">
+          <Link href={NEW_SITE} className="mt-6 inline-flex rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white">
             Create your site
           </Link>
         </section>
@@ -41,5 +43,20 @@ export default async function ShowcasePage({ searchParams }: { searchParams: Pro
     )
   }
 
-  return <ShowcaseClient initial={await showcaseConsoleState(site)} tenantSlug={tenant.slug} />
+  const states = await Promise.all(sites.map(showcaseConsoleState))
+  return (
+    <>
+      <PageHeader
+        eyebrow="Showcase"
+        title={states.length === 1 ? 'Your site' : 'Your sites'}
+        description="One-page sites for your business. Each has its own address, enquiries and hosting."
+        actions={
+          <Link href={NEW_SITE} className="inline-flex items-center gap-1.5 rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white">
+            <Plus className="h-4 w-4" /> New site
+          </Link>
+        }
+      />
+      <SitesList sites={states} tenantSlug={tenant.slug} />
+    </>
+  )
 }

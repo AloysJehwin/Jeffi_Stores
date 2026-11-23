@@ -71,18 +71,17 @@ export async function getShowcaseByHost(host: string): Promise<ShowcaseSiteRow |
   return h ? one(`SELECT ${COLS} FROM showcase_sites WHERE custom_domain = $1`, [h]) : null
 }
 
-/** The owner's newest site. */
-export const getShowcaseByOwner = (ownerId: string) =>
-  one(`SELECT ${COLS} FROM showcase_sites WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 1`, [ownerId])
-
+/** The owner's sites, newest first. */
 export async function listShowcasesByOwner(ownerId: string): Promise<ShowcaseSiteRow[]> {
   const r = await controlPlanePool().query(`SELECT ${COLS} FROM showcase_sites WHERE owner_id = $1 ORDER BY created_at DESC`, [ownerId])
   return r.rows.map(toSite)
 }
 
-/** The workspace's newest site. */
-export const getShowcaseByTenant = (tenantId: string) =>
-  one(`SELECT ${COLS} FROM showcase_sites WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1`, [tenantId])
+/** The workspace's sites, newest first. */
+export async function listShowcasesByTenant(tenantId: string): Promise<ShowcaseSiteRow[]> {
+  const r = await controlPlanePool().query(`SELECT ${COLS} FROM showcase_sites WHERE tenant_id = $1 ORDER BY created_at DESC`, [tenantId])
+  return r.rows.map(toSite)
+}
 
 /** The site when this owner owns it, else null. */
 export const getOwnedShowcase = (siteId: string, ownerId: string) =>

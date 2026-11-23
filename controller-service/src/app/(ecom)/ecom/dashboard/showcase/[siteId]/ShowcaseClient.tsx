@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BarChart3, Check, Copy, ExternalLink, Inbox, Loader2, Pencil } from 'lucide-react'
+import { ArrowLeft, BarChart3, Check, Copy, ExternalLink, Globe, Inbox, Loader2, Pencil } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import type { ShowcaseConsoleState } from '@controller/lib/showcase/state'
-import PageHeader from '../_components/PageHeader'
-import { Card, Row } from '../_components/Card'
+import PageHeader from '../../_components/PageHeader'
+import { Card, Row } from '../../_components/Card'
 
 type Action = 'publish' | 'pause' | 'resume' | 'renew_on' | 'renew_off' | 'pay'
 
@@ -47,20 +47,24 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-/** The console's Showcase page: the site's address, whether it is online, and its hosting. */
+/** One Showcase site's console page: its address, whether it is online, and its hosting. */
 export default function ShowcaseClient({ initial, tenantSlug }: { initial: ShowcaseConsoleState; tenantSlug: string }) {
   const { showToast } = useToast()
   const [s, setS] = useState(initial)
   const [busy, setBusy] = useState<Action | null>(null)
   const [confirmPay, setConfirmPay] = useState(false)
   const short = s.balanceInr !== null && s.balanceInr < s.priceInr
-  const walletHref = `/dashboard/wallet?tenant=${encodeURIComponent(tenantSlug)}`
-  const analyticsHref = `/dashboard/showcase/${s.id}/analytics?tenant=${encodeURIComponent(tenantSlug)}`
+  const t = `?tenant=${encodeURIComponent(tenantSlug)}`
+  const base = `/dashboard/showcase/${s.id}`
+  const walletHref = `/dashboard/wallet${t}`
+  const analyticsHref = `${base}/analytics${t}`
+  // A draft is still in the builder; a published site is edited from the console.
+  const editHref = s.status === 'draft' ? `/onboard/showcase?site=${s.id}` : `${base}/edit${t}`
 
   async function act(action: Action, done?: string) {
     setBusy(action)
     try {
-      const res = await fetch(`/api/ecom/showcase/hosting?tenant=${encodeURIComponent(tenantSlug)}`, {
+      const res = await fetch(`/api/ecom/showcase/${s.id}/hosting${t}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
@@ -90,9 +94,12 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
         title={s.name}
         actions={
           <>
+            <Link href={`/dashboard/showcase${t}`} className={secondary}>
+              <ArrowLeft className="h-4 w-4" /> All sites
+            </Link>
             <StatusPill s={s} />
-            <Link href="/dashboard/showcase/edit" className={secondary}>
-              <Pencil className="h-4 w-4" /> Edit site
+            <Link href={editHref} className={secondary}>
+              <Pencil className="h-4 w-4" /> {s.status === 'draft' ? 'Continue setting up' : 'Edit site'}
             </Link>
             {s.status !== 'draft' && (
               <Link href={analyticsHref} className={secondary}>
@@ -117,6 +124,9 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
               <a href={s.url} target="_blank" rel="noopener noreferrer" className={secondary}>
                 Open <ExternalLink className="h-3.5 w-3.5" />
               </a>
+              <Link href={`${base}/domain${t}`} className={secondary}>
+                <Globe className="h-4 w-4" /> Domain
+              </Link>
             </div>
           </div>
 
@@ -124,7 +134,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             {s.status === 'draft' && !s.hasPage && (
               <div className="flex flex-wrap items-center gap-4">
                 <p className="min-w-0 flex-1 text-sm text-foreground-secondary">Your page isn&apos;t made yet. Finish it in the editor, then publish it here or there.</p>
-                <Link href="/dashboard/showcase/edit" className={primary}>
+                <Link href={editHref} className={primary}>
                   Finish your page
                 </Link>
               </div>
@@ -250,7 +260,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
                 ? `${s.unreadLeads} new ${s.unreadLeads === 1 ? 'enquiry' : 'enquiries'} from your site's contact form.`
                 : "Messages from your site's contact form arrive here and in your email."}
             </p>
-            <Link href={`/dashboard/showcase/leads?tenant=${encodeURIComponent(tenantSlug)}`} className={secondary}>
+            <Link href={`${base}/leads${t}`} className={secondary}>
               Open enquiries
             </Link>
           </div>

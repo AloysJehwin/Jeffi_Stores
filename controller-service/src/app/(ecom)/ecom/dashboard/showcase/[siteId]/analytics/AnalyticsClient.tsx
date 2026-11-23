@@ -81,10 +81,10 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
         description={`Who visits ${host}, where they come from, what they do there and which visits bring enquiries.`}
         actions={
           <>
-            <Link href={`/dashboard/showcase${t}`} className={secondary}>
+            <Link href={`/dashboard/showcase/${siteId}${t}`} className={secondary}>
               <ArrowLeft className="h-4 w-4" /> Site
             </Link>
-            <Link href={`/dashboard/showcase/leads${t}`} className={secondary}>
+            <Link href={`/dashboard/showcase/${siteId}/leads${t}`} className={secondary}>
               <Inbox className="h-4 w-4" /> Enquiries
             </Link>
           </>
@@ -111,7 +111,7 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
         ) : !ready ? (
           <AnalyticsTabLoading tab={tab} />
         ) : (
-          <TabBody key={key} tab={tab} data={ready} csvHref={`${base}&format=csv&from=${period.from}&to=${period.to}`} inboxHref={`/dashboard/showcase/leads${t}`} />
+          <TabBody key={key} tab={tab} data={ready} csvHref={`${base}&format=csv&from=${period.from}&to=${period.to}`} inboxHref={`/dashboard/showcase/${siteId}/leads${t}`} />
         )}
       </div>
     </>

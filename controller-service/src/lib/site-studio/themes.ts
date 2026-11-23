@@ -6,7 +6,7 @@ import { themeSite } from '@/lib/site/themes/apply'
 import { SHOWCASE_HOME, templateFile, themePages, type ThemeProduct } from '@/lib/site/themes/pages'
 import { themeSample } from '@/lib/site/themes/sample'
 import { SEED_CATALOGS } from '@controller/lib/provisioning/seed-catalog'
-import { ownerShowcase } from '@controller/lib/showcase-builder/site'
+import { ownedShowcase, sessionShowcase } from '@controller/lib/showcase-builder/site'
 import { copyStudioPage } from '@controller/lib/showcase-builder/publish'
 import { detailsAnswers, startShowcaseStudio } from '@controller/lib/showcase-builder/studio'
 import { studioStoreAnswers, studioStoreContext, type StudioStoreContext } from './context'
@@ -69,10 +69,10 @@ export function starterSample(category: string | null | undefined): SampleCatalo
 
 export type ThemeStudioResult = { ok: true; session: StudioSession } | { ok: false; status: number; error: string; code?: string }
 
-/** The owner's studio, created on first use with the details the wizard already has; no AI runs. */
-export async function openThemeStudio(ownerId: string, product: StudioProduct): Promise<ThemeStudioResult> {
+/** The owner's store studio, or a Showcase site's (`siteId`), created on first use with the details the wizard already has; no AI runs. */
+export async function openThemeStudio(ownerId: string, product: StudioProduct, siteId: string | null = null): Promise<ThemeStudioResult> {
   if (product === 'showcase') {
-    const site = await ownerShowcase(ownerId)
+    const site = await ownedShowcase(ownerId, siteId)
     if (!site) return { ok: false, status: 409, error: 'Save your business details first.' }
     return { ok: true, session: await startShowcaseStudio(ownerId, site) }
   }
@@ -88,7 +88,7 @@ export async function openThemeStudio(ownerId: string, product: StudioProduct): 
 /** What the theme is filled with: the owner's details (and, for a store, its sample catalogue). */
 async function themeOwner(session: StudioSession) {
   if (session.product === 'showcase') {
-    const site = await ownerShowcase(session.owner_id)
+    const site = await sessionShowcase(session)
     return { answers: { ...session.answers, ...(site ? detailsAnswers(site) : {}) }, category: site?.business.profession ?? null }
   }
   const ctx = await studioStoreContext(session.owner_id)
@@ -124,7 +124,7 @@ export async function applyTheme(session: StudioSession, themeId: unknown, opts:
   // A draft Showcase takes its new page at once, as after an AI design (the console can publish it); a live one when
   // the owner publishes.
   if (product === 'showcase') {
-    const draft = await ownerShowcase(saved.owner_id).catch(() => null)
+    const draft = await sessionShowcase(saved).catch(() => null)
     if (draft?.status === 'draft') await copyStudioPage(draft, saved).catch(err => console.warn('[themes] showcase draft page not saved:', (err as Error).message))
   }
   return { ok: true, session: saved }

@@ -19,12 +19,12 @@ const when = (iso: string) =>
 const chip = 'inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-secondary'
 
 /** The Showcase's enquiries: newest first, open ones marked. Handled (read_at) is the owner's own bookkeeping. */
-export default function LeadsClient({ initial, pageSize, tenantSlug }: { initial: Page; pageSize: number; tenantSlug: string }) {
+export default function LeadsClient({ initial, pageSize, siteId, tenantSlug }: { initial: Page; pageSize: number; siteId: string; tenantSlug: string }) {
   const { showToast } = useToast()
   const [page, setPage] = useState(initial)
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const api = `/api/ecom/showcase/leads?tenant=${encodeURIComponent(tenantSlug)}`
+  const api = `/api/ecom/showcase/${siteId}/leads?tenant=${encodeURIComponent(tenantSlug)}`
 
   async function load(opts: { unread: boolean; offset: number }) {
     setBusy('load')
