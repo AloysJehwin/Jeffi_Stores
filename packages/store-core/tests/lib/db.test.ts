@@ -74,6 +74,8 @@ async function importDb(
     certExists?: boolean
     adminToken?: string | null
     jwtPayload?: any
+    tenantSlug?: string
+    lookupBySlug?: () => Promise<any>
   } = {}
 ) {
   vi.resetModules()
@@ -109,7 +111,10 @@ async function importDb(
       set: vi.fn(),
       delete: vi.fn(),
     }),
+    ...(opts.tenantSlug && { headers: vi.fn().mockResolvedValue(new Headers({ 'x-tenant-slug': opts.tenantSlug })) }),
   }))
+  if (opts.lookupBySlug) vi.doMock('@/lib/tenant-registry', () => ({ lookupTenantContextBySlug: opts.lookupBySlug }))
+  else vi.doUnmock('@/lib/tenant-registry')
 
   const jwtPayload = opts.jwtPayload ?? { adminId: 'admin-123' }
   vi.doMock('jose', () => ({
@@ -613,6 +618,12 @@ describe('getPool – tenant isolation (fail closed)', () => {
     const { mod } = await importDb({})
     const ctx = { tenantId: 't-2', slug: 'bolts', plan: 'basic', infra: { rdsEndpoint: '' } }
     await expect(mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))).rejects.toThrow(/bolts/)
+  })
+
+  it('503s instead of serving the platform DB when the control-plane lookup fails on a store host', async () => {
+    const { mod, pg } = await importDb({ tenantSlug: 'acme', lookupBySlug: () => Promise.reject(new Error('cp down')) })
+    await expect(mod.query('SELECT 1')).rejects.toMatchObject({ name: 'TenantUnavailableError', status: 503, slug: 'acme' })
+    expect(pg.PoolSpy).not.toHaveBeenCalled()
   })
 
   it('still uses the DEFAULT pool when no tenant is in context', async () => {

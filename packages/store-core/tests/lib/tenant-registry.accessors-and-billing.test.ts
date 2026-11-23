@@ -847,11 +847,11 @@ describe('tenant-registry — extended coverage', () => {
       expect(poolQuery.mock.calls.length).toBe(after)
     })
 
-    it('fails open to null on a control-plane error', async () => {
+    it('throws on a control-plane error', async () => {
       const mod = await importRegistry()
       poolQuery.mockReset()
       poolQuery.mockRejectedValue(new Error('boom'))
-      await expect(mod.lookupTenantContextBySlug('acme')).resolves.toBeNull()
+      await expect(mod.lookupTenantContextBySlug('acme')).rejects.toThrow('boom')
     })
   })
 })
