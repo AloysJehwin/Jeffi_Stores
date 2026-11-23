@@ -44,6 +44,16 @@ AI-generated pages must be editable with it.
    Sections: add a starter code section, duplicate, delete (at least one stays). Parts the page needs (`locked`,
    or a classic block the registry locks) can't be duplicated or removed. Pictures swap through the host's own picker
    (`renderImagePicker`; admin: the media library field), with their description; links get a "goes to" field.
+5. Showcase studio host. `controller-service/.../onboard/_studio/VisualStudio.tsx`, opened by "Edit on the page" in
+   the build step of a Showcase (flag on, page built, no build running). It edits the request's own session (`?site=`
+   from the page, else the session's `site_id`) through `/api/ecom/onboard/studio/design` (GET trees; PUT compiles
+   every tree, keeps the page to code sections with its required parts, saves the session page). The canvas is the
+   studio preview with `editor=1` (`ShowcasePreview` `editing`: `data-block-id`, canvas ids, the bridge). Pictures
+   upload as the Details step's do. Publishing stays the studio's own step, whose compile is v2-aware.
+
+**Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
+scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
+all Showcase owners), since their studio runs on the platform.
 
 ## What exists
 
