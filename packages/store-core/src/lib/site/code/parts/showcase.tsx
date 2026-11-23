@@ -150,8 +150,9 @@ defineCodeComponent({
     const v = await view(ctx.data)
     const list = v ? testimonialViews(v.content, p.minRating).slice(0, p.limit) : []
     if (!list.length) return null
+    // The slide width is for the carousel only: on a grid's items it shrank each card to a third of its cell.
     return (
-      <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName || TESTIMONIAL_SLIDE} label="Testimonials" fallbackGrid="grid gap-5 md:grid-cols-3">
+      <ItemsLayout layout={p.layout} className={str(props.className)} itemClassName={p.itemClassName || (p.layout === 'carousel' ? TESTIMONIAL_SLIDE : undefined)} label="Testimonials" fallbackGrid="grid gap-5 md:grid-cols-3">
         {items(list, ctx, (t, i) => <TestimonialCard key={i} t={t} />)}
       </ItemsLayout>
     )
