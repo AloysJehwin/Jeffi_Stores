@@ -15,6 +15,7 @@ import {
   Trash2,
   Undo2,
   Unlink2,
+  WandSparkles,
 } from 'lucide-react'
 import {
   DEFAULT_THEME,
@@ -54,6 +55,7 @@ import AiPanel, { type PageRedo } from './AiPanel'
 import AiSiteBuilder from './AiSiteBuilder'
 import { BlockLibrary, TemplatePanel, ThemePanel } from './SidePanels'
 import { BlockList, DND_MEASURING, useBlockDnd, type NewItem, type Parent, type RowActions } from './BlockList'
+import VisualEditor from './VisualEditor'
 
 // Site Builder: one page on one layout at a time (store or business × desktop web, phone web, app). Left, the page's
 // blocks (drag to reorder, or drag one in from the library); centre, the real store rendering the draft (click a block
@@ -135,9 +137,11 @@ export interface SiteBuilderEditorProps {
   /** Custom pages (/p/<slug>) that already have a layout. */
   customPages?: { slug: string; title: string | null }[]
   drafts: { id: string; title: string | null; updated_at: string }[]
+  /** The visual editor is switched on for this store (site_settings site_editor_enabled); the forms stay the default. */
+  visual?: boolean
 }
 
-export default function SiteBuilderEditor({ options, planTypes, business, initialDraftId, drafts, live = true, customPages = [] }: SiteBuilderEditorProps) {
+export default function SiteBuilderEditor({ options, planTypes, business, initialDraftId, drafts, live = true, customPages = [], visual = false }: SiteBuilderEditorProps) {
   const canWrite = useCanWrite('settings:write')
   const canAi = useCanUseAi('settings:write')
   const [picking, setPicking] = useState(true)
@@ -162,6 +166,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [busy, setBusy] = useState(false)
   const [pageRedo, setPageRedo] = useState<(PageRedo & { keys: string[]; before: Record<string, PageDoc> }) | null>(null)
+  const [visualOn, setVisualOn] = useState(false)
   const frame = useRef<HTMLIFrameElement>(null)
   const frameBox = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -660,6 +665,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
 
   // ── Drafts ─────────────────────────────────────────────────────────────────────────────────────
   function openDraft(id: string | null) {
+    setVisualOn(false)
     setDraftId(id)
     setDocs({})
     setHistory({})
@@ -700,6 +706,16 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     openDraft(null)
   }
 
+  // Back from the visual editor: its saves went straight to the draft, so the pages load again from there.
+  function closeVisual() {
+    setVisualOn(false)
+    setDocs({})
+    setHistory({})
+    setSelected(null)
+    draftDocs.current = null
+    setFrameKey(n => n + 1)
+  }
+
   async function discard() {
     if (!draftId) return
     const ok = await showConfirm({ title: 'Delete this draft?', message: 'Its changes are lost; the live site is not affected.', confirmText: 'Delete', type: 'danger' })
@@ -736,6 +752,22 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         )}
       </div>
       </div>
+    )
+  }
+
+  // The visual editor works on the desktop web layout of a page the canvas can show.
+  const canVisual = visual && previewable && !!token && surface !== 'app'
+  if (canVisual && visualOn && draftId && token) {
+    return (
+      <VisualEditor
+        draftId={draftId}
+        pageRef={ref}
+        title={`${PAGES.find(p => p.key === ref.page)?.label ?? ref.slug ?? ref.page} · ${audience === 'business' ? 'Business' : 'Store'}`}
+        previewUrl={homepagePreviewUrl(audience, token, 'desktop', previewPath)}
+        canWrite={canWrite}
+        onClose={closeVisual}
+        onPublish={publish}
+      />
     )
   }
 
@@ -835,6 +867,16 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
           </button>
         </div>
         <span className="text-xs text-foreground-muted">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved to draft' : saving === 'error' ? 'Not saved' : ''}</span>
+        {canVisual && (
+          <button
+            type="button"
+            onClick={() => setVisualOn(true)}
+            title="Click and type on the page itself (beta). Edits the desktop layout, which phones share when Same on phone is on."
+            className="inline-flex items-center gap-1.5 px-2.5 h-8 text-xs font-medium rounded-lg border border-accent-500 text-accent-600 hover:bg-accent-500/10"
+          >
+            <WandSparkles className="w-3.5 h-3.5" /> Visual editor
+          </button>
+        )}
         <div className="ml-auto flex flex-wrap gap-2">
           {canWrite && (
             <div className="w-48">

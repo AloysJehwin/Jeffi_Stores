@@ -20,6 +20,17 @@ AI-generated pages must be editable with it.
 - Contract for phase 2: the visual editor saves a section's tree with `source` empty; source-level editors
   (`literals.ts`, the AI) write `source`, which wins and rebuilds the tree.
 
+**Phase 2 (editor MVP), in slices**
+1. Shell, select, inline text, undo/redo, autosave. `components/site-editor/`: `SiteEditor.tsx` (toolbar, canvas,
+   sections, inspector), `state.ts` (a design history per section plus one undo stack across sections and block-list
+   changes; `docToSave` sends trees with an empty source; `adoptSaved` takes the server's tree when it settled one
+   differently), `host.ts` (load, save, preview URL, upload, publish), `nodes.ts`, `Inspector.tsx`. Admin host:
+   `components/admin/site-builder/VisualEditor.tsx`, opened from a "Visual editor" button in the forms editor (flag on;
+   desktop web layout, saved to phone too while that is the same document), loading through
+   `GET drafts/[id]/editor?key=` and saving through `PUT drafts/[id]`. The canvas reloads, keeping its scroll, only
+   after a save that holds a change it couldn't show itself. `data-e` now also marks Link, Image, Icon and parts drawn
+   as one plain element (`RenderCtx.edit`, `data-e-cmp`).
+
 ## What exists
 
 - **Page documents.** `PageDoc` (blocks by id plus their order), one per audience × surface × page

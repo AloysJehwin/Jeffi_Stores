@@ -1,4 +1,4 @@
-import { Fragment, createElement, type Key, type ReactNode } from 'react'
+import { Fragment, cloneElement, createElement, isValidElement, type Key, type ReactNode } from 'react'
 import Link from 'next/link'
 import { NODE_ID, type PageKey } from '@jeffi/site-blocks'
 import { carouselList, type CodeNode, type CodeValue } from '@/lib/site/code/ast'
@@ -389,6 +389,7 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
   if (def.name === 'Link' && Array.isArray(node.children) && node.children.some(c => holdsLink(c)))
     return createElement('span', { ...(key != null ? { key } : {}), ...(className ? { className } : {}) }, ...children)
   const render = node.render && typeof node.render.param === 'string' ? node.render : null
+  const edit = editAttrs(node, env)
   const ctx: RenderCtx = {
     children: children.length ? createElement(Fragment, null, ...children) : null,
     renderItem: render
@@ -398,6 +399,7 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
     page: env.page,
     sectionId: env.sectionId,
     claimPriority: () => env.lcp.on && !(env.lcp.on = false),
+    edit,
   }
   let out: ReactNode | Promise<ReactNode>
   try {
@@ -420,7 +422,16 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
       </Fragment>
     )
   }
+  // A part drawn as one plain element carries the node id itself; Link, Image and Icon take ctx.edit.
+  if (edit && isValidElement<Record<string, unknown>>(out) && typeof out.type === 'string' && !out.props['data-e']) out = cloneElement(out, edit)
   return key != null ? <Fragment key={key}>{out}</Fragment> : out
+}
+
+/** The editor's canvas only: a part's node id, and whether its words are written out (editable in place). */
+function editAttrs(node: Extract<CodeNode, { t: 'cmp' }>, env: Env): Record<string, string> | null {
+  if (!env.preview || typeof node.id !== 'string' || !NODE_ID.test(node.id)) return null
+  const text = !node.render && Array.isArray(node.children) && node.children.length > 0 && node.children.every(c => c.t === 'text')
+  return { 'data-e': node.id, 'data-e-cmp': '', ...(text ? { 'data-e-text': '' } : {}) }
 }
 
 export function renderNode(n: unknown, env: Env, key?: Key): ReactNode {

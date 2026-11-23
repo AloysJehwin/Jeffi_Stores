@@ -292,7 +292,7 @@ defineCodeComponent({
   describe: 'A responsive, optimised image in a fixed shape (aspect), so nothing shifts while it loads.',
   render(props, ctx) {
     const p = props as z.infer<typeof ImageProps>
-    return <CodeImage src={p.src} hoverSrc={p.hoverSrc} alt={p.alt} aspect={p.aspect} fit={p.fit} sizes={p.sizes} priority={p.priority || ctx.claimPriority()} className={str(props.className)} />
+    return <CodeImage src={p.src} hoverSrc={p.hoverSrc} alt={p.alt} aspect={p.aspect} fit={p.fit} sizes={p.sizes} priority={p.priority || ctx.claimPriority()} className={str(props.className)} edit={ctx.edit} />
   },
 })
 
@@ -305,7 +305,7 @@ defineCodeComponent({
   render(props, ctx) {
     const p = props as z.infer<typeof LinkProps>
     return (
-      <CodeLink href={p.href} target={p.target} className={str(props.className)}>
+      <CodeLink href={p.href} target={p.target} className={str(props.className)} edit={ctx.edit}>
         {ctx.children}
       </CodeLink>
     )
@@ -318,9 +318,9 @@ defineCodeComponent({
   pages: 'any',
   props: IconProps,
   describe: 'A line icon; colour it with a text-* class.',
-  render(props) {
+  render(props, ctx) {
     const p = props as z.infer<typeof IconProps>
-    return <CodeIcon name={p.name} size={p.size} strokeWidth={p.strokeWidth} className={str(props.className)} />
+    return <CodeIcon name={p.name} size={p.size} strokeWidth={p.strokeWidth} className={str(props.className)} edit={ctx.edit} />
   },
 })
 
