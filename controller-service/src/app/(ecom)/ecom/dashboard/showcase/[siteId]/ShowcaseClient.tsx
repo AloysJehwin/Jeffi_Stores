@@ -7,6 +7,8 @@ import { useToast } from '@/contexts/ToastContext'
 import type { ShowcaseConsoleState } from '@controller/lib/showcase/state'
 import PageHeader from '../../_components/PageHeader'
 import { Card, Row } from '../../_components/Card'
+import HostText from '../../_components/HostText'
+import { showcaseOfferText, showcasePriceText } from '@/lib/showcase/offer'
 
 type Action = 'publish' | 'pause' | 'resume' | 'renew_on' | 'renew_off' | 'pay'
 
@@ -107,7 +109,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
               </Link>
             )}
             {s.status === 'live' && (
-              <a href={s.url} target="_blank" rel="noopener noreferrer" className={primary}>
+              <a href={s.previewUrl} target="_blank" rel="noopener noreferrer" className={primary}>
                 Open site <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
@@ -118,10 +120,10 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
       <div className="space-y-6">
         <Card title="Your site">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="min-w-0 break-all font-mono text-sm text-foreground">{s.host}</span>
+            <HostText host={s.host} className="min-w-0 font-mono text-sm text-foreground" />
             <div className="ml-auto flex flex-wrap gap-2">
               <CopyButton text={`https://${s.host}`} />
-              <a href={s.url} target="_blank" rel="noopener noreferrer" className={secondary}>
+              <a href={s.previewUrl} target="_blank" rel="noopener noreferrer" className={secondary}>
                 Open <ExternalLink className="h-3.5 w-3.5" />
               </a>
               <Link href={`${base}/domain${t}`} className={secondary}>
@@ -133,7 +135,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
           <div className="mt-5 border-t border-border-default pt-5">
             {s.status === 'draft' && !s.hasPage && (
               <div className="flex flex-wrap items-center gap-4">
-                <p className="min-w-0 flex-1 text-sm text-foreground-secondary">Your page isn&apos;t made yet. Finish it in the editor, then publish it here or there.</p>
+                <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-foreground-secondary">Your page isn&apos;t made yet. Finish it in the editor, then publish it here or there.</p>
                 <Link href={editHref} className={primary}>
                   Finish your page
                 </Link>
@@ -141,8 +143,8 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             )}
             {s.status === 'draft' && s.hasPage && (
               <div className="flex flex-wrap items-center gap-4">
-                <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
-                  Not published yet. Publishing puts it online and starts your free month.
+                <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-foreground-secondary">
+                  Not published yet. Publishing puts it online: {showcaseOfferText()}.
                 </p>
                 <button type="button" onClick={() => act('publish', 'Your site is live')} disabled={!!busy} className={primary}>
                   {spin('publish')} Publish
@@ -151,7 +153,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             )}
             {s.status === 'live' && (
               <div className="flex flex-wrap items-center gap-4">
-                <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
+                <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-foreground-secondary">
                   Online{s.publishedAt ? ` since ${fmtDate(s.publishedAt)}` : ''}. Changes you publish from the editor show here within a minute.
                 </p>
                 <button type="button" onClick={() => act('pause', 'Your site is paused')} disabled={!!busy} className={secondary}>
@@ -161,7 +163,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             )}
             {s.status === 'paused' && (
               <div className="flex flex-wrap items-center gap-4">
-                <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
+                <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-foreground-secondary">
                   {unpaidOffline
                     ? 'Offline because its hosting is unpaid. Visitors see a short note instead of your page. Your page and enquiries are kept.'
                     : 'Paused: visitors see a short note instead of your page. Your page and enquiries are kept.'}
@@ -185,10 +187,10 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
           <Card title="Hosting">
             <div className="space-y-2.5">
               <Row
-                label={s.free ? 'Free month until' : 'Paid until'}
+                label={s.free ? 'Free until' : 'Paid until'}
                 value={s.paidUntil ? <span className={s.lapsed ? 'text-[#8a2e1f]' : ''}>{fmtDate(s.paidUntil)}</span> : '—'}
               />
-              <Row label="Price" value={`${inr(s.priceInr)} a month, from your wallet`} />
+              <Row label="Price" value={showcasePriceText(s.priceInr)} />
               {s.balanceInr !== null && <Row label="Wallet balance" value={<span className={short ? 'text-[#8a2e1f]' : ''}>{inr(s.balanceInr)}</span>} />}
             </div>
 
@@ -214,7 +216,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
               <span className="w-full text-xs text-foreground-muted">
                 {s.renew
                   ? 'We remind you three days before each renewal. A short wallet is retried daily for a week.'
-                  : `Auto-renew is off: the site goes offline when ${s.free ? 'the free month' : 'the paid month'} ends.`}
+                  : `Auto-renew is off: the site goes offline when ${s.free ? 'the free days end' : 'the paid month ends'}.`}
               </span>
             </div>
 
@@ -255,7 +257,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
             <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full org-sand">
               <Inbox className="h-5 w-5 text-foreground" />
             </span>
-            <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
+            <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-foreground-secondary">
               {s.unreadLeads > 0
                 ? `${s.unreadLeads} new ${s.unreadLeads === 1 ? 'enquiry' : 'enquiries'} from your site's contact form.`
                 : "Messages from your site's contact form arrive here and in your email."}
@@ -272,7 +274,7 @@ export default function ShowcaseClient({ initial, tenantSlug }: { initial: Showc
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full org-sand">
                 <BarChart3 className="h-5 w-5 text-foreground" />
               </span>
-              <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
+              <p className="min-w-[min(100%,16rem)] flex-1 text-sm text-foreground-secondary">
                 Who visits your site, where they come from, what they tap and which visits bring enquiries.
               </p>
               <Link href={analyticsHref} className={secondary}>

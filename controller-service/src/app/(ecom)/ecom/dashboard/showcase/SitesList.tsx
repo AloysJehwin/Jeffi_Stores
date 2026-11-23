@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BarChart3, CreditCard, ExternalLink, Globe, Inbox, Pencil } from 'lucide-react'
 import type { ShowcaseConsoleState } from '@controller/lib/showcase/state'
+import HostText from '../_components/HostText'
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
 
@@ -34,12 +35,12 @@ export default function SitesList({ sites, tenantSlug }: { sites: ShowcaseConsol
                   </Link>
                 </h2>
                 <a
-                  href={s.url}
+                  href={s.previewUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-1 inline-flex max-w-full items-center gap-1 break-all font-mono text-sm text-foreground-secondary hover:text-foreground"
+                  className="mt-1 inline-flex max-w-full items-center gap-1 font-mono text-sm text-foreground-secondary hover:text-foreground"
                 >
-                  {s.host} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  <HostText host={s.host} className="min-w-0" /> <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                 </a>
               </div>
               <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{label}</span>

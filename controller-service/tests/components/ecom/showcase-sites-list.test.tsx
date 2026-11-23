@@ -8,7 +8,7 @@ vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: str
 import SitesList from '@controller/app/(ecom)/ecom/dashboard/showcase/SitesList'
 
 const site = (o: Partial<ShowcaseConsoleState>): ShowcaseConsoleState => ({
-  id: 'a1', slug: 'acme', name: 'Acme', status: 'live', pauseReason: null, host: 'site-acme.jeffistores.in', url: 'https://site-acme.jeffistores.in',
+  id: 'a1', slug: 'acme', name: 'Acme', status: 'live', pauseReason: null, host: 'site-acme.jeffistores.in', url: 'https://site-acme.jeffistores.in', previewUrl: 'https://site-acme.jeffistores.in?jeffi_preview=1',
   hasPage: true, publishedAt: '2026-11-01T00:00:00Z', paidUntil: '2026-12-01T00:00:00Z', renew: true, lastChargeError: null, balanceInr: null,
   unreadLeads: 0, priceInr: 200, free: true, lapsed: false, due: false, pausesOn: null, ...o,
 })
@@ -22,7 +22,7 @@ describe('SitesList', () => {
     expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('Free until 1 Dec 2026')).toBeTruthy()
     expect(within(rows[0]).getByText('2 new')).toBeTruthy()
-    expect(within(rows[0]).getByRole('link', { name: /site-acme\.jeffistores\.in/ }).getAttribute('href')).toBe('https://site-acme.jeffistores.in')
+    expect(within(rows[0]).getByRole('link', { name: /site-acme\.jeffistores\.in/ }).getAttribute('href')).toBe('https://site-acme.jeffistores.in?jeffi_preview=1')
     expect(hrefs(rows[0])).toEqual(
       expect.arrayContaining([
         '/dashboard/showcase/a1/edit?tenant=ecom',

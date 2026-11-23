@@ -10,7 +10,7 @@ import { THEME_PALETTES, THEME_STYLES, themeIdOf, themeName, themeOfDirection, t
 import { choiceCardCls } from '../../_ui'
 import { ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../ui'
 import { StudioError, studioPost, studioProduct, studioUrl, type StudioView } from './api'
-import StudioPreview, { DeviceToggle, type Device } from './StudioPreview'
+import StudioPreview, { DeviceToggle, usePreviewDevice } from './StudioPreview'
 import { MiniUi, fontsLink, type MiniUiLook } from './StylePreview'
 
 // Ready-made themes: five styles, five palettes each, every one a full site ready at once with the owner's details
@@ -175,7 +175,7 @@ export default function ThemeGallery({
   const [busy, setBusy] = useState<string | null>(null)
   const [preview, setPreview] = useState<{ style: ThemeStyleId; palette: ThemePalette; sessionId: string } | null>(null)
   const [page, setPage] = useState(home)
-  const [device, setDevice] = useState<Device>(() => (typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches ? 'phone' : 'desktop'))
+  const [device, setDevice] = usePreviewDevice()
   const top = useRef<HTMLDivElement>(null)
   const paletteOf = (style: ThemeStyleId) => picked[style] ?? THEME_PALETTES[style][0]
   const ready = (style: ThemeStyleId) => !!available?.[style]

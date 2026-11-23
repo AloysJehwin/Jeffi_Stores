@@ -1,7 +1,7 @@
 import 'server-only'
 import { getWalletBalance, isFlagshipTenant } from '@/lib/payments/wallet'
 import { countUnreadShowcaseLeads, listShowcasesByOwner, type ShowcaseSiteRow } from '@/lib/showcase/store'
-import { showcaseHost, showcaseUrl } from '@/lib/showcase/host'
+import { showcaseHost, showcasePreviewUrl, showcaseUrl } from '@/lib/showcase/host'
 import type { ShowcaseStatus } from '@/lib/showcase/types'
 import { showcaseBilling, showcaseWalletTenant, type ShowcaseBilling } from './billing'
 
@@ -14,6 +14,8 @@ export interface ShowcaseConsoleState extends ShowcaseBilling {
   pauseReason: 'owner' | 'unpaid' | null
   host: string
   url: string
+  /** The address as the console opens it for the owner (their own look isn't counted as a visit). */
+  previewUrl: string
   hasPage: boolean
   publishedAt: string | null
   paidUntil: string | null
@@ -42,6 +44,7 @@ export async function showcaseConsoleState(site: ShowcaseSiteRow): Promise<Showc
     pauseReason: site.pauseReason,
     host: showcaseHost(site.slug),
     url: showcaseUrl(site.slug),
+    previewUrl: showcasePreviewUrl(site.slug),
     hasPage: !!site.page,
     publishedAt: site.publishedAt,
     paidUntil: site.paidUntil,

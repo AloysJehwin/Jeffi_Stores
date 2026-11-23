@@ -7,6 +7,7 @@ import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import SiteReachabilityBadge from './SiteReachabilityBadge'
 import PageHeader from './_components/PageHeader'
 import { Card, Row } from './_components/Card'
+import HostText from './_components/HostText'
 import SetupProgress from './_components/SetupProgress'
 import StoreClosed from './_components/StoreClosed'
 import { MoneyTiles, STATUS_PILL, fmt } from './_components/finance'
@@ -87,8 +88,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card title="Store">
             <div className="space-y-2.5">
-              <Row label="Subdomain" mono value={`${tenant.slug}.jeffistores.in`} />
-              {tenant.custom_domain && <Row label="Custom domain" mono value={tenant.custom_domain} />}
+              <Row label="Subdomain" mono value={<HostText host={`${tenant.slug}.jeffistores.in`} />} />
+              {tenant.custom_domain && <Row label="Custom domain" mono value={<HostText host={tenant.custom_domain} />} />}
               <Row label="Created" value={fmtDay(new Date(tenant.created_at))} />
               {tenant.region && <Row label="Region" value={tenant.region} />}
             </div>

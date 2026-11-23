@@ -3,9 +3,16 @@
 import { useState } from 'react'
 import { Empty } from '@/components/admin/channels/ui'
 
-// Plain SVG / div charts carried over from the old Traffic page (no chart library).
+// Plain SVG / div charts carried over from the old Traffic page (no chart library). Colours are theme tokens
+// (--chart-1..10, --chart-muted, --chart-bar, --chart-heat): the ecom console sets them to its palette; elsewhere the
+// fallbacks are the admin's original colours.
 
-export const PALETTE = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#6b7280']
+const FALLBACK = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#6b7280']
+export const PALETTE = FALLBACK.map((c, i) => `var(--chart-${i + 1}, ${c})`)
+/** The n-th palette colour (1-based), as a token. */
+export const chartColor = (n: number) => PALETTE[(n - 1) % PALETTE.length]
+/** A neutral series (visits behind conversions). */
+export const CHART_MUTED = 'var(--chart-muted, rgba(148,163,184,0.7))'
 
 const tipStyle = { backgroundColor: '#1e2030', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.08)' }
 
@@ -116,7 +123,7 @@ export function Donut({ segments, size = 120 }: { segments: { label: string; val
 }
 
 /** Horizontal bar list: label, value and a bar scaled to the largest value. */
-export function HBars({ rows, color = 'rgba(132,204,22,0.6)', empty }: { rows: { key: string; label: React.ReactNode; value: number; right?: React.ReactNode }[]; color?: string; empty?: string }) {
+export function HBars({ rows, color = 'var(--chart-bar, rgba(132,204,22,0.6))', empty }: { rows: { key: string; label: React.ReactNode; value: number; right?: React.ReactNode }[]; color?: string; empty?: string }) {
   if (!rows.length) return <Empty msg={empty} />
   const max = Math.max(1, ...rows.map(r => r.value))
   return (
@@ -159,7 +166,7 @@ export function Heatmap({ cells }: { cells: { dow: number; hour: number; views: 
                       key={h}
                       title={`${d} ${h}:00 · ${v} views`}
                       className="h-5 rounded-sm bg-surface-secondary"
-                      style={v ? { backgroundColor: `rgba(132,204,22,${0.15 + a * 0.85})` } : undefined}
+                      style={v ? { backgroundColor: `color-mix(in srgb, var(--chart-heat, rgb(132,204,22)) ${Math.round(15 + a * 85)}%, transparent)` } : undefined}
                     />
                   )
                 })}

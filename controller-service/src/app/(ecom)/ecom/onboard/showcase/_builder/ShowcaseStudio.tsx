@@ -71,6 +71,7 @@ export default function ShowcaseStudio({
   const [paidStart, setPaidStart] = useState(false)
   const top = useRef<HTMLDivElement>(null)
   const low = useRef<HTMLDivElement>(null)
+  const stepper = useRef<HTMLOListElement>(null)
   const report = useRef(onView)
   report.current = onView
 
@@ -104,6 +105,13 @@ export default function ShowcaseStudio({
   useEffect(() => {
     if (walletLow) low.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [walletLow])
+
+  // A stepper scrolled sideways keeps the current step in view.
+  useEffect(() => {
+    const ol = stepper.current
+    const on = ol?.querySelector<HTMLElement>('[aria-current="step"]')
+    if (ol && on) ol.scrollLeft = Math.max(0, on.offsetLeft + on.offsetWidth + 4 - ol.clientWidth)
+  }, [phase])
 
   const go = (p: Phase) => {
     setPhase(p)
@@ -280,23 +288,24 @@ export default function ShowcaseStudio({
         ) : (
           <>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <ol className="flex flex-wrap items-center gap-1.5" aria-label="Studio steps">
+              {/* One line, never wrapped (a wrap left a connector dangling): it scrolls sideways if a phone is too narrow. */}
+              <ol ref={stepper} className="ecom-scroll-x relative -m-1 flex min-w-0 items-center gap-1 overflow-x-auto p-1 sm:gap-1.5" aria-label="Studio steps">
                 {PHASES.map((p, i) => {
                   const on = p.id === phase
                   const done = i < at
                   return (
-                    <li key={p.id} className="flex items-center gap-1.5">
+                    <li key={p.id} className="flex shrink-0 items-center gap-1 sm:gap-1.5">
                       <button
                         type="button"
                         disabled={!reachable(p.id) || on || !!busy}
                         onClick={() => go(p.id)}
                         aria-current={on ? 'step' : undefined}
-                        className={`ecom-focus inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${on ? 'ecom-sel' : done ? 'org-sand text-foreground hover:bg-[var(--org-sand-deep)]' : 'text-foreground-muted'} disabled:cursor-default`}
+                        className={`ecom-focus inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold transition-colors sm:gap-1.5 sm:px-3 ${on ? 'ecom-sel' : done ? 'org-sand text-foreground hover:bg-[var(--org-sand-deep)]' : 'text-foreground-muted'} disabled:cursor-default`}
                       >
                         {done && <Check className="h-3 w-3" strokeWidth={3} />}
                         {p.label}
                       </button>
-                      {i < PHASES.length - 1 && <span className="h-px w-3 bg-border-default" aria-hidden />}
+                      {i < PHASES.length - 1 && <span className="h-px w-2 bg-border-default sm:w-3" aria-hidden />}
                     </li>
                   )
                 })}

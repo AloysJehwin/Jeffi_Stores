@@ -15,7 +15,7 @@ export default function AnalyticsTabLoading({ tab }: { tab: ShowcaseTab }) {
     case 'overview':
       return (
         <div className="space-y-5">
-          <LoadingKpis labels={['Visitors', 'Visits', 'Page views', 'Engaged visits', 'Time on page', 'Page seen', 'Enquiries', 'Contact taps', 'Enquiry rate']} />
+          <LoadingKpis labels={['Visitors', 'Visits', 'Page views', 'Engaged visits', 'Time on page', 'Page seen', 'Enquiries', 'Contact taps', 'Contact rate']} />
           <LoadingSection title="Needs attention" lines={2} />
           <LoadingChart title="Visits and enquiries" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -29,7 +29,7 @@ export default function AnalyticsTabLoading({ tab }: { tab: ShowcaseTab }) {
       return (
         <div className="space-y-5">
           <LoadingKpis labels={['Visits', 'Enquiries', 'Tagged visits', 'Paid visits', 'Enquiries from ads', 'Channels']} />
-          <Table title="By channel" columns={['Channel', 'Visits', 'First-time', 'Enquiry rate', 'Enquiries']} />
+          <Table title="By channel" columns={['Channel', 'Visits', 'First-time', 'Contact rate', 'Enquiries']} />
           <LoadingChart title="Paid vs organic visits" />
         </div>
       )
@@ -40,7 +40,7 @@ export default function AnalyticsTabLoading({ tab }: { tab: ShowcaseTab }) {
             <Bars title="How much of the page they saw" />
             <Bars title="Time on the page" />
           </div>
-          <Table title="Landing pages" columns={['Landing page', 'Visits', 'Engaged', 'Enquiry rate', 'Enquiries']} />
+          <Table title="Landing pages" columns={['Landing page', 'Visits', 'Engaged', 'Contact rate', 'Enquiries']} />
         </div>
       )
     case 'funnel':
