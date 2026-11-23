@@ -1,0 +1,8 @@
+[Unit]
+Description=Check the k3s node IP against the box's LAN address every minute
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=5s
+[Install]
+WantedBy=timers.target

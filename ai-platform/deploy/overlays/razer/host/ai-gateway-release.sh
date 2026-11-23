@@ -77,11 +77,12 @@ echo "== Smoke test"
 ok=false
 for _ in $(seq 1 20); do curl -fsS --max-time 5 $GATEWAY/healthz >/dev/null && { ok=true; break; }; sleep 3; done
 $ok || { echo "gateway not healthy after rollout" >&2; exit 1; }
-curl -fsS --max-time 10 $GATEWAY/v1/providers; echo
+curl -sS --fail-with-body --max-time 10 $GATEWAY/v1/providers; echo
 if $ocr; then
   # The sample through the gateway the way KYB reads a document: PaddleOCR only, 503 when it is down.
+  # --fail-with-body: a failure prints the gateway's reason, not just curl's exit code.
   printf '{"data":"%s","mime_type":"image/png"}' "$(base64 -w0 "$src/paddleocr/sample.png")" \
-    | curl -fsS --max-time 60 -H 'Content-Type: application/json' --data-binary @- $GATEWAY/v1/ocr; echo
+    | curl -sS --fail-with-body --max-time 60 -H 'Content-Type: application/json' --data-binary @- $GATEWAY/v1/ocr; echo
 fi
 
 echo "== Keeping the source as $LIVE (previous in $LIVE.prev)"

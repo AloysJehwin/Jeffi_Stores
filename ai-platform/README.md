@@ -116,7 +116,14 @@ card by stopping/starting the host `ollama` service. `deploy/overlays/razer/host
 service always up regardless: a systemd timer (`ollama-gpu-guard.timer`, every 60s) runs
 `ollama-gpu-guard.sh`, which puts Ollama on the GPU when the card is free and pins it to CPU
 (`CUDA_VISIBLE_DEVICES=`) whenever any non-Ollama process is using the GPU. Ollama never goes down;
-it is only slower while training holds the card. Install (idempotent, needs sudo on the node):
+it is only slower while training holds the card.
+
+The same installer adds the k3s IP guard (`k3s-ip-guard.timer`, every 60s): the box is on home Wi-Fi
+with a DHCP address and k3s keeps the node IP it started with, so after an address change pods lose the
+API and CoreDNS stops learning new Services (a new Service never resolves). When the node IP and the
+box's address disagree on two checks in a row, the guard restarts k3s and then CoreDNS (at most once per
+30 minutes). `sudo k3s-ip-guard.sh --check` prints both addresses. Install both (idempotent, needs sudo
+on the node):
 
 ```
 deploy/overlays/razer/host/install-guard.sh
