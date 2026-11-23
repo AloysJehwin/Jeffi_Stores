@@ -25,6 +25,20 @@ export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAu
 export { getCurrentTenant, getCurrentTenantId, runWithTenantContext }
 export { ensureTenantContext as resolveRequestTenant }
 
+/** A store-scoped request whose store can't be resolved right now: 503, never the flagship DB. */
+export class TenantUnavailableError extends Error {
+  readonly status = 503
+  readonly code = 'tenant_unavailable'
+  constructor(
+    readonly slug: string,
+    reason: string,
+    cause?: unknown
+  ) {
+    super(`Store "${slug}" unavailable (${reason}); refusing to fall back to the platform database.`, { cause })
+    this.name = 'TenantUnavailableError'
+  }
+}
+
 // The shared pool tuning (sizing, keepalive, maxUses). Credential/target fields
 // are merged in per source (DEFAULT env, or a tenant's infra).
 function basePoolConfig(): any {
@@ -140,13 +154,16 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
   return createPgPool(config)
 }
 
-function getPool(explicitTenant?: TenantContextType | null): Pool {
+function getPool(explicitTenant?: TenantContextType | null, allowDefault = false): Pool {
   // Prefer an explicitly-resolved tenant (from ensureTenantContext) over ALS.
   // enterWith() set inside an async fn does NOT reliably survive the await back
   // to the caller, so relying on getCurrentTenant() here dropped the tenant and
   // fell back to the platform DB. Passing ctx explicitly is the robust path.
   const tenant = explicitTenant ?? getCurrentTenant()
   if (!tenant) {
+    // A store's pods carry the flagship DATABASE_URL, so their default pool is the flagship's.
+    const pinned = process.env.SERVICE_TENANT_SLUG
+    if (pinned && !allowDefault) throw new TenantUnavailableError(pinned, 'no tenant context in its pod')
     if (!pool) {
       pool = buildDefaultPool()
       dbGlobal.__appPool = pool
@@ -180,9 +197,12 @@ async function pingPool(p: Pool): Promise<'ok' | 'busy'> {
   return 'ok'
 }
 
-/** SELECT 1 on the database this request would use, through its pool; 'busy' when the pool is fully in use. */
+/**
+ * SELECT 1 on the database this request would use, through its pool; 'busy' when the pool is fully in use.
+ * A store pod's probe (localhost, no tenant) pings the flagship DB on purpose; pingStoreDb covers its own.
+ */
 export async function pingDb(): Promise<'ok' | 'busy'> {
-  return pingPool(getPool(await ensureTenantContext()))
+  return pingPool(getPool(await ensureTenantContext(), true))
 }
 
 // The pinned store's infra for the readiness probe: any status (a store being built is probed too).
@@ -242,8 +262,9 @@ export async function pingStoreDb(slug: string): Promise<'ok' | 'busy' | 'pendin
  * request falls back to the DEFAULT pool (the platform DB), leaking one tenant's traffic
  * onto the main store's data. Resolves the tenant's infra from the control-plane and
  * RETURNS it so callers pass it straight to getPool() — enterWith() alone does not
- * survive the await boundary back into query()/getClient(). Returns null when ALS already
- * has a tenant (jobs), when there's no request scope, or when the header is absent.
+ * survive the await boundary back into query()/getClient(). Returns null when there's no
+ * request scope or the header is absent. With the header, it returns the store or throws
+ * TenantUnavailableError: a control-plane error or a store that stopped serving is a 503, not the flagship DB.
  */
 async function ensureTenantContext(): Promise<TenantContextType | null> {
   const existing = getCurrentTenant()
@@ -258,8 +279,15 @@ async function ensureTenantContext(): Promise<TenantContextType | null> {
   }
   if (!slug) return null
   const { lookupTenantContextBySlug } = await import('@/lib/tenant-registry')
-  const ctx = await lookupTenantContextBySlug(slug)
-  if (ctx) setTenantContext(ctx)
+  let ctx: TenantContextType | null
+  try {
+    ctx = await lookupTenantContextBySlug(slug)
+  } catch (err) {
+    throw new TenantUnavailableError(slug, 'control-plane lookup failed', err)
+  }
+  // Middleware forwards the header only for a store it resolved: null means it stopped serving since.
+  if (!ctx) throw new TenantUnavailableError(slug, 'not serving')
+  setTenantContext(ctx)
   return ctx
 }
 

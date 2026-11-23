@@ -135,7 +135,7 @@ export interface ImageGenerateRequest {
 }
 
 export interface GeneratedImageRef {
-  /** Short-lived gateway URL (/v1/files/<id>); the app persists to its own storage. */
+  /** Short-lived gateway URL (/v1/files/<id>; fetch it with fileHeaders()); the app persists to its own storage. */
   url: string
   width: number
   height: number

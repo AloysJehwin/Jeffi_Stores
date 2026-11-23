@@ -4,6 +4,8 @@
 
 export interface SdkConfig {
   gatewayUrl: string
+  /** Bearer token for /v1 calls; empty sends none (a gateway without AI_GATEWAY_TOKEN). */
+  token: string
   requestTimeoutMs: number
   healthTimeoutMs: number
 }
@@ -12,6 +14,7 @@ export function loadConfig(overrides?: Partial<SdkConfig>): SdkConfig {
   const gatewayUrl = (overrides?.gatewayUrl || process.env.AI_GATEWAY_URL || 'http://localhost:8080').replace(/\/$/, '')
   return {
     gatewayUrl,
+    token: (overrides?.token ?? process.env.AI_GATEWAY_TOKEN ?? '').trim(),
     // Long: the gateway may hold the connection open while a queued job runs.
     requestTimeoutMs: overrides?.requestTimeoutMs ?? (Number(process.env.AI_GATEWAY_TIMEOUT_MS) || 130_000),
     healthTimeoutMs: overrides?.healthTimeoutMs ?? (Number(process.env.AI_GATEWAY_HEALTH_TIMEOUT_MS) || 2_000),

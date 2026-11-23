@@ -99,6 +99,12 @@ export function aiGatewayUrl(): string {
   return GATEWAY_URL
 }
 
+/** Bearer auth for every gateway /v1 call (the gateway enforces it once AI_GATEWAY_TOKEN is set there). */
+export function aiGatewayHeaders(): Record<string, string> {
+  const token = (process.env.AI_GATEWAY_TOKEN || '').trim()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 /** Test hook: forget gateway reachability state. */
 export function __resetAiClientState(): void {
   lastContactAt = 0
@@ -143,7 +149,7 @@ async function gatewayPost(path: string, body: unknown, label: string, withBody:
   try {
     res = await fetch(`${GATEWAY_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...aiGatewayHeaders() },
       signal: ctrl.signal,
       body: JSON.stringify(body),
     })
@@ -290,7 +296,7 @@ async function gatewayStream(req: AiChatRequest, onEvent: (e: AiChatStreamEvent)
     const body = { ...req, ...(await gatewayContext(req.cacheNamespace)) }
     const res = await fetch(`${GATEWAY_URL}/v1/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...aiGatewayHeaders() },
       signal: ctrl.signal,
       body: JSON.stringify(body),
     })
@@ -337,7 +343,7 @@ export async function activeTextProvider(cacheNamespace?: string): Promise<'anth
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), GATEWAY_CONNECT_TIMEOUT_MS)
       try {
-        const r = await fetch(`${GATEWAY_URL}/v1/providers`, { signal: ctrl.signal })
+        const r = await fetch(`${GATEWAY_URL}/v1/providers`, { headers: aiGatewayHeaders(), signal: ctrl.signal })
         const d = await r.json()
         providersCache = { at: Date.now(), text: d.text ?? [], defaults: d.defaults?.text ?? [] }
       } finally {

@@ -1,7 +1,7 @@
 // End-to-end AI monitor behind the ai_health cron: a tiny real chat through the gateway (no
 // fallback, no cache) plus a direct-Ollama reachability check. Alerts the platform admin once
 // per incident and once on recovery; incident state lives in Redis.
-import { aiGatewayUrl } from '@/lib/shared/ai-client'
+import { aiGatewayUrl, aiGatewayHeaders } from '@/lib/shared/ai-client'
 import { directReachable, ollamaDirectUrl } from '@/lib/shared/ai-direct-ollama'
 import { getRedisClient } from '@/lib/shared/redis'
 
@@ -42,7 +42,7 @@ async function checkGateway(): Promise<AiHealthResult['gateway']> {
   try {
     const res = await timedFetch(`${base}/v1/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...aiGatewayHeaders() },
       body: JSON.stringify({
         messages: [{ role: 'user', content: 'Reply with the single word OK.' }],
         modelHint: 'fast',

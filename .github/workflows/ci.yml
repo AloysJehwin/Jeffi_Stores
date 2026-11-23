@@ -591,6 +591,8 @@ jobs:
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
       - name: jeffi/store from jeffi/production, without the control-plane keys (prints no values)
         run: bash deploy/k8s/bootstrap/store-secret.sh ${{ env.DRY_FLAG }}
+      - name: jeffi/production/build matches jeffi/production's NEXT_PUBLIC_* keys (warns only; prints no values)
+        run: bash deploy/k8s/bootstrap/build-secret.sh --check
       - name: Room on the core, the ECR pull secret, and what the services share (namespaces, edge, Redis, RBAC, config, release images)
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform prep ${{ env.DRY_FLAG }}
 

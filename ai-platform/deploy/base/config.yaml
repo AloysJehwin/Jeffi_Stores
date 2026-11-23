@@ -69,6 +69,7 @@ data:
 # GOOGLE_AI_API_KEY: Gemini API key (images, Veo video). Empty = google skipped.
 # REPLICATE_API_TOKEN: Replicate token (Flux, Wan video). Empty = replicate skipped.
 # ANTHROPIC_API_KEY: local dev only (production uses workload identity). Leave empty in clusters.
+# AI_GATEWAY_TOKEN: bearer token every /v1 call must carry ("new,old" during a rotation). Empty = no auth.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -81,3 +82,4 @@ stringData:
   GOOGLE_AI_API_KEY: ""
   REPLICATE_API_TOKEN: ""
   ANTHROPIC_API_KEY: ""
+  AI_GATEWAY_TOKEN: ""

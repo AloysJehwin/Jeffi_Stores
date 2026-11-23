@@ -3,7 +3,7 @@
 // to the store's S3 bucket (gateway URLs are temporary). Contract: docs/plans/AI_MEDIA_PLATFORM_PLAN.md.
 import { getAiRouting, getProviderPolicy } from '@/lib/providers/policy'
 import { preauthorize, settle, AiWalletError, type UsageUnits } from './billing'
-import { aiGatewayUrl } from '@/lib/shared/ai-client'
+import { aiGatewayUrl, aiGatewayHeaders } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
 import { query, queryOne } from '@/lib/shared/db'
 import { AI_VIDEO_ASPECTS, AI_VIDEO_DURATIONS, PNG_IMAGE_FEATURES, type AiVideoAspect } from './media-features'
@@ -145,7 +145,7 @@ async function gatewayFetch<T>(path: string, init: RequestInit = {}): Promise<T>
   try {
     res = await fetch(`${aiGatewayUrl()}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+      headers: { 'Content-Type': 'application/json', ...aiGatewayHeaders(), ...(init.headers || {}) },
       signal: ctrl.signal,
     })
   } catch (err) {
@@ -191,11 +191,14 @@ async function fetchBytes(url: string): Promise<Buffer> {
   const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(url)
   if (m) return m[2] ? Buffer.from(m[3], 'base64') : Buffer.from(decodeURIComponent(m[3]), 'utf8')
   // Gateway file URLs are relative (/v1/files/<id>) unless AI_PUBLIC_URL is set on the gateway.
-  const abs = /^https?:\/\//i.test(url) ? url : new URL(url, `${aiGatewayUrl().replace(/\/+$/, '')}/`).toString()
+  const gateway = `${aiGatewayUrl().replace(/\/+$/, '')}/`
+  const abs = /^https?:\/\//i.test(url) ? url : new URL(url, gateway).toString()
+  // The token goes only to the gateway's own origin, never to another host's image URL.
+  const headers = new URL(abs).origin === new URL(gateway).origin ? aiGatewayHeaders() : {}
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(abs, { signal: ctrl.signal })
+    const res = await fetch(abs, { headers, signal: ctrl.signal })
     if (!res.ok) throw new AiMediaError(`Failed to fetch generated media (${res.status})`)
     return Buffer.from(await res.arrayBuffer())
   } finally {
