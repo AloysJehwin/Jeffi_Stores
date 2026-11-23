@@ -4,6 +4,7 @@ import { creditWallet, debitWallet, getWalletBalance } from '@/lib/payments/wall
 import { domainProviders, domainPurchaseEnabled, RegistrarError, type Availability, type DomainContact } from './providers'
 import { getDomainPricing, quoteTld, tldOf, tldPrices, type DomainQuote } from './pricing'
 import { notifyDomain } from './notify'
+import { clearShowcaseCustomDomain, setShowcaseCustomDomain, showcaseDomainHosts } from '@/lib/showcase/domain'
 
 // A bought domain is one tenant_domain_orders row that is also its job. Each advance moves it as far as it
 // can go now, under a session advisory lock (the cron and the owner's page both advance), and saves after
@@ -14,6 +15,8 @@ import { notifyDomain } from './notify'
 //                          for every host the plan gives the store (apex, www., admin., invoice., …) + the
 //                          store's routes, cert-manager certificates
 //   active                 serving; a plan change re-runs records → certs for the new host set; renewal.ts renews
+// An order for a Showcase site (showcase_site_id) gets only the apex and www., routed to showcase-service
+// (showcase-routes.ts); once live the site answers on the domain (showcase_sites.custom_domain).
 
 export type OrderStatus = 'requested' | 'registering' | 'configuring' | 'active' | 'failed' | 'cancelled' | 'expired'
 export const IN_FLIGHT: OrderStatus[] = ['requested', 'registering', 'configuring']
@@ -50,6 +53,8 @@ export interface DomainOrder {
   next_at: string | null
   last_error: string | null
   events: OrderEvent[]
+  /** Bought for this Showcase site; null for the store's domain. */
+  showcase_site_id: string | null
   created_at: string
   updated_at: string
 }
@@ -74,6 +79,10 @@ export async function boughtHosts(domain: string, slug: string, plan: string | n
   }
   return [...new Set(out)]
 }
+
+/** The hosts an order serves: a Showcase site's apex and www., else every host the store's plan gives it. */
+const wantedHosts = (o: DomainOrder, t: { slug: string; plan: string | null }) =>
+  o.showcase_site_id ? Promise.resolve(showcaseDomainHosts(o.domain)) : boughtHosts(o.domain, t.slug, t.plan)
 const pollMs = (live: boolean) => (live ? 60_000 : 5_000)
 
 function row(r: any): DomainOrder {
@@ -96,11 +105,13 @@ export async function getOrder(id: string): Promise<DomainOrder | null> {
   return r.rows[0] ? row(r.rows[0]) : null
 }
 
-export async function listOrders(tenantId: string): Promise<DomainOrder[]> {
+/** The store's orders, or with siteId that Showcase site's. */
+export async function listOrders(tenantId: string, siteId: string | null = null): Promise<DomainOrder[]> {
   const r = await pool().query(
-    `SELECT * FROM tenant_domain_orders WHERE tenant_id = $1 AND NOT (status IN ('failed','cancelled') AND updated_at < now() - interval '30 days')
+    `SELECT * FROM tenant_domain_orders WHERE tenant_id = $1 AND showcase_site_id IS NOT DISTINCT FROM $2::uuid
+        AND NOT (status IN ('failed','cancelled') AND updated_at < now() - interval '30 days')
       ORDER BY created_at DESC`,
-    [tenantId]
+    [tenantId, siteId]
   )
   return r.rows.map(row)
 }
@@ -249,13 +260,13 @@ async function freshQuote(raw: string): Promise<{ ok: true; domain: string; quot
   return { ok: true, domain, quote }
 }
 
-async function insertOrder(tenantId: string, domain: string, contact: DomainContact, quote: DomainQuote, source: 'dashboard' | 'onboarding', message: string) {
+async function insertOrder(tenantId: string, domain: string, contact: DomainContact, quote: DomainQuote, source: 'dashboard' | 'onboarding', message: string, showcaseSiteId: string | null = null) {
   try {
     const r = await pool().query(
-      `INSERT INTO tenant_domain_orders (tenant_id, domain, status, step, source, contact, cost_usd, renewal_cost_usd, usd_inr, margin, price_inr, events)
-       VALUES ($1, $2, 'requested', 'charge', $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      `INSERT INTO tenant_domain_orders (tenant_id, domain, status, step, source, contact, cost_usd, renewal_cost_usd, usd_inr, margin, price_inr, events, showcase_site_id)
+       VALUES ($1, $2, 'requested', 'charge', $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [tenantId, domain, source, JSON.stringify(contact), quote.costUsd, quote.renewalCostUsd, quote.usdInr, quote.margin, quote.priceInr,
-        JSON.stringify([{ at: new Date().toISOString(), step: 'charge', message }])]
+        JSON.stringify([{ at: new Date().toISOString(), step: 'charge', message }]), showcaseSiteId]
     )
     return row(r.rows[0])
   } catch (e: any) {
@@ -264,8 +275,8 @@ async function insertOrder(tenantId: string, domain: string, contact: DomainCont
   }
 }
 
-/** Dashboard purchase: the owner confirmed `expectedPriceInr`; charge now and submit the registration. */
-export async function buyDomain(input: { tenantId: string; domain: string; contact: DomainContact; expectedPriceInr: number }): Promise<BuyResult> {
+/** Dashboard purchase: the owner confirmed `expectedPriceInr`; charge now and submit the registration. With showcaseSiteId it is that site's. */
+export async function buyDomain(input: { tenantId: string; domain: string; contact: DomainContact; expectedPriceInr: number; showcaseSiteId?: string | null }): Promise<BuyResult> {
   if (!domainPurchaseEnabled()) return { ok: false, code: 'disabled', error: 'Buying domains is not available yet.' }
   const q = await freshQuote(input.domain)
   if (!q.ok) return q
@@ -277,7 +288,7 @@ export async function buyDomain(input: { tenantId: string; domain: string; conta
     const short = Math.ceil(q.quote.priceInr - balance)
     return { ok: false, code: 'wallet_short', error: `Your wallet has ₹${balance.toLocaleString('en-IN')}. Top up ₹${short.toLocaleString('en-IN')} to buy ${q.domain}.`, shortfallInr: short }
   }
-  const order = await insertOrder(input.tenantId, q.domain, input.contact, q.quote, 'dashboard', `You confirmed ${q.domain} for ₹${q.quote.priceInr.toLocaleString('en-IN')} a year`)
+  const order = await insertOrder(input.tenantId, q.domain, input.contact, q.quote, 'dashboard', `You confirmed ${q.domain} for ₹${q.quote.priceInr.toLocaleString('en-IN')} a year`, input.showcaseSiteId ?? null)
   if (!order) return { ok: false, code: 'unavailable', error: `${q.domain} is no longer available.` }
   const after = (await advanceOrder(order.id, { force: true })) ?? order
   if (after.status === 'failed' || after.status === 'cancelled') return { ok: false, code: 'failed', error: after.last_error ?? 'The domain could not be bought.', order: after }
@@ -298,7 +309,9 @@ export async function cancelOrder(id: string): Promise<DomainOrder | null> {
   return withLock(`domain_order:${id}`, async () => {
     const o = await getOrder(id)
     if (!o || o.status !== 'requested') return o
-    return patchOrder(id, { status: 'cancelled', step: null, next_at: null, event: { step: 'charge', message: 'Cancelled by you; nothing was charged' } })
+    const out = await patchOrder(id, { status: 'cancelled', step: null, next_at: null, event: { step: 'charge', message: 'Cancelled by you; nothing was charged' } })
+    if (o.showcase_site_id) await clearShowcaseCustomDomain(o.showcase_site_id, o.domain)
+    return out
   })
 }
 
@@ -360,6 +373,7 @@ const wait = (o: DomainOrder, ms: number, event?: Patch['event']) => patchOrder(
 async function step(o: DomainOrder): Promise<{ order: DomainOrder; more: boolean }> {
   const { registrar, dns, hosting } = await domainProviders()
   const live = registrar.live
+  const site = o.showcase_site_id
   const done = (order: DomainOrder) => ({ order, more: true })
   const stop = (order: DomainOrder) => ({ order, more: false })
 
@@ -433,16 +447,18 @@ async function step(o: DomainOrder): Promise<{ order: DomainOrder; more: boolean
       if (o.step === 'records') {
         const t = await tenantState(o.tenant_id)
         if (!t) throw new Error('store not found')
-        const hosts = await boughtHosts(o.domain, t.slug, t.plan)
+        const hosts = await wantedHosts(o, t)
         await dns.pointAtCluster(o.hosted_zone_id!, hosts)
-        return done(await patchOrder(o.id, { step: 'routing', attempts: 0, last_error: null, event: { step: 'records', message: `${hosts.length} addresses on ${o.domain} point at your store` } }))
+        return done(await patchOrder(o.id, { step: 'routing', attempts: 0, last_error: null, event: { step: 'records', message: `${hosts.length} addresses on ${o.domain} point at your ${site ? 'site' : 'store'}` } }))
       }
       if (o.step === 'routing') {
         const t = await tenantState(o.tenant_id)
         if (t?.status !== 'active') return stop(await wait(o, 10 * 60_000, { step: 'routing', message: 'Waiting for your store to go live' }))
-        const stale = await claimHosts(o, await boughtHosts(o.domain, t.slug, t.plan))
-        await hosting.applyRoutes(o.tenant_id)
-        for (const other of stale) await hosting.applyRoutes(other).catch(() => {})
+        const stale = await claimHosts(o, await wantedHosts(o, t))
+        if (site) await hosting.applyShowcaseRoutes()
+        else await hosting.applyRoutes(o.tenant_id)
+        for (const other of stale.tenants) await hosting.applyRoutes(other).catch(() => {})
+        if (stale.showcase && !site) await hosting.applyShowcaseRoutes().catch(() => {})
         return done(await patchOrder(o.id, { step: 'certs', attempts: 0, last_error: null, event: { step: 'routing', message: 'Issuing security certificates' } }))
       }
       if (o.step === 'certs') {
@@ -451,7 +467,8 @@ async function step(o: DomainOrder): Promise<{ order: DomainOrder; more: boolean
         let pending = 0
         for (const r of rows) {
           if (r.status === 'verified') continue
-          if (t && (await hosting.certReady(t.slug, r.domain, new Date(r.updated_at)))) {
+          const ready = site ? hosting.showcaseCertReady(r.domain, new Date(r.updated_at)) : t ? hosting.certReady(t.slug, r.domain, new Date(r.updated_at)) : false
+          if (await ready) {
             await pool().query(`UPDATE tenant_custom_domains SET status = 'verified', verified_at = now(), updated_at = now() WHERE id = $1`, [r.id])
           } else pending++
         }
@@ -461,7 +478,10 @@ async function step(o: DomainOrder): Promise<{ order: DomainOrder; more: boolean
           return stop(await patchOrder(o.id, { next_at: new Date(Date.now() + (slow ? 30 * 60_000 : live ? 60_000 : 5_000)), ...(slow ? { last_error: 'Certificates not issued after 48 hours' } : {}) }))
         }
         clearTenantCache()
-        await hosting.applyRoutes(o.tenant_id)
+        if (site) {
+          await setShowcaseCustomDomain(site, o.domain)
+          await hosting.applyShowcaseRoutes()
+        } else await hosting.applyRoutes(o.tenant_id)
         // A plan-change resync comes back here too; only the first activation is news to the owner.
         const firstLive = !o.events.some(e => e.step === 'certs' && e.message.startsWith('Live'))
         const tld = tldOf(o.domain, (await tldPrices()).keys())
@@ -482,7 +502,7 @@ async function step(o: DomainOrder): Promise<{ order: DomainOrder; more: boolean
     // The plan changed (business. on Pro, quotation. on Grow, …): bring the domain's hosts in line.
     const t = await tenantState(o.tenant_id)
     if (t?.status === 'active') {
-      const want = await boughtHosts(o.domain, t.slug, t.plan)
+      const want = await wantedHosts(o, t)
       const have = await orderHosts(o.id)
       if (want.length !== have.length || want.some(h => !have.includes(h))) {
         return done(await patchOrder(o.id, { status: 'configuring', step: 'records', attempts: 0, event: { step: 'records', message: 'Your plan changed: updating the addresses on your domain' } }))
@@ -498,30 +518,40 @@ async function step(o: DomainOrder): Promise<{ order: DomainOrder; more: boolean
 }
 
 /**
- * Point the domain's hosts at this store: drop other stores' claims on them (we hold the registration now) and
- * hosts the plan no longer has, and upsert the rest as cert-pending. Returns the stores whose routes changed.
+ * Point the domain's hosts at this store (or Showcase site): drop other claims on them (we hold the registration
+ * now) and hosts the plan no longer has, and upsert the rest as cert-pending. Returns the stores whose routes
+ * changed, and whether a Showcase route did.
  */
-async function claimHosts(o: DomainOrder, hosts: string[]): Promise<string[]> {
+async function claimHosts(o: DomainOrder, hosts: string[]): Promise<{ tenants: string[]; showcase: boolean }> {
   const client = await pool().connect()
   try {
     await client.query('BEGIN')
     const gone = await client.query(
-      `DELETE FROM tenant_custom_domains WHERE (domain = ANY($1::text[]) AND order_id IS DISTINCT FROM $2) OR (order_id = $2 AND NOT domain = ANY($1::text[])) RETURNING tenant_id, status`,
+      `DELETE FROM tenant_custom_domains WHERE (domain = ANY($1::text[]) AND order_id IS DISTINCT FROM $2) OR (order_id = $2 AND NOT domain = ANY($1::text[])) RETURNING tenant_id, status, domain, showcase_site_id`,
       [hosts, o.id]
     )
     for (const [i, h] of hosts.entries()) {
       // Created in this order so the apex is the store's first (canonical) custom domain.
       await client.query(
-        `INSERT INTO tenant_custom_domains (tenant_id, domain, status, order_id, created_at)
-         VALUES ($1, $2, 'cert-pending', $3, now() + make_interval(secs => $4))
-         ON CONFLICT (domain) DO UPDATE SET order_id = EXCLUDED.order_id, tenant_id = EXCLUDED.tenant_id,
+        `INSERT INTO tenant_custom_domains (tenant_id, domain, status, order_id, showcase_site_id, created_at)
+         VALUES ($1, $2, 'cert-pending', $3, $5, now() + make_interval(secs => $4))
+         ON CONFLICT (domain) DO UPDATE SET order_id = EXCLUDED.order_id, tenant_id = EXCLUDED.tenant_id, showcase_site_id = EXCLUDED.showcase_site_id,
            status = CASE WHEN tenant_custom_domains.status = 'verified' THEN 'verified' ELSE 'cert-pending' END, updated_at = now()`,
-        [o.tenant_id, h, o.id, i * 0.001]
+        [o.tenant_id, h, o.id, i * 0.001, o.showcase_site_id]
       )
     }
     await client.query('COMMIT')
     clearTenantCache()
-    return [...new Set(gone.rows.filter(r => r.tenant_id !== o.tenant_id && ['cert-pending', 'verified'].includes(r.status)).map(r => r.tenant_id as string))]
+    const routed = gone.rows.filter(r => ['cert-pending', 'verified'].includes(r.status))
+    // A site that lost its host stops answering on it, unless this order keeps it on the same site.
+    for (const r of gone.rows) {
+      if (r.showcase_site_id && !(r.showcase_site_id === o.showcase_site_id && hosts.includes(r.domain))) await clearShowcaseCustomDomain(r.showcase_site_id, r.domain)
+    }
+    return {
+      // A Showcase order renders no store routes, so its own store's dropped claim needs a reconcile too.
+      tenants: [...new Set(routed.filter(r => !r.showcase_site_id && (o.showcase_site_id || r.tenant_id !== o.tenant_id)).map(r => r.tenant_id as string))],
+      showcase: routed.some(r => r.showcase_site_id),
+    }
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
     throw e
@@ -553,9 +583,11 @@ export async function advanceOrder(id: string, opts: { force?: boolean } = {}): 
 export async function expireOrder(o: DomainOrder): Promise<void> {
   await pool().query(`UPDATE tenant_custom_domains SET status = 'expired', updated_at = now() WHERE order_id = $1`, [o.id])
   clearTenantCache()
-  await patchOrder(o.id, { status: 'expired', step: null, next_at: null, event: { step: 'renewal', message: 'Expired; the domain no longer points at your store', level: 'warn' } })
+  const site = o.showcase_site_id
+  if (site) await clearShowcaseCustomDomain(site, o.domain)
+  await patchOrder(o.id, { status: 'expired', step: null, next_at: null, event: { step: 'renewal', message: `Expired; the domain no longer points at your ${site ? 'site' : 'store'}`, level: 'warn' } })
   const { hosting } = await domainProviders()
-  await hosting.applyRoutes(o.tenant_id).catch(e => console.warn('[domains] routes not pruned', o.domain, errText(e)))
+  await (site ? hosting.applyShowcaseRoutes() : hosting.applyRoutes(o.tenant_id)).catch(e => console.warn('[domains] routes not pruned', o.domain, errText(e)))
   await notifyDomain(o.tenant_id, { kind: 'expired', domain: o.domain })
 }
 

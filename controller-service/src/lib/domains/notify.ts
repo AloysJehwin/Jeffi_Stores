@@ -20,10 +20,24 @@ export type DomainNotice =
   | { kind: 'renewal_off'; domain: string; expiresAt: string; renewalPriceInr: number }
   | { kind: 'expired'; domain: string }
 
-function compose(n: DomainNotice): Parameters<typeof sendDomainEmail>[1] {
-  const cta = { href: `${ECOM()}/dashboard/domains`, label: 'Open your domains' }
+/** siteId: the domain was bought for that Showcase site, whose domain page the email links to. */
+function compose(n: DomainNotice, siteId: string | null = null): Parameters<typeof sendDomainEmail>[1] {
+  const what = siteId ? 'site' : 'store'
+  const cta = siteId ? { href: `${ECOM()}/dashboard/showcase/${siteId}/domain`, label: "Open your site's domain" } : { href: `${ECOM()}/dashboard/domains`, label: 'Open your domains' }
   switch (n.kind) {
     case 'active':
+      if (siteId)
+        return {
+          subject: `${n.domain} is live`,
+          title: `${n.domain} is live`,
+          lines: [`Your domain is registered and now serves your Showcase site.`],
+          rows: [
+            { label: 'Site', value: `https://${n.domain}` },
+            ...(n.expiresAt ? [{ label: 'Renews on', value: `${day(n.expiresAt)}${n.renewalPriceInr ? `, ${inr(n.renewalPriceInr)} from your wallet` : ''}${n.autoRenew ? '' : ' (auto-renew is off)'}` }] : []),
+          ],
+          warn: `The domain registry emails ${n.email} to confirm the contact address. Click the link within 15 days or the domain is suspended.`,
+          cta,
+        }
       return {
         subject: `${n.domain} is live`,
         title: `${n.domain} is live`,
@@ -76,7 +90,7 @@ function compose(n: DomainNotice): Parameters<typeof sendDomainEmail>[1] {
       return {
         subject: `${n.domain} will expire`,
         title: `${n.domain} will expire on ${day(n.expiresAt)}`,
-        lines: [`We couldn't renew ${n.domain} in time, so it will not be renewed. Your store stays on its jeffistores.in address.`],
+        lines: [`We couldn't renew ${n.domain} in time, so it will not be renewed. Your ${what} stays on its jeffistores.in address.`],
         cta,
       }
     case 'renewed':
@@ -89,7 +103,7 @@ function compose(n: DomainNotice): Parameters<typeof sendDomainEmail>[1] {
         cta,
       }
     case 'expired':
-      return { subject: `${n.domain} expired`, title: `${n.domain} expired`, lines: [`${n.domain} expired and no longer points at your store. Your store stays on its jeffistores.in address.`], cta }
+      return { subject: `${n.domain} expired`, title: `${n.domain} expired`, lines: [`${n.domain} expired and no longer points at your ${what}. Your ${what} stays on its jeffistores.in address.`], cta }
   }
 }
 
@@ -101,7 +115,11 @@ export async function notifyDomain(tenantId: string, notice: DomainNotice): Prom
     )
     const owner = r.rows[0]
     if (!owner) return
-    await sendDomainEmail({ email: owner.email, name: owner.name }, compose(notice))
+    const order = await controlPlanePool().query(
+      `SELECT showcase_site_id FROM tenant_domain_orders WHERE tenant_id = $1 AND domain = $2 ORDER BY created_at DESC LIMIT 1`,
+      [tenantId, notice.domain]
+    )
+    await sendDomainEmail({ email: owner.email, name: owner.name }, compose(notice, order.rows[0]?.showcase_site_id ?? null))
   } catch (e: any) {
     console.warn('[domains] notice not sent', notice.kind, e?.message || e)
   }

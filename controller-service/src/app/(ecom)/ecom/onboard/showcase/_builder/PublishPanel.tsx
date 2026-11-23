@@ -21,7 +21,7 @@ export default function PublishPanel({
   blocker,
   onPublished,
   siteUrl,
-  billingHref = '/dashboard/showcase',
+  billingHref,
 }: {
   site: ClientSite | null
   /** The studio has a page to publish (or the site already has one). */
@@ -31,6 +31,7 @@ export default function PublishPanel({
   onPublished: (p: Published) => void
   /** Where the site opens (lib/showcase/host showcaseUrl). */
   siteUrl?: string | null
+  /** Where hosting is paid: the site's page by default. */
   billingHref?: string
 }) {
   const [busy, setBusy] = useState(false)
@@ -39,10 +40,11 @@ export default function PublishPanel({
   const paused = site?.status === 'paused'
 
   async function publish() {
+    if (!site) return
     setBusy(true)
     setError(null)
     try {
-      const res = await fetch('/api/ecom/onboard/showcase/publish', { method: 'POST' })
+      const res = await fetch('/api/ecom/onboard/showcase/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ siteId: site.id }) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) return setError({ message: data.error || 'Your site could not be published. Try again.', code: data.code, topUpUrl: typeof data.topUpUrl === 'string' ? data.topUpUrl : undefined })
       onPublished({ site: data.site, url: data.url, first: !!data.first })
@@ -77,7 +79,7 @@ export default function PublishPanel({
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
-          <button type="button" onClick={publish} disabled={busy || !ready || !!blocker} className={`${primaryBtn} max-sm:w-full`} title={blocker ?? (ready ? undefined : 'Design your page first')}>
+          <button type="button" onClick={publish} disabled={busy || !site || !ready || !!blocker} className={`${primaryBtn} max-sm:w-full`} title={blocker ?? (ready ? undefined : 'Design your page first')}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
             {live ? 'Publish changes' : paused ? 'Publish again' : 'Publish my site'}
           </button>
@@ -95,7 +97,7 @@ export default function PublishPanel({
           {(error.code === 'payment_due' || error.topUpUrl) && (
             <>
               {' '}
-              <a href={error.topUpUrl ?? billingHref} className="font-semibold underline">
+              <a href={error.topUpUrl ?? billingHref ?? (site ? `/dashboard/showcase/${site.id}` : '/dashboard/showcase')} className="font-semibold underline">
                 {error.topUpUrl ? 'Add money to your wallet' : 'Pay for hosting'}
               </a>
             </>

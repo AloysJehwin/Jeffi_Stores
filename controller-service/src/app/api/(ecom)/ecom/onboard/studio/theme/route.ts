@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { themeAvailability } from '@/lib/site/themes/pages'
-import { fail, readJson, studioOwner, studioProductOf, studioView } from '@controller/lib/site-studio/http'
+import { fail, readJson, studioOwner, studioProductOf, studioSiteOf, studioView } from '@controller/lib/site-studio/http'
 import { applyTheme, openThemeStudio } from '@controller/lib/site-studio/themes'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   const owner = await studioOwner(request)
   if (owner instanceof NextResponse) return owner
   const body = (await readJson(request)) ?? {}
-  const opened = await openThemeStudio(owner.id, studioProductOf(request))
+  const opened = await openThemeStudio(owner.id, studioProductOf(request), studioSiteOf(request))
   if (!opened.ok) return fail(opened.error, opened.status, opened.code ? { code: opened.code } : undefined)
   if (body.action === 'open') return NextResponse.json(studioView(opened.session))
   if (body.action !== 'apply') return fail('Unknown action.')

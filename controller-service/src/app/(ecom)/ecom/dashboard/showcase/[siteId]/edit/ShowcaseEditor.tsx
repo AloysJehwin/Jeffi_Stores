@@ -3,20 +3,20 @@
 import { useState } from 'react'
 import { ExternalLink, Image as ImageIcon, LayoutTemplate, Store } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
-import PageHeader from '../../_components/PageHeader'
-import { Segmented } from '../../../_ui'
-import { noteCls, secondaryBtn } from '../../../onboard/ui'
-import type { StudioView } from '../../../onboard/_studio/api'
+import PageHeader from '../../../_components/PageHeader'
+import { Segmented } from '../../../../_ui'
+import { noteCls, secondaryBtn } from '../../../../onboard/ui'
+import type { StudioView } from '../../../../onboard/_studio/api'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import type { ClientSite } from '@controller/lib/showcase-builder/site'
-import BusinessFields from '../../../onboard/showcase/_builder/BusinessFields'
-import ContentFields from '../../../onboard/showcase/_builder/ContentFields'
-import ShowcaseStudio from '../../../onboard/showcase/_builder/ShowcaseStudio'
-import ThemesEntry from '../../../onboard/showcase/_builder/ThemesEntry'
-import ShowcaseThemes from '../../../onboard/_studio/ShowcaseThemes'
-import PublishPanel from '../../../onboard/showcase/_builder/PublishPanel'
-import { detailsProblem } from '../../../onboard/showcase/_builder/model'
-import { useRefreshAfterBuild, useShowcaseDetails } from '../../../onboard/showcase/_builder/useShowcaseDetails'
+import BusinessFields from '../../../../onboard/showcase/_builder/BusinessFields'
+import ContentFields from '../../../../onboard/showcase/_builder/ContentFields'
+import ShowcaseStudio from '../../../../onboard/showcase/_builder/ShowcaseStudio'
+import ThemesEntry from '../../../../onboard/showcase/_builder/ThemesEntry'
+import ShowcaseThemes from '../../../../onboard/_studio/ShowcaseThemes'
+import PublishPanel from '../../../../onboard/showcase/_builder/PublishPanel'
+import { detailsProblem } from '../../../../onboard/showcase/_builder/model'
+import { useRefreshAfterBuild, useShowcaseDetails } from '../../../../onboard/showcase/_builder/useShowcaseDetails'
 
 // The dashboard's Showcase editor. Design: the studio in Showcase mode (live preview, the section outline to drag,
 // the picked section's words and pictures, AI changes, "Design this page again" charged to the wallet). Details and
@@ -102,10 +102,10 @@ export default function ShowcaseEditor({ owner, initialSite, siteUrl }: { owner:
         {tab === 'details' && (
           <>
             {problem && <p className={`${noteCls} org-peach text-foreground`}>{problem}</p>}
-            <BusinessFields form={d.form} setForm={d.setForm} slug={d.slug} slugLocked={live} slugTouched onSlugTouched={() => {}} />
+            <BusinessFields form={d.form} setForm={d.setForm} slug={d.slug} slugLocked={live} slugTouched onSlugTouched={() => {}} siteId={site.id} />
           </>
         )}
-        {tab === 'content' && <ContentFields form={d.form} setForm={d.setForm} />}
+        {tab === 'content' && <ContentFields form={d.form} setForm={d.setForm} siteId={site.id} />}
       </div>
     </>
   )

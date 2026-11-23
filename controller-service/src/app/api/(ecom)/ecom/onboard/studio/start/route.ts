@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cleanAnswers } from '@/lib/site/studio'
-import { aiUnavailable, fail, readJson, studioOwner, studioProductOf, studioView } from '@controller/lib/site-studio/http'
+import { aiUnavailable, fail, readJson, studioOwner, studioProductOf, studioSiteOf, studioView } from '@controller/lib/site-studio/http'
 import { buildRunning, getStudioSession, startStudioSession, updateStudioSession } from '@controller/lib/site-studio/sessions'
 import { studioStoreAnswers, studioStoreContext } from '@controller/lib/site-studio/context'
-import { ownerShowcase } from '@controller/lib/showcase-builder/site'
+import { ownedShowcase } from '@controller/lib/showcase-builder/site'
 import { startShowcaseStudio } from '@controller/lib/showcase-builder/studio'
 
 export const dynamic = 'force-dynamic'
@@ -18,11 +18,11 @@ export async function POST(request: NextRequest) {
   const body = (await readJson(request)) ?? {}
   const restart = body.restart === true
   const product = studioProductOf(request)
-  const current = await getStudioSession(owner.id, product)
+  const current = await getStudioSession(owner.id, product, studioSiteOf(request))
   if (restart && current && buildRunning(current)) return fail('Your site is being built. Wait for it to finish first.', 409)
-  // A Showcase's studio starts from its Details (saved first, as the draft site).
+  // A Showcase site's studio starts from its Details (saved first, as the draft site; ?site= names it).
   if (product === 'showcase') {
-    const site = await ownerShowcase(owner.id)
+    const site = await ownedShowcase(owner.id, studioSiteOf(request))
     if (!site) return fail('Save your business details first.', 409)
     return NextResponse.json(studioView(await startShowcaseStudio(owner.id, site, restart)))
   }

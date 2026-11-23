@@ -1,4 +1,4 @@
-import { ConsoleLoading, LinesLoading, PillLoading, Sk } from '../../_components/Skeleton'
+import { ConsoleLoading, LinesLoading, PillLoading, Sk } from '../../../_components/Skeleton'
 
 export default function Loading() {
   return (

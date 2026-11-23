@@ -5,9 +5,9 @@ import { businessView } from '@/lib/showcase/views'
 import type { ShowcaseSiteRow } from '@/lib/showcase/store'
 import { studioAiAvailable, studioView } from '@controller/lib/site-studio/http'
 import { getStudioSession, getStudioSessionById, startStudioSession, updateStudioSession, type StudioSession } from '@controller/lib/site-studio/sessions'
-import { ownerShowcase, siteForClient } from './site'
+import { ownedShowcase, siteForClient } from './site'
 
-// The Showcase's studio (site_studio_sessions, product 'showcase'): its brief starts from the Details step, and keeps
+// A Showcase site's studio (site_studio_sessions, product 'showcase', site_id): its brief starts from the Details step, and keeps
 // the business's name, logo, tagline, story, contacts and socials as the owner changes them (no AI runs for that).
 
 const KEYS = ['storeName', 'logoUrl', 'tagline', 'about', 'contact', 'socials']
@@ -36,9 +36,9 @@ export function whatTheyDo(site: Pick<ShowcaseSiteRow, 'business' | 'content'>):
   return [what, services.length ? `${what ? 'Services' : 'We offer'}: ${services.join(', ')}` : ''].filter(Boolean).join('. ').slice(0, 1200)
 }
 
-/** The owner's Showcase studio, opened (or, with `restart`, cleared back to the brief) with the Details filled in. */
+/** The site's studio, opened (or, with `restart`, cleared back to the brief) with the Details filled in. */
 export async function startShowcaseStudio(ownerId: string, site: ShowcaseSiteRow, restart = false): Promise<StudioSession> {
-  const session = await startStudioSession(ownerId, restart, 'showcase')
+  const session = await startStudioSession(ownerId, restart, 'showcase', site.id)
   if (Object.keys(session.answers ?? {}).length) return session
   const answers = cleanAnswers({ sell: whatTheyDo(site), ...detailsAnswers(site) })
   return (await updateStudioSession(session.id, { answers: answers as unknown as Record<string, unknown> })) ?? session
@@ -70,9 +70,10 @@ export async function syncShowcaseStudio(session: StudioSession, site: ShowcaseS
   return (await getStudioSessionById(session.id)) ?? session
 }
 
-/** What the Showcase's studio shows: the session (kept in step with the Details), the site, and whether AI is up. */
-export async function showcaseStudioState(ownerId: string, opts: { fresh?: boolean } = {}) {
-  const [session, site, available] = await Promise.all([getStudioSession(ownerId, 'showcase'), ownerShowcase(ownerId), studioAiAvailable({ fresh: opts.fresh })])
+/** What a Showcase site's studio shows: the session (kept in step with the Details), the site, and whether AI is up. */
+export async function showcaseStudioState(ownerId: string, siteId: string | null, opts: { fresh?: boolean } = {}) {
+  const [site, available] = await Promise.all([ownedShowcase(ownerId, siteId), studioAiAvailable({ fresh: opts.fresh })])
+  const session = site ? await getStudioSession(ownerId, 'showcase', site.id) : null
   const current = session && site ? await syncShowcaseStudio(session, site).catch(() => session) : session
   return { ...studioView(current), site: siteForClient(site), ai: { available } }
 }

@@ -5,18 +5,17 @@ import PhotoCredits from '@/components/visitor/site/PhotoCredits'
 import { pictureCredits } from '@/lib/ai/stock-credits'
 import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
-import { getShowcaseByOwner } from '@/lib/showcase/store'
 import { emptyShowcaseContent, SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import type { StudioSession } from '@controller/lib/site-studio/sessions'
-import { previewView } from '@controller/lib/showcase-builder/site'
+import { previewView, sessionShowcase } from '@controller/lib/showcase-builder/site'
 import PreviewBridge from './PreviewBridge'
 
-// The studio's preview of a Showcase's one page: its code sections over the owner's own details and content (the
+// The studio's preview of a Showcase's one page: its code sections over its site's own details and content (the
 // draft site), in the session's look, with the lead form inert. Marked up as the store's preview is, so the bridge's
 // picking and arranging work the same.
 
 export default async function ShowcasePreview({ session }: { session: StudioSession }) {
-  const site = await getShowcaseByOwner(session.owner_id).catch(() => null)
+  const site = await sessionShowcase(session).catch(() => null)
   const brief = session.brief as { storeName?: string } | null
   const view = previewView(site ?? { business: { name: brief?.storeName ?? 'Your business' }, content: emptyShowcaseContent() })
   const data = showcaseSiteData(view)

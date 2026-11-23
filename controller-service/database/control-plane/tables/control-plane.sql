@@ -358,6 +358,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_custom_domains (
     cert_arn           character varying(512),   -- ACM cert once issued
     cloudfront_id      character varying(64),
     verified_at        timestamp with time zone,
+    showcase_site_id   uuid,                     -- the Showcase site (showcase_sites) the domain points at; null for a store's domain
     created_at         timestamp with time zone NOT NULL DEFAULT now(),
     updated_at         timestamp with time zone NOT NULL DEFAULT now()
 );

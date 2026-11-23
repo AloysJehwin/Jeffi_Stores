@@ -8,7 +8,7 @@ import { businessIssues } from '@/lib/showcase/clean'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import { goLiveShowcase } from '@controller/lib/showcase/billing'
 import { buildRunning, getStudioSession, type StudioSession } from '@controller/lib/site-studio/sessions'
-import { ownerShowcase } from './site'
+import { ownedShowcase } from './site'
 
 // Publishing a Showcase: the studio's page (recompiled from source: stored ASTs are never trusted) and its look are
 // copied onto the site row, which showcase-service serves, then the site goes live (lib/showcase/store.ts
@@ -48,12 +48,12 @@ export async function copyStudioPage(site: Pick<ShowcaseSiteRow, 'id' | 'theme'>
   return true
 }
 
-export async function publishOwnerShowcase(ownerId: string): Promise<PublishResult> {
-  const site = await ownerShowcase(ownerId)
-  if (!site) return { ok: false, status: 409, error: 'Save your business details first.' }
+export async function publishOwnerShowcase(ownerId: string, siteId: unknown): Promise<PublishResult> {
+  const site = await ownedShowcase(ownerId, siteId)
+  if (!site) return { ok: false, status: 404, error: 'That site could not be found. Save your business details first.' }
   const issues = businessIssues(site.business)
   if (issues.length) return { ok: false, status: 400, error: issues[0], code: 'details' }
-  const session = await getStudioSession(ownerId, 'showcase')
+  const session = await getStudioSession(ownerId, 'showcase', site.id)
   if (session && buildRunning(session)) return { ok: false, status: 409, error: 'Your page is being designed. Publish when it is ready.', code: 'running' }
   if (session?.pages?.[SHOWCASE_PAGE_KEY]) {
     if (!(await copyStudioPage(site, session)))
