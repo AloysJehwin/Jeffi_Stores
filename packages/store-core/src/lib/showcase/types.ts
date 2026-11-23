@@ -1,4 +1,5 @@
 import type { PageDoc, ThemeTokens } from '@jeffi/site-blocks'
+import type { StockCredit } from '../ai/stock-credits'
 
 // Showcase: a one-page site for a business (its work, proof, reviews and contacts), sold as its own service. One
 // row per site in the control plane (showcase_sites); the page is a studio page doc that showcase-service renders.
@@ -63,11 +64,13 @@ export interface ShowcaseFaq {
   ai?: boolean
 }
 
-/** A picture for the page that is not the owner's work: a mood picture made for it (ai) or one they added. */
+/** A picture for the page that is not the owner's work: a mood picture found (stock, credited) or made (ai) for it, or one they added. */
 export interface ShowcasePagePicture {
   image: string
   alt?: string
   ai?: boolean
+  /** A stock photo's photographer and library; the page's footer credits it. */
+  credit?: StockCredit
 }
 
 export interface ShowcaseContent {

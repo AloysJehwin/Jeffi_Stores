@@ -1,6 +1,13 @@
 # Free stock-image APIs for site generation
 
-As of 2026-11-24. This is research only: nothing in the repo was changed. Bracketed tags such as [P2] point to the sources at the end.
+As of 2026-11-24. Bracketed tags such as [P2] point to the sources at the end.
+
+**Status: built** (Pixabay now, Pexels once its key arrives). Gateway `POST /v1/images/stock`
+(`ai-platform/gateway/src/stock.ts`, `providers/pexels.ts`, `providers/pixabay.ts`); app `lib/ai/stock.ts`
+(`pictureFor`, wired into `showcasePictures`, `addPictures`, `fillImages`); credits in `lib/ai/stock-credits.ts`, drawn
+by `components/visitor/site/PhotoCredits.tsx` under the store footer (`lib/site/photo-credits.ts`) and the Showcase
+page. Keys: `PIXABAY_API_KEY`, `PEXELS_API_KEY` in `ai-gateway-secret`. Until Pexels (or Pixabay full access) is on,
+hero slots (1600 px) fall back to AI, since Pixabay's standard files stop at 1280 px.
 
 ## Where images come from today
 
