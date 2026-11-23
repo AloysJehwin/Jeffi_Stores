@@ -94,6 +94,14 @@ resolved to a stale address and took every AI feature down while `/healthz` stay
 
 The gateway is published on `<host>:8080` (ServiceLB).
 
+### Auth
+
+With `AI_GATEWAY_TOKEN` set in `ai-gateway-secret`, every route except `/healthz` and `/readyz` (including
+`/v1/files/:id`) needs `Authorization: Bearer <token>`, else 401. Unset = open. The app sends `AI_GATEWAY_TOKEN`
+from its own env (Secrets Manager `jeffi/production` + `jeffi/store`), the SDK reads the same variable, and the
+release script reads it from the Secret. To rotate, set the gateway to `new,old`, roll the app to `new`, then
+drop `old`.
+
 ### OCR (PaddleOCR)
 
 `POST /v1/ocr` `{data, mime_type?}` reads a document with PaddleOCR only (never a model, so the same file always
