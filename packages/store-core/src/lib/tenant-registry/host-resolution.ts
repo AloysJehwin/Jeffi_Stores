@@ -158,19 +158,15 @@ export function clearTenantCache(): void {
  * Resolve a full TenantContext (incl. infra) from a tenant slug. Used by the DB layer
  * to establish per-request tenant context from the x-tenant-slug header middleware sets
  * (Edge middleware's AsyncLocalStorage does NOT propagate to Node handlers, so the pool
- * selector must re-resolve inside the request). Cached like resolveTenantFromHost.
+ * selector must re-resolve inside the request). Cached like resolveTenantFromHost, but a
+ * control-plane error throws and is never cached: a cached null sent the store's queries to the flagship DB.
  */
 export async function lookupTenantContextBySlug(slug: string): Promise<TenantContext | null> {
   const key = `slug:${slug}`
   const now = Date.now()
   const cached = cache.get(key)
   if (cached && cached.expires > now) return cached.ctx
-  let ctx: TenantContext | null = null
-  try {
-    ctx = await lookupTenant('slug', slug)
-  } catch {
-    ctx = null
-  }
+  const ctx = await lookupTenant('slug', slug)
   cache.set(key, { ctx, expires: now + CACHE_TTL_MS })
   return ctx
 }
