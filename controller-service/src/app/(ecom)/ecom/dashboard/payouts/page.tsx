@@ -1,6 +1,9 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getOwnerBankWithRoute, listLinkedPayouts } from '@/lib/tenant-registry'
+import { Landmark } from 'lucide-react'
 import PageHeader from '../_components/PageHeader'
+import { Card } from '../_components/Card'
+import { EmptyState } from '../_components/EmptyState'
 import { PayoutsTable } from '../_components/finance'
 import PayoutsClient, { type BankState } from './PayoutsClient'
 
@@ -9,6 +12,7 @@ export const metadata = { title: 'Payouts' }
 
 export default async function PayoutsPage() {
   const { owner, tenant } = await loadOwnerContext()
+  const hasStore = (tenant.service_types ?? ['store']).includes('store')
   const [bank, payouts] = await Promise.all([
     getOwnerBankWithRoute(owner.id).catch(() => null),
     listLinkedPayouts(tenant.id).catch(() => []),
@@ -35,10 +39,23 @@ export default async function PayoutsPage() {
         title="Payouts"
         description="Where your sales settle. Changes here are sent to the payment provider straight away."
       />
-      <PayoutsClient initial={initial} />
-      <div className="mt-8 space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Recent payouts</h2>
-        <PayoutsTable payouts={payouts} />
+      <div className="space-y-6">
+        <PayoutsClient initial={initial} hasStore={hasStore} />
+        <Card title="Recent payouts">
+          <PayoutsTable
+            payouts={payouts}
+            empty={
+              <EmptyState
+                bare
+                icon={Landmark}
+                title="No payouts yet"
+                action={hasStore ? { href: '/dashboard/transactions', label: 'View transactions' } : { href: '/dashboard/add-store', label: 'Add a store' }}
+              >
+                {hasStore ? 'Sales are paid out once the payment provider settles them.' : 'Payouts start once you add a store and it sells.'}
+              </EmptyState>
+            }
+          />
+        </Card>
       </div>
     </>
   )

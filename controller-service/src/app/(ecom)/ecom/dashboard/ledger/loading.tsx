@@ -2,9 +2,9 @@ import { ConsoleLoading, FinanceTableLoading, TilesLoading } from '../_component
 
 export default function Loading() {
   return (
-    <ConsoleLoading eyebrow="Finance" title="Settlement ledger" description="Captures, commissions, payouts and adjustments on your wallet.">
+    <ConsoleLoading eyebrow="Finance" title="Settlement ledger" description="Your store's sales money: captured payments, fees, refunds and payouts to your bank. Your prepaid wallet is separate.">
       <div className="space-y-6">
-        <TilesLoading labels={['Wallet balance', 'Gross GMV', 'Your earnings', 'Platform fees']} />
+        <TilesLoading labels={['Settlement balance', 'Gross GMV', 'Your earnings', 'Platform fees']} />
         <FinanceTableLoading columns={['Date', 'Type', 'Amount', 'Note']} minWidth="min-w-[500px]" />
       </div>
     </ConsoleLoading>

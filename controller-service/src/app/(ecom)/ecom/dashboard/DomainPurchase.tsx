@@ -166,7 +166,7 @@ export default function DomainPurchase({ tenantId, tenantSlug, siteId }: { tenan
 
   return (
     <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">
-      <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Your own domain</h2>
+      <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Buy a domain</h2>
       {siteId ? (
         <p className="mb-4 text-sm text-foreground-secondary">
           Buy a domain for this site. We register it in your name with privacy protection and point it and its <span className="font-mono text-foreground">www.</span> at

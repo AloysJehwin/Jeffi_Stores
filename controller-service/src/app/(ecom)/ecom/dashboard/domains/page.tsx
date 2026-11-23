@@ -1,4 +1,5 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
+import { requireStore } from '@controller/lib/ecom/require-store'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import SubdomainList from '../SubdomainList'
@@ -10,17 +11,13 @@ export const metadata = { title: 'Domains' }
 
 export default async function DomainsPage() {
   const { tenant } = await loadOwnerContext()
+  requireStore(tenant)
   return (
     <>
-      <PageHeader eyebrow="Store" title="Domains" description="Where your store, admin and service portals live." />
+      <PageHeader eyebrow="Store" title="Domains" description="Where your store, admin and service portals live. Buy a new domain for them, or connect one you already have." />
       <div className="space-y-6">
         <Card title="Your subdomains">
-          <SubdomainList
-            slug={tenant.slug}
-            plan={tenant.plan}
-            maxCustomDomains={tenant.max_custom_domains ?? 0}
-            rdsReady={!!tenant.rds_endpoint}
-          />
+          <SubdomainList slug={tenant.slug} plan={tenant.plan} rdsReady={!!tenant.rds_endpoint} />
         </Card>
         <DomainPurchase tenantId={tenant.id} tenantSlug={tenant.slug} />
         <CustomDomains tenantId={tenant.id} slug={tenant.slug} maxDomains={tenant.max_custom_domains ?? 0} />

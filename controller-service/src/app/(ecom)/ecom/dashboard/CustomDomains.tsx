@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { SkeletonRows } from './_components/Skeleton'
+import { Card } from './_components/Card'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
-import { fieldRow } from '../onboard/ui'
+import { disabledBtn, fieldRow, primaryBtn } from '../onboard/ui'
 
 interface Domain {
   id: string
@@ -13,7 +15,10 @@ interface Domain {
   verification_token: string | null
 }
 
-/** The owner's own domains for the store, or with siteId the one for that Showcase site (slug is then its site- label). */
+const TITLE = 'Connect a domain you own'
+const rowBtn = `text-xs px-3 py-1 rounded-xl border border-border-default text-foreground-secondary hover:bg-surface-secondary ${disabledBtn}`
+
+/** Domains the owner already has, pointed at the store (or with siteId at that Showcase site; slug is then its site- label). Buying one is DomainPurchase. */
 export default function CustomDomains({
   tenantId,
   slug,
@@ -94,14 +99,17 @@ export default function CustomDomains({
     setBusy(false)
   }
 
+  // The plan's max_custom_domains (custom-domains.ts): Pro 1, Enterprise 3, none below.
   if (maxDomains === 0) {
     return (
-      <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
-        <div className="text-xs text-foreground-secondary uppercase tracking-widest mb-2">Custom domain</div>
+      <Card title={TITLE}>
         <p className="text-sm text-foreground-secondary">
-          Available on Pro plan and above. Upgrade to connect your own domain.
+          Connecting a domain you already have comes with the Pro plan and above. Buying a new one, above, works on every plan.{' '}
+          <Link href="/dashboard/compute" className="font-semibold ecom-accent-text hover:underline">
+            Upgrade
+          </Link>
         </p>
-      </div>
+      </Card>
     )
   }
 
@@ -127,20 +135,17 @@ export default function CustomDomains({
   }
 
   return (
-    <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs text-foreground-secondary uppercase tracking-widest">{siteId ? 'A domain you own' : 'Custom domains'}</div>
-        <span className="text-xs text-foreground-secondary">
-          {used}/{maxDomains} used
-        </span>
-      </div>
+    <Card title={TITLE} action={<span className="text-xs text-foreground-secondary">{used}/{maxDomains} used</span>}>
+      <p className="mb-3 text-sm text-foreground-secondary">
+        Already have a domain? Point it at your {siteId ? 'site' : 'store'} with two DNS records at your provider.
+      </p>
 
       {!loaded && <SkeletonRows rows={2} cols={3} />}
       {domains.map(d => (
         <div key={d.id} className="py-2.5 border-b border-border-default/60 text-sm">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-mono text-foreground truncate">{d.domain}</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <span className="font-mono text-foreground break-all">{d.domain}</span>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor[d.status] ?? ''}`}>
                 {STATUS_LABEL[d.status] ?? d.status}
               </span>
@@ -150,7 +155,7 @@ export default function CustomDomains({
                 <button
                   onClick={() => verify(d.id)}
                   disabled={busy}
-                  className="text-xs px-3 py-1 rounded-xl border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                  className={rowBtn}
                 >
                   Verify
                 </button>
@@ -158,7 +163,7 @@ export default function CustomDomains({
               <button
                 onClick={() => del(d.id, d.domain)}
                 disabled={busy}
-                className="text-xs px-3 py-1 rounded-xl border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+                className={rowBtn}
               >
                 Delete
               </button>
@@ -196,18 +201,15 @@ export default function CustomDomains({
               value={newDomain}
               onChange={e => setNewDomain(e.target.value)}
               placeholder="shop.yourbrand.com"
-              className="flex-1 rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground ecom-field"
+              aria-label="Domain you own"
+              className="min-w-0 flex-1 rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground ecom-field"
             />
-            <button
-              onClick={addDomain}
-              disabled={busy || !newDomain}
-              className={`px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium ${fieldRow}`}
-            >
+            <button onClick={addDomain} disabled={busy || !newDomain} className={`${primaryBtn} ${fieldRow}`}>
               Add
             </button>
           </div>
           <p className="text-xs text-foreground-secondary">
-            After adding, create two DNS records at your provider:
+            After adding, create these two records:
           </p>
           <ol className="text-xs text-foreground-secondary list-decimal pl-4 space-y-1">
             <li>
@@ -233,6 +235,6 @@ export default function CustomDomains({
           <p className="text-xs text-foreground-secondary">Then click Verify. We check every 10 minutes too, and issue the certificate once the domain points at us.</p>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

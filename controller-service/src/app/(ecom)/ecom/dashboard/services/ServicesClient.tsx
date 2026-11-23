@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation'
 import { Check, Clock, FileText, Loader2, MessageSquare, XCircle } from 'lucide-react'
 import type { ApiService, ServiceState } from '@controller/lib/ecom/service-states'
 import type { KybItem } from '@controller/lib/kyb/requirements'
+import { REVIEW_TIME, STATUS_LABEL } from '@controller/lib/ecom/console-copy'
+import { primaryBtn, secondaryBtn } from '../../onboard/ui'
 import { DOCUMENT_POINTS, InvoicePreview, MESSAGING_POINTS, WhatsAppPreview, rupees } from '../../_ui/service-previews'
 import { kybCall } from '../business/api'
-import { TodoList, todoRows, type KybGate, type TodoRow } from '../business/KybChecklist'
+import { TodoList, owedCount, todoRows, type KybGate, type TodoRow } from '../business/KybChecklist'
 
 type Prices = { messages: Record<string, number>; documents: Record<string, number>; media: number }
 
@@ -62,6 +64,8 @@ function ServiceCard({ service, state, prices, compact, kyb }: { service: ApiSer
   const gate = kyb?.services[service]
   const rows = missing ?? (kyb && gate && !gate.ready ? todoRows(gate.todo, kyb.items) : [])
   const blocked = rows.length > 0 && (requestable || state.status === 'pending')
+  // Counted as the Business verification checklist counts it: documents still being checked aren't the owner's to do.
+  const owed = owedCount(rows)
   const loadingKyb = kyb === undefined && requestable
 
   async function add() {
@@ -115,7 +119,7 @@ function ServiceCard({ service, state, prices, compact, kyb }: { service: ApiSer
           <p className="text-sm font-semibold text-foreground">{state.status === 'pending' ? 'Jeffi can approve it once your business is verified' : 'Verify your business first'}</p>
           {compact ? (
             <p className="mt-0.5 text-sm text-foreground-secondary">
-              {rows.length === 1 ? 'One thing' : `${rows.length} things`} to do before {state.status === 'pending' ? 'approval' : `you can add ${short}`}.
+              {owed ? `${owed === 1 ? 'One thing' : `${owed} things`} to do before ${state.status === 'pending' ? 'approval' : `you can add ${short}`}.` : 'We’re checking your documents.'}
             </p>
           ) : (
             <>
@@ -128,20 +132,21 @@ function ServiceCard({ service, state, prices, compact, kyb }: { service: ApiSer
       {error && <p className="mt-4 text-sm text-[#8a2e1f]">{error}</p>}
 
       <div className="mt-auto flex flex-wrap items-center gap-3 pt-5">
-        {state.status === 'live' && <Link href={info.href} className="rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white">Open {short}</Link>}
-        {blocked && <Link href={`/dashboard/business?for=${service}`} className="rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white">Verify your business</Link>}
+        {state.status === 'live' && <Link href={info.href} className={primaryBtn}>Open {short}</Link>}
+        {blocked && <Link href={`/dashboard/business?for=${service}`} className={primaryBtn}>Verify your business</Link>}
         {requestable && (
           <button
             type="button"
             onClick={add}
             disabled={busy || blocked || loadingKyb}
             title={blocked ? `Verify your business before you add ${short}` : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-semibold disabled:opacity-50 ${blocked ? 'org-sand text-foreground' : 'ecom-accent-bg text-white'}`}
+            className={blocked ? secondaryBtn : primaryBtn}
           >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} {state.status === 'rejected' ? 'Request again' : `Add ${short}`}
+            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+            {state.status === 'rejected' ? 'Request again' : `Add ${short}`}
           </button>
         )}
-        {state.status === 'pending' && !blocked && <span className="text-sm text-foreground-secondary">Jeffi is reviewing it. You can create API keys meanwhile.</span>}
+        {state.status === 'pending' && !blocked && <span className="text-sm text-foreground-secondary">Jeffi is reviewing it, usually within {REVIEW_TIME}. You can create API keys meanwhile.</span>}
         {compact && <Link href="/dashboard/services" className="text-sm font-semibold ecom-accent-text hover:underline">Learn more</Link>}
         {state.status !== 'off' && <Link href="/dashboard/api-keys" className="text-sm font-semibold text-foreground-secondary hover:text-foreground">API keys</Link>}
       </div>
@@ -151,14 +156,14 @@ function ServiceCard({ service, state, prices, compact, kyb }: { service: ApiSer
 
 function StatusBadge({ state }: { state: ServiceState }) {
   const map = {
-    live: { label: 'Live', cls: 'bg-[var(--console-sage)] text-[var(--console-sage-deep)]', Icon: Check },
-    pending: { label: 'Awaiting approval', cls: 'org-peach text-foreground', Icon: Clock },
-    rejected: { label: 'Not approved', cls: 'org-peach text-[#8a2e1f]', Icon: XCircle },
-    off: { label: 'Not added', cls: 'org-sand text-foreground-secondary', Icon: null },
+    live: { cls: 'bg-[var(--console-sage)] text-[var(--console-sage-deep)]', Icon: Check },
+    pending: { cls: 'org-peach text-foreground', Icon: Clock },
+    rejected: { cls: 'org-peach text-[#8a2e1f]', Icon: XCircle },
+    off: { cls: 'org-sand text-foreground-secondary', Icon: null },
   }[state.status]
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${map.cls}`}>
-      {map.Icon && <map.Icon className="h-3.5 w-3.5" />}{map.label}
+      {map.Icon && <map.Icon className="h-3.5 w-3.5" />}{STATUS_LABEL[state.status]}
     </span>
   )
 }
