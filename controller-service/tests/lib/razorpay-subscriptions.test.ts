@@ -1,14 +1,17 @@
 /**
- * Tests for src/lib/razorpay-subscriptions.ts — SaaS plan billing via Razorpay
- * Subscriptions. Prices are passed in per-call as priceInrMonth (the quoted monthly total
- * incl. plan margin + GST, rupee-rounded); yearly is 10× monthly (two free months baked in).
+ * Tests for src/lib/payments/razorpay-subscriptions.ts: workspace billing on Razorpay Subscriptions. One combined
+ * plan per cycle amount, keyed by key mode (test/live) and period; replacements keep the billing date with start_at
+ * and collect proration as an upfront add-on.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import crypto from 'crypto'
 
 const rz = {
   plans: { create: vi.fn(), fetch: vi.fn() },
-  subscriptions: { create: vi.fn(), fetch: vi.fn(), cancel: vi.fn(), update: vi.fn() },
+  subscriptions: { create: vi.fn(), fetch: vi.fn(), cancel: vi.fn(), update: vi.fn(), createAddon: vi.fn() },
+  addons: { fetch: vi.fn(), delete: vi.fn() },
+  payments: { refund: vi.fn() },
+  invoices: { all: vi.fn() },
 }
 vi.mock('@/lib/payments/razorpay', () => ({ getRazorpayInstance: () => rz }))
 
@@ -26,172 +29,146 @@ const db = vi.hoisted(() => {
 })
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: db.query }) }))
 
+const env = { key: process.env.RAZORPAY_KEY_ID, period: process.env.BILLING_TEST_PERIOD }
 beforeEach(() => {
   vi.clearAllMocks()
   vi.resetModules()
   for (const k of Object.keys(db.stored)) delete db.stored[k]
+  process.env.RAZORPAY_KEY_ID = 'rzp_test_abc'
+  delete process.env.BILLING_TEST_PERIOD
+})
+afterEach(() => {
+  process.env.RAZORPAY_KEY_ID = env.key
+  if (env.period === undefined) delete process.env.BILLING_TEST_PERIOD
+  else process.env.BILLING_TEST_PERIOD = env.period
 })
 
-const subOpts = {
-  planSlug: 'basic',
-  planName: 'Basic',
-  interval: 'monthly' as const,
-  priceInrMonth: 2999,
-  ownerEmail: 'o@acme.in',
-  ownerName: 'Owner',
-  tenantId: 't-1',
-  tenantSlug: 'acme',
-  callbackUrl: 'https://acme.jeffistores.in/cb',
-}
+const subOpts = { interval: 'monthly' as const, amountPaise: 299900, ownerEmail: 'o@acme.in', notes: { tenant_id: 't-1', billing: '1' } }
 
-describe('createRazorpaySubscription', () => {
-  it('creates a plan then a subscription at the given monthly price', async () => {
-    rz.plans.create.mockResolvedValue({ id: 'plan_api' })
-    rz.subscriptions.create.mockResolvedValue({ id: 'sub_1', short_url: 'https://rzp.io/s1' })
-    const { createRazorpaySubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    const out = await createRazorpaySubscription(subOpts)
-    expect(out).toEqual({ subscriptionId: 'sub_1', shortUrl: 'https://rzp.io/s1' })
-    expect(rz.plans.create.mock.calls[0][0]).toMatchObject({ period: 'monthly', interval: 1 })
-    expect(rz.plans.create.mock.calls[0][0].item.amount).toBe(299900)
+describe('subscriptionPaise', () => {
+  it('is the monthly price in paise, ten months for yearly', async () => {
+    const { subscriptionPaise } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(subscriptionPaise(2999, 'monthly')).toBe(299900)
+    expect(subscriptionPaise(2999, 'yearly')).toBe(2999000)
+  })
+})
+
+describe('razorpayMode', () => {
+  it('is test for rzp_test_ keys and live otherwise', async () => {
+    const { razorpayMode } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(razorpayMode({ RAZORPAY_KEY_ID: 'rzp_test_x' })).toBe('test')
+    expect(razorpayMode({ RAZORPAY_KEY_ID: 'rzp_live_x' })).toBe('live')
+    expect(razorpayMode({})).toBe('live')
+  })
+})
+
+describe('ensureCombinedPlan', () => {
+  it('creates one plan per mode, period and amount and caches it in platform_infra', async () => {
+    rz.plans.create.mockResolvedValue({ id: 'plan_1' })
+    const { ensureCombinedPlan, combinedPlanKey } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await ensureCombinedPlan('monthly', 40000)).toBe('plan_1')
+    expect(await ensureCombinedPlan('monthly', 40000)).toBe('plan_1')
+    expect(rz.plans.create).toHaveBeenCalledTimes(1)
+    const arg = rz.plans.create.mock.calls[0][0]
+    expect(arg).toMatchObject({ period: 'monthly', interval: 1, item: { amount: 40000, currency: 'INR' } })
+    expect(db.stored[combinedPlanKey('test', 'monthly', 40000)]).toBe('plan_1')
   })
 
-  it('yearly plan amount is monthly × 10 (two free months baked in)', async () => {
-    rz.plans.create.mockResolvedValue({ id: 'plan_yr' })
-    rz.subscriptions.create.mockResolvedValue({ id: 'sub_yr', short_url: 'u' })
-    const { createRazorpaySubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    await createRazorpaySubscription({ ...subOpts, interval: 'yearly' })
-    expect(rz.plans.create.mock.calls[0][0].period).toBe('yearly')
-    expect(rz.plans.create.mock.calls[0][0].item.amount).toBe(299900 * 10)
+  it('never reuses a test plan with live keys', async () => {
+    rz.plans.create.mockResolvedValueOnce({ id: 'plan_test' }).mockResolvedValueOnce({ id: 'plan_live' })
+    const mod = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await mod.ensureCombinedPlan('monthly', 40000)).toBe('plan_test')
+    process.env.RAZORPAY_KEY_ID = 'rzp_live_abc'
+    expect(await mod.ensureCombinedPlan('monthly', 40000)).toBe('plan_live')
+    expect(Object.keys(db.stored).sort()).toEqual(['combo:live:monthly:40000', 'combo:test:monthly:40000'])
   })
 
-  it('subscription uses total_count ≥ 1', async () => {
-    rz.plans.create.mockResolvedValue({ id: 'plan_api' })
-    rz.subscriptions.create.mockResolvedValue({ id: 'sub_1', short_url: 'u' })
-    const { createRazorpaySubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    await createRazorpaySubscription(subOpts)
-    expect(rz.subscriptions.create.mock.calls[0][0].total_count).toBeGreaterThanOrEqual(1)
-  })
-
-  it('throws when price is zero', async () => {
-    const { createRazorpaySubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    await expect(createRazorpaySubscription({ ...subOpts, priceInrMonth: 0 })).rejects.toThrow(/positive/)
+  it('reads a stored plan id after a restart', async () => {
+    db.stored['combo:test:yearly:400000'] = 'plan_stored'
+    const { ensureCombinedPlan } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await ensureCombinedPlan('yearly', 400000)).toBe('plan_stored')
     expect(rz.plans.create).not.toHaveBeenCalled()
   })
 
-  it('reuses the in-process cache on a second call for the same slug+interval+price', async () => {
-    rz.plans.create.mockResolvedValue({ id: 'plan_cached' })
-    rz.subscriptions.create.mockResolvedValue({ id: 's', short_url: 'u' })
-    const { createRazorpaySubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    await createRazorpaySubscription(subOpts)
-    await createRazorpaySubscription(subOpts)
-    expect(rz.plans.create).toHaveBeenCalledTimes(1)
+  it('makes test plans weekly under BILLING_TEST_PERIOD=weekly, never live ones', async () => {
+    rz.plans.create.mockResolvedValue({ id: 'plan_w' })
+    process.env.BILLING_TEST_PERIOD = 'weekly'
+    const mod = await import('@controller/lib/payments/razorpay-subscriptions')
+    await mod.ensureCombinedPlan('monthly', 20000)
+    expect(rz.plans.create.mock.calls[0][0].period).toBe('weekly')
+    process.env.RAZORPAY_KEY_ID = 'rzp_live_abc'
+    await mod.ensureCombinedPlan('monthly', 20000)
+    expect(rz.plans.create.mock.calls[1][0].period).toBe('monthly')
   })
 
-  it('creates a new Razorpay plan when the price changes', async () => {
-    rz.plans.create.mockResolvedValueOnce({ id: 'plan_2999' }).mockResolvedValueOnce({ id: 'plan_3499' })
-    rz.subscriptions.create.mockResolvedValue({ id: 's', short_url: 'u' })
-    const { createRazorpaySubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    await createRazorpaySubscription(subOpts)
-    await createRazorpaySubscription({ ...subOpts, priceInrMonth: 3499 })
-    expect(rz.plans.create).toHaveBeenCalledTimes(2)
-    expect(rz.plans.create.mock.calls[1][0].item.amount).toBe(349900)
-    expect(rz.subscriptions.create.mock.calls[1][0].plan_id).toBe('plan_3499')
+  it('rejects a non-positive amount', async () => {
+    const { ensureCombinedPlan } = await import('@controller/lib/payments/razorpay-subscriptions')
+    await expect(ensureCombinedPlan('monthly', 0)).rejects.toThrow(/positive/)
   })
 })
 
-describe('upgradeSubscription', () => {
-  const upOpts = {
-    oldSubscriptionId: 'sub_old',
-    newPlanSlug: 'growth',
-    newPlanName: 'Growth',
-    newInterval: 'monthly' as const,
-    priceInrMonth: 5999,
-    ownerEmail: 'o@acme.in',
-    ownerName: 'Owner',
-    tenantId: 't-1',
-    tenantSlug: 'acme',
-    callbackUrl: 'u',
-  }
-
-  it('prorates the unused half-cycle into a negative addon; leaves the old sub to the caller', async () => {
-    const now = Math.floor(Date.now() / 1000)
-    rz.subscriptions.fetch.mockResolvedValue({
-      current_start: now - 15 * 86400,
-      current_end: now + 15 * 86400,
-      plan: { item: { amount: 299900 } },
-    })
-    rz.plans.create.mockResolvedValue({ id: 'plan_growth' })
-    rz.subscriptions.create.mockResolvedValue({ id: 'sub_new', short_url: 'u2' })
-    const { upgradeSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    const out = await upgradeSubscription(upOpts)
-    expect(rz.subscriptions.cancel).not.toHaveBeenCalled()
-    expect(out.subscriptionId).toBe('sub_new')
-    expect(out.proratedCreditPaise).toBeGreaterThan(140000)
-    expect(out.proratedCreditPaise).toBeLessThan(160000)
-    const created = rz.subscriptions.create.mock.calls[0][0]
-    expect(created.addons[0].item.amount).toBe(-out.proratedCreditPaise)
-    expect(created.notes.upgraded_from).toBe('sub_old')
-    expect(created.total_count).toBeGreaterThanOrEqual(1)
+describe('createBillingSubscription', () => {
+  it('creates a subscription with the pre-debit notice and no start_at or add-ons by default', async () => {
+    rz.plans.create.mockResolvedValue({ id: 'plan_1' })
+    rz.subscriptions.create.mockResolvedValue({ id: 'sub_1', short_url: 'https://rzp.io/i/x' })
+    const { createBillingSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
+    const out = await createBillingSubscription(subOpts)
+    expect(out).toEqual({ subscriptionId: 'sub_1', shortUrl: 'https://rzp.io/i/x', planId: 'plan_1' })
+    const arg = rz.subscriptions.create.mock.calls[0][0]
+    expect(arg).toMatchObject({ plan_id: 'plan_1', quantity: 1, customer_notify: 1, total_count: 120, notes: subOpts.notes })
+    expect(arg.start_at).toBeUndefined()
+    expect(arg.addons).toBeUndefined()
   })
 
-  it('no addon when there is no remaining credit', async () => {
-    const now = Math.floor(Date.now() / 1000)
-    rz.subscriptions.fetch.mockResolvedValue({
-      current_start: now - 30 * 86400,
-      current_end: now - 1,
-      plan: { item: { amount: 299900 } },
-    })
-    rz.plans.create.mockResolvedValue({ id: 'plan_growth' })
-    rz.subscriptions.create.mockResolvedValue({ id: 'sub_new2', short_url: 'u' })
-    const { upgradeSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    const out = await upgradeSubscription(upOpts)
-    expect(out.proratedCreditPaise).toBe(0)
-    expect(rz.subscriptions.create.mock.calls[0][0].addons).toEqual([])
+  it('keeps the billing date with start_at and collects proration as a positive upfront add-on', async () => {
+    rz.plans.create.mockResolvedValue({ id: 'plan_1' })
+    rz.subscriptions.create.mockResolvedValue({ id: 'sub_2', short_url: '' })
+    const { createBillingSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
+    await createBillingSubscription({ ...subOpts, startAt: 1_900_000_000.7, upfrontPaise: 12345.4, upfrontLabel: 'Rest of cycle' })
+    const arg = rz.subscriptions.create.mock.calls[0][0]
+    expect(arg.start_at).toBe(1_900_000_000)
+    expect(arg.addons).toEqual([{ item: { name: 'Rest of cycle', amount: 12345, currency: 'INR' } }])
+  })
+
+  it('caps a yearly subscription at ten cycles', async () => {
+    rz.plans.create.mockResolvedValue({ id: 'plan_y' })
+    rz.subscriptions.create.mockResolvedValue({ id: 'sub_y' })
+    const { createBillingSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
+    await createBillingSubscription({ ...subOpts, interval: 'yearly', amountPaise: 2999000 })
+    expect(rz.subscriptions.create.mock.calls[0][0].total_count).toBe(10)
   })
 })
 
-describe('cancelOldSubscription', () => {
-  it('ends the old subscription now', async () => {
-    rz.subscriptions.cancel.mockResolvedValue({})
-    const { cancelOldSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    await cancelOldSubscription('sub_old')
-    expect(rz.subscriptions.cancel).toHaveBeenCalledWith('sub_old', { cancel_at_cycle_end: 0 })
-  })
-})
-
-describe('downgradeSubscription', () => {
-  it('schedules the plan change at cycle_end and returns the effective date', async () => {
-    rz.plans.create.mockResolvedValue({ id: 'plan_basic' })
-    rz.subscriptions.update.mockResolvedValue({})
-    rz.subscriptions.fetch.mockResolvedValue({ current_end: 1700000000 })
-    const { downgradeSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    const out = await downgradeSubscription({
-      subscriptionId: 'sub_1',
-      newPlanSlug: 'basic',
-      newPlanName: 'Basic',
-      newInterval: 'monthly',
-      priceInrMonth: 2999,
+describe('one-time add-ons, refunds and invoices', () => {
+  it('adds a one-time add-on to a subscription', async () => {
+    rz.subscriptions.createAddon.mockResolvedValue({ id: 'ao_1' })
+    const { addSubscriptionAddon } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await addSubscriptionAddon('sub_1', { name: 'Domain renewal', amountPaise: 99900.2 })).toBe('ao_1')
+    expect(rz.subscriptions.createAddon).toHaveBeenCalledWith('sub_1', {
+      item: { name: 'Domain renewal', amount: 99900, currency: 'INR', description: 'Domain renewal' },
+      quantity: 1,
     })
-    expect(rz.subscriptions.update).toHaveBeenCalledWith(
-      'sub_1',
-      expect.objectContaining({ plan_id: 'plan_basic', schedule_change_at: 'cycle_end', quantity: 1 })
-    )
-    expect(out).toEqual({ scheduledAt: 1700000000 })
   })
 
-  it('returns scheduledAt 0 when the fetched sub has no current_end', async () => {
-    rz.plans.create.mockResolvedValue({ id: 'plan_basic' })
-    rz.subscriptions.update.mockResolvedValue({})
-    rz.subscriptions.fetch.mockResolvedValue({})
-    const { downgradeSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
-    const out = await downgradeSubscription({
-      subscriptionId: 'sub_1',
-      newPlanSlug: 'basic',
-      newPlanName: 'Basic',
-      newInterval: 'monthly',
-      priceInrMonth: 2999,
-    })
-    expect(out.scheduledAt).toBe(0)
+  it('reads whether an add-on was billed, null when unknown', async () => {
+    rz.addons.fetch.mockResolvedValueOnce({ id: 'ao_1', invoice_id: 'inv_1' }).mockRejectedValueOnce(new Error('404'))
+    const { fetchAddon } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await fetchAddon('ao_1')).toEqual({ id: 'ao_1', invoice_id: 'inv_1' })
+    expect(await fetchAddon('ao_2')).toBeNull()
+  })
+
+  it('refunds part of a payment', async () => {
+    rz.payments.refund.mockResolvedValue({ id: 'rfnd_1' })
+    const { refundPayment } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await refundPayment('pay_1', 20000, { reason: 'x' })).toBe('rfnd_1')
+    expect(rz.payments.refund).toHaveBeenCalledWith('pay_1', { amount: 20000, speed: 'normal', notes: { reason: 'x' } })
+  })
+
+  it('lists a subscription invoices', async () => {
+    rz.invoices.all.mockResolvedValue({ items: [{ id: 'inv_1', payment_id: 'pay_1', status: 'paid', amount_paid: 40000, paid_at: 1 }] })
+    const { listSubscriptionInvoices } = await import('@controller/lib/payments/razorpay-subscriptions')
+    expect(await listSubscriptionInvoices('sub_1')).toEqual([{ id: 'inv_1', payment_id: 'pay_1', status: 'paid', amount: 40000, paid_at: 1 }])
+    expect(rz.invoices.all).toHaveBeenCalledWith({ subscription_id: 'sub_1', count: 10 })
   })
 })
 
