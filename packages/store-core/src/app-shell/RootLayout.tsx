@@ -19,6 +19,7 @@ import { resolveGoogleTag, gtagBootstrapScript } from '@/lib/analytics/google-ta
 import { adsenseClient, adsenseInitScript, adsenseScriptSrc } from '@/lib/analytics/adsense'
 import AdSense from '@/components/visitor/AdSense'
 import { storeIsAdFree } from '@/lib/billing/ad-free'
+import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
 import { schemes } from '@jeffi/design-tokens'
 
 export async function generateMetadata() {
@@ -97,9 +98,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     !isEcomSubdomain &&
     !isCertPortalSubdomain &&
     !isVaultSubdomain
-  // Platform AdSense on every store unless its tenant paid to remove ads (lib/billing/ad-free.ts).
+  // Platform AdSense on every store unless its tenant paid to remove ads (lib/billing/ad-free.ts). The tenant comes
+  // from middleware's x-tenant-id: resolveTenant() is null when its lookup fails, which would read as the flagship.
   const adClient = isStorefrontHost ? adsenseClient() : null
-  const showAds = !!adClient && !(await storeIsAdFree(tenant?.tenantId))
+  const adTenantId = (await resolveRequestTenantId()) ?? tenant?.tenantId
+  const showAds = !!adClient && !(await storeIsAdFree(adTenantId))
   const cookieConsent = (hasGoogleTag || showAds) && isStorefrontHost
   // A Site Builder theme recolours and re-fonts the store and business pages (never the staff hosts). Set on the body,
   // twice-classed, so it wins over the base :root / .dark variables.
