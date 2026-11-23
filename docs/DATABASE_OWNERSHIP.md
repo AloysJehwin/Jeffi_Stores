@@ -363,7 +363,9 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 
 | Table | File | Evidence |
 | --- | --- | --- |
+| `showcase_events` | `platform-only/tables/analytics.sql` | Showcase visit tracking (written by showcase-service's /api/track; read by the console's analytics page) |
 | `showcase_leads` | `platform-only/tables/showcase.sql` | Showcase product tables (written by showcase-service's lead form; read in the controller's console) |
+| `showcase_sessions` | `platform-only/tables/analytics.sql` | Showcase visit tracking (written by showcase-service's /api/track; read by the console's analytics page) |
 | `showcase_sites` | `platform-only/tables/showcase.sql` | Showcase product tables (written by the controller's console and showcase_renew cron; served by showcase-service) |
 
 ## storefront-service

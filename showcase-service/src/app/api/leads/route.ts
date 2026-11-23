@@ -4,6 +4,7 @@ import { insertShowcaseLead } from '@/lib/showcase/store'
 import { siteForHost } from '@showcase/lib/site'
 import { hit } from '@showcase/lib/rate-limit'
 import { emailLeadToOwner } from '@showcase/lib/notify'
+import { visitForLead, visitorKey } from '@showcase/lib/track'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,7 +118,9 @@ export async function POST(req: NextRequest) {
     return reply(429, { error: 'Too many messages. Please try again later.' }, { 'Retry-After': String(retry) })
   }
 
-  const saved = await insertShowcaseLead(site.id, { name, phone, email, message }).catch(e => {
+  // The visit it came from (by the same visitor key the tracker keeps), for the analytics page's lead attribution.
+  const sessionId = await visitForLead(site.id, visitorKey(site.id, ip, req.headers.get('user-agent') ?? '')).catch(() => null)
+  const saved = await insertShowcaseLead(site.id, { name, phone, email, message, ...(sessionId ? { sessionId } : {}) }).catch(e => {
     console.error('[showcase-leads] insert failed', e?.message || e)
     return null
   })

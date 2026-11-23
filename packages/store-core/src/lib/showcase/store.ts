@@ -283,11 +283,11 @@ const LEAD_COLS = 'id, site_id, name, phone, email, message, created_at, read_at
 
 export async function insertShowcaseLead(
   siteId: string,
-  lead: { name: string; phone?: string | null; email?: string | null; message?: string | null }
+  lead: { name: string; phone?: string | null; email?: string | null; message?: string | null; sessionId?: string | null }
 ): Promise<ShowcaseLead> {
   const r = await controlPlanePool().query(
-    `INSERT INTO showcase_leads (site_id, name, phone, email, message) VALUES ($1, $2, $3, $4, $5) RETURNING ${LEAD_COLS}`,
-    [siteId, lead.name, lead.phone || null, lead.email || null, lead.message || null]
+    `INSERT INTO showcase_leads (site_id, name, phone, email, message, session_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${LEAD_COLS}`,
+    [siteId, lead.name, lead.phone || null, lead.email || null, lead.message || null, lead.sessionId || null]
   )
   return toLead(r.rows[0])
 }
