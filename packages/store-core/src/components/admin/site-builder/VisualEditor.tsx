@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef } from 'react'
-import { pageRefKey, type PageDoc, type PageRef } from '@jeffi/site-blocks'
+import { pageRefKey, type PageDoc, type PageRef, type ThemeTokens } from '@jeffi/site-blocks'
 import { api } from '@/components/admin/kit/core'
 import SiteEditor from '@/components/site-editor/SiteEditor'
 import type { SaveResult, SiteEditorHost } from '@/components/site-editor/host'
@@ -18,11 +18,12 @@ export interface VisualEditorProps {
   title: string
   previewUrl: string | null
   canWrite: boolean
+  theme: ThemeTokens | null
   onClose: () => void
   onPublish: () => Promise<void>
 }
 
-export default function VisualEditor({ draftId, pageRef, title, previewUrl, canWrite, onClose, onPublish }: VisualEditorProps) {
+export default function VisualEditor({ draftId, pageRef, title, previewUrl, canWrite, theme, onClose, onPublish }: VisualEditorProps) {
   const web: PageRef = useMemo(() => ({ ...pageRef, surface: 'web' }), [pageRef])
   const key = pageRefKey(web)
   const phone = useRef<'same' | 'own' | 'none'>('none')
@@ -32,6 +33,7 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       title,
       previewUrl,
       canWrite,
+      theme,
       async load() {
         const { ok, data } = await api<{ doc: PageDoc; phone: 'same' | 'own' | 'none' }>(`/api/admin/site-builder/drafts/${draftId}/editor?key=${encodeURIComponent(key)}`)
         if (!ok) return null
@@ -52,7 +54,7 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       onClose,
       blockLabel: type => siteRegistry.get(type)?.label ?? type,
     }),
-    [title, previewUrl, canWrite, draftId, key, web, onClose, onPublish]
+    [title, previewUrl, canWrite, theme, draftId, key, web, onClose, onPublish]
   )
 
   return <SiteEditor key={key} host={host} />

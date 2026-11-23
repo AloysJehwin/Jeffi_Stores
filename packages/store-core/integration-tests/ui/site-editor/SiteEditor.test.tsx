@@ -83,6 +83,21 @@ describe('SiteEditor', () => {
     expect(words(save.mock.calls.at(-1)![0].blocks.a.props.tree)).toBe('Hello')
   })
 
+  it('styles per breakpoint: the canvas narrows, and Phone and Desktop values land in their own classes', async () => {
+    const { save } = setup()
+    await screen.findByRole('button', { name: 'Hero' })
+    const post = (await fromCanvas({ type: 'select', block: 'a', id: 'e2' })).postMessage
+    fireEvent.click(screen.getByRole('button', { name: /Phone/ }))
+    expect((screen.getByTitle('Page canvas') as HTMLIFrameElement).style.width).toBe('390px')
+    fireEvent.change(screen.getByLabelText('Size'), { target: { value: 'xl' } })
+    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'site-editor:apply', ops: [{ op: 'classes', id: 'e2', bp: 'base', value: ['text-xl'] }] }), '*')
+    fireEvent.click(screen.getByRole('button', { name: /Desktop/ }))
+    fireEvent.change(screen.getByLabelText('Size'), { target: { value: '4xl' } })
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    const h2 = (save.mock.calls.at(-1)![0].blocks.a.props.tree as { children: { props: { className?: { v: string } } }[] }).children[0]
+    expect(h2.props.className?.v).toBe('text-xl lg:text-4xl')
+  })
+
   it('shows a refused save and keeps the edit to undo', async () => {
     setup({ save: async () => ({ ok: false, error: 'Hero: line 3: nope' }) })
     await screen.findByRole('button', { name: 'Hero' })

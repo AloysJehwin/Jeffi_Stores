@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Redo2, Rocket, Undo2, X } from 'lucide-react'
-import { DesignError, type DesignOp } from '@jeffi/site-blocks/design'
+import { Monitor, Redo2, Rocket, Smartphone, Tablet, Undo2, X } from 'lucide-react'
+import { isTagNode, type CodeNode } from '@jeffi/site-blocks'
+import { DesignError, findNode, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
+import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
+import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
 import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editSection, endGestures, redo, treeOf, undo, type EditorState, type Shown } from './state'
 
 // The visual site editor (docs/plans/SITE_EDITOR_PLAN.md, phase 2): the real page on a canvas (an iframe with a
@@ -14,8 +17,14 @@ import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, ed
 // for changes it can't show by itself.
 
 const P = 'site-editor:'
-const WIDTH = 1280
 const SAVE_AFTER_MS = 800
+/** The canvas per breakpoint (Tailwind's base, md and lg). */
+const WIDTH: Partial<Record<Breakpoint, number>> = { base: 390, md: 768, lg: 1280 }
+const BREAKPOINTS = [
+  ['base', Smartphone],
+  ['md', Tablet],
+  ['lg', Monitor],
+] as const
 
 type Selection = { block: string; id: string | null } | null
 type Status = { kind: 'idle' | 'pending' | 'saving' | 'saved' } | { kind: 'error'; message: string }
@@ -27,6 +36,8 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [frameKey, setFrameKey] = useState(0)
   const [scale, setScale] = useState(1)
+  const [bp, setBp] = useState<Breakpoint>('lg')
+  const width = WIDTH[bp] ?? 1280
   const frame = useRef<HTMLIFrameElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const hostRef = useRef(host)
@@ -135,6 +146,18 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     setState(r.state)
     show(r.shown)
   }
+  /** A style property at the breakpoint being edited, as per-breakpoint class operations. New classes need the
+   * section's CSS compiled again, so the canvas reloads after the save. */
+  const style = (block: string, id: string, prop: PanelProp, value: string | null) => {
+    const node = findNode(latest.current.state?.trees[block]?.tree ?? { t: 'frag', children: [] }, id)?.node
+    if (!node || !isTagNode(node)) return
+    const cls = node.props.className
+    const before = cls && cls.k === 'lit' && typeof cls.v === 'string' ? cls.v : ''
+    const ops = classOps(id, before, setPanelValue(before, bp, prop, value))
+    if (!ops.length) return
+    edit(block, ops)
+    requestReload()
+  }
   const select = (block: string, id: string | null) => {
     setSel({ block, id })
     post({ type: 'select', block, id })
@@ -191,10 +214,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   useEffect(() => {
     const el = box.current
     if (!el) return
-    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / WIDTH)))
+    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / width)))
     ro.observe(el)
     return () => ro.disconnect()
-  }, [ready])
+  }, [ready, width])
 
   // ── Render ─────────────────────────────────────────────────────────────────────────────────────
   if (failed) return <p className="rounded-xl border border-border-default bg-surface-elevated p-5 text-sm text-foreground-muted">This page could not be opened in the visual editor.</p>
@@ -223,6 +246,20 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
           <button type="button" className={iconBtn} disabled={!host.canWrite || !canRedo(state)} onClick={() => step('redo')} aria-label="Redo" title="Redo (⇧⌘Z)">
             <Redo2 className="w-4 h-4" />
           </button>
+        </div>
+        <div className="flex gap-0.5 rounded-lg border border-border-default p-0.5" role="group" aria-label="Screen size">
+          {BREAKPOINTS.map(([b, Icon]) => (
+            <button
+              key={b}
+              type="button"
+              onClick={() => setBp(b)}
+              aria-pressed={bp === b}
+              title={`${BREAKPOINT_NAME[b]} (${WIDTH[b]}px): styles you set apply from this size up`}
+              className={`inline-flex items-center gap-1 rounded-md px-2 h-7 text-xs font-medium ${bp === b ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+            >
+              <Icon className="h-3.5 w-3.5" /> {BREAKPOINT_NAME[b]}
+            </button>
+          ))}
         </div>
         <span role="status" className={`text-xs ${status.kind === 'error' ? 'text-red-600' : 'text-foreground-muted'}`}>
           {statusText}
@@ -274,7 +311,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                 ref={frame}
                 title="Page canvas"
                 src={host.previewUrl}
-                style={{ flexShrink: 0, width: WIDTH, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: 'top center', border: 0, background: 'white' }}
+                style={{ flexShrink: 0, width, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: 'top center', border: 0, background: 'white' }}
               />
             </div>
           ) : (
@@ -292,7 +329,11 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onSelect={id => select(sel.block, id)}
               onText={(id, value) => edit(sel.block, [{ op: 'text', id, value }], `text:${id}`)}
               onDone={() => update(endGestures)}
-            />
+            >
+              {styleable(tree, sel.id) !== null && (
+                <StylePanel key={bp} className={styleable(tree, sel.id) ?? ''} bp={bp} theme={host.theme} canWrite={host.canWrite} onChange={(prop, value) => style(sel.block, sel.id!, prop, value)} />
+              )}
+            </Inspector>
           ) : block ? (
             <div className="space-y-2">
               <p className="text-sm font-semibold text-foreground">{label(block.id)}</p>
@@ -305,4 +346,13 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       </div>
     </div>
   )
+}
+
+/** An element's own classes when the panel can change them (written out, not worked out from data); null otherwise. */
+function styleable(tree: CodeNode, id: string): string | null {
+  const node = findNode(tree, id)?.node
+  if (!node || !isTagNode(node) || node.ro) return null
+  const cls = node.props.className
+  if (!cls) return ''
+  return cls.k === 'lit' && typeof cls.v === 'string' ? cls.v : null
 }

@@ -765,6 +765,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         title={`${PAGES.find(p => p.key === ref.page)?.label ?? ref.slug ?? ref.page} · ${audience === 'business' ? 'Business' : 'Store'}`}
         previewUrl={homepagePreviewUrl(audience, token, 'desktop', previewPath)}
         canWrite={canWrite}
+        theme={theme}
         onClose={closeVisual}
         onPublish={publish}
       />

@@ -30,6 +30,11 @@ AI-generated pages must be editable with it.
    `GET drafts/[id]/editor?key=` and saving through `PUT drafts/[id]`. The canvas reloads, keeping its scroll, only
    after a save that holds a change it couldn't show itself. `data-e` now also marks Link, Image, Icon and parts drawn
    as one plain element (`RenderCtx.edit`, `data-e-cmp`).
+2. Style panel and breakpoints. Phone (390, base), Tablet (768, `md:`) and Desktop (1280, `lg:`) canvas widths; the
+   breakpoint shown is the one styled. `StylePanel.tsx`: font (the theme's pair), size, weight, align, text and
+   background colour (theme scales from `paletteFrom` plus any hex), padding, margins, gap, width, max width, min
+   height, rounding; each shows where its value comes from and clears this breakpoint's. Changes go through
+   `setPanelValue` / `classOps`, so wider breakpoints keep their look; the canvas reloads after the save for the CSS.
 
 ## What exists
 
