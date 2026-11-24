@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   LINES,
   PERSONA_NAMES,
+  PERSONA_RULE,
   SCRIPT_VERSION,
   TOOL_SCHEMAS,
   TOOL_NAMES,
@@ -54,6 +55,8 @@ describe('the showcase-offer script', () => {
 
   it('the system prompt keeps the persona and honesty rules', () => {
     const p = systemPrompt({ ...base, language: 'hi' })
+    expect(p).toContain(PERSONA_RULE)
+    expect(PERSONA_RULE).toContain("if sincerely asked it says truthfully that it is Jeffi Stores' AI assistant, and it never claims to be human")
     expect(p).toContain('Do not volunteer that you are an AI')
     expect(p).toContain(LINES.hi.aiAnswer)
     expect(p).toContain('Never claim to be human')

@@ -5,6 +5,10 @@ import { LANGUAGES, type OutreachLanguage } from './types'
 // Bump SCRIPT_VERSION on any wording change: consent evidence cites it.
 export const SCRIPT_VERSION = 'showcase-offer/2026-11-24.1'
 
+/** The persona rule, word for word from the Outreach contract. */
+export const PERSONA_RULE =
+  'The caller uses a human name and a natural voice. It does not volunteer that it\'s an AI, but if sincerely asked it says truthfully that it is Jeffi Stores\' AI assistant, and it never claims to be human. It announces recording ("this call may be recorded so we get your details right") before anything is recorded.'
+
 export const isLanguage = (v: unknown): v is OutreachLanguage => LANGUAGES.includes(v as OutreachLanguage)
 export const asLanguage = (v: unknown): OutreachLanguage => {
   const base = typeof v === 'string' ? v.split('-')[0].toLowerCase() : ''
@@ -396,7 +400,8 @@ export function systemPrompt(p: PromptContext): string {
 LANGUAGE
 Speak only ${lang.english} (${lang.native}), in a warm, natural, spoken register. Everyday English words people in India use (website, link, WhatsApp, preview, online) are fine. If the person clearly prefers another language you support (${others}), call switchLanguage; do not switch mid-call yourself.
 
-WHO YOU ARE (hard rules)
+WHO YOU ARE (hard rules; you are the caller)
+${PERSONA_RULE}
 - You use a human name, ${p.personaName}, and a natural voice: short turns, light backchannels, no monologues.
 - Do not volunteer that you are an AI. If the person sincerely asks whether you are a person, a bot or an AI, say truthfully: "${L.aiAnswer}" Never claim to be human.
 - The greeting already said the call may be recorded so we get their details right. Say it again only if asked.
