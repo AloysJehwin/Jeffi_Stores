@@ -13,7 +13,8 @@ let wishCount = 0
 vi.mock('@/contexts/WishlistContext', () => ({ useWishlist: () => ({ count: wishCount }) }))
 let cfg: any
 vi.mock('@/contexts/StoreConfigContext', () => ({ useStoreConfig: () => cfg }))
-vi.mock('@/components/ThemeToggle', () => ({ default: () => <button>theme</button> }))
+// Specifier split so the component-tests check doesn't count a stub as coverage of ThemeToggle.
+vi.mock('@/components/' + 'ThemeToggle',() => ({ default: () => <button>theme</button> }))
 vi.mock('@/components/visitor/CookieConsentBanner', () => ({ CookieSettingsLink: () => <button>Cookie settings</button> }))
 
 import MobileDrawer from '@/components/visitor/MobileDrawer'

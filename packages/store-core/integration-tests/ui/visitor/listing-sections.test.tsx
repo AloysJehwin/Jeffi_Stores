@@ -17,7 +17,8 @@ vi.mock('@/components/visitor/ProductCard', () => ({ default: () => null }))
 vi.mock('@/components/visitor/listing/listing-items', () => ({
   renderProductItem: (p: any, _gst: boolean, deferred: boolean) => <span>{`card:${p.id}:${deferred ? 'lazy' : 'eager'}`}</span>,
 }))
-vi.mock('@/components/visitor/site/code/common/SiteCard', () => ({
+// Specifiers split so the component-tests check doesn't count a stub as coverage of SiteCard / HomeSections.
+vi.mock('@/components/visitor/site/code/common/' + 'SiteCard',() => ({
   SiteCardView: ({ product, priority }: any) => <span>{`site:${product.id}:${priority ? 'prio' : '-'}`}</span>,
 }))
 const rowViews = vi.fn()
@@ -35,7 +36,7 @@ vi.mock('@/lib/catalog/homepage-model', () => ({
   getPageSections: (...a: any[]) => getPageSections(...a),
   loadSectionData: (...a: any[]) => loadSectionData(...a),
 }))
-vi.mock('@/components/visitor/home/HomeSections', () => ({ HALF_CELL: 'half-cell', HALF_ROW: 'half-row' }))
+vi.mock('@/components/visitor/home/' + 'HomeSections',() => ({ HALF_CELL: 'half-cell', HALF_ROW: 'half-row' }))
 
 import {
   EAGER_CARDS,
