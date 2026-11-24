@@ -34,6 +34,8 @@
     "setup:test-db": "bash scripts/setup-test-db.sh",
     "sweep:responsive": "playwright test --config playwright.config.ts",
     "test:ui": "playwright test --config playwright.ui.config.ts",
+    "check:component-tests": "node scripts/check-component-tests.mjs",
+    "check:route-tests": "node scripts/check-route-tests.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev:messaging": "npm --prefix messaging-service run dev",
