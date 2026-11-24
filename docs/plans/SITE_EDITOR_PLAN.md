@@ -118,6 +118,13 @@ AI-generated pages must be editable with it.
    `renderBlockFields` (admin: the forms editor's `BlockInspector`, with its section options). Field changes are
    block-list steps (`editDoc` with a gesture, so typing in one block joins one undo step per visit) and the canvas
    redraws after the save. Showcase pages hold only code sections and their required parts, so it passes no fields.
+3. Theme templates stay v1 (source and compiled, no tree); not regenerated. They are editable at once already: every
+   load into the editor upgrades a code section to v2 (`upgradeCodeSections`, admin and Showcase), and
+   `site-code-roundtrip.test.ts` checks each of the 225 template sections parses, prints and compiles back to the same
+   tree. Storing trees in the templates would add weight to `themes/templates` (1.3 MB) for no gain, and would make
+   a freshly installed page read as changed by hand (`keep-words.ts` `handEdited` looks for trees), so "Design this
+   page again" would ask to keep words nobody wrote. A template section gets its tree the first time the editor saves
+   it.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
