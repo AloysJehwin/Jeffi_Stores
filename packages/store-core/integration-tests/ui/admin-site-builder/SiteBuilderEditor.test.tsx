@@ -208,12 +208,16 @@ describe('SiteBuilderEditor', () => {
       expect(rows[1]).toHaveTextContent('Fresh in')
     })
 
-    it('adds a block from the library after the selected one', async () => {
+    // ~30 ms alone; the draft load, the library panel and the insert are three async hops that CI load can stretch.
+    // The test's own limit sits above the 5 s waits, so a stall fails with the waited-for assertion, not a timeout.
+    it('adds a block from the library after the selected one', { timeout: 15_000 }, async () => {
       draftRoutes()
       setup({ initialDraftId: 'd1' })
       fireEvent.click(await screen.findByRole('button', { name: 'Fresh in' }))
+      await waitFor(() => expect(screen.getByTestId('inspector')).toHaveTextContent('inspecting a'))
       fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0])
-      fireEvent.click(screen.getByRole('button', { name: 'add trust strip' }))
+      const library = await screen.findByTestId('library')
+      fireEvent.click(within(library).getByRole('button', { name: 'add trust strip' }))
       await waitFor(() => expect(screen.getByTestId('inspector')).not.toHaveTextContent('inspecting a'))
       await waitFor(() => expect(screen.getAllByRole('button', { name: /Move up/ })).toHaveLength(3))
     })
