@@ -51,6 +51,14 @@ AI-generated pages must be editable with it.
    studio preview with `editor=1` (`ShowcasePreview` `editing`: `data-block-id`, canvas ids, the bridge). Pictures
    upload as the Details step's do. Publishing stays the studio's own step, whose compile is v2-aware.
 
+**Phase 3 (free layers), in slices**
+1. Model and classes. `lib/site/code/free.ts`: a free layer is `absolute` in its frame with left, top, width (and
+   maybe height) in % at a breakpoint, plus a z step (`lg:absolute lg:left-[12%] lg:top-[30%] lg:w-[40%] lg:z-10`).
+   `placeFree` keeps the next wider breakpoint as it was (`static` and its width pinned) unless placed too;
+   `unplaceFree` puts it back in the flow; `frameFor` makes the frame `relative` and keeps its height
+   (`lg:min-h-[640px]`) once the layer leaves the flow; `restack` orders layers. The node keeps its place in the tree,
+   so reading order and SEO don't change. Tested down to the compiled CSS.
+
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
 all Showcase owners), since their studio runs on the platform.
