@@ -3,15 +3,16 @@
 import { useEffect } from 'react'
 import { withBreakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 
-// The visual editor's side of the Site Builder canvas (docs/plans/SITE_EDITOR_PLAN.md, phase 0), successor to
-// SitePreviewBridge for code sections. Dormant until the editor sends `site-editor:mode`; then a click selects the
-// element under it by its `data-e` node id, a double click edits an element whose words are written out
-// (`data-e-text`, never data) in place, and the editor's text and class operations show at once. Every change goes
-// back to the editor as design operations (@jeffi/site-blocks/design), which it records and saves; the save compiles
-// them again.
+// The visual editor's side of the Site Builder canvas (docs/plans/SITE_EDITOR_PLAN.md), successor to
+// SitePreviewBridge. Dormant until the editor (components/site-editor) sends `site-editor:mode`; then a click selects
+// the element under it by its `data-e` node id (or the block, outside code sections), a double click edits an element
+// whose words are written out (`data-e-text`, never data) in place, and the editor's operations that the page can show
+// apply at once (text, classes, a picture); the rest show on the reload after the save. Every change goes back as
+// design operations (@jeffi/site-blocks/design), which the editor records and saves; the save compiles them again.
 //
-// Messages in (from the parent only): mode { on }, select { block, id }, apply { block, ops }.
-// Messages out: ready, select { block, id, tag, className, text }, ops { block, ops }, applied { block, ops }.
+// Messages in (from the parent only): mode { on }, select { block, id }, apply { block, ops, seq }, scroll-to { y }.
+// Messages out: ready, select { block, id, tag, cmp, text }, ops { block, ops }, applied { block, ops, seq },
+// scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' }.
 
 type Win = Window & { __siteEditorBridge?: boolean }
 const P = 'site-editor:'
@@ -28,10 +29,11 @@ export default function SiteEditorBridge() {
     const send = (msg: Record<string, unknown>) => window.parent.postMessage({ ...msg, type: P + msg.type }, '*')
     const blockOf = (el: Element) => el.closest<HTMLElement>('[data-block-id]')?.dataset.blockId ?? null
     const nodeOf = (t: EventTarget | null) => (t instanceof Element ? t.closest<HTMLElement>('[data-block-id] [data-e]') : null)
+    const blockEl = (t: EventTarget | null) => (t instanceof Element ? t.closest<HTMLElement>('[data-block-id]') : null)
+    const sel = (block: string) => `[data-block-id="${CSS.escape(block)}"]`
     // A node inside a list or a render function draws once per item, each copy with its id.
     const findAll = (block: unknown, id: unknown) =>
-      typeof block === 'string' && typeof id === 'string' ? [...document.querySelectorAll<HTMLElement>(`[data-block-id="${CSS.escape(block)}"] [data-e="${CSS.escape(id)}"]`)] : []
-    const find = (block: unknown, id: unknown) => findAll(block, id)[0] ?? null
+      typeof block === 'string' && typeof id === 'string' ? [...document.querySelectorAll<HTMLElement>(`${sel(block)} [data-e="${CSS.escape(id)}"]`)] : []
     // The section's mark class (lib/site/code/css.ts codeMark) is the renderer's, not the element's own.
     const markOf = (el: Element) => el.closest('[data-code-section]')?.getAttribute('data-code-section') ?? ''
     const own = (el: Element) => [...el.classList].filter(c => c !== markOf(el)).join(' ')
@@ -39,12 +41,20 @@ export default function SiteEditorBridge() {
     // React's SSR puts a comment between neighbouring text nodes; committing writes one text node in their place.
     const textOnly = (el: Element) => el.hasAttribute('data-e-text') && [...el.childNodes].every(n => n.nodeType === Node.TEXT_NODE || n.nodeType === Node.COMMENT_NODE)
 
-    const select = (el: HTMLElement | null) => {
+    const mark = (el: HTMLElement | null) => {
       selected?.removeAttribute('data-e-selected')
       selected = el
+      el?.setAttribute('data-e-selected', '')
+    }
+    const select = (el: HTMLElement | null) => {
+      mark(el)
       if (!el) return
-      el.setAttribute('data-e-selected', '')
-      send({ type: 'select', block: blockOf(el), id: el.dataset.e, tag: el.tagName.toLowerCase(), className: own(el), text: textOnly(el) ? el.textContent : null })
+      const id = el.dataset.e ?? null
+      send({ type: 'select', block: blockOf(el), id, tag: el.tagName.toLowerCase(), cmp: el.hasAttribute('data-e-cmp'), text: id && textOnly(el) ? el.textContent : null })
+    }
+    const reveal = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect()
+      if (r.bottom < 0 || r.top > window.innerHeight) el.scrollIntoView({ block: 'center' })
     }
 
     const commit = (keep: boolean) => {
@@ -60,14 +70,21 @@ export default function SiteEditorBridge() {
       if (id && value !== before) send({ type: 'ops', block: blockOf(el), ops: [{ op: 'text', id, value } satisfies DesignOp] })
     }
 
-    /** One operation shown on the page; false when it isn't one the canvas can show (the soft refresh will). */
+    /** One operation shown on the page; false when it isn't one the canvas can show (the reload will). */
     const show = (block: unknown, op: DesignOp): boolean => {
       const els = 'id' in op ? findAll(block, op.id) : []
       if (!els.length) return false
       try {
         if (op.op === 'text' && typeof op.value === 'string' && els.every(textOnly)) els.forEach(el => (el.textContent = op.value as string))
-        else if (op.op === 'classes' && Array.isArray(op.value)) els.forEach(el => setOwn(el, withBreakpoint(own(el), op.bp, op.value as string[])))
-        else if (op.op === 'attr' && op.name === 'className') els.forEach(el => setOwn(el, typeof op.value === 'string' ? op.value : ''))
+        // A part's root holds its own classes beside the node's, so those wait for the reload.
+        else if (op.op === 'classes' && Array.isArray(op.value) && !els.some(el => el.hasAttribute('data-e-cmp')))
+          els.forEach(el => setOwn(el, withBreakpoint(own(el), op.bp, op.value as string[])))
+        else if (op.op === 'attr' && op.name === 'className' && !els.some(el => el.hasAttribute('data-e-cmp'))) els.forEach(el => setOwn(el, typeof op.value === 'string' ? op.value : ''))
+        else if (op.op === 'attr' && (op.name === 'src' || op.name === 'alt') && els.every(el => el instanceof HTMLImageElement) && typeof op.value === 'string')
+          els.forEach(el => {
+            if (op.name === 'src') el.removeAttribute('srcset')
+            el.setAttribute(op.name, op.value as string)
+          })
         else return false
       } catch {
         return false
@@ -78,11 +95,14 @@ export default function SiteEditorBridge() {
     const onClick = (e: MouseEvent) => {
       if (!on) return
       const el = nodeOf(e.target)
-      if (!el || (editing && editing.el.contains(el))) return
+      if (editing && el && editing.el.contains(el)) return
+      const block = el ? null : blockEl(e.target)
+      if (!el && !block) return
+      // Links and buttons on the canvas select instead of navigating.
       e.preventDefault()
       e.stopPropagation()
       commit(true)
-      select(el)
+      select(el ?? block)
     }
     const onDblClick = (e: MouseEvent) => {
       if (!on) return
@@ -97,16 +117,25 @@ export default function SiteEditorBridge() {
       el.focus()
       const range = document.createRange()
       range.selectNodeContents(el)
-      const sel = window.getSelection()
-      sel?.removeAllRanges()
-      sel?.addRange(range)
+      const s = window.getSelection()
+      s?.removeAllRanges()
+      s?.addRange(range)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (!editing) return
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        commit(true)
-      } else if (e.key === 'Escape') commit(false)
+      if (!on) return
+      if (editing) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          commit(true)
+        } else if (e.key === 'Escape') commit(false)
+        return
+      }
+      const mod = e.metaKey || e.ctrlKey
+      const action =
+        mod && e.key.toLowerCase() === 'z' ? (e.shiftKey ? 'redo' : 'undo') : mod && e.key.toLowerCase() === 'y' ? 'redo' : e.key === 'Delete' || e.key === 'Backspace' ? 'delete' : e.key === 'Escape' ? 'escape' : null
+      if (!action) return
+      e.preventDefault()
+      send({ type: 'key', action })
     }
     // Pasted content goes in as plain text only.
     const onPaste = (e: ClipboardEvent) => {
@@ -122,6 +151,11 @@ export default function SiteEditorBridge() {
     const onBlur = (e: FocusEvent) => {
       if (editing && e.target === editing.el) commit(true)
     }
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => send({ type: 'scroll', y: Math.round(window.scrollY) }))
+    }
     const onMessage = (e: MessageEvent) => {
       if (e.source !== window.parent || typeof e.data?.type !== 'string' || !e.data.type.startsWith(P)) return
       const kind = e.data.type.slice(P.length)
@@ -130,13 +164,16 @@ export default function SiteEditorBridge() {
         root.toggleAttribute('data-site-editing', on)
         if (!on) {
           commit(true)
-          select(null)
+          mark(null)
         }
-      } else if (kind === 'select') select(find(e.data.block, e.data.id))
-      else if (kind === 'apply' && Array.isArray(e.data.ops)) {
+      } else if (kind === 'select') {
+        const el = typeof e.data.block === 'string' ? (e.data.id ? findAll(e.data.block, e.data.id)[0] : document.querySelector<HTMLElement>(sel(e.data.block))) : null
+        mark(el ?? null)
+        if (el) reveal(el)
+      } else if (kind === 'apply' && Array.isArray(e.data.ops)) {
         const ops = (e.data.ops as DesignOp[]).filter(op => op && typeof op === 'object' && show(e.data.block, op))
-        send({ type: 'applied', block: e.data.block, ops })
-      }
+        send({ type: 'applied', block: e.data.block, ops, seq: e.data.seq })
+      } else if (kind === 'scroll-to' && typeof e.data.y === 'number') window.scrollTo({ top: e.data.y })
     }
 
     document.addEventListener('click', onClick, true)
@@ -144,22 +181,25 @@ export default function SiteEditorBridge() {
     document.addEventListener('keydown', onKey, true)
     document.addEventListener('paste', onPaste, true)
     document.addEventListener('focusout', onBlur, true)
+    window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('message', onMessage)
     send({ type: 'ready' })
     return () => {
       commit(false)
-      select(null)
+      mark(null)
+      cancelAnimationFrame(raf)
       root.removeAttribute('data-site-editing')
       document.removeEventListener('click', onClick, true)
       document.removeEventListener('dblclick', onDblClick, true)
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('paste', onPaste, true)
       document.removeEventListener('focusout', onBlur, true)
+      window.removeEventListener('scroll', onScroll)
       window.removeEventListener('message', onMessage)
       w.__siteEditorBridge = false
     }
   }, [])
   return (
-    <style>{`[data-site-editing] [data-block-id] [data-e]{cursor:default}[data-site-editing] [data-block-id] [data-e]:hover{outline:1px dashed rgb(var(--c-accent-500) / .7);outline-offset:1px}[data-e-selected]{outline:2px solid rgb(var(--c-accent-500))!important;outline-offset:1px}[data-e][contenteditable]{cursor:text;outline:2px solid rgb(var(--c-accent-500))!important}`}</style>
+    <style>{`[data-site-editing] [data-block-id]{cursor:default}[data-site-editing] [data-block-id] [data-e]:hover{outline:1px dashed rgb(var(--c-accent-500) / .7);outline-offset:1px}[data-e-selected]{outline:2px solid rgb(var(--c-accent-500))!important;outline-offset:1px}[data-e][contenteditable]{cursor:text;outline:2px solid rgb(var(--c-accent-500))!important}`}</style>
   )
 }

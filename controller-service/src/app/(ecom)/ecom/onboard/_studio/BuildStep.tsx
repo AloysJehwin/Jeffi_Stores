@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, WandSparkles, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import CodeContentFields from '@/components/admin/site-builder/CodeContentFields'
@@ -12,6 +12,7 @@ import type { CodeLiteral, LiteralEdit } from '@/lib/site/code/literals'
 import { fieldInput, ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../ui'
 import { AI_UNAVAILABLE, isAiDown, isPriceChanged, isWalletLow, StudioError, studioGet, studioPost, studioStream, studioUrl, WALLET_LOW, type StudioView } from './api'
 import StudioPreview, { DeviceToggle, usePreviewDevice, type PickedSection } from './StudioPreview'
+import VisualStudio from './VisualStudio'
 import type { StudioEvent } from '@/lib/site/studio/types'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 
@@ -251,6 +252,17 @@ export default function BuildStep({
   const [literals, setLiterals] = useState<CodeLiteral[] | null>(null)
   const [unfilled, setUnfilled] = useState<Set<string>>(() => new Set())
   const root = useRef<HTMLDivElement>(null)
+  // The visual editor (a Showcase's page, while site_editor_enabled is on): whether it may open, and whether it is.
+  const [visualOk, setVisualOk] = useState(false)
+  const [visual, setVisual] = useState(false)
+
+  useEffect(() => {
+    if (!showcase) return
+    fetch(studioUrl('design', { check: '1' }), { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setVisualOk(d?.enabled === true))
+      .catch(() => {})
+  }, [showcase])
 
   const pages: ListPage[] = useMemo(
     () => [
@@ -568,6 +580,19 @@ export default function BuildStep({
   // A Showcase has no page list (one page): its section progress shows in the status line and the bar instead.
   const pageSec = showcase && stateOf(home) === 'building' ? section[home] : undefined
 
+  if (visual && showcase && homeReady && !building)
+    return (
+      <VisualStudio
+        session={s}
+        onClose={() => {
+          setVisual(false)
+          setPicked(null)
+          void refresh()
+          setVersion(v => v + 1)
+        }}
+      />
+    )
+
   return (
     <div ref={root}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -668,6 +693,11 @@ export default function BuildStep({
         <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 ecom-scroll-y">
           {homeReady && !building && !aiDown && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
+              {showcase && visualOk && (
+                <button type="button" onClick={() => setVisual(true)} disabled={!!working || editing} className={`${secondaryBtn} px-4 py-2`} title="Click and type on your page itself (beta)">
+                  <WandSparkles className="h-4 w-4" /> Edit on the page
+                </button>
+              )}
               <button type="button" onClick={() => { setPicking(p => !p); setPicked(null) }} disabled={!canTweak || !!working} aria-pressed={picking} className={picking ? `${primaryBtn} px-4 py-2` : `${secondaryBtn} px-4 py-2`}>
                 <MousePointerClick className="h-4 w-4" /> {picking ? 'Click a section…' : 'Change a section'}
               </button>

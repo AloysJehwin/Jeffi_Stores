@@ -20,6 +20,41 @@ AI-generated pages must be editable with it.
 - Contract for phase 2: the visual editor saves a section's tree with `source` empty; source-level editors
   (`literals.ts`, the AI) write `source`, which wins and rebuilds the tree.
 
+**Phase 2 (editor MVP), in slices**
+1. Shell, select, inline text, undo/redo, autosave. `components/site-editor/`: `SiteEditor.tsx` (toolbar, canvas,
+   sections, inspector), `state.ts` (a design history per section plus one undo stack across sections and block-list
+   changes; `docToSave` sends trees with an empty source; `adoptSaved` takes the server's tree when it settled one
+   differently), `host.ts` (load, save, preview URL, upload, publish), `nodes.ts`, `Inspector.tsx`. Admin host:
+   `components/admin/site-builder/VisualEditor.tsx`, opened from a "Visual editor" button in the forms editor (flag on;
+   desktop web layout, saved to phone too while that is the same document), loading through
+   `GET drafts/[id]/editor?key=` and saving through `PUT drafts/[id]`. The canvas reloads, keeping its scroll, only
+   after a save that holds a change it couldn't show itself. `data-e` now also marks Link, Image, Icon and parts drawn
+   as one plain element (`RenderCtx.edit`, `data-e-cmp`).
+2. Style panel and breakpoints. Phone (390, base), Tablet (768, `md:`) and Desktop (1280, `lg:`) canvas widths; the
+   breakpoint shown is the one styled. `StylePanel.tsx`: font (the theme's pair), size, weight, align, text and
+   background colour (theme scales from `paletteFrom` plus any hex), padding, margins, gap, width, max width, min
+   height, rounding; each shows where its value comes from and clears this breakpoint's. Changes go through
+   `setPanelValue` / `classOps`, so wider breakpoints keep their look; the canvas reloads after the save for the CSS.
+3. Layers and reorder. `Layers.tsx`: the page's sections, each code section's elements as a tree (words beside the
+   name, a lock on needed parts, a mark on what store data draws). Rows drag among their siblings with dnd-kit
+   (pointer or keyboard): elements as a design `move`, sections as a block-list step. Nodes filling a slot (a
+   condition's branch, a render function's body) stay put; their contents move. Selecting a row selects on the canvas.
+4. Add, duplicate, delete and pictures. Elements: duplicate and delete (Delete key too), add a heading, paragraph,
+   button, picture, box or divider after the selection (`nodes.ts` `newNode`, all compiler-checked in tests).
+   Sections: add a starter code section, duplicate, delete (at least one stays). Parts the page needs (`locked`,
+   or a classic block the registry locks) can't be duplicated or removed. Pictures swap through the host's own picker
+   (`renderImagePicker`; admin: the media library field), with their description; links get a "goes to" field.
+5. Showcase studio host. `controller-service/.../onboard/_studio/VisualStudio.tsx`, opened by "Edit on the page" in
+   the build step of a Showcase (flag on, page built, no build running). It edits the request's own session (`?site=`
+   from the page, else the session's `site_id`) through `/api/ecom/onboard/studio/design` (GET trees; PUT compiles
+   every tree, keeps the page to code sections with its required parts, saves the session page). The canvas is the
+   studio preview with `editor=1` (`ShowcasePreview` `editing`: `data-block-id`, canvas ids, the bridge). Pictures
+   upload as the Details step's do. Publishing stays the studio's own step, whose compile is v2-aware.
+
+**Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
+scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
+all Showcase owners), since their studio runs on the platform.
+
 ## What exists
 
 - **Page documents.** `PageDoc` (blocks by id plus their order), one per audience × surface × page

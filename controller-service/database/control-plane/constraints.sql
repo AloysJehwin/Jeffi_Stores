@@ -209,3 +209,19 @@ ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_usage_db_
 -- Settled all at once: when, by whom and for how much.
 ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_settled_check
     CHECK ((settled_at IS NULL) = (settled_by IS NULL) AND (settled_at IS NULL) = (charged_inr IS NULL) AND (settled_by IS NULL OR settled_by IN ('run','sweep')));
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_razorpay_key UNIQUE (razorpay_subscription_id);
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_status_check
+    CHECK (status IN ('created','authenticated','active','pending','halted','paused','cancelled','completed','expired','superseded','abandoned'));
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_interval_check CHECK (billing_interval IN ('monthly','yearly'));
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_mode_check CHECK (mode IN ('test','live'));
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_amounts_check CHECK (amount_paise >= 0 AND upfront_paise >= 0);
+ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_kind_check
+    CHECK (kind IN ('store_plan','showcase_site','messaging_addon','ad_free'));
+ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_status_check
+    CHECK (status IN ('trial','awaiting_payment','active','ending','legacy_wallet','ended'));
+ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_amount_check CHECK (amount_paise >= 0 AND (next_amount_paise IS NULL OR next_amount_paise >= 0));
+ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_payment_key UNIQUE (razorpay_payment_id);
+ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_amount_check CHECK (amount_paise >= 0 AND refunded_paise BETWEEN 0 AND amount_paise);

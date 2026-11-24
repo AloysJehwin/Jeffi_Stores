@@ -370,6 +370,17 @@ describe('code_section v2: data-e only in the preview', () => {
     expect(await draw(t.check.ast, 'home', true)).toContain('"data-e":"e1"')
   })
 
+  it('marks parts on the canvas too: Link, Image and Icon roots, a written-out label editable in place', async () => {
+    const src = wrap(`<div><Link href="/products" className="btn">See all</Link><Image src="https://cdn.example.com/a.jpg" alt="A" /><Icon name="arrow-right" /></div>`, `import { Link, Image, Icon } from '@site/ui'`)
+    const t = sectionTree(src, 'home')
+    if (!t?.ok) throw new Error('no tree')
+    const live = await draw(t.check.ast, 'home')
+    const preview = await draw(t.check.ast, 'home', true)
+    expect(live).not.toContain('data-e')
+    expect(preview).toMatch(/"edit":\{"data-e":"e2","data-e-cmp":"","data-e-text":""\}/)
+    expect((preview.match(/"data-e-cmp"/g) ?? []).length).toBe(3)
+  })
+
   it('draws a v1 section on the canvas with the ids the editor loads, in its stored styles', async () => {
     const source = REPRESENTATIVE[0].source
     const v1 = await compileSection(source, { page: 'home' })

@@ -505,3 +505,6 @@ export async function sendShowcaseLeadEmail(
 
 /** A notice about one of the store's licences (not accepted, expiring, expired). Lines and rows are HTML. */
 export const sendComplianceEmail = sendDomainEmail
+
+/** A notice about the workspace's subscription (payment due, halted, trial ending, the switch from the wallet). Lines and rows are HTML. */
+export const sendBillingEmail = sendDomainEmail

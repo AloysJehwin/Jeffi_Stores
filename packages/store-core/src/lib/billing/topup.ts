@@ -26,7 +26,5 @@ export async function creditTopup(p: { tenantId: string; paymentId: string; paid
       amountInr: credit, pricesIncludeGst: false, credited: credit,
     })
   }
-  // Add-ons picked at signup that the wallet could not cover at go-live.
-  if (r.ok) void import('./requested-addons').then(m => m.activateRequestedAddons(p.tenantId)).catch(() => {})
   return r
 }

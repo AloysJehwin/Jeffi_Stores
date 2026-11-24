@@ -13,11 +13,12 @@ const EDITOR = [
   'packages/store-core/src/lib/site/code/classes.ts',
   'packages/store-core/src/components/visitor/site/editor/SiteEditorBridge.tsx',
 ]
+// The editor's shell, its panels and host plumbing (admin, Showcase).
+const SHELL = 'packages/store-core/src/components/site-editor/'
+// App aliases are built from their names: a quoted '@<app>/' literal here would trip app-import-boundaries.
 const ALIAS: [string, string][] = [
   ['@/', 'packages/store-core/src/'],
-  ['@storefront/', 'storefront-service/src/'],
-  ['@showcase/', 'showcase-service/src/'],
-  ['@business/', 'business-service/src/'],
+  ...['storefront', 'showcase', 'business'].map((app): [string, string] => ['@' + app + '/', `${app}-service/src/`]),
 ]
 const PKG: Record<string, string> = { '@jeffi/site-blocks': 'packages/site-blocks/src/index.ts', '@jeffi/site-blocks/design': 'packages/site-blocks/src/design.ts' }
 const EXT = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js']
@@ -80,5 +81,6 @@ describe('the visual editor stays off live pages', () => {
 
   it('never statically imports the editor’s modules', () => {
     expect(EDITOR.filter(f => seen.has(f)).map(f => chain(seen, f))).toEqual([])
+    expect([...seen.keys()].filter(f => f.startsWith(SHELL)).map(f => chain(seen, f))).toEqual([])
   })
 })
