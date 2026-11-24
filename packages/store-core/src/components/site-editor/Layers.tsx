@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type SensorDescriptor, type SensorOptions } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronRight, Database, GripVertical, Lock } from 'lucide-react'
+import { ChevronRight, Database, GripVertical, Lock, Move } from 'lucide-react'
 import type { CodeNode, PageDoc } from '@jeffi/site-blocks'
 import { insideData, nodeName, nodeWords, pathTo } from './nodes'
 
@@ -23,6 +23,9 @@ export interface LayersProps {
   onMoveSection: (block: string, to: number) => void
   /** Before the child at `index` of `parent`, counted before the node leaves its place (design.ts `move`). */
   onMoveNode: (block: string, id: string, parent: string, index: number) => void
+  /** Whether an element is placed freely at the breakpoint being edited ('free'), could be ('flow'), or can't (null). */
+  freeState?: (block: string, id: string) => 'free' | 'flow' | null
+  onToggleFree?: (block: string, id: string) => void
 }
 
 const shown = (n: CodeNode) => n.t !== 'text' && n.t !== 'expr' && !!n.id
@@ -78,6 +81,7 @@ function NodeRow({ block, node, depth, sortable }: { block: string; node: CodeNo
   const s = useSortable({ id, disabled: !sortable || !c.canWrite })
   const words = nodeWords(node, 26)
   const empty = !listOf(node).some(shown) && !slotsOf(node).some(shown)
+  const free = c.freeState?.(block, id) ?? null
   return (
     <div ref={s.setNodeRef} style={{ transform: CSS.Translate.toString(s.transform), transition: s.transition, opacity: s.isDragging ? 0.5 : 1 }}>
       <div className={rowCls(c.sel?.block === block && c.sel.id === id)} style={{ paddingLeft: 6 + depth * 12 }}>
@@ -88,6 +92,19 @@ function NodeRow({ block, node, depth, sortable }: { block: string; node: CodeNo
         </button>
         {'locked' in node && node.locked && <Lock aria-label="Needed on the page" className="h-3 w-3 shrink-0 text-foreground-muted" />}
         {insideData(c.trees[block], id) && <Database aria-label="Drawn from store data" className="h-3 w-3 shrink-0 text-foreground-muted" />}
+        {free && c.onToggleFree && (
+          <button
+            type="button"
+            aria-label="Free placement"
+            aria-pressed={free === 'free'}
+            disabled={!c.canWrite}
+            title={free === 'free' ? 'Placed freely on this screen size: click to put it back in the flow' : 'Place it anywhere in its section on this screen size'}
+            onClick={() => c.onToggleFree?.(block, id)}
+            className={`shrink-0 rounded p-0.5 ${free === 'free' ? 'text-accent-600' : 'text-foreground-muted opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+          >
+            <Move className="h-3 w-3" />
+          </button>
+        )}
         {sortable && c.canWrite && (
           <span {...s.attributes} {...s.listeners} aria-label={`Drag ${nodeName(node)}`} className="shrink-0 cursor-grab text-foreground-muted opacity-0 group-hover:opacity-100 focus:opacity-100">
             <GripVertical className="h-3.5 w-3.5" />

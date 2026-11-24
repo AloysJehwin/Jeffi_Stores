@@ -1,13 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Monitor, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, X } from 'lucide-react'
+import { Copy, Monitor, Move, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, X } from 'lucide-react'
 import { insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
 import { DesignError, findNode, freshId, treeIds, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
 import Layers from './Layers'
+import FreePanel from './FreePanel'
+import { canFree, layerAt, placeOps, restackOps, unplaceOps } from './free-ops'
+import type { FreeRect } from '@/lib/site/code/free'
 import { hasLocked, insertPlace, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
 import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
@@ -30,6 +33,8 @@ const BREAKPOINTS = [
 ] as const
 
 type Selection = { block: string; id: string | null } | null
+/** The canvas's answer to `measure`: the element's box in % of its frame, the frame's node id and height in px. */
+type Measured = { rect: Required<FreeRect> | null; frame: string | null; frameHeight: number | null }
 type Status = { kind: 'idle' | 'pending' | 'saving' | 'saved' } | { kind: 'error'; message: string }
 
 export default function SiteEditor({ host }: { host: SiteEditorHost }) {
@@ -52,6 +57,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const scrollY = useRef(0)
   const seq = useRef({ n: 0, sent: new Map<number, number>() })
+  const measures = useRef({ n: 0, wait: new Map<number, (m: Measured | null) => void>() })
 
   useEffect(() => {
     let stop = false
@@ -229,6 +235,48 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }
   /** A style property at the breakpoint being edited, as per-breakpoint class operations. New classes need the
    * section's CSS compiled again, so the canvas reloads after the save. */
+  // ── Free layers ──
+  /** An element's box in % of its frame, as the canvas measures it. */
+  const measure = (block: string, id: string) =>
+    new Promise<Measured | null>(resolve => {
+      const req = ++measures.current.n
+      const done = (m: Measured | null) => (measures.current.wait.delete(req), resolve(m))
+      measures.current.wait.set(req, done)
+      post({ type: 'measure', block, id, req })
+      setTimeout(() => done(null), 2000)
+    })
+  /** In the flow at this breakpoint: placed where it sits now, on top of the section's other layers. Placed: back. */
+  const toggleFree = async (block: string, id: string) => {
+    const tree = treeAt(block)
+    if (!tree || !canFree(tree, id)) return
+    if (layerAt(tree, id, bp)) {
+      if (edit(block, unplaceOps(tree, id, bp))) post({ type: 'place', block, id, rect: null })
+      return requestReload()
+    }
+    const m = await measure(block, id)
+    if (!m?.rect) return say('Show that element on the canvas first (it may be hidden at this screen size)')
+    const rect: FreeRect = { left: Math.round(m.rect.left), top: Math.round(m.rect.top), width: Math.round(m.rect.width) }
+    const now = treeAt(block)
+    if (!now || !update(s => editSection(s, block, placeOps(now, id, bp, rect, { frame: m.frame, frameHeight: m.frameHeight })))) return
+    post({ type: 'place', block, id, rect, frame: m.frame, frameMinHeight: m.frameHeight })
+    requestReload()
+    select(block, id)
+  }
+  /** A free layer's new place, typed or dragged (`shown`: the canvas already shows it). */
+  const placeLayer = (block: string, id: string, rect: FreeRect, shown = false) => {
+    const tree = treeAt(block)
+    if (!tree) return
+    const ops = placeOps(tree, id, bp, rect)
+    if (!ops.length || !update(s => editSection(s, block, ops))) return
+    if (!shown) post({ type: 'place', block, id, rect })
+    requestReload()
+  }
+  const restackLayer = (block: string, id: string, dir: 'front' | 'back' | 'forward' | 'backward') => {
+    const tree = treeAt(block)
+    if (!tree) return
+    if (edit(block, restackOps(tree, id, bp, dir))) requestReload()
+  }
+
   const style = (block: string, id: string, prop: PanelProp, value: string | null) => {
     const node = findNode(latest.current.state?.trees[block]?.tree ?? { t: 'frag', children: [] }, id)?.node
     if (!node || !isTagNode(node)) return
@@ -249,7 +297,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   handlers.current = m => {
     const kind = String(m.type).slice(P.length)
     if (kind === 'ready') {
-      post({ type: 'mode', on: true })
+      post({ type: 'mode', on: true, write: hostRef.current.canWrite })
       const at = latest.current.sel
       if (at) post({ type: 'select', block: at.block, id: at.id })
       if (scrollY.current) post({ type: 'scroll-to', y: scrollY.current })
@@ -262,6 +310,14 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       seq.current.sent.delete(m.seq)
       if (want !== undefined && (!Array.isArray(m.ops) || m.ops.length < want)) requestReload()
     } else if (kind === 'scroll' && typeof m.y === 'number') scrollY.current = m.y
+    else if (kind === 'measured' && typeof m.req === 'number') measures.current.wait.get(m.req)?.(m as unknown as Measured)
+    else if (kind === 'placed' && typeof m.block === 'string' && typeof m.id === 'string' && m.rect && typeof m.rect === 'object' && hostRef.current.canWrite) {
+      // Dragged on the canvas: its height counts once resized, or when it already had one.
+      const r = m.rect as Required<FreeRect>
+      const tree = treeAt(m.block)
+      const had = tree ? layerAt(tree, m.id, bp)?.rect.height !== undefined : false
+      placeLayer(m.block, m.id, { left: r.left, top: r.top, width: r.width, ...(m.sized || had ? { height: r.height } : {}) }, true)
+    }
     else if (kind === 'key') {
       if (m.action === 'undo' || m.action === 'redo') step(m.action)
       if (m.action === 'escape') setSel(null)
@@ -394,6 +450,11 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               edit(id, [{ op: 'move', id: node, parent, index }])
               requestReload()
             }}
+            freeState={(block, id) => {
+              const tree = trees[block]
+              return !tree || !canFree(tree, id) ? null : layerAt(tree, id, bp) ? 'free' : 'flow'
+            }}
+            onToggleFree={(block, id) => void toggleFree(block, id)}
           />
         </aside>
 
@@ -445,6 +506,22 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onDelete={() => deleteNode(sel.block, sel.id!)}
               renderImagePicker={host.renderImagePicker}
             >
+              {layerAt(tree, sel.id, bp) && (
+                <FreePanel
+                  key={`${bp}:${JSON.stringify(layerAt(tree, sel.id, bp))}`}
+                  layer={layerAt(tree, sel.id, bp)!}
+                  bp={bp}
+                  canWrite={host.canWrite}
+                  onRect={rect => placeLayer(sel.block, sel.id!, rect)}
+                  onRestack={dir => restackLayer(sel.block, sel.id!, dir)}
+                  onFlow={() => void toggleFree(sel.block, sel.id!)}
+                />
+              )}
+              {!layerAt(tree, sel.id, bp) && canFree(tree, sel.id) && host.canWrite && (
+                <button type="button" className={smallBtn} onClick={() => void toggleFree(sel.block, sel.id!)} title="Place it anywhere in its section on this screen size; narrower screens keep it in the flow">
+                  <Move className="h-3.5 w-3.5" /> Free placement
+                </button>
+              )}
               {styleable(tree, sel.id) !== null && (
                 <StylePanel key={bp} className={styleable(tree, sel.id) ?? ''} bp={bp} theme={host.theme} canWrite={host.canWrite} onChange={(prop, value) => style(sel.block, sel.id!, prop, value)} />
               )}

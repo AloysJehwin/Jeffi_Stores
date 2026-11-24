@@ -120,8 +120,10 @@ export function frameFor(className: string, bp: Breakpoint, heightPx: number | n
 /** Layers in a frame ordered back to front: a z among theirs, one step past the top or under the bottom. */
 export function restack(zs: number[], z: number, dir: 'front' | 'back' | 'forward' | 'backward'): number {
   const sorted = [...new Set(zs)].sort((a, b) => a - b)
-  if (dir === 'front') return Math.min(50, (sorted[sorted.length - 1] ?? z) + 10)
-  if (dir === 'back') return Math.max(0, (sorted[0] ?? z) - 10)
+  const top = sorted[sorted.length - 1] ?? z
+  const bottom = sorted[0] ?? z
+  if (dir === 'front') return z === top ? z : Math.min(50, top + 10)
+  if (dir === 'back') return z === bottom ? z : Math.max(0, bottom - 10)
   const i = sorted.indexOf(z)
   const other = dir === 'forward' ? sorted[i + 1] : sorted[i - 1]
   if (other === undefined) return z
