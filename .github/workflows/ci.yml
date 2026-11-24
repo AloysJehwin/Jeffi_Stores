@@ -286,8 +286,8 @@ jobs:
           # Standalone services run their own vitest with their own coverage gate (not merged into the root parts).
           - { app: messaging, run: npm --prefix messaging-service test -- --coverage }
           - { app: documents, run: npm --prefix document-service test -- --coverage }
-          - { app: public-api, run: npm --prefix public-api-service test -- --coverage --passWithNoTests }
-          - { app: mobile, run: npm --prefix mobile-service test -- --coverage --passWithNoTests }
+          - { app: public-api, run: npm --prefix public-api-service test -- --coverage }
+          - { app: mobile, run: npm --prefix mobile-service test -- --coverage }
           - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform test -- --coverage }
     steps:
       - uses: actions/checkout@v4
@@ -500,6 +500,8 @@ jobs:
       - uses: ./.github/actions/node-setup
       - run: npm --prefix ${{ matrix.service == 'documents' && 'document' || matrix.service }}-service test
       - run: npm run check:service-routes
+      - if: strategy.job-index == 0
+        run: npm run test:service-routes
 
   # Shrink-only allowlists: a component or route without a test fails unless it is listed, and the manifest the
   # affected-only matrix reads is current.
