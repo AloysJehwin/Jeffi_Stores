@@ -4,24 +4,27 @@
 // Needs the admin and the storefront on one origin (the dev router, :3000), as the editor's canvas does:
 //   SITE_EDITOR_E2E=1 UI_BASE_URL=http://localhost:3000 npx playwright test --config playwright.ui.config.ts admin-service/ui-tests/site-editor
 import { test, expect, type Page } from '@playwright/test'
-import { ADMIN_BASE, E2E_ON, E2E_SKIP, HERO_HEADING, draftHome, expectSaved, openEditor, seedDown, seedUp, type Seeded } from '../../../tests/site-editor/e2e'
+import { E2E_ON, E2E_SKIP, HERO_HEADING, draftHome, expectSaved, adminPage, openEditor, seedDown, seedUp, type Seeded } from '../../../tests/site-editor/e2e'
 
 test.describe('visual editor in the Site Builder (UI)', () => {
   test.skip(!E2E_ON, E2E_SKIP)
   test.describe.configure({ mode: 'serial' })
   let s: Seeded
-  test.beforeAll(() => {
+  let page: Page
+  // One browser for the file: the seeded admin session binds to the first browser that uses it (session binding).
+  test.beforeAll(async ({ browser }) => {
     s = seedUp()
+    page = await adminPage(browser, s)
   })
-  test.afterAll(() => seedDown())
-  test.beforeEach(async ({ context }) => {
-    await context.addCookies([{ name: 'admin_sid', value: s.sid, url: ADMIN_BASE }])
+  test.afterAll(async () => {
+    await page?.context().close()
+    seedDown()
   })
 
   const open = (page: Page) => openEditor(page, s)
   const saved = expectSaved
 
-  test('opens the draft in the visual editor, saves a change typed on the page, and undoes it', async ({ page }) => {
+  test('opens the draft in the visual editor, saves a change typed on the page, and undoes it', async () => {
     const frame = await open(page)
     await expect(page.getByRole('button', { name: 'Classic editor' })).toBeVisible()
     const heading = frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)
@@ -37,7 +40,7 @@ test.describe('visual editor in the Site Builder (UI)', () => {
     expect(JSON.stringify((await draftHome(page, s)).blocks[s.blocks.hero].props.tree)).toContain(HERO_HEADING)
   })
 
-  test('opens a classic block’s fields, converts it to an editable section, and keeps its words', async ({ page }) => {
+  test('opens a classic block’s fields, converts it to an editable section, and keeps its words', async () => {
     const frame = await open(page)
     await frame.locator(`[data-block-id="${s.blocks.classic}"]`).click()
     await expect(page.getByText(/A classic block: it moves and goes as one piece/)).toBeVisible()
@@ -51,7 +54,7 @@ test.describe('visual editor in the Site Builder (UI)', () => {
     await expect(frame.locator(`[data-block-id="${s.blocks.classic}"] h2`)).toHaveText('A classic block', { timeout: 30_000 })
   })
 
-  test('the classic editor is a fallback: the forms, then back to the visual editor', async ({ page }) => {
+  test('the classic editor is a fallback: the forms, then back to the visual editor', async () => {
     await open(page)
     await page.getByRole('button', { name: 'Classic editor' }).click()
     await expect(page.getByRole('button', { name: 'Visual editor' })).toBeVisible()

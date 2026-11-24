@@ -5,23 +5,24 @@
 //   SITE_EDITOR_E2E=1 UI_BASE_URL=http://localhost:3000 npx playwright test --config playwright.ui.config.ts admin-service/ui-tests/site-editor/ai.spec.ts
 import { test, expect, type Page } from '@playwright/test'
 import { AI_MOCK_PORT, MOCK, startAiMock, type MockCall } from '../../../tests/site-editor/ai-mock'
-import { E2E_ON, E2E_SKIP, HERO_HEADING, ADMIN_BASE, canvasReady, draftHome, expectSaved, openEditor, seedDown, seedUp, type Seeded } from '../../../tests/site-editor/e2e'
+import { E2E_ON, E2E_SKIP, HERO_HEADING, canvasReady, draftHome, expectSaved, adminPage, openEditor, seedDown, seedUp, type Seeded } from '../../../tests/site-editor/e2e'
 
 test.describe('visual editor AI (UI)', () => {
   test.skip(!E2E_ON, E2E_SKIP)
   test.describe.configure({ mode: 'serial' })
   let s: Seeded
   let mock: Awaited<ReturnType<typeof startAiMock>>
-  test.beforeAll(async () => {
+  let page: Page
+  // One browser for the file: the seeded admin session binds to the first browser that uses it (session binding).
+  test.beforeAll(async ({ browser }) => {
     s = seedUp()
     mock = await startAiMock()
+    page = await adminPage(browser, s)
   })
   test.afterAll(async () => {
+    await page?.context().close()
     await mock?.close()
     seedDown()
-  })
-  test.beforeEach(async ({ context }) => {
-    await context.addCookies([{ name: 'admin_sid', value: s.sid, url: ADMIN_BASE }])
   })
 
   const status = (page: Page) => page.locator('[data-site-editor] span[role="status"]')
@@ -34,7 +35,7 @@ test.describe('visual editor AI (UI)', () => {
   const said = (c: MockCall, role: string) => (c.body.messages ?? []).filter(m => m.role === role).map(m => m.content).join('\n')
   const tree = async (page: Page, block = s.blocks.hero) => JSON.stringify((await draftHome(page, s)).blocks[block].props.tree)
 
-  test('Change with AI rewrites the selection as one undoable change and lights up what it touched', async ({ page }) => {
+  test('Change with AI rewrites the selection as one undoable change and lights up what it touched', async () => {
     const frame = await openEditor(page, s)
     const heading = frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)
     await heading.click()
@@ -57,7 +58,7 @@ test.describe('visual editor AI (UI)', () => {
     expect(await tree(page)).toContain(HERO_HEADING)
   })
 
-  test('element actions rewrite, shorten and translate words, and find a picture for an image slot', async ({ page }) => {
+  test('element actions rewrite, shorten and translate words, and find a picture for an image slot', async () => {
     const frame = await openEditor(page, s)
     const heading = frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)
     await heading.click()
@@ -93,7 +94,7 @@ test.describe('visual editor AI (UI)', () => {
     await expectSaved(page)
   })
 
-  test('the page check fixes a missing picture description and shortens words with AI', async ({ page }) => {
+  test('the page check fixes a missing picture description and shortens words with AI', async () => {
     const frame = await openEditor(page, s)
     await frame.locator(`[data-block-id="${s.blocks.hero}"] img`).first().click()
     const alt = page.getByLabel('Description (read aloud)')
@@ -127,7 +128,7 @@ test.describe('visual editor AI (UI)', () => {
     expect(await tree(page)).toContain('Our workshop')
   })
 
-  test('Check screen sizes finds what runs past the screen at Phone, Tablet and Desktop', async ({ page }) => {
+  test('Check screen sizes finds what runs past the screen at Phone, Tablet and Desktop', async () => {
     const frame = await openEditor(page, s)
     await page.getByRole('button', { name: /^Check page/ }).click()
     const sizes = page.getByRole('region', { name: 'Screen sizes' })
@@ -150,7 +151,7 @@ test.describe('visual editor AI (UI)', () => {
     await expectSaved(page)
   })
 
-  test('designing a page changed by hand again asks first and sends the owner’s words with the brief', async ({ page }) => {
+  test('designing a page changed by hand again asks first and sends the owner’s words with the brief', async () => {
     await openEditor(page, s)
     await page.getByRole('button', { name: 'Classic editor' }).click()
     // The panel's AI tab (the admin's side menu has an AI group before it).
@@ -166,7 +167,13 @@ test.describe('visual editor AI (UI)', () => {
     await expect.poll(() => chats(c => /You write ONE section/.test(said(c, 'system')) && said(c, 'user').includes(`"${HERO_HEADING}"`)).length, { timeout: 90_000 }).toBeGreaterThan(0)
     await expect(page.getByText(/Designed again\.|could not design this page again/)).toBeVisible({ timeout: 180_000 })
     await expect(page.getByText(/Designed again\./)).toBeVisible()
+    // The page is the new design, written with the first of the kept words.
+    // (Change with AI's tweaks share the section writer's system prompt; the redo's calls carry the kept words.)
+    const ask = chats(c => /You write ONE section/.test(said(c, 'system')) && said(c, 'user').includes('reuse them as written'))[0]
+    const kept = ask && /reuse them as written[^:]*: "([^"]+)"/.exec(said(ask, 'user'))?.[1]
+    expect(kept).toBeTruthy()
     const home = await draftHome(page, s)
-    expect(home.order.some(id => JSON.stringify(home.blocks[id].props.tree ?? home.blocks[id].props.compiled ?? '').includes(HERO_HEADING))).toBe(true)
+    expect(home.order).not.toContain(s.blocks.hero)
+    expect(JSON.stringify(home)).toContain(kept!)
   })
 })

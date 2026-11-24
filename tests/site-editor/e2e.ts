@@ -2,7 +2,7 @@
 // site-editor): the seed (seed.ts, under tsx, since it reaches store-core) and the canvas message log. Opt in with
 // SITE_EDITOR_E2E=1: they switch site_editor_enabled on and write drafts, on jeffi_test only.
 import fs from 'node:fs'
-import { expect, type FrameLocator, type Page } from '@playwright/test'
+import { expect, type Browser, type FrameLocator, type Page } from '@playwright/test'
 import { runTsx } from '../responsive/tsx'
 
 export const E2E_ON = process.env.SITE_EDITOR_E2E === '1'
@@ -50,6 +50,13 @@ export async function nextMessage(page: Page, type: string, where: Record<string
     { timeout }
   )
   return (await handle.jsonValue()) as Msg
+}
+
+/** A page signed in as the seeded admin, in a browser of its own for a whole spec file. */
+export async function adminPage(browser: Browser, s: Seeded): Promise<Page> {
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } })
+  await context.addCookies([{ name: 'admin_sid', value: s.sid, url: ADMIN_BASE }])
+  return context.newPage()
 }
 
 /** The seeded draft in the admin Site Builder, open in the visual editor, its hero drawn on the canvas. */
