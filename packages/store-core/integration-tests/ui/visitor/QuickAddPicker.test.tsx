@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+// motion runs the sheet's entry through the Web Animations API; happy-dom cancels it on unmount and the
+// rejected `finished` surfaced as unhandled AbortErrors that failed the whole run. A plain div is enough here.
+vi.mock('motion/react', () => ({
+  useReducedMotion: () => false,
+  motion: { div: ({ initial: _i, animate: _a, transition: _t, ...rest }: any) => <div {...rest} /> },
+}))
 const addToCart = vi.fn()
 let cartItems: any[] = []
 vi.mock('@/contexts/CartContext', () => ({ useCart: () => ({ addToCart, cartItems }) }))
