@@ -1,19 +1,6 @@
 {
   "owners": {
     "admin-service": [
-      "admin-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx",
-      "admin-service/src/app/(admin)/admin/business/rfqs/[id]/RFQDetailClient.tsx",
-      "admin-service/src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx",
-      "admin-service/src/app/(admin)/admin/campaigns/new/NewCampaignClient.tsx",
-      "admin-service/src/app/(admin)/admin/campaigns/scenarios/[kind]/ScenarioDetailClient.tsx",
-      "admin-service/src/app/(admin)/admin/campaigns/scenarios/new/NewScenarioClient.tsx",
-      "admin-service/src/app/(admin)/admin/cash-sale/CashSaleClient.tsx",
-      "admin-service/src/app/(admin)/admin/catalog-enrichment/CatalogEnrichmentClient.tsx",
-      "admin-service/src/app/(admin)/admin/categories/CategoriesClient.tsx",
-      "admin-service/src/app/(admin)/admin/controls/ControlsClient.tsx",
-      "admin-service/src/app/(admin)/admin/dashboard/_components/AnalyticsDashboardClient.tsx",
-      "admin-service/src/app/(admin)/admin/delhivery/DelhiveryPageClient.tsx",
-      "admin-service/src/app/(admin)/admin/inflation/InflationClient.tsx",
       "admin-service/src/app/(admin)/admin/inventory/InventoryClient.tsx",
       "admin-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx",
       "admin-service/src/app/(admin)/admin/invoices/[id]/InvoiceDetailClient.tsx",
