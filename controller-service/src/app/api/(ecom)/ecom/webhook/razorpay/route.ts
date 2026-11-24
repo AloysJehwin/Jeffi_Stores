@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature } from '@controller/lib/payments/razorpay-subscriptions'
-import { applyPendingPlan, getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
+import { applyPendingPlan, getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool, stopProvisioningJob } from '@/lib/tenant-registry'
 import { invalidatePlanCache } from '@/lib/auth/plan-gate'
 import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
@@ -18,6 +18,8 @@ async function autoDeprovision(tenantId: string, slug: string): Promise<void> {
     .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
     .catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id ?? null
+  // A build still going is stopped first, as the operator's Stop & deprovision does, so the teardown never reads as a finished build.
+  await stopProvisioningJob(tenantId, 'stopped: the subscription ended').catch(() => false)
   await triggerProvisioning({
     action: 'deprovision',
     tenantId,

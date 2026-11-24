@@ -56,7 +56,7 @@ export default function KycActionButtons({
 
   if (blocked) {
     return (
-      <div className="w-full sm:w-96">
+      <div className="w-full basis-full">
         <KybBlocked
           block={blocked}
           forceLabel={mode === 'retry' ? 'Continue anyway' : 'Approve anyway'}

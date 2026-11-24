@@ -36,6 +36,8 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
   // Find the tenant and verify subscription status with Razorpay.
   const tenants = await getOwnerTenants(owner.id)
   const tenant = tenantSlug ? tenants.find(t => t.slug === tenantSlug) : tenants[0]
+  // Deprovisioned since checkout: /onboard says so; this page would say it is being set up.
+  if (tenant?.status === 'terminated') redirect('/onboard')
 
   let paidNow = false
   if (tenant && tenant.razorpay_subscription_id && tenant.status !== 'active' && tenant.status !== 'provisioning') {

@@ -17,7 +17,7 @@ describe('Showcase enquiries', () => {
     query.mockResolvedValueOnce({ rows: [ROW] })
     const lead = await insertShowcaseLead('site-1', { name: 'Priya', phone: '', email: 'priya@example.com', message: '' })
     expect(query.mock.calls[0][0]).toMatch(/INSERT INTO showcase_leads/)
-    expect(query.mock.calls[0][1]).toEqual(['site-1', 'Priya', null, 'priya@example.com', null])
+    expect(query.mock.calls[0][1]).toEqual(['site-1', 'Priya', null, 'priya@example.com', null, null])
     expect(lead).toEqual({ id: 'lead-1', siteId: 'site-1', name: 'Priya', phone: null, email: 'priya@example.com', message: null, createdAt: '2026-11-18T10:00:00.000Z', readAt: null })
   })
 

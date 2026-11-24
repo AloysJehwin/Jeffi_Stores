@@ -370,12 +370,12 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
       className = s ? marked(s, env) : undefined
     } else raw[k] = k === 'href' && typeof val === 'string' ? liveHref(val, env) : liveLinks(val, env)
   }
-  // Its class props (itemClassName, inputClassName…) carry the mark too, unless that takes one past its length cap.
-  const classProps = env.mark ? Object.keys(raw).filter(k => k.endsWith('ClassName') && typeof raw[k] === 'string' && raw[k] !== '') : []
-  let parsed = classProps.length ? def.props.safeParse({ ...raw, ...Object.fromEntries(classProps.map(k => [k, marked(raw[k] as string, env)])) }) : null
-  if (!parsed?.success) parsed = def.props.safeParse(raw)
+  const parsed = def.props.safeParse(raw)
   if (!parsed.success) return null
-  if (def.name === 'Link' && deadAnchor((parsed.data as { href?: unknown }).href, env.anchors)) return null
+  // Its class props (itemClassName…) take the mark too, after the length caps, so one near its cap keeps its styles.
+  const own: Record<string, unknown> = { ...(parsed.data as Record<string, unknown>) }
+  if (env.mark) for (const [k, v] of Object.entries(own)) if (k.endsWith('ClassName') && typeof v === 'string' && v !== '') own[k] = marked(v, env)
+  if (def.name === 'Link' && deadAnchor(own.href, env.anchors)) return null
   const children = kids(node.children, env)
   if (def.name === 'Link' && Array.isArray(node.children) && node.children.some(c => holdsLink(c)))
     return createElement('span', { ...(key != null ? { key } : {}), ...(className ? { className } : {}) }, ...children)
@@ -392,7 +392,7 @@ function renderCmp(node: Extract<CodeNode, { t: 'cmp' }>, env: Env, key?: Key): 
   }
   let out: ReactNode | Promise<ReactNode>
   try {
-    out = def.render({ ...(parsed.data as Record<string, unknown>), ...(className ? { className } : {}) }, ctx)
+    out = def.render({ ...own, ...(className ? { className } : {}) }, ctx)
   } catch (err) {
     console.error('[code-section]', def.name, err)
     return null

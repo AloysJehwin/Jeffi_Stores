@@ -191,6 +191,9 @@ ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions
     CHECK (status IN ('brief','plan','direction','building','ready','failed'));
 ALTER TABLE ONLY public.site_studio_sessions ADD CONSTRAINT site_studio_sessions_tweaks_today_check
     CHECK (tweaks_today >= 0);
+ALTER TABLE ONLY public.site_studio_corrections ADD CONSTRAINT site_studio_corrections_pkey PRIMARY KEY (owner_id, day);
+ALTER TABLE ONLY public.site_studio_corrections ADD CONSTRAINT site_studio_corrections_used_check
+    CHECK (used >= 0);
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_tenant_doc_key UNIQUE (tenant_id, doc_type);
 ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compliance_documents_status_check

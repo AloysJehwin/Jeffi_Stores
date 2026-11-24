@@ -165,6 +165,19 @@ export interface PipelineOptions {
   restore: boolean
   /** The job seeds a starter catalogue (seedProfile, no restore). */
   seed: boolean
+  /** What build_site will install (steps.ts onboardingSite), for its label; the pre-built site when unset. */
+  site?: SiteChoice
+}
+
+/** theme: the default pre-built site; studio-*: a site made in the onboarding studio; ai: built from the brief. */
+export type SiteChoice = 'theme' | 'studio-theme' | 'studio-ai' | 'ai' | 'none'
+
+const SITE_LABEL: Record<SiteChoice, string> = {
+  theme: 'Set up your pre-built site',
+  'studio-theme': 'Set up your pre-built site',
+  'studio-ai': 'Install your AI-designed site',
+  ai: 'Build your site with AI',
+  none: 'Keep the standard pages',
 }
 
 type DbMode = 'shared' | 'dedicated' | 'node'
@@ -227,10 +240,11 @@ export function buildPipeline(spec: { db: { mode: DbMode } }, plan: string | nul
   // The platform's cron fan-out reaches the store's pods: checked once it is live (a store host answers only then).
   if (opts.engine === 'k8s' && opts.provider === 'aws')
     jobs.push({ id: 'crons', label: 'Scheduled jobs', steps: [step('connect_crons', 'Connect scheduled jobs')] })
-  // The AI builds the store's first site from the owner's onboarding brief, once its admin answers. A restored
-  // store keeps the site its backup holds.
+  // The store's first site, once its admin answers: the pre-built theme (the default), the site the owner made in
+  // the onboarding studio, or one the AI builds from their brief; the label says which. A restored store keeps the
+  // site its backup holds.
   if (opts.engine === 'k8s' && opts.provider === 'aws' && !opts.restore)
-    jobs.push({ id: 'site', label: 'Your site', steps: [step('build_site', 'Build your site with AI')] })
+    jobs.push({ id: 'site', label: 'Your site', steps: [step('build_site', SITE_LABEL[opts.site ?? 'theme'])] })
   return { v: 2, jobs }
 }
 

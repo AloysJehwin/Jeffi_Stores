@@ -8,6 +8,7 @@ import { showcaseSiteData } from '@/lib/showcase/site-data'
 import { currentSite, liveView, siteOrigin } from '@showcase/lib/site'
 import { localBusinessJsonLd, siteMetadata } from '@showcase/lib/seo'
 import Paused from './Paused'
+import Tracker from './Tracker'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +80,7 @@ export default async function ShowcasePage({ searchParams }: { searchParams: Pro
         <LeadNotice state={lead} why={why} />
         <main>{body}</main>
       </div>
+      <Tracker />
     </>
   )
 }

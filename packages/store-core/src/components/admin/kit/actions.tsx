@@ -30,13 +30,21 @@ const VARIANT = {
   danger: 'border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10',
 }
 
-/** One action as a 32px button or link; disabled (not hidden) without write scope. */
-export function ActionButton({ action, variant = 'secondary' }: { action: KitAction; variant?: 'primary' | 'secondary' }) {
+/** One action as a 32px (40px with size lg) button or link; disabled (not hidden) without write scope. */
+export function ActionButton({
+  action,
+  variant = 'secondary',
+  size = 'md',
+}: {
+  action: KitAction
+  variant?: 'primary' | 'secondary'
+  size?: 'md' | 'lg'
+}) {
   const confirm = useConfirm()
   const allowed = useCanWrite(action.scope ?? 'none')
   const [running, setRunning] = useState(false)
   const disabled = action.disabled || action.busy || running || (!!action.scope && !allowed)
-  const cls = `control-md whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none ${action.danger ? VARIANT.danger : VARIANT[variant]}`
+  const cls = `${size === 'lg' ? 'control-lg' : 'control-md'} whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none ${action.danger ? VARIANT.danger : VARIANT[variant]}`
   const Icon = action.busy || running ? Loader2 : action.icon
   const inner = (
     <>

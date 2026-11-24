@@ -60,42 +60,48 @@ export function KybBlocked({
   forceLabel?: string
 }) {
   const services = Object.entries(block.missing)
+  // Full width under the row it blocks: what is missing on the left, the two choices stacked on the right.
   return (
-    <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs min-w-0">
-      <p className="font-medium text-foreground break-words">{block.error || 'The business’s KYB isn’t complete.'}</p>
-      {services.length > 0 && (
-        <ul className="mt-2 space-y-1.5">
-          {services.map(([s, items]) => (
-            <li key={s} className="min-w-0">
-              <span className="font-medium text-foreground">{SERVICE_LABEL[s as KybService] ?? s}</span>
-              <ul className="mt-0.5 space-y-0.5 text-foreground-muted">
-                {items.map(m => (
-                  <li key={m.item} className="break-words">
-                    {m.label}
-                    {m.problem ? `: ${m.problem}` : ''}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <ActionButton
-          action={{
-            label: forceLabel,
-            icon: Check,
-            danger: true,
-            onClick: onForce,
-            confirm: {
-              title: `${forceLabel}?`,
-              message: 'The KYB isn’t complete. Do this only for a business you have verified another way. What is missing stays on the owner’s Business verification page.',
-              confirmLabel: forceLabel,
-              variant: 'danger',
-            },
-          }}
-        />
-        <ActionButton action={{ label: 'Cancel', onClick: onCancel }} />
+    <div role="alert" className="w-full min-w-0 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm sm:p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground break-words">{block.error || 'The business’s KYB isn’t complete.'}</p>
+          {services.length > 0 && (
+            <ul className={`mt-3 grid gap-3 ${services.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+              {services.map(([s, items]) => (
+                <li key={s} className="min-w-0">
+                  <span className="font-medium text-foreground">{SERVICE_LABEL[s as KybService] ?? s}</span>
+                  <ul className="mt-1 space-y-1 text-foreground-muted">
+                    {items.map(m => (
+                      <li key={m.item} className="break-words">
+                        {m.label}
+                        {m.problem ? `: ${m.problem}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 md:w-52 md:shrink-0 md:flex-col md:items-stretch">
+          <ActionButton
+            size="lg"
+            action={{
+              label: forceLabel,
+              icon: Check,
+              danger: true,
+              onClick: onForce,
+              confirm: {
+                title: `${forceLabel}?`,
+                message: 'The KYB isn’t complete. Do this only for a business you have verified another way. What is missing stays on the owner’s Business verification page.',
+                confirmLabel: forceLabel,
+                variant: 'danger',
+              },
+            }}
+          />
+          <ActionButton size="lg" action={{ label: 'Cancel', onClick: onCancel }} />
+        </div>
       </div>
     </div>
   )

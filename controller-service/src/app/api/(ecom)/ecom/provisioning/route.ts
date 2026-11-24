@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { controlPlanePool, getOwnerTenants, getProvisioningJob } from '@/lib/tenant-registry'
+import { loadSetupOutcome } from '@/lib/tenant-registry/provisioning'
 import { cancelSubscription } from '@controller/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning, resolveRestoreKey } from '@controller/lib/provisioning/trigger'
 import { describePipeline, ownerPipelineView } from '@controller/lib/provisioning/pipeline-view'
@@ -27,7 +28,10 @@ const Schema = z.object({
   tenantId: z.string().uuid(),
 })
 
-/** The owner's view of their store's setup: step labels, states and timing only. */
+/**
+ * The owner's view of their store's setup: step labels, states and timing only. A stopped or deprovisioned store
+ * returns `outcome` (stopped / deprovisioned / archived, and what was kept) and no pipeline.
+ */
 export async function GET(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
@@ -36,7 +40,12 @@ export async function GET(request: NextRequest) {
   const tenantId = z.string().uuid().safeParse(request.nextUrl.searchParams.get('tenantId'))
   if (!tenantId.success) return NextResponse.json({ error: 'tenantId is required' }, { status: 400 })
   const tenants = await getOwnerTenants(owner.id)
-  if (!tenants.some(t => t.id === tenantId.data)) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  const tenant = tenants.find(t => t.id === tenantId.data)
+  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+
+  // First: a closed store's last job can still read done (stops made before they stuck were marked done).
+  const outcome = await loadSetupOutcome(tenant, owner.id, tenants)
+  if (outcome) return NextResponse.json({ pipeline: null, outcome })
 
   const job = await getProvisioningJob(tenantId.data)
   if (!job) return NextResponse.json({ pipeline: null })

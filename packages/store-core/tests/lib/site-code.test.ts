@@ -2,6 +2,7 @@ import type { PageDoc } from '@jeffi/site-blocks'
 import { describe, it, expect, vi } from 'vitest'
 import { cloneElement, createElement, isValidElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import path from 'path'
 import postcss from 'postcss'
 import { z } from 'zod'
 
@@ -432,5 +433,23 @@ describe('code sections: the interpreter re-checks the AST', () => {
     const css = inertCss('a{b:c}</style><script>alert(1)</script>@import url(https://x);.x{background:url(https://evil)}')
     expect(css).not.toContain('<')
     expect(css).not.toMatch(/@import|url\(/i)
+  })
+})
+
+describe('code sections: every class they draw is styled', () => {
+  const ROOT = path.resolve(__dirname, '../../../..')
+  // The parts' own default classes come from the app's stylesheet: the studio preview lost the Carousel's md: width.
+  it.each(['controller-service', 'storefront-service', 'business-service', 'showcase-service'])('%s scans the code parts', async app => {
+    const { content } = (await import(path.join(ROOT, app, 'tailwind.config.ts'))).default as { content: string[] }
+    expect(content).toEqual(
+      expect.arrayContaining([path.join(ROOT, 'packages/store-core/src/components/**/*.{js,ts,jsx,tsx,mdx}'), path.join(ROOT, 'packages/store-core/src/lib/site/code/**/*.{ts,tsx}')])
+    )
+  })
+
+  it('marks a class prop written up to its length cap', async () => {
+    const item = 'rounded-xl p-4 '.repeat(13).trim()
+    const r = check(wrap(`<Products itemClassName="${item}" className="grid">{p => <span className="block">{p.name}</span>}</Products>`))
+    if (!r.ok) throw new Error(JSON.stringify(r.issues))
+    expect(await html(r.ast)).toContain(`class="block cs-test ${item} cs-test"`)
   })
 })

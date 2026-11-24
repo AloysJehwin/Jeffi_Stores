@@ -132,7 +132,9 @@ export function checkGstin(gstin: string, expect: { pan?: string | null; state?:
     return fail(`${g} does not start with an Indian state code.`)
   if (gstinCheckChar(g.slice(0, 14)) !== g[14]) return fail(`${g} is not a valid GSTIN: its last character doesn't match. Check for a typo.`)
   const pan = idChars(expect.pan, 10)
-  if (pan && g.slice(2, 12) !== pan) return fail(`This GSTIN belongs to PAN ${g.slice(2, 12)}, not ${pan}. A GSTIN carries the business's own PAN.`)
+  // Never echo the PAN inside the GSTIN: a mistyped GSTIN can be another business's, and its PAN theirs.
+  if (pan && g.slice(2, 12) !== pan)
+    return fail(`This GSTIN doesn't match the business's PAN. Characters 3 to 12 of a GSTIN are the PAN, so check both for a typo.`)
   const code = expect.state ? getStateCode(expect.state) : ''
   if (code && g.slice(0, 2) !== code)
     return fail(`This GSTIN is registered in ${stateNameFromCode(g.slice(0, 2)) || `state ${g.slice(0, 2)}`}, but your address is in ${expect.state}.`)

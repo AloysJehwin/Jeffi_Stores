@@ -16,15 +16,20 @@ import ThemeGallery, { fetchThemes, type ThemeAvailable } from './ThemeGallery'
 import type { StudioAnswers } from '@/lib/site/studio/types'
 import { themeOfDirection } from '@/lib/site/themes/catalog'
 
-// The "Your site" step as the AI Site Studio: brief → page plan → design direction → live build → preview and
-// tweak. "I'll design it myself" stays. Everything is saved server-side (site_studio_sessions), so the owner can
-// leave and come back to the same place.
+// The "Your site" step: a ready-made theme (the default), the AI Site Studio (brief → page plan → design direction →
+// live build → preview and tweak), or "I'll design it myself". Everything is saved server-side (site_studio_sessions),
+// so the owner can leave and come back to the same place; the wizard keeps the choice (site.mode).
+
+/** The owner's choice; provisioning applies the default theme when 'theme' was picked and none applied. */
+export type SiteMode = 'ai' | 'theme' | 'self'
 
 export interface StudioSummary {
   free: 'available' | 'resume' | 'used' | null
   ready: boolean
   pages: number
   style: string | null
+  /** The site was made from a ready-made theme. */
+  themed: boolean
   /** What the store sells, for the brief-only fallback build after go-live. */
   description: string
   references: string[]
@@ -50,15 +55,15 @@ function phaseOf(v: StudioView | null): Phase {
 const describe = (a: Partial<StudioAnswers>) => [a.sell, a.audience && `For ${a.audience}`, a.mood && `Feel: ${a.mood}`, a.notes].filter(Boolean).join('. ').slice(0, 2000)
 
 export default function SiteStudio({
-  skip,
-  onSkipChange,
+  mode,
+  onModeChange,
   storeName,
   logoUrl,
   categories,
   onSummary,
 }: {
-  skip: boolean
-  onSkipChange: (skip: boolean) => void
+  mode: SiteMode
+  onModeChange: (mode: SiteMode) => void
   storeName: string
   logoUrl: string | null
   categories: string[]
@@ -81,22 +86,28 @@ export default function SiteStudio({
   const aiDown = aiOff || view?.ai?.available === false
   const offline = aiDown && !built
   const autoSkipped = useRef(false)
-  // Ready-made themes (ThemeGallery): offered once a style is ready; they need no AI, so they work while it is offline.
-  const [mode, setMode] = useState<'ai' | 'theme'>('ai')
-  const [themes, setThemes] = useState<ThemeAvailable | null>(null)
+  // Ready-made themes (ThemeGallery): offered once a style is ready (and while that is being asked; undefined); they
+  // need no AI, so they work while it is offline.
+  const [themes, setThemes] = useState<ThemeAvailable | null | undefined>(undefined)
   const [gallery, setGallery] = useState(false)
   const fromTheme = themeOfDirection(s?.direction)
   const themed = !!fromTheme
-  const themesOffered = (!!themes && Object.keys(themes).length > 0) || themed
-  const showGallery = gallery || (mode === 'theme' && !built && s?.status !== 'building')
+  const themesOffered = themes === undefined || (!!themes && Object.keys(themes).length > 0) || themed
+  // Without themes to offer, a theme choice shows as our standard pages (provisioning falls back to them too).
+  const shown: SiteMode = mode === 'theme' && !themesOffered ? 'self' : mode
+  const skip = shown === 'self'
+  const showGallery = gallery || (shown === 'theme' && !built && s?.status !== 'building')
 
   useEffect(() => {
     fetchThemes().then(setThemes)
   }, [])
 
+  // A site made from a theme shows as the theme choice (once, so "Design with AI instead" can leave it).
+  const wasThemed = useRef(false)
   useEffect(() => {
-    if (themed) setMode('theme')
-  }, [themed])
+    if (themed && !wasThemed.current && mode === 'ai') onModeChange('theme')
+    wasThemed.current = themed
+  }, [themed, mode, onModeChange])
 
   const apply = useCallback((v: StudioView, follow = true) => {
     setView(prev => ({ ...v, store: v.store ?? prev?.store }))
@@ -109,12 +120,13 @@ export default function SiteStudio({
       .catch(e => setLoadErr((e as Error).message))
   }, [apply])
 
+  // AI offline: the AI choice moves to a ready-made theme (our standard pages without themes); Check again restores it.
   useEffect(() => {
-    if (offline && !skip && mode !== 'theme') {
+    if (offline && mode === 'ai') {
       autoSkipped.current = true
-      onSkipChange(true)
+      onModeChange(themesOffered ? 'theme' : 'self')
     }
-  }, [offline, skip, onSkipChange, mode])
+  }, [offline, mode, themesOffered, onModeChange])
 
   async function checkAgain() {
     setChecking(true)
@@ -128,7 +140,7 @@ export default function SiteStudio({
       setAiOff(false)
       if (autoSkipped.current) {
         autoSkipped.current = false
-        onSkipChange(false)
+        onModeChange('ai')
       }
       showToast('AI site generation is available again.', 'success')
     } catch (e) {
@@ -150,6 +162,7 @@ export default function SiteStudio({
       // As the build step counts them: the plan's pages that are built (the product card is saved beside them).
       pages: (s?.plan?.pages ?? []).filter(p => p.enabled && s?.pages?.[p.key]).length,
       style: s?.direction?.name ?? null,
+      themed: !!themeOfDirection(s?.direction),
       description: describe(a),
       references: a.references ?? [],
     })
@@ -202,7 +215,7 @@ export default function SiteStudio({
       variant: 'danger',
     })
     if (!ok) return
-    setMode('ai')
+    onModeChange('ai')
     await call('restart', 'start', { restart: true, prefill: { storeName, sell: categories.join(', '), logoUrl } }, () => go('brief'))
   }
 
@@ -221,12 +234,21 @@ export default function SiteStudio({
       <ChoiceCards<'ai' | 'theme' | 'self'>
         ariaLabel="How to start your site"
         columns={themesOffered ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}
-        value={skip ? 'self' : mode}
+        value={shown}
         onChange={v => {
-          if (v !== 'self') setMode(v)
-          onSkipChange(v === 'self')
+          autoSkipped.current = false
+          onModeChange(v)
         }}
         options={[
+          ...(themesOffered
+            ? [
+                {
+                  value: 'theme' as const,
+                  label: 'Start with a ready-made theme',
+                  description: 'Recommended. A pre-built site, ready at once with your details: pick one of five styles in five colour palettes, or keep our default. Free, and your free AI generation stays for later.',
+                },
+              ]
+            : []),
           {
             value: 'ai',
             label: 'Design it with AI',
@@ -235,9 +257,6 @@ export default function SiteStudio({
               : 'Describe your store and watch the AI design every page, live, on desktop and phone. Free for new stores.',
             disabled: offline,
           },
-          ...(themesOffered
-            ? [{ value: 'theme' as const, label: 'Pick a ready-made theme', description: 'Five styles in five colour palettes, ready at once with your details. Free, and your free AI generation stays for later.' }]
-            : []),
           { value: 'self', label: 'I’ll design it myself', description: 'Start from our standard pages and change them later in Site Builder, where your first full AI generation is free.' },
         ]}
       />
@@ -254,7 +273,7 @@ export default function SiteStudio({
           </button>
         </div>
       )}
-      {!skip && (!offline || mode === 'theme') && (
+      {!skip && (!offline || shown === 'theme') && (
         <Card className="max-sm:px-4">
           {aiDown && !showGallery && (
             <p role="status" className={`${noteCls} org-peach mb-5 flex items-center gap-2 text-foreground`}>
@@ -263,7 +282,7 @@ export default function SiteStudio({
           )}
           {loadErr ? (
             <p className="text-sm text-red-600">{loadErr}</p>
-          ) : !view ? (
+          ) : !view || (showGallery && themes === undefined) ? (
             <div className="flex items-center gap-2 py-8 text-sm text-foreground-secondary">
               <Loader2 className="h-4 w-4 animate-spin" /> Opening the studio…
             </div>
@@ -271,12 +290,12 @@ export default function SiteStudio({
             <ThemeGallery
               name={s?.brief?.storeName || storeName || 'Your store'}
               view={view}
-              available={themes}
+              available={themes ?? null}
               onView={v => apply(v, false)}
               onApplied={(v, label) => {
                 apply(v)
                 setGallery(false)
-                setMode('theme')
+                onModeChange('theme')
                 scrollTop()
                 showToast(`Your site is ready in the ${label} theme. Change anything you like.`, 'success')
               }}
@@ -327,7 +346,7 @@ export default function SiteStudio({
                   })}
                 </ol>
                 )}
-                {fromTheme || (mode === 'theme' && built) ? (
+                {fromTheme || (shown === 'theme' && built) ? (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <button type="button" onClick={() => setGallery(true)} disabled={!!busy || s.status === 'building'} className="ecom-focus inline-flex items-center gap-1 text-xs font-medium text-foreground-muted hover:text-foreground disabled:opacity-40">
                       <LayoutTemplate className="h-3.5 w-3.5" /> {fromTheme ? 'Change theme' : 'Browse themes'}
@@ -430,7 +449,7 @@ export default function SiteStudio({
           )}
         </Card>
       )}
-      {!skip && !aiDown && s && phase !== 'build' && phase !== 'intro' && (
+      {shown === 'ai' && !aiDown && s && phase !== 'build' && phase !== 'intro' && (
         <p className={`${noteCls} bg-surface-secondary/60 text-foreground-secondary`}>
           You can continue without building now: we&apos;ll build your site from your answers once your store is live.
         </p>

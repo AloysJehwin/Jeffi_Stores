@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Kpi, KpiGrid, Section, change, count, money, pct, Empty } from '@/components/admin/channels/ui'
 import { AttentionList } from '@/components/admin/overview/kit'
 import type { OverviewData } from '@/lib/traffic/types'
-import { BarSeries, HBars } from './charts'
+import { BarSeries, HBars } from '@/components/admin/traffic/charts'
 import { bucketLabel, productHref, rateText, ratio, toAttention } from './shared'
 
 export default function OverviewTab({ data }: { data: OverviewData }) {

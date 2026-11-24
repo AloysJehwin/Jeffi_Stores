@@ -1,5 +1,5 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
-import { bucketKeys, fillSeries, istBounds, previousPeriod, trendBucket, type Period } from './period'
+import { bucketKeys, fillSeries, istBounds, periodInfo, previousPeriod, trendBucket, type Period } from './period'
 import { classifyChannel, sourceLabel, CHANNEL_GROUPS } from './channels'
 import { parseUserAgent } from './user-agent'
 import {
@@ -23,7 +23,6 @@ import type {
   CoreTotals,
   FunnelData,
   OverviewData,
-  PeriodInfo,
   ProductRow,
   ProductsData,
   RealtimeData,
@@ -113,11 +112,6 @@ const num = (v: unknown) => (v == null ? 0 : Number(v) || 0)
 export interface ReportContext {
   /** Hosts of this store; a referrer on one of them is internal (direct). */
   selfHosts: string[]
-}
-
-function periodInfo(p: Period): PeriodInfo {
-  const prev = previousPeriod(p)
-  return { from: p.from, to: p.to, prevFrom: prev.from, prevTo: prev.to, bucket: trendBucket(p) }
 }
 
 // Raw /admin paths; the client maps them for admin hosts.
