@@ -125,6 +125,27 @@ describe('convert to editable section', () => {
     expect(String(some.converted.props.source)).toContain('<Store')
   })
 
+  it('loads the first picture of a converted first section eagerly, the phone one first, as the block did', async () => {
+    const imgs = (n: unknown, out: { props: Record<string, unknown> }[] = []) => {
+      if (Array.isArray(n)) n.forEach(x => imgs(x, out))
+      else if (n && typeof n === 'object') {
+        const { type, props, children } = n as { type: string; props: Record<string, unknown>; children: unknown }
+        if (type === 'img') out.push({ props })
+        imgs(children, out)
+      }
+      return out
+    }
+    const r = await convertBlock(CASES[2][1], 'home')
+    if (!r?.ok) throw new Error('not converted')
+    const first = imgs(await drawn(await CodeSection({ section: r.block.props.compiled as CompiledSection, page: 'home', data: dbSiteData(), always: true, priority: true })))
+    expect(first).toHaveLength(2)
+    expect(first[0].props).toMatchObject({ loading: 'eager', fetchPriority: 'high' })
+    expect(String(first[0].props.className)).toContain('md:hidden')
+    expect(first[1].props.loading).toBe('lazy')
+    const later = imgs(await drawn(await CodeSection({ section: r.block.props.compiled as CompiledSection, page: 'home', data: dbSiteData(), always: true })))
+    expect(later.every(i => i.props.loading === 'lazy')).toBe(true)
+  })
+
   it('converts only the blocks it knows, keeping the block’s place and visibility', async () => {
     expect(isConvertible('rich_text')).toBe(true)
     expect(isConvertible('product_row')).toBe(false)
