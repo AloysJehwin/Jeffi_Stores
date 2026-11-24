@@ -29,9 +29,10 @@ what the agent says is hard-coded here, apart from a filler ("one moment") and t
 | controller → voice | `POST /calls {callId, to, from, language}` → `{providerCallId}` | service token. Same `callId` again returns the same call (`duplicate: true`). `429` at `MAX_CONCURRENT_CALLS`, `503` with `missing: [...]` when not configured, `403` for a non-test number on Twilio, `502` when the provider refuses. |
 | controller → voice | `POST /calls/{callId}/hangup` | ends a live call now, or stops a ringing one. |
 | voice → controller | `GET /api/internal/outreach/voice-config` | provider settings (below). |
-| voice → controller | `GET /api/internal/outreach/calls/{callId}/session` | fetched while the phone rings. Optional extras read: `testNumbers`, `fillers`, `apology`. |
+| voice → controller | `GET /api/internal/outreach/calls/{callId}/session` | fetched while the phone rings. Optional extras read: `testNumbers`, `fillers`, `apology`, `consentWhatsApp`. |
 | voice → controller | `POST .../calls/{callId}/tools/{tool} {args}` → `{ok, say, end?, redialLanguage?}` | |
 | voice → controller | `POST .../calls/{callId}/events {type, at, data}` | below. |
+| k8s → voice | `GET /healthz`, `GET /readyz` | liveness (always 200, with `ready`); readiness: 503 until the call path and the Silero VAD and Smart Turn models are preloaded at startup, so the first call after a deploy doesn't greet late. |
 
 Auth both ways is the repo's service token (`packages/service-auth`, HMAC with `SERVICE_AUTH_SECRET`); outbound
 tokens carry `{service: "voice", tenantId: <platform>, internal: true, callId}`.
@@ -61,9 +62,11 @@ event goes out 30 s later with what is known (`durationSource: "local"`, `provid
   `[S3_KEY_PREFIX/]outreach/recordings/{callId}.mp3`.
 - **Barge-in.** The user turn starts on Silero VAD speech after `VOICE_VAD_START_S` (0.2 s) and interrupts the bot.
 - **Turn-taking.** End of turn is semantic (Smart Turn v3): after `VOICE_TURN_SILENCE_S` (0.48 s) of silence the model
-  judges whether the sentence is finished; "my shop is called… um" is held for up to `VOICE_TURN_MAX_WAIT_S` (3 s).
+  judges whether the sentence is finished; "my shop is called… um" is held for up to `VOICE_TURN_MAX_WAIT_S` (2 s).
 - **Fillers.** A tool call that takes longer than 1.8 s plays a filler ("one moment" in the call's language). If the
-  reply to a turn hasn't started 3 s after the person stopped, a filler plays too. Nothing is ever silent for long.
+  reply to a turn hasn't started 3 s after the person stopped, a filler plays too. Fillers and the failure apology go
+  straight to TTS, so an LLM that is stuck can't hold them up, and a filler never counts as the reply. A turn in which
+  nothing was transcribed (a cough, noise) owes no reply.
 - **Tools.** The controller's `say` is spoken verbatim and the LLM isn't asked again. `end` hangs up after the speech.
   `redialLanguage` ends the call and is reported in `ended`. **No false success:** when the controller errors or times
   out, Claude sees `ok: false` with an instruction not to claim it worked.
@@ -71,10 +74,17 @@ event goes out 30 s later with what is known (`durationSource: "local"`, `provid
   silence it says a short goodbye and hangs up.
 - **Voicemail / IVR.** In the first 8 s after answer: a beep (a sustained pure tone), a monologue longer than 6.5 s,
   or voicemail/operator/IVR phrases (English and Indian languages) end the call at once with `voicemail`, leaving no
-  message (`voicemail.py`).
-- **Failure.** If STT or the LLM breaks (a processor stops being usable) or no reply comes within 9 s, the agent says
-  "sorry, the line's breaking up, I'll message you on WhatsApp" in the call's language and ends with `error`. If TTS
-  is what broke, it hangs up straight away.
+  message (`voicemail.py`). Whichever signal decides, the call ends once, even if it was already saying goodbye.
+- **Failure.** The agent apologises in the call's language and ends with one `error` (its `reason` says what broke) when:
+  - STT breaks: a processor stops being usable, 3 STT errors with no transcript between them, or a turn of 1.5 s or
+    more of speech (or any speech after an STT error) that never gets a transcript (`stt_error` / `stt_timeout`);
+  - the LLM breaks: any LLM error (the SDK has already retried), a completion timeout, or no first token within 8 s
+    (`llm_error` / `llm_timeout`);
+  - no reply has started 9 s after the person's turn (`no_reply`).
+
+  The apology is the session's `apology` if given, else "sorry, the line's breaking up, we'll call you back later";
+  it promises a WhatsApp message only when the session says `consentWhatsApp: true`. If TTS is what broke, it hangs
+  up straight away.
 - **Limits.** `maxDurationS` from the session (a polite goodbye), a hard `TimeLimit` at the provider
   (`VOICE_MAX_CALL_S`, 900 s), a 35 s ring timeout, and `MAX_CONCURRENT_CALLS`.
 - **Restarts.** In-flight call ids are kept in `VOICE_STATE_DIR` (an emptyDir in k8s). On SIGTERM every live call is
@@ -107,6 +117,8 @@ refuses with `503` and lists what is missing.
 | `VOICE_WS_KEY` | | if set, `/ws/exotel` requires `?k=<key>` |
 | `VOICE_STATE_DIR` | `/tmp/voice-service` | in-flight call ids, for restart reporting |
 | `SM_SECRET_ID` | | optional: fill unset env keys from a Secrets Manager JSON secret, like the Node services |
+| `VOICE_LLM_FIRST_TOKEN_S` | `8` | no first token from the LLM by then: apologise and end (`llm_timeout`) |
+| `VOICE_STT_MISS_SPEECH_S` | `1.5` | a turn with this much speech and no transcript means STT isn't answering (`stt_timeout`) |
 | `LOG_LEVEL` | `INFO` | `DEBUG` logs transcripts |
 
 Voice per call: the session's `persona.voiceId`, else the Providers tab's `sarvam.voices[language]`, else Bulbul's
@@ -211,7 +223,7 @@ Unanswered and voicemail calls cost only the ring/answer seconds: voicemail is c
 |---|---|---|
 | `VOICE_VAD_START_S` | 0.2 | speech needed to start a user turn / barge in; lower = snappier interruptions, more false barge-ins on noise |
 | `VOICE_TURN_SILENCE_S` | 0.48 | silence before the end-of-turn model runs; the main lever on response time |
-| `VOICE_TURN_MAX_WAIT_S` | 3.0 | longest wait when the sentence sounds unfinished |
+| `VOICE_TURN_MAX_WAIT_S` | 2.0 | longest wait when the sentence sounds unfinished (was 3.0; see docs/OUTREACH_E2E.md for the measurement) |
 | `VOICE_GREETING_DELAY_S` | 0.4 | pause after answer before the greeting |
 | `VOICE_FILLER_AFTER_S` | 1.8 | tool wait before "one moment" |
 | `VOICE_DEAD_AIR_S` | 3.0 | late reply before a filler |

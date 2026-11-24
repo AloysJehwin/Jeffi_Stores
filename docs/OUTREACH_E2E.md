@@ -113,9 +113,9 @@ python3 tests/voice-e2e/run.py --live-keys --scenario happy_en,happy_hi,happy_ta
 | `stop` | none (plumbing) / Claude | "don't call me": optOut and nothing after it, a short goodbye, hang-up within 12 s |
 | `language_switch` | none (plumbing) / Claude | switchLanguage(ta), and `ended` carries `redialLanguage: "ta"` |
 | `concurrent_2`, `concurrent_5` | none | 2 and 5 simultaneous calls each greet within 2.5 s, get every reply, end with one terminal event; a 6th is refused 429 (the harness runs voice-service with `MAX_CONCURRENT_CALLS=5`; production is 2 per pod) |
-| `fault_stt_5xx`, `fault_stt_timeout` | none | STT errors or goes silent mid-call: apology, hang-up, one `error` |
+| `fault_stt_5xx`, `fault_stt_timeout` | none | STT errors or goes silent mid-call: apology, hang-up, one `error` (`stt_error` / `stt_timeout`) |
 | `fault_tts_5xx`, `fault_tts_timeout` | none | TTS breaks mid-call: no speech after it, hang-up, one `error` |
-| `fault_llm_5xx`, `fault_llm_timeout` | none | Claude errors (after the SDK's retries) or never answers: apology, hang-up, one `error` |
+| `fault_llm_5xx`, `fault_llm_timeout` | none | Claude errors (after the SDK's retries) or never answers: the filler still plays, then the apology, hang-up, one `error` (`llm_error` / `llm_timeout`) |
 | `fault_session_down` | none | the session can't be fetched at answer: the apology in the default voice, hang-up, `error` `session_unavailable` |
 | `fault_tools_slow` | none | a 4 s tool reply is covered by "one moment" and still succeeds |
 | `fault_controller_outage` | none | tools and events return 503 for 8 s: the tool fails without a false claim of success, and the terminal event still lands once the controller is back |
@@ -133,10 +133,10 @@ Anthropic client, a request that never answers. "Documented behaviour" is voice-
 
 - **Key numbers.** Response latency is the end of the caller's speech (from the audio, not the script) to the first
   bot audio the phone plays, per caller turn, p50 and p90; barge-in turns are excluded. Time to first greeting is from
-  the media stream opening, on a warm process (the header's "Cold start" line is the first call after start). Barge-in stop time is how long the bot kept talking after the caller started; clear time
+  the media stream opening, on a warm process (the header's "Cold start" line is the first call after voice-service reports ready on `/readyz`). Barge-in stop time is how long the bot kept talking after the caller started; clear time
   is when voice-service sent `clear`. Terminal events counts placed calls with exactly one. Smart Turn timeouts are
-  caller turns the end-of-turn model judged unfinished until `VOICE_TURN_MAX_WAIT_S` (3 s) ran out: each one adds
-  about 3 s to that reply, so they explain a high p90. Transcript fidelity (live only) re-transcribes the bot's audio
+  caller turns the end-of-turn model judged unfinished until `VOICE_TURN_MAX_WAIT_S` (2 s; 3 s before 2026-11-25) ran
+  out: each one adds about that much to the reply, so they explain a high p90. Transcript fidelity (live only) re-transcribes the bot's audio
   with Sarvam STT and compares it with the bot's text from the events (WER, and CER for Indic scripts). Cost per call
   adds Sarvam STT (the caller's streamed minutes), TTS (spoken characters) and Claude (measured tokens) at the rates in
   `e2e/config.py` (`E2E_RATE_*` overrides); telephony is excluded. In a no-key run it is a projection.
@@ -148,39 +148,60 @@ Anthropic client, a request that never answers. "Documented behaviour" is voice-
 - **Logs.** `stub-controller.jsonl` has every request voice-service made (timestamp, path, body, status, the tool
   reply); `voice-service.log` is voice-service at DEBUG (transcripts and pipecat's turn decisions; test data only).
 
-### Findings so far (no-key runs, 2026-11-24)
+### Findings (no-key runs, 2026-11-24) and fixes (2026-11-25)
 
-These are voice-service behaviours the harness caught; the scenarios named fail until they are fixed.
+The harness caught these voice-service behaviours. All are fixed; `examples/report.md` is a no-key run after the
+fixes, in which every non-skipped scenario passes.
 
-- **A bare beep never ends the call as voicemail** (`voicemail_beep`). `VoicemailDetector.on_audio` decides MACHINE,
-  but `pipeline.tick()` only calls `on_voicemail` while `voicemail.open` is still true, and the observer doesn't call
-  it either, so the beep verdict is never acted on. `voicemail` passes only through the phrase path. Fix in
-  `pipeline.py`: act on `rt.voicemail.verdict == MACHINE` in `tick` (or call `on_voicemail` when `on_audio` returns
-  MACHINE).
-- **A broken STT or LLM doesn't end the call with an apology** (`fault_stt_*`, `fault_llm_*`). Two causes:
-  - a 5xx or a timeout from Sarvam or Claude is a transient error in pipecat, so the processor stays usable and
-    `_on_error` only logs "recoverable pipeline error";
-  - the 9 s no-reply watchdog is disarmed by its own filler. `TurnState.on_bot_started` clears
-    `awaiting_reply_since`, so once "One moment." plays at 3 s, APOLOGY_END never fires (reproduced on `TurnState`
-    alone: filler at 3 s, nothing at 9 s, a check-in at 14 s).
+- **A bare beep never ended the call as voicemail** (`voicemail_beep`). The beep verdict closed the detector's window
+  before `pipeline.tick()` looked, so it was never acted on. Now any machine verdict (beep, monologue, phrase) ends the
+  call once as `voicemail`, and cuts short an ending already under way.
+- **A broken STT or LLM didn't end the call with an apology** (`fault_stt_*`, `fault_llm_*`). A 5xx or a timeout is
+  recoverable to pipecat, so the processor stayed usable and `_on_error` only logged; and the 9 s no-reply watchdog was
+  disarmed by its own filler ("One moment." counted as the reply). Callers got a silence check-in 45 s later (STT
+  down), dead air (Claude erroring), or silence without even the filler (Claude hanging: the filler was queued behind
+  the stuck LLM). Now (`conversation.ProviderWatch`, `pipeline.py`):
+  - STT: 3 errors with no transcript between them, or a turn of 1.5 s or more of speech (any speech after an STT error)
+    that never gets a transcript, ends the call (`stt_error` / `stt_timeout`);
+  - LLM: any error, a completion timeout, or no first token within 8 s (`llm_error` / `llm_timeout`);
+  - only reply audio clears the watchdog, and a turn with nothing transcribed (a cough) owes no reply;
+  - the filler and the apology go straight to TTS, so they play while the LLM is stuck (`fault_llm_timeout` now hears
+    "One moment." at 3 s, then the apology);
+  - the default apology promises a call back, and WhatsApp only when the session says `consentWhatsApp`.
+- A broken TTS behaves as documented (`fault_tts_*`): no speech, hang-up, one `error` (`no_reply`).
+- **The first call after a start greeted late** (2 to 9 s against about 0.46 s warm). Measured, that is mostly
+  importing the call path (about 5 s); building the Silero VAD and Smart Turn sessions takes about 50 ms each.
+  voice-service now does both at startup and answers `/readyz` 503 until they are done; the k8s startup and readiness
+  probes use it, and the harness waits for it. Cold start in the no-key run: 1.82 s before, 0.47 s after.
+- **Smart Turn added 3 s to some replies** (15 of 42 caller turns). An offline probe (Smart Turn v3 on the scenarios'
+  English sentences in four macOS voices, as 8 kHz telephone audio, with 0.2 s and 0.48 s of trailing silence) found
+  two causes:
+  - the harness's caller voice (Rishi) has flat question prosody that the model reads as unfinished. "Can you make the
+    colours a bit warmer, more orange and gold?" scores P(complete) 0.01 in Rishi against 0.91 to 0.98 in Aman,
+    Samantha and Daniel; "Sure, you can send it on WhatsApp." 0.18 against 0.63 to 0.96. Rishi has 12 of 23 sentences
+    judged unfinished, the other voices 5 to 8;
+  - short closings ("Okay, bye.", "Thank you, bye.", "Alright, I'm not interested. Bye.") score under 0.1 in every
+    voice, so real callers will hit it too.
 
-  What the caller gets instead:
-  - STT down: "One moment.", then the silence check-in and a goodbye about 45 s later, as if they had gone quiet.
-    The call ends `ended`.
-  - Claude erroring: "One moment.", then dead air until they hang up. The call ends `ended`.
-  - Claude hanging: even the filler is stuck behind the LLM in the pipeline, so the line is silent. The call ends
-    `error` without an apology.
+  `VOICE_TURN_MAX_WAIT_S` went from 3 s to 2 s, which takes a second off each of those turns. `VOICE_TURN_SILENCE_S`
+  stays 0.48 s: with 0.2 s of trailing silence the model judged more turns unfinished (Aman 11 against 6), not fewer.
+  Barge-in starts on VAD, so it is unaffected (bot audio stopped after p50 0.79 s, max 1.24 s, before and after).
 
-  Fix in `conversation.py` (keep the stuck timer running through a filler) and `pipeline.py` (count repeated
-  recoverable STT/LLM errors as a failure, and speak the apology on a path that doesn't wait for the LLM).
-- A broken TTS behaves as documented (`fault_tts_*` pass): no speech, then hang-up with one `error`.
-- **The first call after voice-service starts greets late.** Its greeting took from 0.7 s to 8 s across runs, against
-  about 0.46 s once warm: the Silero VAD and Smart Turn models load when the first pipeline is built. The harness now
-  makes one unreported warm-up call and reports that figure as "Cold start". Preloading the models at startup (before
-  the pod reports ready) would remove it for the first lead after each deploy.
-- **Smart Turn adds 3 s to some replies.** With synthetic caller speech, Smart Turn v3 judged several complete
-  sentences unfinished and waited the full `VOICE_TURN_MAX_WAIT_S`; replies to the other turns start in about 0.5 to
-  0.8 s. Re-check with real voices in a live run before tuning `VOICE_TURN_MAX_WAIT_S`.
+  | No-key run | Turns | p50 | p90 | Smart Turn timeouts |
+  |---|---|---|---|---|
+  | all scenarios, before (3 s) | 49 | 0.73 s | 4.08 s | 15 of 42 |
+  | all scenarios, after (2 s) | 50 | 0.72 s | 2.98 s | 15 of 42 |
+  | turn-taking subset*, Rishi, 3 s, before | 18 | 0.71 s | 3.70 s | 5 |
+  | turn-taking subset, Rishi, 3 s, fixed code | 18 | 0.70 s | 3.68 s | 5 |
+  | turn-taking subset, Rishi, 2 s | 18 | 0.71 s | 2.76 s | 5 |
+  | turn-taking subset, Aman, 3 s | 18 | 0.70 s | 3.72 s | 3 |
+  | turn-taking subset, Aman, 2 s | 18 | 0.71 s | 2.82 s | 3 |
+
+  \*protocol, happy_en, barge_in, stop, language_switch, concurrent_2 (`E2E_CALLER_SAY_VOICE`, `VOICE_TURN_MAX_WAIT_S`).
+  The fixes alone don't move latency (3.70 against 3.68 s); the wait does. In Aman's voice the consent and colour
+  turns no longer time out (its owner line does), and the closings still do, so p90 barely changes between voices.
+
+  A live run with real voices is still the check before tuning further.
 - Passing and solid: the protocol, events and the single terminal event (every placed call had exactly one), the
   recording gate, barge-in, silence, STOP, the language switch, 2 and 5 concurrent calls with the 429 at the cap, a
   slow or briefly down controller, dropped sockets (with and without Exotel's callback) and both kinds of restart.
@@ -255,7 +276,7 @@ only entry on the program's test list. Never add anyone else's number; the progr
 
 **Before**
 
-1. A no-key run is green except the known findings, and a live harness run (`--live-keys`, 15 min cap) has been
+1. A no-key run is green, and a live harness run (`--live-keys`, 15 min cap) has been
    listened to: `happy_en`, `happy_hi`, `happy_ta`, `bot_question`, `barge_in`, `stop`. Note its key numbers.
 2. Deployed: voice-service at `replicas: 1`, `voice.jeffistores.in` resolving to the cluster (not proxied), the
    `voice-service` secret (`SERVICE_AUTH_SECRET`, `VOICE_WS_KEY`), Claude federation configured for voice-service, and
