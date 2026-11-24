@@ -46,6 +46,8 @@ export interface ProviderPolicy {
   aiImageProviders: AiImageProvider[]
   aiVideoProviders: AiVideoProvider[]
   aiImageDefaultQuality?: AiImageQuality
+  /** India DLT Principal Entity id for AWS SMS (tenant row, else platform default). */
+  smsDltEntityId?: string
   source: Record<ProviderSettingKey, PolicySource>
 }
 
@@ -160,6 +162,7 @@ export async function getProviderPolicy(tenantId?: string | null): Promise<Provi
     aiImageProviders: pick<AiImageProvider[]>('ai_image_providers') ?? [],
     aiVideoProviders: pick<AiVideoProvider[]>('ai_video_providers') ?? [],
     aiImageDefaultQuality: pick<AiImageQuality>('ai_image_default_quality'),
+    smsDltEntityId: pick<string>('sms_dlt_entity_id'),
     source,
   }
 }

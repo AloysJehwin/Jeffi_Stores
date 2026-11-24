@@ -36,6 +36,7 @@ export const SendMessageRequest = z
     reply_to: z.string().email().max(254).optional(), // email: where the customer's reply goes
     in_reply_to: z.string().max(998).optional(), // email: the message this answers, for threading
     provider_ref: z.string().max(80).optional(), // WhatsApp: a Twilio content SID when not using a stored template
+    dlt_template_id: z.string().max(40).optional(), // SMS to India: DLT content template id, overrides the template's own
     // sms/whatsapp: which of the store's numbers sends it (customer default; admin = staff; ecom = flagship owner portal)
     audience: z.enum(['customer', 'admin', 'ecom']).optional(),
     reference: z.string().max(120).optional(),
@@ -169,6 +170,9 @@ export const UpsertLibraryTemplateRequest = z.object({
   meta_category: z.enum(['MARKETING', 'UTILITY', 'AUTHENTICATION']).optional(),
   media_type: z.enum(['image', 'video', 'document']).optional(),
   provider_ref: z.string().max(80).optional(),
+  dlt_template_id: z.string().max(40).nullable().optional().describe('SMS: India DLT content template id, sent to AWS as IN_TEMPLATE_ID'),
+  dlt_header: z.string().max(16).optional().describe('SMS: DLT header (sender id) the template is registered under'),
+  dlt_route: z.enum(['promotional', 'transactional', 'service', 'otp']).optional(),
   note: z.string().max(500).optional(),
   layout: z.enum(['store', 'none']).optional().describe("Email: 'store' (default) wraps the body in your branded layout; 'none' sends your HTML as written"),
   publish: z.boolean().default(true),

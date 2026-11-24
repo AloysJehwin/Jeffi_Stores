@@ -15,6 +15,7 @@ import {
   isAwsTemplateRef,
   parseAwsTemplateRef,
 } from '@jeffi/api-contracts'
+import { getProviderPolicy } from '@/lib/providers/policy'
 import type { SmsProvider, WhatsAppProvider } from './types'
 import type { TenantSender } from '@/lib/messaging/tenant-senders'
 
@@ -59,7 +60,7 @@ const cfg = (ov?: SenderOverride) =>
         smsFrom: process.env.AWS_SMS_FROM || SMS_ORIGINATION,
         waFrom: process.env.AWS_WHATSAPP_FROM || '',
         configurationSet: process.env.AWS_SMS_CONFIGURATION_SET || '',
-        dltEntityId: process.env.AWS_SMS_DLT_ENTITY_ID || '',
+        dltEntityId: '',
         credentials,
       }
 
@@ -100,6 +101,27 @@ async function sendCloud(message: object, ov?: SenderOverride): Promise<string> 
   return r.messageId
 }
 
+/** Entity id order: the sender's own config, the tenant/platform provider setting, then env AWS_SMS_DLT_ENTITY_ID. */
+export async function dltEntityId(senderConfigured: string): Promise<string> {
+  if (senderConfigured) return senderConfigured
+  const fromSetting = await getProviderPolicy().then(p => p.smsDltEntityId).catch(() => undefined)
+  return fromSetting || process.env.AWS_SMS_DLT_ENTITY_ID || ''
+}
+
+/** PROMOTIONAL for promotional/marketing templates (DLT route, else template category); OTP and service stay TRANSACTIONAL. */
+export function smsMessageType(route?: string | null, category?: string | null): 'TRANSACTIONAL' | 'PROMOTIONAL' {
+  if (route) return route === 'promotional' ? 'PROMOTIONAL' : 'TRANSACTIONAL'
+  return ['marketing', 'promotional', 'campaign'].includes((category ?? '').toLowerCase()) ? 'PROMOTIONAL' : 'TRANSACTIONAL'
+}
+
+/** India DLT ids for an SMS: only Indian (+91) destinations carry them; a missing template id warns (no number logged). */
+export function indiaDltParams(to: string, entityId: string, templateId?: string | null, templateSlug?: string | null) {
+  if (!to.startsWith('+91')) return undefined
+  if (entityId && !templateId) console.warn(JSON.stringify({ level: 'warn', msg: 'sms_dlt_template_id_missing', template_slug: templateSlug ?? null }))
+  const p = { ...(entityId ? { IN_ENTITY_ID: entityId } : {}), ...(templateId ? { IN_TEMPLATE_ID: templateId } : {}) }
+  return Object.keys(p).length ? p : undefined
+}
+
 export function awsSmsProviderFor(ov?: SenderOverride): SmsProvider {
   const c = cfg(ov)
   return {
@@ -108,16 +130,17 @@ export function awsSmsProviderFor(ov?: SenderOverride): SmsProvider {
     },
     name: 'aws',
     from: c.smsFrom,
-    async sendText(toE164, body) {
+    async sendText(toE164, body, opts) {
       if (!c.smsOrigination) throw new Error('AWS SMS is not configured (AWS_SMS_ORIGINATION)')
+      const dest = indiaDltParams(toE164, await dltEntityId(c.dltEntityId), opts?.dltTemplateId, opts?.templateSlug)
       const r = await smsClient(ov).send(
         new SendTextMessageCommand({
           DestinationPhoneNumber: toE164,
-          OriginationIdentity: c.smsOrigination,
+          OriginationIdentity: dest && opts?.dltHeader ? opts.dltHeader : c.smsOrigination,
           MessageBody: body,
-          MessageType: 'TRANSACTIONAL',
+          MessageType: opts?.messageType ?? 'TRANSACTIONAL',
           ...(c.configurationSet ? { ConfigurationSetName: c.configurationSet } : {}),
-          ...(c.dltEntityId ? { DestinationCountryParameters: { IN_ENTITY_ID: c.dltEntityId } } : {}),
+          ...(dest ? { DestinationCountryParameters: dest } : {}),
         })
       )
       if (!r.MessageId) throw new Error('AWS SMS returned no message id')

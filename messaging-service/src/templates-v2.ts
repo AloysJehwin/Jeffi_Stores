@@ -29,9 +29,12 @@ export interface TemplateRow {
   current_variant_id: string | null; status: string
   created_at: string; updated_at: string
 }
+export interface DltRow { dlt_template_id: string; dlt_header: string; dlt_route: string }
 export interface VariantRow {
   id: string; template_id: string; tenant_id: string; locale: string
   current_version_id: string | null; provider_ref: string | null
+  /** SMS: India DLT row (sms_dlt_template) with the store's default header; loaded by findBySlug/findById. */
+  dlt?: DltRow | null
   meta_category: string | null; media_type: string | null
   approval_status: string; approval_raw_status: string | null
   approval_reason: string | null; approval_submitted_at: string | null
@@ -111,6 +114,28 @@ export const findPlatformBySlug = (p: Pools, channel: string, slug: string, loca
 export const liveVersion = (e: Executor, variantId: string, providerRef: string) =>
   first<VersionRow>(e, `SELECT * FROM template_version WHERE variant_id=$1 AND provider_ref=$2 ORDER BY version DESC LIMIT 1`, [variantId, providerRef])
 
+/** The variant's India DLT row; the header falls back to the tenant's sms_dlt default. A DB without the tables has none. */
+export async function loadDlt(e: Executor, variantId: string, tenantId: string): Promise<DltRow | null> {
+  const r = await first<DltRow & { default_header: string | null }>(e,
+    `SELECT t.dlt_template_id, t.dlt_header, t.dlt_route, d.default_header
+       FROM sms_dlt_template t LEFT JOIN sms_dlt d ON d.tenant_id=$2::uuid WHERE t.variant_id=$1`, [variantId, tenantId]).catch(err => { if (noTable(err)) return undefined; throw err })
+  return r ? { dlt_template_id: r.dlt_template_id, dlt_header: r.dlt_header || r.default_header || '', dlt_route: r.dlt_route } : null
+}
+
+const PROMO_CATEGORIES = ['marketing', 'promotional', 'campaign']
+async function saveDlt(c: Executor, variantId: string, category: string | null, i: UpsertInput) {
+  const id = i.dlt_template_id?.trim()
+  if (!id) { await c.query(`DELETE FROM sms_dlt_template WHERE variant_id=$1`, [variantId]); return }
+  const route = i.dlt_route ?? (PROMO_CATEGORIES.includes((category ?? '').toLowerCase()) ? 'promotional' : 'transactional')
+  await c.query(
+    `INSERT INTO sms_dlt_template (variant_id, dlt_template_id, dlt_header, dlt_route)
+     VALUES ($1,$2,COALESCE($3,''),$4)
+     ON CONFLICT (variant_id) DO UPDATE SET dlt_template_id=EXCLUDED.dlt_template_id,
+       dlt_header=COALESCE($3, sms_dlt_template.dlt_header),
+       dlt_route=CASE WHEN $5::boolean THEN EXCLUDED.dlt_route ELSE sms_dlt_template.dlt_route END`,
+    [variantId, id, i.dlt_header ?? null, route, i.dlt_route !== undefined])
+}
+
 export async function findBySlug(e: Executor, tenantId: string, channel: string, slug: string, locale = 'en', space: Space = 'store'): Promise<FullTemplate | null> {
   const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE tenant_id=$1 AND slug=$2 AND space=$3`, [tenantId, slug, space])
   if (!family) return null
@@ -123,6 +148,7 @@ export async function findBySlug(e: Executor, tenantId: string, channel: string,
   const version = variant.current_version_id
     ? (await first<VersionRow>(e, `SELECT * FROM template_version WHERE id=$1`, [variant.current_version_id])) ?? null
     : null
+  variant.dlt = await loadDlt(e, variant.id, tenantId)
   return { family, template, variant, version }
 }
 
@@ -138,6 +164,7 @@ export async function findById(e: Executor, tenantId: string, templateId: string
   const version = variant.current_version_id
     ? (await first<VersionRow>(e, `SELECT * FROM template_version WHERE id=$1`, [variant.current_version_id])) ?? null
     : null
+  variant.dlt = await loadDlt(e, variant.id, tenantId)
   return { family, template, variant, version }
 }
 
@@ -160,6 +187,10 @@ export interface UpsertInput {
   meta_category?: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
   media_type?: 'image' | 'video' | 'document'
   provider_ref?: string
+  /** SMS: India DLT content template id, stored in sms_dlt_template. Not given → keep; empty → remove. */
+  dlt_template_id?: string | null
+  dlt_header?: string
+  dlt_route?: 'promotional' | 'transactional' | 'service' | 'otp'
   note?: string
   createdBy?: string
   publish?: boolean
@@ -245,6 +276,8 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
         template.current_variant_id = variant.id
       }
     }
+    if (i.channel === 'sms' && i.dlt_template_id !== undefined) await saveDlt(c, variant.id, family.category ?? i.category ?? null, i)
+    if (i.channel === 'sms') variant.dlt = await loadDlt(c, variant.id, tenantId)
     await c.query('COMMIT')
     return { family, template, variant, version: ver }
   } catch (e) {
@@ -304,6 +337,9 @@ export const toApi = (t: FullTemplate) => ({
   status: t.template.status,
   locale: t.variant?.locale,
   provider_ref: t.variant?.provider_ref,
+  dlt_template_id: t.variant?.dlt?.dlt_template_id ?? null,
+  dlt_header: t.variant?.dlt?.dlt_header ?? null,
+  dlt_route: t.variant?.dlt?.dlt_route ?? null,
   approval_status: t.variant?.approval_status,
   approval_reason: t.variant?.approval_reason,
   // Saved edit not yet submitted: customers keep receiving the approved (live) version.
