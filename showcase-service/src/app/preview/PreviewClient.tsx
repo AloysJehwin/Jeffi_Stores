@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SHOWCASE_OWNER_HOME } from '@/lib/showcase/host'
 import type { PreviewState } from '@showcase/lib/preview'
 
 // The preview's live part: polls /preview/state every 3s and re-renders the page when its version changes, briefly
@@ -78,7 +80,7 @@ export default function PreviewClient({ token, state: rendered }: { token: strin
     return () => clearInterval(t)
   }, [state.live])
   useEffect(() => {
-    if (state.live && left <= 0) location.replace('/')
+    if (state.live && left <= 0) location.replace(SHOWCASE_OWNER_HOME)
   }, [state.live, left])
 
   return (
@@ -87,9 +89,9 @@ export default function PreviewClient({ token, state: rendered }: { token: strin
       {state.live ? (
         <div role="status" aria-live="polite" className="sticky top-0 z-[60] flex flex-wrap items-center justify-center gap-x-4 gap-y-2 bg-emerald-700 px-4 py-3 text-center text-sm text-white shadow-md">
           <span className="font-semibold">Your site is live</span>
-          <a href="/" className="rounded-full bg-white px-4 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-50">
+          <Link href={SHOWCASE_OWNER_HOME} prefetch={false} className="rounded-full bg-white px-4 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-50">
             Go to your live site
-          </a>
+          </Link>
           <span className="tabular-nums text-white/85">This preview closes in {countdown(left)}</span>
         </div>
       ) : (

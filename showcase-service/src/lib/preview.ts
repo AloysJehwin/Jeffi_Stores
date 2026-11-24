@@ -1,5 +1,4 @@
 import { createHash } from 'crypto'
-import { cache } from 'react'
 import { normalizeDoc, topBlocks, type PageDoc } from '@jeffi/site-blocks'
 import { checkShowcasePreviewToken } from '@/lib/showcase/preview-token'
 import { showcaseSlugFromHost } from '@/lib/showcase/host'
@@ -37,9 +36,6 @@ export async function loadPreview(token: string | null | undefined, host: string
   if (check.state !== 'valid' || site.workspaceSuspended) return { kind: 'expired', site }
   return { kind: 'ok', site, expiresAt: check.expiresAt }
 }
-
-/** One lookup per render: the page and its metadata share it. */
-export const previewFor = cache(loadPreview)
 
 /** A short hash of each section on the page, by block id: the poller tells from them which sections changed. */
 export function sectionHashes(page: PageDoc | null): Record<string, string> {

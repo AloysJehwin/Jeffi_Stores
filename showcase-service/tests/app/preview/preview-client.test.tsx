@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { createElement, type ReactNode } from 'react'
 import { act, render, screen } from '@testing-library/react'
 
 // The preview's live part: polls every 3s, re-renders on a new version and marks the changed sections, shows the
@@ -10,6 +11,7 @@ const { refresh, router } = vi.hoisted(() => {
   return { refresh, router: { refresh } }
 })
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
+vi.mock('next/link', () => ({ default: ({ href, prefetch: _p, children, ...rest }: { href: string; prefetch?: boolean; children?: ReactNode }) => createElement('a', { href, ...rest }, children) }))
 
 import PreviewClient, { changedSections, countdown, POLL_MS } from '@showcase/app/preview/PreviewClient'
 
@@ -67,13 +69,13 @@ describe('PreviewClient', () => {
     fetchMock.mockImplementation(async () => reply(200, live))
     render(<PreviewClient token="tok" state={live} />)
     expect(screen.getByText('Your site is live')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Go to your live site' }).getAttribute('href')).toBe('/')
+    expect(screen.getByRole('link', { name: 'Go to your live site' }).getAttribute('href')).toBe('/?jeffi_preview=1')
     expect(screen.getByText(/This preview closes in 1:30/)).toBeTruthy()
     await act(async () => vi.advanceTimersByTimeAsync(31_000))
     expect(screen.getByText(/This preview closes in 0:59/)).toBeTruthy()
     expect(location.replace).not.toHaveBeenCalled()
     await act(async () => vi.advanceTimersByTimeAsync(60_000))
-    expect(location.replace).toHaveBeenCalledWith('/')
+    expect(location.replace).toHaveBeenCalledWith('/?jeffi_preview=1')
   })
 
   it('reloads (the page decides) once the link is refused', async () => {

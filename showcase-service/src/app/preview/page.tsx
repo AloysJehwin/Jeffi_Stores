@@ -1,12 +1,14 @@
 import type { Metadata } from 'next'
+import { cache } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { cssVarsRule, googleFontsHref, normalizeDoc, normalizeTheme, themeCssVars } from '@jeffi/site-blocks'
 import PhotoCredits from '@/components/visitor/site/PhotoCredits'
 import { pageCredits, pictureCredits } from '@/lib/ai/stock-credits'
 import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
+import { SHOWCASE_OWNER_HOME } from '@/lib/showcase/host'
 import { requestHost } from '@showcase/lib/site'
-import { previewFor, previewState, servedLive } from '@showcase/lib/preview'
+import { loadPreview, previewState, servedLive } from '@showcase/lib/preview'
 import SiteSections from '../SiteSections'
 import PreviewClient from './PreviewClient'
 
@@ -19,6 +21,9 @@ export const dynamic = 'force-dynamic'
 type Props = { searchParams: Promise<{ t?: string | string[] }> }
 
 const tokenOf = (t: string | string[] | undefined) => (typeof t === 'string' ? t : undefined)
+
+// One lookup per render: the page and its metadata share it.
+const previewFor = cache(loadPreview)
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const p = await previewFor(tokenOf((await searchParams).t), await requestHost())
@@ -40,7 +45,7 @@ export default async function PreviewPage({ searchParams }: Props) {
   const p = await previewFor(token, await requestHost())
   if (p.kind === 'invalid' || !token) notFound()
   if (p.kind === 'expired') {
-    if (servedLive(p.site)) redirect('/')
+    if (servedLive(p.site)) redirect(SHOWCASE_OWNER_HOME)
     return <Note title="This preview link has expired" body="Ask for a new link, or check back once the site is published." />
   }
 

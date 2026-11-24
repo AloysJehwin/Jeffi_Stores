@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
     throw new Error('NEXT_NOT_FOUND')
   }),
 }))
+// The app's React (Next's) has cache(); the test runner's does not.
+vi.mock('react', async importOriginal => ({ ...(await importOriginal<typeof import('react')>()), cache: <T,>(fn: T) => fn }))
 vi.mock('@/lib/showcase/preview-token', () => ({ checkShowcasePreviewToken: h.checkShowcasePreviewToken }))
 vi.mock('@/lib/showcase/store', () => ({ getShowcaseById: h.getShowcaseById }))
 vi.mock('@showcase/lib/site', () => ({ requestHost: h.requestHost }))
@@ -71,7 +73,7 @@ describe('/preview', () => {
   it('goes to the live site once an expired link names a published site', async () => {
     h.checkShowcasePreviewToken.mockResolvedValue({ state: 'expired', siteId: 's-1', jti: 'j' })
     h.getShowcaseById.mockResolvedValue({ ...SITE, status: 'live' })
-    await expect(html('tok')).rejects.toMatchObject({ to: '/' })
+    await expect(html('tok')).rejects.toMatchObject({ to: '/?jeffi_preview=1' })
   })
 
   it('shows the expired note when the site is not live', async () => {
