@@ -875,8 +875,11 @@ jobs:
             mobile) url=https://mobile.jeffistores.in/ ;;
             *) url= ;;
           esac
-          [ -f "tests/post-deploy/${{ matrix.service }}.spec.ts" ] || url=
+          # public-api and mobile share tests/post-deploy/services.spec.ts (URL from PUBLIC_API_URL / MOBILE_URL).
+          spec=${{ matrix.service }}; case $spec in public-api|mobile) spec=services ;; esac
+          [ -f "tests/post-deploy/$spec.spec.ts" ] || url=
           echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
       - if: steps.postdeploy.outputs.url != ''
         continue-on-error: true
         uses: ./.github/actions/node-setup
@@ -888,7 +891,9 @@ jobs:
         name: Post-deploy browser smoke · ${{ matrix.service }}
         env:
           LIVE_URL: ${{ steps.postdeploy.outputs.url }}
-        run: npx playwright test -c playwright.post-deploy.config.ts tests/post-deploy/${{ matrix.service }}.spec.ts
+          PUBLIC_API_URL: ${{ matrix.service == 'public-api' && steps.postdeploy.outputs.url || '' }}
+          MOBILE_URL: ${{ matrix.service == 'mobile' && steps.postdeploy.outputs.url || '' }}
+        run: npx playwright test -c playwright.post-deploy.config.ts tests/post-deploy/${{ steps.postdeploy.outputs.spec }}.spec.ts
       - if: matrix.kind == 'razer'
         uses: aws-actions/configure-aws-credentials@v4
         with:
