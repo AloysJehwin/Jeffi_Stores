@@ -1,42 +1,6 @@
 {
   "owners": {
     "admin-service": [],
-    "store-core": [
-      "packages/store-core/src/components/admin/AIEnrichButton.tsx",
-      "packages/store-core/src/components/admin/AdminImage.tsx",
-      "packages/store-core/src/components/admin/AdminSkeleton.tsx",
-      "packages/store-core/src/components/admin/GalleryPicker.tsx",
-      "packages/store-core/src/components/admin/HeroSlideManager.tsx",
-      "packages/store-core/src/components/admin/ProductForm.tsx",
-      "packages/store-core/src/components/admin/agent/AgentChatPanel.tsx",
-      "packages/store-core/src/components/admin/agent/AgentDock.tsx",
-      "packages/store-core/src/components/admin/agent/ChangeSummaryBlock.tsx",
-      "packages/store-core/src/components/admin/agent/DocumentBlock.tsx",
-      "packages/store-core/src/components/admin/agent/ProposedActionCard.tsx",
-      "packages/store-core/src/components/admin/agent/QuotationResolver.tsx",
-      "packages/store-core/src/components/admin/agent/RecordCard.tsx",
-      "packages/store-core/src/components/admin/drive/DriveBrowser.tsx",
-      "packages/store-core/src/components/admin/drive/DriveItems.tsx",
-      "packages/store-core/src/components/admin/drive/DriveLoading.tsx",
-      "packages/store-core/src/components/admin/drive/DrivePicker.tsx",
-      "packages/store-core/src/components/admin/drive/FilePreview.tsx",
-      "packages/store-core/src/components/admin/drive/MoveDialog.tsx",
-      "packages/store-core/src/components/admin/drive/ShareDialog.tsx",
-      "packages/store-core/src/components/admin/kit/charts.tsx",
-      "packages/store-core/src/components/admin/kit/core.tsx",
-      "packages/store-core/src/components/admin/kit/data-table.tsx",
-      "packages/store-core/src/components/admin/kit/dialog.tsx",
-      "packages/store-core/src/components/admin/kit/draft-action-notice.tsx",
-      "packages/store-core/src/components/admin/kit/draft-lock.tsx",
-      "packages/store-core/src/components/admin/kit/draft.tsx",
-      "packages/store-core/src/components/admin/kit/edit-session.tsx",
-      "packages/store-core/src/components/admin/kit/form.tsx",
-      "packages/store-core/src/components/admin/kit/infinite.tsx",
-      "packages/store-core/src/components/admin/kit/layout.tsx",
-      "packages/store-core/src/components/admin/kit/list-filters.tsx",
-      "packages/store-core/src/components/admin/kit/period.tsx",
-      "packages/store-core/src/components/admin/kit/saved-views.tsx",
-      "packages/store-core/src/components/admin/kit/skeleton.tsx"
-    ]
+    "store-core": []
   }
 }
