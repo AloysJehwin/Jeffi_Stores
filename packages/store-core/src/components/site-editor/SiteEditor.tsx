@@ -9,9 +9,10 @@ import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
 import Layers from './Layers'
 import FreePanel from './FreePanel'
+import AiBox from './AiBox'
 import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
-import { hasLocked, insertPlace, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
+import { hasLocked, insertPlace, nodeName, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
 import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
 
@@ -58,6 +59,9 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const scrollY = useRef(0)
   const seq = useRef({ n: 0, sent: new Map<number, number>() })
   const measures = useRef({ n: 0, wait: new Map<number, (m: Measured | null) => void>() })
+  const [aiBusy, setAiBusy] = useState(false)
+  /** Elements an AI change touched, lit up on the canvas once it reloads. */
+  const flash = useRef<{ block: string; ids: string[] } | null>(null)
 
   useEffect(() => {
     let stop = false
@@ -235,6 +239,29 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }
   /** A style property at the breakpoint being edited, as per-breakpoint class operations. New classes need the
    * section's CSS compiled again, so the canvas reloads after the save. */
+  // ── AI ──
+  /** The section changed as asked, focused on the selection, as one undoable step; what it touched lights up. */
+  const changeWithAi = async (block: string, id: string | null, instruction: string) => {
+    const ask = hostRef.current.changeWithAi
+    if (!ask || aiBusy) return
+    setAiBusy(true)
+    try {
+      // The saved section is what the AI changes (a Showcase charges and saves on the server).
+      await flushNow()
+      const tree = treeAt(block)
+      const b = latest.current.state?.doc.blocks[block]
+      if (!tree || !b) return
+      const r = await ask({ block, label: (typeof b.props.label === 'string' && b.props.label) || 'Section', tree, ids: id ? [id] : [], instruction })
+      if (!r.ok) return say(r.error)
+      if (!update(s => editSection(s, block, [{ op: 'replace', tree: r.tree }]))) return
+      flash.current = { block, ids: r.changed }
+      requestReload()
+      setStatus({ kind: 'pending' })
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   // ── Free layers ──
   /** An element's box in % of its frame, as the canvas measures it. */
   const measure = (block: string, id: string) =>
@@ -301,6 +328,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       const at = latest.current.sel
       if (at) post({ type: 'select', block: at.block, id: at.id })
       if (scrollY.current) post({ type: 'scroll-to', y: scrollY.current })
+      if (flash.current) {
+        post({ type: 'flash', ...flash.current })
+        flash.current = null
+      }
     } else if (kind === 'select' && typeof m.block === 'string') setSel({ block: m.block, id: typeof m.id === 'string' ? m.id : null })
     else if (kind === 'ops' && typeof m.block === 'string' && Array.isArray(m.ops)) {
       // Typed in place: the canvas shows it already. Refused (it changed since), the reload puts the page right.
@@ -490,6 +521,15 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                 </button>
               </div>
             </div>
+          )}
+          {sel && tree && host.changeWithAi && host.canWrite && (
+            <AiBox
+              key={`${sel.block}:${sel.id ?? ''}`}
+              target={sel.id && sel.id !== tree.id ? nodeName(findNode(tree, sel.id)?.node ?? tree) : 'this section'}
+              note={host.aiNote}
+              busy={aiBusy}
+              onAsk={instruction => void changeWithAi(sel.block, sel.id, instruction)}
+            />
           )}
           {sel && tree && sel.id ? (
             <Inspector

@@ -233,3 +233,36 @@ describe('SiteEditor free layers', () => {
     expect(screen.getAllByRole('button', { name: 'Free placement' })[0]).toHaveAttribute('aria-pressed', 'false')
   })
 })
+
+describe('SiteEditor change with AI', () => {
+  it('applies the reply as one undoable change and lights up what changed after the reload', async () => {
+    const changed = { ...tree('Hello'), children: [{ t: 'el', tag: 'h2', props: {}, id: 'e2', children: [{ t: 'text', value: 'Bolder hello', id: 'e2.0' }] }] } as CodeNode
+    const changeWithAi = vi.fn(async () => ({ ok: true as const, tree: changed, changed: ['e2'] }))
+    const { save } = setup({ changeWithAi, aiNote: '3 free AI changes left today' })
+    await screen.findByRole('button', { name: 'Hero' })
+    await fromCanvas({ type: 'select', block: 'a', id: 'e2' })
+    const first = screen.getByTitle('Page canvas')
+    expect(screen.getByText('3 free AI changes left today')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/What to change/), { target: { value: 'Make it bolder' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+    await waitFor(() => expect(changeWithAi).toHaveBeenCalledWith(expect.objectContaining({ block: 'a', ids: ['e2'], instruction: 'Make it bolder', label: 'Hero' })))
+    expect(await screen.findByDisplayValue('Bolder hello')).toBeInTheDocument()
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    expect(words(save.mock.calls.at(-1)![0].blocks.a.props.tree)).toBe('Bolder hello')
+    // The canvas reloads after the save (a new frame); its ready lights up the changed nodes.
+    await waitFor(() => expect(screen.getByTitle('Page canvas')).not.toBe(first), { timeout: 3000 })
+    const fresh = await fromCanvas({ type: 'ready' })
+    expect(fresh.postMessage).toHaveBeenCalledWith({ type: 'site-editor:flash', block: 'a', ids: ['e2'] }, '*')
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(await screen.findByDisplayValue('Hello')).toBeInTheDocument()
+  })
+
+  it('shows why the AI could not change it', async () => {
+    setup({ changeWithAi: async () => ({ ok: false as const, error: 'Add ₹20 to your wallet' }) })
+    await screen.findByRole('button', { name: 'Hero' })
+    await fromCanvas({ type: 'select', block: 'a', id: 'e2' })
+    fireEvent.change(screen.getByLabelText(/What to change/), { target: { value: 'Make it bolder' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+    expect(await screen.findByText('Add ₹20 to your wallet')).toBeInTheDocument()
+  })
+})

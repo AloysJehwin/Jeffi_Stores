@@ -766,6 +766,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         previewUrl={homepagePreviewUrl(audience, token, 'desktop', previewPath)}
         canWrite={canWrite}
         theme={theme}
+        canAi={canAi}
         onClose={closeVisual}
         onPublish={publish}
       />

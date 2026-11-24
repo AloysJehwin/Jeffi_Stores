@@ -71,6 +71,15 @@ AI-generated pages must be editable with it.
    too" (`free-ops.ts` `placedWider`). `lib/site/critique.ts` `offScreenOnPhones` reports (`off_screen`, per element)
    layers placed on phones whose box runs past the section's edges; the owner moves them on Phone (no auto-fix).
 
+**Phase 4 (AI in the editor), in slices**
+1. Change with AI on a selection. `lib/site/studio/selection.ts`: the section printed with its `data-e` ids, the
+   selected ids named, rewritten through `tweakSection`, read back as a tree; `changedIds` tells what it touched. The
+   tweak prompt adds `EDITOR_RULES` for a section the editor opened (keep `data-e`, prefer theme colours, free layers
+   only inside a `relative` section from a breakpoint up). Admin: `POST /api/admin/site-builder/ai/selection`, billed
+   to the store's AI wallet. Showcase: `POST /studio/design/ai`, one AI correction (3 free a day, then ₹20 at the price
+   shown), working on the saved section and saving inside the run, so an unsaved change isn't charged. The editor
+   saves first, applies the reply as one undoable `replace`, and the changed nodes light up after the reload.
+
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
 all Showcase owners), since their studio runs on the platform.

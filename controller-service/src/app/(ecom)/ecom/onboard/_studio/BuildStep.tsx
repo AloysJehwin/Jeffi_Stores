@@ -584,6 +584,7 @@ export default function BuildStep({
     return (
       <VisualStudio
         session={s}
+        allowance={view.allowance}
         onClose={() => {
           setVisual(false)
           setPicked(null)

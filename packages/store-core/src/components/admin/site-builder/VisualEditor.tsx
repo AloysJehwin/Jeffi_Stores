@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef } from 'react'
-import { pageRefKey, type PageDoc, type PageRef, type ThemeTokens } from '@jeffi/site-blocks'
+import { pageRefKey, type CodeNode, type PageDoc, type PageRef, type ThemeTokens } from '@jeffi/site-blocks'
 import { api } from '@/components/admin/kit/core'
 import SiteEditor from '@/components/site-editor/SiteEditor'
 import type { SaveResult, SiteEditorHost } from '@/components/site-editor/host'
@@ -21,11 +21,13 @@ export interface VisualEditorProps {
   previewUrl: string | null
   canWrite: boolean
   theme: ThemeTokens | null
+  /** The admin may use Site Builder's AI (billed to the store's AI wallet). */
+  canAi?: boolean
   onClose: () => void
   onPublish: () => Promise<void>
 }
 
-export default function VisualEditor({ draftId, pageRef, title, previewUrl, canWrite, theme, onClose, onPublish }: VisualEditorProps) {
+export default function VisualEditor({ draftId, pageRef, title, previewUrl, canWrite, theme, canAi = false, onClose, onPublish }: VisualEditorProps) {
   // The Site Builder's own write scope as well as the caller's say-so, like its other panels.
   const scoped = useCanWrite('settings:write')
   const writable = canWrite && scoped
@@ -59,10 +61,22 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       onClose,
       blockLabel: type => siteRegistry.get(type)?.label ?? type,
       blockLocked: type => !!siteRegistry.get(type)?.locked,
+      ...(canAi
+        ? {
+            aiNote: 'Billed to your AI wallet.',
+            async changeWithAi({ label, tree, ids, instruction }) {
+              const { ok, data } = await api<{ tree?: CodeNode; changed?: string[]; error?: string }>('/api/admin/site-builder/ai/selection', {
+                method: 'POST',
+                json: { ref: { audience: web.audience, page: web.page }, block: { label, tree }, ids, instruction, draftId },
+              })
+              return ok && data.tree ? { ok: true as const, tree: data.tree, changed: data.changed ?? [] } : { ok: false as const, error: data.error || 'The AI could not make that change' }
+            },
+          }
+        : {}),
       // The forms editor's picker: the media library, uploads and AI pictures.
       renderImagePicker: ({ value, disabled, onPick }) => <MediaImage label="Picture" value={value} size="wide" disabled={disabled} onCommit={url => onPick(url)} />,
     }),
-    [title, previewUrl, writable, theme, draftId, key, web, onClose, onPublish]
+    [title, previewUrl, writable, theme, canAi, draftId, key, web, onClose, onPublish]
   )
 
   return <SiteEditor key={key} host={host} />
