@@ -1,6 +1,6 @@
 # Per-service UI and API testing plan
 
-Status: PLAN, nothing implemented. Written 2026-11-24 from a read-only survey (no builds, no test runs).
+Status: APPROVED to build (2026-11-24). Survey drafted by a Sonnet agent; audited and corrected by the main session (section 9 is the execution plan). Code is written by Sonnet agents and audited before merge.
 
 ## 1. Why this exists
 
@@ -115,10 +115,12 @@ Principle: three questions per service, each answered by a test in that service'
 
 `expectPageVisible(page)` runs after load and after interactions that mount overlays (add to cart, open cart, open and close dialogs, route change). It fails if any of these hold:
 
-1. **Hit test.** `document.elementsFromPoint` at 9 viewport points (corners inset 8 px, edge midpoints, centre): the top element must be inside the app root (`body > :not(script)` main content, or an allow-listed `[data-ui-overlay]` such as the cookie banner and the open cart drawer).
-2. **No opaque full-screen layer.** Walk each hit element's ancestors: a `position: fixed|absolute` box covering at least 90 percent of the viewport with computed `opacity > 0.9` and an opaque background, outside the app root, fails. Also fail if `pointer-events: none` is missing on a decorative overlay that sits on top (it would swallow clicks).
+1. **Hit test.** `document.elementFromPoint` at 9 viewport points (corners inset 8 px, edge midpoints, centre). `elementFromPoint` skips `pointer-events: none` layers (that is how PR #636 hid), so the check also walks `document.elementsFromPoint` and looks at the topmost painted box. The top element must be inside `[data-app-root]`, inside an open `[role=dialog]`/`[role=alertdialog]`/`[aria-modal=true]`, or match the allowlist (`ins.adsbygoogle`, `iframe[id^=aswift]`, `iframe[id^=google_ads]`, plus any `allow` selectors the caller passes).
+2. **No opaque full-screen layer.** Any element outside `[data-app-root]` whose box covers at least 90 percent of the viewport, with computed opacity above 0.9 and a non-transparent background, fails. This catches it even with `pointer-events: none`.
 3. **Not blank.** Screenshot, downsample, and require luminance variance above a threshold (a blank white/black page has near zero). Catches the PR #636 case with no baseline image.
-4. **Hydrated.** No `Hydration failed` / uncaught error in the console, and the first interactive control receives focus when tabbed.
+4. **No page errors.** No `pageerror` and no console error containing `Hydration` during the test.
+
+Every Next app's root wrapper carries `data-app-root` (storefront already does since `cf436b09a`; admin, controller, business and showcase get the attribute on their root layout element; no behaviour change).
 5. Optional later: `toHaveScreenshot` on one route per app with a loose `maxDiffPixelRatio`. Not recommended now (fonts, data and CDN variance create churn); see decisions.
 
 Proof it works: revert `cf436b09a` locally and confirm the new storefront spec fails (not run as part of this plan).
@@ -142,7 +144,7 @@ Proof it works: revert `cf436b09a` locally and confirm the new storefront spec f
 
 ### 3.3 Config changes (design only)
 
-- `playwright.ui.config.ts`: take `UI_APP=<storefront|admin|controller|business|showcase>`; derive `testDir`, `baseURL` and port (3010 storefront, 3011 admin, 3012 controller, 3013 business, 3014 showcase) from it; `globalSetup` mints the app's test session when needed.
+- `playwright.ui.config.ts`: take `UI_APP=<storefront|admin|controller|business|showcase>`; derive `testDir`, `baseURL` and port from it (the `DEV_PORTS` in `scripts/dev-router.ts`: 3010 storefront, 3011 admin, 3012 business, 3013 controller; showcase 3014). `globalSetup` mints the app's test session when needed. Unset `UI_APP` keeps today's behaviour (all specs, storefront base URL).
 - `vitest.integration.config.ts` and `vitest.db.config.ts`: add one project per app (as `vitest.config.ts` already does) so a job runs `--project admin`. Keep globs and aliases as they are.
 - `vitest.config.ts` coverage: replace the single five-app glob with one glob per service (business at 0 until it has tests), ratcheting up only.
 - `scripts/component-owners.mjs`: the import-graph walk above, writing `scripts/component-owners.json` (component to owning apps). Used by CI and by a ratchet check.
@@ -260,7 +262,7 @@ Phases 0 to 3 stop the PR #636 class of outage (about 7 to 9 days of work); 4 to
 | 4 | Gate stays one `Checks passed` status? | Yes, keep the name; skipped jobs for unaffected apps count as passing. |
 | 5 | Post-deploy smoke failure policy | Advisory for one week, then fail the Release job and report; manual rollback, no auto-rollback. |
 | 6 | Visual regression screenshots | Not now. Hit-test, opaque-layer and blank-page checks cover the outage class without baseline churn; revisit in phase 7. |
-| 7 | Auth for admin, controller, business browser tests | Mint test sessions in global-setup from the test JWT secret, not by driving the login UI (no OTP/TOTP in CI). Login pages are covered by their own anonymous specs. |
+| 7 | Auth for admin, controller, business browser tests | Mint DB-backed sessions in global-setup with the apps' own session helpers (as `tests/site-editor/seed.ts` does with `createSession` for `admin_sid`), on `jeffi_test` only, not by driving the login UI (no OTP/TOTP in CI). Login pages are covered by their own anonymous specs. |
 | 8 | "All components tested": enforcement | Shrink-only allowlist plus `check-component-tests`, with line coverage gates ratcheting alongside; do not set a global 80 until phase 5 is done. |
 | 9 | Expo client and PaddleOCR | PaddleOCR pytest in phase 4 (cheap); Expo client tests deferred. |
 | 10 | Merged Coverage job | Keep until phase 5 completes, then move gates into the per-service part jobs and delete the merge. |
@@ -270,3 +272,29 @@ Phases 0 to 3 stop the PR #636 class of outage (about 7 to 9 days of work); 4 to
 ## Appendix: how the numbers were taken
 
 File counts by `find` over each service's `tests/`, `integration-tests/{ui,api-db}/` and `ui-tests/`. Component and route coverage by matching import specifiers in test files against each component or `route.ts` path (heuristic; treat as plus or minus 5 percent). Ownership by the same static-plus-dynamic import walk as `packages/store-core/tests/lib/site-editor-imports.test.ts`, extended to all five Next apps. CI timings from the job durations of run 45339474642.
+
+## 9. Execution (main session plans and audits; Sonnet agents write the code)
+
+Decisions 1 to 12 are taken as recommended, with the corrections above (ports, session minting, the visible check, `data-app-root`). Decision 11 (delete the 11 orphaned components) waits for the user: it is a production change.
+
+**Rules for every agent:** own worktree; touch only its listed files; no prettier; terse comments; `graphify query` before grepping; heavy checks one at a time through `heavy.sh`; never `npm run build` or start servers; commit on its branch, no push. The main session audits each diff, runs the checks, resolves `package.json` script conflicts and merges into `feat/feature-release`. Everything ships in PRs after #642.
+
+**Contracts (fixed here so agents can work in parallel):**
+- `tests/ui-kit/visible.ts`: `expectPageVisible(page: Page, opts?: { allow?: string[] }): Promise<void>` (section 3.1) and `watchPageErrors(page): () => string[]`.
+- `playwright.ui.config.ts`: `UI_APP` picks `testMatch` (`<app>-service/ui-tests/**`) and `baseURL` (`UI_BASE_URL` wins, else `http://localhost:<DEV_PORTS[app]>`); `globalSetup: tests/ui-kit/global-setup.ts` (minting is a no-op for storefront and showcase).
+- CI runs a browser card as `UI_APP=<app> npm run test:ui` after `next start <app>-service -p <port>`, only when `<app>-service/ui-tests` has specs.
+- `playwright.post-deploy.config.ts` + `tests/post-deploy/<service>.spec.ts`, base URL from `LIVE_URL`; CI step `LIVE_URL=<url> npx playwright test -c playwright.post-deploy.config.ts tests/post-deploy/<service>.spec.ts` with `continue-on-error: true` for the first week.
+- `scripts/affected.mjs <base> <head>` prints `{"apps":[...],"services":[...],"all":bool}`; `scripts/component-owners.mjs` writes `scripts/component-owners.json`.
+- npm scripts: `check:component-tests`, `check:route-tests`, `check:service-routes`; ai-platform OCR tests run with `pytest ai-platform/<ocr dir>/tests`.
+
+| Wave | Agent | Phase | Files it owns |
+|---|---|---|---|
+| 1 | A browser-kit | 0, 2 (storefront), 3 | `tests/ui-kit/**`, `playwright.ui.config.ts`, `storefront-service/ui-tests/**`, `tests/post-deploy/**`, `playwright.post-deploy.config.ts`, `data-app-root` on the four other root layouts |
+| 1 | B ci-matrix | 1, CI wiring of 2 to 5 | `.github/workflows/ci.yml`, `scripts/affected.mjs`, `scripts/component-owners.mjs`, `vitest.integration.config.ts`, `vitest.db.config.ts`, tests for the scripts |
+| 1 | C service-api | 4 | `messaging-service/`, `document-service/`, `public-api-service/`, `mobile-service/` (not `client/`) tests and scripts, OCR pytest, `scripts/check-service-routes.mjs` |
+| 1 | D ratchets | 5/6 enforcement | `scripts/check-component-tests.mjs`, `scripts/check-route-tests.mjs`, their allowlists, per-service coverage globs in `vitest.config.ts` |
+| 2 | A2 app-browsers | 2 (other apps) | `tests/ui-kit/global-setup.ts`, `tests/ui-kit/session.ts`, `{admin,controller,business,showcase}-service/ui-tests/**` |
+| 2 | 5a to 5d | component tests | one agent per directory slice, shrinking the component allowlist |
+| 3 | 6 | route tests | one agent per route group, shrinking the route allowlist |
+
+Audit gate per merge: diff read in full; no production source change beyond `data-app-root`; the agent's tests pass here; `tsc` and lint clean; for B, every gate job name still matches branch protection and a release still needs every check green.
