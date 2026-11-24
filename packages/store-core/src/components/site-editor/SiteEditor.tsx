@@ -36,6 +36,10 @@ const BREAKPOINTS = [
   ['lg', Monitor],
 ] as const
 
+/** The page check's screen sizes: the page loaded hidden at each width, what runs past it reported by the bridge. */
+const SIZES = BREAKPOINTS.map(([b]) => b)
+type SizeHit = { bp: Breakpoint; block: string; id: string | null }
+
 type Selection = { block: string; id: string | null } | null
 /** The canvas's answer to `measure`: the element's box in % of its frame, the frame's node id and height in px. */
 type Measured = { rect: Required<FreeRect> | null; frame: string | null; frameHeight: number | null }
@@ -69,6 +73,9 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const fieldsRun = useRef(0)
   /** Elements an AI change touched, lit up on the canvas once it reloads. */
   const flash = useRef<{ block: string; ids: string[] } | null>(null)
+  const [sizes, setSizes] = useState<{ run: number; rev: number; running: boolean; found: SizeHit[] | null; missing: Breakpoint[] }>({ run: 0, rev: -1, running: false, found: null, missing: [] })
+  const sizeFrames = useRef<(HTMLIFrameElement | null)[]>([])
+  const sizeRun = useRef<{ run: number; got: Map<Breakpoint, SizeHit[]>; timer?: ReturnType<typeof setTimeout> }>({ run: 0, got: new Map() })
 
   useEffect(() => {
     let stop = false
@@ -146,6 +153,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   useEffect(
     () => () => {
       clearTimeout(timer.current)
+      clearTimeout(sizeRun.current.timer)
       const s = latest.current.state
       if (!s || s.rev === saved.current.rev) return
       void saved.current.chain.then(() => (s.rev !== saved.current.rev ? hostRef.current.save(docToSave(s)) : undefined)).catch(() => {})
@@ -340,6 +348,35 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     }
   }
 
+  // ── Screen sizes (the page check): the saved page loaded hidden at Phone, Tablet and Desktop widths ──
+  const finishSizes = (run: number) => {
+    if (sizeRun.current.run !== run) return
+    clearTimeout(sizeRun.current.timer)
+    const got = sizeRun.current.got
+    setSizes(s => ({ ...s, running: false, found: SIZES.flatMap(bp => got.get(bp) ?? []), missing: SIZES.filter(bp => !got.has(bp)) }))
+  }
+  const checkSizes = async () => {
+    if (!hostRef.current.previewUrl || sizes.running) return
+    await flushNow()
+    const run = sizeRun.current.run + 1
+    clearTimeout(sizeRun.current.timer)
+    sizeRun.current = { run, got: new Map(), timer: setTimeout(() => finishSizes(run), 60_000) }
+    setSizes({ run, rev: latest.current.state?.rev ?? 0, running: true, found: null, missing: [] })
+  }
+  const sizeHandler = useRef<(i: number, m: Record<string, unknown>) => void>(() => {})
+  sizeHandler.current = (i, m) => {
+    const kind = String(m.type).slice(P.length)
+    const { run } = sizeRun.current
+    const bp = SIZES[i]
+    if (kind === 'ready') sizeFrames.current[i]?.contentWindow?.postMessage({ type: `${P}overflow`, req: run }, '*')
+    else if (kind === 'overflowed' && m.req === run && Array.isArray(m.items)) {
+      const blocks = latest.current.state?.doc.blocks ?? {}
+      const hits = (m.items as { block?: unknown; id?: unknown }[]).filter(x => typeof x.block === 'string' && blocks[x.block])
+      sizeRun.current.got.set(bp, hits.map(x => ({ bp, block: x.block as string, id: typeof x.id === 'string' ? x.id : null })))
+      if (sizeRun.current.got.size === SIZES.length) finishSizes(run)
+    }
+  }
+
   // ── Free layers ──
   /** An element's box in % of its frame, as the canvas measures it. */
   const measure = (block: string, id: string) =>
@@ -440,7 +477,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (!frame.current || e.source !== frame.current.contentWindow || typeof e.data?.type !== 'string' || !e.data.type.startsWith(P)) return
+      if (typeof e.data?.type !== 'string' || !e.data.type.startsWith(P)) return
+      const sized = sizeFrames.current.findIndex(f => !!f && e.source === f.contentWindow)
+      if (sized >= 0) return sizeHandler.current(sized, e.data)
+      if (!frame.current || e.source !== frame.current.contentWindow) return
       handlers.current(e.data)
     }
     const onKey = (e: KeyboardEvent) => {
@@ -609,6 +649,22 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
           ) : (
             <p className="p-6 text-sm text-foreground-muted">Loading the canvas…</p>
           )}
+          {sizes.running && host.previewUrl && (
+            <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden opacity-0">
+              {SIZES.map((b, i) => (
+                <iframe
+                  key={`${sizes.run}:${b}`}
+                  ref={el => {
+                    sizeFrames.current[i] = el
+                  }}
+                  src={host.previewUrl!}
+                  title={`${BREAKPOINT_NAME[b]} check`}
+                  tabIndex={-1}
+                  style={{ position: 'absolute', left: 0, top: 0, width: WIDTH[b], height: 900, border: 0 }}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-4 min-w-0 xl:min-h-0 xl:overflow-y-auto [scrollbar-width:thin]">
@@ -622,6 +678,27 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                 busy={aiBusy}
                 onShow={f => select(f.block, f.id)}
                 onFix={fixFinding}
+                sizes={
+                  host.previewUrl
+                    ? {
+                        running: sizes.running,
+                        stale: sizes.found !== null && sizes.rev !== state.rev,
+                        missing: sizes.missing.map(b => BREAKPOINT_NAME[b]),
+                        found:
+                          sizes.found?.map((h, i) => {
+                            const t = trees[h.block]
+                            const node = h.id && t ? findNode(t, h.id)?.node : null
+                            return {
+                              key: `${h.bp}:${h.block}:${h.id ?? ''}:${i}`,
+                              what: node && h.id !== t?.id ? `${nodeName(node)} in "${label(h.block)}"` : `"${label(h.block)}"`,
+                              screen: `${BREAKPOINT_NAME[h.bp]} (${WIDTH[h.bp]}px)`,
+                              show: () => (setBp(h.bp), select(h.block, h.id)),
+                            }
+                          }) ?? null,
+                        run: () => void checkSizes(),
+                      }
+                    : undefined
+                }
               />
             </div>
           )}
