@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 
 const push = vi.fn()
 let search = ''
+// Stable per URL, like Next's: a fresh object each render re-fires the panel's URL-sync effect forever.
+let params: URLSearchParams | null = null
+let paramsFor = ''
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
-  useSearchParams: () => new URLSearchParams(search),
+  useSearchParams: () => {
+    if (!params || paramsFor !== search) {
+      params = new URLSearchParams(search)
+      paramsFor = search
+    }
+    return params
+  },
 }))
 vi.mock('@/components/ui/DatePicker', () => ({
   default: ({ value, onChange, placeholder }: any) => (
@@ -56,8 +65,9 @@ const fields: any[] = [
   { name: 'status', label: 'Status', type: 'toggle', options: [{ value: 'paid', label: 'Paid' }, { value: 'due', label: 'Due' }], section: 'Stock' },
   { name: 'brand', label: 'Brand', type: 'select', options: [{ value: 'acme', label: 'Acme' }], section: 'Catalog' },
   { name: 'colors', label: 'Colours', type: 'multi-select', options: [{ value: 'red', label: 'Red' }, { value: 'blue', label: 'Blue' }], section: 'Catalog' },
-  { name: 'price', label: 'Price', type: 'range', unit: '₹', section: 'Catalog' },
-  { name: 'created', label: 'Created', type: 'date-range', section: 'Dates' },
+  // Ranges and dates reach the panel with both param names, as @jeffi/list-filters/client expands them.
+  { name: ['price_min', 'price_max'], label: 'Price', type: 'range', unit: '₹', section: 'Catalog' },
+  { name: ['created_from', 'created_to'], label: 'Created', type: 'date-range', section: 'Dates' },
   { name: 'sku', label: 'SKU', type: 'text', section: 'Dates' },
   { name: 'customer', label: 'Customer', type: 'text', suggest: 'customers', section: 'Dates' },
   { name: 'tags', label: 'Tags', type: 'value-help', noun: 'Products', section: 'Dates' },
@@ -139,7 +149,7 @@ describe('AdvancedFilterPanel', () => {
     render(<AdvancedFilterPanel fields={fields} forceExpanded />)
     for (const name of [/Stock/, /Catalog/, /Dates/]) fireEvent.click(screen.getByRole('button', { name }))
 
-    fireEvent.click(screen.getByText('Any', { selector: 'span' }))
+    fireEvent.click(within(screen.getByText('In stock').parentElement!).getByRole('button'))
     fireEvent.click(screen.getByRole('button', { name: 'Paid' }))
     fireEvent.change(screen.getByLabelText('select'), { target: { value: 'acme' } })
     fireEvent.change(screen.getByPlaceholderText('Min'), { target: { value: '100' } })
@@ -217,7 +227,8 @@ describe('AdvancedFilterPanel', () => {
     const vh = screen.getByTestId('vh').textContent!
     expect(vh.startsWith('tags|old|Products|')).toBe(true)
     expect(vh).toContain('status=paid')
-    expect(vh).not.toContain('search=x')
+    // The list's text search narrows the counts too; only navigation params (RESERVED_PARAMS) are dropped.
+    expect(vh).toContain('search=x')
     expect(vh).not.toContain('tags=old')
   })
 
