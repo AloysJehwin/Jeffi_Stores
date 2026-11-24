@@ -1,6 +1,7 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **phases 0–6 built** (2026-11-24); phase 6's browser runs are pending their first CI runs. Decided: flow first with free layers later (1), one responsive document
+Status: **phases 0–6 built** (2026-11-24); phases 4–6 verified end to end in a local browser (see "Verified"), CI runs
+pending. Decided: flow first with free layers later (1), one responsive document
 per page with Phone/Tablet/Desktop breakpoints (2), classic blocks kept until converted or redesigned (3), a
 per-tenant rollout flag with the old editors as "Classic editor" (8); fonts and colours (5, 6) run on the defaults
 until decided (see section 6). This replaces
@@ -101,6 +102,12 @@ AI-generated pages must be editable with it.
    studio writes the page's words into the brief (`POST /studio/design/keep-words`, `StudioBrief.keepWords`), the admin
    page redo passes `keepWords` to `startPageRedo`. The section writer's brief reuses them where they fit; section
    changes (tweaks) leave them out. The generation rules for editor sections (`EDITOR_RULES`) came with slice 1.
+5. Screen sizes (the headless overflow check, added 2026-11-24). "Check page" has "Check screen sizes": the editor
+   flushes, loads the saved page in three hidden frames at 390, 768 and 1280 px (the canvas's own URL, so no server
+   browser), and the bridge answers `overflow` with the outermost element of each section that runs past the frame's
+   width with no ancestor clipping it (`SiteEditorBridge` `overflowing`). Each is listed with its screen and "Show"
+   (switches to that breakpoint and selects it); no auto-fix. The CI sweep runs the same kind of check headless on the
+   editor's fixture page.
 
 **Phase 5 (migration), in slices**
 1. Converters. `lib/site/convert.ts` `convertBlock` rewrites `rich_text`, `image_text`, `image_banner`, `faq`,
@@ -155,14 +162,43 @@ AI-generated pages must be editable with it.
    seeds a test DB only (flag, draft, admin session, the first pages if none) and undoes it all. CI: the advisory
    `site-editor-e2e` job (storefront and admin behind the dev router).
 
-**Left after phase 6:** the e2e specs and the sweep's new checks have not run against servers yet (agents don't build
-or start them); the first runs of the advisory `responsive` and `site-editor-e2e` jobs will show whether the budgets
-and selectors hold, and both get promoted to `checks` once reliable. The admin spec signs in with a seeded session
-cookie; if the admin's gate wants more on localhost (MFA, a client certificate), its first test says so.
+4. The AI end to end (`admin-service/ui-tests/site-editor/ai.spec.ts`), against a stand-in gateway
+   (`tests/site-editor/ai-mock.ts`, port 8098; start the apps with `AI_GATEWAY_URL=http://localhost:8098`, as the CI job
+   does): the real routes, prompts, compiler and billing run, only the model's words are fixed. Covers phase 4's flows.
 
-**Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
-scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
-all Showcase owners), since their studio runs on the platform.
+**Verified (2026-11-24), locally in headless Chromium.** The storefront and admin as dev servers (webpack) behind the dev
+router on `jeffi_test` (`tests/site-editor/seed.ts` up and down; never the real-data DB), started and stopped in one
+locked session each. The laptop AI gateway (:8090) was down (its token had expired), so no real AI call was made; the
+AI ran through the stand-in gateway.
+- Phase 4: Change with AI on the hero's heading: the prompt names the selection (`data-e`) and carries `EDITOR_RULES`,
+  the reply lands as one change, the touched node flashes, the draft saves it and one Undo takes it back. Rewrite,
+  Shorten and Translate (Hindi) change the words in place and undo one by one; "Find a picture" shows the route's
+  error when nothing is found, and a found picture (the route's reply stubbed in the browser, since stock and generated
+  pictures upload to S3) swaps the slot and saves. Check page: a cleared picture description is listed and Fix fills
+  it; an overlong heading is listed and "Shorten with AI" shortens it. Check screen sizes: nothing past the screen at
+  first; the badge pushed past the hero's edge on Desktop is listed for Desktop and Show selects it. Design this page
+  again on a hand-edited page asks first, "Keep my words" sends `keepWords`, the section writer's prompt carries the
+  page's words, and the new page (written with them) replaces the old one in the draft.
+- Phase 5: a classic `rich_text` block opens its fields, converts to a code section with its words (saved, drawn on
+  the canvas); "Classic editor" shows the forms and "Visual editor" comes back. Theme templates and the Showcase host
+  were not exercised in a browser (unit tests cover the upgrade; Showcase needs the controller app).
+- Phase 6: the canvas spec (select, type in place, free-layer drag in %, phone placement on screen, no editor code on
+  a live page) and the admin spec pass; with the AI spec, 12 of 12. The sweep's editor pack (`SWEEP_PACKS=editor`,
+  `SWEEP_VITALS=budget`): 7 renders, 0 errors, 24 warnings (product-card buttons 44px where 48 is wanted), no CLS or
+  LCP finding.
+- Fixes found by running them: the canvas spec framed the page from `about:blank`, which the store's CSP refuses (now
+  a page on the store's origin); the admin specs clicked before the bridge loaded (they wait for editing mode now) and
+  each test opened a new browser, which the admin session's binding refuses (one browser per file); the tsx steps
+  failed in a git worktree (tsx and the `server-only` stub are found up the tree). A dev server restarts near its heap
+  limit, which drops requests mid-test: run them with `--max-old-space-size=6144`.
+
+**Left:** the advisory `responsive` and `site-editor-e2e` CI jobs have not run on CI yet (production builds); promote
+them to `checks` once reliable. A run against the real Claude (the laptop gateway) is still to do, at most a few calls.
+
+**Open for the user:** fonts (decision 5) and colours (6) run on the recommended defaults (fonts: the theme's pair;
+colours: theme scales plus any hex, with the page check's contrast finding); when the old Homepage builder
+(`settings/homepage`) goes (3); how long the Classic editor stays once the flag is on (8). The Showcase flag is the
+flagship's `site_settings` row (one switch for all Showcase owners), since their studio runs on the platform.
 
 ## What exists
 
