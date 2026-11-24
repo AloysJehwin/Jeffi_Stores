@@ -658,6 +658,18 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job: sends the queued ecom conversions (owner_conversion_uploads) to the flagship's Google Ads account.
+    id: 'ecom_conversions',
+    name: 'Ecom Google Ads conversions',
+    path: '/api/cron/ecom-conversions',
+    method: 'GET',
+    intervalMs: 15 * MIN,
+    intervalLabel: 'every 15 min',
+    startDelayMs: 345 * SEC,
+    lockTtlMs: 15 * MIN - 30 * SEC,
+    tenantScope: null,
+  },
+  {
     // Platform job: nightly sum of every tenant's S3 bucket, drives the storage.s3Gb cap guard.
     id: 's3_usage',
     name: 'Tenant S3 bucket usage',

@@ -5,6 +5,7 @@ import { loadSalesVelocity } from '@/lib/merchant/sales-velocity'
 import { LIMITS, adTextLength } from './limits'
 import { freeDeliveryCallout } from './assets'
 import { shipToStates, INDIA_REGION_COUNT } from './geo'
+import { buildEcomPresets, ecomOrigin, ecomPresetsAvailable, type EcomPreset } from './ecom-presets'
 
 // Everything the campaign wizard needs from our own data in one read: store identity, a budget
 // suggestion from recent revenue, the states we ship to, categories, brands, custom label counts
@@ -21,6 +22,19 @@ export interface WizardBootstrap {
   merchantConnected: boolean
   /** Short store facts for AI prompts and callouts. */
   facts: string[]
+  /** "Promote ecom" presets: only on the flagship, connected in platform mode. */
+  ecomPresets?: EcomPreset[]
+}
+
+/** The ecom presets, or none unless this is the flagship connected through the platform account. */
+export async function loadEcomPresets(): Promise<EcomPreset[] | undefined> {
+  try {
+    const [{ getAdsConnectionStatus }, { adsTenantKey }] = await Promise.all([import('./connection'), import('./credentials')])
+    const status = await getAdsConnectionStatus(await adsTenantKey())
+    return ecomPresetsAvailable(status) ? buildEcomPresets(ecomOrigin()) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export const AD_SPEND_SHARE = 0.1
@@ -89,7 +103,7 @@ export async function storeFacts(): Promise<string[]> {
 }
 
 export async function loadWizardBootstrap(): Promise<WizardBootstrap> {
-  const [baseUrl, controls, revenue, states, categories, brands, images, labels, facts, account] = await Promise.all([
+  const [baseUrl, controls, revenue, states, categories, brands, images, labels, facts, account, ecomPresets] = await Promise.all([
     catalogBaseUrl(),
     import('@/lib/catalog/site-controls').then(m => m.getSiteControls()).catch(() => null),
     queryOne<{ revenue: string; orders: number }>(
@@ -119,6 +133,7 @@ export async function loadWizardBootstrap(): Promise<WizardBootstrap> {
     labelCounts(),
     storeFacts(),
     queryOne<{ currency_code: string | null }>(`SELECT currency_code FROM ads_account WHERE id = 1`).catch(() => null),
+    loadEcomPresets(),
   ])
   const revenue30d = Number(revenue?.revenue ?? 0) || 0
   let merchantConnected = false
@@ -149,5 +164,6 @@ export async function loadWizardBootstrap(): Promise<WizardBootstrap> {
     images: images.map(i => ({ id: i.id, productId: i.product_id, productName: i.name, url: i.image_url })),
     merchantConnected,
     facts,
+    ...(ecomPresets ? { ecomPresets } : {}),
   }
 }

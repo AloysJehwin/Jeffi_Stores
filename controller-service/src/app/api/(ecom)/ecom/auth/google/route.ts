@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyGoogle } from '@/lib/shared/google-verify'
 import { issueOwnerSession, setOwnerCookie } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { recordOwnerSignIn } from '@controller/lib/attribution/persist'
+import { fireAndForget } from '@controller/lib/attribution/fire'
 
 // Ecom OWNER Google sign-in/up. Reuses the shared Google token verification, then
 // upserts the owner + issues an owner session. body: { idToken } or { accessToken }.
@@ -14,6 +16,7 @@ export async function POST(request: NextRequest) {
     const name = identity.name || [identity.given_name, identity.family_name].filter(Boolean).join(' ') || null
     const signals = extractSessionSignals(request)
     const { sid, owner } = await issueOwnerSession({ email: identity.email, name, signals })
+    fireAndForget('ecom_signup', () => recordOwnerSignIn(owner, request))
 
     const res = NextResponse.json({
       message: 'Signed in',

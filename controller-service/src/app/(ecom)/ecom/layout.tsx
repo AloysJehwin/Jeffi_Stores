@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { cookies, headers } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import AttributionCapture from './AttributionCapture'
 import EcomNav from './EcomNav'
 import EcomMain from './EcomMain'
 import EcomFooter from './EcomFooter'
@@ -35,6 +36,7 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
 
   return (
     <div className={`ecom-scope ${display.variable} min-h-screen bg-surface flex flex-col`}>
+      <AttributionCapture />
       <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />
       <EcomMain footer={<EcomFooter />}>{children}</EcomMain>
     </div>

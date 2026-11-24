@@ -226,3 +226,12 @@ ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_amount_check 
 ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_payment_key UNIQUE (razorpay_payment_id);
 ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_amount_check CHECK (amount_paise >= 0 AND refunded_paise BETWEEN 0 AND amount_paise);
+
+-- Ecom attribution and the offline conversions owed to Google Ads for it.
+ALTER TABLE ONLY public.owner_attribution ADD CONSTRAINT owner_attribution_pkey PRIMARY KEY (owner_id);
+ALTER TABLE ONLY public.owner_conversion_uploads ADD CONSTRAINT owner_conversion_uploads_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.owner_conversion_uploads ADD CONSTRAINT owner_conversion_uploads_owner_action_key UNIQUE (owner_id, action);
+ALTER TABLE ONLY public.owner_conversion_uploads ADD CONSTRAINT owner_conversion_uploads_action_check
+    CHECK (action IN ('ecom_signup','showcase_published','subscription_paid'));
+ALTER TABLE ONLY public.owner_conversion_uploads ADD CONSTRAINT owner_conversion_uploads_status_check
+    CHECK (status IN ('pending','uploaded','failed'));
