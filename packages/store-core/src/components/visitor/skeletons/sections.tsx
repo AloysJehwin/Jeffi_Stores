@@ -577,6 +577,9 @@ export function HomeLayoutSkeleton({ sections, label = 'Loading home' }: { secti
   let n = 0
   return (
     <div className="bg-surface" role="status" aria-busy="true" aria-label={label}>
+      {/* The page's height isn't known until its data lands (empty rows collapse), so the footer stays hidden, not
+          shifted, while this shows; the style goes with the skeleton when the page replaces it. */}
+      <style dangerouslySetInnerHTML={{ __html: '[data-storefront]>footer{visibility:hidden}' }} />
       {groupLayoutRows(sections).map(row => {
         const key = n
         n += row.length
