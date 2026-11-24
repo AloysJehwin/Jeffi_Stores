@@ -1,6 +1,6 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **phases 0–5 built** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
+Status: **phases 0–6 built** (2026-11-24); phase 6's browser runs are pending their first CI runs. Decided: flow first with free layers later (1), one responsive document
 per page with Phone/Tablet/Desktop breakpoints (2), classic blocks kept until converted or redesigned (3), a
 per-tenant rollout flag with the old editors as "Classic editor" (8); fonts and colours (5, 6) run on the defaults
 until decided (see section 6). This replaces
@@ -134,6 +134,31 @@ AI-generated pages must be editable with it.
    stay in the classic editor. On a Showcase, "Edit on the page" is the build step's main button; arranging (the
    section list and the preview's move handles) and the words form come back only with "Classic editor". The editor
    saves a waiting change when it closes or another page is picked. With the flag off, nothing changes.
+
+**Phase 6 (harden), in slices**
+1. LCP. Converted pictures use the Image part (`convert.ts` `pic`), so the first one in the page's LCP section loads
+   eagerly at high priority, as the classic blocks' do; a banner's phone picture comes first (a lazy picture hidden by
+   CSS never loads), and each has a `sizes` hint. `site-convert.test.ts` checks it.
+2. Responsive sweep and load budgets (`tests/responsive`). The sweep adds the editor's page (`editor-pack.ts`, built
+   through the editor's own operations: free layers on Desktop and Tablet and the badge on Phone, panel styles per
+   breakpoint, every convertible kind converted; `SWEEP_PACKS=editor` alone). The audit flags a free layer past its
+   section's side (an error below 768px, a warning wider) or foot. Each page is held to CLS 0.1 / 0.25 and LCP
+   2.5 s / 4 s (`pages.ts` `VITALS`), measured as it first paints, before any scrolling: over the first line a
+   warning, over the second an error in CI (a production build) or with `SWEEP_VITALS=budget`. The CI job stays
+   advisory. `site-editor-pack.test.ts` keeps the fixture compiling.
+3. Playwright end to end, opt-in with `SITE_EDITOR_E2E=1` (`npm run test:ui:editor`). The canvas
+   (`storefront-service/ui-tests/site-editor`): a seeded draft framed as the editor frames it; click selects,
+   double-click types in place and reports a `text` operation, a free layer gets handles and reports its drag in %, a
+   phone placement stays on screen, and a live page has no bridge, no `data-e` and no editing mode. The editor
+   (`admin-service/ui-tests/site-editor`): the draft opens in the visual editor, a typed change autosaves to the draft
+   and undoes, a classic block opens its fields and converts, "Classic editor" and back. `tests/site-editor/seed.ts`
+   seeds a test DB only (flag, draft, admin session, the first pages if none) and undoes it all. CI: the advisory
+   `site-editor-e2e` job (storefront and admin behind the dev router).
+
+**Left after phase 6:** the e2e specs and the sweep's new checks have not run against servers yet (agents don't build
+or start them); the first runs of the advisory `responsive` and `site-editor-e2e` jobs will show whether the budgets
+and selectors hold, and both get promoted to `checks` once reliable. The admin spec signs in with a seeded session
+cookie; if the admin's gate wants more on localhost (MFA, a client certificate), its first test says so.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
