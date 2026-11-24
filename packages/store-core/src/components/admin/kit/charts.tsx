@@ -694,7 +694,7 @@ function SeriesChip({
   onClick: () => void
 }) {
   // Derive translucent tints from the series' `rgb(r g b)` color.
-  const bg = color.replace('rgb(', 'rgb(').replace(')', ' / 0.14)') // rgb(r g b / 0.14)
+  const bg = color.replace(')', ' / 0.14)') // rgb(r g b / 0.14)
   const bgHover = color.replace(')', ' / 0.22)')
   return (
     <button

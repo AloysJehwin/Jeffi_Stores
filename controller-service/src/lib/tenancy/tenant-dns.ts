@@ -97,7 +97,7 @@ async function deleteRecords(hostnames: string[]): Promise<void> {
     if (!list.ok) throw new Error(`Route53 list failed for ${h} (${list.status}): ${list.text.slice(0, 200)}`)
     // Parse the returned record set; only delete if the Name matches exactly (Route53
     // returns the next record alphabetically if ours doesn't exist).
-    const nameMatch = new RegExp(`<Name>${name.replace(/[.]/g, '\\.')}</Name>`, 'i').test(list.text)
+    const nameMatch = new RegExp(`<Name>${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</Name>`, 'i').test(list.text)
     if (!nameMatch) continue // record doesn't exist → nothing to delete
     const ttl = (list.text.match(/<TTL>(\d+)<\/TTL>/) || [])[1] || '300'
     const values = [...list.text.matchAll(/<Value>([^<]+)<\/Value>/g)].map(m => m[1])

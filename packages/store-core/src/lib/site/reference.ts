@@ -64,8 +64,8 @@ const text = (html: string) =>
   html
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;|&#160;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&#39;|&rsquo;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -93,8 +93,8 @@ function summarise(tag: string, attrs: string, body: string): Chunk {
 /** The page's sections in order, header and footer included. */
 export function skeleton(html: string): Chunk[] {
   const clean = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script\b[^>]*>/gi, '')
+    .replace(/<style[\s\S]*?<\/style\b[^>]*>/gi, '')
     .replace(/<svg[\s\S]*?<\/svg>/gi, '<svg/>')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
