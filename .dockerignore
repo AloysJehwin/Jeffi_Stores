@@ -61,3 +61,6 @@ store_documents/
 jeffi-stores-*.json
 # the Expo app is built by EAS, never in a service image (its android/ prebuild alone is 2 GB)
 mobile-service/client
+# voice-service local venv and bytecode
+**/.venv/
+**/__pycache__/

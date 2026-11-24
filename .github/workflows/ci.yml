@@ -90,6 +90,7 @@ jobs:
       browser: ${{ steps.affected.outputs.browser }}
       fastify: ${{ steps.affected.outputs.fastify }}
       ocr: ${{ steps.affected.outputs.ocr }}
+      voice: ${{ steps.affected.outputs.voice }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,7 +104,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -uo pipefail
-          full='{"apps":["controller","storefront","admin","business","showcase"],"services":["messaging","documents","public-api","mobile","ai-gateway","ocr","store-core"],"all":true}'
+          full='{"apps":["controller","storefront","admin","business","showcase"],"services":["messaging","documents","public-api","mobile","ai-gateway","ocr","voice","store-core"],"all":true}'
           out=$full
           if [ "$EVENT" = pull_request ]; then
             out=$(node scripts/affected.mjs "$BASE" HEAD) || { echo "::warning::scripts/affected.mjs failed; running everything"; out=$full; }
@@ -117,6 +118,7 @@ jobs:
             echo "browser=$(jq -c '.apps | map({app: ., port: ({storefront:3010,admin:3011,business:3012,controller:3013,showcase:3014}[.])})' <<<"$out")"
             echo "fastify=$(jq -c '.services | map(select(IN("messaging","documents","public-api","mobile")))' <<<"$out")"
             echo "ocr=$(jq -r '.services | index("ocr") != null' <<<"$out")"
+            echo "voice=$(jq -r '.services | index("voice") != null' <<<"$out")"
           } >> "$GITHUB_OUTPUT"
           { echo "### Affected"; echo '```json'; echo "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Every script a workflow runs is committed
@@ -245,6 +247,8 @@ jobs:
         run: node scripts/audit-gate.mjs
       - name: pip-audit (PaddleOCR)
         run: pipx run pip-audit==2.10.1 --requirement ai-platform/paddleocr/requirements.txt --no-deps --disable-pip --progress-spinner off
+      - name: pip-audit (voice-service)
+        run: pipx run pip-audit==2.10.1 --requirement voice-service/requirements.txt --no-deps --disable-pip --progress-spinner off
 
   test:
     name: Unit tests · ${{ matrix.app }}
@@ -536,6 +540,23 @@ jobs:
       - run: pip install -r ai-platform/paddleocr/requirements.txt pytest
       - run: pytest ai-platform/paddleocr/tests
 
+  # voice-service (Python): pure-logic and contract tests, everything mocked (no calls, no network).
+  voice:
+    name: Voice service tests
+    runs-on: ubuntu-latest
+    needs: init
+    if: needs.init.outputs.voice == 'true'
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: voice-service/requirements*.txt
+      - run: pip install -r voice-service/requirements.txt -r voice-service/requirements-dev.txt
+      - run: python -m pytest voice-service
+
   responsive:
     name: Responsive sweep (advisory)
     runs-on: ubuntu-latest
@@ -696,6 +717,7 @@ jobs:
           - { app: public-api, args: -f deploy/services.Dockerfile --target public-api . }
           - { app: mobile, args: -f deploy/services.Dockerfile --target mobile . }
           - { app: ai-gateway, args: -f ai-platform/gateway/Dockerfile ai-platform }
+          - { app: voice, args: -f voice-service/Dockerfile . }
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -714,7 +736,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase]
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase, voice]
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -739,10 +761,10 @@ jobs:
   checks:
     name: Checks passed
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck, security, test, coverage, integration, api-db-tests, browser, ui-kit, service-api, ratchets, build, images]
+    needs: [init, lint, typecheck, security, test, coverage, integration, api-db-tests, browser, ui-kit, service-api, ratchets, voice, build, images]
     # A PR (or a release whose checks all passed) runs this; a release with a failed check skips it, so nobody is
     # asked to approve a broken build. On a release it is also the approval: the `production` environment.
-    if: ${{ always() && (needs.init.outputs.release != 'true' || (needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test.result == 'success' && needs.coverage.result == 'success' && needs.integration.result == 'success' && needs.api-db-tests.result == 'success' && needs.browser.result == 'success' && needs.ui-kit.result == 'success' && needs.service-api.result == 'success' && needs.ratchets.result == 'success' && needs.build.result == 'success' && needs.images.result == 'success')) }}
+    if: ${{ always() && (needs.init.outputs.release != 'true' || (needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test.result == 'success' && needs.coverage.result == 'success' && needs.integration.result == 'success' && needs.api-db-tests.result == 'success' && needs.browser.result == 'success' && needs.ui-kit.result == 'success' && needs.service-api.result == 'success' && needs.ratchets.result == 'success' && needs.voice.result == 'success' && needs.build.result == 'success' && needs.images.result == 'success')) }}
     environment:
       name: ${{ needs.init.outputs.release == 'true' && 'production' || '' }}
       url: ${{ needs.init.outputs.release == 'true' && 'https://jeffistores.in' || '' }}
