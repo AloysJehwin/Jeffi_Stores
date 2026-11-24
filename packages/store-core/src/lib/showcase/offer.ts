@@ -1,13 +1,15 @@
-import { SHOWCASE_FREE_DAYS, SHOWCASE_PRICE_INR } from './types'
+import { SHOWCASE_PRICE_INR, SHOWCASE_TRIAL_DAYS } from './types'
 
-// What hosting a Showcase costs, worded once for the console (client-safe). Billing phase B changes only this file:
-// the days become the trial's and the payer the subscription.
-export const SHOWCASE_OFFER = { freeDays: SHOWCASE_FREE_DAYS, priceInr: SHOWCASE_PRICE_INR, payer: 'from your wallet' } as const
+// What hosting a Showcase costs, worded once for the console (client-safe).
+export const SHOWCASE_OFFER = { freeDays: SHOWCASE_TRIAL_DAYS, priceInr: SHOWCASE_PRICE_INR, payer: 'on your subscription' } as const
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
 
-/** "30 days free, then ₹200 a month from your wallet" */
-export const showcaseOfferText = () => `${SHOWCASE_OFFER.freeDays} days free, then ${inr(SHOWCASE_OFFER.priceInr)} a month ${SHOWCASE_OFFER.payer}`
+/** "₹200/month" */
+export const showcaseMonthly = (priceInr: number = SHOWCASE_OFFER.priceInr) => `${inr(priceInr)}/month`
 
-/** "₹200 a month, from your wallet" */
-export const showcasePriceText = (priceInr: number = SHOWCASE_OFFER.priceInr) => `${inr(priceInr)} a month, ${SHOWCASE_OFFER.payer}`
+/** "7 days free, then ₹200/month on your subscription" */
+export const showcaseOfferText = () => `${SHOWCASE_OFFER.freeDays} days free, then ${showcaseMonthly()} ${SHOWCASE_OFFER.payer}`
+
+/** "₹200/month on your subscription" */
+export const showcasePriceText = (priceInr: number = SHOWCASE_OFFER.priceInr) => `${showcaseMonthly(priceInr)} ${SHOWCASE_OFFER.payer}`
