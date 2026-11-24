@@ -10,12 +10,18 @@ export default function KycActionButtons({
   tenantId,
   mode = 'pending',
   kyb,
+  store = true,
+  labels,
 }: {
   tenantId: string
   // 'pending' = show Approve+Reject; 'retry' = an approved Mandatory store with no payment link: retry it, or switch to Optional
   mode?: 'pending' | 'retry'
   /** KYB of what approving switches on: the store, or an API workspace's pending services. */
   kyb?: KybReadiness
+  /** Approving switches on a store (payment choice, checkout); false for an API workspace's KYC and services. */
+  store?: boolean
+  /** Service names for this workspace in the KYB gate's answer (KybBlocked). */
+  labels?: Partial<Record<string, string>>
 }) {
   const router = useRouter()
   const toast = useActionToast()
@@ -59,7 +65,9 @@ export default function KycActionButtons({
       <div className="w-full basis-full">
         <KybBlocked
           block={blocked}
+          labels={labels}
           forceLabel={mode === 'retry' ? 'Continue anyway' : 'Approve anyway'}
+          cancelLabel={mode === 'retry' ? 'Back' : 'Keep in review'}
           onForce={() => approve(mode === 'retry', true)}
           onCancel={() => setBlocked(null)}
         />
@@ -108,7 +116,7 @@ export default function KycActionButtons({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <KybBadge readiness={kyb} />
-      {choice}
+      {store && choice}
       <ActionButton action={{ label: 'Reject', icon: X, danger: true, onClick: () => setShowReject(true) }} />
       <ActionButton
         variant="primary"
@@ -116,13 +124,15 @@ export default function KycActionButtons({
           label: 'Approve',
           icon: Check,
           onClick: () => approve(false),
-          confirm: paymentRequired
-            ? {
-                title: 'Approve with payment mandatory?',
-                message: 'We create the Razorpay subscription and email the owner a checkout link. The build starts when their first payment lands.',
-                confirmLabel: 'Approve',
-              }
-            : { title: 'Approve with payment optional?', message: 'The build starts now. No checkout link is sent and nothing is charged.', confirmLabel: 'Approve' },
+          confirm: !store
+            ? { title: 'Approve this business?', message: 'Approves the KYC and every service waiting for review. The owner is emailed, and sending and rendering start.', confirmLabel: 'Approve' }
+            : paymentRequired
+              ? {
+                  title: 'Approve with payment mandatory?',
+                  message: 'We create the Razorpay subscription and email the owner a checkout link. The build starts when their first payment lands.',
+                  confirmLabel: 'Approve',
+                }
+              : { title: 'Approve with payment optional?', message: 'The build starts now. No checkout link is sent and nothing is charged.', confirmLabel: 'Approve' },
         }}
       />
     </div>

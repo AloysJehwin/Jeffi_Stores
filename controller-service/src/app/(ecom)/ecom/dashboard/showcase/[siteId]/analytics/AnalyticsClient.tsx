@@ -94,7 +94,9 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
       <div className="space-y-5">
         {status !== 'live' && (
           <p className="rounded-xl org-peach px-4 py-3 text-sm text-foreground">
-            {status === 'draft' ? 'This site is not published yet, so it has no visitors.' : 'This site is paused: visits are not recorded until it is live again.'}
+            {status === 'draft'
+              ? 'This site isn’t published yet. Visits are counted once it is live, and not when you open it from this console.'
+              : 'This site is paused. New visits aren’t counted until it is live again; the figures below are from when it was live.'}
           </p>
         )}
 

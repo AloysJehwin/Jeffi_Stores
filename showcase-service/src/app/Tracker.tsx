@@ -2,15 +2,34 @@
 
 import { useEffect } from 'react'
 import { classifyLink } from '@showcase/lib/links'
+import { SHOWCASE_PREVIEW_PARAM } from '@/lib/showcase/host'
 
 // The Showcase's visit tracker, as the storefront's PageTracker: a per-tab session id in sessionStorage, no cookies,
 // beacons to /api/track. A page view on load; how far the visitor scrolled and how long the page was visible on the way
 // out (and every 30 s while it changes); taps on contact, map, social and outbound links; and the contact form's first
-// focus and submit. Nothing for automated browsers.
+// focus and submit. Nothing for automated browsers, nor for the owner's own look at their site: the console opens it
+// with ?jeffi_preview=1, which marks the tab (and is taken off the address).
 
 const ENDPOINT = '/api/track'
 const SID = 'jsc_sid'
 const ENGAGED = 'jsc_en'
+const PREVIEW = 'jsc_preview'
+
+/** Opened from the console in this tab: not a visit. */
+function ownerPreview(): boolean {
+  try {
+    const url = new URL(location.href)
+    if (url.searchParams.has(SHOWCASE_PREVIEW_PARAM)) {
+      sessionStorage.setItem(PREVIEW, '1')
+      url.searchParams.delete(SHOWCASE_PREVIEW_PARAM)
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash)
+      return true
+    }
+    return sessionStorage.getItem(PREVIEW) === '1'
+  } catch {
+    return false
+  }
+}
 // Once per page load: a dev re-run of the effect (Strict Mode) adds its listeners again, not a second page view.
 let viewed = false
 
@@ -38,7 +57,7 @@ function send(body: Record<string, unknown>) {
 
 export default function Tracker() {
   useEffect(() => {
-    if (navigator.webdriver) return
+    if (navigator.webdriver || ownerPreview()) return
     const s = sessionId()
     let engaged = 0
     try {

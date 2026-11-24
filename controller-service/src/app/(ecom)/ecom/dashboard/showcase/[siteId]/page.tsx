@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { showcaseConsoleState } from '@controller/lib/showcase/state'
+import { showcaseConsoleState, storePlanOffers } from '@controller/lib/showcase/state'
 import { getOwnedShowcase } from '@/lib/showcase/store'
+import { needsKeepOnline } from '@controller/lib/showcase/hosting'
 import ShowcaseClient from './ShowcaseClient'
 
 export const dynamic = 'force-dynamic'
@@ -15,5 +16,7 @@ export default async function ShowcaseSitePage({ params, searchParams }: { param
   const { owner, tenant } = await loadOwnerContext({ tenantSlug })
   const site = UUID_RE.test(siteId) ? await getOwnedShowcase(siteId, owner.id) : null
   if (!site) notFound()
-  return <ShowcaseClient initial={await showcaseConsoleState(site)} tenantSlug={tenant.slug} />
+  const initial = await showcaseConsoleState(site)
+  const plans = needsKeepOnline(initial) ? await storePlanOffers(owner.id) : null
+  return <ShowcaseClient initial={initial} tenantSlug={tenant.slug} plans={plans} />
 }

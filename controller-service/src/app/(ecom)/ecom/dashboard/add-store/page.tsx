@@ -5,6 +5,7 @@ import { StatusPill } from '@controller/components/admin/ecom/EcomUI'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
 import AddStoreClient from './AddStoreClient'
+import { primaryBtn } from '../../onboard/ui'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Add a store' }
@@ -31,7 +32,7 @@ export default async function AddStorePage() {
                     ? `Setting up ${tenant.slug}.jeffistores.in. We email you when it is live.`
                     : `Status: ${tenant.status}.`}
           </p>
-          {payments && tenant.status === 'awaiting_payment' && <a href="/onboard" className="ecom-accent-bg inline-block mt-4 rounded-full px-5 py-2 text-sm font-semibold text-white">Complete payment →</a>}
+          {payments && tenant.status === 'awaiting_payment' && <a href="/onboard" className={`${primaryBtn} mt-4`}>Complete payment →</a>}
         </Card>
       </>
     )
@@ -48,7 +49,7 @@ export default async function AddStorePage() {
                 ? 'Payment confirmed — provisioning your store. This takes a few minutes.'
                 : 'Approved — complete the subscription payment from the onboarding page to start provisioning.'}
           </p>
-          {payments && tenant.subscription_status !== 'active' && <a href="/onboard" className="ecom-accent-bg inline-block mt-4 rounded-full px-5 py-2 text-sm font-semibold text-white">Complete payment →</a>}
+          {payments && tenant.subscription_status !== 'active' && <a href="/onboard" className={`${primaryBtn} mt-4`}>Complete payment →</a>}
         </Card>
       </>
     )

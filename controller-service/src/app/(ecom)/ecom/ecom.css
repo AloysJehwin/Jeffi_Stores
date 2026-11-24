@@ -47,6 +47,21 @@
   --console-sage: var(--org-sage);
   --console-sage-deep: var(--org-sage-deep);
 
+  /* chart colours (components/admin/traffic/charts.tsx reads them, with the admin's colours as fallbacks) */
+  --chart-1: var(--org-terracotta);
+  --chart-2: var(--org-sage-deep);
+  --chart-3: var(--org-brown);
+  --chart-4: var(--org-apricot);
+  --chart-5: var(--org-band);
+  --chart-6: var(--org-terracotta-deep);
+  --chart-7: #b08d57;
+  --chart-8: #9aa88a;
+  --chart-9: var(--org-sand-deep);
+  --chart-10: var(--color-foreground-muted);
+  --chart-muted: var(--color-border-secondary);
+  --chart-bar: var(--org-terracotta);
+  --chart-heat: var(--org-terracotta);
+
   background-color: var(--color-surface);
   color: var(--color-foreground);
 }
@@ -69,6 +84,8 @@
 
 .ecom-accent-bg { background-color: var(--org-terracotta-deep) !important; color: #fff; }
 .ecom-accent-bg:hover:not(:disabled) { background-color: var(--org-brown) !important; }
+/* The shared disabled look (onboard/ui disabledBtn): the accent's !important would otherwise keep it terracotta. */
+.ecom-accent-bg:disabled { background-color: var(--color-surface-secondary) !important; color: var(--color-foreground-muted); cursor: not-allowed; }
 .ecom-accent-text { color: var(--org-terracotta); }
 .ecom-accent-border { border-color: var(--org-terracotta); }
 

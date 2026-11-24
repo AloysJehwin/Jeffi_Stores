@@ -1,9 +1,10 @@
-import Link from 'next/link'
 import { priceList } from '@jeffi/pricing'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
+import { serviceStates } from '@controller/lib/ecom/service-states'
 import { hasService, getKyc } from '@/lib/tenant-registry'
 import { getTenantWallet } from '@/lib/payments/wallet'
 import PageHeader from '../_components/PageHeader'
+import ServiceNotOn from '../services/ServiceNotOn'
 import DocumentsClient from './DocumentsClient'
 
 export const dynamic = 'force-dynamic'
@@ -23,10 +24,11 @@ export default async function DocumentsPage() {
   if (enabled) {
     return <DocumentsClient seller={seller} prices={priceList().documents} balance={Number(wallet?.balance ?? 0)} />
   }
+  const { documents } = await serviceStates(tenant)
   return (
     <>
       <PageHeader eyebrow="Developers" title="Documents" description="Every PDF rendered through your API keys, and the design they use." />
-      <p className="text-sm text-foreground-secondary">Documents is not added to this workspace yet. <Link href="/dashboard/services" className="font-semibold ecom-accent-text hover:underline">Add it from Services</Link>.</p>
+      <ServiceNotOn service="documents" state={documents} />
     </>
   )
 }

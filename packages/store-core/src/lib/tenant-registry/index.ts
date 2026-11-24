@@ -33,6 +33,7 @@ export {
   planMix,
   planSlugs,
   listPlans,
+  SIGNUP_CREDIT_INR,
   getTenant,
   getTenantBilling,
   listLinkedPayouts,
@@ -165,3 +166,4 @@ export {
   type CustomDomain,
 } from './custom-domains'
 export { listServiceApprovals, requestServiceApproval, reviewServiceApproval, blockedServices, type ServiceApproval, type ApprovalService } from './service-approvals'
+export { firstOwnDomainPlan, ownDomainFrom, domainAllowance, domainFaqAnswer, type DomainPlan } from './domain-rules'

@@ -8,10 +8,11 @@ vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: str
 import SitesList from '@controller/app/(ecom)/ecom/dashboard/showcase/SitesList'
 
 const site = (o: Partial<ShowcaseConsoleState>): ShowcaseConsoleState => ({
-  id: 'a1', slug: 'acme', name: 'Acme', status: 'live', pauseReason: null, host: 'site-acme.jeffistores.in', url: 'https://site-acme.jeffistores.in',
-  hasPage: true, publishedAt: '2026-11-01T00:00:00Z', paidUntil: '2026-12-01T00:00:00Z', renew: true, lastChargeError: null, balanceInr: null,
+  id: 'a1', slug: 'acme', name: 'Acme', status: 'live', pauseReason: null, host: 'site-acme.jeffistores.in', url: 'https://site-acme.jeffistores.in', previewUrl: 'https://site-acme.jeffistores.in?jeffi_preview=1',
+  hasPage: true, publishedAt: '2026-11-01T00:00:00Z', paidUntil: '2026-12-01T00:00:00Z', renew: true, lastChargeError: null,
   unreadLeads: 0, priceInr: 200, free: true, lapsed: false, due: false, pausesOn: null,
-  trialEndsAt: '2026-11-08T00:00:00Z', lineStatus: 'trial', onSubscription: false, subscriptionStatus: null, ...o,
+  trialEndsAt: '2026-12-01T00:00:00Z', lineStatus: 'trial', onSubscription: false, subscriptionStatus: null,
+  autopay: false, checkoutUrl: null, endsAt: null, graceUntil: null, ...o,
 })
 
 const hrefs = (li: HTMLElement) => within(li).getAllByRole('link').map(a => a.getAttribute('href'))
@@ -22,8 +23,9 @@ describe('SitesList', () => {
     const rows = screen.getAllByRole('listitem')
     expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('Free until 1 Dec 2026')).toBeTruthy()
+    expect(within(rows[0]).getByRole('link', { name: /Set up autopay/ }).getAttribute('href')).toBe('/dashboard/showcase/a1?tenant=ecom')
     expect(within(rows[0]).getByText('2 new')).toBeTruthy()
-    expect(within(rows[0]).getByRole('link', { name: /site-acme\.jeffistores\.in/ }).getAttribute('href')).toBe('https://site-acme.jeffistores.in')
+    expect(within(rows[0]).getByRole('link', { name: /site-acme\.jeffistores\.in/ }).getAttribute('href')).toBe('https://site-acme.jeffistores.in?jeffi_preview=1')
     expect(hrefs(rows[0])).toEqual(
       expect.arrayContaining([
         '/dashboard/showcase/a1/edit?tenant=ecom',
@@ -38,7 +40,7 @@ describe('SitesList', () => {
   it('lists two sites; a draft continues in the builder, a paused one says why', () => {
     render(
       <SitesList
-        sites={[site({ id: 'b2', name: 'Beta', status: 'draft', paidUntil: null, publishedAt: null, free: false }), site({ status: 'paused', pauseReason: 'unpaid' })]}
+        sites={[site({ id: 'b2', name: 'Beta', status: 'draft', paidUntil: null, publishedAt: null, free: false }), site({ status: 'paused', pauseReason: 'unpaid', free: false, lapsed: true, paidUntil: '2026-11-20T00:00:00Z' })]}
         tenantSlug="ecom"
       />,
     )
@@ -46,7 +48,9 @@ describe('SitesList', () => {
     expect(within(draft).getByText('Draft')).toBeTruthy()
     expect(within(draft).getByRole('link', { name: /Continue setting up/ }).getAttribute('href')).toBe('/onboard/showcase?site=b2')
     expect(hrefs(draft)).not.toContain('/dashboard/showcase/b2/edit?tenant=ecom')
-    expect(within(paused).getByText('Paused · unpaid')).toBeTruthy()
+    expect(within(paused).getByText('Offline · unpaid')).toBeTruthy()
+    expect(within(paused).getByText('Free trial ended')).toBeTruthy()
+    expect(within(paused).getByRole('link', { name: /Keep it online/ }).getAttribute('href')).toBe('/dashboard/showcase/a1?tenant=ecom')
     expect(within(paused).getByRole('link', { name: /Edit/ }).getAttribute('href')).toBe('/dashboard/showcase/a1/edit?tenant=ecom')
   })
 })

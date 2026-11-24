@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge, Kpi, KpiGrid, Section, Table, count, when, type Col } from '@/components/admin/channels/ui'
-import { BarSeries, HBars } from '@/components/admin/traffic/charts'
+import { CHART_MUTED, BarSeries, HBars, chartColor } from '@/components/admin/traffic/charts'
 import type { ShowcaseRealtime } from '@/lib/traffic/showcase-types'
 import { Note, countryName, targetLabel } from './shared'
 
@@ -65,12 +65,12 @@ export default function RealtimeTab({ data }: { data: ShowcaseRealtime }) {
       </KpiGrid>
 
       <Section title="Page views per minute">
-        <BarSeries rows={data.perMinute} label={r => r.minute} series={[{ key: 'views', label: 'Views', color: '#84cc16' }]} height={100} />
+        <BarSeries rows={data.perMinute} label={r => r.minute} series={[{ key: 'views', label: 'Views', color: chartColor(2) }]} height={100} />
       </Section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Section title="Where they came from">
-          <HBars empty="No one is on your site right now" color="rgba(148,163,184,0.7)" rows={data.sources.map(s => ({ key: s.key, label: s.key, value: s.sessions }))} />
+          <HBars empty="No one is on your site right now" color={CHART_MUTED} rows={data.sources.map(s => ({ key: s.key, label: s.key, value: s.sessions }))} />
         </Section>
         <Section title="What they did">
           <Table rows={data.events} cols={evCols} rowKey={r => `${r.at}|${r.type}|${r.target}|${r.label}`} empty="No taps or form activity in the last 30 minutes" />

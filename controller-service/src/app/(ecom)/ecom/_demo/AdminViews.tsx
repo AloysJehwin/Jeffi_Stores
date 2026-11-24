@@ -29,7 +29,7 @@ import {
 const PANEL = 'bg-surface-elevated rounded-xl border border-border-default'
 const BTN =
   'inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-11 sm:min-h-0 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
-export const rupees = (n: number) => 'Rs. ' + Math.round(n).toLocaleString('en-IN')
+export const rupees = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN')
 
 const STOCK_TONE: Record<string, string> = {
   'In Stock': 'org-sage org-sage-text',

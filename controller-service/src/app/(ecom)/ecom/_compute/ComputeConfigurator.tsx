@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Store } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ChoiceCards, Segmented, fieldCls } from '../_ui'
 import { fieldRow } from '../onboard/ui'
@@ -9,6 +10,8 @@ import { monthlyTotal, quoteSpec, type Quote } from '@controller/lib/compute/pri
 import { LIMITS, PRESET_RANK, fitOf, fittingServers, nodeTier, planCompatibilityError, serverFitErrors, validateSpec, type Fit, type Validation } from '@/lib/compute/validate'
 import { activeServices, cloneSpec, type Catalog, type ComputeSpec, type PodSize, type PresetKey, type ServiceName } from '@/lib/compute/spec'
 import { ConfiguratorLoading } from './ConfiguratorLoading'
+import { dbSize, plainQuoteLine } from './labels'
+import { EmptyState } from '../dashboard/_components/EmptyState'
 
 export interface ComputePlan {
   slug: string
@@ -224,7 +227,16 @@ export function ComputeConfigurator({
   }, [spec, validation?.ok, planSlug])
 
   if (loadError) return <p className="text-sm text-red-600">{loadError}</p>
-  if (!catalog || !plan || !spec) return <ConfiguratorLoading />
+  if (!catalog) return <ConfiguratorLoading />
+  // Prices loaded but no store plan to size (an API workspace's "services" plan): say so rather than load forever.
+  if (!plan) {
+    return (
+      <EmptyState bare icon={Store} title="No store yet" action={{ href: '/dashboard/add-store', label: 'Add a store' }}>
+        Plans and servers are for stores. Add one to choose its size.
+      </EmptyState>
+    )
+  }
+  if (!spec) return <ConfiguratorLoading />
 
   const set = (next: ComputeSpec) => {
     const c = evaluate(next, planSlug)
@@ -377,7 +389,7 @@ export function ComputeConfigurator({
         <div className="rounded-2xl border border-border-default bg-surface-elevated p-4">
           <div className="font-semibold text-foreground">{PRESETS.basic.label}</div>
           <p className="mt-1 text-sm text-foreground-secondary">
-            {dbMode === 'dedicated' ? 'Own server, with its PostgreSQL on a managed RDS database.' : PRESETS.basic.blurb}
+            {dbMode === 'dedicated' ? 'Your own server, with the database on a separate managed server.' : 'Your own server, with the database on it, backed up every night.'}
           </p>
           {basicTotal != null && <p className="mt-2 text-sm text-foreground">{inr(basicTotal)}/mo incl. GST</p>}
           <div className="mt-3">
@@ -390,13 +402,13 @@ export function ComputeConfigurator({
               onChange={m => set(shapeOf('basic', m, false, current))}
               options={[
                 { value: 'node', label: 'On your server (included)' },
-                { value: 'dedicated', label: basicRdsExtra != null ? `RDS +${inr(basicRdsExtra)}/mo` : 'RDS' },
+                { value: 'dedicated', label: basicRdsExtra != null ? `Separate database +${inr(basicRdsExtra)}/mo` : 'Separate database' },
               ]}
             />
             <p className="mt-1 text-xs text-foreground-muted">
               {dbMode === 'dedicated'
-                ? `A managed PostgreSQL server (${spec.db.class ?? PRESET_DB_CLASS.basic}, ${spec.db.storageGb} GB), separate from your app server.`
-                : 'PostgreSQL runs on your own server — nightly backups to S3.'}
+                ? `A managed database server (${(dbSize(spec.db.class ?? PRESET_DB_CLASS.basic) ?? spec.db.class ?? '').toLowerCase()}, ${spec.db.storageGb} GB), separate from your store's server.`
+                : 'The database runs on your own server and is backed up every night.'}
             </p>
           </div>
         </div>
@@ -461,7 +473,7 @@ export function ComputeConfigurator({
                       )}
                       {withDb != null && (
                         <div className={`flex justify-between gap-2 ${dbMode === 'dedicated' ? 'font-bold text-foreground' : 'text-foreground-secondary'}`}>
-                          <span>With dedicated DB</span><span>{inr(withDb)}<span className="text-xs font-normal text-foreground-muted">/mo</span></span>
+                          <span>Separate database</span><span>{inr(withDb)}<span className="text-xs font-normal text-foreground-muted">/mo</span></span>
                         </div>
                       )}
                     </div>
@@ -479,7 +491,7 @@ export function ComputeConfigurator({
               <span className="block text-xs text-foreground-muted">
                 {dbMode === 'dedicated'
                   ? 'A second server and a standby database in another zone, so one failing never stops the store.'
-                  : 'A second server running copies of your store. The database stays on one server; choose a dedicated database for a standby.'}
+                  : 'A second server running copies of your store. The database stays on one server; choose a separate database for a standby.'}
               </span>
             </span>
           </label>
@@ -494,13 +506,13 @@ export function ComputeConfigurator({
               onChange={setDbMode}
               options={[
                 { value: 'node', label: 'On your server' },
-                { value: 'dedicated', label: 'Dedicated database (RDS)' },
+                { value: 'dedicated', label: 'Separate database' },
               ]}
             />
             <p className="mt-1 text-xs text-foreground-muted">
               {dbMode === 'dedicated'
-                ? 'A managed PostgreSQL server, separate from your app server.'
-                : 'PostgreSQL runs on your own server — nightly backups to S3.'}
+                ? "A managed database server, separate from your store's server."
+                : 'The database runs on your own server and is backed up every night.'}
             </p>
           </div>
           {plan.advanced && (
@@ -549,7 +561,7 @@ export function ComputeConfigurator({
               />
             </label>
             <label className="block min-w-0 sm:col-span-2">
-              <span className="mb-1 block text-xs text-foreground-secondary">Object storage, S3 (GB)</span>
+              <span className="mb-1 block text-xs text-foreground-secondary">File storage (GB)</span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -641,12 +653,15 @@ export function ComputeConfigurator({
 
       {choice?.quote && choice.total && (
         <div className="rounded-2xl border border-border-default bg-surface p-4 text-sm">
-          {choice.quote.lines.map(l => (
-            <div key={l.key} className="flex justify-between gap-3 py-0.5">
-              <span className="text-foreground-secondary">{l.label} <span className="text-xs text-foreground-muted">· {l.detail}</span></span>
-              <span className="text-foreground">{inr(l.inrMonth)}</span>
-            </div>
-          ))}
+          {choice.quote.lines.map(l => {
+            const { label, detail } = plainQuoteLine(l)
+            return (
+              <div key={l.key} className="flex justify-between gap-3 py-0.5">
+                <span className="text-foreground-secondary">{label} <span className="text-xs text-foreground-muted">· {detail}</span></span>
+                <span className="text-foreground">{inr(l.inrMonth)}</span>
+              </div>
+            )
+          })}
           <div className="mt-2 flex justify-between border-t border-border-default/60 pt-2 text-foreground-secondary">
             <span>GST (18%)</span>
             <span>{inr(choice.total.gstOnInfra)}</span>
@@ -659,7 +674,7 @@ export function ComputeConfigurator({
             <span>{inr(choice.total.total)}</span>
           </div>
           <p className="mt-2 text-xs text-foreground-muted">
-            One subscription covers your plan and servers. {isBasic ? 'Basic is a fixed size; its database can move to RDS.' : 'Change size any time from Plan & servers.'}
+            One subscription covers your plan and servers. {isBasic ? 'Basic is a fixed size; its database can move to a separate server.' : 'Change size any time from Plan & servers.'}
           </p>
         </div>
       )}

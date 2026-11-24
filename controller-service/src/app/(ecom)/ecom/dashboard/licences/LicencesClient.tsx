@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ExternalLink } from 'lucide-react'
+import { BadgeCheck, ExternalLink } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { ChoiceChips } from '../../_ui'
 import { Badge, fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../../onboard/ui'
 import { ExpiryField, FileField, uploadKyc } from '../../onboard/CompliancePanel'
 import { Card } from '../_components/Card'
+import { EmptyState } from '../_components/EmptyState'
 import {
   DOCS,
   EXPIRY_REMINDER_DAYS,
@@ -312,7 +313,9 @@ export default function LicencesClient({ tenantId, today, selling, documents }: 
     <div className="space-y-6">
       <Card title="On file">
         {sorted.length === 0 ? (
-          <p className="text-sm text-foreground-secondary">No licences on file: what you sell did not need any. When you start selling something that does, add it below.</p>
+          <EmptyState bare icon={BadgeCheck} title="No licences on file" action={{ href: '#add-licence', label: 'Add a licence' }}>
+            What you sell did not need any. When you start selling something that does, add it below.
+          </EmptyState>
         ) : (
           <ul className="divide-y divide-border-default/60">
             {sorted.map(d => (
@@ -321,7 +324,9 @@ export default function LicencesClient({ tenantId, today, selling, documents }: 
           </ul>
         )}
       </Card>
-      <AddLicence selling={selling} onFile={new Map(documents.map(d => [d.docType, d]))} today={today} onSave={save} />
+      <div id="add-licence" className="scroll-mt-6">
+        <AddLicence selling={selling} onFile={new Map(documents.map(d => [d.docType, d]))} today={today} onSave={save} />
+      </div>
     </div>
   )
 }

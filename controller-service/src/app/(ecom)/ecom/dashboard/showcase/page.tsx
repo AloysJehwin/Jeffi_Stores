@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Check, Plus } from 'lucide-react'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { consoleShowcases, showcaseConsoleState } from '@controller/lib/showcase/state'
-import { SHOWCASE_FREE_DAYS, SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
+import { showcaseOfferText } from '@/lib/showcase/offer'
 import PageHeader from '../_components/PageHeader'
 import SitesList from './SitesList'
 
@@ -14,7 +14,7 @@ const NEW_SITE = '/onboard/showcase?new=1'
 const POINTS = [
   'Your work, services, reviews and contacts on one page, at site-yourname.jeffistores.in',
   'Enquiries from its contact form land in your inbox here, and by email',
-  `Free for the first ${SHOWCASE_FREE_DAYS} days from when you publish, then ₹${SHOWCASE_PRICE_INR} a month from your wallet`,
+  `${showcaseOfferText().replace(/^./, c => c.toUpperCase())}, counted from when you publish`,
 ]
 
 export default async function ShowcasePage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {

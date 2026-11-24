@@ -1,7 +1,7 @@
 'use client'
 
 import { Empty, Section, Table, count, type Col } from '@/components/admin/channels/ui'
-import { HBars, Heatmap } from '@/components/admin/traffic/charts'
+import { HBars, Heatmap, chartColor } from '@/components/admin/traffic/charts'
 import type { ShowcaseBehaviour } from '@/lib/traffic/showcase-types'
 import { Note, rateText, ratio, targetLabel } from './shared'
 
@@ -26,7 +26,7 @@ export default function BehaviourTab({ data }: { data: ShowcaseBehaviour }) {
     { key: 'path', label: 'Landing page', render: r => <span className="break-all">{r.path}</span>, sort: r => r.path },
     { key: 'sessions', label: 'Visits', num: true, sort: r => r.sessions, render: r => count(r.sessions) },
     { key: 'engaged', label: 'Engaged', num: true, sort: r => ratio(r.engaged, r.sessions) ?? -1, render: r => rateText(r.engaged, r.sessions, 0) },
-    { key: 'conv', label: 'Enquiry rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
+    { key: 'conv', label: 'Contact rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
     { key: 'leads', label: 'Enquiries', num: true, sort: r => r.leads, render: r => count(r.leads) },
   ]
   const pageCols: Col<Page>[] = [
@@ -43,7 +43,7 @@ export default function BehaviourTab({ data }: { data: ShowcaseBehaviour }) {
         </Section>
         <Section title="Time on the page">
           <HBars
-            color="rgba(59,130,246,0.6)"
+            color={chartColor(1)}
             rows={data.engagement.map(r => ({ key: r.bucket, label: ENGAGE_LABELS[r.bucket] ?? r.bucket, value: r.sessions, right: `${count(r.sessions)} · ${rateText(r.sessions, visits, 0)}` }))}
           />
         </Section>
@@ -53,7 +53,7 @@ export default function BehaviourTab({ data }: { data: ShowcaseBehaviour }) {
         <Section title="Taps by kind">
           <HBars
             empty="No one tapped a contact or link yet"
-            color="rgba(168,85,247,0.6)"
+            color={chartColor(3)}
             rows={data.clicks.map(k => ({ key: k.target, label: targetLabel(k.target), value: k.clicks, right: `${count(k.clicks)} · ${rateText(k.sessions, visits, 1)} of visits` }))}
           />
         </Section>

@@ -231,7 +231,7 @@ export function showcaseAttention(i: ShowcaseAttentionInput): Attention[] {
     out.push({
       key: 'conversion-down',
       severity: 'critical',
-      title: `Enquiry rate fell to ${(conv * 100).toFixed(1)}% from ${(prevConv * 100).toFixed(1)}%`,
+      title: `Contact rate fell to ${(conv * 100).toFixed(1)}% from ${(prevConv * 100).toFixed(1)}%`,
       sub: 'More than 20% below the previous period',
       href: i.tabHref('funnel'),
     })

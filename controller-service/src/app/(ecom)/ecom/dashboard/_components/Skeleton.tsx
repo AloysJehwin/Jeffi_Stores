@@ -125,12 +125,12 @@ export function FinanceTableLoading({ columns, rows = 8, minWidth = 'min-w-[700p
   )
 }
 
-/** Money tiles (MoneyTiles, the wallet's sand tiles) with their real labels. */
-export function TilesLoading({ labels, sand = false, cols = 'grid-cols-2 lg:grid-cols-4' }: { labels: string[]; sand?: boolean; cols?: string }) {
+/** KPI tiles (StatTile: MoneyTiles, the wallet's) with their real labels. */
+export function TilesLoading({ labels, cols = 'grid-cols-2 lg:grid-cols-4' }: { labels: string[]; cols?: string }) {
   return (
     <div className={`grid gap-4 ${cols}`}>
       {labels.map(l => (
-        <div key={l} className={sand ? 'rounded-2xl org-sand p-4 last:col-span-2 sm:p-5 sm:last:col-span-1' : 'rounded-2xl border border-border-default bg-surface-elevated p-4 sm:p-5'}>
+        <div key={l} className="rounded-2xl border border-border-default bg-surface-elevated p-4 sm:p-5">
           <div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{l}</div>
           <Sk className="h-7 w-28 sm:h-8" />
         </div>
