@@ -30,11 +30,12 @@ test.describe('admin signed in (UI)', () => {
     expect(errors()).toEqual([])
   })
 
-  test('product editor opens the seeded product', async ({ page }) => {
+  // A live product is edited through a draft: /edit without one redirects to the product, which redirects to /view.
+  test('the product page shows the seeded product', async ({ page }) => {
     const errors = watchPageErrors(page)
-    await page.goto(`/admin/products/${PRODUCT_ID}/edit`)
-    await expect(page.getByRole('heading', { name: 'Edit Product' })).toBeVisible()
-    await expect(page.getByText('Update product information')).toBeVisible()
+    const res = await page.goto(`/admin/products/${PRODUCT_ID}/view`)
+    expect(res?.status()).toBeLessThan(400)
+    await expect(page.getByRole('heading', { name: 'API Test Bolt' })).toBeVisible()
     await expectPageVisible(page)
     expect(errors()).toEqual([])
   })

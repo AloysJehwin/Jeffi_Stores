@@ -51,8 +51,9 @@ describe('PayableDetailClient', () => {
     expect(screen.getByText('Payment History')).toBeInTheDocument()
     expect(screen.getAllByText('UPI').length).toBeGreaterThan(0)
     expect(screen.getAllByText('UTR123').length).toBeGreaterThan(0)
-    expect(screen.getByText('processed')).toBeInTheDocument()
-    expect(screen.getByText('failed')).toBeInTheDocument()
+    // The status shows in the table column and on the phone card (both may be in the DOM).
+    expect(screen.getAllByText('processed').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('failed').length).toBeGreaterThan(0)
     expect(screen.getByText('29ABCDE1234F1Z5')).toBeInTheDocument()
     expect(screen.getByText('Linked Purchase Order')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View in Inventory' })).toHaveAttribute('href', expect.stringContaining('po=PO-9'))

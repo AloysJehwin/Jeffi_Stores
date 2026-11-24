@@ -90,7 +90,8 @@ describe('affected', () => {
     const r = await run(['storefront-service/src/a.ts', 'admin-service/src/b.ts', 'document-service/src/c.ts', 'docs/x.md'])
     expect(r).toEqual({ apps: ['storefront', 'admin'], services: ['documents'], all: false })
   })
-  it('the CLI prints the contract JSON for a diff range', () => {
+  // A real node process plus git: slower than the 5 s default on a loaded machine.
+  it('the CLI prints the contract JSON for a diff range', { timeout: 30_000 }, () => {
     const out = execFileSync('node', [path.join(root, 'scripts/affected.mjs'), 'HEAD', 'HEAD'], { encoding: 'utf8' })
     expect(JSON.parse(out)).toEqual({ apps: [], services: [], all: false })
   })

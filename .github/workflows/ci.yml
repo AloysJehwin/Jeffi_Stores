@@ -482,6 +482,35 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui:kit
 
+  # Branch protection requires these two names, the single jobs they were before the per-app split: each passes when its
+  # cards did. On a PR an unaffected app's card is skipped; a release needs every card to succeed.
+  api-db-required:
+    name: API tests (real DB)
+    runs-on: ubuntu-latest
+    needs: [init, api-db-tests]
+    if: always()
+    steps:
+      - name: Every API tests (real DB) card passed
+        run: |
+          r='${{ needs.api-db-tests.result }}'; rel='${{ needs.init.outputs.release }}'
+          echo "init: ${{ needs.init.result }}, cards: $r"
+          [ '${{ needs.init.result }}' = success ] || exit 1
+          [ "$r" = success ] || { [ "$r" = skipped ] && [ "$rel" != true ]; } || { echo "::error::API tests (real DB): $r"; exit 1; }
+
+  ui-required:
+    name: UI tests (real browser)
+    runs-on: ubuntu-latest
+    needs: [init, browser, ui-kit]
+    if: always()
+    steps:
+      - name: Every browser card and the UI kit passed
+        run: |
+          b='${{ needs.browser.result }}'; k='${{ needs.ui-kit.result }}'; rel='${{ needs.init.outputs.release }}'
+          echo "init: ${{ needs.init.result }}, build + browser: $b, UI kit: $k"
+          [ '${{ needs.init.result }}' = success ] || exit 1
+          ok() { [ "$1" = success ] || { [ "$1" = skipped ] && [ "$rel" != true ]; }; }
+          ok "$b" && ok "$k" || { echo "::error::UI tests (real browser): build + browser $b, UI kit $k"; exit 1; }
+
   # The Fastify services' route tests (Fastify inject), and every route has one (scripts/check-service-routes.mjs).
   service-api:
     name: Service API · ${{ matrix.service }}

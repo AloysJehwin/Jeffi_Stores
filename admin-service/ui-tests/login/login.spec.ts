@@ -14,12 +14,11 @@ test.describe('admin login (UI)', () => {
     expect(errors()).toEqual([])
   })
 
-  test('a signed-out visit to the dashboard lands on the login page', async ({ page }) => {
-    const errors = watchPageErrors(page)
-    await page.goto('/admin/dashboard')
-    await expect(page).toHaveURL(/\/admin\/login/)
-    await expect(page.getByRole('heading', { name: 'Admin Panel' })).toBeVisible()
-    await expectPageVisible(page)
-    expect(errors()).toEqual([])
+  // Production redirects drop the port and use https (the load balancer's), which `next start` on :3011 doesn't
+  // serve, so check the redirect itself; the login page is the test above.
+  test('a signed-out visit to the dashboard redirects to the login page', async ({ request }) => {
+    const res = await request.get('/admin/dashboard', { maxRedirects: 0 })
+    expect([302, 303, 307, 308]).toContain(res.status())
+    expect(new URL(res.headers()['location'], 'http://x').pathname).toBe('/admin/login')
   })
 })
