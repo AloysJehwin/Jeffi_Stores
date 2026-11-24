@@ -24,11 +24,13 @@ export default function CustomDomains({
   slug,
   maxDomains,
   siteId,
+  ownDomainFrom = null,
 }: {
   tenantId: string
   slug: string
   maxDomains: number
   siteId?: string
+  ownDomainFrom?: string | null
 }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -104,7 +106,7 @@ export default function CustomDomains({
     return (
       <Card title={TITLE}>
         <p className="text-sm text-foreground-secondary">
-          Connecting a domain you already have comes with the Pro plan and above. Buying a new one, above, works on every plan.{' '}
+          {ownDomainFrom ? `Connecting a domain you already own is available on the ${ownDomainFrom}. ` : 'Your plan can\'t connect a domain you already own. '}You can buy a domain through Jeffi on any plan.{' '}
           <Link href="/dashboard/compute" className="font-semibold ecom-accent-text hover:underline">
             Upgrade
           </Link>

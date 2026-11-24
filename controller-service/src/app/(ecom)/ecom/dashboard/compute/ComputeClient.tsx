@@ -152,7 +152,7 @@ export default function ComputeClient({
                 size="sm"
                 value={interval}
                 onChange={setInterval}
-                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]}
+                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: 'Save 2 months' }]}
               />
             </div>
 

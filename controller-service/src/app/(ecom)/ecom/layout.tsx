@@ -4,6 +4,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import EcomNav from './EcomNav'
 import EcomMain from './EcomMain'
+import EcomFooter from './EcomFooter'
 import { Fraunces } from 'next/font/google'
 import './ecom.css'
 
@@ -35,7 +36,7 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
   return (
     <div className={`ecom-scope ${display.variable} min-h-screen bg-surface flex flex-col`}>
       <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />
-      <EcomMain>{children}</EcomMain>
+      <EcomMain footer={<EcomFooter />}>{children}</EcomMain>
     </div>
   )
 }
