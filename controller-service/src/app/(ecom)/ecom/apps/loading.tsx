@@ -1,6 +1,7 @@
 import { Sk } from '@/components/admin/kit/skeleton'
 import { APP_GROUPS } from '@controller/app/(ecom)/ecom/apps'
 import { Eyebrow, Display, SandCard } from '@controller/app/(ecom)/ecom/_ui'
+import { lastGroupSpan } from '@controller/app/(ecom)/ecom/_sections/AppsGrid'
 
 export default function Loading() {
   return (
@@ -15,8 +16,8 @@ export default function Loading() {
         </p>
       </section>
       <section className="relative w-full px-4 sm:px-6 lg:px-12 py-6 sm:py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {APP_GROUPS.map(g => (
-          <SandCard key={g.group} className="p-6">
+        {APP_GROUPS.map((g, i) => (
+          <SandCard key={g.group} className={`p-6 ${lastGroupSpan(i, APP_GROUPS.length) || ''}`}>
             <Eyebrow className="text-[11px]">{g.group}</Eyebrow>
             <ul className="mt-5 space-y-4">
               {g.apps.map(a => (

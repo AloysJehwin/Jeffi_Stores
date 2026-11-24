@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import { priceList } from '@jeffi/pricing'
+import { SIGNUP_CREDIT_INR } from '@/lib/tenant-registry'
 import { Eyebrow, Display, Pill, SandCard } from '../_ui'
 import { DOCUMENT_POINTS, InvoicePreview, MESSAGING_POINTS, WhatsAppPreview, rupees } from '../_ui/service-previews'
 
@@ -8,7 +9,7 @@ export default function ApiServices() {
   const p = priceList()
   const docFrom = Math.min(...Object.values(p.documents))
   return (
-    <section id="apis" className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-24 max-sm:scroll-mt-16">
+    <section id="apis" className="w-full px-4 sm:px-6 lg:px-12 py-12 sm:py-24 max-sm:scroll-mt-16">
       <Eyebrow>Not just stores</Eyebrow>
       <Display className="mt-3 max-w-3xl text-3xl sm:text-4xl lg:text-5xl">Messaging and documents, as an API</Display>
       <p className="mt-4 max-w-2xl text-foreground-secondary">
@@ -21,7 +22,11 @@ export default function ApiServices() {
           <h3 className="mt-2 font-display text-xl sm:text-2xl font-black text-foreground">Reach customers where they read</h3>
           <Points items={MESSAGING_POINTS} />
           <WhatsAppPreview className="mt-6" />
-          <Prices items={[['WhatsApp', p.messages.whatsapp], ['SMS', p.messages.sms], ['Email', p.messages.email], ['Image hosting', p.media]]} unit="per send" />
+          <Prices
+            items={[['WhatsApp', p.messages.whatsapp], ['SMS*', p.messages.sms], ['Email', p.messages.email], ['Image hosting', p.media]]}
+            unit="per send"
+            note="*SMS in India carries DLT registration and operator charges, so it costs more than WhatsApp."
+          />
         </SandCard>
         <SandCard className="flex min-w-0 flex-col max-sm:p-5">
           <div className="text-xs font-bold uppercase tracking-[0.18em] org-brown">Documents API</div>
@@ -34,7 +39,7 @@ export default function ApiServices() {
 
       <div className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         <Pill href="/signup" className="w-full sm:w-auto px-8 py-4 text-base">Get an API key</Pill>
-        <span className="text-center sm:text-left text-sm text-foreground-secondary">Documents from {rupees(docFrom)}. Live in minutes, no store required.</span>
+        <span className="text-center sm:text-left text-sm text-foreground-secondary">Documents from {rupees(docFrom)}. ₹{SIGNUP_CREDIT_INR} welcome credit, no store required.</span>
       </div>
     </section>
   )
@@ -48,7 +53,7 @@ function Points({ items }: { items: string[] }) {
   )
 }
 
-function Prices({ items, unit }: { items: [string, number][]; unit: string }) {
+function Prices({ items, unit, note }: { items: [string, number][]; unit: string; note?: string }) {
   return (
     <div className="mt-auto pt-6">
       <div className="flex flex-wrap gap-2">
@@ -57,6 +62,7 @@ function Prices({ items, unit }: { items: [string, number][]; unit: string }) {
         ))}
       </div>
       <p className="mt-2 text-xs text-foreground-muted">Prices {unit}, charged from your wallet as you use them.</p>
+      {note && <p className="mt-1 text-xs text-foreground-muted">{note}</p>}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { buildRunning, claimBuild, claimPaidBuild, type StudioSession } from '@c
 import { allowanceOf } from '@controller/lib/site-studio/allowance'
 import { reload } from '@controller/lib/site-studio/build'
 import { runShowcaseBuild, runShowcasePaidBuild, WALLET_URL } from './build'
-import { ownerShowcase } from './site'
+import { sessionShowcase } from './site'
 import { showcaseWalletTenant } from '@controller/lib/showcase/billing'
 import { ensureShowcaseWorkspace } from '@/lib/showcase/workspace'
 
@@ -27,9 +27,9 @@ export function redesignShortfall(balanceInr: number, minBalanceInr: number, pri
   return { neededInr, message: `Add ${inr(neededInr)} to your wallet to design your page again. A redesign costs ${inr(priceInr)}; your wallet has ${inr(balanceInr)}${keeps}.` }
 }
 
-export async function showcaseGenerate(owner: Owner, session: StudioSession, body: Record<string, unknown> | null): Promise<Response> {
+export async function showcaseGenerate(_owner: Owner, session: StudioSession, body: Record<string, unknown> | null): Promise<Response> {
   if (!session.direction) return fail('Choose a design direction first.', 409)
-  const site = await ownerShowcase(owner.id)
+  const site = await sessionShowcase(session)
   if (!site) return fail('Save your business details first.', 409)
   const allowance = allowanceOf(session)
   if (buildRunning(session)) return fail('Your page is already being designed.', 409, { code: 'running' })

@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants, getCustomDomain } from '@/lib/tenant-registry'
-import { advanceDomain, reconcileDomains } from '@controller/lib/domains/verify-cron'
+import { advanceDomain, reconcileDomains, reconcileShowcaseDomains } from '@controller/lib/domains/verify-cron'
+import { getOwnedShowcase } from '@/lib/showcase/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,9 +21,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!tenants.find(t => t.id === row.tenant_id)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
+  if (row.showcase_site_id && !(await getOwnedShowcase(row.showcase_site_id, owner.id))) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
 
   const step = await advanceDomain(row)
   if (step.reconcile) await reconcileDomains(step.reconcile).catch(() => {}) // the cron retries
+  if (step.showcase) await reconcileShowcaseDomains().catch(() => {})
   const moved = step.status !== row.status || step.status === 'verified'
   if (moved) return NextResponse.json({ ok: true, status: step.status, message: step.message })
   return NextResponse.json({ error: step.message ?? 'Not ready yet', status: step.status }, { status: 400 })

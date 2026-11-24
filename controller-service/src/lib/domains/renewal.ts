@@ -5,6 +5,8 @@ import { domainProviders, RegistrarError } from './providers'
 import { getDomainPricing, quoteTld, tldOf, tldPrices } from './pricing'
 import { expireOrder, getOrder, patchOrder, withLock, type DomainOrder } from './orders'
 import { notifyDomain } from './notify'
+import { addSubscriptionAddon, deleteAddon, fetchAddon } from '@controller/lib/payments/razorpay-subscriptions'
+import { currentSubscription } from '@controller/lib/billing/subscription'
 
 // Yearly renewal policy (docs/DOMAIN_PURCHASE.md):
 //  - AWS auto-renew is off on every domain, so AWS never renews on its own at the platform's cost.
@@ -15,9 +17,15 @@ import { notifyDomain } from './notify'
 //  - The registry rejecting a renewal refunds the debit and retries the next day, within the same window.
 //  - Only an active store renews; a suspended or closed store's domain is retried, then lapses at the cut-off.
 //  - Auto-renew off: reminders at the window, 7 days and 1 day before expiry; then it expires.
+//  - Decision 8: when the workspace's subscription charges again before the cut-off, the renewal is a one-time
+//    add-on on that charge instead of a wallet debit (charge_ref sub_addon:<id>, then sub_paid:<payment>:<id>); if
+//    it isn't billed two days before the cut-off, the add-on is withdrawn and the wallet pays. The first year stays
+//    on the wallet.
 
 const pool = () => controlPlanePool()
 const DAY = 86400_000
+const SUB_ADDON = 'sub_addon:'
+const SUB_PAID = 'sub_paid:'
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 export interface DomainRenewal {
@@ -142,10 +150,29 @@ export async function advanceRenewal(id: string, opts: { force?: boolean } = {})
       if (store !== 'active') return patch(r.id, { attempts: r.attempts + 1, last_error: `store is ${store ?? 'gone'}`, next_at: new Date(Math.min(now + DAY, cutoff.getTime())) })
       try {
         const q = await renewalQuote(o)
+        const paidOnSubscription = r.charge_ref?.startsWith(SUB_PAID)
+        if (r.charge_ref?.startsWith(SUB_ADDON)) {
+          const addonId = r.charge_ref.slice(SUB_ADDON.length)
+          const fallbackAt = cutoff.getTime() - 2 * DAY
+          if (now < fallbackAt) return patch(r.id, { next_at: new Date(Math.min(now + DAY, fallbackAt)) })
+          const addon = await fetchAddon(addonId)
+          if (addon?.invoice_id) return patch(r.id, { next_at: new Date(now + DAY) }) // billed: the charge webhook marks it paid
+          await deleteAddon(addonId).catch(() => {})
+          await patchOrder(o.id, { event: { step: 'renewal', message: 'Not on the subscription charge in time: paying from the wallet', level: 'warn' } })
+          r = await patch(r.id, { charge_ref: null })
+        } else if (!r.charge_ref) {
+          const addonId = await renewalOnSubscription(o, q.renewalPriceInr, cutoff).catch(() => null)
+          if (addonId) {
+            await patchOrder(o.id, { event: { step: 'renewal', message: `Renewal (₹${q.renewalPriceInr.toLocaleString('en-IN')}) added to your next subscription charge` } })
+            return patch(r.id, { charge_ref: `${SUB_ADDON}${addonId}`, price_inr: q.renewalPriceInr, cost_usd: q.renewalCostUsd, usd_inr: q.usdInr, margin: q.margin, next_at: new Date(now + DAY) })
+          }
+        }
         // The ref is saved before the debit, so a retry after a crash finds the charge instead of taking a second one.
         const ref = r.charge_ref ?? `domain_renew:${o.id}:${now.toString(36)}`
         if (!r.charge_ref) r = await patch(r.id, { charge_ref: ref, price_inr: q.renewalPriceInr, cost_usd: q.renewalCostUsd, usd_inr: q.usdInr, margin: q.margin })
-        const res = await debitWallet({ tenantId: o.tenant_id, amountInr: r.price_inr ?? q.renewalPriceInr, category: 'domain', externalRef: ref, note: `Domain ${o.domain}, renewal to ${expires.getUTCFullYear() + 1}`, floorInr: 0 })
+        const res = paidOnSubscription
+          ? ({ ok: true } as const)
+          : await debitWallet({ tenantId: o.tenant_id, amountInr: r.price_inr ?? q.renewalPriceInr, category: 'domain', externalRef: ref, note: `Domain ${o.domain}, renewal to ${expires.getUTCFullYear() + 1}`, floorInr: 0 })
         if (!res.ok) {
           const { balance } = await getWalletBalance(o.tenant_id)
           const last = r.notified_at ? new Date(r.notified_at).getTime() : 0
@@ -223,6 +250,31 @@ export async function expireLapsedOrders(): Promise<number> {
     if (o) await expireOrder(o)
   }
   return r.rows.length
+}
+
+/** A one-time add-on on the workspace's subscription, when its next charge comes before the cut-off (decision 8). */
+async function renewalOnSubscription(o: DomainOrder, priceInr: number, cutoff: Date): Promise<string | null> {
+  const sub = await currentSubscription(o.tenant_id)
+  if (sub?.status !== 'active' || !sub.currentEnd || Date.parse(sub.currentEnd) > cutoff.getTime() - 3 * DAY) return null
+  return addSubscriptionAddon(sub.razorpaySubscriptionId, { name: `Domain renewal: ${o.domain}`, amountPaise: priceInr * 100, description: `${o.domain}, one year` })
+}
+
+/** After a subscription charge: renewals whose add-on it billed are paid, and go to the registry. */
+export async function markDomainAddonsPaid(tenantId: string, paymentId: string): Promise<number> {
+  const r = await pool().query<{ id: string; charge_ref: string }>(
+    `SELECT id, charge_ref FROM tenant_domain_renewals WHERE tenant_id = $1 AND status = 'due' AND charge_ref LIKE $2`,
+    [tenantId, `${SUB_ADDON}%`]
+  )
+  let paid = 0
+  for (const row of r.rows) {
+    const addonId = row.charge_ref.slice(SUB_ADDON.length)
+    const addon = await fetchAddon(addonId)
+    if (!addon?.invoice_id) continue
+    await patch(row.id, { charge_ref: `${SUB_PAID}${paymentId}:${addonId}`, next_at: new Date() })
+    void advanceRenewal(row.id, { force: true }).catch(() => {})
+    paid++
+  }
+  return paid
 }
 
 /** The daily job. */

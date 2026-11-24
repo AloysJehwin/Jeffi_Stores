@@ -18,6 +18,8 @@ export interface RenderCtx {
   sectionId: string
   /** True for the first caller when the section holds the page's LCP image: load that one eagerly. */
   claimPriority: () => boolean
+  /** The editor's canvas only: attributes for the part's root element naming the tree node it draws (`data-e`). */
+  edit?: Record<string, string> | null
 }
 
 export interface CodeComponentDef {

@@ -112,6 +112,19 @@ async function onSubscriptionEvent(type: string, event: any, ctx: EventContext) 
       throw new TransientWebhookError('subscription tenant resolution failed', err)
     }
   }
+  // A workspace's own Jeffi subscription (plan, add-ons, sites), not a customer subscription in a store.
+  if (store?.collectingAccount === 'billing') {
+    if (!ctx.onBillingSubscription) {
+      console.info('[webhook:subscription] billing subscription with no handler, ack-and-drop', { type, subId: entity?.id })
+      return
+    }
+    try {
+      await ctx.onBillingSubscription(type, event, { tenantId: store.tenantId, eventId: ctx.eventId })
+    } catch (err) {
+      throw new TransientWebhookError('billing subscription handler failed', err)
+    }
+    return
+  }
   if (!store) {
     console.info('[webhook:subscription] unknown subscription, ack-and-drop', { type, subId: entity?.id })
     return

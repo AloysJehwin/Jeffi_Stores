@@ -1,7 +1,79 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **proposed, awaiting decisions** (end of this doc). This replaces the form-based block editor with direct
-manipulation, Canva-style, for Showcase sites and the store's own site. AI-generated pages must be editable with it.
+Status: **phases 0–1 built** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
+per page with Phone/Tablet/Desktop breakpoints (2), a per-tenant rollout flag (8); the rest stay open. This replaces
+the form-based block editor with direct manipulation, Canva-style, for Showcase sites and the store's own site.
+AI-generated pages must be editable with it.
+
+**Built so far**
+- Model: `@jeffi/site-blocks` `code.ts` (tree types, `NODE_ID`); store-core `lib/site/code/ids.ts` (the compile's ids
+  mode), `print.ts`, and in `compile.ts` `sectionTree`, `compileCodeProps` (the one save path), `upgradeCodeProps` /
+  `upgradeCodeSections` (load), `canvasCodeSections` (the canvas draws ids on v1 sections too).
+- Operations and history: `@jeffi/site-blocks/design` (a subpath, so rendering never loads it). Panel classes:
+  `lib/site/code/classes.ts`.
+- Flag: `site_settings.site_editor_enabled = 'true'` (`siteEditorEnabled`). It turns on the canvas bridge and the v2
+  load (`GET /api/admin/site-builder/drafts/[id]?tree=1`).
+- Spike: `components/visitor/site/editor/SiteEditorBridge.tsx`, loaded lazily by `SiteEditorGate` with a preview token.
+  Messages are `site-editor:*` (see the file). Components (`<Link>`, parts) carry no `data-e` yet.
+- Tests: `tests/lib/site-code-roundtrip.test.ts` (225 template sections), `site-code-classes`, `site-editor-imports`,
+  `packages/site-blocks/tests/design.test.ts`.
+- Contract for phase 2: the visual editor saves a section's tree with `source` empty; source-level editors
+  (`literals.ts`, the AI) write `source`, which wins and rebuilds the tree.
+
+**Phase 2 (editor MVP), in slices**
+1. Shell, select, inline text, undo/redo, autosave. `components/site-editor/`: `SiteEditor.tsx` (toolbar, canvas,
+   sections, inspector), `state.ts` (a design history per section plus one undo stack across sections and block-list
+   changes; `docToSave` sends trees with an empty source; `adoptSaved` takes the server's tree when it settled one
+   differently), `host.ts` (load, save, preview URL, upload, publish), `nodes.ts`, `Inspector.tsx`. Admin host:
+   `components/admin/site-builder/VisualEditor.tsx`, opened from a "Visual editor" button in the forms editor (flag on;
+   desktop web layout, saved to phone too while that is the same document), loading through
+   `GET drafts/[id]/editor?key=` and saving through `PUT drafts/[id]`. The canvas reloads, keeping its scroll, only
+   after a save that holds a change it couldn't show itself. `data-e` now also marks Link, Image, Icon and parts drawn
+   as one plain element (`RenderCtx.edit`, `data-e-cmp`).
+2. Style panel and breakpoints. Phone (390, base), Tablet (768, `md:`) and Desktop (1280, `lg:`) canvas widths; the
+   breakpoint shown is the one styled. `StylePanel.tsx`: font (the theme's pair), size, weight, align, text and
+   background colour (theme scales from `paletteFrom` plus any hex), padding, margins, gap, width, max width, min
+   height, rounding; each shows where its value comes from and clears this breakpoint's. Changes go through
+   `setPanelValue` / `classOps`, so wider breakpoints keep their look; the canvas reloads after the save for the CSS.
+3. Layers and reorder. `Layers.tsx`: the page's sections, each code section's elements as a tree (words beside the
+   name, a lock on needed parts, a mark on what store data draws). Rows drag among their siblings with dnd-kit
+   (pointer or keyboard): elements as a design `move`, sections as a block-list step. Nodes filling a slot (a
+   condition's branch, a render function's body) stay put; their contents move. Selecting a row selects on the canvas.
+4. Add, duplicate, delete and pictures. Elements: duplicate and delete (Delete key too), add a heading, paragraph,
+   button, picture, box or divider after the selection (`nodes.ts` `newNode`, all compiler-checked in tests).
+   Sections: add a starter code section, duplicate, delete (at least one stays). Parts the page needs (`locked`,
+   or a classic block the registry locks) can't be duplicated or removed. Pictures swap through the host's own picker
+   (`renderImagePicker`; admin: the media library field), with their description; links get a "goes to" field.
+5. Showcase studio host. `controller-service/.../onboard/_studio/VisualStudio.tsx`, opened by "Edit on the page" in
+   the build step of a Showcase (flag on, page built, no build running). It edits the request's own session (`?site=`
+   from the page, else the session's `site_id`) through `/api/ecom/onboard/studio/design` (GET trees; PUT compiles
+   every tree, keeps the page to code sections with its required parts, saves the session page). The canvas is the
+   studio preview with `editor=1` (`ShowcasePreview` `editing`: `data-block-id`, canvas ids, the bridge). Pictures
+   upload as the Details step's do. Publishing stays the studio's own step, whose compile is v2-aware.
+
+**Phase 3 (free layers), in slices**
+1. Model and classes. `lib/site/code/free.ts`: a free layer is `absolute` in its frame with left, top, width (and
+   maybe height) in % at a breakpoint, plus a z step (`lg:absolute lg:left-[12%] lg:top-[30%] lg:w-[40%] lg:z-10`).
+   `placeFree` keeps the next wider breakpoint as it was (`static` and its width pinned) unless placed too;
+   `unplaceFree` puts it back in the flow; `frameFor` makes the frame `relative` and keeps its height
+   (`lg:min-h-[640px]`) once the layer leaves the flow; `restack` orders layers. The node keeps its place in the tree,
+   so reading order and SEO don't change. Tested down to the compiled CSS.
+2. Handles and guides. In-house, on pointer events, in the lazy canvas bridge (`editor/handles.ts`, behind a small
+   `LayerHandles` interface a library could replace): a selected free layer gets a move area and eight resize knobs;
+   edges snap (`lib/site/code/snap.ts`) to the frame's edges, centre and fractions, to the other boxes in the frame,
+   else to whole percents, with guides drawn while they hold; arrow keys nudge 1% (5% with shift). The drag shows
+   through inline styles; the editor writes `placeFree` classes (`components/site-editor/free-ops.ts`) and the reload
+   after the save draws them. "Free placement" toggles in the layers row and the inspector: the canvas measures the
+   element (`measure`), it is placed where it sits, on top of the section's layers, and its frame made `relative` with
+   its height kept. `FreePanel.tsx`: left, top, width, height in %, front/forward/backward/back, back in the flow.
+3. Phone fallback and critique. Placed on a wider screen only, a layer sits in the flow at its place in the page
+   below it (mobile-first classes); the layers row shows it faintly and the inspector says so, with "Place on Phone
+   too" (`free-ops.ts` `placedWider`). `lib/site/critique.ts` `offScreenOnPhones` reports (`off_screen`, per element)
+   layers placed on phones whose box runs past the section's edges; the owner moves them on Phone (no auto-fix).
+
+**Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
+scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
+all Showcase owners), since their studio runs on the platform.
 
 ## What exists
 

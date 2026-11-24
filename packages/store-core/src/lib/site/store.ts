@@ -8,6 +8,7 @@ import {
   parsePageRefKey,
   surfaceAllows,
   type PageDoc,
+  type PageKey,
   type PageRef,
   type SiteAudience,
   type SiteSurface,
@@ -35,7 +36,7 @@ import {
 import type { HeroSlide } from '@/lib/catalog/hero-slides'
 import type { HomepageDraftState } from '@/lib/catalog/homepage-draft'
 import { siteRegistry } from './blocks'
-import { CodeSectionInvalid, recompileCodeSections } from './code/compile'
+import { CodeSectionInvalid, canvasCodeSections, recompileCodeSections, upgradeCodeSections } from './code/compile'
 import { DEFAULT_FOOTER_COLUMNS, DEFAULT_NAV } from './chrome-types'
 import { docToRows, sectionsToDoc } from './legacy'
 import { isListingKey, listingBetweenDoc } from './listing'
@@ -45,6 +46,8 @@ import { isListingKey, listingBetweenDoc } from './listing'
 // every page keeps rendering from the homepage tables.
 
 const FLAG_KEY = 'site_builder_enabled'
+/** The visual site editor (docs/plans/SITE_EDITOR_PLAN.md), switched on per store while it rolls out. */
+const EDITOR_FLAG_KEY = 'site_editor_enabled'
 const TTL_MS = 15_000
 const KEEP_VERSIONS = 20
 
@@ -73,6 +76,14 @@ export function invalidateSiteCache() {
 export async function siteBuilderEnabled(): Promise<boolean> {
   return cached(flagCache, 'flag', async () => {
     const row = await queryOne<{ value: string | null }>(`SELECT value FROM site_settings WHERE key = $1`, [FLAG_KEY]).catch(() => null)
+    return row?.value === 'true'
+  })
+}
+
+/** The visual site editor is on for this store (its canvas bridge, the v2 upgrade on load). Off unless set. */
+export async function siteEditorEnabled(): Promise<boolean> {
+  return cached(flagCache, 'editor', async () => {
+    const row = await queryOne<{ value: string | null }>(`SELECT value FROM site_settings WHERE key = $1`, [EDITOR_FLAG_KEY]).catch(() => null)
     return row?.value === 'true'
   })
 }
@@ -157,7 +168,8 @@ export async function siteDraftState(draftId: string, surface: SiteSurface): Pro
     const ref = parsePageRefKey(key)
     if (ref && ref.surface === surface) docs.set(key, { ref, doc })
   }
-  return docsToState([...docs.values()])
+  const canvas = await siteEditorEnabled()
+  return docsToState([...docs.values()].map(d => (canvas ? { ...d, doc: canvasCodeSections(d.doc, d.ref.page) } : d)))
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────────────────────────
@@ -278,6 +290,26 @@ export async function createSiteDraft(adminId: string | null, title?: string | n
 
 export function getSiteDraft(id: string): Promise<SiteDraft | null> {
   return queryOne<SiteDraft>(`SELECT id, title, author_admin_id, docs, base, updated_at FROM site_drafts WHERE id = $1`, [id])
+}
+
+/**
+ * The draft as the visual editor loads it: code sections upgraded to v2 (their tree and printed source), only for
+ * stores the editor is on for. Nothing is written: the next save stores them as v2.
+ */
+export async function editorDraft(draft: SiteDraft): Promise<SiteDraft> {
+  if (!(await siteEditorEnabled())) return draft
+  const pages = Object.fromEntries(
+    Object.entries(draft.docs.pages ?? {}).map(([key, doc]) => {
+      const ref = parsePageRefKey(key)
+      return [key, ref && doc ? upgradeCodeSections(normalizeDoc(doc), ref.page) : doc]
+    })
+  )
+  return { ...draft, docs: { ...draft.docs, pages } }
+}
+
+/** A page as the Site Builder canvas draws it: with the editor on, code sections carry its node ids (canvasCodeSections). */
+export async function canvasDoc(doc: PageDoc, page: PageKey): Promise<PageDoc> {
+  return (await siteEditorEnabled()) ? canvasCodeSections(doc, page) : doc
 }
 
 export async function listSiteDrafts(): Promise<Pick<SiteDraft, 'id' | 'title' | 'author_admin_id' | 'updated_at'>[]> {

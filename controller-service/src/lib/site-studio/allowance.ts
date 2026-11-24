@@ -32,6 +32,8 @@ export const AFTER_LIVE = 'Your first full generation was free. Another is avail
 export interface StudioAllowance {
   /** available: never used · resume: claimed but not finished, budget left · used: done or spent (the next one is after go-live) */
   free: 'available' | 'resume' | 'used'
+  /** 'used' only because another of the owner's sites was never paid for (a draft or an unpaid trial). */
+  freeBlocked?: boolean
   /** Design help left today (HELP_PER_DAY). */
   helpLeft: number
   /** Free corrections left today; past them each costs correctionPriceInr from the AI wallet. */
@@ -47,12 +49,13 @@ export interface StudioAllowance {
 const today = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10)
 
 export function allowanceOf(
-  s: (Pick<StudioSession, 'free_used_at' | 'generated_at' | 'tweaks_today' | 'tweaks_day' | 'spent_inr' | 'corrections_today'> & { product?: StudioProduct }) | null
+  s: (Pick<StudioSession, 'free_used_at' | 'generated_at' | 'tweaks_today' | 'tweaks_day' | 'spent_inr' | 'corrections_today' | 'free_blocked'> & { product?: StudioProduct }) | null
 ): StudioAllowance {
   const used = s?.tweaks_day === today() ? s.tweaks_today : 0
-  const free = !s?.free_used_at ? 'available' : s.generated_at || Number(s.spent_inr || 0) >= freeCapInr(s.product) ? 'used' : 'resume'
+  const free = !s?.free_used_at ? (s?.free_blocked ? 'used' : 'available') : s.generated_at || Number(s.spent_inr || 0) >= freeCapInr(s.product) ? 'used' : 'resume'
   return {
     free,
+    ...(s?.free_blocked && !s.free_used_at ? { freeBlocked: true } : {}),
     helpLeft: Math.max(0, HELP_PER_DAY - used),
     correctionsLeft: Math.max(0, CORRECTIONS_FREE_PER_DAY - Number(s?.corrections_today ?? 0)),
     correctionsPerDay: CORRECTIONS_FREE_PER_DAY,

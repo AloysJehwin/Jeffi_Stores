@@ -576,7 +576,7 @@ ALTER TABLE ONLY public.gallery_images
     ADD CONSTRAINT gallery_images_media_kind_check CHECK (media_kind IN ('image')) NOT VALID;
 
 ALTER TABLE ONLY public.gallery_images
-    ADD CONSTRAINT gallery_images_source_check CHECK (source IN ('upload','ai','import')) NOT VALID;
+    ADD CONSTRAINT gallery_images_source_check CHECK (source IN ('upload','ai','import','stock')) NOT VALID;
 
 
 

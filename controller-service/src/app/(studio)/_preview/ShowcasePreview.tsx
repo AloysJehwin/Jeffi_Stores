@@ -1,24 +1,29 @@
 import { cssVarsRule, googleFontsHref, normalizeTheme, themeCssVars, topBlocks } from '@jeffi/site-blocks'
 import type { CompiledSection } from '@/lib/site/code/compile'
 import CodeSection, { planSections } from '@/components/visitor/site/code/CodeSection'
+import SiteEditorLazy from '@/components/visitor/site/editor/SiteEditorLazy'
+import { canvasCodeSections } from '@/lib/site/code/compile'
+import PhotoCredits from '@/components/visitor/site/PhotoCredits'
+import { pictureCredits } from '@/lib/ai/stock-credits'
 import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
-import { getShowcaseByOwner } from '@/lib/showcase/store'
 import { emptyShowcaseContent, SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import type { StudioSession } from '@controller/lib/site-studio/sessions'
-import { previewView } from '@controller/lib/showcase-builder/site'
+import { previewView, sessionShowcase } from '@controller/lib/showcase-builder/site'
 import PreviewBridge from './PreviewBridge'
 
-// The studio's preview of a Showcase's one page: its code sections over the owner's own details and content (the
+// The studio's preview of a Showcase's one page: its code sections over its site's own details and content (the
 // draft site), in the session's look, with the lead form inert. Marked up as the store's preview is, so the bridge's
-// picking and arranging work the same.
+// picking and arranging work the same. `editing`: the visual editor's canvas, its elements carrying their node ids
+// (canvasCodeSections) and its bridge loaded.
 
-export default async function ShowcasePreview({ session }: { session: StudioSession }) {
-  const site = await getShowcaseByOwner(session.owner_id).catch(() => null)
+export default async function ShowcasePreview({ session, editing = false }: { session: StudioSession; editing?: boolean }) {
+  const site = await sessionShowcase(session).catch(() => null)
   const brief = session.brief as { storeName?: string } | null
   const view = previewView(site ?? { business: { name: brief?.storeName ?? 'Your business' }, content: emptyShowcaseContent() })
   const data = showcaseSiteData(view)
-  const doc = session.pages?.[SHOWCASE_PAGE_KEY]
+  const stored = session.pages?.[SHOWCASE_PAGE_KEY]
+  const doc = stored && editing ? canvasCodeSections(stored, 'showcase') : stored
   const theme = normalizeTheme(session.theme ?? (session.direction as { theme?: object } | null)?.theme ?? site?.theme ?? null)
   const css = `${cssVarsRule('.studio-preview.studio-preview', themeCssVars(theme))}
 .studio-preview{font-family:var(--font-body),system-ui,sans-serif;background:var(--color-surface);color:var(--color-foreground);min-height:100vh}
@@ -34,8 +39,8 @@ html{scroll-behavior:smooth}`
     blocks.length ? (
       <main>
         {blocks.map((b, i) => (
-          <div key={b.id} data-studio-block={b.id} data-studio-page={SHOWCASE_PAGE_KEY} data-studio-label={String(b.props.label ?? 'Section')} className="studio-block">
-            <CodeSection section={b.props.compiled as CompiledSection} id={b.id} page="showcase" data={data} priority={i === 0} always={plan.always[i]} anchors={plan.anchors} />
+          <div key={b.id} data-studio-block={b.id} data-block-id={editing ? b.id : undefined} data-studio-page={SHOWCASE_PAGE_KEY} data-studio-label={String(b.props.label ?? 'Section')} className="studio-block">
+            <CodeSection section={b.props.compiled as CompiledSection} id={b.id} page="showcase" data={data} priority={i === 0} always={editing || plan.always[i]} anchors={plan.anchors} preview={editing} />
           </div>
         ))}
       </main>
@@ -48,8 +53,12 @@ html{scroll-behavior:smooth}`
     <>
       <link rel="stylesheet" href={googleFontsHref(theme)} />
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <div className="studio-preview">{body}</div>
+      <div className="studio-preview">
+        {body}
+        <PhotoCredits credits={pictureCredits(site?.content.pictures)} className="px-4 py-4 text-center text-xs text-foreground-muted" />
+      </div>
       <PreviewBridge audience="store" pages={[SHOWCASE_PAGE_KEY]} />
+      {editing && <SiteEditorLazy />}
     </>
   )
 }

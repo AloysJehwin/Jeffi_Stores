@@ -85,18 +85,26 @@ function baseHtml(preheader: string, title: string, body: string): string {
   })
 }
 
+/** Removes every match, repeating until none is left (a removal can join the halves of another). */
+function stripAll(s: string, re: RegExp): string {
+  for (let prev = ''; prev !== s; ) {
+    prev = s
+    s = s.replace(re, '')
+  }
+  return s
+}
+
 /** Crude HTML-to-text for the multipart alternative — improves deliverability. */
 function toText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
+  const breaks = stripAll(html, /<style[\s\S]*?<\/style>/gi)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|tr|h1|h2|div|table)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+  return stripAll(breaks, /<[^>]+>/g)
     .replace(/&middot;/g, '·')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .split('\n')
     .map(l => l.trim())
@@ -359,7 +367,7 @@ export async function sendServicesRequestedEmail(owner: { email: string; name: s
     `
     <p style="margin:0 0 14px;">Hi ${owner.name ?? 'there'},</p>
     <p style="margin:0 0 14px;">Thanks for choosing Jeffi. We have received your request for the <strong>${what}</strong> for <strong>${workspace}</strong>.</p>
-    ${notice('Reviews usually finish the <strong>same business day</strong>. Meanwhile you can explore the console, set up templates and create API keys — sending starts as soon as we approve.')}
+    ${notice('Reviews usually finish within <strong>1–2 business days</strong>. Meanwhile you can explore the console, set up templates and create API keys — sending starts as soon as we approve.')}
     ${button(CONSOLE_URL, 'Open the console')}
   `))
   await send(PLATFORM_ADMIN, `Service request: ${what} — ${workspace}`, baseHtml(
@@ -505,3 +513,6 @@ export async function sendShowcaseLeadEmail(
 
 /** A notice about one of the store's licences (not accepted, expiring, expired). Lines and rows are HTML. */
 export const sendComplianceEmail = sendDomainEmail
+
+/** A notice about the workspace's subscription (payment due, halted, trial ending, the switch from the wallet). Lines and rows are HTML. */
+export const sendBillingEmail = sendDomainEmail

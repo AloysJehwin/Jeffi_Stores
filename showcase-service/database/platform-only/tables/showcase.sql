@@ -3,8 +3,8 @@
 --
 -- showcase_sites: a Showcase, the one-page site of a business served at site-{slug}.<root> by showcase-service
 -- (packages/store-core/src/lib/showcase). Read and written through the control-plane pool: a Showcase-only workspace
--- has no store database. Hosting is free for SHOWCASE_FREE_DAYS from the first publish, then charged monthly to the
--- workspace's wallet by the showcase_renew cron; a short wallet is retried daily and pauses the site after a week.
+-- has no store database. Hosting is free for SHOWCASE_TRIAL_DAYS from the first publish, then a showcase_site line on the
+-- workspace's subscription (controller-service/src/lib/billing); billing writes paid_until.
 --
 CREATE TABLE IF NOT EXISTS public.showcase_sites (
     id                       uuid DEFAULT public.uuid_generate_v4() NOT NULL,
@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS public.showcase_sites (
     free_generation_used_at  timestamp with time zone,
     generations              integer NOT NULL DEFAULT 0,
     custom_domain            character varying(253),
-    published_at             timestamp with time zone,                -- the first publish (starts the free month)
+    published_at             timestamp with time zone,                -- the first publish (starts the trial)
+    trial_ends_at            timestamp with time zone,                -- set at the first publish; the billing sweep pauses an unpaid site then
     created_at               timestamp with time zone NOT NULL DEFAULT now(),
     updated_at               timestamp with time zone NOT NULL DEFAULT now()
 );

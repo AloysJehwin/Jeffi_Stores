@@ -85,3 +85,15 @@ ALTER TABLE ONLY public.tenant_compliance_documents ADD CONSTRAINT tenant_compli
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.ai_wallet_holds ADD CONSTRAINT ai_wallet_holds_tenant_id_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.billing_subscriptions ADD CONSTRAINT billing_subscriptions_replaces_id_fkey
+    FOREIGN KEY (replaces_id) REFERENCES public.billing_subscriptions(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.billing_lines ADD CONSTRAINT billing_lines_subscription_id_fkey
+    FOREIGN KEY (subscription_id) REFERENCES public.billing_subscriptions(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_subscription_id_fkey
+    FOREIGN KEY (subscription_id) REFERENCES public.billing_subscriptions(id) ON DELETE CASCADE;

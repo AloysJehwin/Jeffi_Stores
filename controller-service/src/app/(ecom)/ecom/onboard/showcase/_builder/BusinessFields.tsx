@@ -37,6 +37,7 @@ export default function BusinessFields({
   slugLocked = false,
   slugTouched,
   onSlugTouched,
+  siteId,
 }: {
   form: DetailsForm
   setForm: (f: (f: DetailsForm) => DetailsForm) => void
@@ -45,6 +46,8 @@ export default function BusinessFields({
   slugLocked?: boolean
   slugTouched: boolean
   onSlugTouched: () => void
+  /** The site being edited; null until a new site's draft is saved. */
+  siteId: string | null
 }) {
   const b = form.business
   const set = (patch: Partial<BusinessForm>) => setForm(f => ({ ...f, business: { ...f.business, ...patch } }))
@@ -127,7 +130,7 @@ export default function BusinessFields({
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-[9rem_1fr]">
             <div>
               <span className={lbl}>Logo {optional}</span>
-              <ImageField value={b.logo} onChange={url => set({ logo: url ?? '' })} kind="logo" label="Upload your logo" className="h-28 w-full sm:w-36" fit="contain" />
+              <ImageField value={b.logo} onChange={url => set({ logo: url ?? '' })} kind="logo" label="Upload your logo" className="h-28 w-full sm:w-36" fit="contain" siteId={siteId} />
               <p className="mt-1 text-[11px] text-foreground-muted">PNG, JPG or WebP.</p>
             </div>
             <div className="space-y-4">

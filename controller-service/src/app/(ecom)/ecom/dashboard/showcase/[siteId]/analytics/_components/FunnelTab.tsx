@@ -1,11 +1,11 @@
 'use client'
 
 import { Empty, Kpi, KpiGrid, Section, Table, change, count, pct, type Col } from '@/components/admin/channels/ui'
-import { HBars } from '@/components/admin/traffic/charts'
+import { HBars, chartColor } from '@/components/admin/traffic/charts'
 import type { ShowcaseFunnel, ShowcaseFunnelRow } from '@/lib/traffic/showcase-types'
 import { Note, PointChange, rateText, ratio, targetLabel } from './shared'
 
-const COLORS = ['#3b82f6', '#a855f7', '#f59e0b', '#f97316', '#22c55e']
+const COLORS = [chartColor(1), chartColor(3), chartColor(7), chartColor(4), chartColor(2)]
 
 export default function FunnelTab({ data }: { data: ShowcaseFunnel }) {
   const first = data.steps[0]
@@ -81,7 +81,7 @@ export default function FunnelTab({ data }: { data: ShowcaseFunnel }) {
       <Section title="Taps to contact you directly">
         <HBars
           empty="No one tapped to call, WhatsApp or email in this period"
-          color="rgba(59,130,246,0.6)"
+          color={chartColor(1)}
           rows={data.contact.byTarget.map(k => ({ key: k.target, label: targetLabel(k.target), value: k.sessions, right: `${count(k.sessions)} visits · ${count(k.clicks)} taps` }))}
         />
       </Section>

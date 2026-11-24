@@ -96,5 +96,12 @@ async function tick() {
     for (const id of reclaimed) results.push({ tenantId: '-', step: 'pool_reclaim', status: `terminated ${id}` })
   }
 
-  return { success: true, advanced: results.length, results }
+  // Builds that failed or sit on a step past its timeout: one alert per incident, one on recovery.
+  const { sweepProvisioningIncidents } = await import('@controller/lib/provisioning/alerts')
+  const incidents = await sweepProvisioningIncidents().catch((e: any) => {
+    console.error('[provisioning] incident sweep failed:', e?.message)
+    return null
+  })
+
+  return { success: true, advanced: results.length, results, incidents }
 }

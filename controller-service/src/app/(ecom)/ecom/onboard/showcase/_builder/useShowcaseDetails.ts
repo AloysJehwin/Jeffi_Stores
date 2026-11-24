@@ -5,8 +5,9 @@ import { SHOWCASE_SLUG_RE } from '@/lib/showcase/host'
 import type { ClientSite } from '@controller/lib/showcase-builder/site'
 import { businessFromForm, canSave, formFromSite, type DetailsForm } from './model'
 
-// The builder's form with autosave: changes are saved a moment after the owner stops typing (the first save with a
-// name and a free address creates the draft site), one save at a time; saveNow() flushes before moving on.
+// The builder's form with autosave for one site: changes are saved a moment after the owner stops typing (on a new
+// site the first save with a name and a free address creates its draft), one save at a time; saveNow() flushes before
+// moving on. Every call names the site once it exists.
 
 const BASE = '/api/ecom/onboard/showcase'
 const DELAY_MS = 1200
@@ -20,21 +21,23 @@ function saveRequest(f: DetailsForm, cur: { site: ClientSite | null; slug: SlugS
   const slugOk = cur.slug.state === 'ok'
   if (!cur.site && !slugOk) return null
   const sendContent = f.content !== savedContent || !cur.site
-  const body = JSON.stringify({ ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), ...(sendContent ? { content: f.content } : {}) })
+  const body = JSON.stringify({ ...(cur.site ? { siteId: cur.site.id } : {}), ...(slugOk ? { slug: f.slug } : {}), business: businessFromForm(f.business), ...(sendContent ? { content: f.content } : {}) })
   return { body, sendContent }
 }
 
-export async function uploadShowcaseImage(file: File, kind: 'logo' | 'service' | 'work' | 'avatar'): Promise<string> {
+export async function uploadShowcaseImage(file: File, kind: 'logo' | 'service' | 'work' | 'avatar', siteId?: string | null): Promise<string> {
   const fd = new FormData()
   fd.append('file', file)
   fd.append('kind', kind)
+  if (siteId) fd.append('siteId', siteId)
   const res = await fetch(`${BASE}/upload`, { method: 'POST', body: fd })
   const data = await res.json().catch(() => ({}))
   if (!res.ok || typeof data.url !== 'string') throw new Error(data.error || 'That picture could not be uploaded.')
   return data.url
 }
 
-export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = '') {
+/** `onCreated` runs as soon as the first save creates a new site's draft, before anything renders with it. */
+export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = '', onCreated?: (site: ClientSite) => void) {
   const [form, setFormState] = useState<DetailsForm>(() => formFromSite(initialSite, ownerEmail))
   const [site, setSite] = useState<ClientSite | null>(initialSite)
   const [saving, setSaving] = useState(false)
@@ -47,6 +50,8 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
   unsaved.current = dirty
   const current = useRef({ site, slug })
   current.current = { site, slug }
+  const created = useRef(onCreated)
+  created.current = onCreated
   const running = useRef<Promise<boolean> | null>(null)
   const again = useRef(false)
   const ownSlug = site?.slug ?? null
@@ -60,7 +65,9 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
    * filled stay as they are.
    */
   const refresh = useCallback(async () => {
-    const data = await fetch(BASE, { cache: 'no-store' })
+    const id = current.current.site?.id
+    if (!id) return
+    const data = await fetch(`${BASE}?${new URLSearchParams({ site: id })}`, { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))
       .catch(() => null)
     const next = data?.site as ClientSite | null | undefined
@@ -97,6 +104,10 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
         if (data.field === 'slug') setSlug({ state: 'taken', error: data.error || 'That address is taken.' })
         return false
       }
+      // A save that follows at once (saveNow's loop) must name the site this one created.
+      const isNew = !current.current.site
+      current.current = { ...current.current, site: data.site }
+      if (isNew) created.current?.(data.site)
       setSite(data.site)
       setSaveError(null)
       if (req.sendContent) savedContent.current = f.content
@@ -148,7 +159,8 @@ export function useShowcaseDetails(initialSite: ClientSite | null, ownerEmail = 
     setSlug({ state: 'checking' })
     let stop = false
     const t = setTimeout(async () => {
-      const data = await fetch(`${BASE}/slug?${new URLSearchParams({ slug: s })}`, { cache: 'no-store' })
+      const id = current.current.site?.id
+      const data = await fetch(`${BASE}/slug?${new URLSearchParams({ slug: s, ...(id ? { site: id } : {}) })}`, { cache: 'no-store' })
         .then(r => r.json())
         .catch(() => null)
       if (stop) return

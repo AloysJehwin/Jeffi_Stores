@@ -47,30 +47,43 @@ export function kybBlock(status: number | undefined, data: unknown): KybBlock | 
   return { error: typeof d.error === 'string' ? d.error : '', missing }
 }
 
-/** What the gate found missing, with "Approve anyway" behind the confirm dialog. */
+/**
+ * What the gate found missing, per service, with "Approve anyway" behind the confirm dialog. `labels` renames a
+ * service for this workspace (a store application on one with no store); `cancelLabel` says what backing out leaves.
+ */
 export function KybBlocked({
   block,
   onForce,
   onCancel,
   forceLabel = 'Approve anyway',
+  cancelLabel = 'Keep in review',
+  labels = {},
 }: {
   block: KybBlock
   onForce: () => Promise<void>
   onCancel: () => void
   forceLabel?: string
+  cancelLabel?: string
+  labels?: Partial<Record<string, string>>
 }) {
   const services = Object.entries(block.missing)
+  const name = (s: string) => labels[s] ?? SERVICE_LABEL[s as KybService] ?? s
+  // Named from the services the gate checked, not the owner-facing message (which names only the first).
+  const names = services.map(([s]) => name(s))
+  const headline = names.length
+    ? `The KYB isn’t complete for ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]}.`
+    : block.error || 'The business’s KYB isn’t complete.'
   // Full width under the row it blocks: what is missing on the left, the two choices stacked on the right.
   return (
     <div role="alert" className="w-full min-w-0 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm sm:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground break-words">{block.error || 'The business’s KYB isn’t complete.'}</p>
+          <p className="font-medium text-foreground break-words">{headline}</p>
           {services.length > 0 && (
             <ul className={`mt-3 grid gap-3 ${services.length > 1 ? 'sm:grid-cols-2' : ''}`}>
               {services.map(([s, items]) => (
                 <li key={s} className="min-w-0">
-                  <span className="font-medium text-foreground">{SERVICE_LABEL[s as KybService] ?? s}</span>
+                  <span className="font-medium text-foreground">{name(s)}</span>
                   <ul className="mt-1 space-y-1 text-foreground-muted">
                     {items.map(m => (
                       <li key={m.item} className="break-words">
@@ -100,7 +113,7 @@ export function KybBlocked({
               },
             }}
           />
-          <ActionButton size="lg" action={{ label: 'Cancel', onClick: onCancel }} />
+          <ActionButton size="lg" action={{ label: cancelLabel, onClick: onCancel }} />
         </div>
       </div>
     </div>

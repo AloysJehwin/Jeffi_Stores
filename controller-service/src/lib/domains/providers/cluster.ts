@@ -19,4 +19,14 @@ export class ClusterHosting implements DomainHosting {
     const cert = await get<any>('Certificate', customDomainName(host), tenantNamespace(tenantSlug)).catch(() => null)
     return (cert?.status?.conditions ?? []).some((c: any) => c.type === 'Ready' && c.status === 'True')
   }
+
+  async applyShowcaseRoutes() {
+    const { applyShowcaseRoutes } = await import('../showcase-routes')
+    await applyShowcaseRoutes()
+  }
+
+  async showcaseCertReady(host: string) {
+    const { showcaseCertReady } = await import('../showcase-routes')
+    return showcaseCertReady(host)
+  }
 }

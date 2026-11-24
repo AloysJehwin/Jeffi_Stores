@@ -1,16 +1,24 @@
 import 'server-only'
 import { getOwnerTenants } from '@/lib/tenant-registry'
-import { createShowcaseDraft, getShowcaseByOwner, updateShowcase, type ShowcaseSiteRow } from '@/lib/showcase/store'
+import { createShowcaseDraft, getOwnedShowcase, updateShowcase, type ShowcaseSiteRow } from '@/lib/showcase/store'
 import { setShowcaseSlug } from '@/lib/showcase/builder-data'
 import { cleanBusiness, cleanContent } from '@/lib/showcase/clean'
 import type { ShowcaseView } from '@/lib/showcase/types'
 
-// The owner's Showcase as the builder (signup and dashboard editor) works on it: the newest site row, created as a
-// draft by the first save of the Details step.
+// A Showcase as the builder (signup and dashboard editor) works on it: an owner may have several; each builder page
+// names its site (?site=, /dashboard/showcase/[siteId]), and a new one is created as a draft by the first save of the
+// Details step.
 
 export type SaveResult = { ok: true; site: ShowcaseSiteRow } | { ok: false; error: string; field?: 'slug' | 'name' }
 
-export const ownerShowcase = (ownerId: string) => getShowcaseByOwner(ownerId)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The site when `siteId` is a uuid this owner owns, else null. */
+export const ownedShowcase = async (ownerId: string, siteId: unknown): Promise<ShowcaseSiteRow | null> =>
+  typeof siteId === 'string' && UUID_RE.test(siteId) ? getOwnedShowcase(siteId, ownerId) : null
+
+/** A Showcase studio session's site. */
+export const sessionShowcase = (session: { owner_id: string; site_id?: string | null }) => ownedShowcase(session.owner_id, session.site_id)
 
 /** The workspace a new Showcase joins (its wallet pays for hosting and paid generations): the owner's active one. */
 async function ownerWorkspace(ownerId: string): Promise<string | null> {
@@ -19,11 +27,13 @@ async function ownerWorkspace(ownerId: string): Promise<string | null> {
 }
 
 /**
- * The Details step (or the editor's forms) saved: the draft is created on the first save that has a name and an
- * address, then updated. `content` is left as it is when not sent. A draft's address may change; a live site's not.
+ * The Details step (or the editor's forms) saved for `siteId`, or, without one, a new draft created on the first save
+ * that has a name and an address. `content` is left as it is when not sent. A draft's address may change; a live
+ * site's not. A `siteId` the owner doesn't own is refused.
  */
-export async function saveShowcaseDetails(ownerId: string, input: { slug?: unknown; business?: unknown; content?: unknown }): Promise<SaveResult> {
-  const site = await getShowcaseByOwner(ownerId)
+export async function saveShowcaseDetails(ownerId: string, siteId: unknown, input: { slug?: unknown; business?: unknown; content?: unknown }): Promise<SaveResult> {
+  const site = siteId == null || siteId === '' ? null : await ownedShowcase(ownerId, siteId)
+  if (siteId != null && siteId !== '' && !site) return done(null)
   const content = input.content === undefined ? undefined : cleanContent(input.content)
   if (input.business === undefined && site) return content ? done(await updateShowcase(site.id, { content })) : { ok: true, site }
   const business = cleanBusiness(input.business)

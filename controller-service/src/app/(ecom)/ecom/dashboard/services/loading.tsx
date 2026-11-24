@@ -1,5 +1,6 @@
 import { Check, FileText, MessageSquare } from 'lucide-react'
 import { DOCUMENT_POINTS, MESSAGING_POINTS } from '../../_ui/service-previews'
+import { REVIEW_TIME } from '@controller/lib/ecom/console-copy'
 import { ConsoleLoading, PillLoading, Sk } from '../_components/Skeleton'
 
 const CARDS = [
@@ -9,7 +10,7 @@ const CARDS = [
 
 export default function Loading() {
   return (
-    <ConsoleLoading eyebrow="Developers" title="Services" description="Messaging and Documents are pay-per-use APIs, billed from your wallet. Verify your business, then add one here; it goes live once Jeffi approves it.">
+    <ConsoleLoading eyebrow="Developers" title="Services" description={`Messaging and Documents are pay-per-use APIs, billed from your wallet. Verify your business, then add one here. Jeffi reviews each request, usually within ${REVIEW_TIME}.`}>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {CARDS.map(c => (
           <section key={c.title} className="flex flex-col rounded-2xl border border-border-default bg-surface-elevated p-6">

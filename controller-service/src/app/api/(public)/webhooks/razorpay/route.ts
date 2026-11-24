@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runWithAuditActor } from '@/lib/auth/audit-context'
 import { dispatchRazorpayEvent, TransientWebhookError, verifyRazorpaySignature } from '@/lib/payments/razorpay-events/dispatch'
 import { noteRazorpayWebhook } from '@/lib/payments/rzp-webhook-health'
+import { onBillingSubscription } from '@controller/lib/billing/webhook'
 
 /**
  * The platform Razorpay account's webhook. It hits one fixed URL with no store host, so each handler
  * finds the store from the event and writes inside it. Own-key stores use /webhooks/razorpay/[tenant].
+ * Workspace billing subscriptions (plan, add-ons, sites) go to lib/billing/webhook.ts.
  */
 async function handle(request: NextRequest) {
   const rawBody = await request.text()
@@ -24,6 +26,7 @@ async function handle(request: NextRequest) {
       store: null,
       eventId: request.headers.get('x-razorpay-event-id'),
       accountId: event?.account_id ?? null,
+      onBillingSubscription,
     })
   } catch (err) {
     // Razorpay disables a webhook that keeps failing, so only a retryable failure gets a 5xx.

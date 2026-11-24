@@ -31,17 +31,23 @@ export async function isCertReady(id: string): Promise<boolean> {
   if (row.status === 'verified') return true
   if (row.status !== 'cert-pending') return false
 
-  // Lazy import so this module does not pull k8s into contexts that only resolve DNS.
-  const { get } = await import('@/lib/k8s/client')
-  const { customDomainName } = await import('@/lib/k8s/tenant-workload')
-  const { tenantNamespace } = await import('@/lib/provisioning/tiers')
-  const { getTenant } = await import('@/lib/tenant-registry')
-  const tenant = await getTenant(row.tenant_id)
-  if (!tenant) return false
-
-  const cert = await get<any>('Certificate', customDomainName(row.domain), tenantNamespace(tenant.slug)).catch(() => null)
-  const ready = (cert?.status?.conditions ?? []).find((c: any) => c.type === 'Ready')
-  if (ready?.status === 'True') {
+  // Lazy imports so this module does not pull k8s into contexts that only resolve DNS.
+  let issued: boolean
+  if (row.showcase_site_id) {
+    // A Showcase's certificate sits beside showcase-service, not in a store namespace.
+    const { showcaseCertReady } = await import('./showcase-routes')
+    issued = await showcaseCertReady(row.domain)
+  } else {
+    const { get } = await import('@/lib/k8s/client')
+    const { customDomainName } = await import('@/lib/k8s/tenant-workload')
+    const { tenantNamespace } = await import('@/lib/provisioning/tiers')
+    const { getTenant } = await import('@/lib/tenant-registry')
+    const tenant = await getTenant(row.tenant_id)
+    if (!tenant) return false
+    const cert = await get<any>('Certificate', customDomainName(row.domain), tenantNamespace(tenant.slug)).catch(() => null)
+    issued = (cert?.status?.conditions ?? []).some((c: any) => c.type === 'Ready' && c.status === 'True')
+  }
+  if (issued) {
     await setCustomDomainStatus(id, 'verified')
     return true
   }

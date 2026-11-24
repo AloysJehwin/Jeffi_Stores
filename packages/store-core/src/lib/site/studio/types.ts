@@ -69,6 +69,8 @@ export interface StudioBrief extends StudioStoreDetails {
   logoUrl: string | null
   /** Varies every layout choice made for this brief; a new seed gives a different site. */
   seed: number
+  /** A Showcase's mood pictures: one short stock-photo search per scene (studio/showcase.ts). */
+  stockQueries?: string[]
   /** What the site is for: a store (absent) or a Showcase, a business's one-page site (studio/showcase.ts). */
   kind?: StudioProduct
 }

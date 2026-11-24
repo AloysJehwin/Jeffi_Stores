@@ -71,6 +71,7 @@ export default function ShowcaseStudio({
   const [paidStart, setPaidStart] = useState(false)
   const top = useRef<HTMLDivElement>(null)
   const low = useRef<HTMLDivElement>(null)
+  const stepper = useRef<HTMLOListElement>(null)
   const report = useRef(onView)
   report.current = onView
 
@@ -79,6 +80,8 @@ export default function ShowcaseStudio({
   const locked = !!s && (s.status === 'building' || built)
   const aiDown = aiOff || view?.ai?.available === false
   const paid = view?.allowance.paid ?? null
+  // The free design is held back: another of the owner's sites was never paid for.
+  const freeBlocked = !!view?.allowance.freeBlocked
 
   const apply = useCallback((v: StudioView, follow = true) => {
     setView(prev => ({ ...v, site: v.site ?? prev?.site, ai: v.ai ?? prev?.ai }))
@@ -102,6 +105,13 @@ export default function ShowcaseStudio({
   useEffect(() => {
     if (walletLow) low.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [walletLow])
+
+  // A stepper scrolled sideways keeps the current step in view.
+  useEffect(() => {
+    const ol = stepper.current
+    const on = ol?.querySelector<HTMLElement>('[aria-current="step"]')
+    if (ol && on) ol.scrollLeft = Math.max(0, on.offsetLeft + on.offsetWidth + 4 - ol.clientWidth)
+  }, [phase])
 
   const go = (p: Phase) => {
     setPhase(p)
@@ -246,6 +256,14 @@ export default function ShowcaseStudio({
             <CloudOff className="h-4 w-4 shrink-0 org-brown" aria-hidden /> AI changes aren’t available right now. Your page is kept.
           </p>
         )}
+        {freeBlocked && s?.status !== 'building' && (
+          <p role="status" className={`${noteCls} org-peach mb-5 flex items-start gap-2 text-foreground`}>
+            <Wallet className="mt-0.5 h-4 w-4 shrink-0 org-brown" aria-hidden />
+            <span>
+              <strong className="font-semibold">This site’s AI design isn’t free.</strong> The free AI design is for one unpaid site at a time, and another of your sites hasn’t been paid for yet. To design this one free, publish and pay for that site, or finish it; or design this one now for {paid ? priceText(paid) : 'the redesign price from your wallet'}.
+            </span>
+          </p>
+        )}
         {loadErr ? (
           <p className="text-sm text-red-600">{loadErr}</p>
         ) : !view ? (
@@ -260,7 +278,7 @@ export default function ShowcaseStudio({
             <div className="min-w-0 flex-1">
               <h3 className="font-display text-xl font-black text-foreground">Design your page with AI</h3>
               <p className="mt-1 text-sm text-foreground-secondary">
-                Answer a few questions, pick a look, and the AI designs your page around your details, work and reviews, live on desktop and phone. Your first design is free.
+                Answer a few questions, pick a look, and the AI designs your page around your details, work and reviews, live on desktop and phone.{freeBlocked ? '' : ' Your first design is free.'}
               </p>
             </div>
             <button type="button" onClick={() => void call('start', 'start', {}, () => go('brief'))} disabled={!!busy || aiDown} className={`${primaryBtn} max-sm:w-full`}>
@@ -270,23 +288,24 @@ export default function ShowcaseStudio({
         ) : (
           <>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <ol className="flex flex-wrap items-center gap-1.5" aria-label="Studio steps">
+              {/* One line, never wrapped (a wrap left a connector dangling): it scrolls sideways if a phone is too narrow. */}
+              <ol ref={stepper} className="ecom-scroll-x relative -m-1 flex min-w-0 items-center gap-1 overflow-x-auto p-1 sm:gap-1.5" aria-label="Studio steps">
                 {PHASES.map((p, i) => {
                   const on = p.id === phase
                   const done = i < at
                   return (
-                    <li key={p.id} className="flex items-center gap-1.5">
+                    <li key={p.id} className="flex shrink-0 items-center gap-1 sm:gap-1.5">
                       <button
                         type="button"
                         disabled={!reachable(p.id) || on || !!busy}
                         onClick={() => go(p.id)}
                         aria-current={on ? 'step' : undefined}
-                        className={`ecom-focus inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${on ? 'ecom-sel' : done ? 'org-sand text-foreground hover:bg-[var(--org-sand-deep)]' : 'text-foreground-muted'} disabled:cursor-default`}
+                        className={`ecom-focus inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold transition-colors sm:gap-1.5 sm:px-3 ${on ? 'ecom-sel' : done ? 'org-sand text-foreground hover:bg-[var(--org-sand-deep)]' : 'text-foreground-muted'} disabled:cursor-default`}
                       >
                         {done && <Check className="h-3 w-3" strokeWidth={3} />}
                         {p.label}
                       </button>
-                      {i < PHASES.length - 1 && <span className="h-px w-3 bg-border-default" aria-hidden />}
+                      {i < PHASES.length - 1 && <span className="h-px w-2 bg-border-default sm:w-3" aria-hidden />}
                     </li>
                   )
                 })}

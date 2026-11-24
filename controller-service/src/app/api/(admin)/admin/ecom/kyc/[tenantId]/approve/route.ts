@@ -8,14 +8,13 @@ import {
   getKyc,
   getOwnerById,
   getDraft,
-  saveSubscriptionId,
   saveLinkedAccountId,
   getOwnerBankAccount,
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
   setPaymentRequired,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@controller/lib/payments/razorpay-subscriptions'
+import { currentSubscription, startStoreSubscription } from '@controller/lib/billing/subscription'
 import {
   createLinkedAccount,
   createRouteStakeholder,
@@ -250,7 +249,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ ok: true, paymentRequired, provisioningStarted: true, linkedAccountId })
   }
 
-  // 2. Create Razorpay Subscription and return checkout URL.
+  // 2. Start the workspace's subscription and return its checkout URL.
   // No fallback to another plan: charging a different plan than the owner chose is worse than failing.
   const plans = await listPlans()
   const plan = plans.find(p => p.slug === tenant.plan)
@@ -260,7 +259,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       { status: 409 }
     )
   }
-  const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
   // Price was computed and saved onto tenant_compute by onboard/submit; the subscription charges that total.
   const priceRow = await controlPlanePool().query<{ price: number | null }>(
     `SELECT price_inr_month::int AS price FROM tenant_compute WHERE tenant_id = $1`, [tenantId]
@@ -271,18 +269,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   try {
-    const { subscriptionId, shortUrl } = await createRazorpaySubscription({
-      planSlug: tenant.plan ?? 'basic',
-      planName: plan.name,
-      interval: (tenant.billing_interval as any) ?? 'monthly',
-      priceInrMonth,
-      ownerEmail: owner.email,
-      ownerName: owner.name,
-      tenantId,
-      tenantSlug: tenant.slug,
-      callbackUrl: `${baseUrl}/onboard/success?tenant=${tenant.slug}`,
-    })
-    await saveSubscriptionId(tenantId, subscriptionId, tenant.billing_interval ?? 'monthly', shortUrl)
+    // The workspace's subscription (lib/billing): the plan plus the add-ons picked at signup, one checkout.
+    const r = await startStoreSubscription(tenantId, { email: owner.email, name: owner.name }, priceInrMonth)
+    // Approved again with the checkout still open: the same link.
+    const shortUrl = r.status === 'checkout' ? r.checkoutUrl : (await currentSubscription(tenantId))?.checkoutUrl ?? null
+    if (!shortUrl) throw new Error(`nothing to subscribe to (${r.status})`)
     sendKycApprovedEmail(
       { email: owner.email, name: owner.name },
       { display_name: tenant.display_name, slug: tenant.slug },
