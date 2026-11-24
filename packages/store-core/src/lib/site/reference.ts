@@ -90,14 +90,22 @@ function summarise(tag: string, attrs: string, body: string): Chunk {
   }
 }
 
+/** Removes every match, repeating until none is left (a removal can join the halves of another). */
+function stripAll(s: string, re: RegExp): string {
+  for (let prev = ''; prev !== s; ) {
+    prev = s
+    s = s.replace(re, '')
+  }
+  return s
+}
+
 /** The page's sections in order, header and footer included. */
 export function skeleton(html: string): Chunk[] {
-  const clean = html
-    .replace(/<script[\s\S]*?<\/script\b[^>]*>/gi, '')
-    .replace(/<style[\s\S]*?<\/style\b[^>]*>/gi, '')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, '<svg/>')
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
+  let clean = stripAll(html, /<script[\s\S]*?<\/script\b[^>]*>/gi)
+  clean = stripAll(clean, /<style[\s\S]*?<\/style\b[^>]*>/gi)
+  clean = clean.replace(/<svg[\s\S]*?<\/svg>/gi, '<svg/>')
+  clean = stripAll(clean, /<noscript[\s\S]*?<\/noscript>/gi)
+  clean = stripAll(clean, /<!--[\s\S]*?-->/g)
   // Section starts: theme section wrappers first, else <section>, plus the header and footer.
   const shopify = /<(div|section)\b([^>]*\bid=["']shopify-section-[^"']+["'][^>]*)>/gi
   const plain = /<(section|header|footer)\b([^>]*)>/gi

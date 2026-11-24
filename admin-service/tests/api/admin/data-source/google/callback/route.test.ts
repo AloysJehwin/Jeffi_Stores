@@ -36,7 +36,7 @@ beforeEach(() => {
   vi.mocked(getTenant).mockResolvedValue(null as any)
   vi.mocked(encryptToken).mockImplementation(((s: string) => `enc:${s}`) as any)
   fetchMock.mockImplementation(async (url: string) =>
-    String(url).includes('oauth2.googleapis.com')
+    new URL(String(url)).hostname === 'oauth2.googleapis.com'
       ? json({ refresh_token: 'rt', access_token: 'at', scope: 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file' })
       : json({ user: { emailAddress: 'me@x.test' } })
   )

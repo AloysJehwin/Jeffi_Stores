@@ -27,7 +27,8 @@ const text = (body: MockCall['body'], role: string) => (body.messages ?? []).fil
 function tweak(user: string): string {
   const src = /```tsx\n([\s\S]*?)```/.exec(user)?.[1] ?? ''
   const id = /The owner selected <\w+ data-e="([^"]+)"/.exec(user)?.[1]
-  const at = id ? new RegExp(`(data-e="${id}"[^>]*>)([^<{]*)(<)`) : /(<h[1-3][^>]*>)([^<{]*)(<)/
+  const safeId = id?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const at = safeId ? new RegExp(`(data-e="${safeId}"[^>]*>)([^<{]*)(<)`) : /(<h[1-3][^>]*>)([^<{]*)(<)/
   return '```tsx\n' + src.replace(at, (_m, a: string, _w: string, b: string) => `${a}${MOCK.changed}${b}`) + '```'
 }
 

@@ -18,13 +18,17 @@ const call = (cookie: string | null = 'portal=tok') =>
   })
 const future = new Date(Date.now() + 86_400_000).toISOString()
 const past = new Date(Date.now() - 86_400_000).toISOString()
+// Placeholder sealed and opened values for the mocked decryptPortalSecret.
+const SEALED_FILE = 'sealed-file'
+const SEALED_PIN = 'sealed-pin'
+const OPENED_PIN = 'opened-pin'
 
 beforeEach(() => {
   vi.clearAllMocks()
   session.verifyPortalToken.mockResolvedValue({ email: 'a@b.co' })
   cm.certNeedsMobileCheck.mockReturnValue(false)
-  crypt.decryptPortalSecret.mockImplementation((v: string) => (v === 'data-enc' ? Buffer.from('P12BYTES').toString('base64') : 'pw-secret'))
-  query.mockResolvedValue({ rows: [{ p12_data_enc: 'data-enc', p12_password_enc: 'pw-enc', common_name: 'ada admin/1' }] })
+  crypt.decryptPortalSecret.mockImplementation((v: string) => (v === SEALED_FILE ? Buffer.from('P12BYTES').toString('base64') : OPENED_PIN))
+  query.mockResolvedValue({ rows: [{ p12_data_enc: SEALED_FILE, p12_password_enc: SEALED_PIN, common_name: 'ada admin/1' }] })
 })
 
 describe('GET /api/certportal/certs/[serial]/download', () => {
@@ -39,7 +43,7 @@ describe('GET /api/certportal/certs/[serial]/download', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('application/x-pkcs12')
     expect(res.headers.get('Content-Disposition')).toBe('attachment; filename="ada_admin_1.p12"')
-    expect(res.headers.get('X-Cert-Password')).toBe('pw-secret')
+    expect(res.headers.get('X-Cert-Password')).toBe(OPENED_PIN)
     expect(res.headers.get('Cache-Control')).toBe('no-store')
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe('P12BYTES')
     expect(query.mock.calls[0][0]).toContain('downloaded_at IS NULL')
