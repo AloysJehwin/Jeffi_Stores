@@ -4,7 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadLocalEnv } from './env'
-import { CHROME_PAGES, DRAFT_TITLE_PREFIX, MANIFEST_PATH, OUTPUT_DIR, PAGE_PATHS, type Audience, type Manifest, type ManifestDraft, type Skipped, type SweepPage } from './pages'
+import { CHROME_PAGES, DRAFT_TITLE_PREFIX, EDITOR_ARCHETYPE, MANIFEST_PATH, OUTPUT_DIR, PAGE_PATHS, type Audience, type Manifest, type ManifestDraft, type Skipped, type SweepPage } from './pages'
 
 loadLocalEnv()
 
@@ -83,6 +83,35 @@ async function main() {
     } catch (err) {
       for (const id of [draftId, ...drafts.map(d => d.draftId)]) if (id) await discardSiteDraft(id)
       throw err
+    }
+  }
+  // The visual editor's page (editor-pack.ts): free layers, panel styles and every convertible kind converted, saved
+  // to the desktop and phone home layouts as the editor saves them.
+  if (!only?.length || only.includes(EDITOR_ARCHETYPE)) {
+    if (!up.store) skipped.push({ archetype: EDITOR_ARCHETYPE, pack: EDITOR_ARCHETYPE, page: null, reason: 'the storefront app is not running' })
+    else {
+      const { saveDraftPage } = await import('@/lib/site/store')
+      const { editorHomeDoc, CONVERTED } = await import('./editor-pack')
+      let draftId = ''
+      try {
+        draftId = await createSiteDraft(null, `${DRAFT_TITLE_PREFIX}${EDITOR_ARCHETYPE}`)
+        const doc = await editorHomeDoc()
+        for (const surface of ['web', 'web_mobile'] as const) await saveDraftPage(draftId, { audience: 'store', surface, page: 'home', slug: '' }, doc, null)
+        const kinds = Object.fromEntries(CONVERTED.map(b => [b.id, `code_section (${b.type})`]))
+        drafts.push({
+          packId: EDITOR_ARCHETYPE,
+          name: 'Visual editor page',
+          archetype: EDITOR_ARCHETYPE,
+          audience: 'store',
+          draftId,
+          token: await signHomepagePreviewToken({ draftId, audience: 'store', kind: 'site' }),
+          blocks: Object.fromEntries(doc.order.map(id => [id, kinds[id] ?? 'code_section (free layers)'])),
+          pages: [{ page: 'home', ...PAGE_PATHS.store.home }],
+        })
+      } catch (err) {
+        for (const id of [draftId, ...drafts.map(d => d.draftId)]) if (id) await discardSiteDraft(id)
+        throw err
+      }
     }
   }
   if (drafts.length === 0) throw new Error(`no pack to sweep (${skipped.map(s => `${s.archetype}: ${s.reason}`).join('; ') || 'SWEEP_PACKS matched none'})`)

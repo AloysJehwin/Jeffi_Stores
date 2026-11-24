@@ -386,7 +386,8 @@ jobs:
     needs: init
     # Advisory: not in `checks`' needs and continue-on-error, so it never blocks a merge. Skipped on a release run (its
     # PR already ran it, and Post fails a release on any failed job). Promote it once it has proven reliable.
-    # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5).
+    # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5), and the visual
+    # editor's page (free layers, converted blocks), with a CLS and LCP budget per page (docs/plans/SITE_EDITOR_PLAN.md).
     if: needs.init.outputs.release != 'true'
     continue-on-error: true
     timeout-minutes: 60
