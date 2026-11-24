@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import Papa from 'papaparse'
 import { FileDown, FileUp, Loader2, X } from 'lucide-react'
 import { Card } from '../_components/Card'
@@ -9,6 +10,7 @@ import { fmt } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import AIEnrichButton, { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
 import { Segmented, fieldCls } from '../../_ui'
+import { primaryBtn } from '../../onboard/ui'
 
 export interface Seller { name: string; gstin?: string; address?: string; phone?: string }
 type Row = Record<string, string>
@@ -124,7 +126,10 @@ export default function BulkDocuments({ seller, prices, balance }: { seller: Sel
   const form = (
     <Card title="New bulk job">
       {!seller ? (
-        <p className="text-sm text-foreground-secondary">Add your business details first — they are printed as the seller on every document.</p>
+        <p className="text-sm text-foreground-secondary">
+          Add your business details first — they are printed as the seller on every document.{' '}
+          <Link href="/dashboard/business#kyb-profile" className="font-semibold ecom-accent-text hover:underline">Add business details</Link>
+        </p>
       ) : !file ? (
         <div className="space-y-4">
           <p className="text-sm text-foreground-secondary">Upload a CSV with one row per line item. Rows with the same <code>reference</code> become one document. Seller: <strong>{seller.name}</strong>{seller.gstin ? ` · ${seller.gstin}` : ''}; design: your saved default.</p>
@@ -174,7 +179,7 @@ export default function BulkDocuments({ seller, prices, balance }: { seller: Sel
               Cost about {fmt(cost)} · wallet {fmt(balance)}{cost > balance ? ' — top up, or the job stops part-way' : ''}
             </span>
             <button type="button" disabled={busy || !parsed!.docs.length || parsed!.errors.length > 0 || parsed!.docs.length > 1000} onClick={start}
-              className="inline-flex items-center gap-1.5 rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">
+              className={primaryBtn}>
               {busy && <Loader2 className="w-4 h-4 animate-spin" />} Render {parsed!.docs.length} documents
             </button>
           </div>

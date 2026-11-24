@@ -6,6 +6,7 @@ import { computeSpecEnabled } from '@controller/lib/compute/catalog'
 import { complianceAttention } from '@controller/lib/catalog/compliance-docs'
 import { kybUnready } from '@controller/lib/ecom/service-states'
 import { listLines } from '@controller/lib/billing/lines'
+import { REVIEW_TIME } from '@controller/lib/ecom/console-copy'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {review.length > 0 && (
           <div className={`mb-6 rounded-2xl px-5 py-3 text-sm ${review.some(r => r.status === 'rejected') ? 'bg-[#f6d5cc]/60 text-[#8a2e1f]' : 'org-peach'}`}>
             {review.map(r => r.status === 'pending'
-              ? <p key={r.service}><strong>{label(r.service)} API is under review.</strong> {verify(r.service) ? 'We can approve it once your business is verified.' : 'Explore the console, set up templates and create API keys — sending starts once we approve it (usually the same business day).'}{verify(r.service)}</p>
+              ? <p key={r.service}><strong>{label(r.service)} API is under review.</strong> {verify(r.service) ? 'We can approve it once your business is verified.' : `Explore the console, set up templates and create API keys — sending starts once we approve it (usually within ${REVIEW_TIME}).`}{verify(r.service)}</p>
               : <p key={r.service}><strong>{label(r.service)} API was not approved.</strong> {r.note ? `${r.note} — ` : ''}{verify(r.service) ? 'complete your business verification, then request it again.' : 'reply to our email or write to support@jeffistores.in.'}{verify(r.service)}</p>)}
           </div>
         )}

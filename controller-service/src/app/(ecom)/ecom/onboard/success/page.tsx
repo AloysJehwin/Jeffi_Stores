@@ -37,10 +37,12 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
   const tenants = await getOwnerTenants(owner.id)
   const tenant = tenantSlug ? tenants.find(t => t.slug === tenantSlug) : tenants[0]
   // Deprovisioned since checkout: /onboard says so; this page would say it is being set up.
-  if (tenant?.status === 'terminated') redirect('/onboard')
+  if (!tenant || tenant.status === 'terminated') redirect('/onboard')
+  // Live already: nothing is being set up.
+  if (tenant.status === 'active' && !tenant.store_request) redirect('/dashboard')
 
   let paidNow = false
-  if (tenant && tenant.razorpay_subscription_id && tenant.status !== 'active' && tenant.status !== 'provisioning') {
+  if (tenant.razorpay_subscription_id && tenant.status !== 'active' && tenant.status !== 'provisioning') {
     const sub = await getSubscription(tenant.razorpay_subscription_id).catch(() => null)
     // Razorpay subscription statuses that mean payment was collected
     const paid = sub && ['active', 'authenticated', 'charged'].includes(sub.status)
@@ -52,6 +54,9 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
       if (!(await startStoreIfReady(tenant.id))) redirect('/onboard?paid=1')
     }
   }
+  // Only a verified payment gets "Payment confirmed": paid just now, or paid earlier and the store is being built.
+  const building = tenant.status === 'provisioning' || tenant.store_request === 'provisioning'
+  if (!paidNow && !(building && tenant.subscription_status === 'active')) redirect('/onboard')
 
   // Razorpay's return URL: every step, payment included, is done.
   const steps = statusSteps(true)

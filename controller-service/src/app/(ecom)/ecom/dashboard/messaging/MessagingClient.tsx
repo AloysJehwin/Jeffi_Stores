@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Mail, MessageSquare, MessageCircle, Play, Plus, Search } from 'lucide-react'
 import { Card } from '../_components/Card'
+import { EmptyState } from '../_components/EmptyState'
 import { SandTableLoading, SkeletonRows, Sk } from '../_components/Skeleton'
 import { MESSAGE_COLUMNS } from './columns'
 import Pager, { useCursorPages } from '../_components/Pager'
@@ -13,6 +14,7 @@ import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } f
 import { ECOM_ENRICH_ENDPOINT, ECOM_SCENARIO_ENDPOINT } from '@/components/admin/AIEnrichButton'
 import PlayDialog, { PlayButton, type PlayTarget } from '../_components/PlayDialog'
 import { Segmented, currentRowCls, fieldCls, focusRing } from '../../_ui'
+import { secondaryBtn } from '../../onboard/ui'
 import PageHeader from '../_components/PageHeader'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform'; review_status?: string | null }
@@ -154,7 +156,11 @@ export default function MessagingClient({ storeName, ...props }: { prices: Recor
       {tab === 'log' && (
         <div>
         <Card>
-          {msgs === null ? <SandTableLoading columns={MESSAGE_COLUMNS} rows={6} edge="-m-6" minWidth="min-w-[720px]" /> : msgs.length === 0 ? <p className="text-sm text-foreground-secondary">No messages yet.</p> : (
+          {msgs === null ? <SandTableLoading columns={MESSAGE_COLUMNS} rows={6} edge="-m-6" minWidth="min-w-[720px]" /> : msgs.length === 0 ? (
+            <EmptyState bare icon={MessageSquare} title="No messages yet" action={{ href: '/dashboard/api-keys', label: 'Create an API key' }}>
+              Messages sent with your API keys, or as a bulk send, show up here.
+            </EmptyState>
+          ) : (
             <div className="-m-6 overflow-x-auto"><table className="w-full text-sm min-w-[720px]"><thead className="org-sand text-foreground-secondary"><tr>{MESSAGE_COLUMNS.map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
               <tbody className="divide-y divide-border-default">{msgs.map(m => <tr key={m.id}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(m.created_at)}</td><td className="px-6 py-2.5 capitalize">{m.channel}</td><td className="px-6 py-2.5 font-mono text-xs">{m.to}</td><td className="px-6 py-2.5 text-xs">{m.template ?? '—'}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TONE[m.status] ?? 'org-sand'}`} title={m.error ?? ''}>{m.status}</span></td><td className="px-6 py-2.5 tabular-nums">{fmt(m.charged_inr)}</td></tr>)}</tbody></table></div>
           )}
@@ -184,8 +190,13 @@ export default function MessagingClient({ storeName, ...props }: { prices: Recor
                 ))}
                 {items !== null && grouped.length === 0 && (
                   <div className="p-8 text-center">
-                    <p className="text-sm font-medium">No templates match</p>
-                    <p className="text-xs text-foreground-muted mt-1">{query ? 'Try a different filter.' : 'Create one with the + button.'}</p>
+                    <p className="text-sm font-medium">{query ? 'No templates match' : 'No templates yet'}</p>
+                    <p className="text-xs text-foreground-muted mt-1">{query ? 'Try a different filter.' : canEdit ? 'Create the first one for this channel.' : 'Jeffi manages this workspace’s templates.'}</p>
+                    {query ? (
+                      <button type="button" onClick={() => setQuery('')} className={`mt-4 ${secondaryBtn}`}>Clear filter</button>
+                    ) : canEdit && (
+                      <button type="button" onClick={createNew} className={`mt-4 ${secondaryBtn}`}><Plus className="w-4 h-4" /> New template</button>
+                    )}
                   </div>
                 )}
                 {grouped.map(([cat, list]) => (

@@ -359,7 +359,7 @@ export async function sendServicesRequestedEmail(owner: { email: string; name: s
     `
     <p style="margin:0 0 14px;">Hi ${owner.name ?? 'there'},</p>
     <p style="margin:0 0 14px;">Thanks for choosing Jeffi. We have received your request for the <strong>${what}</strong> for <strong>${workspace}</strong>.</p>
-    ${notice('Reviews usually finish the <strong>same business day</strong>. Meanwhile you can explore the console, set up templates and create API keys — sending starts as soon as we approve.')}
+    ${notice('Reviews usually finish within <strong>1–2 business days</strong>. Meanwhile you can explore the console, set up templates and create API keys — sending starts as soon as we approve.')}
     ${button(CONSOLE_URL, 'Open the console')}
   `))
   await send(PLATFORM_ADMIN, `Service request: ${what} — ${workspace}`, baseHtml(

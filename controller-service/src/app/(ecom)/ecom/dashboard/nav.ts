@@ -7,7 +7,7 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   exact?: boolean
-  requires?: ServiceType      // shown only when the tenant has this service
+  requires?: ServiceType      // shown only when the tenant has this service ('store' pages also call requireStore())
   hideWhen?: ServiceType      // shown only when the tenant does NOT have this service
 }
 export interface NavGroup {

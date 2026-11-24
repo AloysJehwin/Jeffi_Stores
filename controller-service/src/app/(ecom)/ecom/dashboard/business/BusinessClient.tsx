@@ -26,13 +26,12 @@ import type { KybView } from '@controller/lib/kyb/view'
 import { ChoiceCards, ChoiceChips } from '../../_ui'
 import { PhoneInput, isValidPhone } from '../../_ui/phone'
 import { Badge, fieldInput, fieldLabel, noteCls, primaryBtn } from '../../onboard/ui'
-import { Card } from '../_components/Card'
 import { putKyb, kybCall } from './api'
 import DocCard from './DocCard'
-import { ITEM_BADGE, ServiceStanding } from './KybChecklist'
+import { ITEM_BADGE, VerificationChecklist } from './KybChecklist'
 
-// The console's Business verification: the KYB answers a section at a time, the documents with their automatic
-// checks, and where each service stands. Checks still running are polled until they finish.
+// The console's Business verification: one checklist of what each service needs, then every section of the KYB
+// answers with its documents and their automatic checks. Checks still running are polled until they finish.
 
 type Profile = KybView['profile']
 type Section = 'details' | 'pan' | 'gst' | 'website' | 'messaging'
@@ -94,8 +93,8 @@ const readyKey = (v: KybView) => (Object.keys(v.services) as KybService[]).map(s
 
 function Block({ id, title, item, description, children }: { id: string; title: string; item?: ItemStatus; description?: ReactNode; children: ReactNode }) {
   const badge = item ? ITEM_BADGE[item.state] : null
+  // Only a problem to fix: what is still to do is the section itself.
   const fix = item?.problem && (item.state === 'invalid' || item.state === 'rejected')
-  const todo = item?.problem && item.state === 'missing'
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24 rounded-2xl border border-border-default bg-surface-elevated p-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -105,7 +104,7 @@ function Block({ id, title, item, description, children }: { id: string; title: 
         {badge && <Badge tone={badge.tone}>{badge.label}</Badge>}
       </div>
       {description && <p className="mt-2 max-w-2xl text-sm text-foreground-secondary">{description}</p>}
-      {(fix || todo) && <p className={`mt-2 text-sm ${fix ? 'text-[#8a2e1f]' : 'text-foreground-secondary'}`}>{item!.problem}</p>}
+      {fix && <p className="mt-2 text-sm text-[#8a2e1f]">{item!.problem}</p>}
       <div className="mt-5">{children}</div>
     </section>
   )
@@ -377,9 +376,9 @@ export default function BusinessClient({ initial, focus, slug, hasStore, today }
     />
   ))
 
+  // Every API service, and the store when there is one; the one a link asked about (?for=) first.
   const ORDER: KybService[] = ['messaging', 'documents', 'store']
-  const shown = ORDER.filter(s => kyb.services[s]?.active || s === focus).sort((a, b) => Number(b === focus) - Number(a === focus))
-  const messaging = !!kyb.services.messaging?.active || focus === 'messaging'
+  const shown = ORDER.filter(s => s !== 'store' || kyb.services.store?.active).sort((a, b) => Number(b === focus) - Number(a === focus))
   const regItem = kyb.items.registration
   const regBadge = regItem ? ITEM_BADGE[regItem.state] : null
 
@@ -392,15 +391,7 @@ export default function BusinessClient({ initial, focus, slug, hasStore, today }
         </div>
       )}
 
-      {shown.length > 0 ? (
-        <ServiceStanding kyb={kyb} services={shown} />
-      ) : (
-        <Card>
-          <p className="text-sm text-foreground-secondary">
-            A Showcase site needs no verification. Messaging, Documents and an online store each need these details before Jeffi switches them on, so you can fill them in ahead.
-          </p>
-        </Card>
-      )}
+      <VerificationChecklist kyb={kyb} services={shown} showcase={!!kyb.services.showcase?.active} />
 
       <Block id="kyb-profile" title="Business details" item={kyb.items.profile} description="As registered with the government. Your documents are checked against these.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -633,111 +624,107 @@ export default function BusinessClient({ initial, focus, slug, hasStore, today }
         )}
       </Block>
 
-      {messaging && (
-        <Block id="kyb-website" title="Website" item={kyb.items.website} description="Where your business presents itself online. Carriers and WhatsApp look at it before they allow business messages.">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <TextField
-              id="kyb-website-url"
-              label="Website or business page"
-              value={website}
-              error={errs.website}
-              hint="A social media page works too, if it shows the business."
-              input={{ type: 'url', inputMode: 'url', autoComplete: 'url', placeholder: 'https://yourbusiness.in', maxLength: 255 }}
-              onChange={v => {
-                setWebsite(v)
-                clear('website')
-              }}
-            />
-          </div>
-          {suggested && !website.trim() && (
-            <button
-              type="button"
-              className="mt-2 text-sm font-semibold ecom-accent-text hover:underline"
-              onClick={() => {
-                setWebsite(suggested)
-                clear('website')
-              }}
-            >
-              Use your store, {suggested.replace('https://', '')}
-            </button>
-          )}
-          <SaveRow dirty={websiteDirty} busy={saving === 'website'} onSave={saveWebsite} />
-        </Block>
-      )}
+      <Block id="kyb-website" title="Website" item={kyb.items.website} description="Where your business presents itself online. Carriers and WhatsApp look at it before they allow business messages.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField
+            id="kyb-website-url"
+            label="Website or business page"
+            value={website}
+            error={errs.website}
+            hint="A social media page works too, if it shows the business."
+            input={{ type: 'url', inputMode: 'url', autoComplete: 'url', placeholder: 'https://yourbusiness.in', maxLength: 255 }}
+            onChange={v => {
+              setWebsite(v)
+              clear('website')
+            }}
+          />
+        </div>
+        {suggested && !website.trim() && (
+          <button
+            type="button"
+            className="mt-2 text-sm font-semibold ecom-accent-text hover:underline"
+            onClick={() => {
+              setWebsite(suggested)
+              clear('website')
+            }}
+          >
+            Use your store, {suggested.replace('https://', '')}
+          </button>
+        )}
+        <SaveRow dirty={websiteDirty} busy={saving === 'website'} onSave={saveWebsite} />
+      </Block>
 
-      {messaging && (
-        <Block id="kyb-messaging" title="How you will message people" item={kyb.items.messaging_use} description="What you will send and to whom. Carriers and Meta ask Jeffi for this before your messages go out.">
-          <div className="space-y-5">
-            <div>
-              <p className={fieldLabel}>What you will send</p>
-              <ChoiceChips<string>
-                multiple
-                ariaLabel="What you will send"
-                size="md"
-                value={usage.purposes}
-                onChange={v => setU('purposes', v)}
-                options={MESSAGING_PURPOSES.map(o => ({ value: o.id, label: o.label }))}
-              />
-              {errs['messagingUse.purposes'] && <p className={errCls}>{errs['messagingUse.purposes']}</p>}
-            </div>
-            <div>
-              <p className={fieldLabel}>Messages a month</p>
-              <ChoiceChips<string>
-                ariaLabel="Messages a month"
-                size="md"
-                value={usage.volume || null}
-                onChange={v => setU('volume', v)}
-                options={MESSAGING_VOLUMES.map(o => ({ value: o.id, label: o.label }))}
-              />
-              {errs['messagingUse.volume'] && <p className={errCls}>{errs['messagingUse.volume']}</p>}
-            </div>
-            <Field id="kyb-optin" label="How people agree to hear from you" error={errs['messagingUse.optIn']} hint="For example: customers tick a box at checkout to get order updates on WhatsApp.">
-              <textarea
-                id="kyb-optin"
-                rows={3}
-                maxLength={1000}
-                className={fieldInput}
-                value={usage.optIn}
-                onChange={e => setU('optIn', e.target.value)}
-                {...described('kyb-optin', errs['messagingUse.optIn'], true)}
-              />
-            </Field>
-            <Field id="kyb-sample" label="One message you will send" error={errs['messagingUse.sample']} hint="Write it as people will see it.">
-              <textarea
-                id="kyb-sample"
-                rows={3}
-                maxLength={1000}
-                className={fieldInput}
-                value={usage.sample}
-                placeholder="Hi Priya, your order #1042 has shipped and arrives by Friday. Track it here: …"
-                onChange={e => setU('sample', e.target.value)}
-                {...described('kyb-sample', errs['messagingUse.sample'], true)}
-              />
-            </Field>
-            <div className="rounded-xl bg-surface-secondary p-4">
-              <label className="flex items-start gap-3 text-sm text-foreground">
-                <input type="checkbox" className="mt-1 h-4 w-4 shrink-0" checked={usage.accept} onChange={e => setU('accept', e.target.checked)} aria-describedby="kyb-policy" />
-                <span>
-                  <span className="font-semibold">I accept Jeffi’s messaging policy.</span>
-                  {savedUsage.accept && p.messagingUse?.acceptedAt && (
-                    <span className="text-foreground-muted">
-                      {' '}
-                      Accepted on {new Date(p.messagingUse.acceptedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}.
-                    </span>
-                  )}
-                </span>
-              </label>
-              <ul id="kyb-policy" className="ml-7 mt-2 list-disc space-y-1 pl-4 text-xs text-foreground-secondary">
-                {POLICY.map(t => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-              {errs['messagingUse.accept'] && <p className={`${errCls} ml-7`}>{errs['messagingUse.accept']}</p>}
-            </div>
+      <Block id="kyb-messaging" title="How you will message people" item={kyb.items.messaging_use} description="What you will send and to whom. Carriers and Meta ask Jeffi for this before your messages go out.">
+        <div className="space-y-5">
+          <div>
+            <p className={fieldLabel}>What you will send</p>
+            <ChoiceChips<string>
+              multiple
+              ariaLabel="What you will send"
+              size="md"
+              value={usage.purposes}
+              onChange={v => setU('purposes', v)}
+              options={MESSAGING_PURPOSES.map(o => ({ value: o.id, label: o.label }))}
+            />
+            {errs['messagingUse.purposes'] && <p className={errCls}>{errs['messagingUse.purposes']}</p>}
           </div>
-          <SaveRow dirty={usageDirty} busy={saving === 'messaging'} onSave={saveUsage} error={errs.messagingUse} />
-        </Block>
-      )}
+          <div>
+            <p className={fieldLabel}>Messages a month</p>
+            <ChoiceChips<string>
+              ariaLabel="Messages a month"
+              size="md"
+              value={usage.volume || null}
+              onChange={v => setU('volume', v)}
+              options={MESSAGING_VOLUMES.map(o => ({ value: o.id, label: o.label }))}
+            />
+            {errs['messagingUse.volume'] && <p className={errCls}>{errs['messagingUse.volume']}</p>}
+          </div>
+          <Field id="kyb-optin" label="How people agree to hear from you" error={errs['messagingUse.optIn']} hint="For example: customers tick a box at checkout to get order updates on WhatsApp.">
+            <textarea
+              id="kyb-optin"
+              rows={3}
+              maxLength={1000}
+              className={fieldInput}
+              value={usage.optIn}
+              onChange={e => setU('optIn', e.target.value)}
+              {...described('kyb-optin', errs['messagingUse.optIn'], true)}
+            />
+          </Field>
+          <Field id="kyb-sample" label="One message you will send" error={errs['messagingUse.sample']} hint="Write it as people will see it.">
+            <textarea
+              id="kyb-sample"
+              rows={3}
+              maxLength={1000}
+              className={fieldInput}
+              value={usage.sample}
+              placeholder="Hi Priya, your order #1042 has shipped and arrives by Friday. Track it here: …"
+              onChange={e => setU('sample', e.target.value)}
+              {...described('kyb-sample', errs['messagingUse.sample'], true)}
+            />
+          </Field>
+          <div className="rounded-xl bg-surface-secondary p-4">
+            <label className="flex items-start gap-3 text-sm text-foreground">
+              <input type="checkbox" className="mt-1 h-4 w-4 shrink-0" checked={usage.accept} onChange={e => setU('accept', e.target.checked)} aria-describedby="kyb-policy" />
+              <span>
+                <span className="font-semibold">I accept Jeffi’s messaging policy.</span>
+                {savedUsage.accept && p.messagingUse?.acceptedAt && (
+                  <span className="text-foreground-muted">
+                    {' '}
+                    Accepted on {new Date(p.messagingUse.acceptedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}.
+                  </span>
+                )}
+              </span>
+            </label>
+            <ul id="kyb-policy" className="ml-7 mt-2 list-disc space-y-1 pl-4 text-xs text-foreground-secondary">
+              {POLICY.map(t => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+            {errs['messagingUse.accept'] && <p className={`${errCls} ml-7`}>{errs['messagingUse.accept']}</p>}
+          </div>
+        </div>
+        <SaveRow dirty={usageDirty} busy={saving === 'messaging'} onSave={saveUsage} error={errs.messagingUse} />
+      </Block>
     </div>
   )
 }

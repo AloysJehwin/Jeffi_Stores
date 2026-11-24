@@ -69,6 +69,8 @@
 
 .ecom-accent-bg { background-color: var(--org-terracotta-deep) !important; color: #fff; }
 .ecom-accent-bg:hover:not(:disabled) { background-color: var(--org-brown) !important; }
+/* The shared disabled look (onboard/ui disabledBtn): the accent's !important would otherwise keep it terracotta. */
+.ecom-accent-bg:disabled { background-color: var(--color-surface-secondary) !important; color: var(--color-foreground-muted); cursor: not-allowed; }
 .ecom-accent-text { color: var(--org-terracotta); }
 .ecom-accent-border { border-color: var(--org-terracotta); }
 

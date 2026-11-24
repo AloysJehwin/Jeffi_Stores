@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import PlayDialog, { PlayButton } from '../_components/PlayDialog'
 import type { Seller } from './BulkDocuments'
 import { ChoiceCards, Segmented, fieldCls, focusRing } from '../../_ui'
+import { disabledBtn, primaryBtn } from '../../onboard/ui'
 
 interface Design { key: string; name: string; description: string; accent: string; font: string; thumbnail_url: string }
 interface Settings { design: string | null; accent: string | null; font: string | null; has_logo: boolean }
@@ -192,7 +193,7 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
                     : <span className="text-[11px] text-foreground-muted">No logo</span>}
                 </div>
                 <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={e => uploadLogo(e.target.files?.[0] ?? null)} />
-                <button type="button" disabled={busy === 'logo'} onClick={() => file.current?.click()} className="ecom-focus inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1.5 text-xs font-semibold hover:bg-surface-secondary disabled:opacity-50">
+                <button type="button" disabled={busy === 'logo'} onClick={() => file.current?.click()} className={`ecom-focus inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1.5 text-xs font-semibold hover:bg-surface-secondary ${disabledBtn}`}>
                   {busy === 'logo' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />} {saved?.has_logo ? 'Replace' : 'Upload'}
                 </button>
                 {saved?.has_logo && <button type="button" aria-label="Remove logo" onClick={() => uploadLogo(null)} className="rounded-full p-1.5 text-foreground-muted hover:bg-surface-secondary hover:text-foreground"><Trash2 className="w-4 h-4" /></button>}
@@ -205,7 +206,7 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
         <div className="flex items-center justify-end gap-3">
           {dirty && <span className="text-xs text-foreground-muted">Unsaved changes</span>}
           <button type="button" disabled={!dirty || busy === 'save'} onClick={save}
-            className="inline-flex items-center gap-1.5 rounded-full ecom-accent-bg px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            className={primaryBtn}>
             {busy === 'save' && <Loader2 className="w-4 h-4 animate-spin" />} Save as default
           </button>
         </div>
