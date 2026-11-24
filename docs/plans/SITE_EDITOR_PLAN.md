@@ -86,6 +86,13 @@ AI-generated pages must be editable with it.
    `POST /studio/design/element` (the day's free AI help, platform-funded); its pictures stay out of any gallery and
    their credits travel with the page in `settings.credits` (`addCredit`), which the live page and the preview list
    while the page shows them (`pageCredits`).
+3. Critique on trees. `lib/site/code/tree-critique.ts` (pure): words too pale for their background (theme scales,
+   page/text tokens and hex resolved; 4.5:1, 3:1 for h1–h3), words too long for their slot, pictures without a
+   description, headings out of order across the page (one h1, no skipped level), free layers off a phone's screen.
+   Fixes are design operations (text colour, alt from the nearest heading, the heading's level, the layer brought
+   inside), or an AI shorten. The editor's "Check page" lists them with Show and Fix; `lib/site/critique.ts` reports
+   them for code sections while the editor is on (read from their trees), and its off-screen check now uses the same
+   code.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for

@@ -292,3 +292,29 @@ describe('SiteEditor element actions', () => {
     expect(last.settings?.credits).toEqual([{ image: 'https://cdn.example.com/stock/pexels-1.jpg', credit }])
   })
 })
+
+describe('SiteEditor check page', () => {
+  it('lists what to fix and fixes it as an undoable change', async () => {
+    const t: CodeNode = {
+      t: 'el',
+      tag: 'section',
+      props: {},
+      id: 'e1',
+      children: [
+        { t: 'el', tag: 'h2', props: {}, id: 'e2', children: [{ t: 'text', value: 'Our tea', id: 'e2.0' }] },
+        { t: 'cmp', name: 'Image', props: { src: { k: 'lit', v: 'https://cdn.example.com/a.jpg' }, alt: { k: 'lit', v: '' } }, children: [], id: 'e3' },
+      ],
+    }
+    const page = doc()
+    page.blocks.a.props.tree = t
+    const { save } = setup({ load: async () => page })
+    await screen.findByRole('button', { name: 'Hero' })
+    fireEvent.click(screen.getByRole('button', { name: /Check page · 1/ }))
+    expect(await screen.findByText(/has no description/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Fix' }))
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    expect(JSON.stringify(save.mock.calls.at(-1)![0].blocks.a.props.tree)).toContain('"alt":{"k":"lit","v":"Our tea"}')
+    expect(await screen.findByText(/Nothing to fix/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
+  })
+})

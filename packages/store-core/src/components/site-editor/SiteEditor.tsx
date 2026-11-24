@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Monitor, Move, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, X } from 'lucide-react'
-import { insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
+import { DEFAULT_THEME, insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
 import { DesignError, findNode, freshId, treeIds, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
@@ -10,6 +10,8 @@ import Inspector from './Inspector'
 import Layers from './Layers'
 import FreePanel from './FreePanel'
 import AiBox from './AiBox'
+import CritiquePanel from './CritiquePanel'
+import { critiqueTrees, type TreeFinding } from '@/lib/site/code/tree-critique'
 import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
 import { hasLocked, insertPlace, litProp, nodeName, nodeWords, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
@@ -60,6 +62,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const seq = useRef({ n: 0, sent: new Map<number, number>() })
   const measures = useRef({ n: 0, wait: new Map<number, (m: Measured | null) => void>() })
   const [aiBusy, setAiBusy] = useState(false)
+  const [checking, setChecking] = useState(false)
   /** Elements an AI change touched, lit up on the canvas once it reloads. */
   const flash = useRef<{ block: string; ids: string[] } | null>(null)
 
@@ -419,6 +422,17 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
 
   const ready = !!state
   const trees = useMemo(() => (state ? currentTrees(state) : {}), [state])
+  // The page checked in reading order (contrast, lengths, picture descriptions, headings, free layers).
+  const findings = useMemo(() => {
+    if (!state) return []
+    const name = (id: string) => String(state.doc.blocks[id]?.props?.label || 'Section')
+    return critiqueTrees(state.doc.order.filter(id => trees[id]).map(id => ({ block: id, label: name(id), tree: trees[id] })), host.theme ?? DEFAULT_THEME)
+  }, [state, trees, host.theme])
+  const fixFinding = (f: TreeFinding) => {
+    if (!f.fix) return
+    if ('shorten' in f.fix) return void elementText(f.block, f.fix.shorten.fieldId, f.fix.shorten.text, 'shorten')
+    if (edit(f.block, f.fix.ops)) requestReload()
+  }
   useEffect(() => {
     const el = box.current
     if (!el) return
@@ -470,6 +484,14 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setChecking(c => !c)}
+          aria-pressed={checking}
+          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 h-8 text-xs font-medium ${checking ? 'border-accent-500 text-accent-600' : 'border-border-default text-foreground-secondary hover:text-foreground'}`}
+        >
+          Check page{findings.length ? ` · ${findings.length}` : ''}
+        </button>
         <span role="status" className={`text-xs ${status.kind === 'error' ? 'text-red-600' : 'text-foreground-muted'}`}>
           {statusText}
         </span>
@@ -539,6 +561,19 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
         </div>
 
         <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-4 min-w-0 xl:min-h-0 xl:overflow-y-auto [scrollbar-width:thin]">
+          {checking && (
+            <div className="space-y-2 border-b border-border-default pb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Check page</p>
+              <CritiquePanel
+                findings={findings}
+                canWrite={host.canWrite}
+                canShorten={!!host.elementAi}
+                busy={aiBusy}
+                onShow={f => select(f.block, f.id)}
+                onFix={fixFinding}
+              />
+            </div>
+          )}
           {block && host.canWrite && (
             <div className="space-y-2 border-b border-border-default pb-3">
               <p className="truncate text-xs font-semibold uppercase tracking-wide text-foreground-muted">Section · {label(block.id)}</p>
