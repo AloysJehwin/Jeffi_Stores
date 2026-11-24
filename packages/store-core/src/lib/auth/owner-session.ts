@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSession, resolveSession, type SessionSignals } from '@/lib/auth/auth-sessions'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { findOrCreateOwner, getOwnerById, type Owner } from '@/lib/tenant-registry'
+import { isSystemOwnerEmail } from './system-owners'
 
 // Ecom store-owner sessions. Owners live in the CONTROL-PLANE `owners` table, but
 // their session row lives in the app-DB auth_sessions (principal_type='owner'),
@@ -18,6 +19,7 @@ export async function issueOwnerSession(args: {
   name?: string | null
   signals?: SessionSignals
 }): Promise<{ sid: string; owner: Owner }> {
+  if (isSystemOwnerEmail(args.email)) throw new Error('This account cannot sign in')
   const owner = await findOrCreateOwner(args.email.toLowerCase(), args.name ?? null)
   const { sid } = await createSession({
     principalType: 'owner',

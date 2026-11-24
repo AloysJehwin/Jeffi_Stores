@@ -181,7 +181,7 @@ const PAYMENT_DUE = 'Hosting for this site is unpaid. Pay from the Showcase page
  * Put the site live. The first publish starts the trial (trial_ends_at = paid_until = now + SHOWCASE_TRIAL_DAYS), gives
  * the site a workspace if it has none (ensureShowcaseWorkspace: its subscription pays, its console manages the site)
  * and opens its trial billing line; publishing a live site again changes nothing; a paused one resumes while its
- * hosting is paid (resumeShowcase).
+ * hosting is paid (resumeShowcase). The first publish also cuts the site's preview links to 30 minutes.
  */
 export async function publishShowcase(siteId: string): Promise<ShowcaseTransition> {
   const draft = await getShowcaseById(siteId)
@@ -200,6 +200,9 @@ export async function publishShowcase(siteId: string): Promise<ShowcaseTransitio
   )
   if (first) {
     if (first.tenantId && first.trialEndsAt && Date.parse(first.trialEndsAt) > Date.now()) await openTrialLine(first.tenantId, first.id, first.trialEndsAt).catch(() => {})
+    // Preview links stay up for 30 minutes from here, with a way to the live site.
+    const { shortenPreviewAfterPublish } = await import('./preview-token')
+    await shortenPreviewAfterPublish(first.id).catch(() => {})
     return { ok: true, site: first }
   }
   const site = await getShowcaseById(siteId)

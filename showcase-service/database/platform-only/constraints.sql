@@ -15,3 +15,5 @@ ALTER TABLE ONLY public.showcase_sessions ADD CONSTRAINT showcase_sessions_max_s
 ALTER TABLE ONLY public.showcase_events ADD CONSTRAINT showcase_events_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.showcase_events ADD CONSTRAINT showcase_events_type_check CHECK (((type)::text = ANY ((ARRAY['pageview'::character varying, 'click'::character varying, 'form_start'::character varying, 'form_submit'::character varying])::text[])));
 ALTER TABLE ONLY public.showcase_events ADD CONSTRAINT showcase_events_target_check CHECK (((target IS NULL) OR ((target)::text = ANY ((ARRAY['call'::character varying, 'whatsapp'::character varying, 'email'::character varying, 'map'::character varying, 'social'::character varying, 'link'::character varying])::text[]))));
+
+ALTER TABLE ONLY public.showcase_preview_tokens ADD CONSTRAINT showcase_preview_tokens_pkey PRIMARY KEY (jti);

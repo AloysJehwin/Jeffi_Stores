@@ -19,6 +19,9 @@ export function showcaseUrl(slug: string): string {
 /** The query flag the console adds when the owner opens their own site: showcase-service's tracker doesn't count it. */
 export const SHOWCASE_PREVIEW_PARAM = 'jeffi_preview'
 
+/** The site's home on its own host, as its owner's look (not counted). */
+export const SHOWCASE_OWNER_HOME = `/?${SHOWCASE_PREVIEW_PARAM}=1`
+
 /** The site's address as the console links it for its owner (not counted as a visit). */
 export const showcasePreviewUrl = (slug: string) => `${showcaseUrl(slug)}?${SHOWCASE_PREVIEW_PARAM}=1`
 
