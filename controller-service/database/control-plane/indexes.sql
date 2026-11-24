@@ -118,3 +118,5 @@ CREATE INDEX IF NOT EXISTS idx_billing_charges_charged ON public.billing_charges
 -- Showcase custom domains: a site's domains and orders, and the hosts showcase-service routes.
 CREATE INDEX IF NOT EXISTS idx_tcd_showcase_site ON public.tenant_custom_domains USING btree (showcase_site_id) WHERE (showcase_site_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_tenant_domain_orders_showcase_site ON public.tenant_domain_orders USING btree (showcase_site_id) WHERE (showcase_site_id IS NOT NULL);
+-- Offline conversion uploads: the cron's queue of pending rows.
+CREATE INDEX IF NOT EXISTS idx_owner_conversion_uploads_pending ON public.owner_conversion_uploads USING btree (next_attempt_at) WHERE (status = 'pending');

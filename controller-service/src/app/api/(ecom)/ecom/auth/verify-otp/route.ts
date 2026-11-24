@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
 import { issueOwnerSession, setOwnerCookie } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { recordOwnerSignIn } from '@controller/lib/attribution/persist'
+import { fireAndForget } from '@controller/lib/attribution/fire'
 
 // Ecom OWNER verify-otp → creates/finds the owner + issues an owner session.
 // Same endpoint for signup + signin (findOrCreateOwner upserts). name optional (new signups).
@@ -15,6 +17,7 @@ export async function POST(request: NextRequest) {
 
     const signals = extractSessionSignals(request)
     const { sid, owner } = await issueOwnerSession({ email, name: name || null, signals })
+    fireAndForget('ecom_signup', () => recordOwnerSignIn(owner, request))
     await deleteOTP(email)
     await resetSendOtpCounter(email)
 
