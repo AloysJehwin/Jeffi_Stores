@@ -115,18 +115,26 @@ export function indiaDltParams(to: string, entityId: string, templateId?: string
   return Object.keys(p).length ? p : undefined
 }
 
+/** A promotional SMS to India with no promotional DLT header configured: the sender skips and logs it. */
+export class PromoHeaderMissingError extends Error {
+  constructor() { super('promotional_header_missing') }
+}
+
 export async function sendSms(o: { to: string; body: string; messageId: string; tenantId?: string; dltTemplateId?: string | null; dltHeader?: string | null; messageType?: 'TRANSACTIONAL' | 'PROMOTIONAL'; templateSlug?: string | null }, ov?: SenderOverride): Promise<string> {
   const { smsOrigination, configurationSet, dltEntityId } = env(ov)
   if (!smsOrigination) throw notConfigured('AWS_SMS_ORIGINATION')
   const to = normalizePhone(o.to)
   if (usesPlatformCredentials(ov) && !to.startsWith('+91')) throw new Error('This India DLT sender only sends to +91 numbers')
+  // A promotional SMS never goes out on a Service/Transactional header: it needs its own promotional DLT header.
+  const promoIndia = o.messageType === 'PROMOTIONAL' && to.startsWith('+91')
+  if (promoIndia && !o.dltHeader) throw new PromoHeaderMissingError()
   // Entity id order: sender config, tenant/platform provider setting, then env.
   const entity = dltEntityId || await smsDltEntityId(o.tenantId) || process.env.AWS_SMS_DLT_ENTITY_ID || ''
   const dest = indiaDltParams(to, entity, o.dltTemplateId, o.templateSlug)
   const r = await sendText({
     DestinationPhoneNumber: to,
     // An Indian send uses the template's registered DLT header as the sender id, when it has one.
-    OriginationIdentity: usesPlatformCredentials(ov) ? smsOrigination : dest && o.dltHeader ? o.dltHeader : smsOrigination,
+    OriginationIdentity: promoIndia ? o.dltHeader! : usesPlatformCredentials(ov) ? smsOrigination : dest && o.dltHeader ? o.dltHeader : smsOrigination,
     MessageBody: o.body,
     MessageType: o.messageType ?? 'TRANSACTIONAL',
     ...(configurationSet ? { ConfigurationSetName: configurationSet } : {}),

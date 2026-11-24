@@ -1,5 +1,5 @@
 // Prints a CSV of every SMS template in the seed catalog, ready to review before anything is registered on the
-// Airtel DLT portal: slug, category, header, DLT body ({{var}} and {var} become {#var#}), length, encoding, segments.
+// Airtel DLT portal: slug, category, header, header_note, DLT body ({{var}} and {var} become {#var#}, links {#url#}), cta_domains, length, encoding, segments.
 //
 //   node scripts/dlt-template-sheet.mjs > docs/DLT_SMS_TEMPLATES.csv     (Node 22.18+ / 24, strips the TS types)
 //
@@ -19,14 +19,26 @@ const GSM_BASIC = new Set(
 )
 const GSM_EXT = new Set('^{}\\[~]|€'.split(''))
 
-/** {{var}} (catalog) and {var} (campaign catalog) become {#var#}; {#if x}…{/if} blocks keep their text (the longest form). */
+// A variable that holds a link (short_url, vault_url, order_url, ctaUrl, ...) is a typed {#url#}: the DLT portal wants links
+// as URL variables, with their domains whitelisted as CTAs. Every other variable stays {#var#}.
+const URL_VAR = /url|link/i
+
+/** {{var}} (catalog) and {var} (campaign catalog) become {#var#}, or {#url#} for link variables; {#if x}…{/if} blocks keep their text (the longest form). */
 export function toDltBody(body) {
+  const typed = (_m, name) => (URL_VAR.test(name) ? '{#url#}' : '{#var#}')
   return body
     .replace(/\{#if [^}]*\}/g, '')
     .replace(/\{\/if\}/g, '')
-    .replace(/\{\{\s*[\w.]+\s*\}\}/g, '{#var#}')
-    .replace(/\{(?!#var#\})\s*[\w.]+\s*\}/g, '{#var#}')
+    .replace(/\{\{\s*([\w.]+)\s*\}\}/g, typed)
+    .replace(/\{\s*([A-Za-z_][\w.]*)\s*\}/g, typed)
 }
+
+// Links in these messages are the store's own site. For the platform that is jeffistores.in (the storefront) and, for
+// store owners, ecom.jeffistores.in; img.jeffistores.in only carries images. A store on a custom domain would need that
+// domain whitelisted on its own DLT entity.
+export const CTA_DOMAINS = 'jeffistores.in'
+export const PROMO_HEADER = 'NUMERIC-PROMO (not registered)'
+export const PROMO_NOTE = 'needs a promotional numeric header; or send via WhatsApp/email instead'
 
 export function encodingOf(text) {
   for (const ch of text) if (!GSM_BASIC.has(ch) && !GSM_EXT.has(ch)) return 'UCS-2'
@@ -56,7 +68,7 @@ export function categoryOf(slug) {
 
 const csvCell = v => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
 
-export const COLUMNS = ['slug', 'category', 'header', 'dlt_body', 'length', 'encoding', 'segments']
+export const COLUMNS = ['slug', 'category', 'header', 'header_note', 'dlt_body', 'cta_domains', 'length', 'encoding', 'segments']
 
 export function rowsFor(catalog) {
   return catalog
@@ -65,7 +77,12 @@ export function rowsFor(catalog) {
       const body = toDltBody(t.body)
       const encoding = encodingOf(body)
       const length = lengthOf(body, encoding)
-      return { slug: t.slug, category: categoryOf(t.slug), header: HEADER, dlt_body: body, length, encoding, segments: segmentsOf(length, encoding) }
+      const category = categoryOf(t.slug)
+      const promo = category === 'Promotional'
+      return {
+        slug: t.slug, category, header: promo ? PROMO_HEADER : HEADER, header_note: promo ? PROMO_NOTE : '', dlt_body: body,
+        cta_domains: body.includes('{#url#}') ? CTA_DOMAINS : '', length, encoding, segments: segmentsOf(length, encoding),
+      }
     })
 }
 

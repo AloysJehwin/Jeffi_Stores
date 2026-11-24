@@ -50,6 +50,16 @@ describe('India DLT sender on the platform AWS account', () => {
     expect(smsSend).not.toHaveBeenCalled()
   })
 
+  it('never sends a promotional SMS on a service header: no promotional header means nothing is sent', async () => {
+    await expect(aws.sendSms({ to: '9876543210', body: 'hi', messageId: 'm', messageType: 'PROMOTIONAL' }, ov)).rejects.toBeInstanceOf(aws.PromoHeaderMissingError)
+    expect(smsSend).not.toHaveBeenCalled()
+  })
+
+  it('sends a promotional SMS only from its own promotional header, and a non-Indian one unchanged', async () => {
+    await aws.sendSms({ to: '9876543210', body: 'hi', messageId: 'm', messageType: 'PROMOTIONAL', dltHeader: '600123', dltTemplateId: 'T2' }, ov)
+    expect(smsSend.mock.calls[0][0].input).toMatchObject({ OriginationIdentity: '600123', MessageType: 'PROMOTIONAL' })
+  })
+
   it('recognises the platform-credentials marker', () => {
     expect(aws.usesPlatformCredentials(ov)).toBe(true)
     expect(aws.usesPlatformCredentials({ sender: 'x', config: { access_key_id: 'a' } })).toBe(false)

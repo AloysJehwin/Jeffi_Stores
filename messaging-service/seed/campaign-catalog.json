@@ -14,7 +14,7 @@
     "channel": "sms",
     "name": "Abandoned Cart",
     "category": "campaign",
-    "body": "You left {items} in your cart. Complete your order before it's gone.",
+    "body": "{store_name}: You left {items} in your cart. Complete your order before it's gone.",
     "blocks_format": "sms-text"
   },
   {
@@ -32,7 +32,7 @@
     "channel": "sms",
     "name": "Abandoned Checkout",
     "category": "campaign",
-    "body": "You left {items} in your cart. Complete your order before it's gone.",
+    "body": "{store_name}: You left {items} in your cart. Complete your order before it's gone.",
     "blocks_format": "sms-text"
   },
   {
@@ -50,7 +50,7 @@
     "channel": "sms",
     "name": "Post-Purchase Thank-You",
     "category": "campaign",
-    "body": "How was order {orderNumber}? Share a quick review: {ctaUrl}",
+    "body": "{store_name}: How was order {orderNumber}? Share a quick review: {ctaUrl}",
     "blocks_format": "sms-text"
   },
   {
@@ -68,7 +68,7 @@
     "channel": "sms",
     "name": "Review Reminder",
     "category": "campaign",
-    "body": "How was order {orderNumber}? Share a quick review: {ctaUrl}",
+    "body": "{store_name}: How was order {orderNumber}? Share a quick review: {ctaUrl}",
     "blocks_format": "sms-text"
   },
   {
@@ -76,7 +76,7 @@
     "channel": "sms",
     "name": "Review Request (Email Form)",
     "category": "campaign",
-    "body": "How was order {orderNumber}? Share a quick review: {ctaUrl}",
+    "body": "{store_name}: How was order {orderNumber}? Share a quick review: {ctaUrl}",
     "blocks_format": "sms-text"
   },
   {
@@ -94,7 +94,7 @@
     "channel": "sms",
     "name": "Win-Back (90 days)",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -112,7 +112,7 @@
     "channel": "sms",
     "name": "Win-Back (180 days, dormant)",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -130,7 +130,7 @@
     "channel": "sms",
     "name": "Back in Stock",
     "category": "campaign",
-    "body": "{productName} is back in stock. Grab it before it sells out.",
+    "body": "{store_name}: {productName} is back in stock. Grab it before it sells out.",
     "blocks_format": "sms-text"
   },
   {
@@ -148,7 +148,7 @@
     "channel": "sms",
     "name": "Price Drop",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -166,7 +166,7 @@
     "channel": "sms",
     "name": "Viewed Product",
     "category": "campaign",
-    "body": "Still thinking about {items}? Take another look before it's gone.",
+    "body": "{store_name}: Still thinking about {items}? Take another look before it's gone.",
     "blocks_format": "sms-text"
   },
   {
@@ -184,7 +184,7 @@
     "channel": "sms",
     "name": "Viewed Category",
     "category": "campaign",
-    "body": "Still thinking about {items}? Take another look before it's gone.",
+    "body": "{store_name}: Still thinking about {items}? Take another look before it's gone.",
     "blocks_format": "sms-text"
   },
   {
@@ -202,7 +202,7 @@
     "channel": "sms",
     "name": "High-Value Cart",
     "category": "campaign",
-    "body": "You left {items} in your cart. Complete your order before it's gone.",
+    "body": "{store_name}: You left {items} in your cart. Complete your order before it's gone.",
     "blocks_format": "sms-text"
   },
   {
@@ -220,7 +220,7 @@
     "channel": "sms",
     "name": "Cart Price Drop",
     "category": "campaign",
-    "body": "Good news — {items} in your cart just dropped in price.",
+    "body": "{store_name}: Good news: {items} in your cart just dropped in price.",
     "blocks_format": "sms-text"
   },
   {
@@ -238,7 +238,7 @@
     "channel": "sms",
     "name": "Wishlist Reminder",
     "category": "campaign",
-    "body": "Still thinking about {items}? Take another look before it's gone.",
+    "body": "{store_name}: Still thinking about {items}? Take another look before it's gone.",
     "blocks_format": "sms-text"
   },
   {
@@ -256,7 +256,7 @@
     "channel": "sms",
     "name": "Review Photo Follow-up",
     "category": "campaign",
-    "body": "Add a photo to your {productName} review and help other shoppers.",
+    "body": "{store_name}: Add a photo to your {productName} review and help other shoppers.",
     "blocks_format": "sms-text"
   },
   {
@@ -274,7 +274,7 @@
     "channel": "sms",
     "name": "Back in Stock (Wishlist)",
     "category": "campaign",
-    "body": "{productName} is back in stock. Grab it before it sells out.",
+    "body": "{store_name}: {productName} is back in stock. Grab it before it sells out.",
     "blocks_format": "sms-text"
   },
   {
@@ -292,7 +292,7 @@
     "channel": "sms",
     "name": "First Purchase Nudge",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -310,7 +310,7 @@
     "channel": "sms",
     "name": "Second Purchase Nudge",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -328,7 +328,7 @@
     "channel": "sms",
     "name": "Signup Anniversary",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -346,7 +346,7 @@
     "channel": "sms",
     "name": "Replenishment Reminder",
     "category": "campaign",
-    "body": "Running low on {items}? Reorder in a tap.",
+    "body": "{store_name}: Running low on {items}? Reorder in a tap.",
     "blocks_format": "sms-text"
   },
   {
@@ -364,7 +364,7 @@
     "channel": "sms",
     "name": "Subscription Renewal Reminder",
     "category": "campaign",
-    "body": "Running low on {items}? Reorder in a tap.",
+    "body": "{store_name}: Running low on {items}? Reorder in a tap.",
     "blocks_format": "sms-text"
   },
   {
@@ -382,7 +382,7 @@
     "channel": "sms",
     "name": "Loyalty Tier Upgrade",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -400,7 +400,7 @@
     "channel": "sms",
     "name": "Loyalty Points Reminder",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -418,7 +418,7 @@
     "channel": "sms",
     "name": "Referral Invite",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {
@@ -436,7 +436,7 @@
     "channel": "sms",
     "name": "Birthday",
     "category": "campaign",
-    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "body": "{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.",
     "blocks_format": "sms-text"
   },
   {

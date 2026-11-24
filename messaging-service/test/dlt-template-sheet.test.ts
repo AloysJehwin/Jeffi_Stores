@@ -30,7 +30,26 @@ describe('dlt-template-sheet', () => {
   it('turns every {{var}} and {var} into {#var#}', () => {
     expect(toDltBody('{{store_name}}: Order #{{order_number}} Rs. {{total}}')).toBe('{#var#}: Order #{#var#} Rs. {#var#}')
     expect(toDltBody('{headline}{#if couponCode} use code {couponCode}{/if}.')).toBe('{#var#} use code {#var#}.')
-    for (const r of rows) expect(r.dlt_body).not.toMatch(/\{\{|\{(?!#var#\})/)
+    for (const r of rows) expect(r.dlt_body).not.toMatch(/\{\{|\{(?!#(var|url)#\})/)
+  })
+
+  it('types link variables as {#url#} with their domains, and only those', () => {
+    expect(toDltBody('Track {{short_url}} {{vault_url}} {{order_url}} {ctaUrl} {{order_number}}')).toBe('Track {#url#} {#url#} {#url#} {#url#} {#var#}')
+    for (const r of rows) expect(r.cta_domains === '').toBe(!r.dlt_body.includes('{#url#}'))
+    expect(rows.find((r: { slug: string }) => r.slug === 'order/confirmed').cta_domains).toBe('jeffistores.in')
+  })
+
+  it('puts promotional rows on the unregistered numeric header with a note, the rest on JEFFIS', () => {
+    for (const r of rows) {
+      if (r.category === 'Promotional') {
+        expect(r.header).toBe('NUMERIC-PROMO (not registered)')
+        expect(r.header_note).toMatch(/promotional numeric header/)
+      } else {
+        expect(r.header).toBe('JEFFIS')
+        expect(r.header_note).toBe('')
+      }
+    }
+    expect(rows.some((r: { category: string }) => r.category === 'Promotional')).toBe(true)
   })
 
   it('writes a CSV that parses, one row per SMS template, with the header JEFFIS', () => {
@@ -39,7 +58,7 @@ describe('dlt-template-sheet', () => {
     expect(parsed.length - 1).toBe(CATALOG.filter(t => t.channel === 'sms').length)
     for (const r of parsed.slice(1)) {
       expect(r).toHaveLength(COLUMNS.length)
-      expect(r[2]).toBe('JEFFIS')
+      expect(['JEFFIS', 'NUMERIC-PROMO (not registered)']).toContain(r[2])
       expect(['Transactional', 'Service-Implicit', 'Service-Explicit', 'Promotional']).toContain(r[1])
     }
   })
@@ -55,9 +74,9 @@ describe('dlt-template-sheet', () => {
     expect(segmentsOf(71, 'UCS-2')).toBe(2)
   })
 
-  it("the store's own SMS templates are all GSM-7 single segments", () => {
-    const own = rows.filter((r: { slug: string }) => !r.slug.startsWith('campaign/'))
-    expect(own.filter((r: { encoding: string; segments: number }) => r.encoding !== 'GSM-7' || r.segments !== 1)).toEqual([])
+  it('every SMS template is a GSM-7 single segment and starts with the brand variable', () => {
+    expect(rows.filter((r: { encoding: string; segments: number }) => r.encoding !== 'GSM-7' || r.segments !== 1)).toEqual([])
+    expect(rows.filter((r: { dlt_body: string }) => !r.dlt_body.startsWith('{#var#}: ')).map((r: { slug: string }) => r.slug)).toEqual([])
   })
 
   it('docs/DLT_SMS_TEMPLATES.csv is the current output', () => {
