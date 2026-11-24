@@ -33,7 +33,8 @@ describe('FilterValueHelp', () => {
 
   const open = async () => {
     fireEvent.click(screen.getByTitle('Browse Material values'))
-    await screen.findByText('Cotton')
+    await screen.findByText('Select Material')
+    await screen.findAllByText('Cotton')
   }
 
   it('shows the placeholder, or Any <label>, when nothing is selected', () => {

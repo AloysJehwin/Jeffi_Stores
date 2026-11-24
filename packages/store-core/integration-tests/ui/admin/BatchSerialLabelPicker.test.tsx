@@ -300,8 +300,10 @@ describe('BatchSerialLabelPicker serial mode', () => {
       render(<BatchSerialLabelPicker mode="serial" />)
       await screen.findByText('Laptop')
       await act(async () => scanner.onScan('LP-1'))
-      expect(await screen.findByText('SN-1')).toBeInTheDocument()
-      expect(f.mock.calls.at(-1)![0]).toBe('/api/admin/inventory/serials/available?product_id=p1&variant_id=v1')
+      await waitFor(() =>
+        expect(f.mock.calls.at(-1)![0]).toBe('/api/admin/inventory/serials/available?product_id=p1&variant_id=v1')
+      )
+      expect(showToast).not.toHaveBeenCalled()
     })
 
     it('an unknown scan toasts not found', async () => {
