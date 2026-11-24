@@ -162,5 +162,5 @@ test (no `adsbygoogle` while active; last known value survives a read error), an
 9. After an owner upgrades to a store, how are Showcase sites billed? **First site included in the store plan; each extra ₹200.**
 10. Yearly plans bill add-ons yearly in the same subscription at 10× monthly? **Yes.**
 11. Admin changes add-on prices: existing subscriptions change? **No; old price until the tenant's next change.**
-12. Totals above ₹15,000 allow only eMandate or card? **Yes.**
+12. Totals above ₹15,000 allow only eMandate or card? ~~Yes~~ **Revised 2026-11-24: UPI stays allowed** — the hosted checkout offers it anyway (test mode, 2026-11-24), and the payer approves each debit above the limit (NPCI).
 13. AI allowances per site or per owner? **Free generation per site (only while the owner has no other unpaid trial or draft site); daily corrections pooled per owner.** (`controller-service/src/lib/site-studio/allowance.ts` defaults `TWEAKS_PER_DAY` to 30 today; the user chose 3.)

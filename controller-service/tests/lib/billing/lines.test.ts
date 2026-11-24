@@ -12,6 +12,7 @@ import {
   MANDATE_LIMIT_PAISE,
   monthlyTotal,
   paymentMethodsFor,
+  upiNeedsApproval,
   sameLine,
   toLine,
 } from '@controller/lib/billing/lines'
@@ -63,9 +64,10 @@ describe('effectivePaise and monthlyTotal', () => {
 })
 
 describe('paymentMethodsFor', () => {
-  it('allows only eMandate or a card above the mandate limit (decision 12)', () => {
-    expect(paymentMethodsFor(MANDATE_LIMIT_PAISE)).toEqual(['upi', 'card', 'emandate'])
-    expect(paymentMethodsFor(MANDATE_LIMIT_PAISE + 1)).toEqual(['card', 'emandate'])
+  it('allows every method at any amount; UPI above the mandate limit needs approval each time (decision 12)', () => {
+    expect(paymentMethodsFor()).toEqual(['upi', 'card', 'emandate'])
+    expect(upiNeedsApproval(MANDATE_LIMIT_PAISE)).toBe(false)
+    expect(upiNeedsApproval(MANDATE_LIMIT_PAISE + 1)).toBe(true)
   })
 })
 

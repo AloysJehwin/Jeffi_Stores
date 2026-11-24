@@ -115,8 +115,11 @@ export function prorationPaise(o: { monthlyDeltaPaise: number; interval: Billing
 }
 
 export type PaymentMethod = 'upi' | 'card' | 'emandate'
-/** Above the mandate limit (or its yearly 10×) only eMandate or a card can be used (decision 12). */
-export const paymentMethodsFor = (cycle: number): PaymentMethod[] => (cycle > MANDATE_LIMIT_PAISE ? ['card', 'emandate'] : ['upi', 'card', 'emandate'])
+/** Every method at any amount (decision 12, revised 2026-11-24): the hosted checkout offers UPI above the mandate limit
+ *  too, where the payer approves each debit again (NPCI). */
+export const paymentMethodsFor = (): PaymentMethod[] => ['upi', 'card', 'emandate']
+/** Whether a UPI Autopay debit this size needs the payer's approval each time (above the mandate limit). */
+export const upiNeedsApproval = (cycle: number): boolean => cycle > MANDATE_LIMIT_PAISE
 
 export const LINE_LABEL: Record<LineKind, string> = {
   store_plan: 'Store plan',
