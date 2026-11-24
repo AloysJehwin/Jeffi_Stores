@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { isPlatformOwner } from '@/lib/auth/scopes'
-import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { controlPlanePool } from '@/lib/tenant-registry'
+import { platformOwnerOnly as platformOnly } from '@/lib/providers/admin-gate'
+import { invalidateSmsDltConfig } from '@/lib/providers/sms-dlt'
 import {
+  PLATFORM_ONLY_PROVIDER_KEYS,
   PROVIDER_SETTING_KEYS,
   type ProviderSettingKey,
   clearProviderSetting,
@@ -18,13 +19,7 @@ export const dynamic = 'force-dynamic'
 
 // Platform provider policy (control plane platform_provider_settings), edited from the flagship's
 // Settings → Providers. Platform owner on the flagship only: a store admin (tenant resolved) never reaches it.
-
-async function platformOnly(admin: Awaited<ReturnType<typeof requireAdminScope>>) {
-  if (admin instanceof NextResponse) return admin
-  const tenant = await resolveTenantId().catch(() => 'unknown')
-  if (!isPlatformOwner(admin.role) || tenant) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  return admin
-}
+// Outreach secrets are not set here: they go to ./credentials, encrypted.
 
 const UUID = /^[0-9a-f-]{36}$/i
 const keyOf = (v: unknown) => PROVIDER_SETTING_KEYS.find(k => k === v) as ProviderSettingKey | undefined
@@ -70,6 +65,7 @@ export async function PUT(req: NextRequest) {
   const key = keyOf(b.key)
   const tenantId = scopeOf(b.tenantId)
   if (!key || tenantId === undefined) return NextResponse.json({ error: 'A valid key and tenantId (or null) are required' }, { status: 400 })
+  if (tenantId && PLATFORM_ONLY_PROVIDER_KEYS.includes(key)) return NextResponse.json({ error: `${key} is set for the platform only` }, { status: 400 })
   const value = normalizeProviderValue(key, b.value)
   if (value === null) return NextResponse.json({ error: `Invalid value for ${key}` }, { status: 400 })
   if (value === 'aws' && (key === 'sms_provider' || key === 'whatsapp_provider')) {
@@ -78,6 +74,7 @@ export async function PUT(req: NextRequest) {
   }
   try {
     await setProviderSetting(tenantId, key, value, admin.email || admin.adminId || null)
+    invalidateSmsDltConfig()
     return NextResponse.json({ ok: true, tenantId, key, value })
   } catch (err: any) {
     if (err?.code === '23503') return NextResponse.json({ error: 'Unknown store' }, { status: 400 })
@@ -94,6 +91,7 @@ export async function DELETE(req: NextRequest) {
   if (!key || tenantId === undefined) return NextResponse.json({ error: 'A valid key and tenantId (or none) are required' }, { status: 400 })
   try {
     const removed = await clearProviderSetting(tenantId, key)
+    invalidateSmsDltConfig()
     return NextResponse.json({ ok: true, removed })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

@@ -1,6 +1,7 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { VOICE_PROVIDERS, normalizeDltEntityId, normalizeSenderIds, normalizeVoiceConfig, type VoiceProviderName } from './voice-settings'
 
 // Which provider serves SMS, WhatsApp and AI for a store. Set only by the platform admin
 // (flagship Site Controls, Providers card) in control-plane platform_provider_settings: a tenant row overrides the
@@ -26,7 +27,14 @@ export const PROVIDER_SETTING_KEYS = [
   'ai_image_providers',
   'ai_video_providers',
   'ai_image_default_quality',
+  // Outreach calls (platform scope only) and India SMS DLT ids; read by voice-config.ts and sms-dlt.ts.
+  'voice_provider',
+  'voice_config',
+  'sms_dlt_entity_id',
+  'sms_dlt_sender_ids',
 ] as const
+/** Keys set only as the platform default, never per store. */
+export const PLATFORM_ONLY_PROVIDER_KEYS: readonly ProviderSettingKey[] = ['voice_provider', 'voice_config']
 export type ProviderSettingKey = (typeof PROVIDER_SETTING_KEYS)[number]
 export type PolicySource = 'tenant' | 'platform' | 'fallback'
 
@@ -83,6 +91,14 @@ export function normalizeProviderValue(key: ProviderSettingKey, v: unknown): unk
       return orderOf(v, AI_VIDEO_PROVIDERS)
     case 'ai_image_default_quality':
       return AI_IMAGE_QUALITIES.includes(v as AiImageQuality) ? v : null
+    case 'voice_provider':
+      return VOICE_PROVIDERS.includes(v as VoiceProviderName) ? v : null
+    case 'voice_config':
+      return normalizeVoiceConfig(v)
+    case 'sms_dlt_entity_id':
+      return normalizeDltEntityId(v)
+    case 'sms_dlt_sender_ids':
+      return normalizeSenderIds(v)
   }
 }
 
