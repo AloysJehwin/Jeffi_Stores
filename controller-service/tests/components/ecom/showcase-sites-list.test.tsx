@@ -10,7 +10,8 @@ import SitesList from '@controller/app/(ecom)/ecom/dashboard/showcase/SitesList'
 const site = (o: Partial<ShowcaseConsoleState>): ShowcaseConsoleState => ({
   id: 'a1', slug: 'acme', name: 'Acme', status: 'live', pauseReason: null, host: 'site-acme.jeffistores.in', url: 'https://site-acme.jeffistores.in',
   hasPage: true, publishedAt: '2026-11-01T00:00:00Z', paidUntil: '2026-12-01T00:00:00Z', renew: true, lastChargeError: null, balanceInr: null,
-  unreadLeads: 0, priceInr: 200, free: true, lapsed: false, due: false, pausesOn: null, ...o,
+  unreadLeads: 0, priceInr: 200, free: true, lapsed: false, due: false, pausesOn: null,
+  trialEndsAt: '2026-11-08T00:00:00Z', lineStatus: 'trial', onSubscription: false, subscriptionStatus: null, ...o,
 })
 
 const hrefs = (li: HTMLElement) => within(li).getAllByRole('link').map(a => a.getAttribute('href'))

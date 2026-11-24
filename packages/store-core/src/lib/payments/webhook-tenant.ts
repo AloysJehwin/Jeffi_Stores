@@ -21,6 +21,8 @@ export interface WebhookTenant {
   slug: string
   /** The resolved context to run inside, or null for the flagship store (default pool). */
   ctx: TenantContext | null
+  /** Subscription events only: 'billing' is the workspace's own Jeffi subscription (no store context needed). */
+  collectingAccount?: string
 }
 
 /**
@@ -37,12 +39,13 @@ export async function resolveSubscriptionTenant(subscriptionEntity: any): Promis
   // Do NOT swallow a control-plane error here. If the index is briefly unreachable we must let the
   // caller retry (map to a 5xx), not silently fall back to the client-supplied notes — that would
   // let a forged notes.tenant_id route an event into the wrong tenant DB during an outage.
-  const idx = await pool.query<{ tenant_id: string }>(
-    `SELECT tenant_id FROM razorpay_subscription_index WHERE razorpay_subscription_id = $1 LIMIT 1`,
+  const idx = await pool.query<{ tenant_id: string; collecting_account: string | null }>(
+    `SELECT tenant_id, collecting_account FROM razorpay_subscription_index WHERE razorpay_subscription_id = $1 LIMIT 1`,
     [subId]
   )
 
   const indexedTenantId = idx.rows[0]?.tenant_id ?? null
+  const collectingAccount = idx.rows[0]?.collecting_account ?? 'platform'
   const noteTenantId = (subscriptionEntity?.notes?.tenant_id ?? '').toString().trim() || null
 
   // This is the PLATFORM endpoint: every legitimate platform-collect subscription has an index row
@@ -52,7 +55,10 @@ export async function resolveSubscriptionTenant(subscriptionEntity: any): Promis
   if (!indexedTenantId) return null
   if (noteTenantId && indexedTenantId !== noteTenantId) return null // forged/mismatched notes → refuse
 
-  return toWebhookTenant(indexedTenantId)
+  // A billing subscription belongs to a workspace, which may have no store database (Showcase-only).
+  if (collectingAccount === 'billing') return { tenantId: indexedTenantId, slug: '', ctx: null, collectingAccount }
+  const t = await toWebhookTenant(indexedTenantId)
+  return t && { ...t, collectingAccount }
 }
 
 /** A store named by our own server-set notes (payouts, orders we created). Null = unknown store. */

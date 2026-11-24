@@ -11,12 +11,8 @@ import {
   updateTenantPlan,
 } from '@/lib/tenant-registry'
 import { invalidatePlanCache } from '@/lib/auth/plan-gate'
-import {
-  cancelOldSubscription,
-  downgradeSubscription,
-  upgradeSubscription,
-  type BillingInterval,
-} from '@controller/lib/payments/razorpay-subscriptions'
+import type { BillingInterval } from '@controller/lib/payments/razorpay-subscriptions'
+import { changeStorePlan } from '@controller/lib/billing/subscription'
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
 import { ComputeSpecSchema } from '@controller/lib/compute/schema'
 import { checkComputeChange } from '@controller/lib/compute/change'
@@ -37,10 +33,14 @@ const Body = z.object({
 
 /**
  * Unified plan + spec change for a live store. Computes the new monthly subscription price (plan fee + infra margin + GST).
- * Optional store (tenants.payment_required false): the plan and spec change now, unbilled. Mandatory store:
- *   higher than today → upgradeSubscription now (returns checkoutUrl), spec saved as pending
- *   lower            → downgradeSubscription at cycle end; spec queued on tenant_compute (status 'scheduled')
- *                       and the plan change held on tenants.pending_plan_id until the webhook moves it
+ * Optional store (tenants.payment_required false): the plan and spec change now, unbilled. Mandatory store, through the
+ * workspace's subscription (lib/billing changeStorePlan):
+ *   higher → a replacement subscription (returns checkoutUrl) collecting the difference for the rest of the cycle; the
+ *            plan and spec move when the owner authorises it (pending_change). Nothing is cancelled before that.
+ *   lower  → the price drops at cycle end (a replacement the owner approves, else the difference is refunded on each
+ *            charge); spec queued on tenant_compute (status 'scheduled') and the plan held on tenants.pending_plan_id
+ *            until the next charge moves it
+ *   same   → the plan moves now
  */
 export async function POST(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
@@ -91,78 +91,51 @@ export async function POST(request: NextRequest) {
       provisioning: prov ? { ok: prov.ok, error: prov.error ?? null } : null,
     })
   }
-  const subscriptionId = tenant.razorpay_subscription_id as string
+  const payer = { email: owner.email, name: owner.name }
+  let result
+  try {
+    result = await changeStorePlan(tenantId, { planSlug, interval: billingInterval, priceInrMonth: newPrice, spec, applyMode, ownerId: owner.id }, payer)
+  } catch (e: any) {
+    console.error('[plan] subscription change failed', e?.message || e)
+    return NextResponse.json({ error: 'Could not update your subscription. Please try again.' }, { status: 502 })
+  }
 
-  const currentPrice = Number(
-    (
-      await controlPlanePool().query<{ price: number | null }>(
-        `SELECT price_inr_month::int AS price FROM tenant_compute WHERE tenant_id = $1`,
-        [tenantId]
-      )
-    ).rows[0]?.price ?? 0
-  )
-
-  const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
-  const callbackUrl = `${baseUrl}/dashboard/billing?upgraded=1`
-  const isUpgrade = newPrice > currentPrice || (billingInterval === 'yearly' && (tenant.billing_interval ?? 'monthly') === 'monthly')
-
-  if (isUpgrade) {
-    const result = await upgradeSubscription({
-      oldSubscriptionId: subscriptionId,
-      newPlanSlug: planSlug,
-      newPlanName: newPlan.name,
-      newInterval: billingInterval,
-      priceInrMonth: newPrice,
-      ownerEmail: owner.email,
-      ownerName: owner.name,
-      tenantId,
-      tenantSlug: tenant.slug,
-      callbackUrl,
-    })
-    if (!samePlan) {
-      await updateTenantPlan(tenantId, { planSlug, billingInterval, newSubscriptionId: result.subscriptionId })
-      await setPendingPlan(tenantId, null)
-      invalidatePlanCache(tenantId)
-    }
-    await saveDesiredCompute(tenantId, spec, applyMode)
-    await cancelOldSubscription(subscriptionId).catch(async (e: any) => {
-      const { alertProvisioningFailure } = await import('@controller/lib/provisioning/alerts')
-      await alertProvisioningFailure(tenant.slug, 'plan_upgrade', `old subscription ${subscriptionId} not cancelled: ${e?.message}`, tenantId).catch(() => {})
-    })
-    const prov = await triggerProvisioning({
-      action: 'reprovision',
-      tenantId,
-      slug: tenant.slug,
-      plan: planSlug,
-      ownerId: owner.id,
-      reason: 'plan_change',
-    }).catch((e: any) => ({ ok: false, error: e?.message || 'reprovision failed' }))
+  if (result.status === 'checkout') {
     return NextResponse.json({
       status: 'upgrade',
-      checkoutUrl: result.shortUrl,
+      checkoutUrl: result.checkoutUrl,
       priceInrMonth: newPrice,
-      proratedCreditInr: Math.round(result.proratedCreditPaise / 100),
-      effectiveAt: 'now',
-      provisioning: { ok: prov.ok, error: prov.error ?? null },
+      upfrontInr: Math.round(result.quote.upfrontPaise / 100),
+      effectiveAt: 'on_approval',
     })
   }
 
-  // Downgrade: price drops at the next cycle. Hold the plan + spec until the webhook moves them (applyPendingPlan).
-  const result = await downgradeSubscription({
-    subscriptionId,
-    newPlanSlug: planSlug,
-    newPlanName: newPlan.name,
-    newInterval: billingInterval,
-    priceInrMonth: newPrice,
-  })
-  if (!samePlan) await setPendingPlan(tenantId, { planSlug, billingInterval })
-  // Queue the new spec on tenant_compute (status 'scheduled'); provisioning picks it up after cycle_end.
-  await patchTenantCompute(tenantId, { status: 'scheduled', next_at: result.scheduledAt ? new Date(result.scheduledAt * 1000) : null })
-  await controlPlanePool().query(`UPDATE tenant_compute SET desired = $2, updated_at = now() WHERE tenant_id = $1`, [tenantId, JSON.stringify(spec)])
-  return NextResponse.json({
-    status: 'downgrade_scheduled',
-    scheduledAt: result.scheduledAt,
-    priceInrMonth: newPrice,
-    effectiveAt: 'cycle_end',
-  })
+  if (result.status === 'scheduled') {
+    // Held until the next charge (storeCharged applyPendingPlan); the spec waits on tenant_compute.
+    if (!samePlan) await setPendingPlan(tenantId, { planSlug, billingInterval })
+    const at = result.effectiveAt ? new Date(result.effectiveAt) : null
+    await patchTenantCompute(tenantId, { status: 'scheduled', next_at: at })
+    await controlPlanePool().query(`UPDATE tenant_compute SET desired = $2, updated_at = now() WHERE tenant_id = $1`, [tenantId, JSON.stringify(spec)])
+    return NextResponse.json({
+      status: 'downgrade_scheduled',
+      scheduledAt: at ? Math.floor(at.getTime() / 1000) : null,
+      checkoutUrl: result.checkoutUrl,
+      priceInrMonth: newPrice,
+      effectiveAt: 'cycle_end',
+    })
+  }
+
+  // Same price: nothing to charge, the plan and servers move now.
+  if (!samePlan) {
+    await updateTenantPlan(tenantId, { planSlug, billingInterval })
+    await setPendingPlan(tenantId, null)
+    invalidatePlanCache(tenantId)
+  }
+  if (planChanged || specKey(spec) !== specKey(check.current ?? spec)) await saveDesiredCompute(tenantId, spec, applyMode)
+  const prov = planChanged
+    ? await triggerProvisioning({ action: 'reprovision', tenantId, slug: tenant.slug, plan: planSlug, ownerId: owner.id, reason: 'plan_change' }).catch(
+        (e: any) => ({ ok: false, error: e?.message || 'reprovision failed' })
+      )
+    : null
+  return NextResponse.json({ status: 'applied', priceInrMonth: newPrice, effectiveAt: 'now', provisioning: prov ? { ok: prov.ok, error: prov.error ?? null } : null })
 }

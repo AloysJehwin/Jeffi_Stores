@@ -1,10 +1,10 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { debitWallet, isFlagshipTenant } from '@/lib/payments/wallet'
+import { isFlagshipTenant } from '@/lib/payments/wallet'
 
 // SMS & WhatsApp add-on. A tenant store sends on a channel only while its tenant has paid for the current
-// month (tenants.messaging_addon / _until) for that channel AND the platform has assigned it a sender
-// (tenant_messaging_senders). Paid from the prepaid wallet like ad-free; a period's charge is keyed on
-// its tier and start date, so a double click or a cron retry charges once. The flagship is exempt.
+// period (tenants.messaging_addon / _until) for that channel AND the platform has assigned it a sender
+// (tenant_messaging_senders). A messaging_addon line on the workspace's subscription; only the controller's billing
+// handler writes messaging_addon(_until) (controller-service/src/lib/billing). The flagship is exempt.
 
 export type MessagingTier = 'sms' | 'whatsapp' | 'both'
 export type MessagingChannel = 'sms' | 'whatsapp'
@@ -68,7 +68,6 @@ export interface MessagingAddonStatus {
   tier: MessagingTier | 'none'
   active: boolean
   until: string | null
-  renew: boolean
 }
 
 /** 'ok' sends; 'addon' = the active tier doesn't cover the channel; 'number' = covered but no sender assigned yet. */
@@ -80,7 +79,7 @@ export const tierCovers = (tier: MessagingTier | 'none', channel: MessagingChann
 
 export async function getMessagingAddon(tenantId: string): Promise<MessagingAddonStatus> {
   const r = await controlPlanePool().query(
-    `SELECT messaging_addon, messaging_addon_until, messaging_addon_renew, messaging_addon_until > now() AS active
+    `SELECT messaging_addon, messaging_addon_until, messaging_addon_until > now() AS active
        FROM tenants WHERE id = $1`,
     [tenantId]
   )
@@ -89,67 +88,12 @@ export async function getMessagingAddon(tenantId: string): Promise<MessagingAddo
     tier: isTier(row?.messaging_addon) ? row.messaging_addon : 'none',
     active: !!row?.active,
     until: row?.messaging_addon_until ? new Date(row.messaging_addon_until).toISOString() : null,
-    renew: !!row?.messaging_addon_renew,
   }
 }
 
-/** The idempotency key of one period's charge (exported for tests). */
+/** The wallet_ledger key of a wallet-paid month from before the switch (the migration credits from it). */
 export const messagingAddonRef = (tenantId: string, tier: MessagingTier, periodKey: string) =>
   `messaging_addon:${tenantId}:${tier}:${periodKey}`
-
-/**
- * Charge one month. Same tier while active → extends from the current end; a different tier (or a lapsed
- * add-on) starts a new period from now. With renew the daily cron keeps charging; without it the period
- * simply runs out.
- */
-export async function buyMessagingAddonMonth(
-  tenantId: string,
-  opts: { tier: MessagingTier; renew: boolean; reason: 'purchase' | 'renewal' }
-): Promise<{ ok: true; status: MessagingAddonStatus; charged: boolean } | { ok: false; error: string }> {
-  if (isFlagshipTenant(tenantId)) return { ok: false, error: 'The platform store has no messaging add-on.' }
-  if (!isTier(opts.tier)) return { ok: false, error: 'Unknown add-on tier.' }
-  const [current, pricing] = await Promise.all([getMessagingAddon(tenantId), getMessagingAddonPricing()])
-  const extend = current.active && current.until && current.tier === opts.tier
-  const start = extend ? new Date(current.until!) : new Date()
-  const periodKey = start.toISOString().slice(0, 10)
-  const res = await debitWallet({
-    tenantId,
-    amountInr: pricing.priceInr,
-    category: 'messaging_addon',
-    externalRef: messagingAddonRef(tenantId, opts.tier, periodKey),
-    note: `SMS & WhatsApp add-on (${MESSAGING_TIER_LABEL[opts.tier]}), month from ${periodKey}${opts.reason === 'renewal' ? ' (auto-renew)' : ''}`,
-    floorInr: 0,
-    onCharged: async client => {
-      await client.query(
-        `UPDATE tenants SET messaging_addon = $2, messaging_addon_until = $3::timestamptz + interval '1 month',
-                messaging_addon_renew = $4, updated_at = now()
-          WHERE id = $1`,
-        [tenantId, opts.tier, start.toISOString(), opts.renew]
-      )
-    },
-  })
-  if (!res.ok) return res
-  if (!res.charged) await setMessagingAddonRenew(tenantId, opts.renew)
-  invalidateMessagingEntitlement(tenantId)
-  return { ok: true, charged: res.charged, status: await getMessagingAddon(tenantId) }
-}
-
-export async function setMessagingAddonRenew(tenantId: string, renew: boolean): Promise<void> {
-  await controlPlanePool().query(`UPDATE tenants SET messaging_addon_renew = $2, updated_at = now() WHERE id = $1`, [
-    tenantId,
-    renew,
-  ])
-}
-
-/** Auto-renewing tenants whose month ends within a day, or lapsed under a week ago (wallet was short). */
-export async function tenantsDueForMessagingAddonRenewal(): Promise<{ tenantId: string; tier: MessagingTier }[]> {
-  const r = await controlPlanePool().query(
-    `SELECT id, messaging_addon FROM tenants
-      WHERE messaging_addon_renew AND status = 'active' AND messaging_addon <> 'none' AND messaging_addon_until IS NOT NULL
-        AND messaging_addon_until < now() + interval '1 day' AND messaging_addon_until > now() - interval '7 days'`
-  )
-  return r.rows.filter(row => isTier(row.messaging_addon)).map(row => ({ tenantId: row.id as string, tier: row.messaging_addon as MessagingTier }))
-}
 
 const ENTITLEMENT_TTL_MS = 60_000
 const entitlementCache = new Map<string, { at: number; value: MessagingEntitlement }>()

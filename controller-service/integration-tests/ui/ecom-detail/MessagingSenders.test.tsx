@@ -16,7 +16,7 @@ import MessagingSenders from '@controller/components/admin/ecom/detail/Messaging
 import type { MessagingAddonStatus } from '@/lib/billing/messaging-addon'
 
 const addon = (over: Partial<MessagingAddonStatus> = {}): MessagingAddonStatus =>
-  ({ active: true, tier: 'both', until: '2026-12-31T00:00:00Z', renew: true, ...over }) as unknown as MessagingAddonStatus
+  ({ active: true, tier: 'both', until: '2026-12-31T00:00:00Z', ...over }) as unknown as MessagingAddonStatus
 
 const props = (a: MessagingAddonStatus) => ({
   tenantId: 't1',
@@ -27,18 +27,16 @@ const props = (a: MessagingAddonStatus) => ({
 })
 
 describe('MessagingSenders (render + branches)', () => {
-  it('shows the bought add-on tier, paid-until date and auto-renew on', () => {
+  it('shows the bought add-on tier and paid-until date', () => {
     render(<MessagingSenders {...props(addon())} />)
     expect(screen.getByText('SMS & WhatsApp')).toBeInTheDocument()
     expect(screen.getByText('Paid until')).toBeInTheDocument()
-    expect(screen.getByText('On')).toBeInTheDocument()
   })
 
   it('shows "Not bought" and "Ended" for a tier of none', () => {
-    render(<MessagingSenders {...props(addon({ active: false, tier: 'none', until: null, renew: false }))} />)
+    render(<MessagingSenders {...props(addon({ active: false, tier: 'none', until: null }))} />)
     expect(screen.getByText('Not bought')).toBeInTheDocument()
     expect(screen.getByText('Ended')).toBeInTheDocument()
-    expect(screen.getByText('Off')).toBeInTheDocument()
   })
 
   it('renders both audience groups and a sender card per channel', () => {
