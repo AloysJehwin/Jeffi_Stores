@@ -52,7 +52,7 @@ describe('PhotoCredits', () => {
   it('draws the linked credits line', () => {
     const html = renderToStaticMarkup(<PhotoCredits credits={[rao, iyer, das]} className="credits" />)
     expect(html).toContain('<p class="credits" data-photo-credits="">Photos: ')
-    expect(html.replace(/<[^>]+>/g, '')).toBe('Photos: A. Rao, S. Iyer on Pexels · K. Das on Pixabay')
+    expect(html.split(/<[^>]*>/).join('')).toBe('Photos: A. Rao, S. Iyer on Pexels · K. Das on Pixabay')
     expect(html).toContain('href="https://www.pexels.com/@arao"')
     expect(html).toContain('href="https://www.pexels.com"')
     expect(html).toContain('href="https://pixabay.com/users/kdas-3/"')
