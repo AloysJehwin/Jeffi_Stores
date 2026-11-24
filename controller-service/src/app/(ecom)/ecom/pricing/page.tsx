@@ -52,13 +52,17 @@ export default async function PricingPage() {
 
   const groups = Array.from(new Set(COMPARISON_ROWS.map(r => r.group)))
   const cols = { gridTemplateColumns: `repeat(${ordered.length}, minmax(0, 1fr))` }
-  const fromLabel = (p: { slug: string; monthly_price_inr: string }) =>
-    `from ₹${(floors?.[p.slug] ?? Number(p.monthly_price_inr)).toLocaleString('en-IN')}/mo`
+  const gstPct = `${Math.round((prices?.gstRate ?? 0.18) * 100)}%`
+  // Prices are before GST ("₹X/mo + GST"); no figure when they can't be computed.
+  const fromLabel = (p: { slug: string }) => {
+    const inr = floors?.[p.slug]
+    return inr == null ? '' : `from ₹${inr.toLocaleString('en-IN')}/mo + GST`
+  }
   // Every store runs on its own server with Postgres on it, and may move it to a dedicated RDS database; on Basic at a price.
   const rdsExtra = (slug: string) => prices?.rdsExtra[slug]
   const dedicatedDb = (slug: string, cls: string) => {
     const extra = rdsExtra(slug)
-    return extra == null ? <Check /> : <span className={`text-xs text-foreground-muted ${cls}`}>+₹{extra.toLocaleString('en-IN')}/mo</span>
+    return extra == null ? <Check /> : <span className={`text-xs text-foreground-muted ${cls}`}>+₹{extra.toLocaleString('en-IN')}/mo + GST</span>
   }
   const addonPrice = (id: string) => addons.find(a => a.id === id)?.priceInr
   const perMonth = (inr: number | undefined) => (inr == null ? null : `₹${inr.toLocaleString('en-IN')}/mo`)
@@ -103,7 +107,7 @@ export default async function PricingPage() {
 
       {/* Interactive plan cards with monthly/yearly toggle */}
       <section className="w-full px-4 sm:px-6 lg:px-12 pb-12 sm:pb-16">
-        <PricingCards plans={plans} fromInr={floors} />
+        <PricingCards plans={plans} fromInr={floors} gstRate={prices?.gstRate} />
       </section>
 
       {/* Detailed comparison table */}
@@ -294,7 +298,7 @@ export default async function PricingPage() {
             ],
             [
               'What does the price include?',
-              "One subscription for the plan and your store's own server. The plan fee (₹0 on Basic) includes GST; the server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise — with 18% GST on top. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server, or on any plan you can move it to a separate managed database; on Basic that prices your servers at AWS cost plus 20%.",
+              `One subscription for the plan and your store's own server. Prices are shown before GST; ${gstPct} GST is added at checkout. The server is priced at its AWS cost — at cost on Basic, plus 20% on Grow, Pro and Enterprise. Prices shown are each plan's smallest size; you choose the size when you sign up. Your database runs on your server, or on any plan you can move it to a separate managed database; on Basic that prices your servers at AWS cost plus 20%.`,
             ],
             [
               "Monthly vs yearly — what's the difference?",

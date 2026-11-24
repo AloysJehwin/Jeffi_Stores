@@ -2,30 +2,41 @@ import { computePlans, getCatalog } from '@controller/lib/compute/catalog'
 import { presetSpec, withDedicatedDb } from '@/lib/compute/presets'
 import { quoteSpec, monthlyTotal } from '@controller/lib/compute/pricing'
 
+export interface FloorPrices {
+  /** Each plan's "from" price before GST: its minPreset at its own margin plus the plan fee, GST taken out. */
+  floors: Record<string, number>
+  /** What moving Basic's database to RDS adds per month, before GST. */
+  rdsExtra: Record<string, number>
+  gstRate: number
+}
+
 /**
- * Each plan's "from" price: its minPreset at its own margin, GST on the servers, plus the plan fee.
+ * The public "₹X + GST" prices. monthlyTotal's checkout total is the plan fee (GST included) plus infra with GST on
+ * top, so the base is the fee without its GST plus the infra; base × (1 + GST) is the checkout total.
  * Shown whether or not owners can pick a size yet: every plan runs on its own server either way.
- * `rdsExtra`: what moving Basic's database to RDS adds per month.
  */
-export async function floorPrices(): Promise<{ floors: Record<string, number>; rdsExtra: Record<string, number> } | null> {
+export async function floorPrices(): Promise<FloorPrices | null> {
   try {
     const [catalog, plans] = await Promise.all([getCatalog(), computePlans()])
-    const total = (spec: ReturnType<typeof presetSpec>, p: (typeof plans)[number]) =>
-      Math.round(monthlyTotal(quoteSpec(spec, catalog, p), p.monthlyPriceInr, catalog.settings.gstRate).total)
+    const gstRate = catalog.settings.gstRate
+    const base = (spec: ReturnType<typeof presetSpec>, p: (typeof plans)[number]) => {
+      const m = monthlyTotal(quoteSpec(spec, catalog, p), p.monthlyPriceInr, gstRate)
+      return Math.round(m.planFee / (1 + gstRate) + m.infra)
+    }
     const floors: Record<string, number> = {}
     const rdsExtra: Record<string, number> = {}
     for (const p of plans) {
       const key = p.minPreset ?? p.defaultPreset ?? (p.minPlacement === 'pool' ? 'shared' : 'small')
-      floors[p.slug] = total(presetSpec(key), p)
-      if (key === 'basic') rdsExtra[p.slug] = total(withDedicatedDb(presetSpec('basic'), 'basic'), p) - floors[p.slug]
+      floors[p.slug] = base(presetSpec(key), p)
+      if (key === 'basic') rdsExtra[p.slug] = base(withDedicatedDb(presetSpec('basic'), 'basic'), p) - floors[p.slug]
     }
-    return { floors, rdsExtra }
+    return { floors, rdsExtra, gstRate }
   } catch {
     return null
   }
 }
 
-/** The lowest monthly price among the given (active store) plans, or null when prices can't be computed. */
+/** The lowest monthly price before GST among the given (active store) plans, or null when prices can't be computed. */
 export async function lowestPlanInr(planSlugs: string[]): Promise<number | null> {
   const prices = await floorPrices()
   if (!prices) return null

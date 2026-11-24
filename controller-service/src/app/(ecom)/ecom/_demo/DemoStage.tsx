@@ -136,17 +136,7 @@ function Stepper() {
 }
 
 function StageInner() {
-  const { chapter, reducedMotion, actions } = useDemo()
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ index: number }>).detail
-      if (detail && typeof detail.index === 'number') actions.goToChapter(detail.index)
-    }
-    window.addEventListener('ecom-demo-goto', handler as EventListener)
-    return () => window.removeEventListener('ecom-demo-goto', handler as EventListener)
-  }, [actions])
+  const { chapter, reducedMotion } = useDemo()
 
   const isStorefront = chapter.surface === 'storefront'
   const caption = isStorefront ? 'novastore.jeffistores.in' : `admin - ${chapter.title}`

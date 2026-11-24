@@ -32,7 +32,7 @@ export default function Loading() {
             <div key={i} className={`min-w-0 rounded-3xl sm:rounded-[2rem] p-6 sm:p-7 flex flex-col ${i === 1 ? 'org-peach' : 'org-sand'}`}>
               <Sk className="h-7 w-24" />
               <Sk className="mt-3 h-10 w-36" />
-              <div className="text-xs text-foreground-secondary mt-2">Incl. GST · plan &amp; servers in one subscription</div>
+              <div className="text-xs text-foreground-secondary mt-2">Plan &amp; servers in one subscription · 18% GST added at checkout</div>
               <Sk className="mt-4 h-3.5 w-full" />
               <Sk className="mt-2 h-3.5 w-2/3" />
               <Sk className="mt-6 h-11 w-full rounded-full" />

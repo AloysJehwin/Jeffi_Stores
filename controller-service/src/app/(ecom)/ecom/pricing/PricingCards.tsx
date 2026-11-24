@@ -9,8 +9,9 @@ interface Plan {
   slug: string
   name: string
   tier: number
-  monthly_price_inr: string
 }
+
+const gstLabel = (rate = 0.18) => `${Math.round(rate * 100)}% GST`
 
 const PLAN_BLURB: Record<string, string> = {
   basic: 'Everything to launch — full storefront + core admin.',
@@ -21,9 +22,9 @@ const PLAN_BLURB: Record<string, string> = {
 
 /**
  * Plans are a single subscription — servers and plan features in one price. `fromInr` is each plan's
- * floor price (incl. GST) at its minimum preset; the owner picks the exact size on sign-up.
+ * floor price before GST at its minimum preset (none when prices can't be computed); the owner picks the size on sign-up.
  */
-export default function PricingCards({ plans, fromInr }: { plans: Plan[]; fromInr?: Record<string, number> | null }) {
+export default function PricingCards({ plans, fromInr, gstRate }: { plans: Plan[]; fromInr?: Record<string, number> | null; gstRate?: number }) {
   const [interval, setInterval] = useState<Interval>('monthly')
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
@@ -39,8 +40,8 @@ export default function PricingCards({ plans, fromInr }: { plans: Plan[]; fromIn
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-5 w-full">
         {ordered.map(p => {
           const featured = p.slug === 'growth'
-          const floor = fromInr?.[p.slug] ?? Number(p.monthly_price_inr)
-          const price = interval === 'yearly' ? floor * 10 : floor
+          const floor = fromInr?.[p.slug]
+          const price = floor == null ? null : interval === 'yearly' ? floor * 10 : floor
 
           return (
             <div
@@ -56,20 +57,24 @@ export default function PricingCards({ plans, fromInr }: { plans: Plan[]; fromIn
 
               {/* Price display */}
               <div className="mt-2">
-                <div className="flex items-end gap-1">
-                  <span className="text-xs text-foreground-muted mb-2">from</span>
-                  <span className="font-display font-black text-4xl">₹{Math.round(price).toLocaleString('en-IN')}</span>
-                  <span className="text-sm text-foreground-muted font-normal mb-1">
-                    /{interval === 'yearly' ? 'yr' : 'mo'}
-                  </span>
-                </div>
+                {price == null ? (
+                  <div className="font-display font-black text-2xl mt-3">Sized at sign-up</div>
+                ) : (
+                  <div className="flex flex-wrap items-end gap-x-1">
+                    <span className="text-xs text-foreground-muted mb-2">from</span>
+                    <span className="font-display font-black text-4xl">₹{Math.round(price).toLocaleString('en-IN')}</span>
+                    <span className="text-sm text-foreground-muted font-normal mb-1">
+                      /{interval === 'yearly' ? 'yr' : 'mo'} + GST
+                    </span>
+                  </div>
+                )}
                 {interval === 'yearly' && (
                   <div className="text-xs org-sage-text font-semibold mt-0.5">
                     12 months for the price of 10
                   </div>
                 )}
                 <div className="text-xs text-foreground-secondary mt-1">
-                  Incl. GST · plan &amp; servers in one subscription
+                  Plan &amp; servers in one subscription · {gstLabel(gstRate)} added at checkout
                 </div>
               </div>
 
