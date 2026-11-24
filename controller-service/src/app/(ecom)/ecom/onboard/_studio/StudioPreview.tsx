@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Monitor, Smartphone } from 'lucide-react'
 import { Segmented } from '../../_ui'
 import { previewSrc } from './api'
@@ -18,6 +18,26 @@ export interface PickedSection {
 
 const WIDTH: Record<Device, number> = { desktop: 1280, phone: 390 }
 const PHONE_H = 780
+const PHONE_SCREEN = '(max-width: 639px)'
+
+/** Phone below 640px, Desktop above; follows the window (a resize, a turned phone) until the owner picks one. */
+export function usePreviewDevice(): [Device, (d: Device) => void] {
+  const [device, setDevice] = useState<Device>(() => (typeof window !== 'undefined' && window.matchMedia(PHONE_SCREEN).matches ? 'phone' : 'desktop'))
+  const chosen = useRef(false)
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE_SCREEN)
+    const follow = () => {
+      if (!chosen.current) setDevice(mq.matches ? 'phone' : 'desktop')
+    }
+    mq.addEventListener('change', follow)
+    return () => mq.removeEventListener('change', follow)
+  }, [])
+  const choose = useCallback((d: Device) => {
+    chosen.current = true
+    setDevice(d)
+  }, [])
+  return [device, choose]
+}
 
 export function DeviceToggle({ value, onChange }: { value: Device; onChange: (d: Device) => void }) {
   return (

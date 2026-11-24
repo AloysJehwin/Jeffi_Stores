@@ -66,14 +66,15 @@ export function Kpi({
       </div>
       <p className={`text-lg font-bold leading-7 tabular-nums [overflow-wrap:anywhere] ${highlight ? 'text-accent-500' : 'text-foreground'}`}>{value}</p>
       {(delta != null || sub) && (
-        <p className="kpi-extra flex min-w-0 items-center gap-1.5 text-xs leading-4 text-foreground-muted">
+        <p className="kpi-extra flex min-w-0 items-start gap-1.5 text-xs leading-4 text-foreground-muted">
           {delta != null && (
             <span className={`flex shrink-0 items-center gap-1 ${good ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
               {delta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {(delta * 100).toFixed(1)}%{!sub && ' vs previous'}
             </span>
           )}
-          {sub && <span className="truncate" title={sub}>{sub}</span>}
+          {/* Up to two lines, not cut to one: a narrow card still says what the number is. */}
+          {sub && <span className="min-w-0 line-clamp-2 break-words" title={sub}>{sub}</span>}
         </p>
       )}
     </>

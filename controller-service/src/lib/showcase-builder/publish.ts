@@ -12,13 +12,13 @@ import { ownedShowcase } from './site'
 
 // Publishing a Showcase: the studio's page (recompiled from source: stored ASTs are never trusted) and its look are
 // copied onto the site row, which showcase-service serves, then the site goes live (lib/showcase/store.ts
-// publishShowcase: the first publish starts the free month; a paused, unpaid one is charged a month first, as the
+// publishShowcase: the first publish starts the trial; a paused, unpaid one goes on the subscription first, as the
 // console's Publish does). Publishing a live site again is how design changes reach it; the details and content are
 // read live from the row already.
 
 export type PublishResult =
   | { ok: true; site: ShowcaseSiteRow; url: string; first: boolean }
-  | { ok: false; status: number; error: string; code?: string; topUpUrl?: string }
+  | { ok: false; status: number; error: string; code?: string; checkoutUrl?: string }
 
 /** The page as it goes live: every code section compiled again for the Showcase page; one that no longer compiles is left out. */
 async function livePage(doc: PageDoc): Promise<PageDoc> {
@@ -66,6 +66,7 @@ export async function publishOwnerShowcase(ownerId: string, siteId: unknown): Pr
   if (r.code !== 'payment_due') return { ok: false, status: r.code === 'not_found' ? 404 : 409, error: r.error, code: r.code }
   const live = await goLiveShowcase(site.id)
   if (live.ok) return { ok: true, site: live.site, url: showcaseUrl(live.site.slug), first }
-  if (live.code === 'wallet' || live.code === 'no_wallet') return { ok: false, status: 402, error: live.error, code: 'wallet_low', topUpUrl: '/dashboard/wallet' }
+  if (live.code === 'checkout') return { ok: false, status: 402, error: live.error, code: 'checkout', ...(live.checkoutUrl ? { checkoutUrl: live.checkoutUrl } : {}) }
+  if (live.code === 'no_wallet') return { ok: false, status: 402, error: live.error, code: live.code }
   return { ok: false, status: live.code === 'not_found' ? 404 : 409, error: live.error, code: live.code }
 }
