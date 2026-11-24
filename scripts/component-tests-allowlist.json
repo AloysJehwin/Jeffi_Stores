@@ -107,21 +107,7 @@
       "packages/store-core/src/components/business/AccountMobileHeader.tsx",
       "packages/store-core/src/components/on-device/CartInsightPanel.tsx",
       "packages/store-core/src/components/on-device/ProductPitchLine.tsx",
-      "packages/store-core/src/components/shared/CheckoutReviewPage.tsx",
-      "packages/store-core/src/components/visitor/AccountMobileHeader.tsx",
-      "packages/store-core/src/components/visitor/CategoryIcon.tsx",
-      "packages/store-core/src/components/visitor/CompareBar.tsx",
-      "packages/store-core/src/components/visitor/CustomSelect.tsx",
-      "packages/store-core/src/components/visitor/FeaturedForYou.tsx",
-      "packages/store-core/src/components/visitor/Header.tsx",
-      "packages/store-core/src/components/visitor/PageTracker.tsx",
-      "packages/store-core/src/components/visitor/ProductActions.tsx",
-      "packages/store-core/src/components/visitor/home/SlidesSection.tsx",
-      "packages/store-core/src/components/visitor/media/StoreMedia.tsx",
-      "packages/store-core/src/components/visitor/site/ComposedBlock.tsx",
-      "packages/store-core/src/components/visitor/skeletons/account.tsx",
-      "packages/store-core/src/components/visitor/skeletons/commerce.tsx",
-      "packages/store-core/src/components/visitor/slides/Slides.tsx"
+      "packages/store-core/src/components/shared/CheckoutReviewPage.tsx"
     ]
   }
 }
