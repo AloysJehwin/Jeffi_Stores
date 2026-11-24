@@ -20,7 +20,8 @@ const rz = vi.hoisted(() => ({
         rz.created.push({ id, ...o })
         return { id, short_url: `https://rzp.test/${id}` }
       }),
-      cancel: vi.fn(async (id: string, o: any) => (rz.cancelled.push({ id, ...o }), { status: 'cancelled' })),
+      // The SDK takes a boolean and sends cancel_at_cycle_end=1 when true.
+      cancel: vi.fn(async (id: string, atCycleEnd: boolean) => (rz.cancelled.push({ id, cancel_at_cycle_end: atCycleEnd ? 1 : 0 }), { status: 'cancelled' })),
       fetch: vi.fn(async () => ({})),
     },
     payments: { refund: vi.fn(async () => ({ id: 'rfnd_flow' })) },
