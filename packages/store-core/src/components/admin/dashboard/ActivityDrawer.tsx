@@ -103,9 +103,18 @@ export function ActivityDrawer({ activity, open, onClose, loading = false, store
   const [weeks, setWeeks] = useState(activity.weeks)
   const [channel, setChannel] = useState<ActivityChannel>(activity.channel)
   const [entered, setEntered] = useState(false)
+  const [mounted, setMounted] = useState(open)
   useScrollLock(open)
   useFocusTrap(open, panel)
 
+  useEffect(() => {
+    if (open) setMounted(true)
+    else if (reduced) setMounted(false)
+    else {
+      const id = setTimeout(() => setMounted(false), 200)
+      return () => clearTimeout(id)
+    }
+  }, [open, reduced])
   useEffect(() => {
     if (!open) {
       setEntered(false)
@@ -122,7 +131,7 @@ export function ActivityDrawer({ activity, open, onClose, loading = false, store
     if (open && typeof window !== 'undefined') setMode(window.innerWidth < 640 ? 'grid' : '3d')
   }, [open])
 
-  if (!open || typeof document === 'undefined') return null
+  if ((!open && !mounted) || typeof document === 'undefined') return null
   const t = activity.totals
   const change = (next: { weeks?: number; channel?: ActivityChannel }) => {
     const w = next.weeks ?? weeks
@@ -147,12 +156,12 @@ export function ActivityDrawer({ activity, open, onClose, loading = false, store
         }
       }}
     >
-      <div className="absolute inset-0 bg-black/40" style={{ opacity: entered ? 1 : 0, transition: reduced ? undefined : 'opacity 280ms' }} onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" style={{ opacity: entered ? 1 : 0, transition: reduced ? undefined : `opacity ${entered ? 280 : 200}ms` }} onClick={onClose} />
       <div
         ref={panel}
         tabIndex={-1}
         className="absolute inset-y-0 right-0 flex w-full flex-col bg-surface outline-none md:max-w-[560px] md:rounded-l-2xl md:shadow-2xl"
-        style={{ transform: entered ? 'translateX(0)' : 'translateX(100%)', transition: reduced ? undefined : 'transform 280ms cubic-bezier(0.23,1,0.32,1)' }}
+        style={{ transform: entered ? 'translateX(0)' : 'translateX(100%)', transition: reduced ? undefined : `transform ${entered ? '280ms cubic-bezier(0.23,1,0.32,1)' : '200ms ease-in'}` }}
       >
         <header className="px-5 pb-3 pt-4">
           <div className="flex items-start justify-between gap-3">
