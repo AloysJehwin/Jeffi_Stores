@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { migrationQuote } from '@controller/lib/billing/migrate'
-import { sameLine } from '@controller/lib/billing/lines'
+import { sameLine, upiNeedsApproval } from '@controller/lib/billing/lines'
 import PageHeader from '../../_components/PageHeader'
 import { Card } from '../../_components/Card'
 import SubscribeClient from './SubscribeClient'
@@ -96,9 +96,9 @@ export default async function SubscribePage({ searchParams }: { searchParams: Pr
             )}
             <li>
               <span className="font-medium text-foreground">Payment:</span>{' '}
-              {quote.methods.includes('upi')
-                ? 'UPI Autopay, a card or eMandate.'
-                : 'a card or eMandate (UPI Autopay covers up to ₹15,000 a charge).'}{' '}
+              {upiNeedsApproval(quote.cyclePaise)
+                ? 'UPI Autopay, a card or eMandate. Above ₹15,000 a charge, UPI asks you to approve each payment.'
+                : 'UPI Autopay, a card or eMandate.'}{' '}
               You get a reminder a day before each charge.
             </li>
             <li>

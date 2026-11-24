@@ -64,7 +64,7 @@ describe('planChange: first subscriptions', () => {
     expect(p.kind).toBe('new')
     expect(p.cyclePaise).toBe((299900 + 50000) * 10)
     expect(p.startAt).toBeNull()
-    expect(p.methods).toEqual(['card', 'emandate'])
+    expect(p.methods).toEqual(['upi', 'card', 'emandate']) // UPI stays offered above the mandate limit (decision 12)
   })
 
   it('brings wallet-paid lines onto a subscription that starts now (the migration)', () => {

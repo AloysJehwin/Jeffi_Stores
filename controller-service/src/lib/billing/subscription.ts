@@ -359,7 +359,7 @@ export function planChange(tenantId: string, lines: readonly BillingLine[], curr
     upfrontPaise: kind === 'increase' ? upfront : 0,
     startAt,
     replaceNow: halted || (!!change.immediate && paying),
-    methods: paymentMethodsFor(cycle),
+    methods: paymentMethodsFor(),
   }
 }
 

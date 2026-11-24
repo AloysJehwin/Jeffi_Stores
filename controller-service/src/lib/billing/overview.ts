@@ -92,7 +92,7 @@ export async function billingOverview(tenantId: string): Promise<BillingOverview
     })),
     monthlyPaise: monthly,
     cyclePaise: cyclePaise(monthly, interval),
-    methods: paymentMethodsFor(cyclePaise(monthly, interval)),
+    methods: paymentMethodsFor(),
     legacy: lines.filter(l => l.status === 'legacy_wallet').length,
     charges: charges.rows.map((c: any) => ({
       paymentId: c.razorpay_payment_id,
