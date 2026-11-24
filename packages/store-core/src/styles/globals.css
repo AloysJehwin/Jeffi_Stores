@@ -98,7 +98,8 @@
     min-height: 100dvh;
   }
 
-  body > div:first-of-type {
+  /* Marked explicitly: `body > div:first-of-type` is Next's hidden metadata div, or a portal that lands first. */
+  [data-app-root] {
     @apply bg-surface;
     min-height: 100dvh;
   }
