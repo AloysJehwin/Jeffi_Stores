@@ -22,6 +22,8 @@ const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
   { pattern: /^\/api\/orders\/create/, config: { windowSecs: 60, max: 10 } },
   { pattern: /^\/api\/upload/, config: { windowSecs: 60, max: 20 } },
   { pattern: /^\/api\/forms\//, config: { windowSecs: 60, max: 10 } },
+  // A Showcase claim link redeems a bearer token: login-grade.
+  { pattern: /^\/api\/ecom\/claim(\/|$)/, config: { windowSecs: 60, max: 10 } },
   // Staff capture surface (email-OTP, no client cert): login-grade limits on auth, normal on the rest.
   { pattern: /^\/api\/staff\/auth\//, config: { windowSecs: 60, max: 5 } },
   { pattern: /^\/api\/certportal\/auth\//, config: { windowSecs: 60, max: 5 } },
