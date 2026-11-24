@@ -4,7 +4,7 @@ import { queryOne } from '@/lib/shared/db'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getHomepagePlan } from '@/lib/catalog/homepage-plan'
 import { loadHeroData, loadSectionOptions } from '@/lib/catalog/homepage-editor-options'
-import { listCustomPages, listSiteDrafts, siteBuilderEnabled } from '@/lib/site/store'
+import { listCustomPages, listSiteDrafts, siteBuilderEnabled, siteEditorEnabled } from '@/lib/site/store'
 import { getOnboardingBuild } from '@/lib/site/onboarding-build'
 import SiteBuilderEditor from '@/components/admin/site-builder/SiteBuilderEditor'
 import SiteBuilderSwitch from '@/components/admin/site-builder/SiteBuilderSwitch'
@@ -16,7 +16,7 @@ export const revalidate = 0
 export default async function SiteBuilderPage({ searchParams }: { searchParams: Promise<{ draft?: string }> }) {
   const params = await searchParams
   const host = await getHost()
-  const [live, started, drafts, hero, plan, customPages, aiBuild] = await Promise.all([
+  const [live, started, drafts, hero, plan, customPages, aiBuild, visual] = await Promise.all([
     siteBuilderEnabled(),
     queryOne<{ n: string }>(`SELECT count(*) AS n FROM site_pages`).then(r => Number(r?.n ?? 0) > 0).catch(() => false),
     listSiteDrafts(),
@@ -24,6 +24,7 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
     getHomepagePlan(),
     listCustomPages(),
     getOnboardingBuild(),
+    siteEditorEnabled(),
   ])
   const options = started ? await loadSectionOptions(hero.categoryOptions, hero.brandOptions) : null
 
@@ -61,6 +62,7 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
           live={live}
           customPages={customPages}
           drafts={drafts}
+          visual={visual}
         />
       ) : (
         <SiteBuilderSwitch target="site" live={false} setup />

@@ -13,6 +13,8 @@ const EDITOR = [
   'packages/store-core/src/lib/site/code/classes.ts',
   'packages/store-core/src/components/visitor/site/editor/SiteEditorBridge.tsx',
 ]
+// The editor's shell, its panels and host plumbing (admin, Showcase).
+const SHELL = 'packages/store-core/src/components/site-editor/'
 const ALIAS: [string, string][] = [
   ['@/', 'packages/store-core/src/'],
   ['@storefront/', 'storefront-service/src/'],
@@ -80,5 +82,6 @@ describe('the visual editor stays off live pages', () => {
 
   it('never statically imports the editor’s modules', () => {
     expect(EDITOR.filter(f => seen.has(f)).map(f => chain(seen, f))).toEqual([])
+    expect([...seen.keys()].filter(f => f.startsWith(SHELL)).map(f => chain(seen, f))).toEqual([])
   })
 })

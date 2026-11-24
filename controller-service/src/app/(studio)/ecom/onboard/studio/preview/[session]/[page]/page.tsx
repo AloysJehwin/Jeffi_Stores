@@ -12,6 +12,7 @@ import { themePreviewSession } from '@controller/lib/site-studio/themes'
 import ThemedSample from '@controller/app/(studio)/_preview/ThemedSample'
 import PreviewBridge from '@controller/app/(studio)/_preview/PreviewBridge'
 import ShowcasePreview from '@controller/app/(studio)/_preview/ShowcasePreview'
+import { siteEditorEnabled } from '@/lib/site/store'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Site preview', robots: { index: false, follow: false } }
@@ -53,9 +54,9 @@ function Sections({ doc, pageKey, data, lead = false }: { doc: PageDoc; pageKey:
   )
 }
 
-export default async function StudioPreviewPage({ params, searchParams }: { params: Promise<{ session: string; page: string }>; searchParams: Promise<{ surface?: string; catalog?: string; theme?: string }> }) {
+export default async function StudioPreviewPage({ params, searchParams }: { params: Promise<{ session: string; page: string }>; searchParams: Promise<{ surface?: string; catalog?: string; theme?: string; editor?: string }> }) {
   const { session: id, page } = await params
-  const { catalog: as, theme: themeId } = await searchParams
+  const { catalog: as, theme: themeId, editor } = await searchParams
   const h = await headers()
   const owner = await resolveOwnerSession((await cookies()).get(OWNER_COOKIE)?.value, {
     userAgent: h.get('user-agent'),
@@ -67,7 +68,8 @@ export default async function StudioPreviewPage({ params, searchParams }: { para
   // A ready-made theme before it is applied (`theme=minimalist.ocean`): its pages and palette over the owner's details.
   const s = themeId ? ((await themePreviewSession(own, themeId, studioKey(page))) ?? notFound()) : own
   // A Showcase's one page, over the owner's own details and content.
-  if (s.product === 'showcase') return <ShowcasePreview session={s} />
+  // `editor=1`: the visual editor's canvas (node ids and its bridge), only while the editor is switched on.
+  if (s.product === 'showcase') return <ShowcasePreview session={s} editing={editor === '1' && !themeId && (await siteEditorEnabled().catch(() => false))} />
 
   const key = studioKey(page)
   const [audience, pageName] = key.split(':') as ['store' | 'business', string]
