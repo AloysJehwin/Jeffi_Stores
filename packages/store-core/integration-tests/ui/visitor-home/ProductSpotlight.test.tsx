@@ -15,7 +15,9 @@ vi.mock('@/components/visitor/QuickAddButton', () => ({
 }))
 vi.mock('motion/react', async () => {
   const React = await import('react')
-  const strip = (tag: string) => ({ children, className }: any) => React.createElement(tag, { className }, children)
+  const strip = (tag: string) => function Stripped({ children, className }: any) {
+    return React.createElement(tag, { className }, children)
+  }
   return {
     motion: { div: strip('div') },
     useReducedMotion: () => false,

@@ -46,8 +46,9 @@ vi.mock('@/components/visitor/slides/slide-motion', () => ({
 }))
 vi.mock('motion/react', async () => {
   const React = await import('react')
-  const strip = (tag: string) => ({ children, className, role, ...rest }: any) =>
-    React.createElement(tag, { className, role, 'aria-label': rest['aria-label'], 'aria-hidden': rest['aria-hidden'], 'aria-roledescription': rest['aria-roledescription'] }, children)
+  const strip = (tag: string) => function Stripped({ children, className, role, ...rest }: any) {
+    return React.createElement(tag, { className, role, 'aria-label': rest['aria-label'], 'aria-hidden': rest['aria-hidden'], 'aria-roledescription': rest['aria-roledescription'] }, children)
+  }
   return {
     motion: { div: strip('div'), p: strip('p'), h1: strip('h1') },
     useMotionValue: (v: number) => ({ set: () => {}, get: () => v }),

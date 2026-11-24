@@ -16,7 +16,9 @@ vi.mock('@/contexts/CartContext', () => ({ useCart: () => ctx.cart }))
 vi.mock('@/contexts/ToastContext', () => ({ useToast: () => ({ showToast: ctx.toast }) }))
 vi.mock('motion/react', async () => {
   const React = await import('react')
-  const strip = (tag: string) => ({ children, className }: any) => React.createElement(tag, { className }, children)
+  const strip = (tag: string) => function Stripped({ children, className }: any) {
+    return React.createElement(tag, { className }, children)
+  }
   return {
     motion: { div: strip('div'), span: strip('span'), path: () => null },
     useMotionValue: (v: number) => ({ get: () => v, set: () => {} }),
