@@ -8,13 +8,16 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }))
-vi.mock('@/components/ui/ImgWithSkeleton', () => ({ default: ({ src, alt }: any) => <img src={src} alt={alt} /> }))
+vi.mock('@/components/ui/ImgWithSkeleton', () => ({
+  // eslint-disable-next-line @next/next/no-img-element
+  default: ({ src, alt }: any) => <img src={src} alt={alt} />,
+}))
 vi.mock('@/components/shared/ProductWarningBadges', () => ({ default: ({ fragile }: any) => (fragile ? <span>fragile-badge</span> : null) }))
 vi.mock('@/components/visitor/QuickAddButton', () => ({
   default: (p: any) => <button data-testid="quick-add" data-price={p.displayPrice} data-digital={String(p.isDigital)} data-instock={String(p.inStock)}>quick-add</button>,
 }))
-vi.mock('@/components/visitor/QuickAddPicker', () => ({
-  QuickAddHeaderActions: ({ onClose }: any) => <button onClick={onClose}>sheet-close</button>,
+vi.mock('@/components/visitor/useProductLikeShare', () => ({
+  useProductLikeShare: () => ({ isInWishlist: false, wishlistLoading: false, handleWishlist: vi.fn(), handleShare: vi.fn() }),
 }))
 const resolveEdd = vi.fn<(...a: any[]) => Promise<string | null>>()
 vi.mock('@/lib/shipping/edd-cache', () => ({ resolveEdd: (...a: any[]) => resolveEdd(...a) }))
@@ -136,7 +139,7 @@ describe('business ProductCard', () => {
     act(() => void vi.advanceTimersByTime(460))
     expect(screen.getByText('View Full Details')).toBeInTheDocument()
     expect(document.body.style.overflow).toBe('hidden')
-    fireEvent.click(screen.getByText('sheet-close'))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByText('View Full Details')).toBeNull()
     vi.useRealTimers()
   })

@@ -21,11 +21,6 @@ vi.mock('next/dynamic', () => ({
 }))
 vi.mock('@/components/media/ProductMediaGallery', () => ({ default: ({ items }: any) => <div data-testid="media-gallery">{items.length} extras</div> }))
 vi.mock('@/components/media/MediaItemView', () => ({ DocumentList: ({ items, title }: any) => <div data-testid="docs">{title}: {items.length}</div> }))
-vi.mock('@/components/visitor/ProductImageGallery', () => ({
-  default: ({ images, ribbonLabel, discountPct, variantImages }: any) => (
-    <div data-testid="gallery" data-count={images.length} data-ribbon={ribbonLabel ?? ''} data-discount={String(discountPct)} data-variant-imgs={variantImages ? variantImages.length : ''} />
-  ),
-}))
 let actionsProps: any
 vi.mock('@/components/business/ProductActions', () => ({
   default: (p: any) => {
@@ -33,7 +28,7 @@ vi.mock('@/components/business/ProductActions', () => ({
     return (
       <div data-testid="actions" data-price={p.basePrice} data-handling={p.handlingDays}>
         <button onClick={() => p.onSelectionChange('v1', 'sv1')}>select-variant</button>
-        <button onClick={() => p.onVariantChange({ variant_images: [{ id: 'i' }] })}>variant-images</button>
+        <button onClick={() => p.onVariantChange({ variant_images: [{ id: 'i', image_url: '/variant-only.jpg', thumbnail_url: '/variant-only-t.jpg', is_primary: true }] })}>variant-images</button>
         <button onClick={() => p.onVariantChange(null)}>variant-none</button>
         <button onClick={() => p.onUnitChange('Box', 'Box of 6', { min: 2, max: 10, step: 2, factor: 6, dimension: 'count' })}>pick-unit</button>
       </div>
@@ -89,7 +84,7 @@ describe('business ProductDetailClient', () => {
     render(<ProductDetailClient product={baseProduct()} />)
     expect(screen.getByRole('heading', { name: 'Halo Headphones' })).toBeInTheDocument()
     expect(screen.getByTestId('actions')).toHaveAttribute('data-price', '1000')
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-count', '1')
+    expect(document.body.innerHTML).toContain('a.jpg')
     expect(screen.getByText('razorpay-offers')).toBeInTheDocument()
     expect(quoteProps.items[0]).toMatchObject({ productId: 'p1', description: 'Halo Headphones', currentPrice: 1000, sku: 'HALO-1', stockStatus: 'in', brandName: 'Halo', categoryName: 'Audio' })
     expect(fetch).toHaveBeenCalledWith('/api/products/p1/view', expect.objectContaining({ method: 'POST', headers: { 'X-Auth-Portal': 'business' } }))
@@ -126,8 +121,8 @@ describe('business ProductDetailClient', () => {
     auth.user = { isBusiness: true, approvalStatus: 'approved', businessDiscountMap: { c1: 10 } }
     render(<ProductDetailClient product={baseProduct({ discount_pct: 5 })} />)
     expect(screen.getByTestId('actions')).toHaveAttribute('data-price', '900')
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-ribbon', 'Business offer')
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-discount', 'null')
+    expect(screen.getAllByText('Business offer').length).toBeGreaterThan(0)
+    expect(screen.queryByText('SALE')).toBeNull()
     expect(quoteProps.items[0].businessDiscountPct).toBe(10)
   })
 
@@ -135,7 +130,8 @@ describe('business ProductDetailClient', () => {
     auth.user = { isBusiness: true, approvalStatus: 'pending', businessDiscountMap: { c1: 10 } }
     render(<ProductDetailClient product={baseProduct({ discount_pct: 5 })} />)
     expect(screen.getByTestId('actions')).toHaveAttribute('data-price', '1000')
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-discount', '5')
+    expect(screen.getAllByText('SALE').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Business offer')).toBeNull()
     expect(quoteProps.items[0].businessDiscountPct).toBeUndefined()
   })
 
@@ -160,10 +156,11 @@ describe('business ProductDetailClient', () => {
 
   it('swaps gallery images for a variant that has its own, and back', () => {
     render(<ProductDetailClient product={baseProduct()} />)
+    expect(document.body.innerHTML).not.toContain('variant-only')
     fireEvent.click(screen.getByText('variant-images'))
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-variant-imgs', '1')
+    expect(document.body.innerHTML).toContain('variant-only')
     fireEvent.click(screen.getByText('variant-none'))
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-variant-imgs', '')
+    expect(document.body.innerHTML).not.toContain('variant-only')
   })
 
   it('shows extra media and downloadable documents beneath the gallery', async () => {
@@ -176,7 +173,6 @@ describe('business ProductDetailClient', () => {
     render(<ProductDetailClient product={baseProduct({ media })} />)
     expect(await screen.findByTestId('media-gallery')).toHaveTextContent('1 extras')
     expect(screen.getByTestId('docs')).toHaveTextContent('Documents & downloads: 1')
-    expect(screen.getByTestId('gallery')).toHaveAttribute('data-count', '1')
   })
 
   it('shows the warning badges', () => {

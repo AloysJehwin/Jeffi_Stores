@@ -120,7 +120,7 @@ describe('business ProductActions', () => {
   })
 
   it('blocks adding when the per-unit cap is already in the cart', () => {
-    cart.cartItems = [{ productId: 'p1', variantId: null, subVariantId: null, buyMode: 'unit', quantity: 5 }]
+    cart.cartItems = [{ product_id: 'p1', variant_id: null, sub_variant_id: null, buy_mode: 'unit', quantity: 5 }]
     render(
       <ProductActions
         {...base({ productUnits: [{ id: 'u1', variant_id: null, sub_variant_id: null, unit: 'unit', factor: 1, is_base: true, is_purchase_default: true, display_label: null, dimension: 'count', max_qty: 5 }] })}

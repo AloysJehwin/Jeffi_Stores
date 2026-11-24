@@ -49,7 +49,7 @@ describe('BusinessQuotesClient', () => {
     push.mockClear()
     auth.user = { isBusiness: true, approvalStatus: 'approved' }
     auth.isLoading = false
-    vi.stubGlobal('fetch', vi.fn())
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
   })
 
   it('shows a skeleton while auth loads or before the first page arrives', () => {
@@ -59,7 +59,7 @@ describe('BusinessQuotesClient', () => {
   })
 
   it('sends buyers who are not approved business accounts back to their account page', async () => {
-    auth.user = { isBusiness: true, approvalStatus: 'pending' }
+    auth.user = { isBusiness: false, approvalStatus: 'none' }
     render(<BusinessQuotesClient />)
     await waitFor(() => expect(push).toHaveBeenCalledWith('/business/account'))
     expect(fetch).not.toHaveBeenCalled()

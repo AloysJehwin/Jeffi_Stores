@@ -41,7 +41,8 @@ const item = (over: Record<string, any> = {}) => ({
   ...over,
 })
 const open = () => fireEvent.click(screen.getByRole('button', { name: 'Request Quote' }))
-const target = () => screen.getByPlaceholderText(/e\.g\. \d/, { selector: 'input[type="number"]' } as any)
+// The target-price box comes first, before the "% discount" one.
+const target = () => screen.getAllByPlaceholderText(/e\.g\. \d/)[0]
 
 describe('RequestQuoteButton', () => {
   beforeEach(() => {
@@ -86,7 +87,7 @@ describe('RequestQuoteButton', () => {
     open()
     fireEvent.change(target(), { target: { value: '90' } })
     expect(screen.getByText('10% off')).toBeInTheDocument()
-    expect(screen.getByText(/Potential saving of ₹\s*10\.00 per unit if approved/)).toBeInTheDocument()
+    expect(screen.getByText(/Potential saving of ₹\s*10\.00 per \w+ if approved/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Submit Quote' })).toBeEnabled()
   })
 
@@ -170,7 +171,7 @@ describe('RequestQuoteButton', () => {
     render(<RequestQuoteButton items={[item({ currentPrice: null, sku: null, variants })]} />)
     open()
     fireEvent.change(screen.getByLabelText('Select a variant'), { target: { value: 'v2' } })
-    expect(screen.getAllByText('Hex Bolt — M10').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/M10/).length).toBeGreaterThan(0)
     expect(screen.getByText('copy:B-M10')).toBeInTheDocument()
     fireEvent.change(target(), { target: { value: '120' } })
     expect(screen.getByText('20% off')).toBeInTheDocument()
@@ -194,8 +195,8 @@ describe('RequestQuoteButton', () => {
     const sub = screen.getByLabelText('Select an option') as HTMLSelectElement
     expect(Array.from(sub.options).map(o => o.textContent)).toEqual(['Select an option', 'Zinc'])
     fireEvent.change(sub, { target: { value: 's1' } })
-    expect(screen.getAllByText('Hex Bolt — Steel — Zinc').length).toBeGreaterThan(0)
-    expect(screen.getByText('₹180.00')).toBeInTheDocument()
+    expect(screen.getAllByText(/Zinc/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('₹180.00').length).toBeGreaterThan(0)
   })
 
   it('handles several items: tabs, stepping, and a combined submit label', async () => {

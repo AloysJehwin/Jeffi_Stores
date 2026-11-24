@@ -12,7 +12,6 @@ const confirmMock = vi.fn<(...a: any[]) => Promise<boolean>>()
 vi.mock('@/contexts/ConfirmContext', () => ({ useConfirm: () => confirmMock }))
 vi.mock('@/components/visitor/AccountMobileHeader', () => ({ default: () => <div>visitor-header</div> }))
 vi.mock('@/components/business/AccountMobileHeader', () => ({ default: () => <div>business-header</div> }))
-vi.mock('@/components/visitor/FeaturedProducts', () => ({ default: () => <div>featured-products</div> }))
 vi.mock('@/components/visitor/skeletons/account', () => ({ AddressesSkeleton: ({ portal }: any) => <div>skeleton:{portal}</div> }))
 vi.mock('@/components/shared/AccountAddressForm', () => ({
   default: ({ formData, setFormData, editing, onSubmit, onCancel, pinLookupState, onPincodeChange }: any) => (
@@ -47,13 +46,22 @@ const addr = (over: Record<string, any> = {}) => ({
   ...over,
 })
 const res = (body: any, status = 200) => new Response(JSON.stringify(body), { status })
-const loaded = (addresses: any[]) => vi.mocked(fetch).mockResolvedValue(res({ addresses }))
+let current: any[] = []
+const loaded = (addresses: any[]) => {
+  current = addresses
+}
+// Saved addresses by default; the "you might also like" strip gets one product.
+const route = async (url: any) =>
+  String(url).startsWith('/api/products?')
+    ? res({ products: [{ id: 'f1', name: 'Featured Speaker', slug: 'speaker', base_price: 500, product_images: [] }] })
+    : res({ addresses: current })
 
 describe('AccountAddresses', () => {
   beforeEach(() => {
     push.mockClear()
     useAuthMock.mockReturnValue({ user: { id: 'u1', firstName: 'Asha', lastName: 'Rao', phone: '+919876543210' }, isLoading: false })
-    vi.stubGlobal('fetch', vi.fn())
+    current = []
+    vi.stubGlobal('fetch', vi.fn(route))
     confirmMock.mockResolvedValue(true)
   })
 
@@ -71,7 +79,7 @@ describe('AccountAddresses', () => {
     expect(screen.getByText('Near: Metro')).toBeInTheDocument()
     expect(screen.getAllByText('Chennai, TN 600001')).toHaveLength(2)
     expect(screen.getByText('Office')).toBeInTheDocument()
-    expect(screen.getByText('featured-products')).toBeInTheDocument()
+    expect(await screen.findByText('Featured Speaker')).toBeInTheDocument()
     expect(screen.getByText('visitor-header')).toBeInTheDocument()
   })
 
@@ -109,7 +117,7 @@ describe('AccountAddresses', () => {
     fireEvent.change(screen.getByLabelText('phone'), { target: { value: '123' } })
     fireEvent.click(screen.getByRole('button', { name: 'submit' }))
     expect(showToast).toHaveBeenCalledWith('Enter a valid 10-digit mobile number', 'error')
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(fetch).mock.calls.some(c => (c[1] as any)?.method === 'POST')).toBe(false)
   })
 
   it('saves a new address with POST, reloads the list and closes the form', async () => {
@@ -197,7 +205,7 @@ describe('AccountAddresses', () => {
     render(<AccountAddressesBusiness />)
     expect(await screen.findByText('Asha Rao')).toBeInTheDocument()
     expect(screen.getByText('business-header')).toBeInTheDocument()
-    expect(screen.queryByText('featured-products')).toBeNull()
+    expect(screen.queryByText('Featured Speaker')).toBeNull()
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
   })
 })

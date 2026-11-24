@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 
-const installSessionGuard = vi.fn()
+const { installSessionGuard } = vi.hoisted(() => ({ installSessionGuard: vi.fn() }))
 vi.mock('@/lib/client/session-guard', () => ({ installSessionGuard: () => installSessionGuard() }))
 
 import SessionGuard from '@/components/security/SessionGuard'
