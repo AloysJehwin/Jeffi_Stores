@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { CodeNode, PageDoc, ThemeTokens } from '@jeffi/site-blocks'
+import type { Block, CodeNode, PageDoc, ThemeTokens } from '@jeffi/site-blocks'
 
 // What a host (the admin Site Builder, the Showcase studio) gives the visual editor for one page. The editor never
 // fetches on its own: loading, saving, the canvas address, picture uploads and publishing are the host's.
@@ -41,6 +41,12 @@ export interface SiteEditorHost {
    * an image slot (stock first, with its credit when it is one).
    */
   elementAi?(p: ElementAsk): Promise<AiResult<{ text?: string; url?: string; alt?: string | null; credit?: unknown }>>
+  /**
+   * "Convert to editable section": a classic content block (lib/site/convertible.ts) rewritten as a code section with
+   * the same words, links and pictures. The editor saves first; nothing is saved here, and the editor puts the result
+   * in place as an undoable change.
+   */
+  convertBlock?(block: Block): Promise<AiResult<{ block: Block }>>
   /** Publishes (the host confirms first). */
   publish?(): Promise<void>
   /** Back to the host's own editor. */

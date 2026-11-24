@@ -10,6 +10,7 @@ import { money, stars } from './format'
 import { categoryPhotos, loadBrandIndex, loadBrandPage, loadCategoryIndex, loadCategoryPage } from './taxonomy'
 import { safeSrc } from '../code/allow'
 import type { ProductDetailView, ProductQuery, ProductView, SiteData } from './types'
+import { mapsUrl, parseHours, phoneUrl } from '@/lib/site/hours'
 
 // The live store as a SiteData source: the composed block's bound-parameter queries, mapped to views.
 
@@ -138,6 +139,9 @@ export function dbSiteData(): SiteData {
         year: new Date().getFullYear(),
         ...(identity.whatsapp ? { whatsapp: identity.whatsapp } : {}),
         ...(Object.keys(identity.socials).length ? { socials: identity.socials } : {}),
+        hours: parseHours(content.businessHours || ''),
+        phoneUrl: phoneUrl(identity.phone || ''),
+        mapsUrl: mapsUrl(address),
       }
     },
   }

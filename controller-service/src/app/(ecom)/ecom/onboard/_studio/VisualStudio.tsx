@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import type { CodeNode, PageDoc } from '@jeffi/site-blocks'
+import type { Block, CodeNode, PageDoc } from '@jeffi/site-blocks'
 import SiteEditor from '@/components/site-editor/SiteEditor'
 import type { SaveResult, SiteEditorHost } from '@/components/site-editor/host'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
@@ -57,6 +57,12 @@ export default function VisualStudio({ session, allowance: initial, onClose }: {
         const res = await fetch(url('design/element'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
         const data = (await res.json().catch(() => ({}))) as { text?: string; url?: string; alt?: string | null; credit?: unknown; error?: string }
         return res.ok ? { ok: true as const, ...data } : { ok: false as const, error: data.error || 'The AI could not do that' }
+      },
+      // The block as last saved (the editor saves before a conversion runs).
+      async convertBlock(block) {
+        const res = await fetch(url('design/convert'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blockId: block.id }) })
+        const data = (await res.json().catch(() => ({}))) as { block?: Block; error?: string }
+        return res.ok && data.block ? { ok: true as const, block: data.block } : { ok: false as const, error: data.error || 'This section could not be converted' }
       },
       renderImagePicker: ({ value, disabled, onPick }) =>
         disabled ? null : <ImageField value={value || null} onChange={u => u && onPick(u)} kind="work" label="Upload a picture" siteId={site} className="h-24 w-24" />,

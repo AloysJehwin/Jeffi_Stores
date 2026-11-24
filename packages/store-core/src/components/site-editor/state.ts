@@ -25,6 +25,10 @@ export type Shown = { block: string; ops: DesignOp[] } | 'reload' | null
 export const treeOf = (b: Block | undefined): CodeNode | null =>
   b?.type === CODE_SECTION && b.props?.tree && typeof b.props.tree === 'object' ? (b.props.tree as CodeNode) : null
 
+/** A code section's tree as it is now; null for a classic block (one an undone conversion made classic again keeps its history aside). */
+export const liveTree = (s: EditorState | null | undefined, block: string): CodeNode | null =>
+  s && s.doc.blocks[block]?.type === CODE_SECTION ? (s.trees[block]?.tree ?? null) : null
+
 export function createEditor(doc: PageDoc): EditorState {
   const trees: Record<string, History> = {}
   for (const b of Object.values(doc.blocks)) {
@@ -48,7 +52,7 @@ export const endGestures = (s: EditorState): EditorState => (Object.values(s.tre
  * a drag). Throws DesignError, leaving the state as it was, when one doesn't apply.
  */
 export function editSection(s: EditorState, block: string, ops: DesignOp[], gesture?: string): EditorState {
-  const h = s.trees[block]
+  const h = s.doc.blocks[block]?.type === CODE_SECTION ? s.trees[block] : undefined
   if (!h) throw new DesignError('That section has no tree to edit')
   const joins = !!gesture && h.open === gesture && h.past[h.past.length - 1]?.gesture === gesture
   const next = record(h, ops, gesture)
@@ -69,7 +73,9 @@ export function editDoc(s: EditorState, fn: (doc: PageDoc) => PageDoc): EditorSt
   const trees = mapTrees(s.trees, h => ({ ...endGesture(h), future: [] }))
   for (const b of Object.values(after.blocks)) {
     const t = treeOf(b)
-    if (t && !trees[b.id]) trees[b.id] = createHistory(t)
+    // A section new to the page, or one a block became (a conversion), starts its own history.
+    const became = t && s.doc.blocks[b.id] && s.doc.blocks[b.id].type !== b.type
+    if (t && (!trees[b.id] || became)) trees[b.id] = createHistory(t)
   }
   return { ...s, doc: after, trees, past: [...s.past, { before: s.doc, after }].slice(-MAX_HISTORY), future: [], rev: s.rev + 1 }
 }
@@ -114,7 +120,7 @@ export const canRedo = (s: EditorState) => s.future.length > 0
 
 /** The trees as they are now, by block. */
 export const currentTrees = (s: EditorState): Record<string, CodeNode> =>
-  Object.fromEntries(Object.keys(s.doc.blocks).filter(id => s.trees[id]).map(id => [id, s.trees[id].tree]))
+  Object.fromEntries(Object.keys(s.doc.blocks).filter(id => s.trees[id] && s.doc.blocks[id].type === CODE_SECTION).map(id => [id, s.trees[id].tree]))
 
 /**
  * The document to save: each code section with its tree and an empty source, so the server prints and compiles the
@@ -123,7 +129,8 @@ export const currentTrees = (s: EditorState): Record<string, CodeNode> =>
 export function docToSave(s: EditorState): PageDoc {
   const blocks: Record<string, Block> = {}
   for (const [id, b] of Object.entries(s.doc.blocks)) {
-    const h = s.trees[id]
+    // A block converted back by undo is a classic block again: its old history stays out of it.
+    const h = b.type === CODE_SECTION ? s.trees[id] : undefined
     blocks[id] = h ? { ...b, props: { ...b.props, tree: h.tree, source: '' } } : b
   }
   return { ...s.doc, blocks }

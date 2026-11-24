@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { moveBlock, removeBlock, type CodeNode, type PageDoc } from '@jeffi/site-blocks'
+import { moveBlock, removeBlock, updateBlock, type CodeNode, type PageDoc } from '@jeffi/site-blocks'
 import { DesignError } from '@jeffi/site-blocks/design'
-import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo } from '@/components/site-editor/state'
+import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, liveTree, redo, undo } from '@/components/site-editor/state'
 
 const text = (id: string, value: string): CodeNode => ({ t: 'text', value, id })
 const tree = (h: string): CodeNode => ({ t: 'el', tag: 'section', props: {}, id: 'e1', children: [{ t: 'el', tag: 'h2', props: {}, id: 'e2', children: [text('e2.0', h)] }] })
@@ -121,6 +121,32 @@ describe('the visual editor state', () => {
     expect(undo(took).shown).toBeNull()
     const moved = editSection(s, 'a', [{ op: 'text', id: 'e2', value: 'Newer' }])
     expect(adoptSaved(moved, sent, saved)).toBe(moved)
+  })
+})
+
+describe('a classic block converted in the editor', () => {
+  const convert = (d: PageDoc, h: string) => updateBlock(d, 'c', { type: 'code_section', props: { label: 'Converted', source: 'printed c', tree: tree(h), compiled: { id: 'cs-c' } } })
+
+  it('becomes a section with its own history, and undo makes it classic again', () => {
+    let s = createEditor(page())
+    expect(liveTree(s, 'c')).toBeNull()
+    s = editDoc(s, d => convert(d, 'Converted'))
+    expect(words(liveTree(s, 'c')!)).toBe('Converted')
+    s = editSection(s, 'c', [{ op: 'text', id: 'e2', value: 'Edited' }])
+    expect(docToSave(s).blocks.c.props).toMatchObject({ source: '', tree: { id: 'e1' } })
+    let r = undo(undo(s).state)
+    expect(r.state.doc.blocks.c.type).toBe('rich_text')
+    expect(liveTree(r.state, 'c')).toBeNull()
+    expect(docToSave(r.state).blocks.c).toEqual(page().blocks.c)
+    expect(currentTrees(r.state).c).toBeUndefined()
+    expect(() => editSection(r.state, 'c', [{ op: 'text', id: 'e2', value: 'X' }])).toThrow(DesignError)
+    // Redone, it is the section again; converted afresh, it starts over.
+    r = redo(r.state)
+    expect(words(liveTree(r.state, 'c')!)).toBe('Converted')
+    const back = undo(r.state).state
+    const again = editDoc(back, d => convert(d, 'Fresh'))
+    expect(words(liveTree(again, 'c')!)).toBe('Fresh')
+    expect(again.trees.c.past).toEqual([])
   })
 })
 

@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Monitor, Move, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, X } from 'lucide-react'
-import { DEFAULT_THEME, insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
+import { Copy, Monitor, Move, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, Wand2, X } from 'lucide-react'
+import { DEFAULT_THEME, insertBlock, isTagNode, moveBlock, removeBlock, updateBlock, type CodeNode } from '@jeffi/site-blocks'
 import { DesignError, findNode, freshId, treeIds, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
@@ -12,11 +12,12 @@ import FreePanel from './FreePanel'
 import AiBox from './AiBox'
 import CritiquePanel from './CritiquePanel'
 import { critiqueTrees, type TreeFinding } from '@/lib/site/code/tree-critique'
+import { isConvertible } from '@/lib/site/convertible'
 import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
 import { hasLocked, insertPlace, litProp, nodeName, nodeWords, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
-import { addCredit, adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
+import { addCredit, adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, liveTree, redo, undo, type EditorState, type Shown } from './state'
 
 // The visual site editor (docs/plans/SITE_EDITOR_PLAN.md, phase 2): the real page on a canvas (an iframe with a
 // preview token, where components/visitor/site/editor/SiteEditorBridge selects and edits in place), the page's
@@ -63,6 +64,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const measures = useRef({ n: 0, wait: new Map<number, (m: Measured | null) => void>() })
   const [aiBusy, setAiBusy] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [converting, setConverting] = useState(false)
   /** Elements an AI change touched, lit up on the canvas once it reloads. */
   const flash = useRef<{ block: string; ids: string[] } | null>(null)
 
@@ -151,7 +153,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     applyOnCanvas(block, ops)
     return true
   }
-  const treeAt = (block: string) => latest.current.state?.trees[block]?.tree ?? null
+  const treeAt = (block: string) => liveTree(latest.current.state, block)
   const say = (message: string) => setStatus({ kind: 'error', message })
 
   // ── Elements and sections: add, duplicate, delete (parts the page needs stay; design.ts refuses them too) ──
@@ -209,7 +211,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       s =>
         editDoc(s, d => {
           const b = d.blocks[id]
-          const tree = s.trees[id]?.tree
+          const tree = liveTree(s, id)
           const name = typeof b.props.label === 'string' && b.props.label ? b.props.label : 'Section'
           const props = tree ? { ...structuredClone(b.props), label: `${name} (copy)`.slice(0, 80), tree: structuredClone(tree), source: '' } : structuredClone(b.props)
           return insertBlock(d, { ...structuredClone(b), id: copy, children: undefined, props }, d.order.indexOf(id) + 1)
@@ -226,6 +228,29 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       s => editDoc(s, d => removeBlock(d, id)),
       () => setSel(null)
     )
+  }
+  /** A classic content block rewritten as a code section in its place (one undoable step), then selected. */
+  const convertSection = async (id: string) => {
+    const convert = hostRef.current.convertBlock
+    if (!convert || converting) return
+    setConverting(true)
+    try {
+      // The block as saved is what is converted (a Showcase converts its saved page).
+      await flushNow()
+      const b = latest.current.state?.doc.blocks[id]
+      if (!b) return
+      const r = await convert(b).catch(() => ({ ok: false as const, error: 'Could not convert this section' }))
+      if (!r.ok) return say(r.error)
+      const now = latest.current.state?.doc.blocks[id]
+      if (now?.type !== b.type) return
+      const { type, v, props, visibility } = r.block
+      changePage(
+        s => editDoc(s, d => updateBlock(d, id, { type, v, props, visibility })),
+        () => select(id, treeAt(id)?.id ?? null)
+      )
+    } finally {
+      setConverting(false)
+    }
   }
   const show = (shown: Shown) => {
     if (shown === 'reload') requestReload()
@@ -341,7 +366,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }
 
   const style = (block: string, id: string, prop: PanelProp, value: string | null) => {
-    const node = findNode(latest.current.state?.trees[block]?.tree ?? { t: 'frag', children: [] }, id)?.node
+    const node = findNode(liveTree(latest.current.state, block) ?? { t: 'frag', children: [] }, id)?.node
     if (!node || !isTagNode(node)) return
     const cls = node.props.className
     const before = cls && cls.k === 'lit' && typeof cls.v === 'string' ? cls.v : ''
@@ -447,7 +472,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
 
   const { doc } = state
   const block = sel ? doc.blocks[sel.block] : undefined
-  const tree = sel ? (state.trees[sel.block]?.tree ?? null) : null
+  const tree = sel ? liveTree(state, sel.block) : null
   const label = (id: string) => {
     const b = doc.blocks[id]
     return (typeof b?.props?.label === 'string' && b.props.label) || hostRef.current.blockLabel?.(b?.type ?? '') || b?.type || 'Block'
@@ -588,6 +613,11 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                   <Trash2 className="h-3.5 w-3.5" /> Delete
                 </button>
               </div>
+              {!tree && host.convertBlock && isConvertible(block.type) && (
+                <button type="button" className={smallBtn} disabled={converting || busy} onClick={() => void convertSection(block.id)}>
+                  <Wand2 className="h-3.5 w-3.5" /> {converting ? 'Converting…' : 'Convert to editable section'}
+                </button>
+              )}
             </div>
           )}
           {sel && tree && host.changeWithAi && host.canWrite && (

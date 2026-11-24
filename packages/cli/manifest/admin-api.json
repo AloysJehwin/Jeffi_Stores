@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "c28d546f38d628c1ce6536e9fea909ef7b0a9d68be8bd6fd275f501762c0c6c4",
+ "manifestHash": "5605299d1e794beac9c0900a53ab6fb0db1ed381719a809c21440a654b600b75",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -41111,6 +41111,102 @@
    "bodyContentType": "application/json",
    "summary": "POST { source, page }: a code section's editable words, links and pictures. With `edits`, the source with them written in (checked by the compiler) and its new list.",
    "command": "site-builder code"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/convert",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/convert",
+   "gatewayPath": "/v1/admin/site-builder/convert",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/convert/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "page": {
+      "type": "string",
+      "enum": [
+       "home",
+       "products",
+       "category",
+       "brand",
+       "categories",
+       "brands",
+       "product",
+       "cart",
+       "checkout",
+       "wishlist",
+       "compare",
+       "account",
+       "login",
+       "signup",
+       "about",
+       "contact",
+       "support",
+       "returns",
+       "legal",
+       "search",
+       "track",
+       "not_found",
+       "custom",
+       "quotes",
+       "orders",
+       "catalog",
+       "header",
+       "footer",
+       "announcement",
+       "card",
+       "showcase"
+      ]
+     },
+     "block": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "maxLength": 80
+       },
+       "type": {
+        "type": "string",
+        "maxLength": 60
+       },
+       "v": {
+        "type": "integer"
+       },
+       "props": {
+        "type": "object",
+        "additionalProperties": {}
+       },
+       "visibility": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      },
+      "required": [
+       "id",
+       "type",
+       "props"
+      ]
+     }
+    },
+    "required": [
+     "page",
+     "block"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: \"Convert to editable section\" (docs/plans/SITE_EDITOR_PLAN.md phase 5), on demand, one block at a time, while the visual editor is on: a content or composed block rewritten as a code section with the same words, links and pictures…",
+   "command": "site-builder convert"
   },
   {
    "id": "admin POST /api/admin/site-builder/critique",

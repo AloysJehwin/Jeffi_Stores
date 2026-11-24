@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef } from 'react'
-import { pageRefKey, type CodeNode, type PageDoc, type PageRef, type ThemeTokens } from '@jeffi/site-blocks'
+import { pageRefKey, type Block, type CodeNode, type PageDoc, type PageRef, type ThemeTokens } from '@jeffi/site-blocks'
 import { api } from '@/components/admin/kit/core'
 import SiteEditor from '@/components/site-editor/SiteEditor'
 import type { SaveResult, SiteEditorHost } from '@/components/site-editor/host'
@@ -61,6 +61,10 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       onClose,
       blockLabel: type => siteRegistry.get(type)?.label ?? type,
       blockLocked: type => !!siteRegistry.get(type)?.locked,
+      async convertBlock(block) {
+        const { ok, data } = await api<{ block?: Block; error?: string }>('/api/admin/site-builder/convert', { method: 'POST', json: { page: web.page, block } })
+        return ok && data.block ? { ok: true as const, block: data.block } : { ok: false as const, error: data.error || 'Could not convert this section' }
+      },
       ...(canAi
         ? {
             aiNote: 'Billed to your AI wallet.',

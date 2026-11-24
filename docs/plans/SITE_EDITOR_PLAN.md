@@ -1,6 +1,6 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **phases 0–1 built** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
+Status: **phases 0–4 built, phase 5 in progress** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
 per page with Phone/Tablet/Desktop breakpoints (2), a per-tenant rollout flag (8); the rest stay open. This replaces
 the form-based block editor with direct manipulation, Canva-style, for Showcase sites and the store's own site.
 AI-generated pages must be editable with it.
@@ -99,6 +99,18 @@ AI-generated pages must be editable with it.
    studio writes the page's words into the brief (`POST /studio/design/keep-words`, `StudioBrief.keepWords`), the admin
    page redo passes `keepWords` to `startPageRedo`. The section writer's brief reuses them where they fit; section
    changes (tweaks) leave them out. The generation rules for editor sections (`EDITOR_RULES`) came with slice 1.
+
+**Phase 5 (migration), in slices**
+1. Converters. `lib/site/convert.ts` `convertBlock` rewrites `rich_text`, `image_text`, `image_banner`, `faq`,
+   `contact_details` and `composed` blocks (`convertible.ts`) as v2 code sections, by rule, mirroring their renderers'
+   classes; the block keeps its id, place and visibility. Store details stay live: contact rows read `<Store>`, which
+   now also gives `hours` (rows), `phoneUrl` and `mapsUrl` (`lib/site/hours.ts`, shared with `ContactDetails`), and a
+   row exists only where the block showed it; composed product, category, brand, review and offer lists keep their
+   parts and queries. On demand only: "Convert to editable section" in the editor's section bar, for a selected
+   classic block of those kinds; the editor saves, asks the host (admin `POST /api/admin/site-builder/convert`,
+   Showcase `POST /studio/design/convert`, which converts the saved block), and puts the result in place as one
+   undoable step (undo makes it classic again; `state.ts` `liveTree`). Tests: `tests/lib/site-convert.test.ts`
+   renders each kind before and after and compares the words, links and pictures a visitor sees.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for

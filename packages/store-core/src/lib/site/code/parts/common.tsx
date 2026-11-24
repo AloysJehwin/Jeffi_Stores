@@ -255,6 +255,9 @@ defineCodeComponent({
   binding: {
     name: 'store name', tagline: 'tagline (may be empty)', logo: 'logo URL or null', email: 'email', phone: 'phone', address: 'address line', about: 'about text', year: 'the current year',
     whatsapp: 'WhatsApp number as digits with the country code, or empty (link it as `https://wa.me/${s.whatsapp}`)',
+    hours: 'opening hours as rows: array of { label, value } (may be empty)',
+    phoneUrl: 'the phone number as a tel: link, or empty',
+    mapsUrl: 'the address as a map search link, or empty',
   },
   describe: "The store's identity, once: <Store>{s => <p>© {s.year} {s.name}</p>}</Store>.",
   async render(_props, ctx) {
