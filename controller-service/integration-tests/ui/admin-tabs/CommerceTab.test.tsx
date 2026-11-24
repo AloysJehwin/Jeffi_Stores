@@ -34,7 +34,7 @@ describe('CommerceTab', () => {
     expect(screen.getByText('₹1,00,000.00')).toBeInTheDocument()
     expect(screen.getByText('Prepaid').nextSibling).toHaveTextContent('₹75,000.00')
     expect(screen.getByText('COD').nextSibling).toHaveTextContent('₹25,000.00')
-    expect(screen.getByText('Transactions').nextSibling).toHaveTextContent('1,200')
+    expect(screen.getByText('Transactions', { selector: 'div' }).nextSibling).toHaveTextContent('1,200')
     expect(screen.getByText('Settlement balance').nextSibling).toHaveClass('text-green-600')
     expect(screen.getByText('Settlement ledger')).toBeInTheDocument()
   })
