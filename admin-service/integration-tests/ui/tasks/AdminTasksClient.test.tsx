@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { asAdmin, asMember } from '../_support'
 
@@ -25,7 +25,7 @@ vi.mock('@/components/admin/AdminSelect', () => ({
 import AdminTasksClient from '@admin/app/(admin)/admin/tasks/AdminTasksClient'
 
 const day = (offset: number) => {
-  const d = new Date()
+  const d = new Date('2026-06-15T12:00:00Z')
   d.setDate(d.getDate() + offset)
   return d.toISOString()
 }
@@ -59,7 +59,10 @@ const json = (ok: boolean, body: unknown = {}) => ({ ok, json: async () => body 
 const fetchMock = vi.fn()
 
 describe('AdminTasksClient', () => {
+  afterEach(() => vi.useRealTimers())
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
     sp = new URLSearchParams()
     vi.stubGlobal('IntersectionObserver', class { observe() {} unobserve() {} disconnect() {} })
     fetchMock.mockReset()
@@ -97,12 +100,12 @@ describe('AdminTasksClient', () => {
   })
 
   it('an empty search offers to clear it', async () => {
-    sp = new URLSearchParams('q=zzz')
+    sp = new URLSearchParams('search=zzz')
     fetchMock.mockImplementation(async (url: string) => (String(url).startsWith('/api/admin/admins') ? json(true, { admins: [] }) : json(true, { tasks: [], total: 0 })))
     render(asAdmin(<AdminTasksClient />))
     const clear = await screen.findByRole('button', { name: 'Clear search' })
     fireEvent.click(clear)
-    expect(replace).toHaveBeenCalledWith(expect.stringContaining('/admin/tasks?'), { scroll: false })
+    expect(replace).toHaveBeenCalledWith(expect.not.stringContaining('search='), { scroll: false })
   })
 
   it('completes a task: PATCHes status, toasts and refreshes', async () => {
