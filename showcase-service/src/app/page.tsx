@@ -1,15 +1,14 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { blockVisible, cssVarsRule, googleFontsHref, normalizeDoc, normalizeTheme, themeCssVars, topBlocks, type PageDoc } from '@jeffi/site-blocks'
-import CodeSection, { planSections } from '@/components/visitor/site/code/CodeSection'
+import { cssVarsRule, googleFontsHref, normalizeDoc, normalizeTheme, themeCssVars } from '@jeffi/site-blocks'
 import PhotoCredits from '@/components/visitor/site/PhotoCredits'
 import { pageCredits, pictureCredits } from '@/lib/ai/stock-credits'
-import type { CompiledSection } from '@/lib/site/code/compile'
-import { runWithSiteData, type SiteData } from '@/lib/site/data'
+import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
 import { currentSite, liveView, siteOrigin } from '@showcase/lib/site'
 import { localBusinessJsonLd, siteMetadata } from '@showcase/lib/seo'
 import Paused from './Paused'
+import SiteSections from './SiteSections'
 import Tracker from './Tracker'
 
 export const dynamic = 'force-dynamic'
@@ -18,23 +17,6 @@ export async function generateMetadata(): Promise<Metadata> {
   const site = await currentSite().catch(() => null)
   if (!site || site.status === 'draft') return { title: 'Site not found', robots: { index: false, follow: false } }
   return siteMetadata(site, await siteOrigin())
-}
-
-/**
- * The page's code sections in order, as the studio preview draws them; the first is the LCP section. The header and
- * the opening always draw, and links to a section that draws nothing are left out (planSections).
- */
-async function Sections({ doc, data }: { doc: PageDoc; data: SiteData }) {
-  const now = Date.now()
-  const blocks = topBlocks(doc).filter(b => b.type === 'code_section' && b.props.compiled && blockVisible(b, now))
-  const plan = await planSections(blocks.map(b => b.props.compiled as CompiledSection), data)
-  return (
-    <>
-      {blocks.map((b, i) => (
-        <CodeSection key={b.id} section={b.props.compiled as CompiledSection} id={b.id} page="showcase" data={data} priority={i === 0} always={plan.always[i]} anchors={plan.anchors} />
-      ))}
-    </>
-  )
 }
 
 // A no-script form post comes back here with ?lead=sent, or ?lead=error&why=… (api/leads answers it with a redirect).
@@ -70,7 +52,7 @@ export default async function ShowcasePage({ searchParams }: { searchParams: Pro
   const data = showcaseSiteData(liveView(site))
   const css = `${cssVarsRule('.showcase-site.showcase-site', themeCssVars(theme))}.showcase-site{font-family:var(--font-body),system-ui,sans-serif;background:var(--color-surface);color:var(--color-foreground);min-height:100vh}`
   const doc = normalizeDoc(site.page)
-  const body = await runWithSiteData(data, async () => <Sections doc={doc} data={data} />)
+  const body = await runWithSiteData(data, async () => <SiteSections doc={doc} data={data} />)
 
   return (
     <>
