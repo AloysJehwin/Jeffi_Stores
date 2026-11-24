@@ -4,6 +4,7 @@ from typing import Any
 
 from conftest import FakeController, make_session
 
+from voice_service import phrases
 from voice_service import pipeline as pl
 from voice_service.calls import Call, Outcome
 from voice_service.config import Settings
@@ -18,6 +19,16 @@ class FakeWorker:
 
     async def queue_frames(self, frames: list[Any]) -> None:
         self.frames.extend(frames)
+
+
+class FakeTTS:
+    """Stands in for the TTS processor: what goes to it directly, bypassing the LLM."""
+
+    def __init__(self) -> None:
+        self.frames: list[Any] = []
+
+    async def queue_frame(self, frame: Any) -> None:
+        self.frames.append(frame)
 
 
 def runtime(settings: Settings, **session: Any) -> pl.CallRuntime:
@@ -65,9 +76,12 @@ async def test_filler_and_check_in_actions(settings: Settings) -> None:
     from pipecat.frames.frames import LLMMessagesAppendFrame, TTSSpeakFrame
 
     rt = runtime(settings, language="ta")
+    rt.tts = FakeTTS()
     await pl.apply_action(rt, Action.FILLER)
-    f = rt.worker.frames[-1]
+    # Straight to TTS (a stuck LLM can't hold it), and marked so its audio doesn't count as the reply.
+    f = rt.tts.frames[-1]
     assert isinstance(f, TTSSpeakFrame) and f.text == "ஒரு நிமிடம்." and f.append_to_context is False
+    assert rt.turn.filler_pending and rt.worker.frames == []
     await pl.apply_action(rt, Action.CHECK_IN)
     m = rt.worker.frames[-1]
     assert isinstance(m, LLMMessagesAppendFrame) and m.run_llm and m.messages[0]["role"] == "developer"
@@ -79,12 +93,74 @@ async def test_failure_apologises_in_language_then_ends(settings: Settings) -> N
     from pipecat.frames.frames import TTSSpeakFrame
 
     rt = runtime(settings, language="hi")
+    rt.tts = FakeTTS()
     await rt.fail("llm_error")
-    f = rt.worker.frames[-1]
-    assert isinstance(f, TTSSpeakFrame) and "WhatsApp" in f.text and f.interruptible is False
+    f = rt.tts.frames[-1]
+    # No WhatsApp promise without consent; straight to TTS, not behind the LLM.
+    assert isinstance(f, TTSSpeakFrame) and f.text == phrases.APOLOGIES["hi"] and "WhatsApp" not in f.text
+    assert f.interruptible is False and rt.worker.frames == []
     assert rt.call.outcome == Outcome.ERROR and rt.call.error_reason == "llm_error" and rt.end is not None
     await rt.fail("again")  # once only
-    assert len(rt.worker.frames) == 1
+    assert len(rt.tts.frames) == 1
+
+
+async def test_the_apology_promises_whatsapp_only_with_consent(settings: Settings) -> None:
+    rt = runtime(settings, language="en", consentWhatsApp=True)
+    await rt.fail("stt_error")
+    assert "WhatsApp" in rt.worker.frames[-1].text
+    rt = runtime(settings, language="en", apology="Sorry, we'll call back.")
+    await rt.fail("stt_error")
+    assert rt.worker.frames[-1].text == "Sorry, we'll call back."
+
+
+async def test_a_provider_failure_from_the_watch_apologises_and_ends(settings: Settings) -> None:
+    rt = runtime(settings, language="en")
+    rt.turn.start(rt.started_at)
+    rt.watch.on_llm_started(rt.started_at)
+    assert await pl.tick(rt, rt.started_at + 1) is False and not rt.failed
+    assert await pl.tick(rt, rt.started_at + rt.watch.llm_first_token_s) is False
+    assert rt.failed and rt.call.error_reason == "llm_timeout" and rt.end is not None
+    assert rt.worker.frames[-1].text == phrases.APOLOGIES["en"]
+
+
+async def test_a_beep_verdict_ends_the_call_as_voicemail_once(settings: Settings) -> None:
+    rt = runtime(settings)
+    rt.voicemail.start(0)
+    rt.voicemail.on_audio(True, 1.0)
+    rt.voicemail.on_audio(True, 1.15)
+    assert not rt.voicemail.open and rt.voicemail.reason == "beep"  # the verdict closed the window
+    assert await pl.tick(rt, rt.started_at + 1.2) is True
+    assert rt.call.outcome == Outcome.VOICEMAIL and rt.end is not None and rt.end.reason == "voicemail"
+    first = rt.end
+    await pl.tick(rt, rt.started_at + 1.5)
+    await pl.on_voicemail(rt)
+    assert rt.end is first and rt.worker.frames == []
+
+
+async def test_a_monologue_verdict_ends_the_call_as_voicemail(settings: Settings) -> None:
+    rt = runtime(settings)
+    rt.voicemail.start(0)
+    rt.voicemail.on_user_started(0.5)
+    await pl.tick(rt, 7.1)
+    assert rt.call.outcome == Outcome.VOICEMAIL and rt.voicemail.reason == "monologue"
+
+
+async def test_voicemail_cuts_short_an_ending_already_under_way(settings: Settings) -> None:
+    rt = runtime(settings)
+    rt.request_end("tool_end", grace_s=15.0)
+    rt.voicemail.start(0)
+    rt.voicemail.on_transcript("Please leave a message after the tone", 1.0)
+    await pl.on_voicemail(rt)
+    assert rt.call.outcome == Outcome.VOICEMAIL and rt.end is not None and rt.end.deadline <= rt.end.at + 0.01
+
+
+async def test_a_failed_call_is_not_relabelled_voicemail(settings: Settings) -> None:
+    rt = runtime(settings)
+    await rt.fail("stt_error")
+    rt.voicemail.start(0)
+    rt.voicemail.on_transcript("leave a message", 1.0)
+    await pl.on_voicemail(rt)
+    assert rt.call.outcome == Outcome.ERROR
 
 
 async def test_tts_failure_ends_without_speaking(settings: Settings) -> None:

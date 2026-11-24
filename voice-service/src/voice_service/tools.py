@@ -55,6 +55,7 @@ class ToolDispatcher:
     filler_after_s: float = 1.8
     timeout_s: float = 20.0
     filler_override: list[str] | None = None
+    filler: Callable[[str], Awaitable[None]] | None = None  # how a filler is spoken (default: speak, not in context)
     on_started: Hook | None = None
     on_finished: Hook | None = None
     _fillers_played: int = field(default=0, init=False)
@@ -86,7 +87,8 @@ class ToolDispatcher:
         except Exception as e:  # noqa: BLE001
             log.warning("tool failed", callId=self.call_id, tool=name, error=type(e).__name__)
             return None
-        await self.speak(phrases.filler(self.language, self._fillers_played, self.filler_override), False)
+        line = phrases.filler(self.language, self._fillers_played, self.filler_override)
+        await (self.filler(line) if self.filler else self.speak(line, False))
         self._fillers_played += 1
         try:
             return await asyncio.shield(task)

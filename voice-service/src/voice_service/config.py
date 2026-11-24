@@ -71,6 +71,9 @@ class Settings:
     dead_air_s: float = 3.0
     voicemail_window_s: float = 8.0
     tool_timeout_s: float = 20.0
+    # Provider watch (conversation.ProviderWatch).
+    llm_first_token_s: float = 8.0
+    stt_miss_speech_s: float = 1.5
     # Exotel.
     exotel_sid: str = ""
     exotel_api_key: str = ""
@@ -146,6 +149,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         dead_air_s=_num(e, "VOICE_DEAD_AIR_S", 3.0),
         voicemail_window_s=_num(e, "VOICE_VOICEMAIL_WINDOW_S", 8.0),
         tool_timeout_s=_num(e, "VOICE_TOOL_TIMEOUT_S", 20.0),
+        llm_first_token_s=_num(e, "VOICE_LLM_FIRST_TOKEN_S", 8.0),
+        stt_miss_speech_s=_num(e, "VOICE_STT_MISS_SPEECH_S", 1.5),
         exotel_sid=e.get("EXOTEL_SID", ""),
         exotel_api_key=e.get("EXOTEL_API_KEY", ""),
         exotel_api_token=e.get("EXOTEL_API_TOKEN", ""),

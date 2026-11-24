@@ -279,7 +279,7 @@ class CallService:
 
     async def run_stream(self, websocket: Any, call: Call, stream_id: str) -> None:
         from . import pipeline as pl
-        from .conversation import TurnState
+        from .conversation import ProviderWatch, TurnState
         from .voicemail import VoicemailDetector
 
         rt = self.runtimes.get(call.call_id)
@@ -318,6 +318,7 @@ class CallService:
                 deps=deps,
                 turn=TurnState(silence_s=float(session.silenceS or 14), dead_air_s=s.dead_air_s),
                 voicemail=VoicemailDetector(window_s=s.voicemail_window_s),
+                watch=ProviderWatch(stt_miss_speech_s=s.stt_miss_speech_s, llm_first_token_s=s.llm_first_token_s),
             )
             rt.pipeline_rt = prt
             await pl.run_pipeline(websocket, prt, serializer)

@@ -1,7 +1,8 @@
 """Fixed lines spoken without the LLM: a filler while a tool runs, and the apology when a service fails mid-call.
 
 The persona and script come from the controller; these are only the fallbacks for when the LLM can't speak.
-A session may override them with `fillers: [..]` and `apology: ".."`.
+A session may override them with `fillers: [..]` and `apology: ".."`. The default apology promises a WhatsApp
+message only when the session says the person consented (`consentWhatsApp: true`); otherwise it promises a call back.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ FILLERS: dict[str, list[str]] = {
     "gu": ["એક મિનિટ.", "એક ક્ષણ."],
 }
 
-APOLOGIES: dict[str, str] = {
+APOLOGIES_WHATSAPP: dict[str, str] = {
     "en": "Sorry, the line's breaking up. I'll message you on WhatsApp.",
     "hi": "माफ़ कीजिए, लाइन कट रही है। मैं आपको WhatsApp पर मैसेज करती हूँ।",
     "ta": "மன்னிக்கவும், லைன் சரியாக இல்லை. நான் உங்களுக்கு WhatsApp-ல் மெசேஜ் அனுப்புகிறேன்.",
@@ -28,6 +29,18 @@ APOLOGIES: dict[str, str] = {
     "mr": "माफ करा, लाइन तुटत आहे. मी तुम्हाला WhatsApp वर मेसेज करते.",
     "bn": "দুঃখিত, লাইনটা কেটে যাচ্ছে। আমি আপনাকে WhatsApp-এ মেসেজ করছি।",
     "gu": "માફ કરશો, લાઇન તૂટી રહી છે. હું તમને WhatsApp પર મેસેજ કરું છું.",
+}
+
+APOLOGIES: dict[str, str] = {
+    "en": "Sorry, the line's breaking up. We'll call you back later.",
+    "hi": "माफ़ कीजिए, लाइन कट रही है। हम आपको बाद में कॉल करेंगे।",
+    "ta": "மன்னிக்கவும், லைன் சரியாக இல்லை. பிறகு உங்களை மீண்டும் அழைக்கிறோம்.",
+    "te": "క్షమించండి, లైన్ సరిగ్గా లేదు. తర్వాత మళ్ళీ కాల్ చేస్తాం.",
+    "kn": "ಕ್ಷಮಿಸಿ, ಲೈನ್ ಸರಿಯಾಗಿಲ್ಲ. ನಂತರ ಮತ್ತೆ ಕಾಲ್ ಮಾಡುತ್ತೇವೆ.",
+    "ml": "ക്ഷമിക്കണം, ലൈൻ ശരിയല്ല. പിന്നീട് തിരിച്ചു വിളിക്കാം.",
+    "mr": "माफ करा, लाइन तुटत आहे. आम्ही नंतर परत कॉल करू.",
+    "bn": "দুঃখিত, লাইনটা কেটে যাচ্ছে। আমরা পরে আবার কল করব।",
+    "gu": "માફ કરશો, લાઇન તૂટી રહી છે. અમે પછી પાછો કૉલ કરીશું.",
 }
 
 
@@ -42,7 +55,7 @@ def filler(language: str | None, n: int = 0, override: list[str] | None = None) 
     return options[n % len(options)]
 
 
-def apology(language: str | None, override: str | None = None) -> str:
+def apology(language: str | None, override: str | None = None, whatsapp: bool = False) -> str:
     if isinstance(override, str) and override.strip():
         return override
-    return APOLOGIES[base_language(language)]
+    return (APOLOGIES_WHATSAPP if whatsapp else APOLOGIES)[base_language(language)]

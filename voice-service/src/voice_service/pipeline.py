@@ -6,7 +6,8 @@
 Barge-in: the user turn starts on VAD speech after `vad_start_s` and interrupts the bot. End of turn is semantic
 (Smart Turn v3) after `turn_silence_s` of silence, waiting up to `turn_max_wait_s` when the model hears an
 unfinished sentence. A CallObserver watches the frames for silence, dead air, voicemail, the recording gate and the
-transcript; a ticker turns its state into actions.
+transcript; a ticker turns its state into actions. A ProviderWatch turns a broken STT or LLM that pipecat calls
+recoverable into the apology path, and the filler and the apology go straight to TTS so a stuck LLM can't hold them.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import numpy as np
 from . import phrases
 from .calls import Call, Outcome
 from .controller import ControllerClient, Session, TranscriptBuffer
-from .conversation import Action, TurnState
+from .conversation import Action, ProviderWatch, TurnState
 from .llm_client import build_llm_client
 from .log import get_logger
 from .provider_config import VoiceConfig
@@ -100,6 +101,9 @@ class CallRuntime:
     audio_rate: int = 16000
     worker: Any = None
     audiobuffer: Any = None
+    llm: Any = None
+    tts: Any = None
+    watch: ProviderWatch = field(default_factory=ProviderWatch)
     failed: bool = False
     fillers: int = 0
 
@@ -107,13 +111,24 @@ class CallRuntime:
         if self.worker is not None:
             await self.worker.queue_frames(list(frames))
 
-    async def speak(self, text: str, append_to_context: bool = True, interruptible: bool = True) -> None:
+    async def speak(
+        self, text: str, append_to_context: bool = True, interruptible: bool = True, direct: bool = False
+    ) -> None:
+        """`direct` hands the line to TTS itself instead of the top of the pipeline, where it would wait behind an
+        LLM still working on (or stuck in) its reply."""
         from pipecat.frames.frames import TTSSpeakFrame
 
         f = TTSSpeakFrame(text=text, append_to_context=append_to_context)
         if not interruptible:
             f.interruptible = False
-        await self.queue(f)
+        if direct and self.tts is not None:
+            await self.tts.queue_frame(f)
+        else:
+            await self.queue(f)
+
+    async def filler(self, text: str) -> None:
+        self.turn.on_filler_queued()
+        await self.speak(text, False, direct=True)
 
     async def nudge(self, note: str) -> None:
         from pipecat.frames.frames import LLMMessagesAppendFrame
@@ -125,6 +140,8 @@ class CallRuntime:
         if self.end is None:
             self.end = EndRequest(at=now, deadline=now + grace_s, reason=reason, expect_speech_s=expect_speech_s)
             self.turn.ending = True
+        elif now + grace_s < self.end.deadline:
+            self.end.deadline = now + grace_s  # the more urgent end wins (voicemail, a failure, a hangup)
 
     async def end_after_speech(self, redial_language: str | None, spoke: bool) -> None:
         if redial_language:
@@ -134,14 +151,17 @@ class CallRuntime:
 
     async def fail(self, reason: str, can_speak: bool = True) -> None:
         """A service broke mid-call: apologise (when TTS still works) and end with an `error` outcome."""
-        if self.failed:
+        if self.failed or self.call.outcome == Outcome.VOICEMAIL:
             return
         self.failed = True
         self.call.outcome = Outcome.ERROR
         self.call.error_reason = reason
         log.warning("call failing", callId=self.call.call_id, reason=reason)
         if can_speak:
-            await self.speak(phrases.apology(self.session.language, self.session.extra("apology")), False, False)
+            line = phrases.apology(
+                self.session.language, self.session.extra("apology"), bool(self.session.extra("consentWhatsApp"))
+            )
+            await self.speak(line, False, False, direct=True)
             self.request_end(reason, grace_s=8.0)
         else:
             self.request_end(reason, grace_s=0.0)
@@ -155,7 +175,13 @@ class CallObserver:
         from pipecat.frames.frames import (
             BotStartedSpeakingFrame,
             BotStoppedSpeakingFrame,
+            FunctionCallsStartedFrame,
             InputAudioRawFrame,
+            InterruptionFrame,
+            LLMFullResponseEndFrame,
+            LLMFullResponseStartFrame,
+            LLMTextFrame,
+            LLMThoughtStartFrame,
             TranscriptionFrame,
             TTSTextFrame,
             UserStartedSpeakingFrame,
@@ -173,6 +199,8 @@ class CallObserver:
                 now = time.monotonic()
                 if isinstance(f, InputAudioRawFrame):
                     on_audio(rt, f.audio, f.sample_rate, now)
+                    if rt.voicemail.verdict == Verdict.MACHINE:
+                        await on_voicemail(rt)
                 elif isinstance(f, BotStartedSpeakingFrame):
                     if not rt.turn.bot_speaking:
                         rt.turn.on_bot_started(now)
@@ -188,21 +216,33 @@ class CallObserver:
                             await rt.audiobuffer.start_recording()
                 elif isinstance(f, VADUserStartedSpeakingFrame):
                     rt.voicemail.on_user_started(now)
+                    rt.watch.on_speech_started(now - float(getattr(f, "start_secs", 0.0) or 0.0))
                 elif isinstance(f, VADUserStoppedSpeakingFrame):
                     rt.voicemail.on_user_stopped(now)
+                    rt.watch.on_speech_stopped(now - float(getattr(f, "stop_secs", 0.0) or 0.0))
                 elif isinstance(f, UserStartedSpeakingFrame):
+                    rt.watch.on_interrupted()
                     if not rt.turn.user_speaking:
+                        rt.watch.on_user_turn_started()
                         rt.turn.on_user_started(now)
                 elif isinstance(f, UserStoppedSpeakingFrame):
                     if rt.turn.user_speaking:
-                        rt.turn.on_user_stopped(now)
+                        rt.turn.on_user_stopped(now, reply_owed=rt.watch.on_user_turn_stopped(now))
+                elif isinstance(f, InterruptionFrame):
+                    rt.watch.on_interrupted()
                 elif isinstance(f, TranscriptionFrame):
+                    rt.watch.on_transcript()
                     rt.transcript.add("user", f.text)
                     log.debug("user said", callId=rt.call.call_id, text=f.text)
                     if rt.voicemail.on_transcript(f.text, now) == Verdict.MACHINE:
                         await on_voicemail(rt)
                 elif isinstance(f, TTSTextFrame):
                     rt.bot_text.append(f.text)
+                elif rt.llm is not None and data.source is rt.llm:
+                    if isinstance(f, LLMFullResponseStartFrame):
+                        rt.watch.on_llm_started(now)
+                    elif isinstance(f, (LLMTextFrame, LLMThoughtStartFrame, FunctionCallsStartedFrame, LLMFullResponseEndFrame)):
+                        rt.watch.on_llm_output()
 
         return _Observer()
 
@@ -229,7 +269,8 @@ def on_audio(rt: CallRuntime, pcm: bytes, sample_rate: int, now: float) -> None:
 
 
 async def on_voicemail(rt: CallRuntime) -> None:
-    if rt.call.outcome == Outcome.VOICEMAIL:
+    """Any machine verdict (beep, monologue, phrase) ends the call as `voicemail`, once."""
+    if rt.call.outcome is not None or rt.failed:
         return
     rt.call.outcome = Outcome.VOICEMAIL
     log.info("voicemail detected", callId=rt.call.call_id, reason=rt.voicemail.reason)
@@ -245,7 +286,7 @@ async def apply_action(rt: CallRuntime, action: Action) -> None:
         await rt.nudge(GOODBYE_NOTE)
         rt.request_end("silence", grace_s=12.0)
     elif action == Action.FILLER:
-        await rt.speak(phrases.filler(lang, rt.fillers, rt.session.extra("fillers")), False)
+        await rt.filler(phrases.filler(lang, rt.fillers, rt.session.extra("fillers")))
         rt.fillers += 1
     elif action == Action.APOLOGY_END:
         await rt.fail("no_reply")
@@ -253,10 +294,16 @@ async def apply_action(rt: CallRuntime, action: Action) -> None:
 
 async def tick(rt: CallRuntime, now: float) -> bool:
     """One ticker step. Returns True when the pipeline should stop now."""
-    if rt.voicemail.open and rt.voicemail.tick(now) == Verdict.MACHINE:
+    if rt.voicemail.open:
+        rt.voicemail.tick(now)
+    if rt.voicemail.verdict == Verdict.MACHINE:
         await on_voicemail(rt)
     if rt.end is not None:
         return rt.end.done(now, rt.turn.bot_speaking, rt.last_bot_stop)
+    failure = rt.watch.tick(now)
+    if failure:
+        await rt.fail(failure)
+        return False
     if now - rt.started_at >= max(30, rt.session.maxDurationS):
         await rt.nudge(TIME_UP_NOTE)
         rt.request_end("max_duration", grace_s=12.0)
@@ -369,10 +416,12 @@ def build_pipeline(websocket: Any, rt: CallRuntime, serializer: Any) -> Built:
     async def _on_audio(_buf: Any, audio: bytes, sample_rate: int, num_channels: int) -> None:
         recorder.add(audio, sample_rate, num_channels)
 
+    rt.llm, rt.tts = llm, tts
     dispatcher = ToolDispatcher(
         call_id=call.call_id,
         backend=rt.deps.controller,
         speak=lambda text, ctx: rt.speak(text, ctx),
+        filler=rt.filler,
         end_call=rt.end_after_speech,
         language=session.language,
         filler_after_s=s.filler_after_s,
@@ -413,11 +462,22 @@ def build_pipeline(websocket: Any, rt: CallRuntime, serializer: Any) -> Built:
         proc = getattr(frame, "processor", None)
         usable = getattr(proc, "is_usable", True) if proc is not None else True
         fatal = bool(getattr(frame, "fatal", False))
-        if usable and not fatal:
-            log.warning("recoverable pipeline error", callId=call.call_id, processor=type(proc).__name__)
-            return
         kind = "tts" if isinstance(proc, TTSService) else "stt" if isinstance(proc, STTService) else "llm" if proc is llm else "pipeline"
-        await rt.fail(f"{kind}_error", can_speak=kind != "tts")
+        if kind == "llm":
+            # The SDK has already retried; this turn gets no reply, so don't leave the line silent.
+            rt.watch.on_llm_error()
+        elif usable and not fatal:
+            log.warning("recoverable pipeline error", callId=call.call_id, processor=type(proc).__name__)
+            if kind == "stt":
+                rt.watch.on_stt_error()
+            if rt.watch.failure is None:
+                return
+        await rt.fail(rt.watch.failure or f"{kind}_error", can_speak=kind != "tts")
+
+    @llm.event_handler("on_completion_timeout")
+    async def _on_llm_timeout(_llm: Any) -> None:
+        rt.watch.on_llm_timeout()
+        await rt.fail("llm_timeout")
 
     @transport.event_handler("on_client_connected")
     async def _on_connected(_t: Any, _ws: Any) -> None:
@@ -454,8 +514,9 @@ async def run_pipeline(websocket: Any, rt: CallRuntime, serializer: Any) -> None
                 stop = False
             if stop:
                 reason = rt.end.reason if rt.end else "end"
-                if rt.end is None or rt.end.deadline <= time.monotonic():
-                    await worker.cancel(reason=reason)  # voicemail, hangup, a stuck goodbye: drop now
+                if rt.end is None or rt.end.deadline <= time.monotonic() or rt.failed:
+                    # Voicemail, hangup, a stuck goodbye, or a failure (an EndFrame would queue behind a stuck LLM).
+                    await worker.cancel(reason=reason)
                 else:
                     await worker.end(reason=reason)  # the closing words have played: end cleanly
                 return
@@ -512,3 +573,4 @@ async def run_apology_only(websocket: Any, serializer: Any, cfg: VoiceConfig, se
         await asyncio.wait_for(runner.run(), timeout=20)
     except TimeoutError:
         await worker.cancel(reason="apology_timeout")
+

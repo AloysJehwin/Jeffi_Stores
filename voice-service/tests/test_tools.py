@@ -71,6 +71,18 @@ async def test_filler_plays_when_the_tool_is_slow() -> None:
     assert out.result["ok"] is True
 
 
+async def test_a_filler_hook_speaks_the_filler() -> None:
+    rec, fillers = Recorder(), []
+
+    async def filler(text: str) -> None:
+        fillers.append(text)
+
+    d = dispatcher(Backend(ToolResult(ok=True, say="Done."), delay_s=0.2), rec, filler_after_s=0.05)
+    d.filler = filler
+    await d.dispatch("publishSite", {})
+    assert fillers == ["One moment."] and rec.spoken == [("Done.", True)]
+
+
 async def test_no_filler_when_the_tool_is_fast() -> None:
     rec = Recorder()
     await dispatcher(Backend(ToolResult(ok=True), delay_s=0.0), rec, filler_after_s=0.2).dispatch("optOut", {})
