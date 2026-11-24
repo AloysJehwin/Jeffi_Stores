@@ -21,7 +21,7 @@ vi.mock('@/components/chat/ChatShell', () => ({
   ),
 }))
 vi.mock('@/components/chat/Composer', () => ({
-  default: forwardRef(({ notice, placeholder, text, setText, accessory }: any, ref: any) => {
+  default: forwardRef(function ComposerStub({ notice, placeholder, text, setText, accessory }: any, ref: any) {
     if (ref) ref.current = { focus: vi.fn() }
     return (
       <div>
