@@ -5,6 +5,9 @@
 // Chromium only. Output: tests/responsive/output/ (summary.md, summary.json, findings.jsonl, screenshots/, report/).
 // Options: SWEEP_PACKS=tech-mono,b2b-pro  SWEEP_WIDTHS=360,1280  SWEEP_WORKERS=2  SWEEP_BUSINESS_COOKIE=<business_sid>
 // (the business portal's About and Support pages need a signed-in business account).
+// Beside the packs it sweeps the visual editor's page (tests/responsive/editor-pack.ts: free layers, converted blocks;
+// SWEEP_PACKS=editor alone), checks free layers against their sections, and holds each page to a CLS and LCP budget
+// (pages.ts VITALS; failing over it in CI or with SWEEP_VITALS=budget, warnings on a dev server).
 import { defineConfig, devices } from '@playwright/test'
 
 const OUT = 'tests/responsive/output'

@@ -1,5 +1,6 @@
 import Fastify, { type FastifyRequest } from 'fastify'
 import formbody from '@fastify/formbody'
+import rateLimit from '@fastify/rate-limit'
 import { randomUUID } from 'node:crypto'
 import { ZodError, z } from 'zod'
 import type pg from 'pg'
@@ -43,6 +44,16 @@ declare module 'fastify' {
 }
 
 const scope = await resolveServiceScope()
+
+// A flood ceiling, not a quota: internal tokens skip it and API keys are limited per key at the gateway.
+await app.register(rateLimit, {
+  hook: 'preHandler',
+  max: Number(process.env.RATE_LIMIT_PER_MIN) || 3000,
+  timeWindow: '1 minute',
+  allowList: req => !!req.claims?.internal,
+  keyGenerator: req => (req.claims ? `t:${req.claims.tenantId}` : String(req.headers['x-real-ip'] || req.ip)),
+  errorResponseBuilder: (_req, ctx) => Object.assign(new Error(`Rate limit exceeded, retry in ${ctx.after}`), { status: 429, code: 'rate_limited' }),
+})
 
 // An internal send as the platform that goes out from a store's numbers (its staff's verification codes). Only the
 // platform tenant's internal tokens carry it, never the public API's.
@@ -407,7 +418,7 @@ app.post<{ Body: { destination_url: string; kind?: string; variant_id?: string; 
   }
 )
 
-app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }, async (req, reply) => {
+app.get<{ Params: { code: string } }>('/s/:code', async (req, reply) => {
   const signed = verifyLink(req.params.code)
   if (signed) return reply.redirect(signed.destination, 302)
   // Public, no auth. onRequest hook skips /s/* via url prefix check — see below.

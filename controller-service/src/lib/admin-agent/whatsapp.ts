@@ -283,7 +283,7 @@ type Decision = { decision: 'confirm' | 'decline'; which: 'all' | number[] | nul
 
 export function parseDecision(text: string): Decision | null {
   const t = text.trim()
-  const m = t.match(/^(\S+?)[,:]?\s+(all|\d+(?:\s*(?:,|&|and)?\s*\d+)*)[.!]?$/i)
+  const m = t.match(/^(\S+?)[,:]?\s+(all|\d+(?:(?:\s*(?:,|&|and)\s*|\s+)\d+)*)[.!]?$/i)
   if (m) {
     const d = yesNo(m[1])
     if (!d) return null

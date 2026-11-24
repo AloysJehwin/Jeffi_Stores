@@ -33,10 +33,11 @@ const initialOf = (label?: string) => {
  * A picture that isn't there yet, designed rather than missing: the theme's tints with the item's initial (a store
  * mark when it has no name), never a "no image" glyph. Its letter scales with the box (an SVG).
  */
-export function ImagePlaceholder({ label, className = '' }: { label?: string; className?: string }) {
+export function ImagePlaceholder({ label, className = '', edit }: { label?: string; className?: string; edit?: Record<string, string> | null }) {
   const initial = initialOf(label)
   return (
     <div
+      {...edit}
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
       data-picture-fallback=""
       className={`relative isolate overflow-hidden bg-gradient-to-br from-primary-100 via-surface-secondary to-accent-100 ${className}`}
@@ -65,6 +66,7 @@ export function CodeImage({
   sizes = '(min-width: 768px) 50vw, 100vw',
   priority = false,
   className = '',
+  edit,
 }: {
   src?: unknown
   hoverSrc?: unknown
@@ -74,17 +76,19 @@ export function CodeImage({
   sizes?: string
   priority?: boolean
   className?: string
+  /** The editor's canvas only (RenderCtx.edit). */
+  edit?: Record<string, string> | null
 }) {
   const url = safeSrc(src)
   const hover = safeSrc(hoverSrc)
   const box = ASPECT[aspect] ?? ''
   const objectFit = fit === 'contain' ? 'object-contain' : 'object-cover'
-  if (!url) return <ImagePlaceholder label={alt} className={`${box || 'aspect-[4/3]'} ${className}`} />
+  if (!url) return <ImagePlaceholder label={alt} className={`${box || 'aspect-[4/3]'} ${className}`} edit={edit} />
   if (!box && !hover)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img {...responsiveImg(url, sizes)} {...loadAttrs(priority)} alt={alt} className={`${objectFit} ${className}`} />
+    return <img {...edit} {...responsiveImg(url, sizes)} {...loadAttrs(priority)} alt={alt} className={`${objectFit} ${className}`} />
   return (
-    <div className={`group/img relative overflow-hidden bg-surface-secondary ${box} ${className}`}>
+    <div {...edit} className={`group/img relative overflow-hidden bg-surface-secondary ${box} ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img {...responsiveImg(url, sizes)} {...loadAttrs(priority)} alt={alt} className={`${box ? 'absolute inset-0 h-full' : 'block'} w-full ${objectFit} transition-opacity duration-500 ${hover ? 'group-hover/img:opacity-0' : ''}`} />
       {hover && (
@@ -95,27 +99,27 @@ export function CodeImage({
   )
 }
 
-export function CodeLink({ href, target, className, children }: { href?: unknown; target?: '_blank' | '_self'; className?: string; children?: ReactNode }) {
+export function CodeLink({ href, target, className, children, edit }: { href?: unknown; target?: '_blank' | '_self'; className?: string; children?: ReactNode; edit?: Record<string, string> | null }) {
   const url = safeHref(href)
-  if (!url) return <span className={className}>{children}</span>
+  if (!url) return <span {...edit} className={className}>{children}</span>
   if (url.startsWith('/') && target !== '_blank')
     return (
-      <Link href={url} className={className}>
+      <Link {...edit} href={url} className={className}>
         {children}
       </Link>
     )
   return (
-    <a href={url} className={className} {...(target === '_blank' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+    <a {...edit} href={url} className={className} {...(target === '_blank' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
       {children}
     </a>
   )
 }
 
 const ICON_SIZE: Record<string, string> = { xs: 'h-3.5 w-3.5', sm: 'h-4 w-4', md: 'h-6 w-6', lg: 'h-8 w-8', xl: 'h-12 w-12' }
-export function CodeIcon({ name, size = 'md', strokeWidth = 1.75, className = '' }: { name: string; size?: string; strokeWidth?: number; className?: string }) {
+export function CodeIcon({ name, size = 'md', strokeWidth = 1.75, className = '', edit }: { name: string; size?: string; strokeWidth?: number; className?: string; edit?: Record<string, string> | null }) {
   const Icon = CODE_ICONS[name]
   if (!Icon) return null
-  return <Icon aria-hidden strokeWidth={strokeWidth} className={`${ICON_SIZE[size] ?? ICON_SIZE.md} shrink-0 ${className}`} />
+  return <Icon {...edit} aria-hidden strokeWidth={strokeWidth} className={`${ICON_SIZE[size] ?? ICON_SIZE.md} shrink-0 ${className}`} />
 }
 
 /** ProductCard (cart, wishlist, quick add) for a ProductView, with this app's links and prices (business portal or store). */

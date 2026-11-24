@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Store, MessageSquare, FileText, PanelsTopLeft } from 'lucide-react'
-import { SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
+import { showcaseMonthly, SHOWCASE_OFFER } from '@/lib/showcase/offer'
 import { ChoiceCards } from '../_ui'
 import PageHeader from '../dashboard/_components/PageHeader'
 import { primaryBtn } from './ui'
@@ -11,7 +11,7 @@ export type ServiceChoice = 'store' | 'messaging' | 'documents' | 'showcase'
 
 const OPTIONS: { id: ServiceChoice; title: string; copy: string; icon: typeof Store; tag?: string }[] = [
   { id: 'store', title: 'Online store', copy: 'Your own storefront + admin on a subdomain — payments, delivery, GST, the lot.', icon: Store, tag: 'Monthly plan' },
-  { id: 'showcase', title: 'Showcase website', copy: 'A one-page website for your business: your work, reviews and contacts, made with AI. Enquiries come straight to you.', icon: PanelsTopLeft, tag: `First month free, then ₹${SHOWCASE_PRICE_INR}/month` },
+  { id: 'showcase', title: 'Showcase website', copy: 'A one-page website for your business: your work, reviews and contacts, made with AI. Enquiries come straight to you.', icon: PanelsTopLeft, tag: `${SHOWCASE_OFFER.freeDays} days free, then ${showcaseMonthly()}` },
   { id: 'messaging', title: 'Messaging API', copy: 'Send email, SMS and WhatsApp from any app with an API key. Pay per message from a wallet.', icon: MessageSquare, tag: 'Pay as you go' },
   { id: 'documents', title: 'Documents API', copy: 'Generate GST invoices, quotations, receipts and labels as PDFs over an API.', icon: FileText, tag: 'Pay as you go' },
 ]

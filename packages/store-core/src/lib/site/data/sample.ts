@@ -1,6 +1,7 @@
 import { offerHref } from '@/lib/catalog/product-offers-shared'
 import { money, stars } from './format'
 import type { ProductDetailView, ProductQuery, ProductView, SampleCatalog, SiteData } from './types'
+import { mapsUrl, phoneUrl } from '@/lib/site/hours'
 
 // A SiteData source over a made-up catalogue, so the onboarding studio can preview a site before the store has
 // products. Same filters and sorts as the live queries, in memory.
@@ -249,6 +250,9 @@ export function sampleSiteData(catalog: SampleCatalog): SiteData {
         year: new Date().getFullYear(),
         ...(s.whatsapp ? { whatsapp: s.whatsapp } : {}),
         ...(s.socials && Object.keys(s.socials).length ? { socials: s.socials } : {}),
+        hours: [],
+        phoneUrl: phoneUrl(s.phone ?? ''),
+        mapsUrl: mapsUrl(s.address ?? ''),
       }
     },
   }

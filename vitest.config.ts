@@ -10,7 +10,12 @@ const part = !!process.env.VITEST_PART
 // gated branch can't tip CI red; RATCHET each toward 80 as tests land — these only ever go UP.
 // Untested packages/standalone services start at 0 and climb. `perFile: false` (default): the glob is the aggregate.
 const SERVICE_GATES: Record<string, { lines: number; branches: number; statements: number; functions: number }> = {
-  '{controller,storefront,admin,business,showcase}-service/src/**': { lines: 28, branches: 21, statements: 27, functions: 12 },
+  // One floor per Next app, a point under each app's own-project coverage measured 2026-11-24 (merged is never lower).
+  'controller-service/src/**': { lines: 22, branches: 15, statements: 20, functions: 13 },
+  'storefront-service/src/**': { lines: 48, branches: 41, statements: 47, functions: 26 },
+  'admin-service/src/**': { lines: 28, branches: 21, statements: 27, functions: 12 },
+  'business-service/src/**': { lines: 0, branches: 0, statements: 0, functions: 0 },
+  'showcase-service/src/**': { lines: 44, branches: 40, statements: 44, functions: 29 },
   'packages/store-core/src/**': { lines: 46, branches: 36, statements: 45, functions: 36 },
 }
 

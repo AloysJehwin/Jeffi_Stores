@@ -1,21 +1,20 @@
 import { AD_FREE_PRICE_INR, getAdFree, type AdFreeStatus } from '@/lib/billing/ad-free'
-import { getWalletBalance } from '@/lib/payments/wallet'
 import { getRequestedAddons } from '@/lib/billing/requested-addons'
 import type { AddonId } from '@/lib/billing/addons'
+import { lineBillingState, type LineBillingState } from '@controller/lib/billing/subscription'
 
-export interface AdFreeState extends AdFreeStatus {
+export interface AdFreeState extends AdFreeStatus, LineBillingState {
   priceInr: number
-  balanceInr: number
-  /** Picked during signup and not yet bought or declined. */
+  /** Picked during signup and not yet added or declined. */
   requested: boolean
 }
 
-/** What the Billing page and its API return for the ad-free add-on. */
+/** What the Billing page and its API return for the ad-free add-on (a line on the subscription). */
 export async function adFreeState(tenantId: string): Promise<AdFreeState> {
-  const [status, balance, requested] = await Promise.all([
+  const [status, line, requested] = await Promise.all([
     getAdFree(tenantId),
-    getWalletBalance(tenantId),
+    lineBillingState(tenantId, 'ad_free'),
     getRequestedAddons(tenantId).catch(() => [] as AddonId[]),
   ])
-  return { ...status, priceInr: AD_FREE_PRICE_INR, balanceInr: balance.balance, requested: requested.includes('ad_free') }
+  return { ...status, ...line, priceInr: AD_FREE_PRICE_INR, requested: requested.includes('ad_free') }
 }

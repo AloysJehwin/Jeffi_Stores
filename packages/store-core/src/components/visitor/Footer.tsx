@@ -4,12 +4,14 @@ import Link from 'next/link'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { CookieSettingsLink } from './CookieConsentBanner'
 import { DEFAULT_FOOTER_COLUMNS } from '@/lib/site/chrome-types'
+import PhotoCredits from './site/PhotoCredits'
+import type { StockCredit } from '@/lib/ai/stock-credits'
 
 const link =
   'flex items-center min-h-[24px] sm:min-h-0 sm:py-0.5 text-xs sm:text-[13px] text-gray-300 hover:text-accent-400 transition-colors'
 
 /** Storefront footer: links, contact, policies and copyright. Pads itself for the home indicator and any fixed bottom bar. */
-export default function Footer({ cookieConsent = false }: { cookieConsent?: boolean }) {
+export default function Footer({ cookieConsent = false, photoCredits }: { cookieConsent?: boolean; photoCredits?: StockCredit[] }) {
   const { identity, storefront, chrome } = useStoreConfig()
   // Site Builder's footer columns when set; the cookie settings link rides in the last column.
   const groups = chrome?.footer?.columns.length ? chrome.footer.columns : DEFAULT_FOOTER_COLUMNS
@@ -75,6 +77,7 @@ export default function Footer({ cookieConsent = false }: { cookieConsent?: bool
           <p className="text-gray-400 text-[10px] sm:text-xs text-center lg:text-left">
             {chrome?.footer?.note ?? `© ${new Date().getFullYear()} ${identity.name}. All rights reserved.`}
           </p>
+          <PhotoCredits credits={photoCredits} className="mt-1 text-gray-400 text-[10px] sm:text-xs text-center lg:text-left" linkClassName="underline underline-offset-2 hover:text-accent-400" />
         </div>
       </div>
     </footer>

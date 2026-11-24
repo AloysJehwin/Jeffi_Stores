@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { TenantRow } from '@/lib/tenant-registry'
 import { paymentRequired } from '@/lib/billing/payment-required'
 import { Card } from '../_components/Card'
+import { primaryBtn } from '../../onboard/ui'
 
 /** Store application state for a services workspace: the explainer, or where the application stands. Payment is assumed until approval. */
 export default function AddStoreClient({
@@ -33,7 +34,7 @@ export default function AddStoreClient({
       <Card title="Approved — complete payment">
         <p className="text-sm text-foreground-secondary">Your store is approved. Pay the first subscription charge and we start setting it up.</p>
         {tenant.razorpay_checkout_url
-          ? <a href={tenant.razorpay_checkout_url} className="ecom-accent-bg inline-block mt-4 rounded-full px-5 py-2 text-sm font-semibold text-white">Complete payment →</a>
+          ? <a href={tenant.razorpay_checkout_url} className={`${primaryBtn} mt-4`}>Complete payment →</a>
           : <p className="mt-3 text-sm text-foreground-muted">The payment link is being generated — refresh in a moment.</p>}
       </Card>
     )
@@ -56,7 +57,7 @@ export default function AddStoreClient({
         <li>Pay the first subscription charge; provisioning takes a few minutes.</li>
         <li>Your store goes live on <strong>this workspace</strong> — same wallet, same keys.</li>
       </ol>
-      <Link href="/onboard?mode=add-store" className="ecom-accent-bg inline-block mt-5 rounded-full px-6 py-2.5 text-sm font-semibold text-white">Set up my store →</Link>
+      <Link href="/onboard?mode=add-store" className={`${primaryBtn} mt-5`}>Set up my store →</Link>
     </Card>
   )
 }

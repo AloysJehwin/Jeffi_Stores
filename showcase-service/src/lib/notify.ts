@@ -37,7 +37,7 @@ export function leadEmail(site: ShowcaseSiteRow, lead: ShowcaseLead, tenantSlug?
       ...(lead.message ? [{ label: 'Message', value: esc(lead.message).replace(/\r?\n/g, '<br>') }] : []),
       { label: 'Received', value: esc(when(lead.createdAt)) },
     ],
-    cta: { href: `https://ecom.${ROOT}/dashboard/showcase/leads${tenantSlug ? `?tenant=${encodeURIComponent(tenantSlug)}` : ''}`, label: 'Open your enquiries' },
+    cta: { href: `https://ecom.${ROOT}/dashboard/showcase/${site.id}/leads${tenantSlug ? `?tenant=${encodeURIComponent(tenantSlug)}` : ''}`, label: 'Open your enquiries' },
     replyTo: lead.email || null,
   }
 }

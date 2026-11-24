@@ -1,4 +1,5 @@
 import type { PageDoc, ThemeTokens } from '@jeffi/site-blocks'
+import type { StockCredit } from '../ai/stock-credits'
 
 // Showcase: a one-page site for a business (its work, proof, reviews and contacts), sold as its own service. One
 // row per site in the control plane (showcase_sites); the page is a studio page doc that showcase-service renders.
@@ -63,11 +64,13 @@ export interface ShowcaseFaq {
   ai?: boolean
 }
 
-/** A picture for the page that is not the owner's work: a mood picture made for it (ai) or one they added. */
+/** A picture for the page that is not the owner's work: a mood picture found (stock, credited) or made (ai) for it, or one they added. */
 export interface ShowcasePagePicture {
   image: string
   alt?: string
   ai?: boolean
+  /** A stock photo's photographer and library; the page's footer credits it. */
+  credit?: StockCredit
 }
 
 export interface ShowcaseContent {
@@ -94,8 +97,10 @@ export interface ShowcaseSite {
   /** The page (key 'showcase:home'), from the studio or a pre-built theme; null until made. */
   page: PageDoc | null
   theme: ThemeTokens | null
-  /** Hosting is paid up to here; the first month is free from the first publish. */
+  /** Hosting is paid up to here; the trial is free from the first publish. */
   paidUntil: string | null
+  /** End of the free trial, set at the first publish. */
+  trialEndsAt: string | null
   renew: boolean
   /** The free AI generation was used; later ones are charged to the wallet. */
   freeGenerationUsedAt: string | null
@@ -127,7 +132,10 @@ export interface ShowcaseLeadInput {
 export const SHOWCASE_PAGE_KEY = 'showcase:home'
 export const SHOWCASE_HOST_PREFIX = 'site-'
 export const SHOWCASE_PRICE_INR = 200
-export const SHOWCASE_FREE_DAYS = 30
+/** Free from the first publish; then a showcase_site line on the workspace's subscription. */
+export const SHOWCASE_TRIAL_DAYS = 7
+/** @deprecated SHOWCASE_TRIAL_DAYS. */
+export const SHOWCASE_FREE_DAYS = SHOWCASE_TRIAL_DAYS
 /** A redesign (any AI design of the page after the free one) costs this from the workspace's wallet, flat. */
 export const SHOWCASE_REDESIGN_PRICE_INR = 50
 

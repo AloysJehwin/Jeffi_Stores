@@ -45,6 +45,8 @@ data:
   GOOGLE_VEO_FALLBACK: "veo-3.0-generate-001"
   GOOGLE_TIMEOUT_MS: "120000"
   REPLICATE_TIMEOUT_MS: "180000"
+  # Stock photos (/v1/images/stock), tried before AI generation. A provider without its key is skipped.
+  AI_STOCK_PROVIDERS: "pexels,pixabay"
   # Claude text. Text order; empty = anthropic,razer when Claude auth is configured.
   AI_TEXT_PROVIDERS: ""
   # Workload identity federation: org-wide id + the projected token (gateway.yaml). Per-store
@@ -68,6 +70,7 @@ data:
 # OPENAI_API_KEY: only used when a request forces the openai provider.
 # GOOGLE_AI_API_KEY: Gemini API key (images, Veo video). Empty = google skipped.
 # REPLICATE_API_TOKEN: Replicate token (Flux, Wan video). Empty = replicate skipped.
+# PEXELS_API_KEY / PIXABAY_API_KEY: stock photo search keys. Empty = that library skipped.
 # ANTHROPIC_API_KEY: local dev only (production uses workload identity). Leave empty in clusters.
 # AI_GATEWAY_TOKEN: bearer token every /v1 call must carry ("new,old" during a rotation). Empty = no auth.
 apiVersion: v1
@@ -81,5 +84,7 @@ stringData:
   OPENAI_API_KEY: ""
   GOOGLE_AI_API_KEY: ""
   REPLICATE_API_TOKEN: ""
+  PEXELS_API_KEY: ""
+  PIXABAY_API_KEY: ""
   ANTHROPIC_API_KEY: ""
   AI_GATEWAY_TOKEN: ""

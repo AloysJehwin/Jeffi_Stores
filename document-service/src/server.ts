@@ -1,5 +1,6 @@
 import Fastify, { type FastifyRequest } from 'fastify'
 import pg from 'pg'
+import rateLimit from '@fastify/rate-limit'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { ZodError } from 'zod'
 import { RenderDocumentRequest, DocumentType, DocumentSettingsUpdate, DocumentFont, BulkDocumentsRequest } from '@jeffi/api-contracts'
@@ -46,6 +47,16 @@ function isPublicDocHost(req: FastifyRequest): boolean {
 }
 
 const scope = await resolveServiceScope()
+
+// A flood ceiling, not a quota: internal tokens skip it and API keys are limited per key at the gateway.
+await app.register(rateLimit, {
+  hook: 'preHandler',
+  max: Number(process.env.RATE_LIMIT_PER_MIN) || 3000,
+  timeWindow: '1 minute',
+  allowList: req => !!req.claims?.internal,
+  keyGenerator: req => (req.claims ? `t:${req.claims.tenantId}` : String(req.headers['x-real-ip'] || req.ip)),
+  errorResponseBuilder: (_req, ctx) => Object.assign(new Error(`Rate limit exceeded, retry in ${ctx.after}`), { status: 429, code: 'rate_limited' }),
+})
 
 app.addHook('onRequest', async (req, reply) => {
   if (req.url.startsWith('/view/') || req.url.startsWith('/t/') || req.url === '/healthz' || /^\/designs\/[a-z0-9-]+\/thumbnail\.png$/.test(req.url)) return

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 function httpsGet(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     https
-      .get(url, { rejectUnauthorized: false }, res => {
+      .get(url, res => {
         let data = ''
         res.on('data', chunk => {
           data += chunk

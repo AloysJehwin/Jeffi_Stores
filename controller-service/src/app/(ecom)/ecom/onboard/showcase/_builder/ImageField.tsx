@@ -13,6 +13,7 @@ export default function ImageField({
   label,
   className = 'h-24 w-24',
   fit = 'cover',
+  siteId,
 }: {
   value: string | null | undefined
   onChange: (url: string | null) => void
@@ -20,6 +21,8 @@ export default function ImageField({
   label: string
   className?: string
   fit?: 'cover' | 'contain'
+  /** The site the picture is for; absent until a new site's draft is saved. */
+  siteId?: string | null
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +31,7 @@ export default function ImageField({
     setBusy(true)
     setError(null)
     try {
-      onChange(await uploadShowcaseImage(file, kind))
+      onChange(await uploadShowcaseImage(file, kind, siteId))
     } catch (e) {
       setError((e as Error).message)
     } finally {

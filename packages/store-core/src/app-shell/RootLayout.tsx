@@ -12,6 +12,7 @@ import { headers } from 'next/headers'
 import { getSiteChrome } from '@/lib/site/chrome'
 import { getWebSurface } from '@/lib/catalog/web-surface'
 import { loadCodeChrome } from '@/components/visitor/site/code/parts/chrome/code-chrome'
+import { storePhotoCredits } from '@/lib/site/photo-credits'
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
@@ -155,6 +156,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         })
         .catch(() => null)
     : null
+  // Credits for the stock photos the store shows, under its footer (drawn by ConditionalLayout, never by page code).
+  const photoCredits = isStorefrontHost ? await storePhotoCredits(storeSlug ?? 'flagship').catch(() => []) : []
   const siteThemeCss = siteTheme
     ? `${cssVarsRule('body.site-theme.site-theme', themeCssVars(siteTheme))}body.site-theme{font-family:var(--font-body),system-ui,sans-serif}`
     : null
@@ -252,6 +255,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           isVaultSubdomain={isVaultSubdomain}
           cookieConsent={cookieConsent}
           codeChrome={codeChrome}
+          photoCredits={photoCredits}
         >
           {children}
         </ConditionalLayout>

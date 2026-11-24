@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { blockVisible, topBlocks, type PageDoc, type PageKey, type SiteAudience, type SiteSurface } from '@jeffi/site-blocks'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
 import SitePreviewBridge from '@/components/visitor/home/SitePreviewBridge'
+import SiteEditorGate from './editor/SiteEditorGate'
 import { loadSectionData } from '@/lib/catalog/homepage-model'
 import { coreBlockFor, isSectionBlock } from '@/lib/site/blocks'
 import { cleanTree, type ComposedNode } from '@/lib/site/composed'
@@ -78,6 +79,7 @@ export async function SitePage({
   return (
     <div className="bg-surface">
       {selectable && <SitePreviewBridge />}
+      {selectable && <SiteEditorGate />}
       {blocks.length === 0 && orphans.length === 0 && selectable && (
         <div className="container mx-auto px-4 py-24 text-center text-foreground-muted">This page has no blocks yet. Add one in Site Builder.</div>
       )}
@@ -88,9 +90,9 @@ export async function SitePage({
           b.type in core ? (
             corePart(core[b.type], priority ? { ...b.props, lcp: true } : b.props)
           ) : row && data ? (
-            <SectionRenderer section={row} data={data} rowIndex={row.type === 'product_row' ? productRows++ : productRows} />
+            <SectionRenderer section={row} data={data} rowIndex={row.type === 'product_row' ? productRows++ : productRows} preview={selectable} />
           ) : (
-            <ContentBlock block={b} priority={priority} always={selectable || i === 0} page={page} />
+            <ContentBlock block={b} priority={priority} always={selectable || i === 0} page={page} preview={selectable} />
           )
         return selectable ? (
           <div key={b.id} data-block-id={b.id}>

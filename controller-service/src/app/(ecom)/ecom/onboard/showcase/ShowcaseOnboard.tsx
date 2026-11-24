@@ -21,12 +21,20 @@ import { useRefreshAfterBuild, useShowcaseDetails } from './_builder/useShowcase
 
 // The Showcase signup: Details (the business, how people reach it, what the page shows), then the site (the AI studio
 // in Showcase mode, ready-made themes later) and Publish. Everything autosaves to the draft site and the studio
-// session, so the owner can leave and come back to the same place.
+// session, so the owner can leave and come back to the same place. A new site's id goes into the URL (?site=) the
+// moment its draft is saved: the studio's calls read it from there.
 
 const STEPS: RailStep[] = [
   { label: 'Details', icon: 'workspace', desc: 'Your business' },
   { label: 'Your site', icon: 'site', desc: 'Designed live by AI' },
 ]
+
+function putSiteInUrl(site: ClientSite) {
+  const url = new URL(window.location.href)
+  url.searchParams.set('site', site.id)
+  url.searchParams.delete('new')
+  window.history.replaceState(null, '', url)
+}
 
 const hasAnyContent = (c: ClientSite['content'] | undefined) => !!c && (c.services.length + c.work.length + c.reviews.length + c.stats.length + c.faqs.length > 0)
 
@@ -41,7 +49,7 @@ export default function ShowcaseOnboard({
   siteUrl: string | null
 }) {
   const { showToast } = useToast()
-  const d = useShowcaseDetails(initialSite, owner.email)
+  const d = useShowcaseDetails(initialSite, owner.email, putSiteInUrl)
   const slugOk = d.slug.state === 'ok'
   const problem = detailsProblem(d.form, slugOk)
   const [step, setStep] = useState(() => (initialSite && !detailsProblem(d.form, true) ? 1 : 0))
@@ -100,7 +108,7 @@ export default function ShowcaseOnboard({
                 Open your site <ExternalLink className="h-4 w-4" />
               </a>
               {published.site.tenantId ? (
-                <a href="/dashboard/showcase/edit" className={secondaryBtn}>
+                <a href={`/dashboard/showcase/${published.site.id}/edit`} className={secondaryBtn}>
                   Go to your dashboard
                 </a>
               ) : (
@@ -113,10 +121,10 @@ export default function ShowcaseOnboard({
         ) : step === 0 ? (
           <>
             <PageHeader eyebrow="Showcase" title="Your business" description="What your page says about you. Only the name, the address and one way to reach you are needed now; add the rest whenever you like." />
-            <BusinessFields form={d.form} setForm={d.setForm} slug={d.slug} slugLocked={!!site && site.status !== 'draft'} slugTouched={slugTouched} onSlugTouched={() => setSlugTouched(true)} />
+            <BusinessFields form={d.form} setForm={d.setForm} slug={d.slug} slugLocked={!!site && site.status !== 'draft'} slugTouched={slugTouched} onSlugTouched={() => setSlugTouched(true)} siteId={site?.id ?? null} />
             <h2 className="mb-1 mt-10 font-display text-xl font-black text-foreground">What your page shows</h2>
             <p className="mb-4 text-sm text-foreground-secondary">All optional, and you can add them later. The AI designs a section for each one you fill in.</p>
-            <ContentFields form={d.form} setForm={d.setForm} />
+            <ContentFields form={d.form} setForm={d.setForm} siteId={site?.id ?? null} />
             <div className="sticky bottom-0 z-10 -mx-1 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border-default bg-surface px-1 py-4">
               <p className="min-w-0 text-xs text-foreground-muted" aria-live="polite">
                 {d.saveError && d.saveError.field !== 'slug' ? <span className="text-[#8a2e1f]">{d.saveError.error}</span> : d.saving ? 'Saving…' : site ? 'Saved' : problem ?? ''}

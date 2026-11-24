@@ -20,6 +20,10 @@ function rows(sql: string) {
         mrr: '12998',
         paying: 2,
         yearly: 0,
+        // Not on a workspace billing subscription yet: their MRR still comes from the tenant row.
+        legacy_mrr: '12998',
+        legacy_paying: 2,
+        legacy_yearly: 0,
         new_mrr: '4999',
         new_mrr_prev: '0',
         churned_mrr: '2999',

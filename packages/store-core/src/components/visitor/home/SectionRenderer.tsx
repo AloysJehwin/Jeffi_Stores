@@ -109,12 +109,15 @@ export default function SectionRenderer({
   data,
   rowIndex,
   portal = 'storefront',
+  preview = false,
 }: {
   section: HomepageSection
   data: SectionData
   rowIndex: number
   /** Whose prices and links the product cards use: an approved business on the business homepage. */
   portal?: 'storefront' | 'business'
+  /** The Site Builder canvas (a preview token): code sections carry their `data-e` node ids. */
+  preview?: boolean
 }) {
   const cfg = (section.config ?? {}) as Record<string, unknown>
   const carousel = sectionLayout(section) === 'carousel'
@@ -443,7 +446,7 @@ export default function SectionRenderer({
       if (section.type === ('composed' as typeof section.type))
         return <ComposedBlock props={(section.config ?? {}) as Record<string, unknown>} data={extra as ComposedData | undefined} />
       if (section.type === ('code_section' as typeof section.type))
-        return <CodeSection section={(section.config as { compiled?: CompiledSection | null } | null)?.compiled} page="home" />
+        return <CodeSection section={(section.config as { compiled?: CompiledSection | null } | null)?.compiled} page="home" preview={preview} />
       return isContentBlock(section.type) ? <ContentBlock block={{ id: section.id, type: section.type, v: 1, props: (section.config ?? {}) as Record<string, unknown> }} /> : null
   }
 }

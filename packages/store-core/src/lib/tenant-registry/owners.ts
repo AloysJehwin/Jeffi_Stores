@@ -42,7 +42,7 @@ export async function getOwnerById(id: string): Promise<Owner | null> {
 export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified' AND NOT (cd.order_id IS NOT NULL AND cd.domain ~ '^(www|admin|invoice|quotation|purchaseorder|forms|business|vault)\\.')) AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified' AND cd.showcase_site_id IS NULL AND NOT (cd.order_id IS NOT NULL AND cd.domain ~ '^(www|admin|invoice|quotation|purchaseorder|forms|business|vault)\\.')) AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
             t.billing_interval, t.payment_required, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
             pp.slug AS pending_plan, t.pending_billing_interval,
@@ -276,8 +276,8 @@ export const COMPARISON_ROWS: { group: string; label: string; scopeKey: string |
   { group: 'Fulfilment', label: 'Packing slips & labels', scopeKey: 'packing_slips:read' },
   { group: 'Fulfilment', label: 'Delhivery pickup scheduling', scopeKey: 'delhivery:read' },
   { group: 'Fulfilment', label: 'QuickScan (mobile)', scopeKey: 'quick_scan:read' },
-  { group: 'Finance', label: 'Inventory & purchase orders', scopeKey: 'inventory:read' },
-  { group: 'Finance', label: 'Warehouse shelving', scopeKey: 'shelving:read' },
+  { group: 'Inventory', label: 'Inventory & purchase orders', scopeKey: 'inventory:read' },
+  { group: 'Inventory', label: 'Warehouse shelving', scopeKey: 'shelving:read' },
   { group: 'Finance', label: 'GST compliance & filing', scopeKey: 'gst:read' },
   { group: 'Finance', label: 'Financial reports & payouts', scopeKey: 'financial:read' },
   { group: 'Marketing', label: 'Coupons & reviews', scopeKey: 'coupons:read' },
@@ -287,7 +287,7 @@ export const COMPARISON_ROWS: { group: string; label: string; scopeKey: string |
   { group: 'Marketing', label: 'Google Ads campaign management', scopeKey: 'google_ads_campaigns:write' },
   { group: 'AI & B2B', label: 'AI admin assistant', scopeKey: 'agent:read' },
   { group: 'AI & B2B', label: 'B2B partner portal & RFQs', scopeKey: 'business_customers:read' },
-  { group: 'Platform', label: 'Audit log & service accounts', scopeKey: 'audit:read' },
+  { group: 'Platform', label: 'Activity log & API access for your tools', scopeKey: 'audit:read' },
 ]
 
 /** Which scope keys each plan has (for the comparison table). */

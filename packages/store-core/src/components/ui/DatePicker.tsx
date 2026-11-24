@@ -62,7 +62,8 @@ function addDays(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 }
 
-function formatDisplay(val: string): string {
+/** A YYYY-MM-DD date as the picker shows it ("26 Oct 2026"), so text beside a picker can match it. */
+export function formatDisplay(val: string): string {
   const p = parseDateVal(val)
   if (!p) return ''
   return `${String(p.day).padStart(2, '0')} ${MONTHS[p.month].slice(0, 3)} ${p.year}`

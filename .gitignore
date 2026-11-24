@@ -67,6 +67,17 @@ next-env.d.ts
 # The landing page's product films: record, narrate, render (outputs and .local/ stay ignored inside).
 !/scripts/demo-films/
 !/scripts/demo-films/**/*.sh
+# Test ratchets and CI planning scripts (per-service tests plan).
+!/scripts/check-component-tests.mjs
+!/scripts/check-route-tests.mjs
+!/scripts/lib/
+!/scripts/component-tests-allowlist.json
+!/scripts/route-tests-allowlist.json
+!/scripts/affected.mjs
+!/scripts/component-owners.mjs
+!/scripts/component-owners.json
+!/scripts/check-service-routes.mjs
+!/scripts/service-routes-allowlist.json
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md

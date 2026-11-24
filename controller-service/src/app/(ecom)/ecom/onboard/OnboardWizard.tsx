@@ -803,7 +803,7 @@ export default function OnboardWizard({
               <Card title="Plan & servers" className="max-sm:border-0 max-sm:bg-transparent max-sm:p-0">
               <div className="space-y-6">
               <Segmented<Interval> ariaLabel="Billing interval" value={interval} onChange={setInterval}
-                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]} />
+                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: 'Save 2 months' }]} />
               <ComputeConfigurator
                 planSlug={planSlug}
                 onPlanChange={setPlanSlug}

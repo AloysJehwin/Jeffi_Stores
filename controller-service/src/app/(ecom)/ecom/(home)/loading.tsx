@@ -20,6 +20,7 @@ export default function Loading() {
             <span className="inline-flex items-center justify-center rounded-full ecom-accent-bg w-full sm:w-auto px-8 py-4 text-base font-display font-bold text-white">Start your store</span>
             <span className="font-display font-bold text-base ecom-accent-text text-center">See the demo</span>
           </div>
+          <Sk className="mt-4 h-4 w-72 max-w-full max-sm:mx-auto" />
         </div>
         <div className="relative w-full px-4 sm:px-6 lg:px-12 pb-14 sm:pb-20">
           <Sk className="h-[420px] w-full rounded-[2rem] sm:h-[560px]" />

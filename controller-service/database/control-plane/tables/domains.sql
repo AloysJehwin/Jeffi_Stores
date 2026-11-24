@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_domain_orders (
     next_at          timestamp with time zone,             -- lease / backoff: the job is not advanced before this
     last_error       text,
     events           jsonb NOT NULL DEFAULT '[]'::jsonb,   -- progress shown to the owner: [{at, step, message, level}]
+    showcase_site_id uuid,                                 -- bought for this Showcase site (apex + www. go to it); null for a store
     created_at       timestamp with time zone NOT NULL DEFAULT now(),
     updated_at       timestamp with time zone NOT NULL DEFAULT now()
 );

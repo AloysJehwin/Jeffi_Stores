@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react'
 
 // The console's button, field and badge styles, shared by the onboarding pages (server and client).
-export const primaryBtn =
-  'ecom-accent-bg inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-40'
-export const secondaryBtn =
-  'org-sand org-sand-hover inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-foreground transition-colors disabled:opacity-40'
-export const ghostBtn =
-  'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-foreground-secondary ecom-hover hover:text-foreground transition-colors disabled:opacity-40'
+/** The one disabled look for every console button: neutral and readable, never a faded accent. */
+export const disabledBtn = 'disabled:cursor-not-allowed disabled:bg-surface-secondary disabled:text-foreground-muted'
+export const primaryBtn = `ecom-accent-bg inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-colors ${disabledBtn}`
+export const secondaryBtn = `org-sand org-sand-hover inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-foreground transition-colors ${disabledBtn}`
+export const ghostBtn = `inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-foreground-secondary ecom-hover hover:text-foreground transition-colors ${disabledBtn}`
 
 // ecom.css pins every single-line field to one height (the selects'); py-2.5 only pads textareas.
 export const fieldInput =

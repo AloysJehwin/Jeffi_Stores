@@ -1,12 +1,12 @@
 import type { SampleCatalog } from '../data/types'
-import { generateImage } from '@/lib/ai/media'
+import { pictureFor, searchTerms } from '@/lib/ai/stock'
 import { askJson, listOf, orNull, pick, rng, shuffle, str, studioBudgetLeft } from './ai'
 import type { StudioBrief } from './types'
 
 // The sample catalogue the studio previews the site with: categories, 12-24 believable products in INR with
 // attributes, brands, a few reviews and offers. Provisioning seeds it into the new store (provisioning/seed.ts), so the
-// owner starts from it. Each product gets a photo (addPictures, within the budget); without one the Image component
-// draws a placeholder.
+// owner starts from it. Each product gets a photo (addPictures: a stock photo, else one made within the budget); without
+// one the Image component draws a placeholder.
 
 type Product = SampleCatalog['products'][number]
 
@@ -53,7 +53,7 @@ function fallbackProducts(b: StudioBrief, cats: SampleCatalog['categories'], n: 
     taken.add(slug)
     const price = shopPrice(lo + r() * (hi - lo))
     const cat = cats[i % cats.length]
-    out.push({ slug, name, price, mrp: r() < 0.4 ? shopPrice(price * (1.2 + r() * 0.4)) : null, category: cat.slug, description: `${name} from the ${cat.name} range.`, attributes: {}, imagePrompt: `${name}, ${b.category}` })
+    out.push({ slug, name, price, mrp: r() < 0.4 ? shopPrice(price * (1.2 + r() * 0.4)) : null, category: cat.slug, description: `${name} from the ${cat.name} range.`, attributes: {}, imagePrompt: `${name}, ${b.category}`, photoQuery: searchTerms(b.category || name) })
   }
   return out
 }
@@ -63,7 +63,7 @@ export async function sampleCatalog(b: StudioBrief, opts: { images?: number } = 
     studioBudgetLeft() > 0
       ? await askJson(
           `You make a believable sample catalogue for a new Indian online store, used only to preview its website design (the owner's real products replace it). Realistic product names in the store's vocabulary, prices in INR fitting the price tier, real-sounding attributes (material, size, weight, care, origin as fits the category).
-Return JSON {"tagline": short, "about": two sentences, "categories": [4-6 {"name", "description"}], "brands": [2-5 {"name"}] (the store's own label counts), "products": [16-20 {"name", "price": number, "mrp": number or null (higher than price when on sale), "category": a category name, "brand": a brand name or null, "description": one or two sentences, "attributes": {"Material": "…", …}, "badge": "New"|"Bestseller"|null, "imagePrompt": a product photo description}], "reviews": [6 {"product": a product name, "rating": 4-5, "title", "comment": one or two sentences, "author": Indian first name and initial}], "offers": [1-2 {"title", "subtitle", "badge", "cta"}]}.`,
+Return JSON {"tagline": short, "about": two sentences, "categories": [4-6 {"name", "description"}], "brands": [2-5 {"name"}] (the store's own label counts), "products": [16-20 {"name", "price": number, "mrp": number or null (higher than price when on sale), "category": a category name, "brand": a brand name or null, "description": one or two sentences, "attributes": {"Material": "…", …}, "badge": "New"|"Bestseller"|null, "imagePrompt": a product photo description, "photoQuery": a 2-4 word stock-photo search for this kind of product, e.g. "silk saree" or "brass diya"}], "reviews": [6 {"product": a product name, "rating": 4-5, "title", "comment": one or two sentences, "author": Indian first name and initial}], "offers": [1-2 {"title", "subtitle", "badge", "cta"}]}.`,
           `Store: ${b.storeName}. ${b.summary} Sells ${b.category} to ${b.audience}. Price tier ${b.priceTier}. Words: ${b.vocabulary.join(', ')}. Voice: ${b.voice}.`,
           { maxTokens: 6000, temperature: 0.8, modelHint: 'copy' }
         ).catch(orNull)
@@ -111,6 +111,7 @@ Return JSON {"tagline": short, "about": two sentences, "categories": [4-6 {"name
       inStock: true,
       images: [],
       imagePrompt: str(o.imagePrompt ?? o.image_prompt, 300, `${name}, ${b.category}`),
+      photoQuery: searchTerms(str(o.photoQuery ?? o.photo_query, 80)) || searchTerms(name),
     })
     if (products.length >= MAX_PRODUCTS) break
   }
@@ -148,32 +149,42 @@ Return JSON {"tagline": short, "about": two sentences, "categories": [4-6 {"name
 const PICTURE_WORKERS = 4
 
 /**
- * A photo, in the brief's art direction, for each sample product without one (at most `max` made), while the budget
- * lasts. After the first failure no new photo starts, and it says why; returns how many were made.
+ * A photo for each sample product without one (at most `max`): a stock photo (credited) when one is found, else one
+ * made in the brief's art direction while the budget lasts (`ai: false` skips making any). After the first generation
+ * failure the rest are stock only, and it says why; returns how many were added.
  */
-export async function addPictures(catalog: SampleCatalog, b: StudioBrief, max: number): Promise<{ made: number; error?: string }> {
+export async function addPictures(catalog: SampleCatalog, b: StudioBrief, max: number, opts: { ai?: boolean } = {}): Promise<{ made: number; error?: string }> {
   const todo = catalog.products.filter(p => !p.images?.length && p.imagePrompt)
+  const used = new Set<string>()
   let made = 0
   let running = 0
   let error: string | undefined
   const worker = async () => {
-    while (todo.length && !error && made + running < max && studioBudgetLeft() > 0) {
+    while (todo.length && made + running < max) {
       const p = todo.shift()!
       running++
       try {
-        const r = await generateImage({
-          prompt: `${p.imagePrompt}. Product photograph for an online store. ${b.artDirection}. No text, no logos, no watermarks.`,
-          negativePrompt: 'text, letters, watermark, logo, distorted hands',
-          width: 1024,
-          height: 1024,
-          feature: 'homepage_image',
-          // Site generation always uses the cheapest image model.
-          quality: 'draft',
-          ref: 'site-studio:sample',
-          skipGallery: true,
+        const pic = await pictureFor({
+          stock: { queries: [p.photoQuery || p.name], shape: 'square', seed: b.seed, used, skipGallery: true },
+          ai:
+            error || opts.ai === false
+              ? null
+              : {
+                  prompt: `${p.imagePrompt}. Product photograph for an online store. ${b.artDirection}. No text, no logos, no watermarks.`,
+                  negativePrompt: 'text, letters, watermark, logo, distorted hands',
+                  width: 1024,
+                  height: 1024,
+                  feature: 'homepage_image',
+                  // Site generation always uses the cheapest image model.
+                  quality: 'draft',
+                  ref: 'site-studio:sample',
+                  skipGallery: true,
+                },
+          aiAllowed: () => studioBudgetLeft() > 0,
         })
-        if (r.images[0]?.url) {
-          p.images = [r.images[0].url]
+        if (pic) {
+          p.images = [pic.url]
+          if (pic.credit) p.imageCredit = pic.credit
           made++
         }
       } catch (err) {

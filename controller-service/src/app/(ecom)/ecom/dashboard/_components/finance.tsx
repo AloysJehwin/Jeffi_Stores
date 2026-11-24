@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react'
 import type { TenantTransaction, LedgerEntry, LinkedPayout } from '@/lib/tenant-registry'
+import { aiLedgerNote } from '@/lib/ai/feature-labels'
+import { StatTile } from './Card'
 
 export const STATUS_PILL: Record<string, string> = {
   captured: 'org-sage org-sage-text',
@@ -22,6 +25,11 @@ const LEDGER_COLORS: Record<string, string> = {
 export function fmt(n: number) {
   return '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+/** Like fmt, without ".00" on whole rupees (₹1,180; ₹1,234.12 keeps its paise). */
+export function fmtWhole(n: number) {
+  const a = Math.abs(n)
+  return '₹' + a.toLocaleString('en-IN', { minimumFractionDigits: Math.round(a * 100) % 100 ? 2 : 0, maximumFractionDigits: 2 })
+}
 export function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -32,19 +40,82 @@ export function fmtDate(s: string) {
   })
 }
 
+const humanize = (s: string) => {
+  const t = s.replace(/_/g, ' ')
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+// Plain labels for the stored keys, in one place: wallet_ledger categories (entry_type when a row has none),
+// settlement_ledger entry types, and transaction gateways.
+const WALLET_LABEL: Record<string, string> = {
+  recharge: 'Top-up',
+  debit: 'Charge',
+  adjustment: 'Adjustment',
+  goodwill_credit: 'Credit from Jeffi',
+  shipping_forward: 'Shipping',
+  shipping_rvp: 'Return pickup',
+  shipping_correction: 'Shipping correction',
+  shipping_cancel_credit: 'Cancelled shipment refund',
+  campaign: 'Marketing campaign',
+  ai: 'AI usage',
+  sms: 'SMS message',
+  whatsapp: 'WhatsApp message',
+  email: 'Email',
+  media: 'Media',
+  ad_free: 'Ad-free',
+  messaging_addon: 'SMS & WhatsApp add-on',
+  domain: 'Domain',
+  infra: 'Servers',
+  showcase: 'Showcase site',
+}
+const LEDGER_LABEL: Record<string, string> = {
+  order_capture: 'Sale (your share)',
+  commission: 'Platform commission',
+  gateway_fee: 'Payment gateway fee',
+  subscription_charge: 'Subscription charge',
+  cod_remittance: 'Cash-on-delivery remittance',
+  delhivery_correction: 'Shipping charge correction',
+  refund: 'Refund',
+  payout: 'Payout to your bank',
+  adjustment: 'Adjustment',
+}
+const GATEWAY_LABEL: Record<string, string> = { razorpay: 'Razorpay', phonepe: 'PhonePe', upi: 'UPI', cashfree: 'Cashfree' }
+
+export function walletEntryLabel(e: { entry_type: string; category: string | null }) {
+  const k = e.category || e.entry_type
+  return WALLET_LABEL[k] ?? humanize(k)
+}
+export function walletEntryNote(e: { category: string | null; note: string | null }) {
+  return e.category === 'ai' ? aiLedgerNote(e.note) : e.note
+}
+export function ledgerEntryLabel(type: string) {
+  return LEDGER_LABEL[type] ?? humanize(type)
+}
+
+/** Where an empty sales list points next: add a store, follow its setup, or open the live store. */
+export function salesNextStep(t: { slug: string; status: string; service_types?: string[] | null }) {
+  if (!(t.service_types ?? ['store']).includes('store')) return { href: '/dashboard/add-store', label: 'Add a store' }
+  if (t.status !== 'active') return { href: '/dashboard', label: 'See store setup' }
+  return { href: `https://${t.slug}.jeffistores.in`, label: 'Open your store' }
+}
+
 const TH = 'px-4 py-3 text-xs font-semibold text-foreground-muted uppercase tracking-widest'
 const TR = 'border-t border-border-default/60 hover:bg-surface-secondary/40'
 const WRAP = 'rounded-2xl border border-border-default bg-surface-elevated overflow-x-auto'
 
+/**
+ * The store's money at a glance. `balance` names its own label: Overview shows the prepaid wallet (tenant_wallets,
+ * as the Wallet page does); the settlement ledger shows its settlement balance.
+ */
 export function MoneyTiles({
   balance,
   totals,
 }: {
-  balance: number
+  balance: { label: string; value: number }
   totals: { gross: number; tenantShare: number; commission: number; fees: number }
 }) {
   const tiles = [
-    { label: 'Wallet balance', value: fmt(balance), accent: true },
+    { label: balance.label, value: fmt(balance.value), accent: true },
     { label: 'Gross GMV', value: fmt(totals.gross) },
     { label: 'Your earnings', value: fmt(totals.tenantShare) },
     { label: 'Platform fees', value: fmt(totals.commission + totals.fees) },
@@ -52,12 +123,7 @@ export function MoneyTiles({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {tiles.map(t => (
-        <div key={t.label} className="rounded-2xl border border-border-default bg-surface-elevated p-4 sm:p-5">
-          <div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{t.label}</div>
-          <div className={`font-display text-lg sm:text-2xl lg:text-3xl font-black tabular-nums [overflow-wrap:anywhere] sm:[overflow-wrap:normal] ${t.accent ? 'ecom-accent-text' : 'text-foreground'}`}>
-            {t.value}
-          </div>
-        </div>
+        <StatTile key={t.label} label={t.label} value={t.value} accent={t.accent} />
       ))}
     </div>
   )
@@ -66,13 +132,14 @@ export function MoneyTiles({
 export function TransactionsTable({
   transactions,
   totals,
+  empty,
 }: {
   transactions: TenantTransaction[]
   totals: { gross: number; tenantShare: number; commission: number; fees: number }
+  /** Shown when there are no rows (an EmptyState with the next step). */
+  empty: ReactNode
 }) {
-  if (transactions.length === 0) {
-    return <div className={`${WRAP} py-16 text-center text-foreground-secondary text-sm`}>No transactions yet</div>
-  }
+  if (transactions.length === 0) return <>{empty}</>
   return (
     <div className={WRAP}>
       <table className="w-full text-sm min-w-[700px]">
@@ -94,10 +161,10 @@ export function TransactionsTable({
               <td className="px-4 py-3 font-semibold org-sage-text">{fmt(Number(t.tenant_share))}</td>
               <td className="px-4 py-3 text-foreground-secondary">{fmt(Number(t.platform_commission))}</td>
               <td className="px-4 py-3 text-foreground-secondary">{fmt(Number(t.gateway_fee))}</td>
-              <td className="px-4 py-3 text-foreground-secondary">{t.is_cod ? 'COD' : t.gateway}</td>
+              <td className="px-4 py-3 text-foreground-secondary">{t.is_cod ? 'COD' : t.gateway ? (GATEWAY_LABEL[t.gateway] ?? humanize(t.gateway)) : '-'}</td>
               <td className="px-4 py-3">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_PILL[t.status] ?? 'bg-surface-secondary text-foreground-muted'}`}>
-                  {t.status}
+                  {humanize(t.status)}
                 </span>
               </td>
               <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
@@ -128,10 +195,8 @@ export function TransactionsTable({
   )
 }
 
-export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balance: number }) {
-  if (ledger.length === 0) {
-    return <div className={`${WRAP} py-16 text-center text-foreground-secondary text-sm`}>No ledger entries yet</div>
-  }
+export function LedgerTable({ ledger, balance, empty }: { ledger: LedgerEntry[]; balance: number; empty: ReactNode }) {
+  if (ledger.length === 0) return <>{empty}</>
   return (
     <div className={WRAP}>
       <table className="w-full text-sm min-w-[500px]">
@@ -149,8 +214,8 @@ export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balanc
               <tr key={e.id} className={TR}>
                 <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{fmtDate(e.occurred_at)}</td>
                 <td className="px-4 py-3">
-                  <span className={`font-medium capitalize ${LEDGER_COLORS[e.entry_type] ?? 'text-foreground-secondary'}`}>
-                    {e.entry_type.replace(/_/g, ' ')}
+                  <span className={`font-medium ${LEDGER_COLORS[e.entry_type] ?? 'text-foreground-secondary'}`}>
+                    {ledgerEntryLabel(e.entry_type)}
                   </span>
                 </td>
                 <td className={`px-4 py-3 font-semibold ${amt >= 0 ? 'org-sage-text' : 'text-[#8a2e1f]'}`}>
@@ -163,7 +228,7 @@ export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balanc
         </tbody>
         <tfoot className="border-t-2 border-border-default bg-surface-secondary">
           <tr>
-            <td className="px-4 py-3 font-semibold text-foreground-secondary" colSpan={2}>Balance</td>
+            <td className="px-4 py-3 font-semibold text-foreground-secondary" colSpan={2}>Settlement balance</td>
             <td className={`px-4 py-3 font-bold ${balance >= 0 ? 'org-sage-text' : 'text-[#8a2e1f]'}`}>
               {balance >= 0 ? '+' : '-'}{fmt(balance)}
             </td>
@@ -175,29 +240,27 @@ export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balanc
   )
 }
 
-/** What the payment provider paid into the store's bank, newest first. */
-export function PayoutsTable({ payouts }: { payouts: LinkedPayout[] }) {
-  if (payouts.length === 0) {
-    return <div className={`${WRAP} py-10 text-center text-foreground-secondary text-sm`}>No payouts yet. Sales are paid out once the payment provider settles them.</div>
-  }
+/** What the payment provider paid into the store's bank, newest first. A table inside a Card (sand heading row). */
+export function PayoutsTable({ payouts, empty }: { payouts: LinkedPayout[]; empty: ReactNode }) {
+  if (payouts.length === 0) return <>{empty}</>
   return (
-    <div className={WRAP}>
+    <div className="-mx-6 -mb-6 overflow-x-auto">
       <table className="w-full text-sm min-w-[500px]">
-        <thead>
-          <tr className="bg-surface-secondary text-left">
+        <thead className="org-sand text-foreground-secondary">
+          <tr>
             {['Paid on', 'Amount', 'Fees', 'Bank reference (UTR)', 'Status'].map(h => (
-              <th key={h} className={TH}>{h}</th>
+              <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-border-default">
           {payouts.map(p => (
-            <tr key={p.id} className={TR}>
-              <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{p.settled_at ? fmtDate(p.settled_at) : '-'}</td>
-              <td className="px-4 py-3 font-semibold org-sage-text">{fmt(Number(p.amount))}</td>
-              <td className="px-4 py-3 text-foreground-secondary">{fmt(Number(p.fees))}</td>
-              <td className="px-4 py-3 font-mono text-xs">{p.utr || '-'}</td>
-              <td className="px-4 py-3 text-foreground-secondary">{p.status || '-'}</td>
+            <tr key={p.id}>
+              <td className="px-6 py-2.5 text-foreground-secondary whitespace-nowrap">{p.settled_at ? fmtDate(p.settled_at) : '-'}</td>
+              <td className="px-6 py-2.5 font-semibold tabular-nums org-sage-text">{fmt(Number(p.amount))}</td>
+              <td className="px-6 py-2.5 tabular-nums text-foreground-secondary">{fmt(Number(p.fees))}</td>
+              <td className="px-6 py-2.5 font-mono text-xs">{p.utr || '-'}</td>
+              <td className="px-6 py-2.5 text-foreground-secondary">{p.status ? humanize(p.status) : '-'}</td>
             </tr>
           ))}
         </tbody>

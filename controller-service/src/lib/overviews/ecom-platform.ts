@@ -1,6 +1,7 @@
 import type { Pool } from 'pg'
-import type { Period } from '@/lib/overview/period'
+import { delta, type Period } from '@/lib/overview/period'
 import type { AttentionItem } from '@/lib/overview/attention'
+import type { LineKind } from '@controller/lib/billing/lines'
 
 // Shared SQL and maths for the platform (control-plane) overviews: ecom customers, billing,
 // instances and store status. All of it reads the control-plane tables via controlPlanePool().
@@ -47,6 +48,58 @@ export const PAID_STORE_SQL = `(p.product = 'store' AND ${PRICE_INR_MONTH_SQL} >
 export const PAYING_SQL = `(t.status = 'active' AND ${PAID_STORE_SQL})`
 
 export const NOT_PLATFORM = `t.id <> '${PLATFORM_TENANT_ID}'`
+
+// ── Workspace subscriptions (lib/billing): one Razorpay subscription per workspace ──────
+
+export const BILLING_KINDS: readonly LineKind[] = ['store_plan', 'showcase_site', 'messaging_addon', 'ad_free']
+
+/** Billing subscription statuses a workspace is paying on. */
+export const BILLING_PAYING_SQL = `('authenticated', 'active', 'pending')`
+
+/** The tenant (alias t) is billed on a workspace subscription, so its MRR comes from billing_subscriptions. */
+export const HAS_BILLING_SQL = `EXISTS (SELECT 1 FROM billing_subscriptions bs WHERE bs.tenant_id = t.id AND bs.is_current)`
+
+/** Monthly value in rupees of a billing subscription (alias b): a yearly one charges ten months, spread over twelve. */
+export const BILLING_MRR_SQL = `(CASE WHEN b.billing_interval = 'yearly' THEN b.amount_paise::numeric / 12 ELSE b.amount_paise::numeric END / 100)`
+
+const LINES_ARRAY = (col: string) => `jsonb_array_elements(CASE WHEN jsonb_typeof(${col}) = 'array' THEN ${col} ELSE '[]'::jsonb END)`
+const LINE_PAISE = `COALESCE((e->>'amountPaise')::numeric, 0)`
+
+/** Each line (alias e) of a billing subscription's (alias b) lines snapshot. */
+export const BILLING_LINES_SQL = `CROSS JOIN LATERAL ${LINES_ARRAY('b.lines')} e`
+
+/** Monthly value in rupees of a snapshot line (alias e) on billing subscription b. */
+export const BILLING_LINE_MRR_SQL = `(CASE WHEN b.billing_interval = 'yearly' THEN ${LINE_PAISE} * 10 / 12 ELSE ${LINE_PAISE} END / 100)`
+
+// A legacy settlement row is a charge from before billing_charges: one not matched by a billing charge.
+const LEGACY_CHARGE = `l.entry_type = 'subscription_charge' AND NOT EXISTS (SELECT 1 FROM billing_charges bc WHERE bc.razorpay_payment_id = l.external_ref)`
+
+/**
+ * Collected subscription revenue, one row per charge: tenant_id, at, amount and refunded (rupees, amount net of
+ * refunds). billing_charges since the switch, settlement_ledger subscription_charge rows before it.
+ */
+export const SUBSCRIPTION_CHARGES_SQL = `
+SELECT ch.tenant_id, ch.charged_at AS at, (ch.amount_paise - ch.refunded_paise)::numeric / 100 AS amount, ch.refunded_paise::numeric / 100 AS refunded
+  FROM billing_charges ch WHERE ch.amount_paise > 0
+UNION ALL
+SELECT l.tenant_id, l.occurred_at, -l.amount, 0 FROM settlement_ledger l WHERE ${LEGACY_CHARGE}`
+
+/**
+ * The same revenue by line kind (at, kind, amount): a charge is split over its lines snapshot in proportion to
+ * their price; a legacy settlement row was a store plan charge.
+ */
+export const SUBSCRIPTION_CHARGE_KINDS_SQL = `
+SELECT ch.charged_at AS at, COALESCE(x.kind, 'other') AS kind,
+       (ch.amount_paise - ch.refunded_paise)::numeric / 100
+         * CASE WHEN x.total > 0 THEN x.paise / x.total WHEN x.n > 0 THEN 1.0 / x.n ELSE 1 END AS amount
+  FROM billing_charges ch
+  LEFT JOIN LATERAL (
+    SELECT e->>'kind' AS kind, ${LINE_PAISE} AS paise, SUM(${LINE_PAISE}) OVER () AS total, count(*) OVER () AS n
+      FROM ${LINES_ARRAY('ch.lines')} e
+  ) x ON true
+ WHERE ch.amount_paise > 0
+UNION ALL
+SELECT l.occurred_at, 'store_plan', -l.amount FROM settlement_ledger l WHERE ${LEGACY_CHARGE}`
 
 export const periodParams = (cur: Period, prev: Period) => [cur.from, cur.to, prev.from, prev.to]
 
@@ -129,6 +182,35 @@ export function walletMix(
   }
   for (const k of Object.keys(m) as (keyof WalletMix)[]) m[k] = round2(m[k])
   return m
+}
+
+export interface KindRevenue {
+  kind: LineKind | 'other'
+  mrr: number
+  collected: number
+  previous: number
+  delta: number | null
+  /** Open billing lines: active (incl. ending), in trial, awaiting a first charge, still paid from the wallet. */
+  lines: { active: number; trial: number; awaiting: number; legacy: number }
+}
+
+const LINE_STATE: Record<string, keyof KindRevenue['lines']> = { active: 'active', ending: 'active', trial: 'trial', awaiting_payment: 'awaiting', legacy_wallet: 'legacy' }
+
+/** One row per line kind; 'other' (a charge without a lines snapshot) only when it collected something. */
+export function billingByKind(o: {
+  mrr: Record<string, number>
+  collected: Record<string, number>
+  previous: Record<string, number>
+  lines: { kind: string; status: string; n: number }[]
+}): KindRevenue[] {
+  const kinds: (LineKind | 'other')[] = [...BILLING_KINDS, ...(o.collected.other || o.previous.other ? ['other' as const] : [])]
+  return kinds.map(kind => {
+    const lines = { active: 0, trial: 0, awaiting: 0, legacy: 0 }
+    for (const l of o.lines) if (l.kind === kind && LINE_STATE[l.status]) lines[LINE_STATE[l.status]] += Number(l.n) || 0
+    const collected = round2(o.collected[kind] ?? 0)
+    const previous = round2(o.previous[kind] ?? 0)
+    return { kind, mrr: round2(o.mrr[kind] ?? 0), collected, previous, delta: delta(collected, previous), lines }
+  })
 }
 
 // ── Needs attention (shared across the four platform pages) ─────────────────────────────

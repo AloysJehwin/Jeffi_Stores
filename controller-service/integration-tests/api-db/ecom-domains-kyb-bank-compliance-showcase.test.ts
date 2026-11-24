@@ -26,6 +26,9 @@ describe.skipIf(!API_DB_ENABLED)('controller ecom bank/compliance/showcase API (
   const tenantId = crypto.randomUUID()
   const slug = 'apitest-bcs-' + crypto.randomBytes(3).toString('hex')
   const email = `apitest-bcs-${crypto.randomBytes(3).toString('hex')}@jeffi.test`
+  // The Showcase routes are per site: /api/ecom/showcase/[siteId]/…
+  const siteId = crypto.randomUUID()
+  const site = () => ({ params: Promise.resolve({ siteId }) })
 
   beforeAll(async () => {
     requireTestDb()
@@ -36,8 +39,8 @@ describe.skipIf(!API_DB_ENABLED)('controller ecom bank/compliance/showcase API (
     bankVerifyR = await import('@controller/app/api/(ecom)/ecom/bank/verify/route')
     bankUpiR = await import('@controller/app/api/(ecom)/ecom/bank/upi/route')
     complianceDocR = await import('@controller/app/api/(ecom)/ecom/compliance/[docId]/route')
-    showcaseHostingR = await import('@controller/app/api/(ecom)/ecom/showcase/hosting/route')
-    showcaseLeadsR = await import('@controller/app/api/(ecom)/ecom/showcase/leads/route')
+    showcaseHostingR = await import('@controller/app/api/(ecom)/ecom/showcase/[siteId]/hosting/route')
+    showcaseLeadsR = await import('@controller/app/api/(ecom)/ecom/showcase/[siteId]/leads/route')
     ;({ sid, owner: { id: ownerId } } = await makeOwnerSession(ownerSession, email))
     await cp.query(
       `INSERT INTO tenants (id, slug, display_name, status, service_types) VALUES ($1,$2,'API Test BCS Store','active','{store}'::text[]) ON CONFLICT (id) DO NOTHING`,
@@ -135,53 +138,51 @@ describe.skipIf(!API_DB_ENABLED)('controller ecom bank/compliance/showcase API (
     expect(res.status).toBe(404)
   })
 
-  // ── GET/POST /api/ecom/showcase/hosting ─────────────────────────────────────
+  // ── GET/POST /api/ecom/showcase/[siteId]/hosting ────────────────────────────
   it('showcase hosting GET: 401 without an owner session', async () => {
     ownerSidCookie = undefined
-    const res = await showcaseHostingR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/hosting?tenant=${slug}`) as any)
+    const res = await showcaseHostingR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/${siteId}/hosting?tenant=${slug}`) as any, site())
     expect(res.status).toBe(401)
   })
 
-  it('showcase hosting GET: 404 when the workspace has no Showcase site', async () => {
+  it('showcase hosting GET: 404 for a site that is not the owner’s', async () => {
     ownerSidCookie = sid
-    const res = await showcaseHostingR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/hosting?tenant=${slug}`) as any)
+    const res = await showcaseHostingR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/${siteId}/hosting?tenant=${slug}`) as any, site())
     expect(res.status).toBe(404)
   })
 
   it('showcase hosting POST: 400 on an unknown action', async () => {
     ownerSidCookie = sid
-    const res = await showcaseHostingR.POST(await apiRequest('POST', `http://localhost/api/ecom/showcase/hosting?tenant=${slug}`, { body: { action: 'explode' } }) as any)
+    const res = await showcaseHostingR.POST(await apiRequest('POST', `http://localhost/api/ecom/showcase/${siteId}/hosting?tenant=${slug}`, { body: { action: 'explode' } }) as any, site())
     expect(res.status).toBe(400)
   })
 
   it('showcase hosting GET: 200 with the console state once a site exists (real DB side-effect read)', async () => {
     const siteSlug = 'apitest-sc-' + crypto.randomBytes(3).toString('hex')
     await cp.query(
-      `INSERT INTO showcase_sites (tenant_id, owner_id, slug, status, business) VALUES ($1,$2,$3,'draft','{"name":"Acme Showcase"}'::jsonb)`,
-      [tenantId, ownerId, siteSlug]
+      `INSERT INTO showcase_sites (id, tenant_id, owner_id, slug, status, business) VALUES ($4,$1,$2,$3,'draft','{"name":"Acme Showcase"}'::jsonb)`,
+      [tenantId, ownerId, siteSlug, siteId]
     )
     ownerSidCookie = sid
-    const res = await showcaseHostingR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/hosting?tenant=${slug}`) as any)
+    const res = await showcaseHostingR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/${siteId}/hosting?tenant=${slug}`) as any, site())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.slug).toBe(siteSlug)
     expect(body.status).toBe('draft')
   })
 
-  // ── GET/POST /api/ecom/showcase/leads ───────────────────────────────────────
+  // ── GET/POST /api/ecom/showcase/[siteId]/leads ──────────────────────────────
   it('showcase leads GET: 401 without an owner session', async () => {
     ownerSidCookie = undefined
-    const res = await showcaseLeadsR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/leads?tenant=${slug}`) as any)
+    const res = await showcaseLeadsR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/${siteId}/leads?tenant=${slug}`) as any, site())
     expect(res.status).toBe(401)
   })
 
   it('showcase leads GET: 200 lists the site’s leads, newest first (real DB side-effect read)', async () => {
     // relies on the site inserted by the hosting GET test
-    const site = await cp.query(`SELECT id FROM showcase_sites WHERE owner_id=$1 LIMIT 1`, [ownerId])
-    const siteId = site.rows[0].id
     await cp.query(`INSERT INTO showcase_leads (site_id, name, email, message) VALUES ($1,'Lead One','l1@x.test','hi')`, [siteId])
     ownerSidCookie = sid
-    const res = await showcaseLeadsR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/leads?tenant=${slug}`) as any)
+    const res = await showcaseLeadsR.GET(await apiRequest('GET', `http://localhost/api/ecom/showcase/${siteId}/leads?tenant=${slug}`) as any, site())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.pageSize).toBe(50)
@@ -191,18 +192,17 @@ describe.skipIf(!API_DB_ENABLED)('controller ecom bank/compliance/showcase API (
 
   it('showcase leads POST: 400 on a bad payload (no ids)', async () => {
     ownerSidCookie = sid
-    const res = await showcaseLeadsR.POST(await apiRequest('POST', `http://localhost/api/ecom/showcase/leads?tenant=${slug}`, { body: { action: 'read' } }) as any)
+    const res = await showcaseLeadsR.POST(await apiRequest('POST', `http://localhost/api/ecom/showcase/${siteId}/leads?tenant=${slug}`, { body: { action: 'read' } }) as any, site())
     expect(res.status).toBe(400)
   })
 
   it('showcase leads POST: 200 marks all read (real DB side-effect)', async () => {
     ownerSidCookie = sid
-    const res = await showcaseLeadsR.POST(await apiRequest('POST', `http://localhost/api/ecom/showcase/leads?tenant=${slug}`, { body: { action: 'read', ids: 'all' } }) as any)
+    const res = await showcaseLeadsR.POST(await apiRequest('POST', `http://localhost/api/ecom/showcase/${siteId}/leads?tenant=${slug}`, { body: { action: 'read', ids: 'all' } }) as any, site())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
-    const site = await cp.query(`SELECT id FROM showcase_sites WHERE owner_id=$1 LIMIT 1`, [ownerId])
-    const unread = await cp.query(`SELECT COUNT(*)::int AS n FROM showcase_leads WHERE site_id=$1 AND read_at IS NULL`, [site.rows[0].id])
+    const unread = await cp.query(`SELECT COUNT(*)::int AS n FROM showcase_leads WHERE site_id=$1 AND read_at IS NULL`, [siteId])
     expect(unread.rows[0].n).toBe(0)
   })
 })

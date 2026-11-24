@@ -99,7 +99,7 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
     where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`)
   }
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified' AND cd.showcase_site_id IS NULL) AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.created_at,
             t.instance_state, t.billing_interval, t.subscription_status,
             p.slug AS plan, p.monthly_price_inr, COALESCE(CASE WHEN COALESCE(tc.applied, tc.desired)->'db'->>'mode' = 'dedicated' THEN p.rds_margin END, p.infra_margin)::float8 AS infra_margin,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.s3_usage_bytes::float8 AS s3_usage_bytes,
@@ -264,12 +264,12 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
     ])
     // Welcome wallet credit so a new store can send messages immediately. Idempotent via external_ref.
     await client.query(
-      `INSERT INTO tenant_wallets (tenant_id, balance) VALUES ($1, 100) ON CONFLICT (tenant_id) DO NOTHING`,
+      `INSERT INTO tenant_wallets (tenant_id, balance) VALUES ($1, ${SIGNUP_CREDIT_INR}) ON CONFLICT (tenant_id) DO NOTHING`,
       [tenantId]
     )
     await client.query(
       `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
-       VALUES ($1, 'recharge', 'recharge', 100, $2, 'Welcome wallet credit')
+       VALUES ($1, 'recharge', 'recharge', ${SIGNUP_CREDIT_INR}, $2, 'Welcome wallet credit')
        ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
       [tenantId, `signup_credit:${tenantId}`]
     )
@@ -298,12 +298,15 @@ export async function planMix(): Promise<{ plan: string; count: number }[]> {
 
 /** List active plans for the onboarding UI. */
 /** Active plans; the store lineup unless `any` (which adds the services workspace plan). */
+/** Wallet credit every new workspace starts with (the public pages call it the welcome credit). */
+export const SIGNUP_CREDIT_INR = 100
+
 export async function listPlans(product: 'store' | 'any' = 'store'): Promise<
-  Array<{ slug: string; name: string; tier: number; monthly_price_inr: string }>
+  Array<{ slug: string; name: string; tier: number; monthly_price_inr: string; max_custom_domains: number }>
 > {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT slug, name, tier, monthly_price_inr FROM plans
+    `SELECT slug, name, tier, monthly_price_inr, COALESCE(max_custom_domains, 0)::int AS max_custom_domains FROM plans
       WHERE is_active = true ${product === 'store' ? `AND product = 'store'` : ''} ORDER BY tier`
   )
   return res.rows
@@ -324,7 +327,7 @@ export interface TenantDetail extends TenantRow {
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified') AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.requested_addons, t.created_at, t.instance_state,
+    `SELECT t.id, t.slug, (SELECT string_agg(cd.domain, ', ' ORDER BY cd.created_at) FROM tenant_custom_domains cd WHERE cd.tenant_id = t.id AND cd.status = 'verified' AND cd.showcase_site_id IS NULL) AS custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.upi_mode, t.service_types, t.store_request, t.requested_addons, t.created_at, t.instance_state,
             t.billing_interval, t.payment_required, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,

@@ -8,6 +8,8 @@ import type { DesignDirection, StudioAnswers, StudioBrief, StudioPlan } from '@/
 
 export interface PageOutline {
   sections: { id: string; label: string }[]
+  /** Changed by hand in the visual editor. */
+  edited?: boolean
 }
 
 export type SessionView = Omit<StudioSession, 'catalog' | 'owner_id' | 'brief' | 'plan' | 'directions' | 'direction' | 'answers' | 'pages'> & {
@@ -49,17 +51,31 @@ export class StudioError extends Error {
 const BASE = '/api/ecom/onboard/studio'
 
 /**
- * Which of the owner's studios this page works on: the Showcase's on its signup and editor pages (/onboard/showcase,
- * /dashboard/showcase/…), else the store's. Every call below says so (`?product=showcase`), so the two never mix.
+ * Which of the owner's studios this page works on: a Showcase's on its builder and editor pages (/onboard/showcase,
+ * /dashboard/showcase/…), else the store's. Every call below says so (`?product=showcase&site=`), so they never mix.
  */
 export function studioProduct(): StudioProduct {
   return typeof window !== 'undefined' && /\/(onboard|dashboard)\/showcase(\/|$)/.test(window.location.pathname) ? 'showcase' : 'store'
 }
 
+/**
+ * The Showcase site this page designs: /dashboard/showcase/[siteId]/…, else `?site=` (the builder puts it in the URL
+ * once a new site's draft is saved). Null on a new site's first steps and for the store's studio.
+ */
+export function studioSite(): string | null {
+  if (typeof window === 'undefined') return null
+  const m = /\/dashboard\/showcase\/([0-9a-f-]{36})(\/|$)/i.exec(window.location.pathname)
+  return m?.[1] ?? new URLSearchParams(window.location.search).get('site')
+}
+
 /** A studio API URL (`path` under /api/ecom/onboard/studio) for this page's studio. */
 export function studioUrl(path = '', params: Record<string, string> = {}): string {
   const q = new URLSearchParams(params)
-  if (studioProduct() === 'showcase') q.set('product', 'showcase')
+  if (studioProduct() === 'showcase') {
+    q.set('product', 'showcase')
+    const site = studioSite()
+    if (site) q.set('site', site)
+  }
   const qs = q.toString()
   return `${BASE}${path ? `/${path}` : ''}${qs ? `?${qs}` : ''}`
 }

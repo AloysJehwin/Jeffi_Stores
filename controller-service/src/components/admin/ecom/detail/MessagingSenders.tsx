@@ -39,7 +39,7 @@ export default function MessagingSenders({
 
   return (
     <div className="space-y-5 min-w-0">
-      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-xs uppercase tracking-wide text-foreground-muted font-medium">Add-on</dt>
           <dd className="font-semibold text-foreground mt-0.5">{addon.active ? TIER_LABEL[addon.tier] : addon.tier === 'none' ? 'Not bought' : `${TIER_LABEL[addon.tier]} (lapsed)`}</dd>
@@ -47,10 +47,6 @@ export default function MessagingSenders({
         <div>
           <dt className="text-xs uppercase tracking-wide text-foreground-muted font-medium">{addon.active ? 'Paid until' : 'Ended'}</dt>
           <dd className="font-semibold text-foreground mt-0.5">{addon.until ? day(addon.until) : '—'}</dd>
-        </div>
-        <div>
-          <dt className="text-xs uppercase tracking-wide text-foreground-muted font-medium">Auto-renew</dt>
-          <dd className="font-semibold text-foreground mt-0.5">{addon.renew ? 'On' : 'Off'}</dd>
         </div>
       </dl>
 
