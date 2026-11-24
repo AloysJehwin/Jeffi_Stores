@@ -6,7 +6,8 @@ import { api } from '@/components/admin/kit/core'
 import SiteEditor from '@/components/site-editor/SiteEditor'
 import type { SaveResult, SiteEditorHost } from '@/components/site-editor/host'
 import { siteRegistry } from '@/lib/site/blocks'
-import { Image as MediaImage } from '@/components/admin/homepage/editors/fields'
+import { Image as MediaImage, type SectionOptions } from '@/components/admin/homepage/editors/fields'
+import BlockInspector from './BlockInspector'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 // The admin Site Builder's host for the visual editor (components/site-editor), behind site_settings
@@ -23,11 +24,13 @@ export interface VisualEditorProps {
   theme: ThemeTokens | null
   /** The admin may use Site Builder's AI (billed to the store's AI wallet). */
   canAi?: boolean
+  /** The forms editor's section options, for a classic block's fields (BlockInspector). */
+  options?: SectionOptions
   onClose: () => void
   onPublish: () => Promise<void>
 }
 
-export default function VisualEditor({ draftId, pageRef, title, previewUrl, canWrite, theme, canAi = false, onClose, onPublish }: VisualEditorProps) {
+export default function VisualEditor({ draftId, pageRef, title, previewUrl, canWrite, theme, canAi = false, options, onClose, onPublish }: VisualEditorProps) {
   // The Site Builder's own write scope as well as the caller's say-so, like its other panels.
   const scoped = useCanWrite('settings:write')
   const writable = canWrite && scoped
@@ -61,6 +64,8 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       onClose,
       blockLabel: type => siteRegistry.get(type)?.label ?? type,
       blockLocked: type => !!siteRegistry.get(type)?.locked,
+      // A classic block's fields: the forms editor's own inspector.
+      ...(options ? { renderBlockFields: ({ block, canWrite: w, onChange }) => <BlockInspector key={block.id} block={block} pageRef={web} options={options} canWrite={w} onChange={onChange} /> } : {}),
       async convertBlock(block) {
         const { ok, data } = await api<{ block?: Block; error?: string }>('/api/admin/site-builder/convert', { method: 'POST', json: { page: web.page, block } })
         return ok && data.block ? { ok: true as const, block: data.block } : { ok: false as const, error: data.error || 'Could not convert this section' }
@@ -87,7 +92,7 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       // The forms editor's picker: the media library, uploads and AI pictures.
       renderImagePicker: ({ value, disabled, onPick }) => <MediaImage label="Picture" value={value} size="wide" disabled={disabled} onCommit={url => onPick(url)} />,
     }),
-    [title, previewUrl, writable, theme, canAi, draftId, key, web, onClose, onPublish]
+    [title, previewUrl, writable, theme, canAi, options, draftId, key, web, onClose, onPublish]
   )
 
   return <SiteEditor key={key} host={host} />

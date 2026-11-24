@@ -19,6 +19,8 @@ export interface LayersProps {
   sel: { block: string; id: string | null } | null
   canWrite: boolean
   label: (block: string) => string
+  /** A section the page needs (a locked part inside, or a classic block the registry locks). */
+  locked?: (block: string) => boolean
   onSelect: (block: string, id: string | null) => void
   onMoveSection: (block: string, to: number) => void
   /** Before the child at `index` of `parent`, counted before the node leaves its place (design.ts `move`). */
@@ -44,7 +46,7 @@ export function moveIndex(all: CodeNode[], active: string, over: string): number
   return to > from ? to + 1 : to
 }
 
-type Ctx = Omit<LayersProps, 'doc' | 'label' | 'onMoveSection'> & {
+type Ctx = Omit<LayersProps, 'doc' | 'label' | 'locked' | 'onMoveSection'> & {
   open: Set<string>
   toggle: (k: string) => void
   sensors: SensorDescriptor<SensorOptions>[]
@@ -145,7 +147,7 @@ function NodeList({ block, parent, depth }: { block: string; parent: CodeNode; d
   )
 }
 
-function SectionRow({ id, label }: { id: string; label: string }) {
+function SectionRow({ id, label, locked }: { id: string; label: string; locked: boolean }) {
   const c = useLayers()
   const s = useSortable({ id, disabled: !c.canWrite })
   const tree = c.trees[id]
@@ -158,6 +160,9 @@ function SectionRow({ id, label }: { id: string; label: string }) {
         <button type="button" onClick={() => c.onSelect(id, tree?.id ?? null)} className="min-w-0 flex-1 truncate text-left font-semibold">
           {label}
         </button>
+        {/* A classic block is one unit: it moves and goes as a whole, and its fields open on the right. */}
+        {!tree && <span className="shrink-0 rounded border border-border-default px-1 text-[10px] font-medium uppercase tracking-wide text-foreground-muted">Classic</span>}
+        {locked && <Lock aria-label="The page needs this section" className="h-3 w-3 shrink-0 text-foreground-muted" />}
         {c.canWrite && (
           <span {...s.attributes} {...s.listeners} aria-label={`Drag ${label}`} className="shrink-0 cursor-grab text-foreground-muted opacity-0 group-hover:opacity-100 focus:opacity-100">
             <GripVertical className="h-3.5 w-3.5" />
@@ -169,7 +174,7 @@ function SectionRow({ id, label }: { id: string; label: string }) {
   )
 }
 
-export default function Layers({ doc, label, onMoveSection, ...rest }: LayersProps) {
+export default function Layers({ doc, label, locked, onMoveSection, ...rest }: LayersProps) {
   const [open, setOpen] = useState<Set<string>>(() => new Set())
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
   const { sel, trees } = rest
@@ -195,7 +200,7 @@ export default function Layers({ doc, label, onMoveSection, ...rest }: LayersPro
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSectionsEnd}>
           <SortableContext items={doc.order} strategy={verticalListSortingStrategy}>
             {doc.order.map(id => (
-              <SectionRow key={id} id={id} label={label(id)} />
+              <SectionRow key={id} id={id} label={label(id)} locked={!!locked?.(id)} />
             ))}
           </SortableContext>
         </DndContext>

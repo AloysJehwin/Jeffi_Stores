@@ -7,8 +7,8 @@ import { DesignError, MAX_HISTORY, createHistory, endGesture, record, redo as re
 
 const CODE_SECTION = 'code_section'
 
-/** A section's own edits, or a change to the page's block list (add, move, remove a section). */
-type Entry = { block: string } | { before: PageDoc; after: PageDoc }
+/** A section's own edits, or a change to the page's blocks (add, move, remove a section; a classic block's fields). */
+type Entry = { block: string } | { before: PageDoc; after: PageDoc; gesture?: string }
 
 export interface EditorState {
   doc: PageDoc
@@ -64,12 +64,15 @@ export function editSection(s: EditorState, block: string, ops: DesignOp[], gest
 }
 
 /**
- * A change to the page's blocks (order, sections added or removed), as one step. Code sections it adds get their own
- * history; the trees of those already there are never changed by it.
+ * A change to the page's blocks (order, sections added or removed, a classic block's fields), as one step, or into the
+ * last step while `gesture` is the same (typing in one block's fields). Code sections it adds get their own history;
+ * the trees of those already there are never changed by it.
  */
-export function editDoc(s: EditorState, fn: (doc: PageDoc) => PageDoc): EditorState {
+export function editDoc(s: EditorState, fn: (doc: PageDoc) => PageDoc, gesture?: string): EditorState {
   const after = fn(s.doc)
   if (after === s.doc) return s
+  const last = s.past[s.past.length - 1]
+  const joined = gesture && last && 'before' in last && last.gesture === gesture ? last : null
   const trees = mapTrees(s.trees, h => ({ ...endGesture(h), future: [] }))
   for (const b of Object.values(after.blocks)) {
     const t = treeOf(b)
@@ -77,7 +80,9 @@ export function editDoc(s: EditorState, fn: (doc: PageDoc) => PageDoc): EditorSt
     const became = t && s.doc.blocks[b.id] && s.doc.blocks[b.id].type !== b.type
     if (t && (!trees[b.id] || became)) trees[b.id] = createHistory(t)
   }
-  return { ...s, doc: after, trees, past: [...s.past, { before: s.doc, after }].slice(-MAX_HISTORY), future: [], rev: s.rev + 1 }
+  const entry = { before: joined ? joined.before : s.doc, after, ...(gesture ? { gesture } : {}) }
+  const past = joined ? [...s.past.slice(0, -1), entry] : [...s.past, entry].slice(-MAX_HISTORY)
+  return { ...s, doc: after, trees, past, future: [], rev: s.rev + 1 }
 }
 
 export function undo(s: EditorState): { state: EditorState; shown: Shown } {

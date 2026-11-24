@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Monitor, Move, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, Wand2, X } from 'lucide-react'
-import { DEFAULT_THEME, insertBlock, isTagNode, moveBlock, removeBlock, updateBlock, type CodeNode } from '@jeffi/site-blocks'
+import { DEFAULT_THEME, insertBlock, isTagNode, moveBlock, removeBlock, updateBlock, type Block, type CodeNode } from '@jeffi/site-blocks'
 import { DesignError, findNode, freshId, treeIds, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
@@ -65,6 +65,8 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const [aiBusy, setAiBusy] = useState(false)
   const [checking, setChecking] = useState(false)
   const [converting, setConverting] = useState(false)
+  /** Counts selections, so field edits join one undo step only within one visit to a block. */
+  const fieldsRun = useRef(0)
   /** Elements an AI change touched, lit up on the canvas once it reloads. */
   const flash = useRef<{ block: string; ids: string[] } | null>(null)
 
@@ -228,6 +230,12 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       s => editDoc(s, d => removeBlock(d, id)),
       () => setSel(null)
     )
+  }
+  /** A classic block's fields from the host's form: typing in one block stays one undo step until something else changes. */
+  const classicFields = (id: string, next: Block) => {
+    const cur = latest.current.state?.doc.blocks[id]
+    if (!hostRef.current.canWrite || !cur || cur.type !== next.type || treeAt(id)) return
+    changePage(s => editDoc(s, d => updateBlock(d, id, { props: next.props, visibility: next.visibility }), `fields:${id}:${fieldsRun.current}`))
   }
   /** A classic content block rewritten as a code section in its place (one undoable step), then selected. */
   const convertSection = async (id: string) => {
@@ -414,7 +422,11 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       if (m.action === 'undo' || m.action === 'redo') step(m.action)
       if (m.action === 'escape') setSel(null)
       const at = latest.current.sel
-      if (m.action === 'delete' && at?.id && hostRef.current.canWrite) deleteNode(at.block, at.id)
+      if (m.action === 'delete' && at && hostRef.current.canWrite) {
+        if (at.id) deleteNode(at.block, at.id)
+        // A classic block is one piece: Delete takes it whole (undoable), unless the page needs it.
+        else if (!treeAt(at.block)) deleteSection(at.block)
+      }
     }
   }
   useEffect(() => {
@@ -444,6 +456,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       window.removeEventListener('keydown', onKey)
     }
   }, [])
+
+  useEffect(() => {
+    fieldsRun.current++
+  }, [sel?.block, sel?.id])
 
   const ready = !!state
   const trees = useMemo(() => (state ? currentTrees(state) : {}), [state])
@@ -553,6 +569,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
             sel={sel}
             canWrite={host.canWrite}
             label={label}
+            locked={sectionLocked}
             onSelect={select}
             onMoveSection={(id, to) => {
               if (update(s => editDoc(s, d => moveBlock(d, id, to)))) requestReload()
@@ -682,11 +699,20 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                 <StylePanel key={bp} className={styleable(tree, sel.id) ?? ''} bp={bp} theme={host.theme} canWrite={host.canWrite} onChange={(prop, value) => style(sel.block, sel.id!, prop, value)} />
               )}
             </Inspector>
-          ) : block ? (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">{label(block.id)}</p>
-              <p className="text-sm text-foreground-muted">This block is set up with its own fields. Open it in the forms editor to change it; here it can be moved with the page.</p>
+          ) : block && !tree ? (
+            <div className="space-y-3">
+              <p className="text-xs text-foreground-muted">
+                A classic block: it moves and goes as one piece{host.renderBlockFields ? ', and its fields are below' : ''}.{' '}
+                {host.convertBlock && isConvertible(block.type) ? 'Convert it to edit it on the page.' : 'Designing the page again with AI makes it editable on the page.'}
+              </p>
+              {host.renderBlockFields ? (
+                host.renderBlockFields({ block, canWrite: host.canWrite, onChange: next => classicFields(block.id, next) })
+              ) : (
+                <p className="text-sm font-semibold text-foreground">{label(block.id)}</p>
+              )}
             </div>
+          ) : block ? (
+            <p className="text-sm text-foreground-muted">Select an element of this section on the canvas or in the layers.</p>
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-foreground-muted">Click anything on the canvas to select it. Double-click words to type in place.</p>

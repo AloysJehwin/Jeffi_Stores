@@ -150,6 +150,28 @@ describe('a classic block converted in the editor', () => {
   })
 })
 
+describe('a classic block’s fields in the editor', () => {
+  const html = (d: PageDoc, v: string) => updateBlock(d, 'c', { props: { html: v } })
+
+  it('joins typing in one visit into one step, and keeps other changes apart', () => {
+    let s = createEditor(page())
+    for (const v of ['<p>a</p>', '<p>ab</p>', '<p>abc</p>']) s = editDoc(s, d => html(d, v), 'fields:c:1')
+    expect(s.past).toHaveLength(1)
+    s = editDoc(s, d => moveBlock(d, 'c', 0))
+    s = editDoc(s, d => html(d, '<p>abcd</p>'), 'fields:c:1')
+    expect(s.past).toHaveLength(3)
+    s = editDoc(s, d => html(d, '<p>new visit</p>'), 'fields:c:2')
+    expect(s.past).toHaveLength(4)
+    let r = undo(s)
+    expect(r.state.doc.blocks.c.props.html).toBe('<p>abcd</p>')
+    r = undo(undo(r.state).state)
+    expect(r.state.doc.blocks.c.props.html).toBe('<p>abc</p>')
+    r = undo(r.state)
+    expect(r.state.doc.blocks.c.props.html).toBe('<p>x</p>')
+    expect(canUndo(r.state)).toBe(false)
+  })
+})
+
 describe('page credits in the editor state', () => {
   it('keeps a stock photo credit with the page for the next save, once per picture', async () => {
     const { addCredit } = await import('@/components/site-editor/state')

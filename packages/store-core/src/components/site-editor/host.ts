@@ -27,6 +27,11 @@ export interface SiteEditorHost {
   theme?: ThemeTokens | null
   /** The host's own picture picker (its uploads, its library), reporting the chosen URL. */
   renderImagePicker?(p: { value: string; disabled: boolean; onPick: (url: string) => void }): ReactNode
+  /**
+   * A classic block's own fields (admin: the forms editor's BlockInspector). Each change comes back as the whole block;
+   * the editor keeps its props and visibility as an undoable step and the canvas redraws after the save.
+   */
+  renderBlockFields?(p: { block: Block; canWrite: boolean; onChange: (next: Block) => void }): ReactNode
   /** A classic block the page can't lose (its core block), so it can't be duplicated or removed. */
   blockLocked?(type: string): boolean
   /**

@@ -111,6 +111,13 @@ AI-generated pages must be editable with it.
    Showcase `POST /studio/design/convert`, which converts the saved block), and puts the result in place as one
    undoable step (undo makes it classic again; `state.ts` `liveTree`). Tests: `tests/lib/site-convert.test.ts`
    renders each kind before and after and compares the words, links and pictures a visitor sees.
+2. Classic blocks in the editor (decision 3: kept as classic blocks until converted or designed again with AI). The
+   legacy homepage sections and page-core blocks are single rows in the layers, marked "Classic", with a lock where
+   the page needs them (`blockLocked`). They drag among the sections, delete from the section bar or with the Delete
+   key (not when locked; undoable), and a click on the canvas or the row opens their fields: the host's
+   `renderBlockFields` (admin: the forms editor's `BlockInspector`, with its section options). Field changes are
+   block-list steps (`editDoc` with a gesture, so typing in one block joins one undo step per visit) and the canvas
+   redraws after the save. Showcase pages hold only code sections and their required parts, so it passes no fields.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for

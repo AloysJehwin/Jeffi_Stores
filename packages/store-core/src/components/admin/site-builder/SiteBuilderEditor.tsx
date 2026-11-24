@@ -774,6 +774,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         canWrite={canWrite}
         theme={theme}
         canAi={canAi}
+        options={options}
         onClose={closeVisual}
         onPublish={publish}
       />
