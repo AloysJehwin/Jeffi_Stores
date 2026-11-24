@@ -2,7 +2,7 @@
 // site-editor): the seed (seed.ts, under tsx, since it reaches store-core) and the canvas message log. Opt in with
 // SITE_EDITOR_E2E=1: they switch site_editor_enabled on and write drafts, on jeffi_test only.
 import fs from 'node:fs'
-import { expect, type Browser, type FrameLocator, type Page } from '@playwright/test'
+import { expect, type Browser, type FrameLocator, type Locator, type Page } from '@playwright/test'
 import { runTsx } from '../responsive/tsx'
 
 export const E2E_ON = process.env.SITE_EDITOR_E2E === '1'
@@ -56,7 +56,8 @@ export async function nextMessage(page: Page, type: string, where: Record<string
 export async function adminPage(browser: Browser, s: Seeded): Promise<Page> {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } })
   await context.addCookies([{ name: 'admin_sid', value: s.sid, url: ADMIN_BASE }])
-  return context.newPage()
+  const p = await context.newPage()
+  return p
 }
 
 /** The seeded draft in the admin Site Builder, open in the visual editor, its hero drawn on the canvas. */
@@ -79,13 +80,24 @@ export async function openEditor(page: Page, s: Seeded): Promise<FrameLocator> {
     await page.waitForTimeout(8_000)
   }
   const frame = page.frameLocator('iframe[title="Page canvas"]')
-  await expect(frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)).toBeVisible({ timeout: 30_000 })
+  // Bridge first (it loads once the page hydrated), then one hero heading: until then the canvas may hold the old and new render.
   await canvasReady(frame)
+  const heading = await single(frame.locator(`[data-block-id="${s.blocks.hero}"] h1`))
+  await expect(heading).toBeVisible({ timeout: 30_000 })
   return frame
 }
 
 /** The canvas bridge loaded and in editing mode (it loads after the page hydrates, and again after each reload). */
 export const canvasReady = (frame: FrameLocator) => expect(frame.locator('html[data-site-editing]')).toBeAttached({ timeout: 60_000 })
+
+/** The locator once exactly one element matches it: a redraw of the canvas shows the old and the new render side by side for a moment, which a strict locator refuses. */
+export async function single(loc: Locator): Promise<Locator> {
+  await expect(loc).toHaveCount(1, { timeout: 30_000 })
+  return loc
+}
+
+/** The canvas element reads `text` once the redraw has settled to that one element (a plain toHaveText fails on the two renders). */
+export const expectOneText = (loc: Locator, text: string, timeout = 30_000) => expect.poll(() => loc.allTextContents(), { timeout }).toEqual([text])
 
 export const expectSaved = (page: Page) => expect(page.locator('[data-site-editor] span[role="status"]')).toHaveText('Saved to draft', { timeout: 20_000 })
 

@@ -5,7 +5,7 @@
 //   SITE_EDITOR_E2E=1 UI_BASE_URL=http://localhost:3000 npx playwright test --config playwright.ui.config.ts admin-service/ui-tests/site-editor/ai.spec.ts
 import { test, expect, type Page } from '@playwright/test'
 import { AI_MOCK_PORT, MOCK, startAiMock, type MockCall } from '../../../tests/site-editor/ai-mock'
-import { E2E_ON, E2E_SKIP, HERO_HEADING, canvasReady, draftHome, expectSaved, adminPage, openEditor, seedDown, seedUp, type Seeded } from '../../../tests/site-editor/e2e'
+import { E2E_ON, E2E_SKIP, HERO_HEADING, canvasReady, draftHome, expectOneText, expectSaved, single, adminPage, openEditor, seedDown, seedUp, type Seeded } from '../../../tests/site-editor/e2e'
 
 test.describe('visual editor AI (UI)', () => {
   test.skip(!E2E_ON, E2E_SKIP)
@@ -38,11 +38,11 @@ test.describe('visual editor AI (UI)', () => {
   test('Change with AI rewrites the selection as one undoable change and lights up what it touched', async () => {
     const frame = await openEditor(page, s)
     const heading = frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)
-    await heading.click()
+    await (await single(heading)).click()
     const id = await heading.getAttribute('data-e')
     await page.getByRole('textbox', { name: /^What to change in/ }).fill('Make the heading about our Chennai workshop')
     await page.getByRole('button', { name: 'Change', exact: true }).click()
-    await expect(heading).toHaveText(MOCK.changed, { timeout: 60_000 }).catch(async e => (await noAiError(page), Promise.reject(e)))
+    await expectOneText(heading, MOCK.changed, 60_000).catch(async e => (await noAiError(page), Promise.reject(e)))
     await expect(frame.locator('[data-e-flash]').first()).toBeAttached()
     // The prompt named the selection and carried the editor's rules.
     const ask = chats(c => said(c, 'user').includes('This is the section "')).pop()
@@ -53,7 +53,7 @@ test.describe('visual editor AI (UI)', () => {
     expect(await tree(page)).toContain(MOCK.changed)
 
     await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(heading).toHaveText(HERO_HEADING, { timeout: 30_000 })
+    await expectOneText(heading, HERO_HEADING, 30_000)
     await expectSaved(page)
     expect(await tree(page)).toContain(HERO_HEADING)
   })
@@ -61,18 +61,18 @@ test.describe('visual editor AI (UI)', () => {
   test('element actions rewrite, shorten and translate words, and find a picture for an image slot', async () => {
     const frame = await openEditor(page, s)
     const heading = frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)
-    await heading.click()
+    await (await single(heading)).click()
     await page.getByRole('button', { name: 'Rewrite' }).click()
-    await expect(heading).toHaveText(MOCK.rewrite, { timeout: 30_000 }).catch(async e => (await noAiError(page), Promise.reject(e)))
+    await expectOneText(heading, MOCK.rewrite, 30_000).catch(async e => (await noAiError(page), Promise.reject(e)))
     await page.getByRole('button', { name: 'Shorten', exact: true }).click()
-    await expect(heading).toHaveText(MOCK.shorten, { timeout: 30_000 })
+    await expectOneText(heading, MOCK.shorten, 30_000)
     await page.getByLabel('Translate into').selectOption('Hindi')
-    await expect(heading).toHaveText(MOCK.hindi, { timeout: 30_000 })
+    await expectOneText(heading, MOCK.hindi, 30_000)
     expect(chats(c => said(c, 'user').includes('Translate it into Hindi')).length).toBeGreaterThan(0)
     await expectSaved(page)
     expect(await tree(page)).toContain(MOCK.hindi)
     for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(heading).toHaveText(HERO_HEADING)
+    await expectOneText(heading, HERO_HEADING)
     await expectSaved(page)
 
     // A picture: the route's stock search and generation run against the mock (nothing found), then a found one as the
@@ -112,18 +112,18 @@ test.describe('visual editor AI (UI)', () => {
     const heading = frame.locator(`[data-block-id="${s.blocks.hero}"] h1`)
     // The fix redraws the canvas after its save.
     await canvasReady(frame)
-    await heading.dblclick()
+    await (await single(heading)).dblclick()
     await page.keyboard.type('Made by hand in small batches, packed with care and shipped to every corner of India')
     await page.keyboard.press('Enter')
     const long = fixes.getByRole('listitem').filter({ hasText: 'characters; it may wrap badly' })
     await expect(long).toHaveCount(1)
     await long.getByRole('button', { name: 'Shorten with AI' }).click()
-    await expect(heading).toHaveText(MOCK.shorten, { timeout: 30_000 })
+    await expectOneText(heading, MOCK.shorten, 30_000)
     await expect(long).toHaveCount(0)
     await expectSaved(page)
     // Back as seeded: the shortening, the typing, the fix and the cleared description.
     for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(heading).toHaveText(HERO_HEADING, { timeout: 30_000 })
+    await expectOneText(heading, HERO_HEADING, 30_000)
     await expectSaved(page)
     expect(await tree(page)).toContain('Our workshop')
   })
@@ -136,7 +136,7 @@ test.describe('visual editor AI (UI)', () => {
     await expect(sizes).toContainText('Nothing runs past the screen', { timeout: 90_000 })
 
     // The badge placed past the hero's right edge on Desktop: the page now runs wider than the screen there.
-    await frame.locator(`[data-block-id="${s.blocks.hero}"] span`, { hasText: 'New season' }).click()
+    await (await single(frame.locator(`[data-block-id="${s.blocks.hero}"] span`, { hasText: 'New season' }))).click()
     await page.getByLabel('Left (%)').fill('90')
     await page.getByLabel('Left (%)').press('Enter')
     await page.getByLabel('Width (%)').fill('40')
