@@ -756,7 +756,9 @@ CREATE TABLE IF NOT EXISTS public.ai_price_list (
 -- Managed only by the platform admin at /admin/ecom/providers; read by lib/providers/policy.ts.
 -- value: "twilio"|"aws" for sms_provider/whatsapp_provider, an ordered JSON array of gateway
 -- provider names for ai_*_providers ([] = gateway default), "draft"|"standard"|"premium" for
--- ai_image_default_quality.
+-- ai_image_default_quality. Outreach (platform default only): voice_provider "exotel"|"twilio_test" and
+-- voice_config (non-secret call/voice settings; secrets sit in tenant_integration_credentials). India SMS DLT:
+-- sms_dlt_entity_id (string) and sms_dlt_sender_ids (array of 6-character headers).
 CREATE TABLE IF NOT EXISTS public.platform_provider_settings (
     id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     tenant_id   uuid,

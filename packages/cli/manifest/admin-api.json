@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "5605299d1e794beac9c0900a53ab6fb0db1ed381719a809c21440a654b600b75",
+ "manifestHash": "7f4f4050ca9c614ecb41af42655662edebc6b12a518bc36eb3f4fa6955025ee0",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -39175,7 +39175,7 @@
     "settings:read"
    ],
    "guard": "auth",
-   "platform": "owner",
+   "platform": null,
    "body": null,
    "summary": "List providers (settings)",
    "command": "settings providers"
@@ -39196,7 +39196,7 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": "owner",
+   "platform": null,
    "body": {
     "type": "object",
     "properties": {
@@ -39259,11 +39259,144 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": "owner",
+   "platform": null,
    "body": null,
    "noBody": true,
    "summary": "Delete providers (settings)",
    "command": "settings providers-delete"
+  },
+  {
+   "id": "admin GET /api/admin/settings/providers/credentials",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/settings/providers/credentials",
+   "gatewayPath": "/v1/admin/settings/providers/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get credentials (settings providers)",
+   "command": "settings-providers credentials"
+  },
+  {
+   "id": "admin PUT /api/admin/settings/providers/credentials",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/settings/providers/credentials",
+   "gatewayPath": "/v1/admin/settings/providers/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "exotel",
+       "sarvam",
+       "twilio_voice",
+       "anthropic_voice"
+      ]
+     },
+     "values": {
+      "description": "any JSON value (type not inferred)"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Update credentials (settings providers)",
+   "command": "settings-providers credentials-update"
+  },
+  {
+   "id": "admin DELETE /api/admin/settings/providers/credentials",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/settings/providers/credentials",
+   "gatewayPath": "/v1/admin/settings/providers/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
+   "pathParams": [],
+   "query": [
+    "provider"
+   ],
+   "queryParams": [
+    {
+     "name": "provider",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "exotel",
+       "sarvam",
+       "twilio_voice",
+       "anthropic_voice"
+      ]
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete credentials (settings providers)",
+   "command": "settings-providers credentials-delete"
+  },
+  {
+   "id": "admin POST /api/admin/settings/providers/credentials/test",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/settings/providers/credentials/test",
+   "gatewayPath": "/v1/admin/settings/providers/credentials/test",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/test/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "exotel"
+      ]
+     }
+    },
+    "required": [
+     "provider"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Read-only check of saved Outreach credentials. Exotel only: a balance read, no call placed. Sarvam has no read-only endpoint, so it has no test. Platform owner on the flagship only.",
+   "command": "settings-providers-credentials test"
   },
   {
    "id": "admin GET /api/admin/setup-guide",
