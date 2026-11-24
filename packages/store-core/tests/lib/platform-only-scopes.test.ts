@@ -7,6 +7,8 @@ const ECOM = [
   'ecom_instances:read',
   'ecom_billing:read',
   'ecom_billing:write',
+  'ecom_outreach:read',
+  'ecom_outreach:write',
 ]
 
 describe('control-plane scopes belong to the platform operator alone', () => {
