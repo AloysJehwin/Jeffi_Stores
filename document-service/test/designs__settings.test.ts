@@ -149,7 +149,7 @@ describe('resolveBranding', () => {
       .rejects.toMatchObject({ status: 400 })
   })
   it('rejects a private resolved address', async () => {
-    lookupMock.mockResolvedValue({ address: '10.0.0.5' })
+    lookupMock.mockResolvedValue([{ address: '10.0.0.5' }])
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://internal.example/logo.png' }))
       .rejects.toMatchObject({ status: 400 })
   })
@@ -159,20 +159,20 @@ describe('resolveBranding', () => {
       .rejects.toMatchObject({ status: 400 })
   })
   it('rejects when fetch is not ok', async () => {
-    lookupMock.mockResolvedValue({ address: '93.184.216.34' })
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://cdn.example/logo.png' }))
       .rejects.toMatchObject({ status: 400 })
   })
   it('rejects a body larger than 2 MB', async () => {
-    lookupMock.mockResolvedValue({ address: '93.184.216.34' })
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
     const big = new Uint8Array(2_000_001).buffer
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => big }))
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://cdn.example/logo.png' }))
       .rejects.toMatchObject({ status: 400 })
   })
   it('fetches, normalizes and returns the logo on success', async () => {
-    lookupMock.mockResolvedValue({ address: '93.184.216.34' })
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
     const small = new Uint8Array([1, 2, 3]).buffer
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => small }))
     const out = await resolveBranding(fakeDb([{ design: null, accent: null, font: null, logo_key: null }]), 't1', null, { logo_url: 'https://cdn.example/logo.png' })
