@@ -16,10 +16,11 @@ import { boxIn, createHandles } from './handles'
 //
 // Messages in (from the parent only): mode { on, write }, select { block, id }, apply { block, ops, seq },
 // scroll-to { y }, measure { block, id, req }, place { block, id, rect | null, frame?, frameMinHeight? },
-// flash { block, ids } (what an AI change touched, lit up for a moment).
+// flash { block, ids } (what an AI change touched, lit up for a moment), overflow { req } (the page check's screen
+// sizes: what runs past this frame's width, answered without editing mode).
 // Messages out: ready, select { block, id, tag, cmp, text }, ops { block, ops }, applied { block, ops, seq },
 // scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' }, measured { req, rect, frame, frameHeight },
-// placed { block, id, rect, sized }.
+// placed { block, id, rect, sized }, overflowed { req, width, items: { block, id, right }[] }.
 
 type Win = Window & { __siteEditorBridge?: boolean }
 const P = 'site-editor:'
@@ -78,6 +79,30 @@ export default function SiteEditorBridge() {
       if (!el) return
       const id = el.dataset.e ?? null
       send({ type: 'select', block: blockOf(el), id, tag: el.tagName.toLowerCase(), cmp: el.hasAttribute('data-e-cmp'), text: id && textOnly(el) ? el.textContent : null })
+    }
+    /** What runs past the screen sideways, so the page scrolls or cuts it: the outermost such element of each section
+     * that no ancestor clips or scrolls on purpose. Fixed layers never widen the page. */
+    const overflowing = () => {
+      const vw = root.clientWidth
+      const found: HTMLElement[] = []
+      for (const el of document.querySelectorAll<HTMLElement>('[data-block-id] *')) {
+        if (found.some(f => f.contains(el))) continue
+        const r = el.getBoundingClientRect()
+        if (!r.width || !r.height || (r.right <= vw + 1 && r.left >= -1)) continue
+        const cs = getComputedStyle(el)
+        if (cs.position === 'fixed' || cs.visibility === 'hidden') continue
+        let clipped = false
+        for (let a = el.parentElement; a && a !== document.body && !clipped; a = a.parentElement) {
+          const s = getComputedStyle(a)
+          clipped = s.overflowX !== 'visible' || s.position === 'fixed'
+        }
+        if (!clipped) found.push(el)
+      }
+      return found.slice(0, 20).map(el => {
+        const block = blockOf(el)
+        const node = el.closest<HTMLElement>('[data-e]')
+        return { block, id: node && blockOf(node) === block ? (node.dataset.e ?? null) : null, right: Math.round(el.getBoundingClientRect().right) }
+      })
     }
     const reveal = (el: HTMLElement) => {
       const r = el.getBoundingClientRect()
@@ -216,6 +241,10 @@ export default function SiteEditorBridge() {
         const el = findAll(e.data.block, e.data.id)[0]
         const frame = el && frameOf(el)
         send({ type: 'measured', req: e.data.req, rect: el && frame ? boxIn(el, frame) : null, frame: frame?.dataset.e ?? null, frameHeight: frame ? frame.getBoundingClientRect().height : null })
+      } else if (kind === 'overflow') {
+        // After the fonts, and a beat for late pictures.
+        const req = e.data.req
+        void document.fonts.ready.then(() => setTimeout(() => send({ type: 'overflowed', req, width: root.clientWidth, items: overflowing() }), 400))
       } else if (kind === 'flash' && Array.isArray(e.data.ids)) {
         const els = (e.data.ids as unknown[]).flatMap(id => findAll(e.data.block, id))
         els.forEach(el => el.setAttribute('data-e-flash', ''))

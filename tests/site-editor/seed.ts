@@ -85,7 +85,12 @@ async function down() {
   const { discardSiteDraft, invalidateSiteCache } = await import('@/lib/site/store')
   const { revokeSession } = await import('@/lib/auth/auth-sessions')
   const { query, queryMany } = await import('@/lib/shared/db')
-  for (const d of await queryMany<{ id: string }>(`SELECT id FROM site_drafts WHERE title LIKE $1`, [`${TITLE}%`])) await discardSiteDraft(d.id)
+  for (const d of await queryMany<{ id: string }>(`SELECT id FROM site_drafts WHERE title LIKE $1`, [`${TITLE}%`])) {
+    await discardSiteDraft(d.id)
+    await query(`DELETE FROM site_settings WHERE key LIKE 'site\\_redesign%:' || $1`, [d.id])
+  }
+  // The AI spec's calls (tests/site-editor/ai-mock.ts) as the store's AI usage.
+  await query(`DELETE FROM ai_usage WHERE model = 'mock-claude'`)
   await revokeSession(s.sid).catch(() => {})
   if (s.emptyBefore?.pages) {
     await query(`DELETE FROM site_versions`)

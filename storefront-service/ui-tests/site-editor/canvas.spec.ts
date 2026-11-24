@@ -18,7 +18,10 @@ test.describe('site editor canvas (UI)', () => {
   async function canvas(page: Page, width = 1280) {
     await page.setViewportSize({ width: width + 40, height: 1000 })
     const src = `${STORE_BASE}/?preview=${encodeURIComponent(s.token)}&layout=${width < 768 ? 'mobile' : 'desktop'}`
-    await page.setContent(`<!doctype html><html><body style="margin:0"><script>${LOG_SCRIPT}</script><iframe id="c" src="${src}" style="width:${width}px;height:960px;border:0"></iframe></body></html>`)
+    // The frame's parent on the store's own origin, as the editor's is: the store's CSP frames it only there.
+    const host = `${STORE_BASE}/__site-editor-e2e`
+    await page.route(host, r => r.fulfill({ contentType: 'text/html', body: `<!doctype html><html><body style="margin:0"><script>${LOG_SCRIPT}</script><iframe id="c" src="${src}" style="width:${width}px;height:960px;border:0"></iframe></body></html>` }))
+    await page.goto(host)
     // The store reads the flag through a 15s cache, so a first load may come before it sees the seed.
     for (let i = 0; ; i++) {
       const ready = await nextMessage(page, 'ready', {}, 8_000).then(
