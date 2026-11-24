@@ -106,6 +106,9 @@ def markdown(meta: dict[str, Any], kn: dict[str, Any], results: list[ScenarioRes
              + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
     if meta.get("claude"):
         L.append(f"- Claude: {meta['claude']}")
+    if meta.get("cold_greeting_s") is not None:
+        L.append(f"- Cold start: the first call after voice-service started greeted after {meta['cold_greeting_s']:.2f}s "
+                 "(VAD and Smart Turn models loading); an unreported warm-up call takes that, and the scenarios run warm")
     L.append("")
     if mocked:
         L.append("> No-key run: Sarvam and Claude are replaced by mocks (an energy-segmenting STT that reports the caller's "

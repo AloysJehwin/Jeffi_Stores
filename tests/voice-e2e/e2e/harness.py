@@ -260,6 +260,14 @@ class Harness:
             voice_patches.say_pcm(p, 8000, voice, cache / "bot")
         return len(parts)
 
+    async def warmup(self, contact: dict[str, str]) -> float | None:
+        """One unreported call right after voice-service starts: the first call pays for loading the VAD and Smart
+        Turn models. Returns its time to greeting (the cold-start figure); the scenarios then run warm."""
+        turns = [Turn(kind="hangup", when="bot_done", gap_s=0.3, max_wait_s=30, label="warm-up")]
+        r = await self.run_call(name="warmup", idx=0, language="en", contact=contact, turns=turns, session={}, max_s=45,
+                                terminal_wait_s=10)
+        return r.metrics.get("time_to_first_greeting_s")
+
     # ── caller audio ──
 
     def caller_audio(self, text: str, language: str) -> bytes | None:

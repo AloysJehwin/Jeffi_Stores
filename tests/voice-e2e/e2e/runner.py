@@ -218,6 +218,8 @@ async def run(names: list[str], groups: list[str], live: bool, max_minutes: floa
         n = h.prewarm_mock_voice([EN])
         if n:
             log(f"pre-rendered {n} mock bot lines")
+        cold_greeting = await h.warmup(EN)
+        log(f"warm-up call: greeting after {cold_greeting}s (cold start)")
         for sc, why in plan:
             res = report.ScenarioResult(sc.name, sc.group, sc.title, sc.proves, "skip", reason=why, providers=providers.label(),
                                         plumbing_only=sc.plumbing_only_when_mocked and providers.llm == "mock")
@@ -259,7 +261,7 @@ async def run(names: list[str], groups: list[str], live: bool, max_minutes: floa
             log(f"     {res.status.upper()} in {res.seconds}s" + "".join(f"\n       FAIL {a['name']}: {a['detail'][:200]}" for a in checks if not a["ok"]))
     finally:
         await h.close()
-    meta = {"started": started, "mode": mode, "providers": providers.label(), "claude": claude_note if live else "",
+    meta = {"started": started, "mode": mode, "cold_greeting_s": locals().get("cold_greeting"), "providers": providers.label(), "claude": claude_note if live else "",
             "commit": git_commit(), "pipecat": _pipecat_version(), "llm_model": keys.llm_model,
             "max_concurrent": h.max_concurrent, "seconds": round(time.monotonic() - t_start), "live_minutes": round(spent_min, 2)}
     jp, mp = report.write(out, meta, results)
