@@ -171,7 +171,8 @@ export async function sendOrderConfirmedSMS(params: {
   orderNumber: string
   total: number
 }): Promise<boolean> {
-  const total = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(params.total)
+  // The template says "Rs."; a currency-formatted total would double the symbol.
+  const total = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(params.total)
   return sendBySlug(params.phone, 'order/confirmed', {
     order_number: params.orderNumber,
     total,
@@ -218,7 +219,6 @@ export async function sendOrderCancelledSMS(params: {
 }): Promise<boolean> {
   return sendBySlug(params.phone, 'order/cancelled', {
     order_number: params.orderNumber,
-    refund_amount: '',
     reason: params.reason ?? '',
   })
 }
@@ -251,6 +251,5 @@ export async function sendPaymentFailedSMS(params: { phone?: string | null; orde
 export async function sendOutForDeliverySMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
   return sendBySlug(params.phone, 'order/out-for-delivery', {
     order_number: params.orderNumber,
-    customer_phone: '',
   })
 }

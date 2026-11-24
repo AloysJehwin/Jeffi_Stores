@@ -26,6 +26,26 @@ describe('email catalog', () => {
   })
 })
 
+describe('sms catalog DLT hygiene', () => {
+  const own = CATALOG.filter(t => t.channel === 'sms' && !t.slug.startsWith('campaign/'))
+
+  it('starts every SMS with the brand name', () => {
+    expect(own.filter(t => !t.body.startsWith('{{store_name}}')).map(t => t.slug)).toEqual([])
+  })
+
+  it('says Rs. and stays plain ASCII (GSM-7)', () => {
+    expect(own.filter(t => /[^\x20-\x7E]/.test(t.body)).map(t => t.slug)).toEqual([])
+  })
+
+  it('has no variable no sender ever fills', () => {
+    expect(own.filter(t => /\{\{\s*(customer_phone|refund_amount)\s*\}\}/.test(t.body)).map(t => t.slug)).toEqual([])
+  })
+
+  it('the confirmation says Rs. before a plain total, never a doubled rupee sign', () => {
+    expect(own.find(x => x.slug === 'order/confirmed')!.body).toContain('Rs. {{total}}')
+  })
+})
+
 describe('sms catalog DLT ids', () => {
   it('carries an optional dltTemplateId on SMS seeds and never on other channels', () => {
     expect(CATALOG.filter(t => t.channel !== 'sms' && t.dltTemplateId)).toEqual([])

@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { decryptToken, encryptToken } from '@/lib/crypto/token-cipher'
+import { IN_DLT_REGION, indiaDltError, isIndiaDltConfig } from '@/lib/messaging/dlt-sender'
+import { getSmsDltConfig } from '@/lib/providers/sms-dlt'
 import { AUDIENCE_CHANNELS, PLATFORM_TENANT_ID, audiencesFor, isSenderAudience, type MessagingChannel, type SenderAudience } from '@/lib/messaging/audiences'
 
 export { AUDIENCE_CHANNELS, PLATFORM_TENANT_ID, audiencesFor, isSenderAudience, type MessagingChannel, type SenderAudience }
@@ -82,6 +84,11 @@ export const usesPlatformAccount = (tenantId: string, provider: SenderProvider, 
 function validate(channel: MessagingChannel, provider: SenderProvider, sender: string, c: Record<string, string>, tenantId: string) {
   if (!sender) throw new Error('sender is required')
   if (usesPlatformAccount(tenantId, provider, c)) return
+  if (provider === 'aws' && isIndiaDltConfig(c)) {
+    if (channel !== 'sms') throw new Error('The platform AWS account is only for India SMS (DLT)')
+    if (c.access_key_id || c.secret_access_key) throw new Error("Do not enter AWS keys with the platform's AWS account")
+    return
+  }
   if (provider === 'twilio') {
     if (!c.account_sid) throw new Error('Twilio account SID is required')
     if (!c.auth_token && !(c.api_key_sid && c.api_key_secret)) throw new Error('Twilio needs an auth token or an API key SID + secret')
@@ -234,9 +241,18 @@ export async function saveTenantSender(i: {
   if (!isProvider(i.provider)) throw new Error('provider must be twilio or aws')
   const sender = (i.sender ?? '').trim()
   const config = cleanConfig(i.config ?? {})
+  if (i.provider === 'aws' && isIndiaDltConfig(config)) {
+    config.region = IN_DLT_REGION
+    if (i.channel === 'sms') {
+      const platform = (await getSmsDltConfig(null, { fresh: true }).catch(() => null))?.senderIds ?? []
+      const bad = indiaDltError(sender, config, platform)
+      if (bad) throw new Error(bad)
+    }
+  }
   if (!(i.platformAccount && i.provider === 'twilio' && !Object.keys(config).length)) validate(i.channel, i.provider, sender, config, i.tenantId)
   else if (!sender) throw new Error('sender is required')
-  const taken = await controlPlanePool().query<{ tenant_id: string; audience: string }>(
+  const dltHeader = i.provider === 'aws' && isIndiaDltConfig(config) // a header is shared across stores, not a number
+  const taken = dltHeader ? { rows: [] as { tenant_id: string; audience: string }[] } : await controlPlanePool().query<{ tenant_id: string; audience: string }>(
     `SELECT tenant_id::text, audience FROM tenant_messaging_senders
       WHERE regexp_replace(sender, '\\D', '', 'g') = $1 AND channel=$2 AND NOT (tenant_id=$3::uuid AND audience=$4) LIMIT 1`,
     [digits(sender), i.channel, i.tenantId, audience]

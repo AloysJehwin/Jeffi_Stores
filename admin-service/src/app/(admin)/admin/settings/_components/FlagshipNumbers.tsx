@@ -18,7 +18,7 @@ const GROUPS: { audience: SenderAudience; blurb: string }[] = [
   { audience: 'ecom', blurb: 'Store owners on the ecom portal; messages to it reach the support inbox. WhatsApp and SMS.' },
 ]
 
-export default function FlagshipNumbers({ senders, storeName }: { senders: TenantSenderMeta[]; storeName: string }) {
+export default function FlagshipNumbers({ senders, storeName, dltHeaders = [] }: { senders: TenantSenderMeta[]; storeName: string; dltHeaders?: string[] }) {
   const find = (ch: Channel, a: SenderAudience) => senders.find(s => s.channel === ch && s.audience === a) ?? null
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -43,6 +43,8 @@ export default function FlagshipNumbers({ senders, storeName }: { senders: Tenan
               <SenderCard
                 key={`${g.audience}-${ch}-${find(ch, g.audience)?.updatedAt ?? 'none'}`}
                 url={`/api/admin/settings/messaging-numbers/${ch}?audience=${g.audience}`}
+                dltHeaders={dltHeaders}
+                checkUrl="/api/admin/settings/messaging-numbers/check-sender-id"
                 channel={ch}
                 audience={g.audience}
                 initial={find(ch, g.audience)}
