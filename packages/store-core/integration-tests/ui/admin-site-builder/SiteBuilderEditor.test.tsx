@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, configure } from '@testing-library/react'
 import { emptyDoc, pageRefKey, type Block, type PageDoc } from '@jeffi/site-blocks'
 import SiteBuilderEditor from '@/components/admin/site-builder/SiteBuilderEditor'
 import { AdminScopesProvider } from '@/contexts/AdminScopesContext'
@@ -96,6 +96,8 @@ function setup(props: Props = {}, who: 'administrator' | 'staff' = 'administrato
 
 describe('SiteBuilderEditor', () => {
   beforeEach(() => {
+    // Draft loading is a chain of fetches; give the whole file headroom under a loaded full run.
+    configure({ asyncUtilTimeout: 5000 })
     try {
       ;(window as any).happyDOM.settings.handleDisabledFileLoadingAsSuccess = true
     } catch {}
@@ -212,9 +214,8 @@ describe('SiteBuilderEditor', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Fresh in' }))
       fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0])
       fireEvent.click(screen.getByRole('button', { name: 'add trust strip' }))
-      const inspector = await screen.findByTestId('inspector')
-      expect(inspector).not.toHaveTextContent('inspecting a')
-      expect(screen.getAllByRole('button', { name: /Move up/ })).toHaveLength(3)
+      await waitFor(() => expect(screen.getByTestId('inspector')).not.toHaveTextContent('inspecting a'))
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Move up/ })).toHaveLength(3))
     })
 
     it('saves the current layout as a template, and a theme change to the draft', async () => {
