@@ -172,7 +172,8 @@ fixes, in which every non-skipped scenario passes.
 - **The first call after a start greeted late** (2 to 9 s against about 0.46 s warm). Measured, that is mostly
   importing the call path (about 5 s); building the Silero VAD and Smart Turn sessions takes about 50 ms each.
   voice-service now does both at startup and answers `/readyz` 503 until they are done; the k8s startup and readiness
-  probes use it, and the harness waits for it. Cold start in the no-key run: 1.82 s before, 0.47 s after.
+  probes use it, and the harness waits for it. Cold start in the no-key runs: 1.82 s before (9.29 s for the first
+  call after a crash), 0.47 to 0.76 s after (0.47 s after a crash).
 - **Smart Turn added 3 s to some replies** (15 of 42 caller turns). An offline probe (Smart Turn v3 on the scenarios'
   English sentences in four macOS voices, as 8 kHz telephone audio, with 0.2 s and 0.48 s of trailing silence) found
   two causes:
@@ -190,7 +191,7 @@ fixes, in which every non-skipped scenario passes.
   | No-key run | Turns | p50 | p90 | Smart Turn timeouts |
   |---|---|---|---|---|
   | all scenarios, before (3 s) | 49 | 0.73 s | 4.08 s | 15 of 42 |
-  | all scenarios, after (2 s) | 50 | 0.72 s | 2.98 s | 15 of 42 |
+  | all scenarios, after (2 s) | 50 | 0.74 s | 2.98 s | 15 of 42 |
   | turn-taking subset*, Rishi, 3 s, before | 18 | 0.71 s | 3.70 s | 5 |
   | turn-taking subset, Rishi, 3 s, fixed code | 18 | 0.70 s | 3.68 s | 5 |
   | turn-taking subset, Rishi, 2 s | 18 | 0.71 s | 2.76 s | 5 |
