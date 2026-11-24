@@ -67,7 +67,7 @@ describe('POST /api/ecom/ai/template-scenario', () => {
   })
 
   it('surfaces a wallet shortfall and a generic failure', async () => {
-    mockFill.mockRejectedValueOnce(new AiWalletError('low'))
+    mockFill.mockRejectedValueOnce(new AiWalletError('low', 1, 5))
     const res = await POST(req(BODY))
     expect(res.status).toBe(402)
     expect(await res.json()).toMatchObject({ error: 'low', balanceInr: 1, neededInr: 5 })

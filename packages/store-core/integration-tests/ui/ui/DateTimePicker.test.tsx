@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 
 const open = () => fireEvent.click(screen.getAllByRole('button')[0])
-const day = (n: number) => screen.getByRole('button', { name: String(n), exact: true })
+const day = (n: number) => screen.getByRole('button', { name: String(n) })
 
 describe('DateTimePicker', () => {
   it('shows the placeholder, or the formatted value, and a hidden form field when named', () => {

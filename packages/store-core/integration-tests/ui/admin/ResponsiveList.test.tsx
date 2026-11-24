@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import ResponsiveList from '@/components/admin/ResponsiveList'
 
-const items = [{ id: 1, n: 'Alpha' }, { id: 2, n: 'Beta' }]
+type Item = { id: number; n: string }
+const items: Item[] = [{ id: 1, n: 'Alpha' }, { id: 2, n: 'Beta' }]
 const base = {
-  getKey: (i: { id: number }) => i.id,
-  renderCard: (i: { n: string }) => <div>card-{i.n}</div>,
+  getKey: (i: Item) => i.id,
+  renderCard: (i: Item) => <div>card-{i.n}</div>,
   tableHead: <th>Name</th>,
   tableBody: <tbody><tr><td>row-data</td></tr></tbody>,
 }

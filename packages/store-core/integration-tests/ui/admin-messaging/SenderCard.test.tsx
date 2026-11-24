@@ -19,6 +19,7 @@ vi.mock('@/components/admin/AdminSelect', () => ({
   ),
 }))
 
+import type { TenantSenderMeta } from '@/lib/messaging/tenant-senders'
 import SenderCard, { day, CHANNEL_LABEL, AUDIENCE_LABEL } from '@/components/admin/messaging/SenderCard'
 
 const badge = (s: unknown) => ({ tone: s ? ('green' as const) : ('muted' as const), label: s ? 'Live' : 'Not set' })
@@ -27,7 +28,7 @@ const existing = {
   sender: '+919800000001',
   updatedAt: '2026-03-05T00:00:00Z',
   meta: { account_sid_last4: 'ab12', has_auth_token: true },
-} as never
+} as unknown as TenantSenderMeta
 
 describe('SenderCard', () => {
   let fetchMock: ReturnType<typeof vi.fn<(...a: any[]) => any>>

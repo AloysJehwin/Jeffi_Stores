@@ -8,7 +8,9 @@ vi.mock('@/lib/site/studio/context', () => ({ saveStudioContext: vi.fn() }))
 vi.mock('@/lib/site/studio/redesign', () => ({ draftStudioContext: vi.fn() }))
 vi.mock('@/lib/site/store', () => {
   class SiteDocInvalid extends Error {
-    issues = [{ message: 'bad block' }]
+    constructor(readonly issues: { blockId?: string; message: string }[], message = 'Invalid page') {
+      super(message)
+    }
   }
   return {
     SiteDocInvalid,
@@ -98,7 +100,7 @@ describe('PUT /api/admin/site-builder/drafts/[id]', () => {
   })
 
   it('returns 400 with the issues for an invalid document', async () => {
-    vi.mocked(saveDraftPage).mockRejectedValue(new SiteDocInvalid('Invalid page'))
+    vi.mocked(saveDraftPage).mockRejectedValue(new SiteDocInvalid([{ message: 'bad block' }]))
     const res = await PUT(withBody('PUT', { page: { ref: REF, doc: {} } }), ctx)
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Invalid page', issues: [{ message: 'bad block' }] })

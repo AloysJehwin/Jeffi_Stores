@@ -10,7 +10,12 @@ vi.mock('@/lib/shared/admin-audit', () => audit)
 const wallet = vi.hoisted(() => ({ getTenantWallet: vi.fn(), rechargeWallet: vi.fn() }))
 vi.mock('@/lib/payments/wallet', () => wallet)
 
-import { GET, POST } from '@controller/app/api/(admin)/admin/ecom/[tenantId]/wallet/route'
+import { GET as rawGET, POST as rawPOST } from '@controller/app/api/(admin)/admin/ecom/[tenantId]/wallet/route'
+
+// the route's gate union types its early return as possibly undefined; it is always a response
+type Ctx = { params: Promise<{ tenantId: string }> }
+const GET = rawGET as (r: NextRequest, c: Ctx) => Promise<Response>
+const POST = rawPOST as (r: NextRequest, c: Ctx) => Promise<Response>
 
 const ctx = { params: Promise.resolve({ tenantId: 't-1' }) }
 const get = () => GET(new NextRequest('http://localhost/api/admin/ecom/t-1/wallet'), ctx)

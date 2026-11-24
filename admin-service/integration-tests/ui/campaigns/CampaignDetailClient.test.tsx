@@ -14,7 +14,7 @@ const lock = { readOnly: false, markLocked: vi.fn() }
 vi.mock('@/hooks/useDraftLock', () => ({ useDraftLock: () => lock }))
 const edit = { sessionId: 's1', save: vi.fn(async () => {}), cancel: vi.fn(async () => {}) }
 vi.mock('@/hooks/useEditSession', () => ({ useEditSession: () => edit }))
-const resnapshot = vi.fn(async () => {})
+const resnapshot = vi.fn<(...a: any[]) => Promise<void>>(async () => {})
 vi.mock('@admin/app/(admin)/admin/campaigns/[kind]/edit/actions', () => ({ resnapshotCampaignSession: (...a: any[]) => resnapshot(...a) }))
 vi.mock('@admin/app/(admin)/admin/campaigns/[kind]/CampaignLoading', () => ({ CampaignEditLoading: () => <div>campaign-loading</div> }))
 vi.mock('@admin/app/(admin)/admin/campaigns/_components/campaign-presentation', () => ({ channelParamOff: () => false }))

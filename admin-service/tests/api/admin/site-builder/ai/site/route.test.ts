@@ -9,19 +9,23 @@ vi.mock('@/lib/site/ai-status', () => ({ AI_UNAVAILABLE_CODE: 'ai_unavailable', 
 vi.mock('@/lib/site/site-generation', () => {
   class SiteGenerationRefused extends Error {
     status = 409
+    constructor(readonly code: 'busy' | 'not_resumable', message: string) {
+      super(message)
+    }
     body() {
-      return { error: this.message, code: 'busy' }
+      return { error: this.message, code: this.code }
     }
   }
   return { SiteGenerationRefused, siteGenerationQuote: vi.fn(), startSiteGeneration: vi.fn() }
 })
 vi.mock('@/lib/ai/paid-generation', () => {
   class PaidGenerationError extends Error {
-    constructor(public status: number, message: string) {
+    status = 402
+    constructor(readonly code: 'wallet_low' | 'duplicate' | 'price_changed', message: string) {
       super(message)
     }
     body() {
-      return { error: this.message, code: 'wallet_low' }
+      return { error: this.message, code: this.code }
     }
   }
   return { PaidGenerationError }
@@ -93,11 +97,11 @@ describe('POST /api/admin/site-builder/ai/site', () => {
   })
 
   it('relays a paid-generation or busy refusal with its status and body', async () => {
-    vi.mocked(startSiteGeneration).mockRejectedValueOnce(new PaidGenerationError(402, 'Wallet too low'))
+    vi.mocked(startSiteGeneration).mockRejectedValueOnce(new PaidGenerationError('wallet_low', 'Wallet too low'))
     const low = await POST(post({ expect: 'paid' }))
     expect(low.status).toBe(402)
     expect(await low.json()).toEqual({ error: 'Wallet too low', code: 'wallet_low' })
-    vi.mocked(startSiteGeneration).mockRejectedValueOnce(new SiteGenerationRefused('Another build is running'))
+    vi.mocked(startSiteGeneration).mockRejectedValueOnce(new SiteGenerationRefused('busy', 'Another build is running'))
     const busy = await POST(post({}))
     expect(busy.status).toBe(409)
     expect(await busy.json()).toEqual({ error: 'Another build is running', code: 'busy' })

@@ -35,7 +35,7 @@ const admin = {
   scopes: ['orders:read'],
   is_active: true,
   mfa_enabled: true,
-  mobile_hint: '••1234',
+  mobile_hint: '••1234' as string | null,
   last_login: null,
   created_at: '2026-01-01T00:00:00Z',
   idle_timeout_minutes: 120,
