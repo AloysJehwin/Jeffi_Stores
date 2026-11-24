@@ -8,13 +8,12 @@ const h = vi.hoisted(() => ({
   mergeBrief: vi.fn(),
   requestChange: vi.fn(),
   publish: vi.fn(),
-  sendPreviewReady: vi.fn(),
-  sendSiteLive: vi.fn(),
+  send: vi.fn(),
 }))
 vi.mock('@controller/lib/outreach/db', () => ({ outreachPool: () => ({ query: h.query }) }))
 vi.mock('@controller/lib/outreach/session', () => ({ loadCallContext: h.loadCallContext, readVoiceSettings: vi.fn() }))
 vi.mock('@controller/lib/outreach/build.stub', () => ({ startDraft: h.startDraft, mergeBrief: h.mergeBrief, requestChange: h.requestChange, publish: h.publish }))
-vi.mock('@controller/lib/outreach/whatsapp.stub', () => ({ sendPreviewReady: h.sendPreviewReady, sendSiteLive: h.sendSiteLive }))
+vi.mock('@controller/lib/outreach/whatsapp', () => ({ sendOutreachTemplate: h.send }))
 vi.mock('@controller/lib/outreach/state', async orig => ({ ...(await orig<typeof import('@controller/lib/outreach/state')>()), transition: h.transition }))
 
 import { runTool, callbackTime } from '@controller/lib/outreach/tools'
@@ -101,17 +100,17 @@ describe('startPreview', () => {
     const r = await run('startPreview', { business_name: 'Ravi Stores' })
     expect(r.body).toEqual({ ok: false, say: LINES.en.consentNeeded })
     expect(h.startDraft).not.toHaveBeenCalled()
-    expect(h.sendPreviewReady).not.toHaveBeenCalled()
+    expect(h.send).not.toHaveBeenCalled()
   })
 
   it('with consent: draft, WhatsApp link, preview_sent, and the success line', async () => {
     setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z' })
     h.startDraft.mockResolvedValue({ siteId: 's1', previewUrl: 'https://site-x/preview?t=abc' })
-    h.sendPreviewReady.mockResolvedValue({ ok: true, messageId: 'm1' })
+    h.send.mockResolvedValue({ ok: true, mode: 'captured', messageId: 'm1', providerMessageId: null })
     const r = await run('startPreview', { business_name: 'Ravi Stores' })
     expect(r.body).toEqual({ ok: true, say: LINES.en.previewSent })
     expect(h.startDraft).toHaveBeenCalledWith('k1', { businessName: 'Ravi Stores', language: 'en' })
-    expect(h.sendPreviewReady).toHaveBeenCalledWith('k1', { previewUrl: 'https://site-x/preview?t=abc' })
+    expect(h.send).toHaveBeenCalledWith('k1', { template: 'preview_ready', url: 'https://site-x/preview?t=abc', actor: 'voice', callId: CALL })
     expect(moves()).toEqual(['interested', 'building', 'preview_sent'])
     expect(JSON.stringify(events())).not.toContain('t=abc')
   })
@@ -119,7 +118,7 @@ describe('startPreview', () => {
   it('does not claim the link went out when WhatsApp fails', async () => {
     setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z' })
     h.startDraft.mockResolvedValue({ siteId: 's1', previewUrl: 'u' })
-    h.sendPreviewReady.mockResolvedValue({ ok: false, error: 'template not approved' })
+    h.send.mockResolvedValue({ ok: false, reason: 'failed', error: 'template not approved' })
     const r = await run('startPreview', { business_name: 'Ravi Stores' })
     expect(r.body).toEqual({ ok: false, say: LINES.en.failedSoft })
     expect(moves()).not.toContain('preview_sent')
@@ -159,18 +158,21 @@ describe('publishSite', () => {
   it('publishes, sends the links, records the outcome', async () => {
     setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z', status: 'preview_sent' })
     h.publish.mockResolvedValue({ liveUrl: 'https://ravi.example', claimUrl: 'https://ecom/claim/x' })
-    h.sendSiteLive.mockResolvedValue({ ok: true })
+    h.send.mockResolvedValue({ ok: true, mode: 'sent', messageId: 'm', providerMessageId: 'p' })
     expect((await run('publishSite')).body).toEqual({ ok: true, say: LINES.en.published })
     expect(moves()).toEqual(['published'])
     expect(sqls().some(s => s.startsWith('UPDATE outreach_calls SET outcome'))).toBe(true)
+    expect(h.send.mock.calls.map(c => [c[1].template, c[1].url])).toEqual([
+      ['site_live', 'https://ravi.example'],
+      ['claim', 'https://ecom/claim/x'],
+    ])
   })
 
   it('live but links not sent: says so honestly', async () => {
     setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z', status: 'preview_sent' })
     h.publish.mockResolvedValue({ liveUrl: 'l', claimUrl: 'c' })
-    h.sendSiteLive.mockResolvedValue({ ok: false, error: 'x' })
+    h.send.mockResolvedValueOnce({ ok: true, mode: 'sent', messageId: 'm', providerMessageId: 'p' }).mockResolvedValueOnce({ ok: false, reason: 'failed' })
     expect((await run('publishSite')).body).toEqual({ ok: true, say: LINES.en.publishedNoLinks })
-    expect(events().map(e => e.kind)).toContain('whatsapp_failed')
   })
 })
 

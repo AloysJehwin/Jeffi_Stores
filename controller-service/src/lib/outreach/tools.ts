@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import * as build from './build.stub'
-import * as whatsapp from './whatsapp.stub'
+import { sendOutreachTemplate } from './whatsapp'
 import { outreachPool } from './db'
 import { recordEvent } from './events'
 import { LINES, SCRIPT_VERSION, asLanguage, isToolName, spokenTime, type ToolName } from './prompt'
@@ -165,10 +165,10 @@ const HANDLERS: { [T in ToolName]: (ctx: Ctx, args: Args<T>) => Promise<Result> 
     const draft = await build.startDraft(contact.id, { businessName: a.business_name, language })
     await outreachPool().query(`UPDATE outreach_contacts SET showcase_site_id = $2, updated_at = now() WHERE id = $1`, [contact.id, draft.siteId])
     await advance(contact.id, 'building', call.id, { siteId: draft.siteId })
-    const sent = await whatsapp.sendPreviewReady(contact.id, { previewUrl: draft.previewUrl })
-    if (!sent.ok) return { ok: false, say: L.failedSoft, detail: { siteId: draft.siteId, whatsapp: sent.error ?? 'not sent' } }
+    const sent = await sendOutreachTemplate(contact.id, { template: 'preview_ready', url: draft.previewUrl, actor: ACTOR, callId: call.id })
+    if (!sent.ok) return { ok: false, say: L.failedSoft, detail: { siteId: draft.siteId, whatsapp: sent.reason } }
     await advance(contact.id, 'preview_sent', call.id, { siteId: draft.siteId })
-    return { ok: true, say: L.previewSent, detail: { siteId: draft.siteId, messageId: sent.messageId } }
+    return { ok: true, say: L.previewSent, detail: { siteId: draft.siteId, messageId: sent.messageId, mode: sent.mode } }
   },
 
   async addDetails({ call, contact }, a) {
@@ -200,9 +200,10 @@ const HANDLERS: { [T in ToolName]: (ctx: Ctx, args: Args<T>) => Promise<Result> 
     const r = await build.publish(contact.id)
     await advance(contact.id, 'published', call.id)
     await setCall(call.id, { outcome: 'published' })
-    const sent = await whatsapp.sendSiteLive(contact.id, { liveUrl: r.liveUrl, claimUrl: r.claimUrl })
-    if (!sent.ok) await recordEvent(contact.id, 'whatsapp_failed', { callId: call.id, actor: ACTOR, data: { template: 'site_live', error: sent.error ?? null } })
-    return { ok: true, say: sent.ok ? L.published : L.publishedNoLinks, detail: { liveUrl: r.liveUrl, linksSent: sent.ok } }
+    const live = await sendOutreachTemplate(contact.id, { template: 'site_live', url: r.liveUrl, actor: ACTOR, callId: call.id })
+    const claim = await sendOutreachTemplate(contact.id, { template: 'claim', url: r.claimUrl, actor: ACTOR, callId: call.id })
+    const linksSent = live.ok && claim.ok
+    return { ok: true, say: linksSent ? L.published : L.publishedNoLinks, detail: { liveUrl: r.liveUrl, linksSent } }
   },
 
   async scheduleCallback({ call, contact, language, now }, a) {
