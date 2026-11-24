@@ -76,13 +76,16 @@ describe('POST /api/admin/ai/template-scenario', () => {
   })
 
   it('maps typed errors to their status', async () => {
-    vi.mocked(fillFromScenario).mockRejectedValueOnce(new AiWalletError('low'))
+    const Wallet = AiWalletError as unknown as new (m: string) => Error
+    const Media = AiMediaError as unknown as new (m: string) => Error
+    vi.mocked(fillFromScenario).mockRejectedValueOnce(new Wallet('low'))
     const w = await POST(req(body))
     expect(w.status).toBe(402)
     expect(await w.json()).toMatchObject({ balanceInr: 1, neededInr: 5 })
-    vi.mocked(fillFromScenario).mockRejectedValueOnce(new AiMediaError('bad media'))
+    vi.mocked(fillFromScenario).mockRejectedValueOnce(new Media('bad media'))
     expect((await POST(req(body))).status).toBe(415)
-    vi.mocked(fillFromScenario).mockRejectedValueOnce(new TemplateScenarioError('bad'))
+    const Scenario = TemplateScenarioError as unknown as new (m: string) => Error
+    vi.mocked(fillFromScenario).mockRejectedValueOnce(new Scenario('bad'))
     expect((await POST(req(body))).status).toBe(422)
   })
 
