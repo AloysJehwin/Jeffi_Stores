@@ -5,7 +5,7 @@ import { SHOWCASE_PRICE_INR } from '@/lib/showcase/types'
 import { cancelSubscription, getSubscription, listSubscriptionInvoices } from '@controller/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
 import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
-import { DAY_MS, effectivePaise, lineLabels, listLines, patchLine, toLine, type BillingLine } from './lines'
+import { DAY_MS, effectivePaise, lineLabels, listLines, patchLine, releaseUnstartedLines, toLine, type BillingLine } from './lines'
 import { abandonPending, currentSubscription, isPaying, toSubscription } from './subscription'
 import { extendEntitlements } from './entitlements'
 import { notifyBilling } from './notify'
@@ -208,8 +208,7 @@ async function abandoned(run: SweepRun): Promise<void> {
   )
   for (const b of first.rows.map(toSubscription)) {
     await pool().query(`UPDATE billing_subscriptions SET status = 'abandoned', is_current = false, updated_at = now() WHERE id = $1`, [b.id])
-    await pool().query(`UPDATE billing_lines SET status = 'ended', ends_at = now(), updated_at = now() WHERE subscription_id = $1 AND status = 'awaiting_payment'`, [b.id])
-    await pool().query(`UPDATE billing_lines SET subscription_id = NULL, updated_at = now() WHERE subscription_id = $1 AND status = 'trial'`, [b.id])
+    await releaseUnstartedLines(b.id)
     await cancelSubscription(b.razorpaySubscriptionId, { cancelAtCycleEnd: false }).catch(() => {})
     run.abandoned++
   }

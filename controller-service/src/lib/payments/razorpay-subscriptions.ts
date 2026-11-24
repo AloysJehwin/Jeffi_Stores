@@ -135,16 +135,28 @@ export async function listSubscriptionInvoices(subscriptionId: string): Promise<
   return (r?.items ?? []).map((i: any) => ({ id: i.id, payment_id: i.payment_id ?? null, status: i.status, amount: Number(i.amount_paid ?? i.amount ?? 0), paid_at: i.paid_at ?? null }))
 }
 
+// Razorpay's answer to a cycle-end cancel before any cycle has started (seen in test mode on a created subscription).
+const NO_CYCLE = /no billing cycle is going on/i
+
 /**
  * Cancel a Razorpay subscription. At cycle end by default, so the workspace keeps the period it paid for; the
- * resulting cancelled/completed webhook ends its lines.
+ * resulting cancelled/completed webhook ends its lines. With no cycle started yet nothing has been paid for, so a
+ * cycle-end cancel that Razorpay refuses is made at once.
  */
 export async function cancelSubscription(
   subscriptionId: string,
   opts?: { cancelAtCycleEnd?: boolean }
 ): Promise<{ status: string; endsAt: number | null }> {
   const cancelAtCycleEnd = opts?.cancelAtCycleEnd !== false
-  const sub = await (getRazorpayInstance().subscriptions as any).cancel(subscriptionId, { cancel_at_cycle_end: cancelAtCycleEnd ? 1 : 0 })
+  const subs = getRazorpayInstance().subscriptions as any
+  // The SDK takes a boolean (true sends cancel_at_cycle_end=1); an options object is truthy, so it always meant cycle end.
+  let sub: any
+  try {
+    sub = await subs.cancel(subscriptionId, cancelAtCycleEnd)
+  } catch (e: any) {
+    if (!cancelAtCycleEnd || !NO_CYCLE.test(e?.error?.description ?? '')) throw e
+    sub = await subs.cancel(subscriptionId, false)
+  }
   return {
     status: (sub?.status ?? 'cancelled') as string,
     endsAt: (sub?.current_end ?? sub?.ended_at ?? null) as number | null,

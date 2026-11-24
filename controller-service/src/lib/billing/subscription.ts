@@ -19,6 +19,7 @@ import {
   patchLine,
   paymentMethodsFor,
   prorationPaise,
+  releaseUnstartedLines,
   sameLine,
   snapshot,
   type BillingLine,
@@ -572,12 +573,7 @@ export async function abandonPending(tenantId: string, keep?: string): Promise<n
   )
   for (const s of r.rows) {
     await cancelSubscription(s.razorpay_subscription_id, { cancelAtCycleEnd: false }).catch(() => {})
-    // Lines only that replacement would have started never started; trials it would have covered go back to waiting.
-    await controlPlanePool().query(
-      `UPDATE billing_lines SET status = 'ended', ends_at = now(), updated_at = now() WHERE subscription_id = $1 AND status = 'awaiting_payment'`,
-      [s.id]
-    )
-    await controlPlanePool().query(`UPDATE billing_lines SET subscription_id = NULL, updated_at = now() WHERE subscription_id = $1 AND status = 'trial'`, [s.id])
+    await releaseUnstartedLines(s.id)
   }
   return r.rowCount ?? 0
 }

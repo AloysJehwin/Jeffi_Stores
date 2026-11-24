@@ -198,6 +198,12 @@ export async function openLine(
   return (await getOpenLine(input.tenantId, input.kind, input.ref ?? '', client))!
 }
 
+/** A subscription nobody authorised: the lines it would have started end, and trials it would have covered wait again. */
+export async function releaseUnstartedLines(subscriptionId: string, client?: Q): Promise<void> {
+  await q(client).query(`UPDATE billing_lines SET status = 'ended', ends_at = now(), updated_at = now() WHERE subscription_id = $1 AND status = 'awaiting_payment'`, [subscriptionId])
+  await q(client).query(`UPDATE billing_lines SET subscription_id = NULL, updated_at = now() WHERE subscription_id = $1 AND status = 'trial'`, [subscriptionId])
+}
+
 export async function patchLine(id: string, cols: Record<string, unknown>, client?: Q): Promise<void> {
   const keys = Object.keys(cols)
   if (!keys.length) return
