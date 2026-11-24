@@ -73,6 +73,8 @@ vi.mock('@/lib/shared/ecom-emails', () => ({
 }))
 
 vi.mock('@controller/lib/provisioning/start-store', () => ({ startStore: vi.fn() }))
+// The linked-account failure path alerts the platform admin; a unit test must not send real mail.
+vi.mock('@controller/lib/provisioning/alerts', () => ({ alertProvisioningFailure: vi.fn().mockResolvedValue(undefined) }))
 
 // ---------------------------------------------------------------------------
 // Imports after mocks
