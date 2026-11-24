@@ -7,29 +7,13 @@ import { recordEvent } from './events'
 import { findActiveByPhone } from './contacts'
 import { InvalidTransitionError, transition } from './state'
 import { captureMode, recordInbound, sendOutreachText } from './whatsapp'
+import { mergeBrief, requestChange, type OutreachBrief } from './build'
 import { LANGUAGES, type OutreachContact, type OutreachLanguage } from './types'
 
 // WhatsApp from an owner the outreach program is talking to (interested…claimed, last 30 days). The webhook sends
 // it here before the shopper bot and never forwards it on. STOP in any supported language opts out at once (one
 // confirmation); anything else is one Claude slot-filling turn that updates the brief or asks for a change through
 // build.ts, then replies in the owner's language inside the 24h window.
-
-// lib/outreach/build.ts (O-build's contract); loaded lazily so this file compiles before that module lands.
-export interface OutreachBrief {
-  whatTheyDo?: string
-  audience?: string
-  highlights?: string[]
-  contact?: { phone?: string; email?: string; whatsapp?: string }
-  hours?: string
-  address?: string
-  style?: string
-  language?: string
-}
-interface BuildApi {
-  mergeBrief(contactId: string, partial: OutreachBrief): Promise<{ building: boolean; missing: (keyof OutreachBrief)[] }>
-  requestChange(contactId: string, instruction: string): Promise<{ ok: boolean; summary: string }>
-}
-const loadBuild = (): Promise<BuildApi> => import('./build' as string)
 
 const ACTOR = 'outreach:whatsapp'
 const MAX_ITERATIONS = 4
@@ -261,14 +245,14 @@ async function runTool(contact: OutreachContact, name: string, args: Record<stri
   if (name === 'update_details') {
     const brief = briefFromArgs(args)
     if (!Object.keys(brief).length) return { error: 'No details given' }
-    const res = await (await loadBuild()).mergeBrief(contact.id, brief)
+    const res = await mergeBrief(contact.id, brief)
     await recordEvent(contact.id, 'brief_updated', { actor: ACTOR, data: { via: 'whatsapp', fields: Object.keys(brief), building: res.building, missing: res.missing } })
     return res
   }
   if (name === 'request_change') {
     const instruction = str(args.instruction)
     if (!instruction) return { error: 'No instruction given' }
-    const res = await (await loadBuild()).requestChange(contact.id, instruction)
+    const res = await requestChange(contact.id, instruction)
     await recordEvent(contact.id, 'change_requested', { actor: ACTOR, data: { via: 'whatsapp', instruction, ok: res.ok, summary: res.summary } })
     return res
   }

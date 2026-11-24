@@ -16,7 +16,6 @@ vi.mock('@/lib/shared/send-by-template', () => ({ sendByTemplate: vi.fn() }))
 vi.mock('@/lib/support/translate', () => ({
   detectLang: (t: string, fallback?: string | null) => (/[ऀ-ॿ]/.test(t) ? 'hi' : /[஀-௿]/.test(t) ? 'ta' : fallback ?? 'en'),
 }))
-// build.ts belongs to O-build and is not on this branch yet; the contract is mocked.
 vi.mock('@controller/lib/outreach/build', () => ({ mergeBrief: h.mergeBrief, requestChange: h.requestChange }))
 
 import { briefFromArgs, handleOutreachInbound, isOptOut, OPT_OUT_CONFIRMATION, replyLanguage, routeOutreachWhatsApp } from '@controller/lib/outreach/inbound'
