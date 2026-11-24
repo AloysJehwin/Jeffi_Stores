@@ -4,6 +4,7 @@ import { authenticateUser } from '@/lib/auth/jwt'
 import { revokeSession, revokeVaultSessionsFor } from '@/lib/auth/auth-sessions'
 import { logActivity } from '@/lib/shared/activity'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
+import { newGuestSessionId } from '@/lib/shared/guest-user'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,8 +29,7 @@ export async function POST(request: NextRequest) {
     store.set('session_id', '', baseOpts)
     store.set('session_id', '', { ...baseOpts, ...cookieDomain })
 
-    const newGuestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    store.set('session_id', newGuestSessionId, {
+    store.set('session_id', newGuestSessionId(), {
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
       ...cookieDomain,

@@ -78,9 +78,9 @@ describe('ProvidersCard (overrides view)', () => {
   it('lists the store overrides with the resolved store name and value', async () => {
     vi.stubGlobal('fetch', dataFetch())
     render(<ProvidersCard view="overrides" />)
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Store overrides' })).toBeInTheDocument())
-    // The one override row: Acme Store / WhatsApp provider / AWS.
-    expect(screen.getByText('Acme Store')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Store overrides' })).toBeInTheDocument()
+    // The heading shows while loading; wait for the one override row: Acme Store / WhatsApp provider / AWS.
+    await waitFor(() => expect(screen.getByText('Acme Store')).toBeInTheDocument())
     expect(screen.getByText('WhatsApp provider')).toBeInTheDocument()
     expect(screen.getByText('AWS')).toBeInTheDocument()
   })

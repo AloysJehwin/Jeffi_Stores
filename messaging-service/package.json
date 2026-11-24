@@ -20,6 +20,7 @@
     "@aws-sdk/client-secrets-manager": "^3.1110.0",
     "@aws-sdk/client-socialmessaging": "3.1071.0",
     "@fastify/formbody": "^8.0.2",
+    "@fastify/rate-limit": "^10.3.0",
     "@jeffi/api-contracts": "*",
     "@jeffi/bulk": "*",
     "@jeffi/mail-shell": "*",

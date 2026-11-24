@@ -8,6 +8,13 @@ const BUCKET = process.env.DOCUMENTS_BUCKET
 const LOCAL_DIR = process.env.DOCUMENTS_LOCAL_DIR || path.join(process.cwd(), '.documents')
 const s3 = BUCKET ? new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' }) : null
 
+function localPath(key: string): string {
+  const root = path.resolve(LOCAL_DIR)
+  const file = path.resolve(root, key)
+  if (!file.startsWith(root + path.sep)) throw new Error('Invalid storage key')
+  return file
+}
+
 export const putPdf = (key: string, body: Buffer) => putObject(key, body, 'application/pdf')
 
 export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
@@ -15,7 +22,7 @@ export async function putObject(key: string, body: Buffer, contentType: string):
     await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }))
     return
   }
-  const file = path.join(LOCAL_DIR, key)
+  const file = localPath(key)
   await mkdir(path.dirname(file), { recursive: true })
   await writeFile(file, body)
 }
@@ -25,7 +32,7 @@ export async function getPdf(key: string): Promise<Buffer> {
     const r = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }))
     return Buffer.from(await r.Body!.transformToByteArray())
   }
-  return readFile(path.join(LOCAL_DIR, key))
+  return readFile(localPath(key))
 }
 
 /** 1-hour signed URL on S3; the service's own /documents/:id/pdf route in dev. */

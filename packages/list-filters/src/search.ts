@@ -59,12 +59,22 @@ export function buildVectorSearchClause(
 // Minimum pg_trgm word_similarity for a query word to fuzzily match the closest run of words in a column.
 const WORD_SIM_THRESHOLD = 0.5
 
+const isWordChar = (c: string) => /\w/.test(c)
+// Linear trim of leading/trailing non-word characters (a regex for the tail backtracks).
+function trimNonWord(w: string): string {
+  let s = 0
+  let e = w.length
+  while (s < e && !isWordChar(w[s])) s++
+  while (e > s && !isWordChar(w[e - 1])) e--
+  return w.slice(s, e)
+}
+
 /** Every word as an escaped substring somewhere across `columns`, or any word fuzzily (typos). */
 export function buildSearchClause(raw: string, columns: string[], startIdx: number = 1): SearchClause {
   const words = raw
     .trim()
     .split(/\s+/)
-    .map(w => w.replace(/^[^\w]+|[^\w]+$/g, ''))
+    .map(trimNonWord)
     .filter(Boolean)
   if (words.length === 0) return { clause: 'TRUE', params: [], nextIdx: startIdx }
 
