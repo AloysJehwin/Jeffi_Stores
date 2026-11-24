@@ -116,7 +116,8 @@ def test_ocr_reports_an_engine_failure(client, svc):
     body = client.post("/ocr", json={"data": b64(), "mime_type": "image/png"}).json()
     assert body["ok"] is False
     assert body["code"] == "ocr_failed"
-    assert "boom" in body["reason"]
+    assert body["reason"] == "OCR failed"
+    assert "boom" not in body["reason"]
 
 
 # ---- real model: only where paddlepaddle and the cached models exist ----
