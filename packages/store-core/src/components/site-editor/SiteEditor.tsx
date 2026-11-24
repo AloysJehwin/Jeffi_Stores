@@ -12,9 +12,9 @@ import FreePanel from './FreePanel'
 import AiBox from './AiBox'
 import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
-import { hasLocked, insertPlace, nodeName, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
+import { hasLocked, insertPlace, litProp, nodeName, nodeWords, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
-import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
+import { addCredit, adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
 
 // The visual site editor (docs/plans/SITE_EDITOR_PLAN.md, phase 2): the real page on a canvas (an iframe with a
 // preview token, where components/visitor/site/editor/SiteEditorBridge selects and edits in place), the page's
@@ -257,6 +257,39 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       flash.current = { block, ids: r.changed }
       requestReload()
       setStatus({ kind: 'pending' })
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  /** A cheap action's words written into the element, as one step. */
+  const elementText = async (block: string, fieldId: string, text: string, action: 'rewrite' | 'shorten' | 'translate', language?: string) => {
+    const ask = hostRef.current.elementAi
+    if (!ask || aiBusy) return
+    setAiBusy(true)
+    try {
+      const r = await ask({ kind: 'text', action, text, language, context: label(block) })
+      if (!r.ok) return say(r.error)
+      if (r.text) edit(block, [{ op: 'text', id: fieldId, value: r.text }])
+    } finally {
+      setAiBusy(false)
+    }
+  }
+  /** A picture for an image slot (its shape, what it shows), its description when it had none, its credit kept. */
+  const elementPicture = async (block: string, id: string) => {
+    const ask = hostRef.current.elementAi
+    const tree = treeAt(block)
+    const node = tree && findNode(tree, id)?.node
+    if (!ask || aiBusy || !tree || !node) return
+    const alt = litProp(node, 'alt') ?? ''
+    setAiBusy(true)
+    try {
+      const r = await ask({ kind: 'picture', subject: alt || nodeWords(tree, 80) || label(block), aspect: litProp(node, 'aspect') })
+      if (!r.ok) return say(r.error)
+      if (!r.url) return
+      const ops: DesignOp[] = [{ op: 'attr', id, name: 'src', value: r.url }]
+      if (!alt && r.alt && litProp(node, 'alt') !== null) ops.push({ op: 'attr', id, name: 'alt', value: r.alt.slice(0, 200) })
+      if (edit(block, ops) && r.credit) update(s => addCredit(s, r.url!, r.credit))
     } finally {
       setAiBusy(false)
     }
@@ -545,6 +578,15 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onDuplicate={() => duplicateNode(sel.block, sel.id!)}
               onDelete={() => deleteNode(sel.block, sel.id!)}
               renderImagePicker={host.renderImagePicker}
+              ai={
+                host.elementAi
+                  ? {
+                      busy: aiBusy,
+                      text: (fieldId, current, action, language) => void elementText(sel.block, fieldId, current, action, language),
+                      picture: () => void elementPicture(sel.block, sel.id!),
+                    }
+                  : undefined
+              }
             >
               {layerAt(tree, sel.id, bp) && (
                 <FreePanel

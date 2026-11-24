@@ -43,6 +43,17 @@ export const isStockImageUrl = (url: unknown) => typeof url === 'string' && STOC
 export const pictureCredits = (pictures: { image?: unknown; credit?: unknown }[] | null | undefined): StockCredit[] =>
   (pictures ?? []).filter(p => isStockImageUrl(p?.image)).map(p => cleanStockCredit(p.credit)).filter((c): c is StockCredit => !!c)
 
+/**
+ * The credits a page carries for stock photos placed in it by the visual editor (`settings.credits`, a Showcase's,
+ * whose pictures stay out of any gallery): those whose picture the page still shows.
+ */
+export function pageCredits(doc: { blocks?: unknown; settings?: Record<string, unknown> } | null | undefined): StockCredit[] {
+  const list = Array.isArray(doc?.settings?.credits) ? (doc!.settings!.credits as { image?: unknown; credit?: unknown }[]) : []
+  if (!list.length) return []
+  const shown = JSON.stringify(doc?.blocks ?? {})
+  return pictureCredits(list.filter(c => typeof c?.image === 'string' && shown.includes(c.image)))
+}
+
 /** site_settings key: credits by image URL for stock photos outside the gallery (a seeded sample catalogue's). */
 export const STOCK_CREDITS_SETTING = 'stock_photo_credits'
 

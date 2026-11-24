@@ -146,3 +146,14 @@ export function adoptSaved(s: EditorState, sent: Record<string, CodeNode>, saved
   }
   return trees === s.trees ? s : { ...s, trees }
 }
+
+/**
+ * A stock photo's credit kept with the page (`settings.credits`), for hosts whose pictures stay out of a gallery (a
+ * Showcase's footer lists those the page still shows). Not an undo step; the next save carries it.
+ */
+export function addCredit(s: EditorState, image: string, credit: unknown): EditorState {
+  if (!credit || typeof credit !== 'object') return s
+  const list = Array.isArray(s.doc.settings?.credits) ? (s.doc.settings!.credits as { image: string }[]) : []
+  const credits = [...list.filter(c => c?.image !== image), { image, credit }].slice(-40)
+  return { ...s, doc: { ...s.doc, settings: { ...s.doc.settings, credits } }, rev: s.rev + 1 }
+}

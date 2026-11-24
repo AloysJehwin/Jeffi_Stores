@@ -6,6 +6,9 @@ import type { CodeNode, PageDoc, ThemeTokens } from '@jeffi/site-blocks'
 
 export type SaveResult = { ok: true; doc: PageDoc } | { ok: false; error: string }
 export type AiResult<T> = ({ ok: true } & T) | { ok: false; error: string }
+export type ElementAsk =
+  | { kind: 'text'; action: 'rewrite' | 'shorten' | 'translate'; text: string; language?: string; context?: string }
+  | { kind: 'picture'; subject: string; aspect?: string | null }
 
 export interface SiteEditorHost {
   /** Names what is being edited (the toolbar). */
@@ -33,6 +36,11 @@ export interface SiteEditorHost {
   changeWithAi?(p: { block: string; label: string; tree: CodeNode; ids: string[]; instruction: string }): Promise<AiResult<{ tree: CodeNode; changed: string[] }>>
   /** A line under the AI box: what a change costs here. */
   aiNote?: string
+  /**
+   * Cheap element actions that return values, not code: words rewritten, shortened or translated, or a picture for
+   * an image slot (stock first, with its credit when it is one).
+   */
+  elementAi?(p: ElementAsk): Promise<AiResult<{ text?: string; url?: string; alt?: string | null; credit?: unknown }>>
   /** Publishes (the host confirms first). */
   publish?(): Promise<void>
   /** Back to the host's own editor. */

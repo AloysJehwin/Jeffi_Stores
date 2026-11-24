@@ -71,6 +71,13 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
               })
               return ok && data.tree ? { ok: true as const, tree: data.tree, changed: data.changed ?? [] } : { ok: false as const, error: data.error || 'The AI could not make that change' }
             },
+            async elementAi(p) {
+              const { ok, data } = await api<{ text?: string; url?: string; alt?: string | null; credit?: unknown; error?: string }>('/api/admin/site-builder/ai/element', {
+                method: 'POST',
+                json: p.kind === 'picture' ? { ...p, draftId } : p,
+              })
+              return ok ? { ok: true as const, ...data } : { ok: false as const, error: data.error || 'The AI could not do that' }
+            },
           }
         : {}),
       // The forms editor's picker: the media library, uploads and AI pictures.

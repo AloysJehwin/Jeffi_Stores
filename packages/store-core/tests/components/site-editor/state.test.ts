@@ -123,3 +123,16 @@ describe('the visual editor state', () => {
     expect(adoptSaved(moved, sent, saved)).toBe(moved)
   })
 })
+
+describe('page credits in the editor state', () => {
+  it('keeps a stock photo credit with the page for the next save, once per picture', async () => {
+    const { addCredit } = await import('@/components/site-editor/state')
+    let s = createEditor(page())
+    s = addCredit(s, 'https://cdn.example.com/stock/pexels-1.jpg', { name: 'A' })
+    s = addCredit(s, 'https://cdn.example.com/stock/pexels-1.jpg', { name: 'A2' })
+    expect(s.rev).toBe(2)
+    expect(docToSave(s).settings?.credits).toEqual([{ image: 'https://cdn.example.com/stock/pexels-1.jpg', credit: { name: 'A2' } }])
+    expect(addCredit(s, 'x', null)).toBe(s)
+    expect(canUndo(s)).toBe(false)
+  })
+})

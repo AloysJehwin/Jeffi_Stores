@@ -79,6 +79,13 @@ AI-generated pages must be editable with it.
    to the store's AI wallet. Showcase: `POST /studio/design/ai`, one AI correction (3 free a day, then ₹20 at the price
    shown), working on the saved section and saving inside the run, so an unsaved change isn't charged. The editor
    saves first, applies the reply as one undoable `replace`, and the changed nodes light up after the reload.
+2. Cheap element actions (values, not code). `lib/site/studio/element-ai.ts`: words rewritten, shortened or
+   translated (ten Indian languages and English) through the studio chat; a picture for an image slot's aspect
+   through `pictureFor`, stock first, generated at draft quality otherwise. Admin `POST ai/element` (store AI wallet;
+   stock photos go to the gallery with their credit, so the store's credits line names them). Showcase
+   `POST /studio/design/element` (the day's free AI help, platform-funded); its pictures stay out of any gallery and
+   their credits travel with the page in `settings.credits` (`addCredit`), which the live page and the preview list
+   while the page shows them (`pageCredits`).
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for

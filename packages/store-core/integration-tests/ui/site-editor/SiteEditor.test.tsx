@@ -266,3 +266,29 @@ describe('SiteEditor change with AI', () => {
     expect(await screen.findByText('Add ₹20 to your wallet')).toBeInTheDocument()
   })
 })
+
+describe('SiteEditor element actions', () => {
+  it('rewrites words and finds a picture, keeping its credit with the page', async () => {
+    const pic: CodeNode = { t: 'el', tag: 'section', props: {}, id: 'e1', children: [{ t: 'el', tag: 'h2', props: {}, id: 'e2', children: [{ t: 'text', value: 'Hello there', id: 'e2.0' }] }, { t: 'cmp', name: 'Image', props: { alt: { k: 'lit', v: '' }, aspect: { k: 'lit', v: '1:1' } }, children: [], id: 'e3' }] }
+    const page = doc()
+    page.blocks.a.props.tree = pic
+    const credit = { name: 'A', source: 'pexels', pageUrl: 'https://www.pexels.com/photo/1', url: null }
+    const elementAi = vi.fn(async (p: { kind: string }) =>
+      p.kind === 'text' ? { ok: true as const, text: 'Hi' } : { ok: true as const, url: 'https://cdn.example.com/stock/pexels-1.jpg', alt: 'Chai', credit }
+    )
+    const { save } = setup({ load: async () => page, elementAi })
+    await screen.findByRole('button', { name: 'Hero' })
+    await fromCanvas({ type: 'select', block: 'a', id: 'e2' })
+    fireEvent.click(await screen.findByRole('button', { name: /Shorten/ }))
+    expect(await screen.findByDisplayValue('Hi')).toBeInTheDocument()
+    expect(elementAi).toHaveBeenCalledWith(expect.objectContaining({ kind: 'text', action: 'shorten', text: 'Hello there' }))
+    await fromCanvas({ type: 'select', block: 'a', id: 'e3' })
+    fireEvent.click(await screen.findByRole('button', { name: /Find a picture/ }))
+    await waitFor(() => expect(elementAi).toHaveBeenCalledWith(expect.objectContaining({ kind: 'picture', aspect: '1:1' })))
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    await waitFor(() => expect(JSON.stringify(save.mock.calls.at(-1)![0].blocks.a.props.tree)).toContain('pexels-1.jpg'), { timeout: 3000 })
+    const last = save.mock.calls.at(-1)![0] as PageDoc
+    expect(JSON.stringify(last.blocks.a.props.tree)).toContain('"Chai"')
+    expect(last.settings?.credits).toEqual([{ image: 'https://cdn.example.com/stock/pexels-1.jpg', credit }])
+  })
+})

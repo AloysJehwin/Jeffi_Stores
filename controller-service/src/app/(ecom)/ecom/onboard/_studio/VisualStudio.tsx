@@ -52,6 +52,12 @@ export default function VisualStudio({ session, allowance: initial, onClose }: {
         else if (typeof data.priceInr === 'number') setAllowance(a => ({ ...a, correctionsLeft: 0, correctionPriceInr: data.priceInr! }))
         return res.ok && data.tree ? { ok: true as const, tree: data.tree, changed: data.changed ?? [] } : { ok: false as const, error: data.error || 'The AI could not make that change' }
       },
+      // The day's free AI help (a picture is a stock photo first).
+      async elementAi(p) {
+        const res = await fetch(url('design/element'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+        const data = (await res.json().catch(() => ({}))) as { text?: string; url?: string; alt?: string | null; credit?: unknown; error?: string }
+        return res.ok ? { ok: true as const, ...data } : { ok: false as const, error: data.error || 'The AI could not do that' }
+      },
       renderImagePicker: ({ value, disabled, onPick }) =>
         disabled ? null : <ImageField value={value || null} onChange={u => u && onPick(u)} kind="work" label="Upload a picture" siteId={site} className="h-24 w-24" />,
       onClose,
