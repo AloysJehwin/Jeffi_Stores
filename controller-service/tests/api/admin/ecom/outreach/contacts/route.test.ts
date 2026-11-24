@@ -11,7 +11,7 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 
 const get = (qs = '') => GET(new NextRequest('http://localhost/api/admin/ecom/outreach/contacts' + qs))
-const LIST = '33333333-3333-3333-3333-333333333333'
+const LIST = '33333333-3333-4333-8333-333333333333'
 
 beforeEach(() => {
   vi.clearAllMocks()
