@@ -16,7 +16,7 @@ function makeRequest(pin: string) {
 }
 
 function mockHttpsResponse(data: object) {
-  mockHttpsGet.mockImplementationOnce((_url: any, _opts: any, callback: any) => {
+  mockHttpsGet.mockImplementationOnce((_url: any, callback: any) => {
     const res = {
       on: (event: string, handler: (chunk?: any) => void) => {
         if (event === 'data') handler(JSON.stringify(data))
@@ -30,7 +30,7 @@ function mockHttpsResponse(data: object) {
 }
 
 function mockHttpsError(err: Error) {
-  mockHttpsGet.mockImplementationOnce((_url: any, _opts: any, _callback: any) => {
+  mockHttpsGet.mockImplementationOnce((_url: any, _callback: any) => {
     return {
       on: (_event: string, handler: (e: Error) => void) => {
         handler(err)

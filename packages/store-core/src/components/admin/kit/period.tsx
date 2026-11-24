@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, AlertCircle, Info, CheckCircle2, RefreshCw } from 'lucide-react'
 import { PERIOD_PRESETS, matchPreset, parsePeriod, previousPeriod, type Period, type PeriodPreset } from '@/lib/overview/period'
 import { api } from './core'
-import DatePicker from '@/components/ui/DatePicker'
+import DatePicker, { formatDisplay } from '@/components/ui/DatePicker'
 
 // Shared pieces for admin overview tabs: the period bar (presets + custom, kept in ?from&to), a
 // loader that only ever returns data fetched for the current URL, and the needs-attention list.
@@ -51,7 +51,7 @@ export function PeriodBar({ value, onChange, onRefresh, busy }: { value: Period;
         <span className="text-foreground-muted">to</span>
 <DatePicker aria-label="To" value={value.to} min={value.from} onChange={v => v && onChange({ from: value.from, to: v })} />
       </div>
-      <span className="text-xs text-foreground-muted">vs {prev.from} to {prev.to}</span>
+      <span className="text-xs text-foreground-muted">vs {formatDisplay(prev.from) || prev.from} to {formatDisplay(prev.to) || prev.to}</span>
       {onRefresh && (
         <button type="button" onClick={onRefresh} aria-label="Refresh" className="ml-auto control-md control-icon text-foreground-muted hover:text-foreground hover:bg-surface-elevated">
           <RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} />

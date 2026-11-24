@@ -18,7 +18,7 @@ export interface DomainPricingSettings {
 
 export const DEFAULT_DOMAIN_PRICING: DomainPricingSettings = {
   marginPct: 25,
-  renewLeadDays: 30,
+  renewLeadDays: 35, // decision 8: a monthly subscription charge always falls inside the window
   renewCutoffDays: 3,
   tlds: ['com', 'in', 'store', 'shop', 'co', 'net', 'org', 'online'],
 }

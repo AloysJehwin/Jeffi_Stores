@@ -4,7 +4,7 @@ import { getWalletBalance, isFlagshipTenant } from '@/lib/payments/wallet'
 import { runPaidGeneration } from '@/lib/ai/paid-generation'
 import { ensureShowcaseWorkspace } from '@/lib/showcase/workspace'
 import { showcaseWalletTenant } from '@controller/lib/showcase/billing'
-import { ownerShowcase } from '@controller/lib/showcase-builder/site'
+import { sessionShowcase } from '@controller/lib/showcase-builder/site'
 import { WALLET_URL } from '@controller/lib/showcase-builder/build'
 import { CORRECTION_PRICE_INR, CORRECTIONS_FREE_PER_DAY } from './allowance'
 import { funded } from './funded'
@@ -63,7 +63,7 @@ async function giveBack(ownerId: string, free: number): Promise<void> {
 /** Whose AI wallet pays: a Showcase's workspace (made on first need, as a redesign does), else the owner's active one. */
 async function walletTenant(s: StudioSession): Promise<string | null> {
   if (s.product === 'showcase') {
-    const site = await ownerShowcase(s.owner_id)
+    const site = await sessionShowcase(s)
     if (!site) return null
     return (await showcaseWalletTenant(site)) ?? (await ensureShowcaseWorkspace(site).catch(() => null))
   }

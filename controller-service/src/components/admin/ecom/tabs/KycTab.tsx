@@ -85,6 +85,8 @@ export default function KycTab({
   files?: Record<string, DocFile>
 }) {
   const store = (t.service_types ?? ['store']).includes('store') || !!t.store_request
+  // A workspace with no store yet, applying for one: approving decides the application.
+  const upgrade = !!t.store_request && !(t.service_types ?? ['store']).includes('store')
   const services = (
     <ServiceApprovals
       tenantId={t.id}
@@ -138,7 +140,15 @@ export default function KycTab({
           {t.store_request && <span className={badgeCls('amber')}>Store upgrade</span>}
         </div>
 
-        {pending && <KycActionButtons tenantId={t.id} mode="pending" kyb={kyb ? readinessOf(kyb, gated) : undefined} />}
+        {pending && (
+          <KycActionButtons
+            tenantId={t.id}
+            mode="pending"
+            kyb={kyb ? readinessOf(kyb, gated) : undefined}
+            store={store}
+            labels={upgrade ? { store: 'Store application' } : undefined}
+          />
+        )}
         {noPaymentLink && <KycActionButtons tenantId={t.id} mode="retry" />}
         {approved && !noPaymentLink && (
           <div className="text-xs text-foreground-muted">

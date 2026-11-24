@@ -1,5 +1,6 @@
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { handEdited } from '@/lib/site/studio/keep-words'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
@@ -18,11 +19,17 @@ export async function studioOwner(request: NextRequest): Promise<Owner | NextRes
 /** Which of the owner's studios a request works on: `?product=showcase` (the Showcase signup and editor), else the store's. */
 export const studioProductOf = (request: NextRequest): StudioProduct => (request.nextUrl.searchParams.get('product') === 'showcase' ? 'showcase' : 'store')
 
+/** A Showcase studio's site (`?site=`); sessions are read by owner, so another owner's site finds nothing. */
+export const studioSiteOf = (request: NextRequest): string | null => {
+  const site = request.nextUrl.searchParams.get('site')
+  return site && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(site) ? site : null
+}
+
 /** The owner and their studio; a 404 when they have not started one. */
 export async function studioOf(request: NextRequest): Promise<{ owner: Owner; session: StudioSession } | NextResponse> {
   const owner = await studioOwner(request)
   if (owner instanceof NextResponse) return owner
-  const session = await getStudioSession(owner.id, studioProductOf(request))
+  const session = await getStudioSession(owner.id, studioProductOf(request), studioSiteOf(request))
   if (!session) return NextResponse.json({ error: 'Start the studio first' }, { status: 404 })
   return { owner, session }
 }
@@ -39,7 +46,11 @@ export function studioView(s: StudioSession | null) {
   const outline = Object.fromEntries(
     Object.entries(pages ?? {}).map(([key, doc]) => [
       key,
-      { sections: (doc.order ?? []).map(id => ({ id, label: String(doc.blocks?.[id]?.props?.label ?? 'Section'), ...(doc.blocks?.[id]?.visibility?.hidden ? { hidden: true } : {}) })) },
+      {
+        sections: (doc.order ?? []).map(id => ({ id, label: String(doc.blocks?.[id]?.props?.label ?? 'Section'), ...(doc.blocks?.[id]?.visibility?.hidden ? { hidden: true } : {}) })),
+        // Changed by hand in the visual editor: a redesign asks first and offers to keep the owner's words.
+        ...(handEdited(doc) ? { edited: true } : {}),
+      },
     ])
   )
   const products = ((catalog as { products?: { images?: string[]; imagePrompt?: string }[] } | null)?.products ?? [])

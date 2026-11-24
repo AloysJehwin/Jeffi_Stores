@@ -1,7 +1,9 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getTenantBilling } from '@/lib/tenant-registry'
+import { BookOpen } from 'lucide-react'
 import PageHeader from '../_components/PageHeader'
-import { LedgerTable, MoneyTiles } from '../_components/finance'
+import { EmptyState } from '../_components/EmptyState'
+import { LedgerTable, MoneyTiles, salesNextStep } from '../_components/finance'
 import { PageLinks, PAGE_SIZE, pageParam } from '../_components/Pagination'
 
 export const dynamic = 'force-dynamic'
@@ -16,11 +18,19 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   if (page !== want) billing = await load(page)
   return (
     <>
-      <PageHeader eyebrow="Finance" title="Settlement ledger" description="Captures, commissions, payouts and adjustments on your wallet." />
+      <PageHeader eyebrow="Finance" title="Settlement ledger" description="Your store's sales money: captured payments, fees, refunds and payouts to your bank. Your prepaid wallet is separate." />
       <div className="space-y-6">
-        <MoneyTiles balance={billing.balance} totals={billing.totals} />
+        <MoneyTiles balance={{ label: 'Settlement balance', value: billing.balance }} totals={billing.totals} />
         <div>
-          <LedgerTable ledger={billing.ledger} balance={billing.balance} />
+          <LedgerTable
+            ledger={billing.ledger}
+            balance={billing.balance}
+            empty={
+              <EmptyState icon={BookOpen} title="No settlement entries yet" action={salesNextStep(tenant)}>
+                Each sale, fee, refund and payout is recorded here once your store sells.
+              </EmptyState>
+            }
+          />
           <PageLinks page={page} total={billing.ledgerCount} base="/dashboard/ledger" />
         </div>
       </div>

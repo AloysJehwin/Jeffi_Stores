@@ -25,7 +25,7 @@ vi.mock('@/lib/payments/wallet', () => ({ getWalletBalance: m.getWalletBalance, 
 vi.mock('@/lib/ai/paid-generation', () => ({ runPaidGeneration: m.runPaidGeneration }))
 vi.mock('@/lib/showcase/workspace', () => ({ ensureShowcaseWorkspace: vi.fn() }))
 vi.mock('@controller/lib/showcase/billing', () => ({ showcaseWalletTenant: vi.fn() }))
-vi.mock('@controller/lib/showcase-builder/site', () => ({ ownerShowcase: vi.fn() }))
+vi.mock('@controller/lib/showcase-builder/site', () => ({ sessionShowcase: vi.fn() }))
 vi.mock('@controller/lib/showcase-builder/build', () => ({ WALLET_URL: '/dashboard/wallet' }))
 vi.mock('@controller/lib/site-studio/funded', () => ({ funded: m.funded }))
 

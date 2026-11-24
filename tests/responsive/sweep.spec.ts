@@ -4,8 +4,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { test, expect, devices, type Browser, type Page } from '@playwright/test'
-import { auditInPage, type Finding } from './audit'
-import { FINDINGS_PATH, MANIFEST_PATH, MIN_TAP, OUTPUT_DIR, SCREENSHOT_WIDTHS, TAP_MAX_WIDTH, WARN_TAP, WIDTHS, layoutFor, type Manifest, type ManifestDraft, type SweepPage } from './pages'
+import { auditInPage, installVitals, vitalsInPage, type Finding } from './audit'
+import { FINDINGS_PATH, MANIFEST_PATH, MIN_TAP, OUTPUT_DIR, SCREENSHOT_WIDTHS, TAP_MAX_WIDTH, VITALS, WARN_TAP, WIDTHS, layoutFor, vitalsStrict, type Manifest, type ManifestDraft, type SweepPage } from './pages'
 
 export interface FindingsLine {
   archetype: string
@@ -35,6 +35,7 @@ async function newContext(browser: Browser, layout: 'mobile' | 'desktop', width:
     userAgent: layout === 'mobile' ? PHONE_UA : DESKTOP_UA,
     hasTouch: layout === 'mobile',
   })
+  await context.addInitScript(installVitals)
   if (businessCookie) {
     await context.addCookies([{ name: 'business_sid', value: businessCookie, domain: new URL(manifest!.baseUrl).hostname, path: '/' }])
   }
@@ -91,13 +92,17 @@ test.describe('responsive sweep', () => {
               const ssr = (await resp?.text().catch(() => '')) ?? ''
               const threw = ssr.match(/Switched to client rendering because the server rendering errored:(?:\\n|\s)*(?:error: )?([^"\\]{1,200})/)
               const ssrError: Finding[] = threw ? [{ kind: 'render', severity: 'error', element: 'document', blockId: null, detail: `server render errored: ${threw[1].trim().slice(0, 200)}` }] : []
+              // Load budgets, as the page first paints at this layout's first width: before any scrolling or resizing.
+              await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {})
+              await page.waitForTimeout(500)
+              const vitals = await page.evaluate(vitalsInPage, { ...VITALS, strict: vitalsStrict() }).catch(() => [] as Finding[])
               await settle(page)
               for (const w of group) {
                 await page.setViewportSize({ width: w, height: layout === 'mobile' ? 800 : 1000 })
                 await page.waitForTimeout(150)
                 await settle(page)
                 const result = await page.evaluate(auditInPage, { width: w, minTap: MIN_TAP, warnTap: WARN_TAP, taps: w <= TAP_MAX_WIDTH })
-                const findings: Finding[] = [...ssrError, ...result.findings]
+                const findings: Finding[] = [...ssrError, ...(w === group[0] ? vitals : []), ...result.findings]
                 if (result.blocks === 0 && !threw) findings.push({ kind: 'render', severity: 'error', element: 'document', blockId: null, detail: 'no Site Builder blocks rendered (preview token not honoured?)' })
                 lines.push(line(draft, p, w, url, result.blocks, result.docWidth, findings))
                 if (p.page === 'home' && SCREENSHOT_WIDTHS.includes(w as (typeof WIDTHS)[number])) {

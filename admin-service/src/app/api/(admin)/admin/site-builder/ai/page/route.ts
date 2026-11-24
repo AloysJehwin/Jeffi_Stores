@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { PAGE_KEYS, SITE_AUDIENCES, type PageKey, type SiteAudience, type SiteSurface } from '@jeffi/site-blocks'
+import { PAGE_KEYS, SITE_AUDIENCES, pageRefKey, type PageKey, type SiteAudience, type SiteSurface } from '@jeffi/site-blocks'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { aiDenial } from '@/lib/auth/ai-scope'
 import { AI_UNAVAILABLE_CODE, AI_UNAVAILABLE_MESSAGE, siteAiAvailable } from '@/lib/site/ai-status'
 import { PageRedoRefused, pageRedoStatus, startPageRedo } from '@/lib/site/studio/redesign'
+import { pageWords } from '@/lib/site/studio/keep-words'
+import { getPublishedPage, getSiteDraft } from '@/lib/site/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +15,8 @@ const Body = z.object({
   ref: z.object({ audience: z.enum(SITE_AUDIENCES as [string, ...string[]]), page: z.enum(PAGE_KEYS) }),
   // The layouts that take the new page: the one open, and its twin while "Same on phone" links them.
   surfaces: z.array(z.enum(['web', 'web_mobile'])).min(1).max(2).default(['web', 'web_mobile']),
+  // "Keep my words": the words on the page as it is now go to the AI, to reuse where they fit.
+  keepWords: z.boolean().optional(),
 })
 
 // POST: one page of a draft (or its product card) designed again the AI Site Studio way, planned afresh and written
@@ -27,14 +31,22 @@ export async function POST(request: NextRequest) {
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Open a page of a draft first' }, { status: 400 })
   if (!(await siteAiAvailable())) return NextResponse.json({ error: AI_UNAVAILABLE_MESSAGE, code: AI_UNAVAILABLE_CODE }, { status: 503 })
-  const { draftId, ref, surfaces } = parsed.data
+  const { draftId, ref, surfaces, keepWords } = parsed.data
   try {
-    const job = await startPageRedo(draftId, { audience: ref.audience as SiteAudience, page: ref.page as PageKey }, surfaces as SiteSurface[], admin.adminId)
+    const words = keepWords ? await draftPageWords(draftId, { audience: ref.audience as SiteAudience, page: ref.page as PageKey }, surfaces[0] as SiteSurface) : []
+    const job = await startPageRedo(draftId, { audience: ref.audience as SiteAudience, page: ref.page as PageKey }, surfaces as SiteSurface[], admin.adminId, { keepWords: words })
     return NextResponse.json({ job }, { status: 202 })
   } catch (err) {
     if (err instanceof PageRedoRefused) return NextResponse.json({ error: err.message }, { status: err.status })
     throw err
   }
+}
+
+/** The words on the draft's page as it is now (else the published one). */
+async function draftPageWords(draftId: string, ref: { audience: SiteAudience; page: PageKey }, surface: SiteSurface): Promise<string[]> {
+  const full = { ...ref, surface, slug: '' }
+  const draft = await getSiteDraft(draftId)
+  return pageWords(draft?.docs.pages?.[pageRefKey(full)] ?? (await getPublishedPage(full))?.doc ?? null)
 }
 
 export async function GET(request: NextRequest) {

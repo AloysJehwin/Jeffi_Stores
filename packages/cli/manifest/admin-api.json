@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "179ed9e673bb9a7e340dccb0c0d1a85d4cc060df55515590dfc380665e7e0535",
+ "manifestHash": "5605299d1e794beac9c0900a53ab6fb0db1ed381719a809c21440a654b600b75",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -40551,6 +40551,118 @@
    "command": "site-builder-ai compose"
   },
   {
+   "id": "admin POST /api/admin/site-builder/ai/element",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai/element",
+   "gatewayPath": "/v1/admin/site-builder/ai/element",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/element/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "kind": {
+        "const": "text",
+        "type": "string"
+       },
+       "action": {
+        "type": "string",
+        "enum": [
+         "rewrite",
+         "shorten",
+         "translate"
+        ]
+       },
+       "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1500
+       },
+       "language": {
+        "type": "string",
+        "enum": [
+         "English",
+         "Hindi",
+         "Tamil",
+         "Telugu",
+         "Kannada",
+         "Malayalam",
+         "Marathi",
+         "Bengali",
+         "Gujarati",
+         "Punjabi"
+        ]
+       },
+       "context": {
+        "type": "string",
+        "maxLength": 200
+       }
+      },
+      "required": [
+       "kind",
+       "action",
+       "text"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "kind": {
+        "const": "picture",
+        "type": "string"
+       },
+       "subject": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 200
+       },
+       "aspect": {
+        "anyOf": [
+         {
+          "type": "string",
+          "maxLength": 8
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "draftId": {
+        "anyOf": [
+         {
+          "type": "string",
+          "format": "uuid"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       }
+      },
+      "required": [
+       "kind",
+       "subject"
+      ]
+     }
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: the visual editor's cheap element actions (lib/site/studio/element-ai.ts), while the editor is on: words rewritten, shortened or translated ({ text }), or a picture for an image slot ({ url, alt, credit }): a stock photo first (kept…",
+   "command": "site-builder-ai element"
+  },
+  {
    "id": "admin GET /api/admin/site-builder/ai/page",
    "host": "admin",
    "method": "GET",
@@ -40665,6 +40777,9 @@
       },
       "minItems": 1,
       "maxItems": 2
+     },
+     "keepWords": {
+      "type": "boolean"
      }
     },
     "required": [
@@ -40676,6 +40791,130 @@
    "bodyContentType": "application/json",
    "summary": "POST: one page of a draft (or its product card) designed again the AI Site Studio way, planned afresh and written section by section in the background into the draft (lib/site/studio/redesign.ts startPageRedo).",
    "command": "site-builder-ai page-create"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/ai/selection",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/ai/selection",
+   "gatewayPath": "/v1/admin/site-builder/ai/selection",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/ai/selection/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "ref": {
+      "type": "object",
+      "properties": {
+       "audience": {
+        "type": "string",
+        "enum": [
+         "store",
+         "business"
+        ]
+       },
+       "page": {
+        "type": "string",
+        "enum": [
+         "home",
+         "products",
+         "category",
+         "brand",
+         "categories",
+         "brands",
+         "product",
+         "cart",
+         "checkout",
+         "wishlist",
+         "compare",
+         "account",
+         "login",
+         "signup",
+         "about",
+         "contact",
+         "support",
+         "returns",
+         "legal",
+         "search",
+         "track",
+         "not_found",
+         "custom",
+         "quotes",
+         "orders",
+         "catalog",
+         "header",
+         "footer",
+         "announcement",
+         "card",
+         "showcase"
+        ]
+       }
+      },
+      "required": [
+       "audience",
+       "page"
+      ]
+     },
+     "block": {
+      "type": "object",
+      "properties": {
+       "label": {
+        "type": "string",
+        "maxLength": 200
+       },
+       "tree": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      },
+      "required": [
+       "tree"
+      ]
+     },
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "maxLength": 60
+      },
+      "maxItems": 20
+     },
+     "instruction": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 1000
+     },
+     "draftId": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "ref",
+     "block",
+     "instruction"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: the visual editor's \"Change with AI\" on a selection (docs/plans/SITE_EDITOR_PLAN.md phase 4), while the editor is on.",
+   "command": "site-builder-ai selection"
   },
   {
    "id": "admin GET /api/admin/site-builder/ai/site",
@@ -40872,6 +41111,102 @@
    "bodyContentType": "application/json",
    "summary": "POST { source, page }: a code section's editable words, links and pictures. With `edits`, the source with them written in (checked by the compiler) and its new list.",
    "command": "site-builder code"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/convert",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/convert",
+   "gatewayPath": "/v1/admin/site-builder/convert",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/convert/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "page": {
+      "type": "string",
+      "enum": [
+       "home",
+       "products",
+       "category",
+       "brand",
+       "categories",
+       "brands",
+       "product",
+       "cart",
+       "checkout",
+       "wishlist",
+       "compare",
+       "account",
+       "login",
+       "signup",
+       "about",
+       "contact",
+       "support",
+       "returns",
+       "legal",
+       "search",
+       "track",
+       "not_found",
+       "custom",
+       "quotes",
+       "orders",
+       "catalog",
+       "header",
+       "footer",
+       "announcement",
+       "card",
+       "showcase"
+      ]
+     },
+     "block": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "maxLength": 80
+       },
+       "type": {
+        "type": "string",
+        "maxLength": 60
+       },
+       "v": {
+        "type": "integer"
+       },
+       "props": {
+        "type": "object",
+        "additionalProperties": {}
+       },
+       "visibility": {
+        "type": "object",
+        "additionalProperties": {}
+       }
+      },
+      "required": [
+       "id",
+       "type",
+       "props"
+      ]
+     }
+    },
+    "required": [
+     "page",
+     "block"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST: \"Convert to editable section\" (docs/plans/SITE_EDITOR_PLAN.md phase 5), on demand, one block at a time, while the visual editor is on: a content or composed block rewritten as a code section with the same words, links and pictures…",
+   "command": "site-builder convert"
   },
   {
    "id": "admin POST /api/admin/site-builder/critique",
@@ -41072,8 +41407,20 @@
      "optional": false
     }
    ],
-   "query": [],
-   "queryParams": [],
+   "query": [
+    "tree"
+   ],
+   "queryParams": [
+    {
+     "name": "tree",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    }
+   ],
    "scope": "settings:read",
    "scopeSource": "literal",
    "scopes": [
@@ -41269,6 +41616,42 @@
    "noBody": true,
    "summary": "Delete a draft (site builder)",
    "command": "site-builder-drafts delete"
+  },
+  {
+   "id": "admin GET /api/admin/site-builder/drafts/{id}/editor",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/drafts/{id}/editor",
+   "gatewayPath": "/v1/admin/site-builder/drafts/{id}/editor",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/drafts/[id]/editor/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "key"
+   ],
+   "queryParams": [
+    {
+     "name": "key",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get editor for a draft",
+   "command": "site-builder-drafts editor"
   },
   {
    "id": "admin POST /api/admin/site-builder/drafts/{id}/pack",

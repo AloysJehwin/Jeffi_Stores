@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, Tabs, change, count, pct, type Col } from '@/components/admin/channels/ui'
-import { BarSeries } from '@/components/admin/traffic/charts'
+import { CHART_MUTED, BarSeries, chartColor } from '@/components/admin/traffic/charts'
 import type { ShowcaseAcquisition, ShowcaseChannelRow, ShowcaseDrillRow } from '@/lib/traffic/showcase-types'
 import { Change, Note, bucketLabel, rateText, ratio } from './shared'
 
@@ -51,7 +51,7 @@ export default function AcquisitionTab({ data }: { data: ShowcaseAcquisition }) 
       ),
     },
     { key: 'new', label: 'First-time', num: true, sort: r => r.newVisitors, render: r => count(r.newVisitors) },
-    { key: 'conv', label: 'Enquiry rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
+    { key: 'conv', label: 'Contact rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
     {
       key: 'leads',
       label: 'Enquiries',
@@ -69,7 +69,7 @@ export default function AcquisitionTab({ data }: { data: ShowcaseAcquisition }) 
   const drillCols = (label: string): Col<ShowcaseDrillRow>[] => [
     { key: 'key', label, render: r => <span className="break-all">{r.key}</span>, sort: r => r.key },
     { key: 'sessions', label: 'Visits', num: true, sort: r => r.sessions, render: r => count(r.sessions) },
-    { key: 'conv', label: 'Enquiry rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
+    { key: 'conv', label: 'Contact rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
     { key: 'leads', label: 'Enquiries', num: true, sort: r => r.leads, render: r => count(r.leads) },
   ]
 
@@ -97,8 +97,8 @@ export default function AcquisitionTab({ data }: { data: ShowcaseAcquisition }) 
           rows={data.paidTrend}
           label={r => bucketLabel(r.bucket, data.period.bucket)}
           series={[
-            { key: 'organic', label: 'Organic and direct', color: 'rgba(148,163,184,0.7)' },
-            { key: 'paid', label: 'Paid', color: '#f97316' },
+            { key: 'organic', label: 'Organic and direct', color: CHART_MUTED },
+            { key: 'paid', label: 'Paid', color: chartColor(4) },
           ]}
         />
       </Section>

@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, Loader2 } from 'lucide-react'
+import { Check, ChevronRight, Loader2 } from 'lucide-react'
 import { ITEM_LABEL, SERVICE_LABEL, type ItemState, type ItemStatus, type KybItem, type KybService } from '@controller/lib/kyb/requirements'
 import type { KybView } from '@controller/lib/kyb/view'
+import type { ServiceState } from '@controller/lib/ecom/service-states'
+import { STATUS_LABEL } from '@controller/lib/ecom/console-copy'
 import { Badge } from '../../onboard/ui'
 
 // What a service still needs from the owner, shared by the Business verification page and the Services cards.
@@ -83,22 +85,53 @@ export function TodoList({ rows, service, local = false, className = '' }: { row
   )
 }
 
-type Phase = 'off' | 'pending' | 'rejected' | 'live'
+/** What the owner still owes a service: its open items, less the documents still being checked. */
+export const owedCount = (rows: TodoRow[]) => rows.filter(r => r.state !== 'checking').length
 
-const APPROVAL: Record<Phase, { label: string; tone: Tone }> = {
-  off: { label: 'Not requested', tone: 'muted' },
-  pending: { label: 'Awaiting approval', tone: 'peach' },
-  rejected: { label: 'Not approved', tone: 'red' },
-  live: { label: 'Live', tone: 'sage' },
+type Phase = ServiceState['status']
+
+const APPROVAL_TONE: Record<Phase, Tone> = { off: 'muted', pending: 'peach', rejected: 'red', live: 'sage' }
+const DONE: ItemState[] = ['review', 'complete', 'approved']
+
+/** One part a service needs, linked to where it is filled in: done, being checked, or still to do. */
+function Part({ item, status }: { item: KybItem; status?: ItemStatus }) {
+  const state = status?.state ?? 'missing'
+  const done = DONE.includes(state)
+  const href = itemHref(item, null, true)
+  const said = ITEM_BADGE[state]?.label
+  const cls = `inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ecom-focus ${done ? 'org-sage org-sage-text' : 'border border-border-default text-foreground ecom-hover'}`
+  const body = (
+    <>
+      {done ? (
+        <Check aria-hidden className="h-3.5 w-3.5" />
+      ) : state === 'checking' ? (
+        <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin text-foreground-muted" />
+      ) : (
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--org-terracotta)]" />
+      )}
+      {ITEM_LABEL[item] ?? item}
+      {said && <span className="sr-only">: {said}</span>}
+    </>
+  )
+  return href.startsWith('#') ? (
+    <a href={href} title={said} className={cls}>
+      {body}
+    </a>
+  ) : (
+    <Link href={href} title={said} className={cls}>
+      {body}
+    </Link>
+  )
 }
 
-function StandingRow({ service, kyb }: { service: KybService; kyb: KybGate }) {
+function ServiceRow({ service, kyb }: { service: KybService; kyb: KybGate }) {
   const st = kyb.services[service]
   const api = service === 'messaging' || service === 'documents'
-  const phase: Phase = !api ? 'live' : !st.active ? 'off' : st.approval === 'pending' ? 'pending' : st.approval === 'rejected' ? 'rejected' : 'live'
+  // As the Services page has it (lib/ecom/service-states.ts): a request not yet approved first, then whether it is on.
+  const phase: Phase = !api ? 'live' : st.approval === 'pending' ? 'pending' : st.approval === 'rejected' ? 'rejected' : st.active ? 'live' : 'off'
   const canRequest = api && (phase === 'off' || phase === 'rejected')
-  const rows = todoRows(st.todo, kyb.items)
-  const owed = rows.filter(r => r.state !== 'checking').length
+  const owed = owedCount(todoRows(st.todo, kyb.items))
+  const parts = st.required.filter(i => kyb.items[i]?.state !== 'not_needed')
   const badge: { label: string; tone: Tone } = st.verified
     ? { label: 'Verified', tone: 'sage' }
     : st.ready
@@ -135,13 +168,21 @@ function StandingRow({ service, kyb }: { service: KybService; kyb: KybGate }) {
           <p className="mt-0.5 text-sm text-foreground-secondary">{said}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {api && <Badge tone={APPROVAL[phase].tone}>{APPROVAL[phase].label}</Badge>}
+          {api && <Badge tone={APPROVAL_TONE[phase]}>{STATUS_LABEL[phase]}</Badge>}
           <Badge tone={badge.tone}>{badge.label}</Badge>
         </div>
       </div>
-      {!st.ready && rows.length > 0 && <TodoList rows={rows} local className="mt-2" />}
+      {parts.length > 0 && (
+        <ul aria-label={`What ${SERVICE_LABEL[service]} needs`} className="mt-3 flex flex-wrap gap-2">
+          {parts.map(i => (
+            <li key={i}>
+              <Part item={i} status={kyb.items[i]} />
+            </li>
+          ))}
+        </ul>
+      )}
       {st.ready && canRequest && (
-        <Link href="/dashboard/services" className="mt-2 inline-flex text-sm font-semibold ecom-accent-text hover:underline">
+        <Link href="/dashboard/services" className="mt-3 inline-flex text-sm font-semibold ecom-accent-text hover:underline">
           Request it on Services
         </Link>
       )}
@@ -149,16 +190,19 @@ function StandingRow({ service, kyb }: { service: KybService; kyb: KybGate }) {
   )
 }
 
-/** Where each service stands: its approval, and what its verification still needs. */
-export function ServiceStanding({ kyb, services }: { kyb: KybGate; services: KybService[] }) {
+/** The page's one checklist: per service, the parts it needs (each linked to its section below) and which are done. */
+export function VerificationChecklist({ kyb, services, showcase = false }: { kyb: KybGate; services: KybService[]; showcase?: boolean }) {
   return (
-    <section aria-labelledby="kyb-standing-title" className="rounded-2xl border border-border-default bg-surface-elevated p-6">
-      <h2 id="kyb-standing-title" className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground-muted">
-        Where your services stand
+    <section aria-labelledby="kyb-checklist-title" className="rounded-2xl border border-border-default bg-surface-elevated p-6">
+      <h2 id="kyb-checklist-title" className="text-xs font-semibold uppercase tracking-widest text-foreground-muted">
+        Verification checklist
       </h2>
+      <p className="mb-4 mt-2 max-w-2xl text-sm text-foreground-secondary">
+        Each service needs these parts before Jeffi switches it on. You can fill them in ahead.{showcase && ' A Showcase site needs none of them.'}
+      </p>
       <ul className="divide-y divide-border-default/60">
         {services.map(s => (
-          <StandingRow key={s} service={s} kyb={kyb} />
+          <ServiceRow key={s} service={s} kyb={kyb} />
         ))}
       </ul>
     </section>

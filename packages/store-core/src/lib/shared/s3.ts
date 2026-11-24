@@ -259,6 +259,8 @@ export interface GalleryUploadResult {
 export type GalleryImageFormat = 'webp' | 'png'
 export interface GalleryUploadOptions {
   format?: GalleryImageFormat
+  /** A stable key without extension (`stock/pixabay-123`): the same file always lands at the same place. */
+  key?: string
 }
 
 const GALLERY_MAX_EDGE = 1600
@@ -266,6 +268,12 @@ const GALLERY_ENCODERS: Record<GalleryImageFormat, { ext: string; mime: string; 
   // Both keep alpha.
   webp: { ext: 'webp', mime: 'image/webp', full: s => s.webp({ quality: 82 }), thumb: s => s.webp({ quality: 75 }) },
   png: { ext: 'png', mime: 'image/png', full: s => s.png({ compressionLevel: 8 }), thumb: s => s.png({ compressionLevel: 8 }) },
+}
+
+/** `stock/pixabay-123` → `stock/thumbnails/pixabay-123.webp`. */
+export function stableThumbnailKey(key: string, ext: string): string {
+  const i = key.lastIndexOf('/')
+  return i < 0 ? `thumbnails/${key}.${ext}` : `${key.slice(0, i)}/thumbnails/${key.slice(i + 1)}.${ext}`
 }
 
 export async function uploadGalleryImage(
@@ -277,8 +285,9 @@ export async function uploadGalleryImage(
   const BUCKET_NAME = await resolveBucket()
   const timestamp = Date.now()
   const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
-  const s3Key = `gallery/${timestamp}-${baseName}.${enc.ext}`
-  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.${enc.ext}`
+  const stable = opts.key?.replace(/[^a-zA-Z0-9/_-]/g, '_').replace(/^\/+|\/+$/g, '')
+  const s3Key = stable ? `${stable}.${enc.ext}` : `gallery/${timestamp}-${baseName}.${enc.ext}`
+  const s3ThumbnailKey = stable ? stableThumbnailKey(stable, enc.ext) : `gallery/thumbnails/${timestamp}-${baseName}.${enc.ext}`
 
   const { data: body, info } = await enc
     .full(sharp(imageBuffer).rotate().resize(GALLERY_MAX_EDGE, GALLERY_MAX_EDGE, { fit: 'inside', withoutEnlargement: true }))

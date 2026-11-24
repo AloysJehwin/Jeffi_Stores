@@ -187,26 +187,15 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
-    // Platform job: one run walks every tenant on auto-renew (charges are control-plane wallet debits).
-    id: 'ad_free_renew',
-    name: 'Renew ad-free add-on',
-    path: '/api/cron/ad-free-renew',
+    // Platform job: workspace subscriptions (controller lib/billing/sweep.ts): trial reminders and pauses, grace ends,
+    // migration deadlines, abandoned checkouts, missed-webhook catch-up.
+    id: 'billing_sweep',
+    name: 'Billing sweep',
+    path: '/api/cron/billing-sweep',
     method: 'POST',
     intervalMs: DAY,
     intervalLabel: 'every 24 h',
     startDelayMs: 240 * SEC,
-    lockTtlMs: HOUR,
-    tenantScope: null,
-  },
-  {
-    // Platform job, like ad_free_renew: one run walks every tenant on auto-renew.
-    id: 'messaging_addon_renew',
-    name: 'Renew SMS & WhatsApp add-on',
-    path: '/api/cron/messaging-addon-renew',
-    method: 'POST',
-    intervalMs: DAY,
-    intervalLabel: 'every 24 h',
-    startDelayMs: 250 * SEC,
     lockTtlMs: HOUR,
     tenantScope: null,
   },
@@ -220,18 +209,6 @@ export const CRON_JOBS: readonly CronJob[] = [
     intervalLabel: 'every 5 min',
     startDelayMs: 105 * SEC,
     lockTtlMs: 5 * MIN - 30 * SEC,
-    tenantScope: null,
-  },
-  {
-    // Platform job: Showcase hosting (lib/showcase/billing.ts): reminders, renewals from the wallet, unpaid sites paused.
-    id: 'showcase_renew',
-    name: 'Renew Showcase sites',
-    path: '/api/cron/showcase-renew',
-    method: 'POST',
-    intervalMs: DAY,
-    intervalLabel: 'every 24 h',
-    startDelayMs: 260 * SEC,
-    lockTtlMs: HOUR,
     tenantScope: null,
   },
   {
@@ -748,11 +725,9 @@ const DAILY_AT_IST: Record<string, string> = {
   google_ads_sync: '30 4',
   // After the nightly sync, so lists are built from the same day's orders.
   google_ads_audiences: '0 6',
-  // Early morning IST, so a lapsing month is charged before most store traffic.
-  ad_free_renew: '0 5',
-  messaging_addon_renew: '10 5',
+  // Early morning IST: trials and grace periods end before most store traffic.
+  billing_sweep: '0 5',
   domain_renew: '20 5',
-  showcase_renew: '30 5',
   drive_purge_trash: '15 3',
   wallet_drift: '45 3',
   s3_usage: '30 2',

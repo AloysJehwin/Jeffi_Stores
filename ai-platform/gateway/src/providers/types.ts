@@ -1,6 +1,20 @@
-import type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect } from '../../../sdk/types'
+import type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName } from '../../../sdk/types'
 
-export type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect }
+export type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName }
+
+/** A normalised stock search as providers see it. */
+export interface StockQuery {
+  query: string
+  orientation: StockOrientation
+  perPage: number
+}
+
+/** A photo library searched by keyword (no key = not configured, skipped). */
+export interface StockProvider {
+  readonly name: StockProviderName
+  configured(): boolean
+  search(q: StockQuery): Promise<StockImage[]>
+}
 
 /** Validated, clamped image request as providers see it. */
 export interface ImageGenInput {

@@ -9,17 +9,21 @@ import { isSectionBlock } from './blocks'
 import { docToRows } from './legacy'
 import { DATA_KINDS, cleanTree, updateNode, walkTree, type ComposedNode } from './composed'
 import { loadComposedData, productsFor } from './composed-data'
-import { getSiteDraft, saveDraftPage, saveDraftTheme } from './store'
+import { getSiteDraft, saveDraftPage, saveDraftTheme, siteEditorEnabled } from './store'
+import type { CodeNode } from './code/ast'
+import { critiqueTrees, offScreen } from './code/tree-critique'
+import { upgradeCodeProps } from './code/compile'
 
 // The critique pass: a page checked the way a careful designer would before it goes live, without a browser. It finds
 // blocks that would render empty (no products, reviews or offers behind them), banners with no picture, text too long
 // for its slot, headings on a picture with nothing to keep them readable, colours too pale for white text, the same
-// thing twice, and phone layouts too dense to tap. Most findings fix themselves; long text is shortened by the AI.
+// thing twice, phone layouts too dense to tap, and freely placed elements that fall off a phone's screen. Most
+// findings fix themselves; long text is shortened by the AI.
 // A screenshot check can join later through the same Finding shape.
 
 export interface Finding {
   severity: 'error' | 'warn'
-  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page'
+  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page' | 'off_screen' | 'no_alt' | 'heading_order'
   message: string
   blockId?: string
   /** It can be fixed without asking (removed, set, shortened). */
@@ -119,6 +123,11 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
           })
         }
       }
+      // Free layers placed on phones (base classes) that run past the section's edges.
+      if (b.type === 'code_section') {
+        for (const id of offScreenOnPhones((p.compiled as { ast?: CodeNode } | null)?.ast))
+          out.push({ severity: 'warn', code: 'off_screen', blockId: id ? `${b.id}#${id}` : b.id, message: `A freely placed element in "${p.label ?? 'a section'}" sits partly off the screen on phones. Move it inside the section on Phone.`, fixable: false })
+      }
       // Pictures.
       if (b.type === 'image_banner' && !p.image) {
         if (!p.heading) out.push({ severity: 'error', code: 'empty_block', blockId: b.id, message: 'A banner has no picture and no words.', fixable: true })
@@ -146,6 +155,15 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
       }
     })
   )
+  // Code sections read as the visual editor's trees, while it is on: contrast, lengths, picture descriptions and
+  // heading order (fixed in the editor, as design operations).
+  if (await siteEditorEnabled().catch(() => false)) {
+    const sections = blocks
+      .filter(b => b.type === 'code_section')
+      .map(b => ({ block: b.id, label: String(b.props.label ?? 'a section'), tree: upgradeCodeProps(b.props, ref.page).tree as CodeNode | undefined }))
+      .filter((x): x is { block: string; label: string; tree: CodeNode } => !!x.tree)
+    for (const f of critiqueTrees(sections, theme)) if (f.code !== 'off_screen') out.push({ severity: f.severity, code: f.code, blockId: f.id ? `${f.block}#${f.id}` : f.block, message: f.message, fixable: false })
+  }
   // Colours: buttons and brand sections put white text on the accent and brand colours.
   const pal = { accent: paletteFrom(theme.accent)[500], primary: paletteFrom(theme.primary)[600] }
   if (contrast(pal.accent, '#ffffff') < 3) out.push({ severity: 'warn', code: 'contrast', message: `White text on your accent colour (${theme.accent}) is hard to read; buttons use it.`, fixable: true })
@@ -154,6 +172,13 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
   const order = new Map(blocks.map((b, i) => [b.id, i]))
   return out.sort((a, b) => (order.get(a.blockId?.split('#')[0] ?? '') ?? 99) - (order.get(b.blockId?.split('#')[0] ?? '') ?? 99))
 }
+
+/**
+ * Elements placed freely on phones (lib/site/code/free.ts, on the base classes) whose box runs past the section: left
+ * or top below 0, or right or bottom past 100%. Their node ids ('' without one). Placed only on wider screens, an
+ * element sits in the flow on phones, so it can't fall off.
+ */
+export const offScreenOnPhones = (ast: CodeNode | null | undefined): string[] => (ast && typeof ast === 'object' ? offScreen(ast).map(o => o.id) : [])
 
 function countContent(tree: ComposedNode) {
   let n = 0

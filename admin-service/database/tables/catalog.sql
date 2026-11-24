@@ -193,7 +193,8 @@ CREATE TABLE public.gallery_images (
     media_kind text DEFAULT 'image'::text NOT NULL,
     source text DEFAULT 'upload'::text NOT NULL,
     prompt_text text,
-    model_name text
+    model_name text,
+    credit jsonb
 );
 
 

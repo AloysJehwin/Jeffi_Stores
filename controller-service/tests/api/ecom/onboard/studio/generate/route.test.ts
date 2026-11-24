@@ -36,7 +36,7 @@ vi.mock('@controller/lib/site-studio/funded', () => ({ freeBudgetLeft: () => 100
 vi.mock('@/lib/site/studio', () => ({ CARD_KEY: 'store:card' }))
 vi.mock('@/lib/site/themes/catalog', () => ({ themeOfDirection: () => null }))
 vi.mock('@controller/lib/showcase-builder/build', () => ({ runShowcaseBuild: m.freeBuild, runShowcasePaidBuild: m.paidBuild, WALLET_URL: '/dashboard/wallet' }))
-vi.mock('@controller/lib/showcase-builder/site', () => ({ ownerShowcase: m.site }))
+vi.mock('@controller/lib/showcase-builder/site', () => ({ sessionShowcase: m.site }))
 vi.mock('@controller/lib/showcase/billing', () => ({ showcaseWalletTenant: m.walletTenant }))
 vi.mock('@/lib/showcase/workspace', () => ({ ensureShowcaseWorkspace: m.workspace }))
 vi.mock('@/lib/payments/wallet', () => ({ getWalletBalance: m.balance, isFlagshipTenant: (id: string) => id === '00000000-0000-0000-0000-000000000000' }))

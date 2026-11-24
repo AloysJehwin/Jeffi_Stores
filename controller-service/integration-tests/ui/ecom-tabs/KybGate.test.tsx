@@ -48,17 +48,17 @@ describe('KybBlocked (render + actions)', () => {
 
   it('lists each missing item under its mapped service label', () => {
     render(<KybBlocked block={block} onForce={async () => {}} onCancel={() => {}} />)
-    expect(screen.getByText('KYB incomplete for this store')).toBeInTheDocument()
+    expect(screen.getByText('The KYB isn’t complete for Online store and Messaging API.')).toBeInTheDocument()
     expect(screen.getByText('Online store')).toBeInTheDocument()
     expect(screen.getByText('Messaging API')).toBeInTheDocument()
     expect(screen.getByText('PAN card: not uploaded')).toBeInTheDocument()
     expect(screen.getByText('Use case')).toBeInTheDocument()
   })
 
-  it('invokes onCancel from the Cancel button', () => {
+  it('invokes onCancel from the Keep in review button', () => {
     const onCancel = vi.fn<(...a: any[]) => any>()
     render(<KybBlocked block={block} onForce={async () => {}} onCancel={onCancel} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep in review' }))
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
 

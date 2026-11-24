@@ -4,6 +4,7 @@ import { groupRows, type HomepageSection } from '@/lib/catalog/homepage-sections
 import type { SectionData } from '@/lib/catalog/homepage-model'
 import { HALF_CELL, HALF_ROW } from './layout-classes'
 import SitePreviewBridge from './SitePreviewBridge'
+import SiteEditorGate from '@/components/visitor/site/editor/SiteEditorGate'
 
 export { HALF_CELL, HALF_ROW }
 
@@ -32,6 +33,7 @@ export default function HomeSections({
         rowIndex={section.type === 'product_row' ? rowIndex++ : rowIndex}
         data={data}
         portal={portal}
+        preview={selectable}
       />
     )
     const i = seen++
@@ -53,6 +55,7 @@ export default function HomeSections({
   return (
     <>
       {selectable && <SitePreviewBridge />}
+      {selectable && <SiteEditorGate />}
       {groupRows(sections).map(row =>
         row.length === 2 ? (
           <div key={row[0].id} className={HALF_ROW}>

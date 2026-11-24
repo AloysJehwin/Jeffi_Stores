@@ -12,10 +12,12 @@ vi.mock('@/lib/payments/webhook-tenant', () => ({
   runInTenant: vi.fn(async (_t: unknown, fn: () => Promise<unknown>) => fn()),
 }))
 vi.mock('@/lib/subscriptions/cycle', () => ({ processSubscriptionEvent: vi.fn(async () => true) }))
+vi.mock('@controller/lib/billing/webhook', () => ({ onBillingSubscription: vi.fn(async () => {}) }))
 
 import { POST } from '@controller/app/api/(public)/webhooks/razorpay/route'
 import { resolveSubscriptionTenant, runInTenant } from '@/lib/payments/webhook-tenant'
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
+import { onBillingSubscription } from '@controller/lib/billing/webhook'
 
 const SECRET = 'test-webhook-secret'
 function req(body: object) {
@@ -41,6 +43,14 @@ describe('platform webhook — subscription events', () => {
     expect(res.status).toBe(200)
     expect(runInTenant).toHaveBeenCalledWith(t, expect.any(Function))
     expect(processSubscriptionEvent).toHaveBeenCalledWith('subscription.halted', evt, { tenantId: 't1', slug: 'acme' })
+  })
+
+  it("hands a workspace's own billing subscription to lib/billing", async () => {
+    vi.mocked(resolveSubscriptionTenant).mockResolvedValue({ tenantId: 't1', slug: '', ctx: null, collectingAccount: 'billing' } as any)
+    const res = await POST(req(evt))
+    expect(res.status).toBe(200)
+    expect(onBillingSubscription).toHaveBeenCalledWith('subscription.halted', evt, { tenantId: 't1', eventId: null })
+    expect(processSubscriptionEvent).not.toHaveBeenCalled()
   })
 
   it('acks and drops an unindexed subscription', async () => {

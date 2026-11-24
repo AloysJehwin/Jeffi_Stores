@@ -2,13 +2,16 @@
 
 import { useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { DataTable, StatusBadge, humanize, type DataCol, type PagerControl } from '@/components/admin/kit'
+import { DataTable, StatusBadge, humanize, type DataCol, type PagerControl, type StatusMap } from '@/components/admin/kit'
 import type { LedgerEntry, TenantTransaction } from '@/lib/tenant-registry/tenants'
 import type { WalletLedgerEntry } from '@/lib/payments/wallet'
+import type { OverviewLine } from '@controller/lib/billing/overview'
+import type { TenantBillingCharge } from '@controller/lib/overviews/ecom-billing'
 import { MONEY_STATUS, inr as inrBase } from '../cells'
 
-// Transactions, settlement ledger and wallet ledger for the Billing page and the Commerce tab. Each gets one
-// server page of rows; its ‹ › arrows change that table's page param (?tp, ?lp, ?wp) in the URL.
+// Transactions, settlement ledger, wallet ledger and the workspace subscription's lines and charges for the Billing
+// page and the Commerce tab. Each paged table gets one server page of rows; its ‹ › arrows change that table's page
+// param (?tp, ?lp, ?wp, ?cp) in the URL.
 
 const inr = (n: number | string) => inrBase(n, 2)
 const day = (v: string) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -70,6 +73,9 @@ const WALLET_LABEL: Record<string, string> = {
   domain: 'Domain',
   infra: 'Servers',
   showcase: 'Showcase site',
+  campaign: 'Campaign',
+  media: 'Media',
+  adjustment: 'Adjustment',
 }
 export const walletLabel = (e: Pick<WalletLedgerEntry, 'category' | 'entry_type'>) => WALLET_LABEL[e.category ?? ''] ?? humanize(e.category || e.entry_type)
 
@@ -194,6 +200,159 @@ export function WalletTable({ rows, paging, hasNext }: { rows: WalletLedgerEntry
             {(e.order_ref || e.awb) && ` · ${[e.order_ref, e.awb].filter(Boolean).join(' · ')}`}
           </div>
           {e.note && <div className="text-xs text-foreground-muted break-words">{e.note}</div>}
+        </div>
+      )}
+    />
+  )
+}
+
+// ── Workspace subscription (lib/billing) ─────────────────────────────────────
+
+const SUBSCRIPTION_STATUS: StatusMap = {
+  created: { label: 'Not paid yet', tone: 'amber' },
+  authenticated: { label: 'Authorised', tone: 'blue' },
+  active: { label: 'Active', tone: 'green' },
+  pending: { label: 'Retrying payment', tone: 'amber' },
+  halted: { label: 'Payment failed', tone: 'red' },
+  paused: { label: 'Paused', tone: 'muted' },
+  cancelled: { label: 'Cancelled', tone: 'muted' },
+  completed: { label: 'Completed', tone: 'muted' },
+  expired: { label: 'Expired', tone: 'muted' },
+  superseded: { label: 'Replaced', tone: 'muted' },
+  abandoned: { label: 'Abandoned', tone: 'muted' },
+}
+
+const LINE_STATUS: StatusMap = {
+  trial: { label: 'Trial', tone: 'blue' },
+  awaiting_payment: { label: 'Awaiting payment', tone: 'amber' },
+  active: { label: 'Active', tone: 'green' },
+  ending: { label: 'Ending', tone: 'amber' },
+  legacy_wallet: { label: 'Wallet (legacy)', tone: 'muted' },
+  ended: { label: 'Ended', tone: 'muted' },
+}
+
+export const LINE_KIND_LABEL: Record<string, string> = {
+  store_plan: 'Store plan',
+  showcase_site: 'Showcase site',
+  messaging_addon: 'SMS & WhatsApp add-on',
+  ad_free: 'Ad-free store',
+  other: 'Unassigned',
+}
+
+export function SubscriptionBadge({ status }: { status: string | null | undefined }) {
+  return <StatusBadge status={status} map={SUBSCRIPTION_STATUS} />
+}
+
+const rupees = (paise: number) => inr(paise / 100)
+
+/** The date that matters next for a line: its trial end, its end, or the end of its grace. */
+function lineUntil(l: OverviewLine): string {
+  if (l.graceUntil) return `Grace until ${day(l.graceUntil)}`
+  if (l.status === 'trial' && l.trialEndsAt) return `Trial ends ${day(l.trialEndsAt)}`
+  if (l.endsAt) return `Ends ${day(l.endsAt)}`
+  return '-'
+}
+
+const lineSub = (l: OverviewLine) => [LINE_KIND_LABEL[l.kind] ?? humanize(l.kind), l.kind === 'messaging_addon' && l.ref ? humanize(l.ref) : null].filter(Boolean).join(' · ')
+const linePrice = (l: OverviewLine) => (
+  <span className="tabular-nums">
+    {rupees(l.amountPaise)}
+    {l.nextAmountPaise != null && l.changesAt && (
+      <span className="block text-xs text-foreground-muted">
+        {rupees(l.nextAmountPaise)} from {day(l.changesAt)}
+      </span>
+    )}
+  </span>
+)
+
+const LINE_COLS: DataCol<OverviewLine>[] = [
+  {
+    key: 'line',
+    label: 'Line',
+    sort: l => l.label,
+    render: l => (
+      <div className="min-w-0">
+        <p className="font-medium text-foreground break-words">{l.label}</p>
+        <p className="text-xs text-foreground-muted">{lineSub(l)}</p>
+      </div>
+    ),
+  },
+  { key: 'status', label: 'Status', sort: l => l.status, render: l => <StatusBadge status={l.status} map={LINE_STATUS} /> },
+  { key: 'monthly', label: 'Monthly', num: true, sort: l => l.amountPaise, render: linePrice },
+  { key: 'until', label: 'Next date', hideBelow: 'lg', sort: l => l.graceUntil || l.trialEndsAt || l.endsAt || '', render: l => <span className="text-foreground-muted">{lineUntil(l)}</span> },
+]
+
+/** What the workspace is billed for (its open billing lines). */
+export function BillingLinesTable({ rows }: { rows: OverviewLine[] }) {
+  return (
+    <DataTable
+      sortNs="lines"
+      rows={rows}
+      cols={LINE_COLS}
+      rowKey={l => l.id}
+      noun="lines"
+      empty="Nothing on the subscription yet."
+      bare
+      mobileCard={l => (
+        <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1.5 min-w-0">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <span className="text-sm font-medium text-foreground min-w-0 break-words">{l.label}</span>
+            <StatusBadge status={l.status} map={LINE_STATUS} />
+          </div>
+          <div className="flex justify-between gap-2 text-xs text-foreground-muted">
+            <span>{lineUntil(l)}</span>
+            <span className="font-semibold text-foreground tabular-nums">{rupees(l.amountPaise)}/mo</span>
+          </div>
+        </div>
+      )}
+    />
+  )
+}
+
+const chargeFor = (c: TenantBillingCharge) => c.lines.map(l => l.label || LINE_KIND_LABEL[l.kind] || l.kind).join(', ') || 'Subscription'
+const chargePeriod = (c: TenantBillingCharge) => (c.periodStart && c.periodEnd ? `${day(c.periodStart)} – ${day(c.periodEnd)}` : '-')
+
+const CHARGE_COLS: DataCol<TenantBillingCharge>[] = [
+  { key: 'date', label: 'Charged', sortType: 'date', sort: c => new Date(c.chargedAt).getTime(), render: c => <span className="text-foreground-muted">{day(c.chargedAt)}</span> },
+  { key: 'for', label: 'For', sort: c => chargeFor(c), className: 'max-w-xs truncate', render: c => <span className="text-foreground">{chargeFor(c)}</span> },
+  { key: 'period', label: 'Period', hideBelow: 'lg', sort: c => c.periodStart || '', render: c => <span className="text-foreground-muted">{chargePeriod(c)}</span> },
+  { key: 'amount', label: 'Amount', num: true, sort: c => c.amountPaise, render: c => <span className="font-medium text-foreground">{inr(c.amountPaise / 100)}</span> },
+  {
+    key: 'refunded',
+    label: 'Refunded',
+    num: true,
+    hideBelow: 'lg',
+    sort: c => c.refundedPaise,
+    render: c => (c.refundedPaise > 0 ? <span className="text-red-600 dark:text-red-400">−{inr(c.refundedPaise / 100)}</span> : <span className="text-foreground-muted">-</span>),
+  },
+  { key: 'payment', label: 'Payment', hideBelow: 'xl', sort: c => c.paymentId, render: c => <span className="font-mono text-xs text-foreground-secondary">{c.paymentId}</span> },
+]
+
+/** Successful charges of the workspace subscription, one server page at a time (?cp). */
+export function BillingChargesTable({ rows, total, paging }: { rows: TenantBillingCharge[]; total: number; paging: TablePage }) {
+  const pager = useUrlPager(paging, total)
+  return (
+    <DataTable
+      sortNs="charges"
+      rows={rows}
+      cols={CHARGE_COLS}
+      rowKey={c => c.id}
+      pager={pager}
+      noun="charges"
+      empty="No subscription charges yet."
+      bare
+      mobileCard={c => (
+        <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-foreground min-w-0 break-words">{chargeFor(c)}</span>
+            <span className="shrink-0 font-semibold tabular-nums text-foreground">{inr(c.amountPaise / 100)}</span>
+          </div>
+          <div className="text-xs text-foreground-muted">
+            {day(c.chargedAt)}
+            {c.periodStart && c.periodEnd && ` · ${chargePeriod(c)}`}
+          </div>
+          {c.refundedPaise > 0 && <div className="text-xs text-red-600 dark:text-red-400">Refunded {inr(c.refundedPaise / 100)}</div>}
+          <div className="font-mono text-xs text-foreground-muted break-all">{c.paymentId}</div>
         </div>
       )}
     />

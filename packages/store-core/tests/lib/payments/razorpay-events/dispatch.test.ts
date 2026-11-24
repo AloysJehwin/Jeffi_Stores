@@ -195,4 +195,29 @@ describe('subscription events', () => {
     vi.mocked(processSubscriptionEvent).mockRejectedValue(new Error('boom'))
     await expect(dispatchRazorpayEvent(subEvt, ctx())).rejects.toBeInstanceOf(TransientWebhookError)
   })
+
+  describe("a workspace's own billing subscription", () => {
+    const billing = { tenantId: 't1', slug: '', ctx: null, collectingAccount: 'billing' }
+
+    it('goes to the injected handler, never into a store', async () => {
+      vi.mocked(resolveSubscriptionTenant).mockResolvedValue(billing as any)
+      const onBillingSubscription = vi.fn().mockResolvedValue(undefined)
+      await dispatchRazorpayEvent(subEvt, { ...ctx({ source: 'platform' }), eventId: 'evt_1', onBillingSubscription })
+      expect(onBillingSubscription).toHaveBeenCalledWith('subscription.charged', subEvt, { tenantId: 't1', eventId: 'evt_1' })
+      expect(processSubscriptionEvent).not.toHaveBeenCalled()
+      expect(runInTenant).not.toHaveBeenCalled()
+    })
+
+    it('is acked and dropped without a handler', async () => {
+      vi.mocked(resolveSubscriptionTenant).mockResolvedValue(billing as any)
+      await expect(dispatchRazorpayEvent(subEvt, ctx({ source: 'platform' }))).resolves.toBeUndefined()
+      expect(processSubscriptionEvent).not.toHaveBeenCalled()
+    })
+
+    it('a handler failure is retryable', async () => {
+      vi.mocked(resolveSubscriptionTenant).mockResolvedValue(billing as any)
+      const onBillingSubscription = vi.fn().mockRejectedValue(new Error('db down'))
+      await expect(dispatchRazorpayEvent(subEvt, { ...ctx({ source: 'platform' }), onBillingSubscription })).rejects.toBeInstanceOf(TransientWebhookError)
+    })
+  })
 })

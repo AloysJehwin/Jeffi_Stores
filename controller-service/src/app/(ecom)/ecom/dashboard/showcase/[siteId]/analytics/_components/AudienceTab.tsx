@@ -3,8 +3,9 @@
 import { Empty } from '@/components/admin/channels/ui'
 import type { ShowcaseAudience } from '@/lib/traffic/showcase-types'
 import { Note, ShareCard, countryName } from './shared'
+import { chartColor } from '@/components/admin/traffic/charts'
 
-const DEVICE_COLORS: Record<string, string> = { Mobile: '#3b82f6', Tablet: '#8b5cf6', Desktop: '#22c55e' }
+const DEVICE_COLORS: Record<string, string> = { Mobile: chartColor(1), Tablet: chartColor(3), Desktop: chartColor(2) }
 const NETWORK_LABELS: Record<string, string> = { '4g': '4G or faster', '3g': '3G', '2g': '2G', 'slow-2g': 'Slow 2G' }
 
 export default function AudienceTab({ data }: { data: ShowcaseAudience }) {
@@ -16,7 +17,7 @@ export default function AudienceTab({ data }: { data: ShowcaseAudience }) {
         <ShareCard title="Device" rows={data.devices} colors={DEVICE_COLORS} />
         <ShareCard title="Browser" rows={data.browsers} />
         <ShareCard title="Operating system" rows={data.os} />
-        <ShareCard title="New vs returning" rows={data.newReturning} colors={{ New: '#84cc16', Returning: '#3b82f6' }} />
+        <ShareCard title="New vs returning" rows={data.newReturning} colors={{ New: chartColor(2), Returning: chartColor(1) }} />
         <ShareCard title="Country" rows={data.countries} label={countryName} />
         <ShareCard title="Language" rows={data.languages} />
         <ShareCard title="Time zone" rows={data.timezones} />

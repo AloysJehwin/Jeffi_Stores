@@ -122,6 +122,14 @@ describe('resolveSubscriptionTenant', () => {
     const r = await resolveSubscriptionTenant({ id: 'sub_1', notes: { tenant_id: TID } })
     expect(r).toMatchObject({ tenantId: TID })
   })
+  it("returns a workspace's own billing subscription with no store context (it may have no store DB)", async () => {
+    cpQuery.mockResolvedValueOnce({ rows: [{ tenant_id: TID, collecting_account: 'billing' }] })
+    expect(await resolveSubscriptionTenant({ id: 'sub_1', notes: { tenant_id: TID } })).toEqual({ tenantId: TID, slug: '', ctx: null, collectingAccount: 'billing' })
+  })
+  it('says which account collects a customer subscription', async () => {
+    cpQuery.mockResolvedValueOnce({ rows: [{ tenant_id: TID, collecting_account: 'platform' }] })
+    expect(await resolveSubscriptionTenant({ id: 'sub_1' })).toMatchObject({ tenantId: TID, collectingAccount: 'platform' })
+  })
   it('propagates a control-plane error (caller retries)', async () => {
     cpQuery.mockRejectedValueOnce(new Error('index down'))
     await expect(resolveSubscriptionTenant({ id: 'sub_1' })).rejects.toThrow('index down')

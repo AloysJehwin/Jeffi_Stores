@@ -4,14 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, ListOrdered, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, WandSparkles, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import CodeContentFields from '@/components/admin/site-builder/CodeContentFields'
 import type { CodeLiteral, LiteralEdit } from '@/lib/site/code/literals'
 import { fieldInput, ghostBtn, noteCls, primaryBtn, secondaryBtn } from '../ui'
 import { AI_UNAVAILABLE, isAiDown, isPriceChanged, isWalletLow, StudioError, studioGet, studioPost, studioStream, studioUrl, WALLET_LOW, type StudioView } from './api'
-import StudioPreview, { DeviceToggle, type Device, type PickedSection } from './StudioPreview'
+import StudioPreview, { DeviceToggle, usePreviewDevice, type PickedSection } from './StudioPreview'
+import VisualStudio from './VisualStudio'
 import type { StudioEvent } from '@/lib/site/studio/types'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 
@@ -36,13 +37,23 @@ interface ListPage {
 type OutlineSection = { id: string; label: string; hidden?: boolean }
 type EditView = StudioView & { literals?: CodeLiteral[] }
 const PREVIEW_FRAME = 'iframe[src*="/onboard/studio/preview/"]'
-const previewWindow = () => document.querySelector<HTMLIFrameElement>(PREVIEW_FRAME)?.contentWindow ?? null
+// This step's own frame: a Showcase's theme gallery above can hold another preview.
+const previewWindow = (root: HTMLElement | null) => root?.querySelector<HTMLIFrameElement>(PREVIEW_FRAME)?.contentWindow ?? null
+/** Showcase sections the preview drew nothing for (no reviews, no work yet…): they show once filled. */
+function unfilledIn(w: Window): Set<string> {
+  try {
+    return new Set([...w.document.querySelectorAll<HTMLElement>('[data-studio-block]')].filter(el => !el.childElementCount).map(el => el.dataset.studioBlock ?? ''))
+  } catch {
+    return new Set()
+  }
+}
 
 function SectionRow({
   section,
   selected,
   disabled,
   only,
+  unfilled,
   onSelect,
   onHide,
   onDuplicate,
@@ -53,6 +64,8 @@ function SectionRow({
   disabled: boolean
   /** The page's last shown section: it can't be hidden or deleted. */
   only: boolean
+  /** Drawn only once its content exists (unlike `hidden`, which the owner chose). */
+  unfilled: boolean
   onSelect: () => void
   onHide: () => void
   onDuplicate: () => void
@@ -80,8 +93,13 @@ function SectionRow({
       >
         <GripVertical className="h-3.5 w-3.5" />
       </button>
-      <button type="button" onClick={onSelect} className="ecom-focus min-w-0 flex-1 truncate rounded-lg px-1 py-1 text-left text-foreground">
+      <button type="button" onClick={onSelect} className="ecom-focus min-w-0 flex-1 rounded-lg px-1 py-1 text-left text-foreground [overflow-wrap:anywhere]">
         {section.label}
+        {unfilled && (
+          <span className="mt-0.5 block w-fit rounded-full bg-surface-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted" title="Nothing to show yet: it appears on your page once you add what it lists.">
+            Hidden until filled
+          </span>
+        )}
       </button>
       <button type="button" onClick={onHide} disabled={disabled || (only && !section.hidden)} className={icon} aria-label={section.hidden ? `Show ${section.label}` : `Hide ${section.label}`} title={section.hidden ? 'Show' : 'Hide'}>
         {section.hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -101,6 +119,7 @@ function SectionList({
   sections,
   disabled,
   picked,
+  unfilled,
   onSelect,
   onMove,
   onHide,
@@ -110,6 +129,7 @@ function SectionList({
   sections: OutlineSection[]
   disabled: boolean
   picked: string | null
+  unfilled: Set<string>
   onSelect: (s: OutlineSection) => void
   onMove: (id: string, before: string | null, order: string[]) => void
   onHide: (s: OutlineSection) => void
@@ -145,6 +165,7 @@ function SectionList({
               selected={picked === x.id}
               disabled={disabled}
               only={sections.length <= 1 || (!x.hidden && shown <= 1)}
+              unfilled={!x.hidden && unfilled.has(x.id)}
               onSelect={() => onSelect(x)}
               onHide={() => onHide(x)}
               onDuplicate={() => onDuplicate(x)}
@@ -218,7 +239,7 @@ export default function BuildStep({
   const [streaming, setStreaming] = useState(false)
   const [current, setCurrent] = useState<string>(home)
   const follow = useRef(true)
-  const [device, setDevice] = useState<Device>('desktop')
+  const [device, setDevice] = usePreviewDevice()
   const [version, setVersion] = useState(0)
   const [picking, setPicking] = useState(false)
   const [picked, setPicked] = useState<PickedSection | null>(null)
@@ -229,10 +250,21 @@ export default function BuildStep({
   const [editing, setEditing] = useState(false)
   const [order, setOrder] = useState<{ page: string; ids: string[] } | null>(null)
   const [literals, setLiterals] = useState<CodeLiteral[] | null>(null)
+  const [unfilled, setUnfilled] = useState<Set<string>>(() => new Set())
+  const root = useRef<HTMLDivElement>(null)
+  // The visual editor (a Showcase's page, while site_editor_enabled is on): whether it may open, and whether it is.
+  const [visualOk, setVisualOk] = useState(false)
+  const [visual, setVisual] = useState(false)
+  /** With the visual editor on it is the main way to edit; arranging and the words form are the "Classic editor". */
+  const [classic, setClassic] = useState(false)
 
   useEffect(() => {
-    if (window.matchMedia('(max-width: 639px)').matches) setDevice('phone')
-  }, [])
+    if (!showcase) return
+    fetch(studioUrl('design', { check: '1' }), { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setVisualOk(d?.enabled === true))
+      .catch(() => {})
+  }, [showcase])
 
   const pages: ListPage[] = useMemo(
     () => [
@@ -357,7 +389,19 @@ export default function BuildStep({
               confirmLabel: `Design again · ₹${charge}`,
             }
           : { title: `Design the ${currentPage.label} page again?`, message: `It counts as ${units} of today’s free changes.`, confirmLabel: 'Design again' }
-    if (!(await confirm(ask))) return
+    // Changed by hand in the visual editor: say so, then offer to keep the owner's words in the new design.
+    const edited = visualOk && !!s.pages[current]?.edited
+    if (!(await confirm(edited ? { ...ask, message: `${ask.message} It replaces the changes you made by hand.` } : ask))) return
+    if (edited) {
+      const keep = await confirm({
+        title: 'Keep your words?',
+        message: 'The new design can reuse the words you wrote on this page, or start from fresh copy.',
+        confirmLabel: 'Keep my words',
+        cancelLabel: 'Start fresh',
+      })
+      const ok = await fetch(studioUrl('design/keep-words'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: current, keep }) }).then(r => r.ok, () => false)
+      if (!ok) return showToast('Your choice could not be saved. Try again.', 'error')
+    }
     setWorking('rebuild')
     setPicked(null)
     try {
@@ -498,16 +542,19 @@ export default function BuildStep({
   const showOutline = homeReady && !!currentPage && !currentPage.themed && stateOf(current) === 'done'
 
   // The preview shows move handles while arranging is possible, and its drops arrive here.
-  const arrange = canArrange && !picking
-  const latest = useRef({ arrange, move: moveSection, outlineOf })
-  latest.current = { arrange, move: moveSection, outlineOf }
+  const visualFirst = showcase && visualOk
+  const arrange = canArrange && !picking && (!visualFirst || classic)
+  const latest = useRef({ arrange, move: moveSection, outlineOf, showcase })
+  latest.current = { arrange, move: moveSection, outlineOf, showcase }
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      const w = previewWindow()
+      const w = previewWindow(root.current)
       if (!w || e.source !== w || e.origin !== window.location.origin || e.data?.type !== 'studio-preview') return
       const d = e.data
-      if (d.event === 'ready') w.postMessage({ type: 'studio-preview', arrange: latest.current.arrange }, window.location.origin)
-      else if (d.event === 'move' && typeof d.page === 'string' && typeof d.blockId === 'string' && typeof d.target === 'string') {
+      if (d.event === 'ready') {
+        w.postMessage({ type: 'studio-preview', arrange: latest.current.arrange }, window.location.origin)
+        if (latest.current.showcase) setUnfilled(unfilledIn(w))
+      } else if (d.event === 'move' && typeof d.page === 'string' && typeof d.blockId === 'string' && typeof d.target === 'string') {
         const now = latest.current.outlineOf(d.page).map(x => x.id)
         const rest = now.filter(id => id !== d.blockId)
         const at = rest.indexOf(d.target)
@@ -521,7 +568,7 @@ export default function BuildStep({
     return () => window.removeEventListener('message', onMessage)
   }, [])
   useEffect(() => {
-    previewWindow()?.postMessage({ type: 'studio-preview', arrange }, window.location.origin)
+    previewWindow(root.current)?.postMessage({ type: 'studio-preview', arrange }, window.location.origin)
   }, [arrange, version])
 
   const overlay = working ? (
@@ -545,23 +592,39 @@ export default function BuildStep({
   }
 
   const viewable = (p: ListPage) => p.themed ? homeReady : stateOf(p.key) === 'done'
+  // A Showcase has no page list (one page): its section progress shows in the status line and the bar instead.
+  const pageSec = showcase && stateOf(home) === 'building' ? section[home] : undefined
+
+  if (visual && showcase && homeReady && !building)
+    return (
+      <VisualStudio
+        session={s}
+        allowance={view.allowance}
+        onClose={() => {
+          setVisual(false)
+          setPicked(null)
+          void refresh()
+          setVersion(v => v + 1)
+        }}
+      />
+    )
 
   return (
-    <div>
+    <div ref={root}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-foreground">
             {building ? `Building your site · ${built} of ${total} pages` : s.status === 'ready' ? 'Your site is ready' : built ? `${built} of ${total} pages built` : 'Your site'}
           </div>
           <div className="mt-0.5 text-xs text-foreground-secondary" aria-live="polite">
-            {building ? message ?? 'Working…' : s.status === 'ready' ? freeNote : s.error ?? ''}
+            {building ? `${message ?? 'Working…'}${pageSec ? ` · ${pageSec.label} (${pageSec.index + 1} of ${pageSec.total})` : ''}` : s.status === 'ready' ? freeNote : s.error ?? ''}
           </div>
         </div>
         <DeviceToggle value={device} onChange={setDevice} />
       </div>
       {building && (
         <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-surface-secondary" aria-hidden>
-          <div className="ecom-accent-bg h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(4, (built / Math.max(1, total)) * 100)}%` }} />
+          <div className="ecom-accent-bg h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(4, (pageSec ? pageSec.index / Math.max(1, pageSec.total) : built / Math.max(1, total)) * 100)}%` }} />
         </div>
       )}
 
@@ -598,9 +661,10 @@ export default function BuildStep({
         </div>
       )}
 
-      {/* On desktop the page list and the preview scroll on their own, so the preview stays in view. */}
-      <div className="grid grid-cols-1 gap-4 lg:h-[clamp(32rem,calc(100dvh-14rem),52rem)] lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <nav aria-label="Pages" className="max-lg:-mx-1 max-lg:overflow-x-auto ecom-scroll-x lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 ecom-scroll-y">
+      {/* On desktop the page list and the preview scroll on their own, so the preview stays in view. A Showcase's one
+          page needs no list: the preview takes its width. */}
+      <div className={`grid grid-cols-1 gap-4 lg:h-[clamp(32rem,calc(100dvh-14rem),52rem)] ${showcase ? '' : 'lg:grid-cols-[15rem_minmax(0,1fr)]'}`}>
+        <nav hidden={showcase} aria-label="Pages" className="max-lg:-mx-1 max-lg:overflow-x-auto ecom-scroll-x lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 ecom-scroll-y">
           <ul className="flex gap-1.5 px-1 lg:flex-col lg:gap-0.5 lg:px-0">
             {pages.map(p => {
               const on = p.key === current
@@ -645,6 +709,11 @@ export default function BuildStep({
         <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 ecom-scroll-y">
           {homeReady && !building && !aiDown && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
+              {visualFirst && (
+                <button type="button" onClick={() => setVisual(true)} disabled={!!working || editing} className={`${primaryBtn} px-4 py-2`} title="Click and type on your page itself">
+                  <WandSparkles className="h-4 w-4" /> Edit on the page
+                </button>
+              )}
               <button type="button" onClick={() => { setPicking(p => !p); setPicked(null) }} disabled={!canTweak || !!working} aria-pressed={picking} className={picking ? `${primaryBtn} px-4 py-2` : `${secondaryBtn} px-4 py-2`}>
                 <MousePointerClick className="h-4 w-4" /> {picking ? 'Click a section…' : 'Change a section'}
               </button>
@@ -652,6 +721,11 @@ export default function BuildStep({
               <button type="button" onClick={rebuild} disabled={!canTweak || !!working} className={`${ghostBtn} px-3 py-2`}>
                 <RefreshCw className="h-4 w-4" /> {paid ? `Design this page again · ₹${paid.priceInr}` : showcase ? 'Design this page again · Free' : chargeFor(correctionUnits.page) ? `Design this page again · ₹${chargeFor(correctionUnits.page)}` : 'Design this page again'}
               </button>
+              {visualFirst && showOutline && (
+                <button type="button" onClick={() => setClassic(c => !c)} aria-pressed={classic} className={`${ghostBtn} px-3 py-2`} title="Arrange sections and edit their words in a list">
+                  <ListOrdered className="h-4 w-4" /> Classic editor
+                </button>
+              )}
               {currentPage?.themed && <span className="text-xs text-foreground-muted">Themed page: it takes your look; the AI designs the main pages.</span>}
             </div>
           )}
@@ -712,7 +786,7 @@ export default function BuildStep({
             </form>
           )}
           </div>
-          {showOutline && (
+          {showOutline && (!visualFirst || classic) && (
             <aside aria-label="Sections on this page" className="mt-4 space-y-4 xl:mt-0">
               <div>
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -723,6 +797,7 @@ export default function BuildStep({
                   sections={sections}
                   disabled={!canArrange}
                   picked={picked?.page === current ? picked.blockId : null}
+                  unfilled={unfilled}
                   onSelect={x => {
                     setPicked({ page: current, blockId: x.id, label: x.label })
                     setPicking(false)
@@ -732,6 +807,9 @@ export default function BuildStep({
                   onDuplicate={x => void duplicateSection(x)}
                   onDelete={x => void deleteSection(x)}
                 />
+                {sections.some(x => !x.hidden && unfilled.has(x.id)) && (
+                  <p className="mt-2 text-xs text-foreground-muted">Sections hidden until filled appear on your page once you add what they list: services, work, reviews, numbers or questions.</p>
+                )}
                 <p className="mt-2 text-xs text-foreground-muted">
                   Drag to reorder, here or by a section’s handle in the preview. Arranging is free: it doesn’t count against today’s changes.
                 </p>
@@ -739,7 +817,7 @@ export default function BuildStep({
               {picked && (
                 <div className="rounded-2xl border border-border-default bg-surface-elevated p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <h3 className="min-w-0 truncate text-sm font-semibold text-foreground">Words, links and pictures: {picked.label}</h3>
+                    <h3 className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">Words, links and pictures: {picked.label}</h3>
                     <button type="button" onClick={() => setPicked(null)} aria-label="Close" className="ecom-focus shrink-0 rounded-full p-1 text-foreground-muted ecom-hover hover:text-foreground">
                       <X className="h-4 w-4" />
                     </button>
