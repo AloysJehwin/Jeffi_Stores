@@ -670,6 +670,19 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: null,
   },
   {
+    // Platform job: the Outreach dialler (controller lib/outreach/worker.ts). k8s only, so no dev process ever dials.
+    id: 'outreach_calls',
+    name: 'Outreach calls',
+    path: '/api/cron/outreach-calls',
+    method: 'GET',
+    intervalMs: 2 * MIN,
+    intervalLabel: 'every 2 min',
+    startDelayMs: 375 * SEC,
+    lockTtlMs: 2 * MIN - 10 * SEC,
+    tenantScope: null,
+    k8sOnly: true,
+  },
+  {
     // Platform job: nightly sum of every tenant's S3 bucket, drives the storage.s3Gb cap guard.
     id: 's3_usage',
     name: 'Tenant S3 bucket usage',
