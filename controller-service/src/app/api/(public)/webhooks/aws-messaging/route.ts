@@ -8,6 +8,7 @@ import { handleInboundWhatsApp } from '@controller/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
 import { routeAdminWhatsApp } from '@controller/lib/admin-agent/whatsapp'
 import { resolveInbound } from '@controller/lib/messaging/inbound-number'
+import { routeOutreachWhatsApp } from '@controller/lib/outreach/inbound'
 import type { TenantContext } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
@@ -109,6 +110,8 @@ async function handle(raw: string, hintCtx: TenantContext | null, hint: string |
           await handleInboundWhatsApp({ ...inbound, audience: 'ecom' })
           return
         }
+        // An owner the outreach program is talking to (flagship customer number): handled there, never by the shopper bot.
+        if (!target.tenantId && (await routeOutreachWhatsApp({ from, text: inbound.text, providerMessageId: m.id, hasMedia: !!media }))) return
         if (await routeAdminWhatsApp({ providerSid: m.id, from, to: ours, text: inbound.text, hasMedia: !!media, repliedToSid, receivedOn: 'customer', separateAdminNumber: target.separateAdminNumber })) return
         const r = await handleInboundWhatsApp(inbound)
         if (r) await onCustomerMessage(r.session, r.message, { repliedToSid, phone: m.from })

@@ -9,8 +9,10 @@ vi.mock('@/lib/tenant-registry/host-resolution', () => ({ lookupTenantContextByI
 vi.mock('@/lib/tenancy/tenant-context', () => ({ runWithTenantContext: vi.fn() }))
 vi.mock('@controller/lib/support/inbound', () => ({ handleInboundWhatsApp: vi.fn() }))
 vi.mock('@/lib/support/agent', () => ({ onCustomerMessage: vi.fn() }))
+vi.mock('@controller/lib/outreach/inbound', () => ({ routeOutreachWhatsApp: vi.fn() }))
 
 import { POST } from '@controller/app/api/(public)/webhooks/twilio/route'
+import { routeOutreachWhatsApp } from '@controller/lib/outreach/inbound'
 import { query, queryOne } from '@/lib/shared/db'
 import { logMessage } from '@/lib/shared/message-log'
 import { lookupTenantContextById } from '@/lib/tenant-registry/host-resolution'
@@ -25,6 +27,7 @@ const mockLookup = vi.mocked(lookupTenantContextById)
 const mockRunWith = vi.mocked(runWithTenantContext)
 const mockInbound = vi.mocked(handleInboundWhatsApp)
 const mockOnCustomer = vi.mocked(onCustomerMessage)
+const mockOutreach = vi.mocked(routeOutreachWhatsApp)
 
 const WA_FROM = 'whatsapp:+919876543210'
 const WA_TO = 'whatsapp:+18722179910'
@@ -56,6 +59,7 @@ beforeEach(() => {
   mockRunWith.mockImplementation((_ctx, fn) => fn())
   mockInbound.mockResolvedValue({ session: SESSION, message: MESSAGE })
   mockOnCustomer.mockResolvedValue(undefined)
+  mockOutreach.mockResolvedValue(false)
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -166,6 +170,35 @@ describe('POST /api/webhooks/twilio — WhatsApp', () => {
     const res = await POST(makeReq({ From: WA_FROM, Body: 'STOP', MessageSid: 'SM1' }))
     await expectEmptyTwiml(res)
     expect(mockOnCustomer).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/webhooks/twilio — outreach', () => {
+  it('an active outreach contact on the flagship number is handled there, never by the support chat or the assistant', async () => {
+    mockOutreach.mockResolvedValue(true)
+    const res = await POST(makeReq({ From: WA_FROM, To: WA_TO, Body: 'we open 9 to 9', MessageSid: 'SM9' }))
+    await expectEmptyTwiml(res)
+    expect(mockOutreach).toHaveBeenCalledWith({ from: WA_FROM, text: 'we open 9 to 9', providerMessageId: 'SM9', hasMedia: false })
+    expect(mockInbound).not.toHaveBeenCalled()
+    expect(mockOnCustomer).not.toHaveBeenCalled()
+  })
+
+  it('a sender outreach does not know goes on to the support chat', async () => {
+    await POST(makeReq({ From: WA_FROM, To: WA_TO, Body: 'hi', MessageSid: 'SM1' }))
+    expect(mockOutreach).toHaveBeenCalled()
+    expect(mockInbound).toHaveBeenCalled()
+  })
+
+  it("a store's number never consults outreach", async () => {
+    mockLookup.mockResolvedValue({ tenantId: 'ten-1' } as any)
+    await POST(makeReq({ From: WA_FROM, To: WA_TO, Body: 'hi', MessageSid: 'SM1' }, '?t=ten-1'))
+    expect(mockOutreach).not.toHaveBeenCalled()
+    expect(mockInbound).toHaveBeenCalled()
+  })
+
+  it('SMS never reaches outreach', async () => {
+    await POST(makeReq({ From: '+919876543210', To: '+18722179910', Body: 'STOP', MessageSid: 'SM1' }))
+    expect(mockOutreach).not.toHaveBeenCalled()
   })
 })
 

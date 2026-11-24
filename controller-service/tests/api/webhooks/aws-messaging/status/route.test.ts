@@ -10,6 +10,7 @@ vi.mock('@controller/lib/support/inbound', () => ({ handleInboundWhatsApp: vi.fn
 vi.mock('@/lib/support/agent', () => ({ onCustomerMessage: vi.fn() }))
 vi.mock('@controller/lib/admin-agent/whatsapp', () => ({ routeAdminWhatsApp: vi.fn() }))
 vi.mock('@controller/lib/messaging/inbound-number', () => ({ resolveInbound: vi.fn() }))
+vi.mock('@controller/lib/outreach/inbound', () => ({ routeOutreachWhatsApp: vi.fn() }))
 
 import { POST } from '@controller/app/api/(public)/webhooks/aws-messaging/status/route'
 
