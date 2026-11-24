@@ -1,6 +1,7 @@
 // Custom-domain rules, read from plans.max_custom_domains: the one source for the pricing page, the Domains
 // page and the FAQs. Connecting a domain you already own takes a plan with a quota (addCustomDomain enforces it);
-// a domain bought through Jeffi serves the store on any plan (lib/domains/orders.ts).
+// a domain bought through the platform serves the store on any plan (lib/domains/orders.ts).
+import { platformBrandName } from '@/lib/catalog/brand'
 
 export interface DomainPlan {
   slug: string
@@ -25,12 +26,12 @@ export function ownDomainFrom(plans: DomainPlan[]): string | null {
 /** One plan's cell in a comparison: what it allows. */
 export function domainAllowance(max: number | string | null): string {
   const n = Number(max) || 0
-  return n === 0 ? 'Buy one through Jeffi' : `${n} of your own, or buy one`
+  return n === 0 ? `Buy one through ${platformBrandName()}` : `${n} of your own, or buy one`
 }
 
 /** The FAQ answer, built from the plans. */
 export function domainFaqAnswer(plans: DomainPlan[]): string {
-  const buy = 'Yes. On any plan you can buy a domain through Jeffi and we connect it, with the certificate and DNS handled.'
+  const buy = `Yes. On any plan you can buy a domain through ${platformBrandName()} and we connect it, with the certificate and DNS handled.`
   const owned = [...plans].sort((a, b) => a.tier - b.tier).filter(p => quota(p) > 0)
   if (!owned.length) return buy
   const list = owned.map(p => `${p.name} ${quota(p)}`).join(', ')
