@@ -5,6 +5,8 @@ import { acc, linePath, nf, pctChange, svgId, TIP_CLASS, useIndexNav, NEUTRAL_LI
 
 export interface ComparePoint {
   label: string
+  /** Tooltip heading; the axis uses `label`. */
+  detail?: string
   current: number
   previous: number
 }
@@ -68,7 +70,7 @@ export function CompareArea({ points, format = nf, currentLabel = 'This period',
         <>
           <span className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface-elevated" style={{ left: `${left}%`, top: `${(y(points[idx].current) / H) * 100}%`, background: acc(600) }} />
           <div role="tooltip" className={TIP_CLASS} style={{ left: `${left}%`, top: 0, transform: `translateX(${left > 65 ? '-105%' : '8%'})` }}>
-            <div className="mb-1 font-medium opacity-70">{hot!.label}</div>
+            <div className="mb-1 font-medium opacity-70">{hot!.detail ?? hot!.label}</div>
             <div className="flex items-center justify-between gap-4">
               <span className="opacity-70">{currentLabel}</span>
               <span className="font-semibold tabular-nums">{format(hot!.current)}</span>

@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics, AnalyticsRange } from '@/lib/queries'
-import { DonutSplit, RankedBars, FunnelBar, LinkedLegend, MiniStat, ListRows, GroupLabel, StatusBadge, ORDER_STATUS, rs, rsCompact, pctStr, numStr, hoursStr, delta } from '@/components/admin/kit'
+import { DonutSplit, RankedBars, FunnelBar, LinkedLegend, MiniStat, ListRows, GroupLabel, StatusBadge, ORDER_STATUS, rs, rsCompact, pctStr, numStr, hoursStr, delta, formatBucket } from '@/components/admin/kit'
 import { DashCard, SegmentedPills, DeltaChip, Sparkline, CompareArea, FlowStream, WeekdayBars, DotCalendar, ActivityLegend, MetricList, ActivityDrawer } from '@/components/admin/dashboard'
 import type { ActivityChannel, DashboardActivity } from '@/lib/dashboard/activity-types'
 import OpsInsights from './OpsInsights'
@@ -241,7 +241,7 @@ export default function AnalyticsDashboardClient({
               </p>
               <div className="mt-3">
                 <CompareArea
-                  points={data.trend.map((t, i) => ({ label: t.label, current: t.revenue, previous: data.trendPrev[i]?.revenue ?? 0 }))}
+                  points={data.trend.map((t, i) => ({ label: formatBucket(t.label, data.trendBucket, false), detail: formatBucket(t.label, data.trendBucket, true), current: t.revenue, previous: data.trendPrev[i]?.revenue ?? 0 }))}
                   format={rs}
                 />
               </div>
