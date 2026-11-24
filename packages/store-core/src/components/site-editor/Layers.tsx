@@ -23,8 +23,11 @@ export interface LayersProps {
   onMoveSection: (block: string, to: number) => void
   /** Before the child at `index` of `parent`, counted before the node leaves its place (design.ts `move`). */
   onMoveNode: (block: string, id: string, parent: string, index: number) => void
-  /** Whether an element is placed freely at the breakpoint being edited ('free'), could be ('flow'), or can't (null). */
-  freeState?: (block: string, id: string) => 'free' | 'flow' | null
+  /**
+   * Whether an element is placed freely at the breakpoint being edited ('free'), only on a wider one and so in the flow
+   * here ('wider'), could be ('flow'), or can't (null).
+   */
+  freeState?: (block: string, id: string) => 'free' | 'wider' | 'flow' | null
   onToggleFree?: (block: string, id: string) => void
 }
 
@@ -50,7 +53,7 @@ const LayersCtx = createContext<Ctx | null>(null)
 const useLayers = () => useContext(LayersCtx)!
 
 const rowCls = (on: boolean) =>
-  `group flex min-w-0 items-center gap-1 rounded-md py-1 pr-1.5 text-left text-[13px] ${on ? 'bg-accent-500/10 text-accent-700' : 'text-foreground hover:bg-surface-secondary'}`
+  `group flex min-w-0 items-center gap-1 rounded-md py-1 pr-1.5 text-left text-[13px] ${on ? 'bg-accent-50 text-accent-700' : 'text-foreground hover:bg-surface-secondary'}`
 
 function Chevron({ open, hidden, onClick }: { open: boolean; hidden: boolean; onClick: () => void }) {
   return (
@@ -98,9 +101,15 @@ function NodeRow({ block, node, depth, sortable }: { block: string; node: CodeNo
             aria-label="Free placement"
             aria-pressed={free === 'free'}
             disabled={!c.canWrite}
-            title={free === 'free' ? 'Placed freely on this screen size: click to put it back in the flow' : 'Place it anywhere in its section on this screen size'}
+            title={
+              free === 'free'
+                ? 'Placed freely on this screen size: click to put it back in the flow'
+                : free === 'wider'
+                  ? 'Placed freely on a wider screen; here it sits in the flow. Click to place it on this screen size too'
+                  : 'Place it anywhere in its section on this screen size'
+            }
             onClick={() => c.onToggleFree?.(block, id)}
-            className={`shrink-0 rounded p-0.5 ${free === 'free' ? 'text-accent-600' : 'text-foreground-muted opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+            className={`shrink-0 rounded p-0.5 ${free === 'free' ? 'text-accent-600' : free === 'wider' ? 'text-accent-400' : 'text-foreground-muted opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
           >
             <Move className="h-3 w-3" />
           </button>

@@ -10,16 +10,19 @@ import { docToRows } from './legacy'
 import { DATA_KINDS, cleanTree, updateNode, walkTree, type ComposedNode } from './composed'
 import { loadComposedData, productsFor } from './composed-data'
 import { getSiteDraft, saveDraftPage, saveDraftTheme } from './store'
+import { freeAt } from './code/free'
+import type { CodeNode } from './code/ast'
 
 // The critique pass: a page checked the way a careful designer would before it goes live, without a browser. It finds
 // blocks that would render empty (no products, reviews or offers behind them), banners with no picture, text too long
 // for its slot, headings on a picture with nothing to keep them readable, colours too pale for white text, the same
-// thing twice, and phone layouts too dense to tap. Most findings fix themselves; long text is shortened by the AI.
+// thing twice, phone layouts too dense to tap, and freely placed elements that fall off a phone's screen. Most
+// findings fix themselves; long text is shortened by the AI.
 // A screenshot check can join later through the same Finding shape.
 
 export interface Finding {
   severity: 'error' | 'warn'
-  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page'
+  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page' | 'off_screen'
   message: string
   blockId?: string
   /** It can be fixed without asking (removed, set, shortened). */
@@ -119,6 +122,11 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
           })
         }
       }
+      // Free layers placed on phones (base classes) that run past the section's edges.
+      if (b.type === 'code_section') {
+        for (const id of offScreenOnPhones((p.compiled as { ast?: CodeNode } | null)?.ast))
+          out.push({ severity: 'warn', code: 'off_screen', blockId: id ? `${b.id}#${id}` : b.id, message: `A freely placed element in "${p.label ?? 'a section'}" sits partly off the screen on phones. Move it inside the section on Phone.`, fixable: false })
+      }
       // Pictures.
       if (b.type === 'image_banner' && !p.image) {
         if (!p.heading) out.push({ severity: 'error', code: 'empty_block', blockId: b.id, message: 'A banner has no picture and no words.', fixable: true })
@@ -153,6 +161,33 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
   // Keep the page order stable for the reader.
   const order = new Map(blocks.map((b, i) => [b.id, i]))
   return out.sort((a, b) => (order.get(a.blockId?.split('#')[0] ?? '') ?? 99) - (order.get(b.blockId?.split('#')[0] ?? '') ?? 99))
+}
+
+/**
+ * Elements placed freely on phones (lib/site/code/free.ts, on the base classes) whose box runs past the section: left
+ * or top below 0, or right or bottom past 100%. Their node ids ('' without one). Placed only on wider screens, an
+ * element sits in the flow on phones, so it can't fall off.
+ */
+export function offScreenOnPhones(ast: CodeNode | null | undefined): string[] {
+  const out: string[] = []
+  const walk = (n: CodeNode | null | undefined) => {
+    if (!n || typeof n !== 'object') return
+    if (n.t === 'el' || n.t === 'cmp') {
+      const c = n.props?.className
+      const layer = c && c.k === 'lit' && typeof c.v === 'string' ? freeAt(c.v, 'base') : null
+      const r = layer?.rect
+      if (r && (r.left < 0 || r.top < 0 || r.left + r.width > 100.5 || (r.height !== undefined && r.top + r.height > 100.5))) out.push(n.id ?? '')
+    }
+    if (n.t === 'el' || n.t === 'cmp' || n.t === 'frag') n.children?.forEach(walk)
+    if (n.t === 'cmp') walk(n.render?.body)
+    if (n.t === 'cond') {
+      walk(n.then)
+      walk(n.else)
+    }
+    if (n.t === 'each') walk(n.body)
+  }
+  walk(ast)
+  return out
 }
 
 function countContent(tree: ComposedNode) {

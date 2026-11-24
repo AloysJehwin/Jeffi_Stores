@@ -66,6 +66,10 @@ AI-generated pages must be editable with it.
    after the save draws them. "Free placement" toggles in the layers row and the inspector: the canvas measures the
    element (`measure`), it is placed where it sits, on top of the section's layers, and its frame made `relative` with
    its height kept. `FreePanel.tsx`: left, top, width, height in %, front/forward/backward/back, back in the flow.
+3. Phone fallback and critique. Placed on a wider screen only, a layer sits in the flow at its place in the page
+   below it (mobile-first classes); the layers row shows it faintly and the inspector says so, with "Place on Phone
+   too" (`free-ops.ts` `placedWider`). `lib/site/critique.ts` `offScreenOnPhones` reports (`off_screen`, per element)
+   layers placed on phones whose box runs past the section's edges; the owner moves them on Phone (no auto-fix).
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for

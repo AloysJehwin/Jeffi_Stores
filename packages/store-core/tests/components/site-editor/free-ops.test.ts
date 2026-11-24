@@ -47,3 +47,17 @@ describe('free layer operations', () => {
     expect(placeOps(tree, 'e6', 'lg', { left: 0, top: 0, width: 10 })).toEqual([])
   })
 })
+
+describe('the phone fallback', () => {
+  it('says where a layer leaves the flow when it is placed only on wider screens', async () => {
+    const { placedWider } = await import('@/components/site-editor/free-ops')
+    const desk = applyOps(tree, placeOps(tree, 'e2', 'lg', { left: 10, top: 20, width: 50 })).tree
+    expect(placedWider(desk, 'e2', 'base')).toBe('lg')
+    expect(placedWider(desk, 'e2', 'md')).toBe('lg')
+    expect(placedWider(desk, 'e2', 'lg')).toBeNull()
+    const both = applyOps(desk, placeOps(desk, 'e2', 'base', { left: 0, top: 0, width: 100 })).tree
+    expect(placedWider(both, 'e2', 'base')).toBeNull()
+    expect(placedWider(both, 'e2', 'md')).toBe('lg')
+    expect(layerAt(both, 'e2', 'md')).toBeNull()
+  })
+})

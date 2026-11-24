@@ -218,4 +218,18 @@ describe('SiteEditor free layers', () => {
     fireEvent.click(screen.getByRole('button', { name: /Back in the flow/ }))
     await waitFor(() => expect(h2Class(save).h2).toBe(''), { timeout: 3000 })
   })
+
+  it('on Phone, shows a Desktop-placed layer in the flow and offers to place it there too', async () => {
+    const page = doc()
+    const t = page.blocks.a.props.tree as { children: { props: Record<string, unknown> }[] }
+    t.children[0].props.className = { k: 'lit', v: 'lg:absolute lg:left-[10%] lg:top-[20%] lg:w-[50%] lg:z-10' }
+    setup({ load: async () => page })
+    await screen.findByRole('button', { name: 'Hero' })
+    await fromCanvas({ type: 'select', block: 'a', id: 'e2' })
+    expect(await screen.findByText('Free placement', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Phone/ }))
+    expect(await screen.findByText(/Placed freely on Desktop; on Phone it sits in the flow/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Place on Phone too' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Free placement' })[0]).toHaveAttribute('aria-pressed', 'false')
+  })
 })

@@ -9,7 +9,7 @@ import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
 import Layers from './Layers'
 import FreePanel from './FreePanel'
-import { canFree, layerAt, placeOps, restackOps, unplaceOps } from './free-ops'
+import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
 import { hasLocked, insertPlace, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
@@ -383,7 +383,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     <div className="space-y-3" data-site-editor="">
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
         <p className="px-1 text-sm font-semibold text-foreground">{host.title}</p>
-        <span className="rounded-full bg-accent-500/10 px-2 py-0.5 text-[11px] font-medium text-accent-600">Visual editor · beta</span>
+        <span className="rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-600">Visual editor · beta</span>
         <div className="flex gap-1">
           <button type="button" className={iconBtn} disabled={!host.canWrite || !canUndo(state)} onClick={() => step('undo')} aria-label="Undo" title="Undo (⌘Z)">
             <Undo2 className="w-4 h-4" />
@@ -452,7 +452,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
             }}
             freeState={(block, id) => {
               const tree = trees[block]
-              return !tree || !canFree(tree, id) ? null : layerAt(tree, id, bp) ? 'free' : 'flow'
+              return !tree || !canFree(tree, id) ? null : layerAt(tree, id, bp) ? 'free' : placedWider(tree, id, bp) ? 'wider' : 'flow'
             }}
             onToggleFree={(block, id) => void toggleFree(block, id)}
           />
@@ -517,10 +517,19 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                   onFlow={() => void toggleFree(sel.block, sel.id!)}
                 />
               )}
-              {!layerAt(tree, sel.id, bp) && canFree(tree, sel.id) && host.canWrite && (
-                <button type="button" className={smallBtn} onClick={() => void toggleFree(sel.block, sel.id!)} title="Place it anywhere in its section on this screen size; narrower screens keep it in the flow">
-                  <Move className="h-3.5 w-3.5" /> Free placement
-                </button>
+              {!layerAt(tree, sel.id, bp) && canFree(tree, sel.id) && (
+                <div className="space-y-1.5">
+                  {placedWider(tree, sel.id, bp) && (
+                    <p className="text-[11px] text-foreground-muted">
+                      Placed freely on {BREAKPOINT_NAME[placedWider(tree, sel.id, bp)!]}; on {BREAKPOINT_NAME[bp]} it sits in the flow at its place in the page.
+                    </p>
+                  )}
+                  {host.canWrite && (
+                    <button type="button" className={smallBtn} onClick={() => void toggleFree(sel.block, sel.id!)} title="Place it anywhere in its section on this screen size; narrower screens keep it in the flow">
+                      <Move className="h-3.5 w-3.5" /> {placedWider(tree, sel.id, bp) ? `Place on ${BREAKPOINT_NAME[bp]} too` : 'Free placement'}
+                    </button>
+                  )}
+                </div>
               )}
               {styleable(tree, sel.id) !== null && (
                 <StylePanel key={bp} className={styleable(tree, sel.id) ?? ''} bp={bp} theme={host.theme} canWrite={host.canWrite} onChange={(prop, value) => style(sel.block, sel.id!, prop, value)} />

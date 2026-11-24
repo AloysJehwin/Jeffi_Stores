@@ -1,5 +1,5 @@
 import { isTagNode, type CodeNode } from '@jeffi/site-blocks'
-import { findNode, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
+import { EDITOR_BREAKPOINTS, findNode, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps } from '@/lib/site/code/classes'
 import { frameFor, freeAt, placeFree, restack, unplaceFree, type FreeLayer, type FreeRect } from '@/lib/site/code/free'
 import { insideData } from './nodes'
@@ -23,6 +23,16 @@ export const canFree = (tree: CodeNode, id: string) => id !== tree.id && litClas
 export function layerAt(tree: CodeNode, id: string, bp: Breakpoint): FreeLayer | null {
   const cls = litClass(tree, id)
   return cls === null ? null : freeAt(cls, bp)
+}
+
+/**
+ * The phone fallback: in the flow at this breakpoint but placed on a wider one, the narrowest such breakpoint (where
+ * it leaves the flow); null otherwise.
+ */
+export function placedWider(tree: CodeNode, id: string, bp: Breakpoint): Breakpoint | null {
+  if (layerAt(tree, id, bp)) return null
+  const order = EDITOR_BREAKPOINTS
+  return order.slice(order.indexOf(bp) + 1).find(b => layerAt(tree, id, b)) ?? null
 }
 
 /** The section's free layers at a breakpoint. */
