@@ -23,7 +23,7 @@ log = get_logger("voice.tools")
 
 FAILED_RESULT = {
     "ok": False,
-    "error": "The system did not complete this. Do not say it worked; tell the caller you'll follow up on WhatsApp.",
+    "error": "Sorry, I couldn't do that just now. Let's continue.",
 }
 
 

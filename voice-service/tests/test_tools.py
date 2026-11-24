@@ -103,7 +103,8 @@ async def test_failure_is_never_success() -> None:
     for result in (ControllerError("tool 502"), ToolResult(ok=False)):
         rec = Recorder()
         out = await dispatcher(Backend(result), rec).dispatch("publishSite", {})
-        assert out.result["ok"] is False and "Do not say it worked" in out.result["error"]
+        assert out.result["ok"] is False and "couldn't do that just now" in out.result["error"]
+        assert "WhatsApp" not in out.result["error"] and "follow up" not in out.result["error"]
         assert out.run_llm is True and rec.spoken == [] and rec.ended == []
 
 
