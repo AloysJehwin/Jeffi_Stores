@@ -134,14 +134,17 @@ describe('Contact detail and call panel', () => {
         contact: contact(),
         calls: [{ id: 'k1', status: 'completed', outcome: 'interested', created_at: '2026-11-24T10:00:00Z', started_at: null }],
         messages: [{ id: 'm1', direction: 'out', template_slug: 'preview', body: 'Your site', status: 'sent', created_at: '' }],
-        events: [{ id: 1, contact_id: 'c1', call_id: null, kind: 'preview.minted', data: { previewUrl: 'https://preview.example/x' }, actor: 'system', created_at: '2026-11-24T10:00:00Z' }],
+        events: [
+          { id: 2, contact_id: 'c1', call_id: null, kind: 'published', data: { claimLinkCreated: true, claimExpiresAt: '2026-12-08T00:00:00.000Z' }, actor: 'build', created_at: '2026-11-24T10:05:00Z' },
+          { id: 1, contact_id: 'c1', call_id: null, kind: 'preview.minted', data: { previewUrl: 'https://preview.example/x' }, actor: 'system', created_at: '2026-11-24T10:00:00Z' },
+        ],
       }),
       'GET /api/admin/ecom/outreach/calls/k1': () => ({ call: { id: 'k1', status: 'completed', outcome: 'interested', created_at: '', transcript: [{ role: 'agent', text: 'Namaste' }], consent: { recorded: true } }, recordingUrl: 'https://rec.example/a.mp3', events: [] }),
     }
     const { container } = render(<ContactDetailClient contactId="c1" />)
     await screen.findByText('Acme Sweets')
     expect(screen.getByText('preview minted')).toBeTruthy()
-    expect(screen.getByText('Claim link issued, not claimed yet')).toBeTruthy()
+    expect(screen.getByText(/^Claim link sent · expires /)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'https://preview.example/x' })).toBeTruthy()
     expect(screen.getByText(/Given/)).toBeTruthy()
     expect(screen.getByText('Your site')).toBeTruthy()

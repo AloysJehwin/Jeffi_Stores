@@ -323,7 +323,10 @@ describe('publish', () => {
     expect(r).toEqual({ liveUrl: 'https://site-lens-light-chennai.jeffistores.in', claimUrl: 'https://ecom.jeffistores.in/claim/claim-tok' })
     expect(h.publishOwnerShowcase).toHaveBeenCalledWith(SYSTEM.id, SITE)
     expect(h.createClaimToken).toHaveBeenCalledWith(CONTACT)
-    expect(events('published')[0].data).toMatchObject({ liveUrl: r.liveUrl, claimUrl: r.claimUrl, first: true })
+    expect(events('published')[0].data).toMatchObject({ liveUrl: r.liveUrl, claimLinkCreated: true, claimExpiresAt: '2026-12-08T00:00:00.000Z', first: true })
+    const stored = JSON.stringify([...h.db.events])
+    expect(stored).not.toContain('claim-tok')
+    expect(stored).not.toContain('/claim/')
     expect(row().status).toBe('published')
   })
 

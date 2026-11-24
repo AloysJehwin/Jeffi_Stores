@@ -15,19 +15,21 @@ type Action = 'requeue' | 'not_interested' | 'suppress'
 
 const isUrl = (v: unknown): v is string => typeof v === 'string' && /^https?:\/\//.test(v)
 
-/** Preview / live / claim links the pipeline recorded on the audit trail, newest first wins. */
-export function linksFromEvents(events: OutreachEvent[]): { preview?: string; live?: string; claim?: string } {
-  const out: { preview?: string; live?: string; claim?: string } = {}
+/** Preview / live links and the claim link's expiry the pipeline recorded on the audit trail, newest first wins. The claim link itself is never stored. */
+export function linksFromEvents(events: OutreachEvent[]): { preview?: string; live?: string; claimExpiresAt?: string } {
+  const out: { preview?: string; live?: string; claimExpiresAt?: string } = {}
   for (const e of events) {
     const d = e.data ?? {}
     if (!out.preview && isUrl(d.previewUrl)) out.preview = d.previewUrl
     if (!out.live && isUrl(d.liveUrl)) out.live = d.liveUrl
-    if (!out.claim && isUrl(d.claimUrl)) out.claim = d.claimUrl
+    const exp = d.claimExpiresAt ?? d.expires_at
+    if (!out.claimExpiresAt && typeof exp === 'string' && !Number.isNaN(Date.parse(exp))) out.claimExpiresAt = exp
   }
   return out
 }
 
-const claimState = (c: OutreachContact) => (c.claimed_owner_id ? 'Claimed' : c.claim_token_hash ? 'Claim link issued, not claimed yet' : 'No claim link yet')
+const claimState = (c: OutreachContact, expiresAt?: string) =>
+  c.claimed_owner_id ? 'Claimed' : c.claim_token_hash ? `Claim link sent${expiresAt ? ` · expires ${when(expiresAt)}` : ''}` : 'No claim link yet'
 
 export default function ContactDetailClient({ contactId }: { contactId: string }) {
   const canWrite = useCanWrite('ecom_outreach:write')
@@ -104,7 +106,7 @@ export default function ContactDetailClient({ contactId }: { contactId: string }
               <Field label="Site" value={c.showcase_site_id ? <span className="font-mono text-xs">{c.showcase_site_id}</span> : 'Not built yet'} />
               <Field label="Preview link" value={links.preview ? <a className="text-accent-500 hover:underline break-all" href={links.preview} target="_blank" rel="noreferrer">{links.preview}</a> : '-'} />
               <Field label="Live link" value={links.live ? <a className="text-accent-500 hover:underline break-all" href={links.live} target="_blank" rel="noreferrer">{links.live}</a> : '-'} />
-              <Field label="Claim" value={claimState(c)} />
+              <Field label="Claim" value={claimState(c, links.claimExpiresAt)} />
             </Fields>
           </Card>
         </div>

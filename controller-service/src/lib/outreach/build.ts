@@ -179,7 +179,7 @@ export async function publish(contactId: string): Promise<{ liveUrl: string; cla
   if (!claim) throw new OutreachBuildError('claimed', 'The site has already been claimed by its owner.')
   await recordEvent(contactId, 'published', {
     actor: 'build',
-    data: { site_id: site.id, slug: r.site.slug, first: r.first, trial_ends_at: r.site.trialEndsAt, liveUrl: r.url, claimUrl: claim.url, claimExpiresAt: claim.expiresAt },
+    data: { site_id: site.id, slug: r.site.slug, first: r.first, trial_ends_at: r.site.trialEndsAt, liveUrl: r.url, claimLinkCreated: true, claimExpiresAt: claim.expiresAt },
   })
   await advance(contact, 'published', { site_id: site.id })
   return { liveUrl: r.url, claimUrl: claim.url }
