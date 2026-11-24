@@ -13,20 +13,7 @@
       "admin-service/src/app/(admin)/admin/controls/ControlsClient.tsx",
       "admin-service/src/app/(admin)/admin/dashboard/_components/AnalyticsDashboardClient.tsx",
       "admin-service/src/app/(admin)/admin/delhivery/DelhiveryPageClient.tsx",
-      "admin-service/src/app/(admin)/admin/inflation/InflationClient.tsx",
-      "admin-service/src/app/(admin)/admin/inventory/InventoryClient.tsx",
-      "admin-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx",
-      "admin-service/src/app/(admin)/admin/invoices/[id]/InvoiceDetailClient.tsx",
-      "admin-service/src/app/(admin)/admin/labels/LabelsClient.tsx",
-      "admin-service/src/app/(admin)/admin/marketing/messaging-templates/MessagingTemplatesClient.tsx",
-      "admin-service/src/app/(admin)/admin/offers/[id]/OfferDetailClient.tsx",
-      "admin-service/src/app/(admin)/admin/products/[id]/view/ProductViewClient.tsx",
-      "admin-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx",
-      "admin-service/src/app/(admin)/admin/replacements/AdminReplacementsClient.tsx",
-      "admin-service/src/app/(admin)/admin/scan/ScanClient.tsx",
-      "admin-service/src/app/(admin)/admin/setup/_components/SetupGuideClient.tsx",
-      "admin-service/src/app/(admin)/admin/shelving/ShelvingClient.tsx",
-      "admin-service/src/app/(admin)/admin/suppliers/[id]/edit/EditSupplierClient.tsx"
+      "admin-service/src/app/(admin)/admin/inflation/InflationClient.tsx"
     ],
     "store-core": [
       "packages/store-core/src/components/PolicyConsentGate.tsx",
