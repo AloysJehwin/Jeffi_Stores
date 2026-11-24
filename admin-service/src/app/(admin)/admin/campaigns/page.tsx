@@ -1,4 +1,8 @@
 import { Suspense } from 'react'
+import { headers } from 'next/headers'
+import { resolveRequestTenant } from '@/lib/shared/db'
+import { isFlagship } from '@/lib/payments/webhook-tenant'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { Plus } from 'lucide-react'
@@ -26,11 +30,15 @@ export default async function CampaignsPage({
   const period = new URLSearchParams()
   if (sp.from) period.set('from', sp.from)
   if (sp.to) period.set('to', sp.to)
+  // Outreach lives in the platform admin; only a platform admin on the flagship store is offered it.
+  const flagship = await resolveRequestTenant().then(isFlagship, () => false)
+  const showOutreach = flagship && isPlatformAdmin((await headers()).get('x-user-role') || '')
   const tabs = [
     { id: 'overview' as const, label: 'Overview', href: period.size ? `${base}?${period}` : base },
     { id: 'list' as const, label: 'Campaigns', href: `${base}?tab=list` },
     { id: 'scenarios' as const, label: 'Scenarios', href: `${base}?tab=scenarios` },
     { id: 'drafts' as const, label: <DraftsTabLabel type="campaign,scenario" />, href: `${base}?tab=drafts` },
+    ...(showOutreach ? [{ id: 'outreach' as const, label: 'Outreach', href: ap('/admin/ecom/outreach', host) }] : []),
   ]
   return (
     <PageBody>
