@@ -256,6 +256,8 @@ export async function expireLapsedOrders(): Promise<number> {
 async function renewalOnSubscription(o: DomainOrder, priceInr: number, cutoff: Date): Promise<string | null> {
   const sub = await currentSubscription(o.tenant_id)
   if (sub?.status !== 'active' || !sub.currentEnd || Date.parse(sub.currentEnd) > cutoff.getTime() - 3 * DAY) return null
+  // Razorpay refuses add-ons on UPI Autopay subscriptions ("Addons can't be added ... when payment mode is upi").
+  if (sub.paymentMethod === 'upi') return null
   return addSubscriptionAddon(sub.razorpaySubscriptionId, { name: `Domain renewal: ${o.domain}`, amountPaise: priceInr * 100, description: `${o.domain}, one year` })
 }
 
