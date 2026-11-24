@@ -77,8 +77,9 @@ spec:
           resources:
             requests: { cpu: 250m, memory: 512Mi }
             limits: { cpu: 2, memory: 1536Mi }
-          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 3, failureThreshold: 20 }
-          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 3 }
+          # /readyz is 503 until the VAD and Smart Turn models are preloaded, so calls only reach a warm pod.
+          startupProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 2, failureThreshold: 45 }
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10, timeoutSeconds: 3 }
           livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
           lifecycle:
             preStop: { exec: { command: [sleep, '5'] } }

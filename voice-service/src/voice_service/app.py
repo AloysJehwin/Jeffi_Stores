@@ -4,12 +4,14 @@ controller -> here (service token):  POST /calls, POST /calls/{callId}/hangup
 provider -> here (per-call token):   POST /telephony/{provider}/status/{callId}?t=..
 media streams:                       WS /ws/exotel?k=..   (Exotel Voicebot applet)
                                      WS /ws/twilio/{callId}/{token}   (Twilio <Connect><Stream>, test calls only)
-health:                              GET /healthz
+health:                              GET /healthz (liveness), GET /readyz (503 until the models are preloaded)
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import parse_qsl
@@ -40,31 +42,61 @@ def build_service(settings: Settings) -> CallService:
     return CallService(settings, controller, ProviderConfigSource(settings), uploader=uploader)
 
 
-def create_app(settings: Settings | None = None, service: CallService | None = None, manage: bool = True) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    service: CallService | None = None,
+    manage: bool = True,
+    preload: Callable[[], None] | None = None,
+) -> FastAPI:
+    """`preload` runs in a thread at startup and /readyz answers 503 until it has finished; by default it is the
+    pipeline's model warm-up when `manage` is set, and nothing (ready at once) otherwise."""
     if settings is None:
         bootstrap_env()
         settings = load_settings()
     svc = service or build_service(settings)
+    if preload is None and manage:
+        from .pipeline import warmup as preload
+
+    async def run_preload(fn: Callable[[], None]) -> None:
+        try:
+            await asyncio.to_thread(fn)
+        except Exception:  # noqa: BLE001
+            log.exception("preload failed: staying not ready")
+            return
+        app.state.ready = True
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
+        task = asyncio.ensure_future(run_preload(preload)) if preload is not None else None
         if manage:
             await svc.start()
         try:
             yield
         finally:
+            if task is not None:
+                task.cancel()
             if manage:
                 await svc.stop()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = svc
+    app.state.ready = preload is None
 
     def authed(request: Request) -> bool:
         return verify_service_token(bearer(request.headers.get("authorization")), settings.service_secret) is not None
 
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:
-        return {"ok": True, "activeCalls": svc.registry.active_count(), "maxConcurrentCalls": settings.max_concurrent_calls}
+        return {
+            "ok": True,
+            "ready": app.state.ready,
+            "activeCalls": svc.registry.active_count(),
+            "maxConcurrentCalls": settings.max_concurrent_calls,
+        }
+
+    @app.get("/readyz")
+    async def readyz() -> Response:
+        return JSONResponse({"ready": app.state.ready}, status_code=200 if app.state.ready else 503)
 
     @app.post("/calls")
     async def place_call(request: Request) -> Response:

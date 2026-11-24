@@ -210,6 +210,54 @@ async def test_healthz(settings: Settings) -> None:
     _, client, _, _ = build(settings)
     r = await client.get("/healthz")
     assert r.status_code == 200 and r.json()["ok"] is True and r.json()["activeCalls"] == 0
+    assert (await client.get("/readyz")).status_code == 200  # nothing to preload
+
+
+def test_readyz_waits_for_the_model_preload(settings: Settings) -> None:
+    """k8s routes calls only to a ready pod: /readyz is 503 until the VAD and Smart Turn models are loaded, while
+    /healthz (liveness) stays 200."""
+    import threading
+    import time
+
+    from fastapi.testclient import TestClient
+
+    release, ran = threading.Event(), threading.Event()
+
+    def preload() -> None:
+        ran.set()
+        release.wait(5)
+
+    svc = CallService(settings, FakeController(), StaticConfig(merge(None, settings)), http=httpx.AsyncClient())  # type: ignore[arg-type]
+    with TestClient(create_app(settings, svc, manage=False, preload=preload)) as tc:
+        assert ran.wait(5)
+        r = tc.get("/readyz")
+        assert r.status_code == 503 and r.json() == {"ready": False}
+        h = tc.get("/healthz")
+        assert h.status_code == 200 and h.json()["ready"] is False
+        release.set()
+        deadline = time.monotonic() + 5
+        while tc.get("/readyz").status_code != 200 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert tc.get("/readyz").json() == {"ready": True} and tc.get("/healthz").json()["ready"] is True
+
+
+def test_a_failed_preload_stays_not_ready(settings: Settings) -> None:
+    from fastapi.testclient import TestClient
+
+    def preload() -> None:
+        raise RuntimeError("model file missing")
+
+    svc = CallService(settings, FakeController(), StaticConfig(merge(None, settings)), http=httpx.AsyncClient())  # type: ignore[arg-type]
+    with TestClient(create_app(settings, svc, manage=False, preload=preload)) as tc:
+        for _ in range(20):
+            tc.get("/healthz")
+        assert tc.get("/readyz").status_code == 503
+
+
+def test_the_real_preload_loads_both_models() -> None:
+    from voice_service.pipeline import warmup
+
+    warmup()  # imports the call path, builds Silero VAD and Smart Turn v3, runs each once
 
 
 @pytest.mark.parametrize("path", ["/ws/exotel", "/ws/twilio/call-1/bad"])

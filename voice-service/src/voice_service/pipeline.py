@@ -574,3 +574,37 @@ async def run_apology_only(websocket: Any, serializer: Any, cfg: VoiceConfig, se
     except TimeoutError:
         await worker.cancel(reason="apology_timeout")
 
+
+CALL_PATH_MODULES = (
+    "pipecat.services.anthropic.llm",
+    "pipecat.services.sarvam.stt",
+    "pipecat.services.sarvam.tts",
+    "pipecat.processors.aggregators.llm_response_universal",
+    "pipecat.processors.audio.audio_buffer_processor",
+    "pipecat.pipeline.worker",
+    "pipecat.workers.runner",
+    "pipecat.transports.websocket.fastapi",
+    "pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy",
+    "pipecat.serializers.exotel",
+    "pipecat.serializers.twilio",
+)
+
+
+def warmup() -> None:
+    """Imports the call path and loads the Silero VAD and Smart Turn models once, so the first call after a start
+    doesn't pay for it (seconds of imports, then the ONNX sessions). Raises if a model can't be loaded."""
+    import importlib
+
+    from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
+    from pipecat.audio.vad.silero import SileroVADAnalyzer
+
+    t0 = time.monotonic()
+    for name in CALL_PATH_MODULES:
+        importlib.import_module(name)
+    vad = SileroVADAnalyzer()
+    vad.set_sample_rate(16000)
+    vad.voice_confidence(bytes(1024))
+    turn = LocalSmartTurnAnalyzerV3()
+    turn.set_sample_rate(16000)
+    turn._predict_endpoint(np.zeros(16000, dtype=np.float32))
+    log.info("models preloaded", seconds=round(time.monotonic() - t0, 2))
