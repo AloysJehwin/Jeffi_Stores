@@ -1,4 +1,4 @@
-import { getDashboardMetrics, getDashboardAnalytics } from '@/lib/queries'
+import { getDashboardMetrics, getDashboardAnalytics, getDashboardActivity } from '@/lib/queries'
 import { queryMany } from '@/lib/shared/db'
 import { headers, cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
@@ -116,9 +116,10 @@ export default async function AdminDashboard() {
   }
   const host = await getHost()
   const can = (scope: string) => hasScope(role, scopes, scope)
-  const [metrics, analytics, setup] = await Promise.all([
+  const [metrics, analytics, activity, setup] = await Promise.all([
     getDashboardMetrics(),
     getDashboardAnalytics('30d'),
+    getDashboardActivity({ weeks: 26, channel: 'all' }).catch(() => null),
     setupTenantId()
       .then(t => getSetupGuide({ role, scopes }, t))
       .catch(() => null),
@@ -326,6 +327,7 @@ export default async function AdminDashboard() {
     <div className="p-4 sm:p-6">
       <AnalyticsDashboardClient
         initial={analytics}
+        activity={activity}
         metrics={metrics}
         host={host}
         username={displayName}
