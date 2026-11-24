@@ -77,7 +77,7 @@ describe('/api/admin/ecom/outreach/contacts/[id]', () => {
   it('not_interested moves the status; an invalid move is a 409', async () => {
     expect((await patch({ action: 'not_interested' })).status).toBe(200)
     expect(m.transition).toHaveBeenCalledWith(contact, 'not_interested', expect.anything())
-    m.transition.mockRejectedValueOnce(new InvalidTransitionError('nope'))
+    m.transition.mockRejectedValueOnce(new InvalidTransitionError('claimed', 'not_interested'))
     expect((await patch({ action: 'not_interested' })).status).toBe(409)
   })
 })
