@@ -50,11 +50,12 @@ describe('affected', () => {
     expect(await run(['packages/gst/src/index.ts'])).toEqual({ apps: [], services: ['documents'], all: false })
     expect((await run(['packages/new-pkg/src/index.ts'])).all).toBe(true)
   })
-  it('maps each Fastify service and the ai-platform folders', async () => {
+  it('maps each Fastify service, the ai-platform folders and voice-service', async () => {
     expect((await run(['messaging-service/src/x.ts'])).services).toEqual(['messaging'])
     expect((await run(['document-service/src/x.ts'])).services).toEqual(['documents'])
     expect((await run(['ai-platform/paddleocr/ocr_service.py'])).services).toEqual(['ocr'])
     expect((await run(['ai-platform/gateway/src/x.ts'])).services).toEqual(['ai-gateway'])
+    expect(await run(['voice-service/src/voice_service/app.py'])).toEqual({ apps: [], services: ['voice'], all: false })
     expect(await run(['mobile-service/client/app/index.tsx'])).toEqual({ apps: [], services: [], all: false })
   })
   it('a database file also marks every app, since each loads the schema', async () => {
