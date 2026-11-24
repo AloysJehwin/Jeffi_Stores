@@ -148,8 +148,8 @@ export function effectiveValue(className: string, bp: Breakpoint, prop: PanelPro
 
 const prefixed = (bp: Breakpoint, utility: string) => (bp === 'base' ? utility : `${bp}:${utility}`)
 
-/** One breakpoint's own value of a property set (null clears it); its other tokens are kept. */
-function setOwn(className: string, bp: Breakpoint, prop: PanelProp, value: string | null): string {
+/** One breakpoint's own value of a property set (null clears it); its other tokens are kept. Nothing is pinned. */
+export function setOwn(className: string, bp: Breakpoint, prop: PanelProp, value: string | null): string {
   const keep = breakpointTokens(className, bp).filter(t => panelToken(t)?.prop !== prop)
   return withBreakpoint(className, bp, value === null ? keep : [...keep, prefixed(bp, PANEL_PROPS[prop].make(value))])
 }

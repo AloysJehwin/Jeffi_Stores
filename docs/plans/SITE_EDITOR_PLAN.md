@@ -51,6 +51,26 @@ AI-generated pages must be editable with it.
    studio preview with `editor=1` (`ShowcasePreview` `editing`: `data-block-id`, canvas ids, the bridge). Pictures
    upload as the Details step's do. Publishing stays the studio's own step, whose compile is v2-aware.
 
+**Phase 3 (free layers), in slices**
+1. Model and classes. `lib/site/code/free.ts`: a free layer is `absolute` in its frame with left, top, width (and
+   maybe height) in % at a breakpoint, plus a z step (`lg:absolute lg:left-[12%] lg:top-[30%] lg:w-[40%] lg:z-10`).
+   `placeFree` keeps the next wider breakpoint as it was (`static` and its width pinned) unless placed too;
+   `unplaceFree` puts it back in the flow; `frameFor` makes the frame `relative` and keeps its height
+   (`lg:min-h-[640px]`) once the layer leaves the flow; `restack` orders layers. The node keeps its place in the tree,
+   so reading order and SEO don't change. Tested down to the compiled CSS.
+2. Handles and guides. In-house, on pointer events, in the lazy canvas bridge (`editor/handles.ts`, behind a small
+   `LayerHandles` interface a library could replace): a selected free layer gets a move area and eight resize knobs;
+   edges snap (`lib/site/code/snap.ts`) to the frame's edges, centre and fractions, to the other boxes in the frame,
+   else to whole percents, with guides drawn while they hold; arrow keys nudge 1% (5% with shift). The drag shows
+   through inline styles; the editor writes `placeFree` classes (`components/site-editor/free-ops.ts`) and the reload
+   after the save draws them. "Free placement" toggles in the layers row and the inspector: the canvas measures the
+   element (`measure`), it is placed where it sits, on top of the section's layers, and its frame made `relative` with
+   its height kept. `FreePanel.tsx`: left, top, width, height in %, front/forward/backward/back, back in the flow.
+3. Phone fallback and critique. Placed on a wider screen only, a layer sits in the flow at its place in the page
+   below it (mobile-first classes); the layers row shows it faintly and the inspector says so, with "Place on Phone
+   too" (`free-ops.ts` `placedWider`). `lib/site/critique.ts` `offScreenOnPhones` reports (`off_screen`, per element)
+   layers placed on phones whose box runs past the section's edges; the owner moves them on Phone (no auto-fix).
+
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
 all Showcase owners), since their studio runs on the platform.

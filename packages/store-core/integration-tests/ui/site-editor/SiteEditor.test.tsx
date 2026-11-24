@@ -190,3 +190,46 @@ describe('SiteEditor pictures and links', () => {
     expect(sent).toContain('"/b"')
   })
 })
+
+describe('SiteEditor free layers', () => {
+  const h2Class = (save: ReturnType<typeof vi.fn>) => {
+    const t = (save.mock.calls.at(-1)![0] as PageDoc).blocks.a.props.tree as { props: { className?: { v: string } }; children: { props: { className?: { v: string } } }[] }
+    const sorted = (v?: string) => (v ?? '').split(' ').filter(Boolean).sort().join(' ')
+    return { section: sorted(t.props.className?.v), h2: sorted(t.children[0].props.className?.v) }
+  }
+
+  it('places an element where the canvas measured it, then moves it where it was dragged', async () => {
+    const { save } = setup()
+    await screen.findByRole('button', { name: 'Hero' })
+    const post = (await canvas()).postMessage
+    fireEvent.click(screen.getAllByRole('button', { name: 'Expand' })[0])
+    fireEvent.click(await screen.findByRole('button', { name: 'Free placement' }))
+    const ask = post.mock.calls.map(c => c[0]).find(m => m.type === 'site-editor:measure')
+    expect(ask).toMatchObject({ block: 'a', id: 'e2' })
+    await fromCanvas({ type: 'measured', req: ask.req, rect: { left: 10.2, top: 20.4, width: 50.3, height: 10 }, frame: 'e1', frameHeight: 500 })
+    expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: 'site-editor:place', id: 'e2', rect: { left: 10, top: 20, width: 50 }, frameMinHeight: 500 }), '*')
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    expect(h2Class(save)).toEqual({ section: 'lg:min-h-[500px] relative', h2: 'lg:absolute lg:left-[10%] lg:top-[20%] lg:w-[50%] lg:z-10' })
+    expect(await screen.findByText('Free placement', { selector: 'p' })).toBeInTheDocument()
+    save.mockClear()
+    await fromCanvas({ type: 'placed', block: 'a', id: 'e2', rect: { left: 30, top: 40, width: 20, height: 15 }, sized: false })
+    await waitFor(() => expect(save).toHaveBeenCalled(), { timeout: 3000 })
+    expect(h2Class(save).h2).toBe('lg:absolute lg:left-[30%] lg:top-[40%] lg:w-[20%] lg:z-10')
+    fireEvent.click(screen.getByRole('button', { name: /Back in the flow/ }))
+    await waitFor(() => expect(h2Class(save).h2).toBe(''), { timeout: 3000 })
+  })
+
+  it('on Phone, shows a Desktop-placed layer in the flow and offers to place it there too', async () => {
+    const page = doc()
+    const t = page.blocks.a.props.tree as { children: { props: Record<string, unknown> }[] }
+    t.children[0].props.className = { k: 'lit', v: 'lg:absolute lg:left-[10%] lg:top-[20%] lg:w-[50%] lg:z-10' }
+    setup({ load: async () => page })
+    await screen.findByRole('button', { name: 'Hero' })
+    await fromCanvas({ type: 'select', block: 'a', id: 'e2' })
+    expect(await screen.findByText('Free placement', { selector: 'p' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Phone/ }))
+    expect(await screen.findByText(/Placed freely on Desktop; on Phone it sits in the flow/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Place on Phone too' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Free placement' })[0]).toHaveAttribute('aria-pressed', 'false')
+  })
+})

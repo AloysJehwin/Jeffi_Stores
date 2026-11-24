@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { withBreakpoint, type DesignOp } from '@jeffi/site-blocks/design'
+import { boxIn, createHandles } from './handles'
 
 // The visual editor's side of the Site Builder canvas (docs/plans/SITE_EDITOR_PLAN.md), successor to
 // SitePreviewBridge. Dormant until the editor (components/site-editor) sends `site-editor:mode`; then a click selects
@@ -10,9 +11,14 @@ import { withBreakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 // apply at once (text, classes, a picture); the rest show on the reload after the save. Every change goes back as
 // design operations (@jeffi/site-blocks/design), which the editor records and saves; the save compiles them again.
 //
-// Messages in (from the parent only): mode { on }, select { block, id }, apply { block, ops, seq }, scroll-to { y }.
+// Free layers (phase 3): a selected element positioned `absolute` gets move and resize handles (handles.ts); a drag
+// or an arrow key reports its new box in % of its frame, and `measure` reports an element's box before it is placed.
+//
+// Messages in (from the parent only): mode { on, write }, select { block, id }, apply { block, ops, seq },
+// scroll-to { y }, measure { block, id, req }, place { block, id, rect | null, frame?, frameMinHeight? }.
 // Messages out: ready, select { block, id, tag, cmp, text }, ops { block, ops }, applied { block, ops, seq },
-// scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' }.
+// scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' }, measured { req, rect, frame, frameHeight },
+// placed { block, id, rect, sized }.
 
 type Win = Window & { __siteEditorBridge?: boolean }
 const P = 'site-editor:'
@@ -23,6 +29,8 @@ export default function SiteEditorBridge() {
     if (window.parent === window || w.__siteEditorBridge) return
     w.__siteEditorBridge = true
     let on = false
+    let write = true
+    const handles = createHandles(document)
     let selected: HTMLElement | null = null
     let editing: { el: HTMLElement; before: string } | null = null
     const root = document.documentElement
@@ -41,10 +49,28 @@ export default function SiteEditorBridge() {
     // React's SSR puts a comment between neighbouring text nodes; committing writes one text node in their place.
     const textOnly = (el: Element) => el.hasAttribute('data-e-text') && [...el.childNodes].every(n => n.nodeType === Node.TEXT_NODE || n.nodeType === Node.COMMENT_NODE)
 
+    const isFree = (el: HTMLElement) => getComputedStyle(el).position === 'absolute'
+    /** Handles on the selection while it is a free layer. */
+    const syncHandles = () => {
+      const el = selected
+      if (!on || !write || !el?.dataset.e || !isFree(el)) return handles.detach()
+      const block = blockOf(el)
+      const id = el.dataset.e
+      handles.attach(el, { sized: false, onCommit: (rect, sized) => send({ type: 'placed', block, id, rect, sized }) })
+    }
     const mark = (el: HTMLElement | null) => {
       selected?.removeAttribute('data-e-selected')
       selected = el
       el?.setAttribute('data-e-selected', '')
+      syncHandles()
+    }
+    /** What a layer is placed in: its offsetParent once free; before, the nearest positioned ancestor in the section,
+     * else the section's root (which the editor makes `relative`). */
+    const frameOf = (el: HTMLElement): HTMLElement | null => {
+      if (isFree(el)) return el.offsetParent instanceof HTMLElement ? el.offsetParent : null
+      const top = el.closest('[data-code-section]')?.querySelector<HTMLElement>(':scope > [data-e]')
+      for (let p = el.parentElement; p && top?.contains(p); p = p.parentElement) if (p === top || getComputedStyle(p).position !== 'static') return p
+      return null
     }
     const select = (el: HTMLElement | null) => {
       mark(el)
@@ -131,6 +157,13 @@ export default function SiteEditorBridge() {
         return
       }
       const mod = e.metaKey || e.ctrlKey
+      // Arrow keys nudge a free layer by 1% (5% with shift).
+      const step = e.shiftKey ? 5 : 1
+      const nudge = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]
+      if (nudge && handles.target) {
+        e.preventDefault()
+        return handles.nudge(nudge[0], nudge[1])
+      }
       const action =
         mod && e.key.toLowerCase() === 'z' ? (e.shiftKey ? 'redo' : 'undo') : mod && e.key.toLowerCase() === 'y' ? 'redo' : e.key === 'Delete' || e.key === 'Backspace' ? 'delete' : e.key === 'Escape' ? 'escape' : null
       if (!action) return
@@ -154,13 +187,17 @@ export default function SiteEditorBridge() {
     let raf = 0
     const onScroll = () => {
       cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => send({ type: 'scroll', y: Math.round(window.scrollY) }))
+      raf = requestAnimationFrame(() => {
+        send({ type: 'scroll', y: Math.round(window.scrollY) })
+        handles.refresh()
+      })
     }
     const onMessage = (e: MessageEvent) => {
       if (e.source !== window.parent || typeof e.data?.type !== 'string' || !e.data.type.startsWith(P)) return
       const kind = e.data.type.slice(P.length)
       if (kind === 'mode') {
         on = e.data.on === true
+        write = e.data.write !== false
         root.toggleAttribute('data-site-editing', on)
         if (!on) {
           commit(true)
@@ -174,6 +211,22 @@ export default function SiteEditorBridge() {
         const ops = (e.data.ops as DesignOp[]).filter(op => op && typeof op === 'object' && show(e.data.block, op))
         send({ type: 'applied', block: e.data.block, ops, seq: e.data.seq })
       } else if (kind === 'scroll-to' && typeof e.data.y === 'number') window.scrollTo({ top: e.data.y })
+      else if (kind === 'measure') {
+        const el = findAll(e.data.block, e.data.id)[0]
+        const frame = el && frameOf(el)
+        send({ type: 'measured', req: e.data.req, rect: el && frame ? boxIn(el, frame) : null, frame: frame?.dataset.e ?? null, frameHeight: frame ? frame.getBoundingClientRect().height : null })
+      } else if (kind === 'place') {
+        // Shown at once with inline styles; the classes draw it after the save's reload.
+        const r = e.data.rect as { left: number; top: number; width: number; height?: number } | null
+        for (const el of findAll(e.data.block, e.data.id))
+          Object.assign(el.style, r ? { position: 'absolute', left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: r.height !== undefined ? `${r.height}%` : '' } : { position: '', left: '', top: '', width: '', height: '' })
+        const frame = typeof e.data.frame === 'string' ? findAll(e.data.block, e.data.frame)[0] : null
+        if (frame) {
+          if (getComputedStyle(frame).position === 'static') frame.style.position = 'relative'
+          if (typeof e.data.frameMinHeight === 'number') frame.style.minHeight = `${e.data.frameMinHeight}px`
+        }
+        syncHandles()
+      }
     }
 
     document.addEventListener('click', onClick, true)
@@ -182,12 +235,14 @@ export default function SiteEditorBridge() {
     document.addEventListener('paste', onPaste, true)
     document.addEventListener('focusout', onBlur, true)
     window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', handles.refresh)
     window.addEventListener('message', onMessage)
     send({ type: 'ready' })
     return () => {
       commit(false)
       mark(null)
       cancelAnimationFrame(raf)
+      handles.detach()
       root.removeAttribute('data-site-editing')
       document.removeEventListener('click', onClick, true)
       document.removeEventListener('dblclick', onDblClick, true)
@@ -195,6 +250,7 @@ export default function SiteEditorBridge() {
       document.removeEventListener('paste', onPaste, true)
       document.removeEventListener('focusout', onBlur, true)
       window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', handles.refresh)
       window.removeEventListener('message', onMessage)
       w.__siteEditorBridge = false
     }
