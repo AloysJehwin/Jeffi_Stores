@@ -16,6 +16,11 @@ export interface EventContext {
   store: WebhookTenant | null
   eventId: string | null
   accountId: string | null
+  /**
+   * Workspace billing subscriptions (index rows with collecting_account 'billing'), injected by the controller's
+   * platform webhook: store-core can't import controller code. Without it those events are acked and dropped.
+   */
+  onBillingSubscription?: (type: string, event: any, ctx: { tenantId: string; eventId: string | null }) => Promise<void>
 }
 
 /** Raised on a failure worth a retry (a 503), never for an event we simply don't know. */

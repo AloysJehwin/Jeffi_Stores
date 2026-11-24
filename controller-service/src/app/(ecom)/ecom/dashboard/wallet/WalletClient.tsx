@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card } from '../_components/Card'
+import { Wallet } from 'lucide-react'
+import { Card, StatTile } from '../_components/Card'
+import { EmptyState } from '../_components/EmptyState'
 import { ChoiceChips, fieldCls } from '../../_ui'
-import { fieldRow } from '../../onboard/ui'
-import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
+import { primaryBtn } from '../../onboard/ui'
+import { STATUS_PILL, fmt, fmtDate, fmtWhole, walletEntryLabel, walletEntryNote } from '../_components/finance'
 import Pager from '../_components/Pager'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
 import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, useUpiPayment, type PaymentChoice } from '@/components/payments'
@@ -13,7 +15,9 @@ import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, useUpiPayment,
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
 const AMOUNTS = [500, 1000, 2500, 5000]
-const CATEGORY: Record<string, string> = { ad_free: 'ad-free', messaging_addon: 'SMS & WhatsApp add-on', domain: 'domain', showcase: 'Showcase site' }
+const MIN_TOPUP = 100
+const legend = 'mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted'
+const fmtDay = (s: string) => new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function WalletClient({ initial, keyId, tenantName, upiEnabled = false }: { initial: { balance: number; ledger: Entry[] }; keyId: string; tenantName: string; upiEnabled?: boolean }) {
   const router = useRouter()
@@ -49,44 +53,98 @@ export default function WalletClient({ initial, keyId, tenantName, upiEnabled = 
         })
         rz.open()
       })
-      setMsg(`Added ${fmt(amount)} to your wallet. The tax invoice is on its way to your email.`); router.refresh()
+      setMsg(`Added ${fmtWhole(amount)} to your wallet. The tax invoice is on its way to your email.`); router.refresh()
     } catch (e: any) { setMsg(e.message) } finally { setBusy(false) }
   }
 
   const spentToday = initial.ledger.filter(e => e.entry_type === 'debit' && new Date(e.occurred_at).toDateString() === new Date().toDateString()).reduce((a, e) => a + Math.abs(e.amount), 0)
+  const lastTopUp = initial.ledger.find(e => e.entry_type === 'recharge')
+  const valid = amount >= MIN_TOPUP
+  const due = topupAmounts(amount)
+  const rows = initial.ledger.slice((page - 1) * 20, page * 20)
+  const sign = (n: number) => `${n >= 0 ? '+' : '−'}${fmt(n)}`
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {[['Balance', fmt(initial.balance), true], ['Spent today', fmt(spentToday)], ['Entries', String(initial.ledger.length)]].map(([l, v, a]) => (
-          <div key={l as string} className="rounded-2xl org-sand p-4 last:col-span-2 sm:p-5 sm:last:col-span-1"><div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">{l}</div><div className={`font-display font-black text-lg sm:text-2xl lg:text-3xl tabular-nums [overflow-wrap:anywhere] sm:[overflow-wrap:normal] ${a ? 'ecom-accent-text' : ''}`}>{v}</div></div>
-        ))}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
+        <StatTile label="Balance" value={fmt(initial.balance)} accent />
+        <StatTile label="Spent today" value={fmt(spentToday)} />
+        <StatTile
+          label="Last top-up"
+          value={lastTopUp ? <>{fmtWhole(lastTopUp.amount)}<span className="mt-1 block font-sans text-xs font-normal text-foreground-muted">{fmtDay(lastTopUp.occurred_at)}</span></> : '—'}
+        />
       </div>
       <Card title="Top up">
-        <div className="space-y-3">
-          <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
-            options={AMOUNTS.map(a => ({ value: String(a), label: fmt(a) }))} />
-          <div className="flex items-center gap-3">
-            <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} aria-label="Custom amount" className={`w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm ${fieldCls}`} />
-            <button onClick={topUp} disabled={busy || upi.busy || amount < 100} className={`ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40 ${fieldRow}`}>{busy || upi.busy ? 'Opening…' : viaUpi ? 'Pay with UPI' : upiEnabled ? 'Pay' : 'Pay with Razorpay'}</button>
+        <p className="mb-4 text-sm text-foreground-secondary">The wallet pays for usage only: messages, documents, AI and shipping. Your plan, Showcase sites and add-ons are billed on your subscription.</p>
+        <div className="space-y-5">
+          <div>
+            <p className={legend}>Amount</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
+                options={AMOUNTS.map(a => ({ value: String(a), label: fmtWhole(a) }))} />
+              <input type="number" min={MIN_TOPUP} value={amount} onChange={e => setAmount(Number(e.target.value))} aria-label="Custom amount" className={`w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm ${fieldCls}`} />
+            </div>
+            {!valid && <p className="mt-2 text-xs text-foreground-muted">The minimum top-up is {fmtWhole(MIN_TOPUP)}.</p>}
+          </div>
+          {upiEnabled && (
+            <div className="max-w-md">
+              <PaymentSections compact upi razorpay value={method} onChange={setMethod} />
+            </div>
+          )}
+          <div className="flex flex-col gap-3 border-t border-border-default pt-4 sm:flex-row sm:items-center sm:justify-between">
+            {valid && (
+              <p className="text-xs tabular-nums text-foreground-muted">
+                {fmtWhole(amount)} credit + {fmtWhole(due.gst)} GST (18%) = you pay <strong className="text-foreground">{fmtWhole(due.total)}</strong>. A tax invoice is emailed after payment.
+              </p>
+            )}
+            <button onClick={topUp} disabled={busy || upi.busy || !valid} className={`${primaryBtn} w-full shrink-0 sm:ml-auto sm:w-auto`}>
+              {busy || upi.busy ? 'Opening…' : valid ? `Pay ${fmtWhole(due.total)}` : 'Pay'}
+            </button>
           </div>
         </div>
-        {upiEnabled && (
-          <div className="mt-4 max-w-md">
-            <PaymentSections compact upi razorpay value={method} onChange={setMethod} />
-          </div>
-        )}
-        {amount >= 100 && (
-          <p className="mt-3 text-xs tabular-nums text-foreground-muted">
-            {fmt(amount)} credit + {fmt(topupAmounts(amount).gst)} GST (18%) = you pay <strong className="text-foreground">{fmt(topupAmounts(amount).total)}</strong>. A tax invoice is emailed after payment.
-          </p>
-        )}
         {msg && <p className="mt-3 text-sm text-foreground-secondary">{msg}</p>}
         {upi.error && !upi.manual && <p role="alert" className="mt-3 text-sm text-foreground-secondary">{upi.error}</p>}
         <UpiManualDialog manual={upi.manual} busy={upi.busy} error={upi.error} onConfirm={upi.confirmUtr} onClose={upi.dismissManual} />
       </Card>
-      <Card title="Ledger">
-        <div className="-mx-6 -mb-6 overflow-x-auto"><table className="w-full text-sm min-w-[560px]"><thead className="org-sand text-foreground-secondary"><tr>{['When', 'Category', 'Amount', 'Note'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-border-default">{initial.ledger.slice((page - 1) * 20, page * 20).map((e, i) => <tr key={i}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(e.occurred_at)}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.amount >= 0 ? STATUS_PILL.captured : 'org-sand'}`}>{(CATEGORY[e.category ?? ''] ?? e.category ?? e.entry_type).replace(/_/g, ' ')}</span></td><td className={`px-6 py-2.5 font-semibold tabular-nums ${e.amount >= 0 ? 'text-green-600' : ''}`}>{e.amount >= 0 ? '+' : '−'}{fmt(e.amount)}</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{e.note ?? '—'}</td></tr>)}</tbody></table></div>
+      <Card title="Wallet activity">
+        {rows.length === 0 ? (
+          <EmptyState bare icon={Wallet} title="No wallet activity yet" action={{ href: '/dashboard/services', label: 'Browse services' }}>
+            Top-ups and charges for messages, documents and shipping show here.
+          </EmptyState>
+        ) : (
+          <>
+            <ul className="-mx-6 -mb-6 divide-y divide-border-default border-t border-border-default sm:hidden">
+              {rows.map((e, i) => {
+                const note = walletEntryNote(e)
+                return (
+                  <li key={i} className="flex items-start justify-between gap-3 px-6 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{walletEntryLabel(e)}</p>
+                      <p className="text-xs text-foreground-muted break-words">{fmtDate(e.occurred_at)}{note && ` · ${note}`}</p>
+                    </div>
+                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${e.amount >= 0 ? 'text-green-600' : 'text-foreground'}`}>{sign(e.amount)}</span>
+                  </li>
+                )
+              })}
+            </ul>
+            <div className="-mx-6 -mb-6 hidden overflow-x-auto sm:block">
+              <table className="w-full text-sm min-w-[560px]">
+                <thead className="org-sand text-foreground-secondary">
+                  <tr>{['Date', 'Type', 'Note', 'Amount'].map(h => <th key={h} className={`px-6 py-2 text-xs font-semibold ${h === 'Amount' ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {rows.map((e, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(e.occurred_at)}</td>
+                      <td className="px-6 py-2.5"><span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.amount >= 0 ? STATUS_PILL.captured : 'org-sand'}`}>{walletEntryLabel(e)}</span></td>
+                      <td className="px-6 py-2.5 text-xs text-foreground-secondary">{walletEntryNote(e) ?? '—'}</td>
+                      <td className={`px-6 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap ${e.amount >= 0 ? 'text-green-600' : ''}`}>{sign(e.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </Card>
       <Pager page={page} total={initial.ledger.length} onPage={setPage} />
     </div>

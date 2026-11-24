@@ -102,7 +102,7 @@ function ListCard<T>({
 }
 
 /** Several work pictures at once: each uploaded becomes a work sample to caption. */
-function AddPictures({ room, onAdd }: { room: number; onAdd: (urls: string[]) => void }) {
+function AddPictures({ room, onAdd, siteId }: { room: number; onAdd: (urls: string[]) => void; siteId: string | null }) {
   const [busy, setBusy] = useState(0)
   const [error, setError] = useState<string | null>(null)
   async function pick(files: File[]) {
@@ -112,7 +112,7 @@ function AddPictures({ room, onAdd }: { room: number; onAdd: (urls: string[]) =>
     const urls: string[] = []
     for (const f of list) {
       try {
-        urls.push(await uploadShowcaseImage(f, 'work'))
+        urls.push(await uploadShowcaseImage(f, 'work', siteId))
       } catch (e) {
         setError((e as Error).message)
       }
@@ -163,7 +163,7 @@ function Stars({ value, onChange }: { value: number | undefined; onChange: (v: n
   )
 }
 
-export default function ContentFields({ form, setForm }: { form: DetailsForm; setForm: (f: (f: DetailsForm) => DetailsForm) => void }) {
+export default function ContentFields({ form, setForm, siteId }: { form: DetailsForm; setForm: (f: (f: DetailsForm) => DetailsForm) => void; siteId: string | null }) {
   const c = form.content
   const setList =
     <K extends ListKey>(key: K) =>
@@ -182,7 +182,7 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
         addLabel="Add a service"
         render={(s, set, i) => (
           <div className="flex flex-col gap-3 sm:flex-row">
-            <ImageField value={s.image} onChange={image => set({ image })} kind="service" label="Picture (optional)" className="h-24 w-24" />
+            <ImageField value={s.image} onChange={image => set({ image })} kind="service" label="Picture (optional)" className="h-24 w-24" siteId={siteId} />
             <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-[1fr_10rem]">
               <div>
                 <label htmlFor={`sv-title-${i}`} className={lbl}>
@@ -217,6 +217,7 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
         addLabel="Add one"
         extra={
           <AddPictures
+            siteId={siteId}
             room={SHOWCASE_LIMITS.work - c.work.length}
             onAdd={urls =>
               setForm(f => ({ ...f, content: { ...f.content, work: [...f.content.work, ...urls.map(image => ({ title: '', description: '', image, link: '' }))].slice(0, SHOWCASE_LIMITS.work) } }))
@@ -225,7 +226,7 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
         }
         render={(w, set, i) => (
           <div className="flex flex-col gap-3 sm:flex-row">
-            <ImageField value={w.image} onChange={image => set({ image: image ?? '' })} kind="work" label="Picture" className="h-24 w-24" />
+            <ImageField value={w.image} onChange={image => set({ image: image ?? '' })} kind="work" label="Picture" className="h-24 w-24" siteId={siteId} />
             <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor={`wk-title-${i}`} className={lbl}>
@@ -254,7 +255,7 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
 
       <ListCard<ShowcasePagePicture>
         title="Pictures for your page"
-        hint="Pictures that set the mood, shown after your work photos (never as your work). When you have few work photos, designing your page adds some made by AI."
+        hint="Pictures that set the mood, shown after your work photos (never as your work). When you have few work photos, designing your page adds some: free stock photos (credited at the foot of your page) or ones made by AI."
         items={c.pictures ?? []}
         limit={SHOWCASE_LIMITS.pictures}
         update={fn => setForm(f => ({ ...f, content: { ...f.content, pictures: fn(f.content.pictures ?? []) } }))}
@@ -263,7 +264,7 @@ export default function ContentFields({ form, setForm }: { form: DetailsForm; se
         aiNote="Made by AI for your page. Replace it with your own photo whenever you like."
         render={(p, set, i) => (
           <div className="flex flex-col gap-3 sm:flex-row">
-            <ImageField value={p.image} onChange={image => set({ image: image ?? '' })} kind="work" label="Picture" className="h-24 w-24" />
+            <ImageField value={p.image} onChange={image => set({ image: image ?? '' })} kind="work" label="Picture" className="h-24 w-24" siteId={siteId} />
             <div className="min-w-0 flex-1">
               <label htmlFor={`pc-alt-${i}`} className={lbl}>
                 What it shows

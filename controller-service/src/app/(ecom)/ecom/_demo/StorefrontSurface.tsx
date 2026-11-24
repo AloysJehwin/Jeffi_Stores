@@ -8,7 +8,7 @@ import { STATUS_CLASSES } from './theme'
 import ProductArt from './ProductArt'
 
 function formatRs(n: number): string {
-  return `Rs. ${n.toLocaleString('en-IN')}`
+  return `₹${n.toLocaleString('en-IN')}`
 }
 
 function discountPct(price: number, mrp: number | null): number | null {
@@ -148,7 +148,7 @@ function ProductView({ product, onAdd }: { product: Product; onAdd: () => void }
           {off !== null && <span className="ecom-accent-text text-sm font-bold">{off}% off</span>}
         </div>
         <p className="text-sm text-foreground-secondary leading-relaxed">
-          In stock and ready to ship. Free delivery on orders over Rs. 999.
+          In stock and ready to ship. Free delivery on orders over ₹999.
         </p>
         <button
           onClick={onAdd}

@@ -16,7 +16,8 @@ export async function siteForHost(host: string): Promise<ShowcaseSiteRow | null>
   if (!key) return null
   const hit = hosts.get(key)
   if (hit && Date.now() - hit.at < TTL_MS) return hit.site
-  const site = await getShowcaseByHost(key)
+  // A bought domain serves its www. too; the site holds the apex as its custom domain.
+  const site = (await getShowcaseByHost(key)) ?? (key.startsWith('www.') ? await getShowcaseByHost(key.slice(4)) : null)
   hosts.delete(key)
   hosts.set(key, { at: Date.now(), site })
   if (hosts.size > MAX_HOSTS) hosts.delete(hosts.keys().next().value!)

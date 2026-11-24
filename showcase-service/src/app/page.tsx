@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { blockVisible, cssVarsRule, googleFontsHref, normalizeDoc, normalizeTheme, themeCssVars, topBlocks, type PageDoc } from '@jeffi/site-blocks'
 import CodeSection, { planSections } from '@/components/visitor/site/code/CodeSection'
+import PhotoCredits from '@/components/visitor/site/PhotoCredits'
+import { pageCredits, pictureCredits } from '@/lib/ai/stock-credits'
 import type { CompiledSection } from '@/lib/site/code/compile'
 import { runWithSiteData, type SiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
@@ -79,6 +81,7 @@ export default async function ShowcasePage({ searchParams }: { searchParams: Pro
       <div className="showcase-site">
         <LeadNotice state={lead} why={why} />
         <main>{body}</main>
+        <PhotoCredits credits={[...pictureCredits(site.content.pictures), ...pageCredits(site.page)]} className="px-4 py-4 text-center text-xs text-foreground-muted" />
       </div>
       <Tracker />
     </>

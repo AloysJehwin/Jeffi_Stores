@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Segmented } from '../../_ui'
 import { ComputeConfigurator, type ComputeChoice } from '../../_compute/ComputeConfigurator'
+import { specSummary as summary } from '../../_compute/labels'
 import { describeChange } from '@controller/lib/compute/changes'
 import { specKey } from '@/lib/compute/presets'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { Card, Row } from '../_components/Card'
+import { primaryBtn } from '../../onboard/ui'
 type ComparisonRow = { group: string; label: string; scopeKey: string | null }
 
 type ApplyMode = 'window' | 'now'
@@ -22,12 +24,6 @@ const STATUS: Record<string, string> = {
   paused: 'Paused',
   scheduled: 'At your next renewal',
 }
-
-const summary = (s: ComputeSpec) =>
-  [
-    s.node.placement === 'pool' ? 'Shared servers' : `${s.node.count > 1 ? `${s.node.count}× ` : ''}${s.node.type}`,
-    s.db.mode === 'shared' ? 'shared database' : s.db.mode === 'node' ? 'on-node database' : `${s.db.class?.replace(/^db\./, '')} database, ${s.db.storageGb} GB${s.db.multiAz ? ', with standby' : ''}`,
-  ].join(' · ')
 
 /** Features gained/lost moving from one plan to another, from the comparison rows + feature matrix. */
 function planDelta(from: string, to: string, matrix: Record<string, string[]>, rows: ComparisonRow[]): { gained: string[]; lost: string[] } {
@@ -156,7 +152,7 @@ export default function ComputeClient({
                 size="sm"
                 value={interval}
                 onChange={setInterval}
-                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]}
+                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: 'Save 2 months' }]}
               />
             </div>
 
@@ -217,7 +213,7 @@ export default function ComputeClient({
               type="button"
               disabled={!changed || !choice?.valid || saving}
               onClick={apply}
-              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background disabled:opacity-40"
+              className={primaryBtn}
             >
               {saving ? 'Saving…' : 'Apply change'}
             </button>

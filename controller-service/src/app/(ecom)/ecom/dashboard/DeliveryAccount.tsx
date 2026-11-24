@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { ghostBtn, primaryBtn } from '../onboard/ui'
+import { Card } from './_components/Card'
 
 export default function DeliveryAccount({
   tenantId,
@@ -39,32 +41,27 @@ export default function DeliveryAccount({
     }
   }
 
-  return (
-    <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs text-foreground-secondary uppercase tracking-widest">Delivery account</div>
-        {ownDelhivery && (
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-              connected
-                ? 'org-sage org-sage-text'
-                : 'bg-[#f2d4cd] text-[#8a2e1f]'
-            }`}
-          >
-            {connected ? 'Token connected' : 'Token missing'}
-          </span>
-        )}
-      </div>
+  const badge = ownDelhivery && (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${connected ? 'org-sage org-sage-text' : 'bg-[#f2d4cd] text-[#8a2e1f]'}`}>
+      {connected ? 'Token connected' : 'Token missing'}
+    </span>
+  )
 
+  return (
+    <Card title="Delivery account" action={badge || undefined}>
       {!ownDelhivery ? (
         <p className="text-sm text-foreground-secondary">
-          Your store ships on the platform Delhivery account, and courier charges are paid from your wallet. To ship on
-          your own Delhivery account instead, contact support.
+          Orders ship on our Delhivery account, and courier charges are paid from your wallet. To ship on your own
+          Delhivery account instead,{' '}
+          <a href="mailto:support@jeffistores.in" className="font-semibold ecom-accent-text hover:underline">
+            contact support
+          </a>
+          .
         </p>
       ) : (
         <>
           <p className="text-sm text-foreground-secondary">
-            Your store ships on your own Delhivery account and Delhivery bills you directly.
+            Orders ship on your own Delhivery account, and Delhivery bills you directly.
             {!connected && ' No API token is on file, so shipments cannot be created until you add one.'}
           </p>
 
@@ -94,7 +91,7 @@ export default function DeliveryAccount({
                   type="button"
                   onClick={save}
                   disabled={busy || token.trim().length < 8}
-                  className="px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={primaryBtn}
                 >
                   {busy ? 'Verifying...' : 'Verify and save'}
                 </button>
@@ -105,7 +102,7 @@ export default function DeliveryAccount({
                     setToken('')
                   }}
                   disabled={busy}
-                  className="px-4 py-2 rounded-xl text-sm text-foreground-secondary hover:text-foreground disabled:opacity-50"
+                  className={ghostBtn}
                 >
                   Cancel
                 </button>
@@ -122,6 +119,6 @@ export default function DeliveryAccount({
           )}
         </>
       )}
-    </div>
+    </Card>
   )
 }

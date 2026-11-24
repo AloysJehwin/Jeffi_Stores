@@ -6,6 +6,7 @@ import { responsiveImg, srcSetFor } from '@/lib/shared/image-url'
 import ComposedBlock from './ComposedBlock'
 import CodeSection from './code/CodeSection'
 import type { CompiledSection } from '@/lib/site/code/compile'
+import { mapsUrl, parseHours, phoneUrl } from '@/lib/site/hours'
 
 // Store renderers for Site Builder's content blocks. Fluid by construction: stacks on phones, container-width on
 // desktop, images in fixed-ratio boxes so nothing shifts while they load. `priority` marks the page's LCP image
@@ -127,24 +128,13 @@ function Faq({ p }: { p: P }) {
   )
 }
 
-function parseHours(text: string) {
-  return text
-    .split(/\r?\n|,\s*(?=[A-Za-z][^,:]*:)/)
-    .map(l => l.trim())
-    .filter(Boolean)
-    .map(l => {
-      const i = l.indexOf(':')
-      return i > 0 ? { label: l.slice(0, i).trim(), value: l.slice(i + 1).trim() } : { label: l, value: '' }
-    })
-}
-
 async function ContactDetails({ p }: { p: P }) {
   const [identity, content, address] = await Promise.all([getStoreIdentity(), getStorefrontContent(), storeAddressLine().catch(() => '')])
   const hours = parseHours(content.businessHours || '')
   const rows = [
     p.showEmail !== false && identity.email ? { label: 'Email', value: identity.email, href: `mailto:${identity.email}` } : null,
-    p.showPhone !== false && identity.phone ? { label: 'Phone', value: identity.phone, href: `tel:${identity.phone.replace(/\s+/g, '')}` } : null,
-    p.showAddress !== false && address ? { label: 'Address', value: address, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` } : null,
+    p.showPhone !== false && identity.phone ? { label: 'Phone', value: identity.phone, href: phoneUrl(identity.phone) } : null,
+    p.showAddress !== false && address ? { label: 'Address', value: address, href: mapsUrl(address) } : null,
   ].filter(Boolean) as { label: string; value: string; href: string }[]
   return (
     <section className="container mx-auto px-4 py-10 md:py-14">
@@ -178,8 +168,11 @@ async function ContactDetails({ p }: { p: P }) {
 }
 
 /** One content block, or null when the type is not a content block. */
-/** `always`: a code section draws even when its store data is empty (the page's first block, the Site Builder editor). */
-export function ContentBlock({ block, priority = false, always = false, page = null }: { block: Block; priority?: boolean; always?: boolean; page?: PageKey | null }) {
+/**
+ * `always`: a code section draws even when its store data is empty (the page's first block, the Site Builder editor).
+ * `preview`: the Site Builder canvas (a preview token), where code sections carry their `data-e` node ids.
+ */
+export function ContentBlock({ block, priority = false, always = false, page = null, preview = false }: { block: Block; priority?: boolean; always?: boolean; page?: PageKey | null; preview?: boolean }) {
   const p = block.props
   switch (block.type) {
     case 'rich_text':
@@ -195,7 +188,7 @@ export function ContentBlock({ block, priority = false, always = false, page = n
     case 'composed':
       return <ComposedBlock props={p} priority={priority} />
     case 'code_section':
-      return <CodeSection section={p.compiled as CompiledSection | null} page={page} priority={priority} always={always} />
+      return <CodeSection section={p.compiled as CompiledSection | null} page={page} priority={priority} always={always} preview={preview} />
     default:
       return null
   }

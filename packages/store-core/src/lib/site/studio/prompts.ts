@@ -82,6 +82,13 @@ ${libraryText(page)}`
 }
 
 export function briefText(b: StudioBrief): string {
+  const keep = b.keepWords?.length
+    ? `\nThe owner wrote these words on the page being designed again; reuse them as written where they fit (headings, lines, buttons): ${b.keepWords.map(w => `"${w}"`).join(' · ')}`
+    : ''
+  return `${ownBriefText(b)}${keep}`
+}
+
+function ownBriefText(b: StudioBrief): string {
   if (b.kind === 'showcase') return showcaseBriefText(b)
   const st = uiStyle(b.uiStyle)
   const refs = b.references ?? []
@@ -122,7 +129,7 @@ Fix exactly these problems, keep the design, and return the whole component agai
 }
 
 export function tweakUser(b: StudioBrief, d: DesignDirection, label: string, source: string, instruction: string): string {
-  return `${briefText(b)}
+  return `${ownBriefText(b)}
 
 ${directionText(d)}
 
@@ -132,8 +139,19 @@ ${source}
 \`\`\`
 
 Change it as the owner asks: ${instruction}
-Keep everything else, keep every library component it uses, and return the whole component in one \`\`\`tsx block.`
+Keep everything else, keep every library component it uses, and return the whole component in one \`\`\`tsx block.${source.includes('data-e=') ? `\n\n${EDITOR_RULES}` : ''}`
 }
+
+/**
+ * For a section the visual editor has opened (its elements carry `data-e` ids): keep the ids so the owner's selection
+ * and layers survive the change, prefer the theme's colours, and place free layers only the way the editor does.
+ */
+export const EDITOR_RULES = [
+  'This section is edited in a visual editor:',
+  '- Keep the data-e attribute exactly as it is on every element you keep; give new elements no data-e.',
+  '- Prefer the theme colours (bg-surface, bg-surface-secondary, text-foreground, text-foreground-secondary, text-foreground-muted and the primary-/secondary-/accent-50…900 scales) to fixed colours.',
+  '- To place an element freely, make it absolute only inside a relative section, in % of the section (left-[12%] top-[30%] w-[40%]), and only from a breakpoint up (lg:absolute lg:left-[12%] …) so phones keep it in the flow; never place text off the section.',
+].join('\n')
 
 // ── The site card: one product card per site (lib/site/card.ts), drawn by every product list. Written once, early in
 // the build, for the direction and the owner's style.

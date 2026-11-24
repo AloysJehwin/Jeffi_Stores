@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { workspaceLabel } from '@controller/lib/ecom/console-copy'
 
 interface Item {
   slug: string
@@ -30,7 +31,8 @@ export default function TenantSwitcher({ items, value, disabled, onChange }: { i
     else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open ? pick(items[hi].slug) : setOpen(true) }
     else if (e.key === 'Escape') setOpen(false)
   }
-  const label = (t: Item) => t.service_types.includes('store') ? 'Store' : t.service_types.map(s => (s === 'messaging' ? 'Messaging' : 'Documents')).join(' + ')
+  // Each service by its own name, as Services and the nav name them.
+  const label = (t: Item) => workspaceLabel(t.service_types) || 'Workspace'
 
   return (
     <div ref={ref} className="relative mb-6">
@@ -46,7 +48,7 @@ export default function TenantSwitcher({ items, value, disabled, onChange }: { i
         <span className="inline-flex shrink-0 items-center justify-center w-7 h-7 rounded-lg org-peach text-[13px] font-display font-black uppercase">{current.display_name.slice(0, 1)}</span>
         <span className="flex-1 min-w-0">
           <span className="block truncate">{current.display_name}</span>
-          <span className="block text-[11px] font-normal text-foreground-muted">{label(current)}</span>
+          <span className="block truncate text-[11px] font-normal text-foreground-muted">{label(current)}</span>
         </span>
         {!single && <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />}
       </button>
@@ -66,7 +68,7 @@ export default function TenantSwitcher({ items, value, disabled, onChange }: { i
                 <span className="inline-flex shrink-0 items-center justify-center w-7 h-7 rounded-lg org-peach text-[13px] font-display font-black uppercase">{t.display_name.slice(0, 1)}</span>
                 <span className="flex-1 min-w-0">
                   <span className={`block truncate ${active ? 'font-semibold' : ''}`}>{t.display_name}</span>
-                  <span className="block text-[11px] text-foreground-muted">{label(t)}</span>
+                  <span className="block truncate text-[11px] text-foreground-muted">{label(t)}</span>
                 </span>
                 {active && <Check className="w-4 h-4 org-brown" />}
               </li>

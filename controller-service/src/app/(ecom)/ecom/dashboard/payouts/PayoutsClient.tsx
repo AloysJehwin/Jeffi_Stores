@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { Card } from '../_components/Card'
+import { fieldInput, fieldLabel, ghostBtn, primaryBtn, secondaryBtn } from '../../onboard/ui'
 
 export interface BankState {
   last4: string | null
@@ -35,8 +37,15 @@ const STATE: Record<string, { label: string; tone: string; blurb: string }> = {
   },
 }
 
-export default function PayoutsClient({ initial }: { initial: BankState | null }) {
+// Why the form asks for a bank account at all.
+const WHY = {
+  store: "Your store's sales, and any refunds due to you, are paid out to this account.",
+  none: 'Needed only once you sell: when you add a store, its sales and any refunds due to you are paid out here.',
+}
+
+export default function PayoutsClient({ initial, hasStore }: { initial: BankState | null; hasStore: boolean }) {
   const { showToast } = useToast()
+  const id = useId()
   const [bank, setBank] = useState<BankState | null>(initial)
   const [editing, setEditing] = useState(!initial)
   const [accountNumber, setAccountNumber] = useState('')
@@ -117,30 +126,27 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
     setBusy(false)
   }
 
-  const inp = 'w-full rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground ecom-field'
-  const lbl = 'block text-xs font-medium text-foreground-muted mb-1'
+  const field = (key: string, label: string, input: ReactNode, error?: ReactNode) => (
+    <div>
+      <label htmlFor={`${id}-${key}`} className={fieldLabel}>{label}</label>
+      {input}
+      {error}
+    </div>
+  )
 
   return (
-    <div className="max-w-xl space-y-6">
+    <>
       {bank && !editing && (
-        <div className="rounded-xl border border-border-default bg-surface-elevated p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Settlement account</p>
-              <p className="text-sm text-foreground-muted mt-1 font-mono">
-                ••••{bank.last4} · {bank.ifsc}
-              </p>
-              <p className="text-sm text-foreground-muted">{bank.verifiedName || bank.holderName}</p>
-            </div>
-            <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${meta.tone}`}>
-              {meta.label}
-            </span>
-          </div>
+        <Card
+          title="Settlement account"
+          action={<span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${meta.tone}`}>{meta.label}</span>}
+        >
+          <p className="text-sm text-foreground font-mono">
+            ••••{bank.last4} · {bank.ifsc}
+          </p>
+          <p className="text-sm text-foreground-muted">{bank.verifiedName || bank.holderName}</p>
           <p className="text-xs text-foreground-muted mt-3">{meta.blurb}</p>
-          <button
-            onClick={() => setEditing(true)}
-            className="mt-4 rounded-xl border border-border-default px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface"
-          >
+          <button onClick={() => setEditing(true)} className={`${secondaryBtn} mt-4`}>
             {status === 'failed' ? 'Correct these details' : 'Change account'}
           </button>
 
@@ -158,35 +164,29 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
                     setUpiDraft(bank.upiId ?? '')
                     setEditingUpi(true)
                   }}
-                  className="shrink-0 rounded-xl border border-border-default px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface"
+                  className={`${secondaryBtn} shrink-0`}
                 >
                   {bank.upiId ? 'Change' : 'Add'}
                 </button>
               )}
             </div>
             {editingUpi ? (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 max-w-md space-y-2">
                 <input
-                  className={inp}
+                  className={fieldInput}
                   value={upiDraft}
                   placeholder="yourstore@okaxis"
+                  aria-label="UPI ID"
                   autoCapitalize="none"
                   autoComplete="off"
                   onChange={e => setUpiDraft(e.target.value.trim())}
                 />
                 {!upiDraftOk && <p className="text-xs text-[#8a2e1f]">A UPI ID looks like name@bank.</p>}
                 <div className="flex gap-2">
-                  <button
-                    disabled={busy || !upiDraftOk}
-                    onClick={saveUpi}
-                    className="rounded-xl bg-secondary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  >
+                  <button disabled={busy || !upiDraftOk} onClick={saveUpi} className={primaryBtn}>
                     {busy ? 'Saving…' : 'Save'}
                   </button>
-                  <button
-                    onClick={() => setEditingUpi(false)}
-                    className="rounded-xl border border-border-default px-4 py-2 text-sm font-medium text-foreground"
-                  >
+                  <button onClick={() => setEditingUpi(false)} className={ghostBtn}>
                     Cancel
                   </button>
                 </div>
@@ -197,79 +197,81 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
               </p>
             )}
           </div>
-        </div>
+        </Card>
       )}
 
       {editing && (
-        <div className="rounded-xl border border-border-default bg-surface-elevated p-6 space-y-4">
-          <p className="text-sm font-semibold text-foreground">
-            {bank ? 'Update settlement account' : 'Add a settlement account'}
-          </p>
-          <div>
-            <label className={lbl}>Account number</label>
-            <input
-              className={inp}
-              value={accountNumber}
-              inputMode="numeric"
-              autoComplete="off"
-              onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
-            />
+        <Card title={bank ? 'Update settlement account' : 'Add a settlement account'}>
+          <p className="mb-5 text-sm text-foreground-secondary">{hasStore ? WHY.store : WHY.none}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {field(
+              'acct',
+              'Account number',
+              <input
+                id={`${id}-acct`}
+                className={fieldInput}
+                value={accountNumber}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+              />
+            )}
+            {field(
+              'confirm',
+              'Re-enter account number',
+              <input
+                id={`${id}-confirm`}
+                className={fieldInput}
+                value={confirmNumber}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={e => setConfirmNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+              />,
+              mismatch && <p className="text-xs text-[#8a2e1f] mt-1">The two numbers do not match.</p>
+            )}
+            {field(
+              'ifsc',
+              'IFSC',
+              <input
+                id={`${id}-ifsc`}
+                className={fieldInput}
+                value={ifsc}
+                maxLength={11}
+                onChange={e => setIfsc(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              />
+            )}
+            {field(
+              'holder',
+              'Account holder name',
+              <input id={`${id}-holder`} className={fieldInput} value={holderName} onChange={e => setHolderName(e.target.value)} />
+            )}
+            {field(
+              'upi',
+              'UPI ID (optional)',
+              <input
+                id={`${id}-upi`}
+                className={fieldInput}
+                value={upiId}
+                placeholder="yourstore@okaxis"
+                autoCapitalize="none"
+                autoComplete="off"
+                onChange={e => setUpiId(e.target.value.trim())}
+              />,
+              !upiOk && <p className="text-xs text-[#8a2e1f] mt-1">A UPI ID looks like name@bank.</p>
+            )}
           </div>
-          <div>
-            <label className={lbl}>Re-enter account number</label>
-            <input
-              className={inp}
-              value={confirmNumber}
-              inputMode="numeric"
-              autoComplete="off"
-              onChange={e => setConfirmNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
-            />
-            {mismatch && <p className="text-xs text-[#8a2e1f] mt-1">The two numbers do not match.</p>}
-          </div>
-          <div>
-            <label className={lbl}>IFSC</label>
-            <input
-              className={inp}
-              value={ifsc}
-              maxLength={11}
-              onChange={e => setIfsc(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-            />
-          </div>
-          <div>
-            <label className={lbl}>Account holder name</label>
-            <input className={inp} value={holderName} onChange={e => setHolderName(e.target.value)} />
-          </div>
-          <div>
-            <label className={lbl}>UPI ID (optional)</label>
-            <input
-              className={inp}
-              value={upiId}
-              placeholder="yourstore@okaxis"
-              autoCapitalize="none"
-              autoComplete="off"
-              onChange={e => setUpiId(e.target.value.trim())}
-            />
-            {!upiOk && <p className="text-xs text-[#8a2e1f] mt-1">A UPI ID looks like name@bank.</p>}
-          </div>
-          <div className="flex gap-2">
-            <button
-              disabled={!canSubmit || busy}
-              onClick={submit}
-              className="rounded-xl bg-secondary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button disabled={!canSubmit || busy} onClick={submit} className={primaryBtn}>
               {busy ? 'Checking…' : 'Save and verify'}
             </button>
             {bank && (
-              <button
-                onClick={() => setEditing(false)}
-                className="rounded-xl border border-border-default px-4 py-2 text-sm font-medium text-foreground"
-              >
+              <button onClick={() => setEditing(false)} className={ghostBtn}>
                 Cancel
               </button>
             )}
           </div>
-        </div>
+        </Card>
       )}
-    </div>
+    </>
   )
 }

@@ -1,18 +1,14 @@
 import { redirect } from 'next/navigation'
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
-import { showcaseUrl } from '@/lib/showcase/host'
-import { ownerShowcase, siteForClient } from '@controller/lib/showcase-builder/site'
-import ShowcaseEditor from './ShowcaseEditor'
+import { listShowcasesByOwner } from '@/lib/showcase/store'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Edit your Showcase' }
 
-// The Showcase editor: the studio (preview, sections to arrange, words and pictures to change, AI changes), the
-// business details and the page's content. Details and content save to the site at once; the design goes live when
-// published.
-export default async function ShowcaseEditPage() {
+// The old single-site editor link: the newest published site's editor, else the newest draft's signup, else a new one.
+export default async function ShowcaseEditRedirect() {
   const { owner } = await loadOwnerContext()
-  const site = await ownerShowcase(owner.id)
-  if (!site) redirect('/onboard/showcase')
-  return <ShowcaseEditor owner={{ email: owner.email }} initialSite={siteForClient(site)!} siteUrl={showcaseUrl(site.slug)} />
+  const sites = await listShowcasesByOwner(owner.id)
+  const published = sites.find(s => s.status !== 'draft')
+  if (published) redirect(`/dashboard/showcase/${published.id}/edit`)
+  redirect(sites[0] ? `/onboard/showcase?site=${sites[0].id}` : '/onboard/showcase?new=1')
 }

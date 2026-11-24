@@ -8,8 +8,8 @@ export default function Loading() {
       description="Jeffi verifies the business behind each service before switching it on. Save each part as you go; documents are checked as soon as you upload them."
     >
       <div className="space-y-6">
-        <CardLoading title="Where your services stand">
-          <LinesLoading lines={2} />
+        <CardLoading title="Verification checklist">
+          <LinesLoading lines={3} />
         </CardLoading>
         <CardLoading title="Business details">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -25,6 +25,8 @@ export default function Loading() {
           </div>
         </CardLoading>
         <CardLoading title="GST registration" />
+        <CardLoading title="Website" />
+        <CardLoading title="How you will message people" />
       </div>
     </ConsoleLoading>
   )

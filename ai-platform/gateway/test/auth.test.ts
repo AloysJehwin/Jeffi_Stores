@@ -22,6 +22,8 @@ describe('gateway auth', () => {
     expect(authorized('/v1/chat', 'Bearer test-fake-new', tokens)).toBe(true)
     expect(authorized('/v1/files/abc', 'bearer test-fake-old', tokens)).toBe(true)
     expect(authorized('/v1/chat', undefined, tokens)).toBe(false)
+    expect(authorized('/v1/images/stock', undefined, tokens)).toBe(false)
+    expect(authorized('/v1/images/stock', 'Bearer test-fake-new', tokens)).toBe(true)
     expect(authorized('/v1/chat', 'Bearer wrong', tokens)).toBe(false)
     expect(authorized('/v1/chat', 'test-fake-new', tokens)).toBe(false)
     expect(authorized('/v1/chat', 'Bearer test-fake-new,test-fake-old', tokens)).toBe(false)

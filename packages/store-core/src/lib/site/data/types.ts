@@ -2,6 +2,7 @@ import type { ProductQuery } from '../composed'
 import type { CodeNode } from '../code/ast'
 import type { StoreSocialNetwork } from '@/lib/catalog/store-socials'
 import type { ShowcaseView } from '../../showcase/types'
+import type { StockCredit } from '../../ai/stock-credits'
 
 // What code sections read: the store's catalogue as flat, render-ready views. Prices come formatted and as numbers.
 
@@ -178,6 +179,11 @@ export interface StoreView {
   whatsapp?: string
   /** Profile links (absolute https URLs), only the networks the store set. Absent when none. */
   socials?: Partial<Record<StoreSocialNetwork, string>>
+  /** Opening hours as rows (lib/site/hours.ts); empty when the store gave none. */
+  hours?: { label: string; value: string }[]
+  /** The phone number as a `tel:` link and the address as a map search link; empty when not set. */
+  phoneUrl?: string
+  mapsUrl?: string
 }
 
 export interface SiteData {
@@ -246,6 +252,10 @@ export interface SampleCatalog {
     images?: string[]
     /** What to generate when there is no image yet. */
     imagePrompt?: string
+    /** A short stock-photo search for it, tried before generating ("silk saree"). */
+    photoQuery?: string
+    /** Set when images[0] is a stock photo: who to credit (seeded into the store with it). */
+    imageCredit?: StockCredit
     description?: string
     attributes?: Record<string, string> | { name: string; value: string }[]
     featured?: boolean

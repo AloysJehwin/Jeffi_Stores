@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid, Server, PanelsTopLeft, Inbox, BadgeCheck } from 'lucide-react'
+import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid, Server, PanelsTopLeft, BadgeCheck } from 'lucide-react'
 import type { ServiceType } from '@/lib/tenant-registry'
 
 export interface NavItem {
@@ -7,7 +7,7 @@ export interface NavItem {
   label: string
   icon: LucideIcon
   exact?: boolean
-  requires?: ServiceType      // shown only when the tenant has this service
+  requires?: ServiceType      // shown only when the tenant has this service ('store' pages also call requireStore())
   hideWhen?: ServiceType      // shown only when the tenant does NOT have this service
 }
 export interface NavGroup {
@@ -37,11 +37,10 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    // The editor (/dashboard/showcase/edit) opens from the Site page.
+    // Sites lists the owner's sites; each site's pages (/dashboard/showcase/[siteId]/…) keep it highlighted.
     title: 'Showcase',
     items: [
-      { href: '/dashboard/showcase', label: 'Site', icon: PanelsTopLeft, exact: true, requires: 'showcase' },
-      { href: '/dashboard/showcase/leads', label: 'Enquiries', icon: Inbox, requires: 'showcase' },
+      { href: '/dashboard/showcase', label: 'Sites', icon: PanelsTopLeft, requires: 'showcase' },
       { href: '/dashboard/showcase', label: 'Get a website', icon: PanelsTopLeft, exact: true, hideWhen: 'showcase' },
     ],
   },

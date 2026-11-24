@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Download, Inbox } from 'lucide-react'
 import { Badge, Kpi, KpiGrid, Section, Table, btnGhost, change, count, when, type Col } from '@/components/admin/channels/ui'
-import { BarSeries, HBars } from '@/components/admin/traffic/charts'
+import { BarSeries, HBars, chartColor } from '@/components/admin/traffic/charts'
 import type { LeadRow, ShowcaseLeads } from '@/lib/traffic/showcase-types'
 import { Note, bucketLabel, countryName, rateText } from './shared'
 
@@ -62,18 +62,18 @@ export default function LeadsTab({ data, csvHref, inboxHref }: { data: ShowcaseL
       </KpiGrid>
 
       <Section title={`Enquiries by ${data.period.bucket}`}>
-        <BarSeries rows={data.trend} label={r => bucketLabel(r.bucket, data.period.bucket)} series={[{ key: 'leads', label: 'Enquiries', color: '#84cc16' }]} />
+        <BarSeries rows={data.trend} label={r => bucketLabel(r.bucket, data.period.bucket)} series={[{ key: 'leads', label: 'Enquiries', color: chartColor(2) }]} />
       </Section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Breakdown title="By channel" rows={data.byChannel} empty="No enquiries in this period" />
-        <Breakdown title="By source" rows={data.bySource} color="rgba(59,130,246,0.6)" empty="No enquiries in this period" />
-        <Breakdown title="By campaign" rows={data.byCampaign} color="rgba(249,115,22,0.6)" empty="No enquiries from UTM-tagged links in this period" />
-        <Breakdown title="By device" rows={data.byDevice} color="rgba(168,85,247,0.6)" empty="No enquiries in this period" />
+        <Breakdown title="By source" rows={data.bySource} color={chartColor(1)} empty="No enquiries in this period" />
+        <Breakdown title="By campaign" rows={data.byCampaign} color={chartColor(4)} empty="No enquiries from UTM-tagged links in this period" />
+        <Breakdown title="By device" rows={data.byDevice} color={chartColor(3)} empty="No enquiries in this period" />
       </div>
 
       <Section title="When enquiries arrive (IST)">
-        <BarSeries rows={data.byHour.map(h => ({ ...h, label: `${h.hour}:00` }))} label={r => r.label} series={[{ key: 'leads', label: 'Enquiries', color: '#3b82f6' }]} height={110} />
+        <BarSeries rows={data.byHour.map(h => ({ ...h, label: `${h.hour}:00` }))} label={r => r.label} series={[{ key: 'leads', label: 'Enquiries', color: chartColor(1) }]} height={110} />
       </Section>
 
       <Section

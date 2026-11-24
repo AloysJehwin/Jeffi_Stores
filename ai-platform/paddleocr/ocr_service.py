@@ -166,7 +166,7 @@ def ocr(req: OcrRequest):
         pages = _ocr_buffer(raw, suffix, max(1, req.max_pages or 10))
     except Exception as e:
         print(f"[ocr] {mime} {len(raw)}B failed: {e}", flush=True)
-        return JSONResponse({"ok": False, "reason": f"OCR failed: {str(e)}", "code": "ocr_failed"})
+        return JSONResponse({"ok": False, "reason": "OCR failed", "code": "ocr_failed"})
 
     read = [line for page in pages for line in page]
     page_count = len(pages) or 1

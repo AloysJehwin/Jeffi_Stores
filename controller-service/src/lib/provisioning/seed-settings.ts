@@ -123,7 +123,7 @@ async function cityForPincode(pin: string, tenantId: string): Promise<string> {
 async function verifiedCustomDomain(tenantId: string): Promise<string> {
   const r = await controlPlanePool()
     .query(
-      `SELECT domain FROM tenant_custom_domains WHERE tenant_id=$1 AND status='verified' ORDER BY created_at LIMIT 1`,
+      `SELECT domain FROM tenant_custom_domains WHERE tenant_id=$1 AND status='verified' AND showcase_site_id IS NULL ORDER BY created_at LIMIT 1`,
       [tenantId]
     )
     .catch(() => null)

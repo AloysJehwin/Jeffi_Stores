@@ -69,8 +69,8 @@ function Progress({ o }: { o: OwnerOrderView }) {
   )
 }
 
-/** Buy a domain through the platform: search, confirm, then watch it register and go live. */
-export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: string; tenantSlug: string }) {
+/** Buy a domain through the platform: search, confirm, then watch it register and go live. With siteId, for that Showcase site. */
+export default function DomainPurchase({ tenantId, tenantSlug, siteId }: { tenantId: string; tenantSlug: string; siteId?: string }) {
   const { showToast } = useToast()
   const [s, setS] = useState<State | null>(null)
   const [picked, setPicked] = useState<SearchResult | null>(null)
@@ -82,13 +82,13 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
   sRef.current = s
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/ecom/domains/orders?tenantId=${tenantId}`)
+    const res = await fetch(`/api/ecom/domains/orders?tenantId=${tenantId}${siteId ? `&siteId=${siteId}` : ''}`)
     const data = await res.json().catch(() => null)
     if (res.ok && data) {
       setS(data)
       setContact(c => (c.email ? c : { ...EMPTY_CONTACT, ...data.contact }))
     }
-  }, [tenantId])
+  }, [tenantId, siteId])
 
   useEffect(() => {
     load()
@@ -137,7 +137,7 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
       const res = await fetch('/api/ecom/domains/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, domain: picked.domain, expectedPriceInr: picked.priceInr, contact }),
+        body: JSON.stringify({ tenantId, ...(siteId && { siteId }), domain: picked.domain, expectedPriceInr: picked.priceInr, contact }),
       })
       const data = await res.json().catch(() => ({}))
       if (data.order) replace(data.order)
@@ -158,14 +158,26 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
   }
 
   const walletHref = `/dashboard/wallet?tenant=${encodeURIComponent(tenantSlug)}`
+  const hostLabel = (o: OwnerOrderView, host: string) => {
+    const label = host === o.domain ? '' : host.split('.')[0]
+    if (siteId && (label === '' || label === 'www')) return label ? 'Site (www)' : 'Site'
+    return HOST_LABEL[label] ?? label
+  }
 
   return (
     <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">
-      <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Your own domain</h2>
-      <p className="mb-4 text-sm text-foreground-secondary">
-        Buy a domain for your store. We register it in your name with privacy protection and move everything your plan gives you onto it, with HTTPS: the
-        store, <span className="font-mono text-foreground">admin.</span>, <span className="font-mono text-foreground">invoice.</span> and the rest. Billed yearly from your wallet.
-      </p>
+      <h2 className="mb-1 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Buy a domain</h2>
+      {siteId ? (
+        <p className="mb-4 text-sm text-foreground-secondary">
+          Buy a domain for this site. We register it in your name with privacy protection and point it and its <span className="font-mono text-foreground">www.</span> at
+          your site, with HTTPS. Billed yearly from your wallet.
+        </p>
+      ) : (
+        <p className="mb-4 text-sm text-foreground-secondary">
+          Buy a domain for your store. We register it in your name with privacy protection and move everything your plan gives you onto it, with HTTPS: the
+          store, <span className="font-mono text-foreground">admin.</span>, <span className="font-mono text-foreground">invoice.</span> and the rest. Billed yearly from your wallet.
+        </p>
+      )}
 
       {!s && <SkeletonRows rows={2} cols={3} />}
       {s && !s.enabled && <p className="text-sm text-foreground-muted">Buying domains isn&apos;t available yet.</p>}
@@ -216,7 +228,7 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
                     <ul className="space-y-1">
                       {o.hosts.map(h => (
                         <li key={h.host} className="flex min-w-0 items-center gap-2">
-                          <span className="w-28 shrink-0 text-xs text-foreground-muted">{HOST_LABEL[h.host === o.domain ? '' : h.host.split('.')[0]] ?? h.host.split('.')[0]}</span>
+                          <span className="w-28 shrink-0 text-xs text-foreground-muted">{hostLabel(o, h.host)}</span>
                           <a href={`https://${h.host}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 break-all font-mono text-xs text-foreground underline-offset-2 hover:underline">
                             {h.host} <ExternalLink className="h-3 w-3 shrink-0" />
                           </a>
@@ -224,7 +236,7 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
                         </li>
                       ))}
                     </ul>
-                    <p className="text-xs text-foreground-muted">The admin panel needs your admin certificate, as on admin-{tenantSlug}.</p>
+                    {!siteId && <p className="text-xs text-foreground-muted">The admin panel needs your admin certificate, as on admin-{tenantSlug}.</p>}
                     {!o.contact_verified && (
                       <div className={`${noteCls} org-peach`}>
                         Confirm the email the domain registry sent to <span className="font-medium">{o.contactEmail}</span>. Without it the domain is suspended 15 days after registration.
@@ -258,7 +270,7 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
                     {o.refunded_inr ? ` · ${inr(o.refunded_inr)} refunded to your wallet.` : ''}
                   </p>
                 )}
-                {o.status === 'expired' && <p className="mt-2 text-xs text-foreground-secondary">This domain expired and no longer points at your store.</p>}
+                {o.status === 'expired' && <p className="mt-2 text-xs text-foreground-secondary">This domain expired and no longer points at your {siteId ? 'site' : 'store'}.</p>}
 
                 {o.events.length > 1 && (
                   <button onClick={() => setOpenLog(openLog === o.id ? null : o.id)} className="mt-2 text-xs text-foreground-muted underline-offset-2 hover:underline">
@@ -293,8 +305,9 @@ export default function DomainPurchase({ tenantId, tenantSlug }: { tenantId: str
                   </li>
                   <li>Renews every year at {inr(picked.renewalPriceInr)} from your wallet; you can turn auto-renew off.</li>
                   <li>
-                    Includes WHOIS privacy, DNS and HTTPS for {picked.domain} and every address your plan has on it (www., admin., invoice. and so on). If registration fails, the charge
-                    is refunded.
+                    {siteId
+                      ? `Includes WHOIS privacy, DNS and HTTPS for ${picked.domain} and www.${picked.domain}. If registration fails, the charge is refunded.`
+                      : `Includes WHOIS privacy, DNS and HTTPS for ${picked.domain} and every address your plan has on it (www., admin., invoice. and so on). If registration fails, the charge is refunded.`}
                   </li>
                 </ul>
               </div>

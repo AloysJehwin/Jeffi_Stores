@@ -540,7 +540,8 @@ jobs:
     needs: init
     # Advisory: not in `checks`' needs and continue-on-error, so it never blocks a merge. Skipped on a release run (its
     # PR already ran it, and Post fails a release on any failed job). Promote it once it has proven reliable.
-    # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5).
+    # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5), and the visual
+    # editor's page (free layers, converted blocks), with a CLS and LCP budget per page (docs/plans/SITE_EDITOR_PLAN.md).
     if: needs.init.outputs.release != 'true'
     continue-on-error: true
     timeout-minutes: 60
@@ -607,6 +608,74 @@ jobs:
             tests/responsive/output/report
           if-no-files-found: ignore
           retention-days: 14
+
+  site-editor-e2e:
+    name: Site editor end-to-end (advisory)
+    runs-on: ubuntu-latest
+    needs: init
+    # Advisory, like the responsive sweep: not in `checks`' needs and continue-on-error, skipped on a release run.
+    # The visual editor in a real browser (docs/plans/SITE_EDITOR_PLAN.md phase 6): the canvas bridge on the storefront
+    # and the editor in the admin Site Builder, behind the dev router so both share an origin as the editor's canvas
+    # needs. tests/site-editor/seed.ts seeds jeffi_test (flag on, a draft, an admin session). Promote once reliable.
+    if: needs.init.outputs.release != 'true'
+    continue-on-error: true
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: jeffi
+          POSTGRES_PASSWORD: jeffi
+          POSTGRES_DB: jeffi_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://jeffi:jeffi@localhost:5432/jeffi_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
+      CRON_SECRET: test-cron-secret
+      SERVICE_AUTH_SECRET: test-service-auth-secret
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_BASE_URL: http://localhost:3000
+      SKIP_DB_CHECK: true
+      UI_BASE_URL: http://localhost:3000
+      SITE_EDITOR_E2E: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/node-setup
+      - name: Schema + seed jeffi_test
+        run: |
+          set -uo pipefail
+          for f in $(node scripts/db-files.mjs platform) $(node scripts/db-files.mjs control-plane); do
+            psql "$DATABASE_URL" -q -f "$f" >/dev/null 2>"$RUNNER_TEMP/psql.err" || echo "::warning::$f: $(head -c 300 "$RUNNER_TEMP/psql.err")"
+          done
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f scripts/seed-test-db.sql
+      - run: npx playwright install --with-deps chromium
+      - name: Build storefront and admin
+        run: npm run build:storefront && npm run build:admin
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Start the apps behind the dev router
+        run: |
+          npx next start storefront-service -p 3010 > storefront.log 2>&1 &
+          npx next start admin-service -p 3011 > admin.log 2>&1 &
+          npx tsx scripts/dev-router.ts > router.log 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && break; sleep 2; done
+          curl -fsS -o /dev/null http://localhost:3000/ || { tail -50 storefront.log router.log; exit 1; }
+      - run: npx playwright test --config playwright.ui.config.ts storefront-service/ui-tests/site-editor admin-service/ui-tests/site-editor
+      - name: Logs
+        if: failure()
+        run: tail -60 storefront.log admin.log router.log 2>/dev/null || true
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-editor-e2e
+          path: tests/ui-output/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   build:
     name: Build · ${{ matrix.app }}

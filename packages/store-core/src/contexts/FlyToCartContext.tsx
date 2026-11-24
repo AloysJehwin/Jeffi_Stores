@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useRef, useState, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { CART_GLYPH } from '@/components/visitor/site/code/parts/chrome/marks'
@@ -30,6 +30,9 @@ export function FlyToCartProvider({ children }: { children: ReactNode }) {
   const cartTarget = useRef<HTMLElement | null>(null)
   const nextId = useRef(0)
   const [flights, setFlights] = useState<Flight[]>([])
+  // A portal into <body> during hydration is matched against the server's body children; mount it after.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const setCartTarget = useCallback((el: HTMLElement | null) => {
     cartTarget.current = el
@@ -53,9 +56,11 @@ export function FlyToCartProvider({ children }: { children: ReactNode }) {
   return (
     <FlyToCartContext.Provider value={{ setCartTarget, flyToCart }}>
       {children}
-      {typeof document !== 'undefined' &&
+      {mounted &&
+        flights.length > 0 &&
         createPortal(
-          <div className="pointer-events-none fixed inset-0 z-[70]" aria-hidden="true">
+          // Inline transparent so no `body > div` style can ever paint this full-screen layer.
+          <div className="pointer-events-none fixed inset-0 z-[70]" style={{ background: 'transparent' }} aria-hidden="true">
             <AnimatePresence>
               {flights.map(f => (
                 <motion.div

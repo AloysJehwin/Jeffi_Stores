@@ -81,10 +81,10 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
         description={`Who visits ${host}, where they come from, what they do there and which visits bring enquiries.`}
         actions={
           <>
-            <Link href={`/dashboard/showcase${t}`} className={secondary}>
+            <Link href={`/dashboard/showcase/${siteId}${t}`} className={secondary}>
               <ArrowLeft className="h-4 w-4" /> Site
             </Link>
-            <Link href={`/dashboard/showcase/leads${t}`} className={secondary}>
+            <Link href={`/dashboard/showcase/${siteId}/leads${t}`} className={secondary}>
               <Inbox className="h-4 w-4" /> Enquiries
             </Link>
           </>
@@ -94,7 +94,9 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
       <div className="space-y-5">
         {status !== 'live' && (
           <p className="rounded-xl org-peach px-4 py-3 text-sm text-foreground">
-            {status === 'draft' ? 'This site is not published yet, so it has no visitors.' : 'This site is paused: visits are not recorded until it is live again.'}
+            {status === 'draft'
+              ? 'This site isn’t published yet. Visits are counted once it is live, and not when you open it from this console.'
+              : 'This site is paused. New visits aren’t counted until it is live again; the figures below are from when it was live.'}
           </p>
         )}
 
@@ -111,7 +113,7 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
         ) : !ready ? (
           <AnalyticsTabLoading tab={tab} />
         ) : (
-          <TabBody key={key} tab={tab} data={ready} csvHref={`${base}&format=csv&from=${period.from}&to=${period.to}`} inboxHref={`/dashboard/showcase/leads${t}`} />
+          <TabBody key={key} tab={tab} data={ready} csvHref={`${base}&format=csv&from=${period.from}&to=${period.to}`} inboxHref={`/dashboard/showcase/${siteId}/leads${t}`} />
         )}
       </div>
     </>

@@ -13,7 +13,7 @@ export default async function WalletPage() {
   const upiEnabled = await walletUpiAvailable().catch(() => false)
   return (
     <>
-      <PageHeader eyebrow="Finance" title="Wallet" description="One prepaid balance for messaging, documents and shipping. Shared with your store admin." />
+      <PageHeader eyebrow="Finance" title="Wallet" description="One prepaid balance for messaging, documents and shipping." />
       <WalletClient initial={{ balance: w.balance, ledger: w.ledger.map(e => ({ ...e, amount: Number(e.amount) })) }} keyId={process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? ''} tenantName={tenant.display_name} upiEnabled={upiEnabled} />
     </>
   )

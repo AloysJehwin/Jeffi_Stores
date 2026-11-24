@@ -1,4 +1,5 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
+import { requireStore } from '@controller/lib/ecom/require-store'
 import { computeSpecEnabled, computePlans } from '@controller/lib/compute/catalog'
 import { legacySpecFor } from '@/lib/compute/legacy'
 import { getTenantCompute } from '@controller/lib/compute/store'
@@ -8,6 +9,8 @@ import { paymentRequired } from '@/lib/billing/payment-required'
 import { getTenantS3UsageBytes } from '@jeffi/tenancy'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
+import { EmptyState } from '../_components/EmptyState'
+import { Server } from 'lucide-react'
 import ComputeClient from './ComputeClient'
 
 export const dynamic = 'force-dynamic'
@@ -16,16 +19,25 @@ export const metadata = { title: 'Plan & servers' }
 export default async function ComputePage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const { tenant: tenantSlug } = await searchParams
   const { tenant } = await loadOwnerContext({ tenantSlug })
+  requireStore(tenant)
   const header = <PageHeader eyebrow="Store" title="Plan & servers" description="The plan your store runs on, its servers and database, and what they cost." />
-  if (!computeSpecEnabled() || tenant.status !== 'active') {
+  if (tenant.status !== 'active') {
     return (
       <>
         {header}
-        <Card>
-          <p className="text-sm text-foreground-secondary">
-            {tenant.status !== 'active' ? 'You can change your plan and servers once your store is live.' : 'Choosing a plan and server size is not available yet.'}
-          </p>
-        </Card>
+        <EmptyState icon={Server} title="Your store isn't live yet" action={{ href: '/dashboard', label: 'See setup progress' }}>
+          You can change your plan and servers once your store is live.
+        </EmptyState>
+      </>
+    )
+  }
+  if (!computeSpecEnabled()) {
+    return (
+      <>
+        {header}
+        <EmptyState icon={Server} title="Not available yet" action={{ href: '/dashboard/billing', label: 'See your plan' }}>
+          Choosing a plan and server size is not available yet. Billing shows the plan you are on.
+        </EmptyState>
       </>
     )
   }
@@ -62,9 +74,9 @@ export default async function ComputePage({ searchParams }: { searchParams: Prom
         comparisonRows={COMPARISON_ROWS}
       />
       {s3CapGb > 0 ? (
-        <Card>
+        <Card title="File storage">
           <p className="text-sm text-foreground-secondary">
-            S3 storage: {s3UsedGb.toFixed(2)} GB of {s3CapGb} GB used ({s3Pct}%).
+            Images and files: {s3UsedGb.toFixed(2)} GB of {s3CapGb} GB used ({s3Pct}%).
           </p>
         </Card>
       ) : null}

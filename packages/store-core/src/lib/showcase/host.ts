@@ -16,6 +16,12 @@ export function showcaseUrl(slug: string): string {
 }
 
 /** The slug a site-{slug}.<root> (or site-{slug}.localhost) host names; null for any other host. */
+/** The query flag the console adds when the owner opens their own site: showcase-service's tracker doesn't count it. */
+export const SHOWCASE_PREVIEW_PARAM = 'jeffi_preview'
+
+/** The site's address as the console links it for its owner (not counted as a visit). */
+export const showcasePreviewUrl = (slug: string) => `${showcaseUrl(slug)}?${SHOWCASE_PREVIEW_PARAM}=1`
+
 export function showcaseSlugFromHost(host: string): string | null {
   const h = host.toLowerCase().split(':')[0].trim()
   const root = h.endsWith('.localhost') ? 'localhost' : ROOT

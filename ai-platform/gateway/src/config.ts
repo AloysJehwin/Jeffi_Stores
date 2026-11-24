@@ -32,6 +32,8 @@ export const CONFIG = {
   publicUrl: (process.env.AI_PUBLIC_URL || '').replace(/\/$/, ''),
   imageCacheTtlSeconds: Number(process.env.AI_IMAGE_CACHE_TTL_SECONDS) || 3600,
   videoPollMs: Number(process.env.AI_VIDEO_POLL_MS) || 10_000,
+  // Stock photos (/v1/images/stock): order of pexels,pixabay; each runs only with its key (PEXELS_API_KEY, PIXABAY_API_KEY).
+  stockProviders: process.env.AI_STOCK_PROVIDERS || '',
 
   // Anthropic (Claude) text. No key = provider skipped and text stays on Razer.
   // Production auth is workload identity federation: one Anthropic workspace + service account per

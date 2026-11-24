@@ -38,7 +38,7 @@ export function countryName(code: string | null | undefined) {
   return regionNames?.of(code) ?? code
 }
 
-/** A donut and table of visits by one trait, with each value's enquiry rate. */
+/** A donut and table of visits by one trait, with each value's contact rate. */
 export function ShareCard({ title, rows, colors, label }: { title: string; rows: ShowcaseShareRow[]; colors?: Record<string, string>; label?: (key: string) => string }) {
   const total = rows.reduce((s, r) => s + r.sessions, 0)
   const name = label ?? ((k: string) => k)
@@ -46,7 +46,7 @@ export function ShareCard({ title, rows, colors, label }: { title: string; rows:
     { key: 'key', label: title, render: r => name(r.key), sort: r => name(r.key) },
     { key: 'sessions', label: 'Visits', num: true, sort: r => r.sessions, render: r => count(r.sessions) },
     { key: 'share', label: 'Share', num: true, sort: r => r.sessions, render: r => rateText(r.sessions, total, 0) },
-    { key: 'conv', label: 'Enquiry rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
+    { key: 'conv', label: 'Contact rate', num: true, sort: r => ratio(r.convertedSessions, r.sessions) ?? -1, render: r => rateText(r.convertedSessions, r.sessions, 1) },
   ]
   return (
     <Section title={title}>

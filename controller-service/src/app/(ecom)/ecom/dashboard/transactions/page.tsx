@@ -1,7 +1,9 @@
 import { loadOwnerContext } from '@controller/lib/ecom/owner-context'
 import { getTenantBilling } from '@/lib/tenant-registry'
+import { Receipt } from 'lucide-react'
 import PageHeader from '../_components/PageHeader'
-import { TransactionsTable } from '../_components/finance'
+import { EmptyState } from '../_components/EmptyState'
+import { TransactionsTable, salesNextStep } from '../_components/finance'
 import { PageLinks, PAGE_SIZE, pageParam } from '../_components/Pagination'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +19,15 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   return (
     <>
       <PageHeader eyebrow="Finance" title="Transactions" description="Every captured order, with your share and platform fees." />
-      <TransactionsTable transactions={billing.transactions} totals={billing.totals} />
+      <TransactionsTable
+        transactions={billing.transactions}
+        totals={billing.totals}
+        empty={
+          <EmptyState icon={Receipt} title="No transactions yet" action={salesNextStep(tenant)}>
+            Each paid order shows here with your share, the platform commission and the gateway fee.
+          </EmptyState>
+        }
+      />
       <PageLinks page={page} total={billing.transactionCount} base="/dashboard/transactions" />
     </>
   )

@@ -1,13 +1,15 @@
 import type { PageDoc, ThemeTokens } from '@jeffi/site-blocks'
 import { controlPlanePool, RESERVED_LABELS } from '@/lib/tenant-registry/shared'
-import { emptyShowcaseContent, SHOWCASE_FREE_DAYS, type ShowcaseBusiness, type ShowcaseContent, type ShowcaseSite, type ShowcaseStatus } from './types'
+import { emptyShowcaseContent, SHOWCASE_PRICE_INR, SHOWCASE_TRIAL_DAYS, type ShowcaseBusiness, type ShowcaseContent, type ShowcaseSite, type ShowcaseStatus } from './types'
 import { SHOWCASE_SLUG_RE, showcaseSlugFromHost } from './host'
+
+const FLAGSHIP_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 
 // Showcase data access: showcase_sites and showcase_leads, through the control-plane pool (a Showcase-only
 // workspace has no store database). Callers check ownership (getOwnedShowcase) before changing a site; charging
 // for hosting lives in the controller (lib/showcase/billing.ts).
 
-const COLS = `id, tenant_id, owner_id, slug, status, business, content, page, theme, paid_until, renew, free_generation_used_at,
+const COLS = `id, tenant_id, owner_id, slug, status, business, content, page, theme, paid_until, trial_ends_at, renew, free_generation_used_at,
   generations, custom_domain, published_at, created_at, updated_at, pause_reason, charge_failed_at, last_charge_error,
   (SELECT t.status FROM tenants t WHERE t.id = showcase_sites.tenant_id) AS tenant_status`
 
@@ -38,6 +40,7 @@ function toSite(r: Row): ShowcaseSiteRow {
     page: (r.page ?? null) as PageDoc | null,
     theme: (r.theme ?? null) as ThemeTokens | null,
     paidUntil: iso(r.paid_until),
+    trialEndsAt: iso(r.trial_ends_at),
     renew: !!r.renew,
     freeGenerationUsedAt: iso(r.free_generation_used_at),
     generations: Number(r.generations ?? 0),
@@ -71,18 +74,17 @@ export async function getShowcaseByHost(host: string): Promise<ShowcaseSiteRow |
   return h ? one(`SELECT ${COLS} FROM showcase_sites WHERE custom_domain = $1`, [h]) : null
 }
 
-/** The owner's newest site. */
-export const getShowcaseByOwner = (ownerId: string) =>
-  one(`SELECT ${COLS} FROM showcase_sites WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 1`, [ownerId])
-
+/** The owner's sites, newest first. */
 export async function listShowcasesByOwner(ownerId: string): Promise<ShowcaseSiteRow[]> {
   const r = await controlPlanePool().query(`SELECT ${COLS} FROM showcase_sites WHERE owner_id = $1 ORDER BY created_at DESC`, [ownerId])
   return r.rows.map(toSite)
 }
 
-/** The workspace's newest site. */
-export const getShowcaseByTenant = (tenantId: string) =>
-  one(`SELECT ${COLS} FROM showcase_sites WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT 1`, [tenantId])
+/** The workspace's sites, newest first. */
+export async function listShowcasesByTenant(tenantId: string): Promise<ShowcaseSiteRow[]> {
+  const r = await controlPlanePool().query(`SELECT ${COLS} FROM showcase_sites WHERE tenant_id = $1 ORDER BY created_at DESC`, [tenantId])
+  return r.rows.map(toSite)
+}
 
 /** The site when this owner owns it, else null. */
 export const getOwnedShowcase = (siteId: string, ownerId: string) =>
@@ -176,9 +178,10 @@ export type ShowcaseTransition =
 const PAYMENT_DUE = 'Hosting for this site is unpaid. Pay from the Showcase page to bring it back.'
 
 /**
- * Put the site live. The first publish starts the free month (paid_until = now + SHOWCASE_FREE_DAYS) and gives the
- * site a workspace if it has none (ensureShowcaseWorkspace: its wallet pays, its console manages the site);
- * publishing a live site again changes nothing; a paused one resumes while its hosting is paid (resumeShowcase).
+ * Put the site live. The first publish starts the trial (trial_ends_at = paid_until = now + SHOWCASE_TRIAL_DAYS), gives
+ * the site a workspace if it has none (ensureShowcaseWorkspace: its subscription pays, its console manages the site)
+ * and opens its trial billing line; publishing a live site again changes nothing; a paused one resumes while its
+ * hosting is paid (resumeShowcase).
  */
 export async function publishShowcase(siteId: string): Promise<ShowcaseTransition> {
   const draft = await getShowcaseById(siteId)
@@ -189,17 +192,33 @@ export async function publishShowcase(siteId: string): Promise<ShowcaseTransitio
   const first = await one(
     `UPDATE showcase_sites
         SET status = 'live', pause_reason = NULL, published_at = COALESCE(published_at, now()),
+            trial_ends_at = COALESCE(trial_ends_at, paid_until, now() + make_interval(days => $2::int)),
             paid_until = COALESCE(paid_until, now() + make_interval(days => $2::int)), updated_at = now()
       WHERE id = $1 AND status = 'draft' AND page IS NOT NULL
       RETURNING ${COLS}`,
-    [siteId, SHOWCASE_FREE_DAYS]
+    [siteId, SHOWCASE_TRIAL_DAYS]
   )
-  if (first) return { ok: true, site: first }
+  if (first) {
+    if (first.tenantId && first.trialEndsAt && Date.parse(first.trialEndsAt) > Date.now()) await openTrialLine(first.tenantId, first.id, first.trialEndsAt).catch(() => {})
+    return { ok: true, site: first }
+  }
   const site = await getShowcaseById(siteId)
   if (!site) return { ok: false, code: 'not_found', error: 'Site not found.' }
   if (!site.page) return { ok: false, code: 'no_page', error: 'Make the page before publishing.', site }
   if (site.status === 'live') return { ok: true, site }
   return resumeShowcase(siteId)
+}
+
+// The billing sweep also opens missed ones (controller lib/billing/sweep.ts syncShowcaseLines). The platform's own
+// sites are not billed.
+async function openTrialLine(tenantId: string, siteId: string, trialEndsAt: string): Promise<void> {
+  if (tenantId === FLAGSHIP_TENANT_ID) return
+  await controlPlanePool().query(
+    `INSERT INTO billing_lines (tenant_id, kind, ref, amount_paise, status, trial_ends_at)
+     VALUES ($1, 'showcase_site', $2, $3, 'trial', $4)
+     ON CONFLICT (tenant_id, kind, ref) WHERE status <> 'ended' DO NOTHING`,
+    [tenantId, siteId, SHOWCASE_PRICE_INR * 100, trialEndsAt]
+  )
 }
 
 /** Take the site offline: `owner` from the console, `unpaid` when its hosting lapsed. Its data and leads stay. */

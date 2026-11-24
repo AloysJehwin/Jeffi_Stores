@@ -55,7 +55,7 @@ describe('showcaseAttention', () => {
     ])
   })
 
-  it('flags a falling enquiry rate and a channel that jumped without enquiries', () => {
+  it('flags a falling contact rate and a channel that jumped without enquiries', () => {
     const row = (sessions: number, convertedSessions: number) => ({ channel: 'paid_social', label: 'Paid social', paid: true, sessions, newVisitors: 0, convertedSessions, leads: 0 })
     const out = showcaseAttention({
       ...base,
@@ -65,7 +65,7 @@ describe('showcaseAttention', () => {
       previousChannels: [row(10, 1)],
     })
     expect(out.map(a => a.key)).toEqual(['conversion-down', 'source-paid_social'])
-    expect(out[0].title).toBe('Enquiry rate fell to 2.0% from 10.0%')
+    expect(out[0].title).toBe('Contact rate fell to 2.0% from 10.0%')
   })
 })
 

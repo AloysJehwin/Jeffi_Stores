@@ -8,17 +8,17 @@ import { businessIssues } from '@/lib/showcase/clean'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import { goLiveShowcase } from '@controller/lib/showcase/billing'
 import { buildRunning, getStudioSession, type StudioSession } from '@controller/lib/site-studio/sessions'
-import { ownerShowcase } from './site'
+import { ownedShowcase } from './site'
 
 // Publishing a Showcase: the studio's page (recompiled from source: stored ASTs are never trusted) and its look are
 // copied onto the site row, which showcase-service serves, then the site goes live (lib/showcase/store.ts
-// publishShowcase: the first publish starts the free month; a paused, unpaid one is charged a month first, as the
+// publishShowcase: the first publish starts the trial; a paused, unpaid one goes on the subscription first, as the
 // console's Publish does). Publishing a live site again is how design changes reach it; the details and content are
 // read live from the row already.
 
 export type PublishResult =
   | { ok: true; site: ShowcaseSiteRow; url: string; first: boolean }
-  | { ok: false; status: number; error: string; code?: string; topUpUrl?: string }
+  | { ok: false; status: number; error: string; code?: string; checkoutUrl?: string }
 
 /** The page as it goes live: every code section compiled again for the Showcase page; one that no longer compiles is left out. */
 async function livePage(doc: PageDoc): Promise<PageDoc> {
@@ -48,12 +48,12 @@ export async function copyStudioPage(site: Pick<ShowcaseSiteRow, 'id' | 'theme'>
   return true
 }
 
-export async function publishOwnerShowcase(ownerId: string): Promise<PublishResult> {
-  const site = await ownerShowcase(ownerId)
-  if (!site) return { ok: false, status: 409, error: 'Save your business details first.' }
+export async function publishOwnerShowcase(ownerId: string, siteId: unknown): Promise<PublishResult> {
+  const site = await ownedShowcase(ownerId, siteId)
+  if (!site) return { ok: false, status: 404, error: 'That site could not be found. Save your business details first.' }
   const issues = businessIssues(site.business)
   if (issues.length) return { ok: false, status: 400, error: issues[0], code: 'details' }
-  const session = await getStudioSession(ownerId, 'showcase')
+  const session = await getStudioSession(ownerId, 'showcase', site.id)
   if (session && buildRunning(session)) return { ok: false, status: 409, error: 'Your page is being designed. Publish when it is ready.', code: 'running' }
   if (session?.pages?.[SHOWCASE_PAGE_KEY]) {
     if (!(await copyStudioPage(site, session)))
@@ -66,6 +66,7 @@ export async function publishOwnerShowcase(ownerId: string): Promise<PublishResu
   if (r.code !== 'payment_due') return { ok: false, status: r.code === 'not_found' ? 404 : 409, error: r.error, code: r.code }
   const live = await goLiveShowcase(site.id)
   if (live.ok) return { ok: true, site: live.site, url: showcaseUrl(live.site.slug), first }
-  if (live.code === 'wallet' || live.code === 'no_wallet') return { ok: false, status: 402, error: live.error, code: 'wallet_low', topUpUrl: '/dashboard/wallet' }
+  if (live.code === 'checkout') return { ok: false, status: 402, error: live.error, code: 'checkout', ...(live.checkoutUrl ? { checkoutUrl: live.checkoutUrl } : {}) }
+  if (live.code === 'no_wallet') return { ok: false, status: 402, error: live.error, code: live.code }
   return { ok: false, status: live.code === 'not_found' ? 404 : 409, error: live.error, code: live.code }
 }

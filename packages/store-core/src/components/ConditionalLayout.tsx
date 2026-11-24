@@ -18,6 +18,8 @@ import NumberInputWheelGuard from './NumberInputWheelGuard'
 import CookieConsentBanner, { CookieSettingsLink } from './visitor/CookieConsentBanner'
 import AnnouncementBar from '@/components/visitor/AnnouncementBar'
 import Footer from './visitor/Footer'
+import PhotoCredits from './visitor/site/PhotoCredits'
+import type { StockCredit } from '@/lib/ai/stock-credits'
 
 export default function ConditionalLayout({
   children,
@@ -31,10 +33,13 @@ export default function ConditionalLayout({
   isVaultSubdomain,
   cookieConsent,
   codeChrome,
+  photoCredits,
 }: {
   children: React.ReactNode
   /** The store's AI-written header, footer and announcement bar (AI Site Studio), in place of the built-in ones. */
   codeChrome?: { header: React.ReactNode | null; footer: React.ReactNode | null; announcement: React.ReactNode | null } | null
+  /** Credits for the stock photos the store shows (lib/site/photo-credits.ts). */
+  photoCredits?: StockCredit[]
   initialStoreConfig?: StoreConfig
   isFormsSubdomain?: boolean
   isDocumentSubdomain?: boolean
@@ -89,7 +94,7 @@ export default function ConditionalLayout({
                 <ConfirmProvider>
                   <CompareProvider>
                     <NumberInputWheelGuard />
-                    <div data-storefront className="flex flex-col min-h-[100dvh] bg-surface">
+                    <div data-storefront data-app-root className="flex flex-col min-h-[100dvh] bg-surface">
                       <PageTracker />
                       {codeChrome?.header ?? <Header />}
                       <main className={`flex-1 bg-surface ${codeChrome?.header ? '' : 'pt-[calc(4rem+env(safe-area-inset-top,0px))] lg:pt-[calc(5rem+env(safe-area-inset-top,0px))]'}`}>
@@ -99,6 +104,7 @@ export default function ConditionalLayout({
                       {codeChrome?.footer ? (
                         <>
                           {codeChrome.footer}
+                          <PhotoCredits credits={photoCredits} className="bg-surface px-4 py-3 text-center text-xs text-foreground-muted" />
                           {cookieConsent && (
                             <div className="bg-surface px-4 py-3 text-center text-xs text-foreground-muted">
                               <CookieSettingsLink className="underline" />
@@ -106,7 +112,7 @@ export default function ConditionalLayout({
                           )}
                         </>
                       ) : (
-                        <Footer cookieConsent={cookieConsent} />
+                        <Footer cookieConsent={cookieConsent} photoCredits={photoCredits} />
                       )}
                     </div>
                     <CompareBar />

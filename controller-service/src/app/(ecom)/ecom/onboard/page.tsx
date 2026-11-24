@@ -87,8 +87,9 @@ export default async function OnboardPage({
   if (existing.length > 0) {
     const t = existing[0]
     if (!hasService(t, 'store') && !t.store_request) {
-      if ((await searchParams).mode !== 'add-store') redirect('/dashboard')
-      return <UpgradeWizard ownerId={owner.id} owner={who} tenant={t} />
+      const q = await searchParams
+      if (q.mode !== 'add-store') redirect('/dashboard')
+      return <UpgradeWizard ownerId={owner.id} owner={who} tenant={t} query={q} />
     }
     if (t.status === 'active') redirect('/dashboard')
 
@@ -305,10 +306,13 @@ async function UpgradeWizard({
   ownerId,
   owner,
   tenant,
+  query,
 }: {
   ownerId: string
   owner: { email: string; name: string | null }
   tenant: { id: string; slug: string; display_name: string }
+  /** A plan picked before arriving (the Showcase page's upgrade offer) wins over the draft's. */
+  query: { plan?: string; interval?: string }
 }) {
   const ownerName = owner.name
   const draft = await getDraft(ownerId)
@@ -322,11 +326,13 @@ async function UpgradeWizard({
     addonPrices().catch(() => []),
   ])
   const plans = allPlans.filter(p => p.slug !== 'services')
+  const picked = pickedPlan(plans, query)
   const saved = draft?.data ?? {}
   const bankOk = bank?.verification_status === 'verified' || bank?.verification_status === 'unverified'
   const data: Record<string, any> = {
     ...saved,
-    planSlug: plans.some(p => p.slug === saved.planSlug) ? saved.planSlug : plans[0]?.slug,
+    planSlug: picked?.planSlug ?? (plans.some(p => p.slug === saved.planSlug) ? saved.planSlug : plans[0]?.slug),
+    ...(picked ? { interval: picked.interval } : {}),
     displayName: saved.displayName || tenant.display_name,
     slug: tenant.slug,
     bizName: saved.bizName || kyc?.business_name || '',
