@@ -3,6 +3,7 @@ import { resolveSettingsHubTab, visibleSettingsHubTabs } from '@/lib/admin/setti
 import { isPlatformOwner } from '@/lib/auth/scopes'
 import SettingsHub from '@/components/admin/SettingsHub'
 import ProvidersCard from '@/components/admin/site-controls/ProvidersCard'
+import OutreachProvidersCard from '@/components/admin/site-controls/OutreachProvidersCard'
 import CliTokensPanel from './_components/CliTokensPanel'
 import AccountPanel from './_components/AccountPanel'
 import NumbersPanel from './_components/NumbersPanel'
@@ -39,8 +40,9 @@ export default async function SettingsPage({
     return (
       <>
         <SettingsHub active="providers" />
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 space-y-6">
           <ProvidersCard view="default" />
+          <OutreachProvidersCard owner={isPlatformOwner(role)} />
         </div>
       </>
     )
