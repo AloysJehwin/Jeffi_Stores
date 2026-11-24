@@ -24,6 +24,8 @@ export interface SendByTemplateInput {
   audience?: 'customer' | 'admin' | 'ecom'
   /** With asPlatform: send from this store's numbers (the audience's, else its customer number), else the platform's. */
   senderTenant?: string | null
+  /** whatsapp: the destination of the template's URL button; messaging-service fills its link code. */
+  buttonUrl?: string
 }
 
 export interface SendResult {
@@ -75,6 +77,7 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     reference: i.reference,
     locale: i.locale,
     audience: i.channel === 'email' ? undefined : i.audience,
+    button_url: i.channel === 'whatsapp' ? i.buttonUrl : undefined,
     // Inside a reply scope the customer's email reply comes back to the record that asked.
     reply_to: i.channel === 'email' ? currentReplyScope()?.replyTo : undefined,
     ...extra,
