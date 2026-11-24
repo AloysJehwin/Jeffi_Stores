@@ -737,7 +737,7 @@ function Dlt({
       <details className="rounded-lg border border-border-default p-3 text-xs text-foreground-muted">
         <summary className="cursor-pointer text-foreground">Airtel DLT portal steps</summary>
         <ol className="list-decimal pl-5 mt-2 space-y-1">
-          <li>Register Jeffi as the Principal Entity and copy the Entity ID here.</li>
+          <li>Register the sending business as the Principal Entity and copy the Entity ID here.</li>
           <li>Add the sender headers and wait for approval, then list them above.</li>
           <li>Register each SMS template and put its template ID on the template.</li>
           <li>Under PE–TM chains, add Karix and Sinch, the telemarketers AWS End User Messaging delivers through.</li>

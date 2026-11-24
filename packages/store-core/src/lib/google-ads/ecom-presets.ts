@@ -2,7 +2,7 @@ import { INDIA, type CampaignSpec, type KeywordSpec } from './campaign-spec'
 import { cleanKeyword } from './limits'
 
 // "Promote ecom" presets for the flagship's own Google Ads account: Search campaigns that send people to the ecom
-// site. Client-safe (no env, no database): the server passes the ecom origin in.
+// site. Client-safe (no env, no database): the server passes the ecom origin and brand name in.
 
 export const ECOM_PRESET_IDS = ['ecom_store', 'ecom_showcase'] as const
 export type EcomPresetId = (typeof ECOM_PRESET_IDS)[number]
@@ -57,7 +57,7 @@ const COMMON_NEGATIVES = [
   'wordpress', 'github', 'open source', 'login', 'sign in', 'customer care', 'complaint', 'refund',
 ]
 
-export function buildEcomPresets(origin: string): EcomPreset[] {
+export function buildEcomPresets(origin: string, brand: string): EcomPreset[] {
   const base = {
     locations: [INDIA],
     languages: [EN, HI],
@@ -84,12 +84,12 @@ export function buildEcomPresets(origin: string): EcomPreset[] {
         'Orders, Payments and Delivery',
         'Your Own Branded Store',
         'Set Up Your Store Today',
-        'Jeffi Commerce',
+        brand,
       ],
       descriptions: [
         'Launch your own online store with payments, delivery and a simple admin. Sign up today.',
         'Sell to customers across India with your own store, catalogue and checkout. Start today.',
-        'Run products, orders and messaging from one place. Create your store on Jeffi Commerce.',
+        `Run products, orders and messaging from one place. Create your store on ${brand}.`,
       ],
       path1: 'online-store',
       path2: 'india',
@@ -116,7 +116,7 @@ export function buildEcomPresets(origin: string): EcomPreset[] {
         'Showcase Your Business',
         'Enquiries Straight to You',
         'Make Your Site Today',
-        'Jeffi Showcase',
+        `${brand} Showcase`,
       ],
       descriptions: [
         'Make a one-page website with your work, reviews and contact details. Free trial.',

@@ -5,6 +5,7 @@ import { loadSalesVelocity } from '@/lib/merchant/sales-velocity'
 import { LIMITS, adTextLength } from './limits'
 import { freeDeliveryCallout } from './assets'
 import { shipToStates, INDIA_REGION_COUNT } from './geo'
+import { platformBrandName } from '@/lib/catalog/brand'
 import { buildEcomPresets, ecomOrigin, ecomPresetsAvailable, type EcomPreset } from './ecom-presets'
 
 // Everything the campaign wizard needs from our own data in one read: store identity, a budget
@@ -31,7 +32,7 @@ export async function loadEcomPresets(): Promise<EcomPreset[] | undefined> {
   try {
     const [{ getAdsConnectionStatus }, { adsTenantKey }] = await Promise.all([import('./connection'), import('./credentials')])
     const status = await getAdsConnectionStatus(await adsTenantKey())
-    return ecomPresetsAvailable(status) ? buildEcomPresets(ecomOrigin()) : undefined
+    return ecomPresetsAvailable(status) ? buildEcomPresets(ecomOrigin(), platformBrandName()) : undefined
   } catch {
     return undefined
   }

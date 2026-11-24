@@ -18,7 +18,7 @@ import { loadEcomPresets } from '@/lib/google-ads/manage-data'
 const ORIGIN = 'https://ecom.jeffistores.in'
 
 describe('ecom presets', () => {
-  const presets = buildEcomPresets(ORIGIN)
+  const presets = buildEcomPresets(ORIGIN, 'Jeffi Stores')
 
   it('offers the store and Showcase presets', () => {
     expect(presets.map(p => p.id)).toEqual([...ECOM_PRESET_IDS])

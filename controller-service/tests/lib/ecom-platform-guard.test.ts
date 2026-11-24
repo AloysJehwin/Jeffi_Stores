@@ -5,7 +5,8 @@ import glob from 'fast-glob'
 
 // The ecom API is the control plane. Middleware limits it to the platform administrator, but its log
 // mode lets cert-carrying calls through, so every route checks for itself too.
-const GUARD = /\b(isPlatformAdmin|requireAdminScope|hasScope|ecomOverviewGet)\(/
+// outreachGuard wraps requireAdminScope + isPlatformAdmin; the last test pins that.
+const GUARD = /\b(isPlatformAdmin|requireAdminScope|hasScope|ecomOverviewGet|outreachGuard)\(/
 
 describe('ecom admin routes guard themselves', () => {
   const files = glob.sync('controller-service/src/app/api/\\(admin\\)/admin/ecom/**/route.ts', { cwd: process.cwd() })
@@ -17,5 +18,11 @@ describe('ecom admin routes guard themselves', () => {
   it('every route calls a platform or scope guard', () => {
     const unguarded = files.filter(f => !GUARD.test(fs.readFileSync(path.join(process.cwd(), f), 'utf8')))
     expect(unguarded).toEqual([])
+  })
+
+  it('outreachGuard checks the scope and platform admin itself', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'controller-service/src/lib/outreach/guard.ts'), 'utf8')
+    expect(src).toMatch(/requireAdminScope\(/)
+    expect(src).toMatch(/isPlatformAdmin\(/)
   })
 })
