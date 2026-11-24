@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1795461896.8088517,
-    "ast_hash": "f6ac18f3b8348644a8cc3057d61832c4",
+    "mtime": 1795496525.4405925,
+    "ast_hash": "936f4a7bdd4849a55e4456b816029599",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -23645,8 +23645,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/payments/razorpay-subscriptions.ts": {
-    "mtime": 1795492992.7575173,
-    "ast_hash": "e22e41d3fb9fcdb13becf96507d0efdc",
+    "mtime": 1795496893.0010633,
+    "ast_hash": "8c69d454f68458adbc5e7d8bfcf03549",
     "semantic_hash": ""
   },
   "controller-service/src/lib/provisioning/alerts.ts": {
@@ -23875,8 +23875,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/lib/razorpay-subscriptions.test.ts": {
-    "mtime": 1795492992.8051128,
-    "ast_hash": "9ccf397d709f77eaabeff4a4cd84d12f",
+    "mtime": 1795496893.002064,
+    "ast_hash": "3f2ff3fd7b59a43f6f6896f0463dbe99",
     "semantic_hash": ""
   },
   "controller-service/tests/lib/tenant-admin-provision-scopes.test.ts": {
@@ -29190,8 +29190,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/site/critique.ts": {
-    "mtime": 1794853114.2474453,
-    "ast_hash": "0265b90514c36e8efe2fbaeb158ed156",
+    "mtime": 1795496769.852786,
+    "ast_hash": "9c3926a66955589da8ade26ceafa2b66",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/site/profile-page.ts": {
@@ -34255,8 +34255,8 @@
     "semantic_hash": ""
   },
   "docs/plans/SITE_EDITOR_PLAN.md": {
-    "mtime": 1795492994.015457,
-    "ast_hash": "7eb8edc704fc7ce61b95a25afeac0e28",
+    "mtime": 1795496769.812391,
+    "ast_hash": "37f4e1aec2efaaaebcd01d54532f4775",
     "semantic_hash": ""
   },
   "docs/plans/STOCK_IMAGES.md": {
@@ -34265,8 +34265,8 @@
     "semantic_hash": ""
   },
   "docs/plans/SUBSCRIPTION_BILLING_PLAN.md": {
-    "mtime": 1795464486.0511918,
-    "ast_hash": "a7ce5940c3d7b1432efe3fdd7e01edff",
+    "mtime": 1795497137.2156315,
+    "ast_hash": "d1dece5f60cb145024f3feaf38601a1d",
     "semantic_hash": ""
   },
   "docs/plans/UPI_YOUPI_PG.md": {
@@ -34355,8 +34355,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/billing/subscribe/page.tsx": {
-    "mtime": 1795492992.7354214,
-    "ast_hash": "eec479573a62a6317ca5b028a97b2ccb",
+    "mtime": 1795497094.5544226,
+    "ast_hash": "3f6949d0a9b1d08e2e7b848d1db8e1c6",
     "semantic_hash": ""
   },
   "controller-service/src/app/(ecom)/ecom/dashboard/services/ServiceNotOn.tsx": {
@@ -34460,8 +34460,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/lines.ts": {
-    "mtime": 1795492992.7484071,
-    "ast_hash": "7baa5f1524fab2e393a8c4bff39b2766",
+    "mtime": 1795497094.5526903,
+    "ast_hash": "03b70de3dc23f2f1e9afb80c0b118019",
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/migrate.ts": {
@@ -34475,23 +34475,23 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/overview.ts": {
-    "mtime": 1795492992.7497978,
-    "ast_hash": "52987e071dc4760cf62a3175e484e867",
+    "mtime": 1795497094.5538046,
+    "ast_hash": "26a2aebb96b3fe8509d4f510f719a429",
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/subscription.ts": {
-    "mtime": 1795492992.75042,
-    "ast_hash": "616de55997ae2744ea1b73cdde6d1515",
+    "mtime": 1795497094.553383,
+    "ast_hash": "88619c8e5e30137a4e3b467992da1d92",
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/sweep.ts": {
-    "mtime": 1795492992.7510774,
-    "ast_hash": "81fe098aee1f0860a620095a485b6d29",
+    "mtime": 1795496892.9998775,
+    "ast_hash": "779271f2b57c85cb3b5f59259456c75a",
     "semantic_hash": ""
   },
   "controller-service/src/lib/billing/webhook.ts": {
-    "mtime": 1795492992.7515557,
-    "ast_hash": "f6295dea5f63bb3af31d7eee8179e754",
+    "mtime": 1795496893.0005429,
+    "ast_hash": "c83e66ca38e382be0204fe4af0d0e93c",
     "semantic_hash": ""
   },
   "controller-service/src/lib/compute/floor-prices.ts": {
@@ -34535,8 +34535,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/lib/billing/lines.test.ts": {
-    "mtime": 1795492992.7853608,
-    "ast_hash": "aa48e5daaa2f14e64fd0e27ea933c6f8",
+    "mtime": 1795497094.5553973,
+    "ast_hash": "bf3405c08a230a8046090588c81f9cb0",
     "semantic_hash": ""
   },
   "controller-service/tests/lib/billing/migrate.test.ts": {
@@ -34550,8 +34550,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/lib/billing/subscription.test.ts": {
-    "mtime": 1795492992.788265,
-    "ast_hash": "683868bf934482e52286b65f932de371",
+    "mtime": 1795497121.6647696,
+    "ast_hash": "aab6b21b343fbe1f6d4dc5c38510bd5f",
     "semantic_hash": ""
   },
   "controller-service/tests/lib/billing/sweep.test.ts": {
@@ -34560,8 +34560,8 @@
     "semantic_hash": ""
   },
   "controller-service/tests/lib/billing/webhook.test.ts": {
-    "mtime": 1795492992.798977,
-    "ast_hash": "007bd48a39a757ec3880d6447c2ab8f0",
+    "mtime": 1795496893.001553,
+    "ast_hash": "4e955fc12636d174b783de2fca5f9804",
     "semantic_hash": ""
   },
   "controller-service/tests/lib/domains/showcase-routes.test.ts": {
@@ -34595,8 +34595,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/integration-tests/ui/site-editor/SiteEditor.test.tsx": {
-    "mtime": 1795492994.0161898,
-    "ast_hash": "8e24acfb2087414febb69b8d8cd7de98",
+    "mtime": 1795496769.8151329,
+    "ast_hash": "7658d249520b808b151514e0fab95231",
     "semantic_hash": ""
   },
   "packages/store-core/integration-tests/ui/site-editor/StylePanel.test.tsx": {
@@ -34605,8 +34605,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/admin/site-builder/VisualEditor.tsx": {
-    "mtime": 1795492994.0184505,
-    "ast_hash": "f173957264f283734bdb5a1dfdd2f9c2",
+    "mtime": 1795496371.285485,
+    "ast_hash": "b95ec6edd3709f83262c59d6b2f7d142",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/site-editor/Inspector.tsx": {
@@ -34615,13 +34615,13 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/site-editor/Layers.tsx": {
-    "mtime": 1795492994.0198288,
-    "ast_hash": "c38941e70bde9136b011ddd06b2e2fb9",
+    "mtime": 1795496769.8299336,
+    "ast_hash": "b0572d4fc528b08a604f439a093adf36",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/site-editor/SiteEditor.tsx": {
-    "mtime": 1795492994.0204284,
-    "ast_hash": "364e32e97c02e4e0cb08e7723cfd6258",
+    "mtime": 1795496769.832655,
+    "ast_hash": "93f4942d6d98e89a9ff1f1ef5b6a7686",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/site-editor/StylePanel.tsx": {
@@ -34650,8 +34650,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/site/editor/SiteEditorBridge.tsx": {
-    "mtime": 1795492994.025326,
-    "ast_hash": "601873e4c6f9a631d752f6c7e404b453",
+    "mtime": 1795496769.8382287,
+    "ast_hash": "880fe195870f3aafe6c795ece1ecca8f",
     "semantic_hash": ""
   },
   "packages/store-core/src/components/visitor/site/editor/SiteEditorGate.tsx": {
@@ -34685,8 +34685,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/site/code/classes.ts": {
-    "mtime": 1795469356.2754922,
-    "ast_hash": "b365474c32b54960aced7cabce89c595",
+    "mtime": 1795496769.843016,
+    "ast_hash": "2b68d48d95c1fd0d3e782cb8c17fef73",
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/site/code/ids.ts": {
@@ -34705,8 +34705,8 @@
     "semantic_hash": ""
   },
   "packages/store-core/src/lib/tenant-registry/domain-rules.ts": {
-    "mtime": 1795493785.7940493,
-    "ast_hash": "696a849d5c6dcb05002fdce38f2de20f",
+    "mtime": 1795496356.3338044,
+    "ast_hash": "cfab5a000c2ccaaeac5517b66c1cb3ae",
     "semantic_hash": ""
   },
   "packages/store-core/tests/components/site-editor/layers.test.ts": {
@@ -34745,13 +34745,63 @@
     "semantic_hash": ""
   },
   "packages/store-core/tests/lib/site-editor-imports.test.ts": {
-    "mtime": 1795493050.5316148,
-    "ast_hash": "b6b8fa65a826771cea800d03b272c3ad",
+    "mtime": 1795496769.865687,
+    "ast_hash": "163df961ab0f20ba73ea706883804425",
     "semantic_hash": ""
   },
   ".github/workflows/codeql.yml": {
     "mtime": 1795493682.4283867,
     "ast_hash": "b772130e9033145b16714c2c5862c376",
+    "semantic_hash": ""
+  },
+  "packages/store-core/src/components/site-editor/FreePanel.tsx": {
+    "mtime": 1795496769.8236392,
+    "ast_hash": "e3622857bd1bba78a65e2fe5065d39e5",
+    "semantic_hash": ""
+  },
+  "packages/store-core/src/components/site-editor/free-ops.ts": {
+    "mtime": 1795496769.8354423,
+    "ast_hash": "676e9caf26ca2b987c1d722fec9bb0f6",
+    "semantic_hash": ""
+  },
+  "packages/store-core/src/components/visitor/site/editor/handles.ts": {
+    "mtime": 1795496769.8405309,
+    "ast_hash": "730bd4a27d770b60069396166249d14a",
+    "semantic_hash": ""
+  },
+  "packages/store-core/src/lib/site/code/free.ts": {
+    "mtime": 1795496769.8467515,
+    "ast_hash": "2a739c4d2ee90a46e7f9c23feb4601a0",
+    "semantic_hash": ""
+  },
+  "packages/store-core/src/lib/site/code/snap.ts": {
+    "mtime": 1795496769.8503265,
+    "ast_hash": "c4e0ccc5bd73f05388d3a349d23ef79f",
+    "semantic_hash": ""
+  },
+  "packages/store-core/tests/components/site-editor/free-ops.test.ts": {
+    "mtime": 1795496769.8547218,
+    "ast_hash": "ab9df985a3abda370990ac211d1d64fc",
+    "semantic_hash": ""
+  },
+  "packages/store-core/tests/components/site-editor/handles.test.ts": {
+    "mtime": 1795496769.8564389,
+    "ast_hash": "28a9795773db93c3b7682d63316bc510",
+    "semantic_hash": ""
+  },
+  "packages/store-core/tests/lib/site-code-free.test.ts": {
+    "mtime": 1795496769.8589077,
+    "ast_hash": "21f36b61ae30371f4ee18eddc3fe9d0c",
+    "semantic_hash": ""
+  },
+  "packages/store-core/tests/lib/site-code-snap.test.ts": {
+    "mtime": 1795496769.8611913,
+    "ast_hash": "ae79ac3ce3520b8006bef3a66bdcd0e5",
+    "semantic_hash": ""
+  },
+  "packages/store-core/tests/lib/site-critique-free.test.ts": {
+    "mtime": 1795496769.8631566,
+    "ast_hash": "721a4c88c8a4e8fff112ec350cd92a64",
     "semantic_hash": ""
   }
 }
