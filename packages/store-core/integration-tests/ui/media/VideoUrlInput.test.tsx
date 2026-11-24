@@ -12,7 +12,9 @@ vi.mock('@/components/admin/GalleryPicker', () => ({
 vi.mock('@/components/admin/ai/AiVideoButton', () => ({
   default: ({ feature, onPick }: any) => <button onClick={() => onPick({ url: 'https://cdn/ai.mp4' })}>ai-{feature}</button>,
 }))
-const uploadGalleryVideo = vi.fn()
+let uploadImpl: (...a: unknown[]) => unknown = () => ({})
+let uploadCalls = 0
+const uploadGalleryVideo = Object.assign((...a: unknown[]) => { uploadCalls++; return uploadImpl(...a) }, { mockReset: () => { uploadCalls = 0; uploadImpl = () => ({}) }, mockResolvedValue: (v: unknown) => { uploadImpl = async () => v }, mockReturnValue: (v: unknown) => { uploadImpl = () => v } })
 vi.mock('@/components/admin/media/media-upload', () => ({
   VIDEO_TYPES: ['video/mp4', 'video/webm'],
   VIDEO_MAX: 50 * 1024 * 1024,
@@ -52,14 +54,16 @@ describe('VideoUrlInput', () => {
     expect(await screen.findByText('Use an MP4 or WebM video')).toBeInTheDocument()
     fireEvent.change(input, { target: { files: [file('video/mp4', 60 * 1024 * 1024)] } })
     expect(await screen.findByText('Video must be under 50 MB')).toBeInTheDocument()
-    expect(uploadGalleryVideo).not.toHaveBeenCalled()
+    expect(uploadCalls).toBe(0)
   })
 
   it('shows an upload failure', async () => {
-    uploadGalleryVideo.mockResolvedValue({})
-    const { container } = render(<VideoUrlInput value="" onChange={vi.fn()} />)
+    uploadGalleryVideo.mockReturnValue({ then: (_r: unknown, rej: (e: Error) => void) => rej(new Error('Upload failed')) })
+    const onChange = vi.fn()
+    const { container } = render(<VideoUrlInput value="" onChange={onChange} />)
     fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file('video/webm')] } })
-    expect(await screen.findByText(/Cannot read properties of undefined/)).toBeInTheDocument()
+    expect(await screen.findByText('Upload failed')).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('picks a gallery video', () => {
