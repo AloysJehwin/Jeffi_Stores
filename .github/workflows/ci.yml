@@ -280,7 +280,10 @@ jobs:
           pattern: vitest-*
           path: .vitest-reports
           merge-multiple: true
+      # Merging every part's coverage outgrew Node's default heap (OOM on #641's run).
       - run: npx vitest run --merge-reports --coverage
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
   integration:
     name: Integration tests
