@@ -41,6 +41,18 @@ const sms = (slug: string, name: string, category: string, body: string, tags?: 
 const wa = (slug: string, name: string, category: string, body: string, metaCategory: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION', samples?: Record<string, string>, tags?: string[]): TemplateSeed =>
   ({ slug, channel: 'whatsapp', name, category, body, meta_category: metaCategory, blocks_format: 'wa-content', blocks: { types: { 'twilio/text': { body } }, ...(samples ? { variables: samples } : {}) }, tags })
 
+// UTILITY with one URL button on the short-link host (the `_action` convention): Meta approves the host only; each
+// send passes button_url and messaging-service fills the code. Stored as {{k+2}}, after the body's k and {{brand_name}}.
+const WA_LINK_HOST = 'https://img.jeffistores.in'
+const waLink = (slug: string, name: string, body: string, label: string, samples: Record<string, string>, locale = 'en'): TemplateSeed => {
+  const k = new Set(body.match(/\{\{\s*\d+\s*\}\}/g) ?? []).size
+  const link = String(k + 2)
+  return {
+    slug, channel: 'whatsapp', name, category: 'transactional', locale, body, meta_category: 'UTILITY', blocks_format: 'wa-content', tags: ['outreach'],
+    blocks: { types: { 'twilio/text': { body } }, buttons: [{ type: 'url', label, value: `${WA_LINK_HOST}/{{${link}}}` }], variables: { ...samples, [String(k + 1)]: 'Jeffi Stores', [link]: 'demo' } },
+  }
+}
+
 export const CATALOG: TemplateSeed[] = [
   // ────────────── EMAIL — TRANSACTIONAL (order lifecycle) ──────────────
   email('order/confirmed', 'Order confirmed', 'transactional',
@@ -663,6 +675,48 @@ export const CATALOG: TemplateSeed[] = [
     "A refund of {{1}} for order {{2}} has been processed and will reflect in 5-7 business days. Thank you.\n— from {{brand_name}} team", 'UTILITY'),
   wa('feedback/request', 'Feedback request', 'automation',
     "How was your order {{1}}? We would love your feedback. Share it here: {{2}} Thank you for shopping with us!\n— from {{brand_name}} team", 'UTILITY'),
+
+  // Outreach (flagship only, to business owners after the AI call; controller lib/outreach/whatsapp.ts).
+  // {{1}} owner name, {{2}} business name, {{3}} as noted. `_hi` = the Hindi copy (locale hi).
+  waLink('outreach/preview_ready', 'Outreach: preview ready',
+    "Hi {{1}}, thanks for your time on the call. Here is the preview of the website we are making for {{2}}. It updates as you send us details, so just reply here with anything you want added.\n— from {{brand_name}} team",
+    'See your preview', { '1': 'Ravi', '2': 'Sharma Sweets' }),
+  waLink('outreach/preview_ready_hi', 'Outreach: preview ready (Hindi)',
+    "नमस्ते {{1}}, कॉल पर समय देने के लिए धन्यवाद। {{2}} के लिए हम जो वेबसाइट बना रहे हैं, उसका प्रीव्यू यहाँ है। आप जो जानकारी भेजेंगे, वह इसमें जुड़ती जाएगी, इसलिए जो भी जोड़ना हो, यहीं जवाब में भेज दीजिए।\n— from {{brand_name}} team",
+    'प्रीव्यू देखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स' }, 'hi'),
+  // {{3}} the details still missing, in plain words.
+  waLink('outreach/details_needed', 'Outreach: details needed',
+    "Hi {{1}}, the website for {{2}} is nearly ready. To finish it we still need: {{3}}. Please reply here with these details and we will add them for you.\n— from {{brand_name}} team",
+    'See your preview', { '1': 'Ravi', '2': 'Sharma Sweets', '3': 'your opening hours and shop address' }),
+  waLink('outreach/details_needed_hi', 'Outreach: details needed (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट लगभग तैयार है। इसे पूरा करने के लिए हमें यह जानकारी चाहिए: {{3}}। कृपया यहीं जवाब में भेज दीजिए, हम इसे जोड़ देंगे।\n— from {{brand_name}} team",
+    'प्रीव्यू देखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स', '3': 'दुकान खुलने का समय और पता' }, 'hi'),
+  waLink('outreach/site_live', 'Outreach: site live',
+    "Hi {{1}}, the website for {{2}} is now live. Tap the button to open it, and share the link with your customers.\n— from {{brand_name}} team",
+    'Open your website', { '1': 'Ravi', '2': 'Sharma Sweets' }),
+  waLink('outreach/site_live_hi', 'Outreach: site live (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट अब लाइव है। इसे खोलने के लिए नीचे का बटन दबाइए और लिंक अपने ग्राहकों के साथ शेयर कीजिए।\n— from {{brand_name}} team",
+    'वेबसाइट खोलें', { '1': 'रवि', '2': 'शर्मा स्वीट्स' }, 'hi'),
+  waLink('outreach/claim', 'Outreach: claim your site',
+    "Hi {{1}}, the website for {{2}} is ready to be yours. Tap the button to claim it with your email, so you can edit it and see who visits. This link works for 14 days.\n— from {{brand_name}} team",
+    'Claim your website', { '1': 'Ravi', '2': 'Sharma Sweets' }),
+  waLink('outreach/claim_hi', 'Outreach: claim your site (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट अब आपकी होने के लिए तैयार है। नीचे का बटन दबाकर अपने ईमेल से इसे अपने नाम कीजिए, ताकि आप इसे बदल सकें और देख सकें कि कितने लोग आए। यह लिंक 14 दिन तक चलेगा।\n— from {{brand_name}} team",
+    'अपनी वेबसाइट लें', { '1': 'रवि', '2': 'शर्मा स्वीट्स' }, 'hi'),
+  // {{3}} when we will call, e.g. "25 Nov, 11:00 am".
+  waLink('outreach/callback', 'Outreach: callback booked',
+    "Hi {{1}}, as you asked, we will call you back about the website for {{2}} on {{3}}. If another time is better, just reply here.\n— from {{brand_name}} team",
+    'View details', { '1': 'Ravi', '2': 'Sharma Sweets', '3': '25 Nov, 11:00 am' }),
+  waLink('outreach/callback_hi', 'Outreach: callback booked (Hindi)',
+    "नमस्ते {{1}}, जैसा आपने कहा, हम {{2}} की वेबसाइट के बारे में आपको {{3}} को वापस कॉल करेंगे। कोई और समय ठीक हो तो यहीं जवाब दीजिए।\n— from {{brand_name}} team",
+    'जानकारी देखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स', '3': '25 नव॰, 11:00 am' }, 'hi'),
+  // {{3}} the day the trial ends, e.g. "1 December".
+  waLink('outreach/trial_ending', 'Outreach: trial ending',
+    "Hi {{1}}, the free trial of the website for {{2}} ends on {{3}}. Tap the button to keep it online and see how many people visit it.\n— from {{brand_name}} team",
+    'Keep my website', { '1': 'Ravi', '2': 'Sharma Sweets', '3': '1 December' }),
+  waLink('outreach/trial_ending_hi', 'Outreach: trial ending (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट का फ़्री ट्रायल {{3}} को खत्म हो रहा है। इसे चालू रखने और यह देखने के लिए कि कितने लोग आए, नीचे का बटन दबाइए।\n— from {{brand_name}} team",
+    'वेबसाइट चालू रखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स', '3': '1 दिसंबर' }, 'hi'),
   // Imported from campaigns / mailer — regenerate with scripts/import-campaign-templates.ts --generate.
   ...(campaignCatalog as TemplateSeed[]),
 ]
