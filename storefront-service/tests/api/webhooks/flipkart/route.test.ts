@@ -1,6 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createHash } from 'node:crypto'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@/lib/tenant-registry', () => ({
   resolveTenantFromHost: vi.fn(),
@@ -21,10 +20,20 @@ const URL_ = `https://${HOST}/api/webhooks/flipkart`
 const store = { tenantId: 't-acme', slug: 'acme', displayName: 'Acme', plan: 'growth', infra: null }
 const body = [{ eventType: 'order_item_approved', eventId: 'ev-1', orderId: 'OD1', shipmentId: 'S1', orderItems: [{ orderItemId: 'OI1', status: 'APPROVED', quantity: 1 }] }]
 
-// Flipkart's scheme: X-Authorization "FKLOGIN " + base64(appId:sha1(date + url + method + secret)).
-function signed(opts: { secret?: string; date?: string; raw?: string } = {}) {
-  const date = opts.date ?? new Date().toUTCString()
-  const sig = createHash('sha1').update(`${date}${URL_}POST${opts.secret ?? APP_SECRET}`).digest('hex')
+// Flipkart's scheme: X-Authorization "FKLOGIN " + base64(appId:sha1(date + url + method + secret)). The signatures
+// are precomputed for these fixed inputs (Flipkart mandates SHA-1; the test only replays its output), and the clock
+// is frozen at DATE so the 15-minute skew check passes.
+const DATE = 'Tue, 24 Nov 2026 10:00:00 GMT'
+const OLD_DATE = 'Mon, 23 Nov 2026 10:00:00 GMT'
+const SIG = {
+  ok: 'fec5405c742d953cb20c86832775f37c4cdb3c93', // DATE, APP_SECRET
+  wrongSecret: 'bb02114968a1d65b96ff5fb4341ee3e31b3b8e02', // DATE, 'wrong-secret'
+  oldDate: 'ea51fe12131a88e7012fae72291b6169223c2e75', // OLD_DATE, APP_SECRET
+}
+
+function signed(opts: { sig?: string; date?: string; raw?: string } = {}) {
+  const date = opts.date ?? DATE
+  const sig = opts.sig ?? SIG.ok
   return new Request(URL_, {
     method: 'POST',
     headers: {
@@ -38,10 +47,16 @@ function signed(opts: { secret?: string; date?: string; raw?: string } = {}) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(DATE))
   vi.mocked(resolveTenantFromHost).mockResolvedValue(store as any)
   vi.mocked(resolveMarketplaceCreds).mockResolvedValue({ mode: 'sandbox', fields: { app_id: APP_ID, app_secret: APP_SECRET } } as any)
   vi.mocked(recordEvents).mockResolvedValue({ ids: ['e1'], duplicates: 0 })
   vi.mocked(processEvents).mockResolvedValue({ processed: 1, pending: 0 })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('POST /api/webhooks/flipkart', () => {
@@ -55,7 +70,7 @@ describe('POST /api/webhooks/flipkart', () => {
   })
 
   it('401s a bad signature and stores nothing', async () => {
-    const res = await POST(signed({ secret: 'wrong-secret' }))
+    const res = await POST(signed({ sig: SIG.wrongSecret }))
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('Invalid signature')
     expect(recordEvents).not.toHaveBeenCalled()
@@ -67,8 +82,8 @@ describe('POST /api/webhooks/flipkart', () => {
   })
 
   it('401s a stale signed date (replay window)', async () => {
-    const old = new Date(Date.now() - 24 * 3600_000).toUTCString()
-    expect((await POST(signed({ date: old }))).status).toBe(401)
+    // Correctly signed, but a day old.
+    expect((await POST(signed({ date: OLD_DATE, sig: SIG.oldDate }))).status).toBe(401)
     expect(recordEvents).not.toHaveBeenCalled()
   })
 
