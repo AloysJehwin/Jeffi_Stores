@@ -7,7 +7,9 @@ export const viewport = { width: 'device-width', initialScale: 1, viewportFit: '
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="bg-surface">
-      <body className="antialiased m-0 p-0 bg-surface text-foreground">{children}</body>
+      <body className="antialiased m-0 p-0 bg-surface text-foreground">
+        <div data-app-root style={{ display: 'contents' }}>{children}</div>
+      </body>
     </html>
   )
 }

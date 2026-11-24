@@ -52,7 +52,7 @@ export default function ConditionalLayout({
 }) {
   const pathname = usePathname()
   // The vault brings its own chrome; host paths there are /library, not /vault/*.
-  if (isVaultSubdomain) return <>{children}</>
+  if (isVaultSubdomain) return <div data-app-root style={{ display: 'contents' }}>{children}</div>
   const isAdminPage = isAdminSubdomain || pathname?.startsWith('/admin')
   const isBusinessPage = !isAdminPage && (isBusinessSubdomain || pathname?.startsWith('/business'))
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
@@ -73,7 +73,7 @@ export default function ConditionalLayout({
             <ToastProvider>
               <ConfirmProvider>
                 <NumberInputWheelGuard />
-                {children}
+                <div data-app-root style={{ display: 'contents' }}>{children}</div>
                 {isBusinessPage && <PolicyConsentGate />}
               </ConfirmProvider>
             </ToastProvider>
