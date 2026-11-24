@@ -50,6 +50,12 @@ class Settings:
     # Speech + LLM.
     sarvam_api_key: str = ""
     anthropic_api_key: str = ""
+    # Claude via workload identity federation (preferred over the key); the token file is renewed by a sidecar.
+    anthropic_organization_id: str = ""
+    anthropic_workspace_id: str = ""
+    anthropic_service_account_id: str = ""
+    anthropic_federation_rule_id: str = ""
+    anthropic_identity_token_file: str = ""
     llm_model: str = "claude-haiku-5-5"
     llm_effort: str = "low"
     llm_max_tokens: int = 400
@@ -121,6 +127,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         max_call_ceiling_s=_int(e, "VOICE_MAX_CALL_S", 900),
         sarvam_api_key=e.get("SARVAM_API_KEY", ""),
         anthropic_api_key=e.get("ANTHROPIC_API_KEY", ""),
+        anthropic_organization_id=e.get("ANTHROPIC_ORGANIZATION_ID", "").strip(),
+        anthropic_workspace_id=e.get("ANTHROPIC_WORKSPACE_ID", "").strip(),
+        anthropic_service_account_id=e.get("ANTHROPIC_SERVICE_ACCOUNT_ID", "").strip(),
+        anthropic_federation_rule_id=e.get("ANTHROPIC_FEDERATION_RULE_ID", "").strip(),
+        anthropic_identity_token_file=e.get("ANTHROPIC_IDENTITY_TOKEN_FILE", "").strip(),
         llm_model=e.get("VOICE_LLM_MODEL", "") or "claude-haiku-5-5",
         llm_effort=e.get("VOICE_LLM_EFFORT", "") or "low",
         llm_max_tokens=_int(e, "VOICE_LLM_MAX_TOKENS", 400),

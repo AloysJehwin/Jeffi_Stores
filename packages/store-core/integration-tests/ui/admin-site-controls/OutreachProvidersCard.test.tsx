@@ -26,7 +26,7 @@ const data = () => ({
       configured: false,
     },
     llmModel: 'claude-haiku-5-5',
-    anthropic: { apiKey: set(null), source: 'env', configured: true },
+    anthropic: { apiKey: set(null), source: 'env', federation: false, configured: true },
     ready: false,
   },
   dlt: { entityId: null, senderIds: [], source: { entityId: 'none', senderIds: 'none' } },

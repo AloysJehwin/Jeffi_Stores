@@ -97,7 +97,7 @@ async def test_fail_closed_with_no_config_anywhere(tmp_path: Any) -> None:
                     state_dir=str(tmp_path))
     src, _ = source(bare, lambda r: httpx.Response(503), Clock())
     cfg = await src.get()
-    assert "exotel.apiKey" in cfg.missing() and "sarvam.apiKey" in cfg.missing() and "anthropic.apiKey" in cfg.missing()
+    assert "exotel.apiKey" in cfg.missing() and "sarvam.apiKey" in cfg.missing() and "anthropic.identity-or-apiKey" in cfg.missing()
 
 
 async def test_the_response_is_never_logged(settings: Settings, caplog: pytest.LogCaptureFixture) -> None:

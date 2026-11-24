@@ -99,7 +99,8 @@ refuses with `503` and lists what is missing.
 | `TEST_NUMBERS` | | comma-separated E.164; joined with the Providers tab's test numbers (Twilio allowlist) |
 | `EXOTEL_SID`, `EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`, `EXOTEL_SUBDOMAIN` (`api.in.exotel.com`), `EXOTEL_APP_ID`, `EXOTEL_CALLER_ID` | | Exotel fallbacks |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VOICE_FROM` | | Twilio fallbacks (test calls only) |
-| `SARVAM_API_KEY`, `ANTHROPIC_API_KEY` | | key fallbacks |
+| `ANTHROPIC_ORGANIZATION_ID`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_SERVICE_ACCOUNT_ID`, `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_IDENTITY_TOKEN_FILE` | | Claude via workload identity federation (preferred); the first four override the controller's `anthropicIdentity` field by field, the token file is always local |
+| `SARVAM_API_KEY`, `ANTHROPIC_API_KEY` | | key fallbacks (the Anthropic key only if federation isn't set up) |
 | `VOICE_LLM_MODEL` | `claude-haiku-5-5` | fallback for `llmModel` |
 | `VOICE_STT_MODEL` / `VOICE_TTS_MODEL` | `saaras:v3` / `bulbul:v3` | fallbacks for the Sarvam models |
 | `S3_BUCKET` (or `S3_BUCKET_NAME`), `S3_KEY_PREFIX`, `AWS_REGION` | | recordings; unset bucket = no recording |
@@ -127,7 +128,8 @@ default.
    140-series), so with `twilio_test` selected `/calls` refuses every number that isn't on the test allowlist (the
    Providers tab's test numbers, `TEST_NUMBERS`, or the session's `testNumbers`), and an empty allowlist refuses
    everything. Set the account SID, auth token and a Twilio voice number as `from`.
-3. **Sarvam** API key, and optionally a voice per language. **Anthropic** API key for voice.
+3. **Sarvam** API key, and optionally a voice per language. **Claude** through federation (next section); the
+   Anthropic API key in Providers is only a fallback.
 4. **Secret.** `kubectl -n jeffi create secret generic voice-service --from-literal=SERVICE_AUTH_SECRET=<the shared
    secret> --from-literal=VOICE_WS_KEY=<random>` (optionally the env fallbacks too).
 5. **DNS.** An A record `voice.jeffistores.in` → the cluster IP, as `deploy/k8s/bootstrap/doc-hosts-dns.sh` does for the
@@ -135,6 +137,42 @@ default.
    store slug.
 6. **Turn it on.** Set `replicas: 1` in `deploy/k8s/platform/48-voice-service.yaml` and release. Until then the
    Deployment is applied at 0 replicas (a `kubectl scale` would be undone by the next release).
+
+## Claude through federation
+
+Calls reach Claude with Anthropic workload identity federation, not a key. The client is built with explicit
+`WorkloadIdentityCredentials` (`llm_client.py`), so a stray `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` in the
+environment cannot shadow it. The key is used only when no identity is configured. The identity ids come from the
+controller's voice-config (`anthropicIdentity`: the platform's `ai_provider_identities` row plus its
+`ANTHROPIC_ORGANIZATION_ID`), and the `ANTHROPIC_*` env vars override them field by field. `/calls` answers 503 and names what is
+missing (`anthropic.identity.*`, `anthropic.identityTokenFile`, or `anthropic.identity-or-apiKey`).
+
+The platform k3s's service-account tokens are not trusted by the existing federation rules, so the pod has a
+`wif-minter` sidecar (`deploy/k8s/platform/48-voice-service.yaml`) that signs its own token: issuer
+`https://wif-voice.jeffistores.in`, subject `jeffi-voice-service`, audience `https://api.anthropic.com`. It renews
+`/wif/token` every 30 minutes (1 h lifetime), and the app reads it through `ANTHROPIC_IDENTITY_TOKEN_FILE`.
+
+Founder steps:
+
+1. **Keypair, off the repo.** `JEFFI_WIF_DIR=$HOME/.jeffi/wif-voice node ai-platform/scripts/local-wif-token.mjs jwk`
+   creates `~/.jeffi/wif-voice/local-issuer.pem` and prints the public JWK (kid `jeffi-local-1`; the sidecar signs with
+   that kid). Keep the PEM private.
+2. **Issuer.** Anthropic Console, then Settings, Workload identity federation: add an issuer with URL
+   `https://wif-voice.jeffistores.in`, an inline JWKS of `{"keys":[<the JWK from step 1>]}`.
+3. **Federation rule.** Add a rule for that issuer: subject exactly `jeffi-voice-service`, audience
+   `https://api.anthropic.com`, target the **flagship workspace's service account** (the platform row in
+   `ai_provider_identities`, tenant `00000000-0000-0000-0000-000000000000`). The rule must be enabled for that
+   workspace. The service account must already have API access there.
+4. **Ids.** The controller serves the platform row of `ai_provider_identities` (the gateway's rule, which trusts the
+   Razer and local issuers, not this one), so give voice-service its own ids in the `voice-service` Secret:
+   `ANTHROPIC_FEDERATION_RULE_ID` (the rule from step 3) and, if they differ from the platform row,
+   `ANTHROPIC_SERVICE_ACCOUNT_ID` and `ANTHROPIC_WORKSPACE_ID`. Env wins over the controller's ids; do not edit the
+   platform row, the gateway uses it. Set `ANTHROPIC_ORGANIZATION_ID` there too (and on the controller, for the
+   admin readiness check).
+5. **Secret.** `kubectl -n jeffi create secret generic voice-service ... --from-file=wif-issuer.pem=$HOME/.jeffi/wif-voice/local-issuer.pem`
+   (or `kubectl patch`/re-create the existing Secret so it keeps `SERVICE_AUTH_SECRET` and `VOICE_WS_KEY`). Optionally add
+   `ANTHROPIC_ORGANIZATION_ID` to it as the env fallback.
+6. Set `replicas: 1` and release. The sidecar log line `wif token renewed` confirms the key is mounted.
 
 ## Local development
 

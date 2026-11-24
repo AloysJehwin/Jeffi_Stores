@@ -615,11 +615,11 @@ function VoiceAi({ data, disabled, saveVoice, reload }: { data: Data; disabled: 
           <SecretGroup
             provider="anthropic_voice"
             title="Anthropic API key"
-            help="Optional. console.anthropic.com → API keys."
+            help="Optional: only if federation isn't set up. console.anthropic.com → API keys."
             fields={[{ key: 'apiKey', label: 'API key' }]}
             statuses={{ apiKey: v.anthropic.apiKey }}
             stored={v.anthropic.source === 'stored'}
-            fallback={v.anthropic.source === 'env' ? 'Using the ANTHROPIC_API_KEY environment key.' : 'Not set: voice-service has no Claude key.'}
+            fallback={v.anthropic.federation ? 'Using workload identity federation; no key needed.' : v.anthropic.source === 'env' ? 'Using the ANTHROPIC_API_KEY environment key.' : 'Not set: voice-service has no Claude key.'}
             disabled={disabled}
             onChanged={reload}
           />
