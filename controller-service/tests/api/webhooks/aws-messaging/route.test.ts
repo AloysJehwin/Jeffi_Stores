@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   onCustomer: vi.fn(),
   adminRoute: vi.fn(),
   resolveInbound: vi.fn(),
+  outreach: vi.fn(),
 }))
 
 vi.mock('@controller/lib/shared/messaging/sns', () => ({ verifySns: m.verify, confirmSnsSubscription: m.confirm }))
@@ -21,6 +22,7 @@ vi.mock('@controller/lib/support/inbound', () => ({ handleInboundWhatsApp: m.inb
 vi.mock('@/lib/support/agent', () => ({ onCustomerMessage: m.onCustomer }))
 vi.mock('@controller/lib/admin-agent/whatsapp', () => ({ routeAdminWhatsApp: m.adminRoute }))
 vi.mock('@controller/lib/messaging/inbound-number', () => ({ resolveInbound: m.resolveInbound }))
+vi.mock('@controller/lib/outreach/inbound', () => ({ routeOutreachWhatsApp: m.outreach }))
 
 import { POST } from '@controller/app/api/(public)/webhooks/aws-messaging/route'
 import { POST as STATUS_POST } from '@controller/app/api/(public)/webhooks/aws-messaging/status/route'
@@ -39,6 +41,7 @@ describe('POST /api/webhooks/aws-messaging', () => {
     m.runWith.mockImplementation((_ctx: unknown, fn: () => unknown) => fn())
     m.resolveInbound.mockResolvedValue({ tenantId: null, audience: 'customer', separateAdminNumber: false })
     m.adminRoute.mockResolvedValue(false)
+    m.outreach.mockResolvedValue(false)
     m.inbound.mockResolvedValue({ session: { id: 's-1' }, message: { id: 'm-1' } })
   })
 
@@ -85,6 +88,31 @@ describe('POST /api/webhooks/aws-messaging', () => {
     await POST(req(env(waEvent({ messages: [TEXT_MSG] }))))
     expect(m.adminRoute).toHaveBeenCalled()
     expect(m.inbound).not.toHaveBeenCalled()
+  })
+
+  it('an active outreach contact on the flagship number is handled there, before the admin agent and the shopper bot', async () => {
+    m.outreach.mockResolvedValue(true)
+    await POST(req(env(waEvent({ messages: [TEXT_MSG] }))))
+    expect(m.outreach).toHaveBeenCalledWith({ from: '+919876543210', text: 'hello', providerMessageId: 'wamid.1', hasMedia: false })
+    expect(m.adminRoute).not.toHaveBeenCalled()
+    expect(m.inbound).not.toHaveBeenCalled()
+    expect(m.onCustomer).not.toHaveBeenCalled()
+  })
+
+  it('a sender outreach does not know goes on to support chat', async () => {
+    await POST(req(env(waEvent({ messages: [TEXT_MSG] }))))
+    expect(m.outreach).toHaveBeenCalled()
+    expect(m.inbound).toHaveBeenCalled()
+  })
+
+  it("never consults outreach for a store's number or the ecom number", async () => {
+    m.lookup.mockResolvedValue({ tenantId: 't-1' })
+    m.resolveInbound.mockResolvedValue({ tenantId: 't-1', audience: 'customer', separateAdminNumber: false })
+    await POST(req(env(waEvent({ messages: [TEXT_MSG] }))))
+    m.resolveInbound.mockResolvedValue({ tenantId: null, audience: 'ecom', separateAdminNumber: false })
+    await POST(req(env(waEvent({ messages: [TEXT_MSG] }))))
+    expect(m.outreach).not.toHaveBeenCalled()
+    expect(m.inbound).toHaveBeenCalledTimes(2)
   })
 
   it('503s so SNS retries when handling throws', async () => {
