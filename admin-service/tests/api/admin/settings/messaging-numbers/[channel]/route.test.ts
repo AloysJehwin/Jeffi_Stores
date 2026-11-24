@@ -60,6 +60,18 @@ describe('/api/admin/settings/messaging-numbers/[channel]', () => {
       expect(ts.saveTenantSender).not.toHaveBeenCalled()
     })
 
+    it('a store admin gets 403 on every write, including the India DLT sender, and GET returns masked meta only', async () => {
+      vi.mocked(isPlatformAdmin).mockReturnValue(false)
+      expect((await PUT(req('PUT', '', { provider: 'aws', sender: 'JEFFIS', config: { credentials: 'platform' } }), ctx('sms'))).status).toBe(403)
+      expect((await DELETE(req('DELETE'), ctx('sms'))).status).toBe(403)
+      expect(ts.saveTenantSender).not.toHaveBeenCalled()
+      expect(ts.deleteTenantSender).not.toHaveBeenCalled()
+      vi.mocked(isPlatformAdmin).mockReturnValue(true)
+      vi.mocked(ts.listTenantSenders).mockResolvedValue([{ channel: 'sms', audience: 'customer', sender: 'JEFFIS', meta: { credentials: 'platform' } }] as never)
+      const body = JSON.stringify(await (await GET(req('GET'), ctx('sms'))).json())
+      expect(body).not.toMatch(/secret|config_enc/)
+    })
+
     it('returns 403 on a store tenant', async () => {
       vi.mocked(resolveTenantId).mockResolvedValue('store-1' as never)
       expect((await DELETE(req('DELETE'), ctx('sms'))).status).toBe(403)

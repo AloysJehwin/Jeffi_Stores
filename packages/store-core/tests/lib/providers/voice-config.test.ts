@@ -13,6 +13,8 @@ vi.mock('@/lib/tenant-registry', () => ({
     store.delete(`${t}:${p}`)
   }),
 }))
+const identity = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/providers/policy', () => ({ getAnthropicIdentity: identity }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: vi.fn(async () => null) }))
 
 import {
@@ -39,6 +41,8 @@ beforeEach(() => {
   vi.stubEnv('TWILIO_ACCOUNT_SID', '')
   vi.stubEnv('TWILIO_AUTH_TOKEN', '')
   vi.stubEnv('ANTHROPIC_API_KEY', '')
+  vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', '')
+  identity.mockResolvedValue(null)
   settings([])
 })
 afterEach(() => {
@@ -92,7 +96,7 @@ describe('getVoiceConfig', () => {
 
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-env-key-0000')
     c = await getVoiceConfig()
-    expect(c.anthropic).toEqual({ apiKey: 'sk-ant-env-key-0000', source: 'env', configured: true })
+    expect(c.anthropic).toEqual({ apiKey: 'sk-ant-env-key-0000', source: 'env', federation: false, configured: true })
     expect(c.ready).toBe(true)
   })
 
@@ -109,6 +113,34 @@ describe('getVoiceConfig', () => {
 
     await saveVoiceCredential('twilio_voice', { accountSid: 'AC' + 'a'.repeat(32), authToken: 'stored-auth-token-6666' })
     expect((await getVoiceConfig()).twilioTest).toMatchObject({ source: 'stored', authToken: 'stored-auth-token-6666' })
+  })
+})
+
+describe('anthropic federation', () => {
+  const ids = { workspaceId: 'wrkspc_1', serviceAccountId: 'svac_1', federationRuleId: 'fdrl_1' }
+  const org = '11111111-2222-3333-4444-555555555555'
+
+  it('reports the platform identity plus the org id, and counts as configured without a key', async () => {
+    identity.mockResolvedValue(ids)
+    vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
+    const c = await getVoiceConfig()
+    expect(identity).toHaveBeenCalledWith(null)
+    expect(c.anthropicIdentity).toEqual({ organizationId: org, ...ids })
+    expect(c.anthropic).toEqual({ apiKey: null, source: null, federation: true, configured: true })
+    const p = await getVoiceConfigPublic()
+    expect(p.anthropic.federation).toBe(true)
+    expect(JSON.stringify(p)).not.toContain('wrkspc_1')
+  })
+
+  it('is null without the org id or without an identity row; a stored key stays as the fallback', async () => {
+    identity.mockResolvedValue(ids)
+    expect((await getVoiceConfig()).anthropicIdentity).toBeNull()
+    vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
+    identity.mockResolvedValue(null)
+    await saveVoiceCredential('anthropic_voice', { apiKey: 'sk-ant-' + 'x'.repeat(30) })
+    const c = await getVoiceConfig()
+    expect(c.anthropicIdentity).toBeNull()
+    expect(c.anthropic).toMatchObject({ source: 'stored', federation: false, configured: true })
   })
 })
 

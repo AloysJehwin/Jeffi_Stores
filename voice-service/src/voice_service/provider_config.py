@@ -16,11 +16,32 @@ import httpx
 
 from .auth import outbound_token
 from .config import Settings, normalize_number
+from .llm_client import token_file_ok
 from .log import get_logger
 
 log = get_logger("voice.provider_config")
 
 PROVIDER_ALIASES = {"exotel": "exotel", "twilio_test": "twilio", "twilio": "twilio"}
+
+
+@dataclass(frozen=True)
+class AnthropicIdentity:
+    organization_id: str = ""
+    workspace_id: str = ""
+    service_account_id: str = ""
+    federation_rule_id: str = ""
+
+    def absent(self) -> list[str]:
+        need = {
+            "organizationId": self.organization_id,
+            "workspaceId": self.workspace_id,
+            "serviceAccountId": self.service_account_id,
+            "federationRuleId": self.federation_rule_id,
+        }
+        return [f"anthropic.identity.{k}" for k, v in need.items() if not v]
+
+    def any(self) -> bool:
+        return len(self.absent()) < 4
 
 
 @dataclass(frozen=True)
@@ -41,6 +62,8 @@ class VoiceConfig:
     tts_model: str = ""
     voices: dict[str, str] = field(default_factory=dict)
     anthropic_api_key: str = ""
+    anthropic_identity: AnthropicIdentity = field(default_factory=AnthropicIdentity)
+    anthropic_identity_token_file: str = ""
     llm_model: str = ""
     source: str = "env"  # controller | env
 
@@ -48,8 +71,26 @@ class VoiceConfig:
         base = (language or "").split("-")[0].lower()
         return self.voices.get(language) or self.voices.get(base) or ""
 
+    def identity_ready(self) -> bool:
+        """Federation is usable: every id set and the token file present."""
+        return not self.anthropic_identity.absent() and token_file_ok(self.anthropic_identity_token_file)
+
+    def claude_missing(self) -> list[str]:
+        """Empty when federation or a key is usable. A half-configured identity names its gaps."""
+        if self.identity_ready() or self.anthropic_api_key:
+            return []
+        ident = self.anthropic_identity
+        gaps = ident.absent()
+        if not ident.any() and not self.anthropic_identity_token_file:
+            return ["anthropic.identity-or-apiKey"]
+        if not self.anthropic_identity_token_file:
+            gaps.append("anthropic.identityTokenFile")
+        elif not gaps:
+            gaps.append("anthropic.identityTokenFile (file not found)")
+        return gaps
+
     def missing(self) -> list[str]:
-        need: dict[str, str] = {"sarvam.apiKey": self.sarvam_api_key, "anthropic.apiKey": self.anthropic_api_key}
+        need: dict[str, str] = {"sarvam.apiKey": self.sarvam_api_key}
         if self.provider == "exotel":
             need |= {
                 "exotel.accountSid": self.exotel_sid,
@@ -66,7 +107,7 @@ class VoiceConfig:
             }
         else:
             need["voice_provider"] = ""
-        return sorted(k for k, v in need.items() if not v)
+        return sorted([k for k, v in need.items() if not v] + self.claude_missing())
 
 
 def _get(d: Any, *path: str) -> Any:
@@ -97,6 +138,15 @@ def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
         numbers |= {normalize_number(n) for n in remote_numbers if isinstance(n, str) and normalize_number(n)}
     voices_raw = _get(cfg, "sarvam", "voices")
     voices = {k: v for k, v in voices_raw.items() if isinstance(k, str) and _s(v)} if isinstance(voices_raw, dict) else {}
+    ident_raw = r.get("anthropicIdentity") if isinstance(r.get("anthropicIdentity"), dict) else {}
+    # Env wins here (unlike the keys): the pod's own env names a rule that trusts this pod's issuer, while the
+    # controller serves the platform row that the gateway's rule belongs to.
+    identity = AnthropicIdentity(
+        organization_id=env.anthropic_organization_id or _s(_get(ident_raw, "organizationId")),
+        workspace_id=env.anthropic_workspace_id or _s(_get(ident_raw, "workspaceId")),
+        service_account_id=env.anthropic_service_account_id or _s(_get(ident_raw, "serviceAccountId")),
+        federation_rule_id=env.anthropic_federation_rule_id or _s(_get(ident_raw, "federationRuleId")),
+    )
     return VoiceConfig(
         provider=provider,
         exotel_sid=pick(_get(cfg, "exotel", "accountSid"), env.exotel_sid),
@@ -114,6 +164,8 @@ def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
         tts_model=pick(_get(cfg, "sarvam", "ttsModel"), env.tts_model),
         voices=voices,
         anthropic_api_key=pick(_get(sec, "anthropic_voice", "apiKey"), env.anthropic_api_key),
+        anthropic_identity=identity,
+        anthropic_identity_token_file=env.anthropic_identity_token_file,
         llm_model=pick(_get(cfg, "llmModel"), env.llm_model),
         source="controller" if remote else "env",
     )

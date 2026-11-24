@@ -26,7 +26,10 @@ export default function MessagingSenders({
   addon,
   senders,
   entitlement: initial,
+  dltHeaders = [],
 }: {
+  /** The platform's registered DLT headers, for an India SMS (DLT) sender. */
+  dltHeaders?: string[]
   tenantId: string
   storeName: string
   addon: MessagingAddonStatus
@@ -64,6 +67,8 @@ export default function MessagingSenders({
               <SenderCard
                 key={`${g.audience}-${ch}-${find(ch, g.audience)?.updatedAt ?? 'none'}`}
                 url={url(ch, g.audience)}
+                dltHeaders={dltHeaders}
+                checkUrl={`/api/admin/ecom/${tenantId}/messaging-senders/check-sender-id`}
                 channel={ch}
                 audience={g.audience}
                 initial={find(ch, g.audience)}

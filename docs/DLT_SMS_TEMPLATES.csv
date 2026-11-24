@@ -1,0 +1,41 @@
+slug,category,header,header_note,dlt_body,cta_domains,length,encoding,segments
+order/confirmed,Service-Implicit,JEFFIS,,{#var#}: Order #{#var#} confirmed. Rs. {#var#}. Track {#url#},jeffistores.in,69,GSM-7,1
+order/shipped,Service-Implicit,JEFFIS,,{#var#}: #{#var#} shipped via {#var#}. AWB {#var#}. {#url#},jeffistores.in,69,GSM-7,1
+order/out-for-delivery,Service-Implicit,JEFFIS,,{#var#}: Order #{#var#} is out for delivery today. Please keep your phone reachable.,,88,GSM-7,1
+order/delivered,Service-Implicit,JEFFIS,,{#var#}: #{#var#} delivered. Review: {#url#},jeffistores.in,50,GSM-7,1
+order/cancelled,Service-Implicit,JEFFIS,,{#var#}: Order #{#var#} is cancelled. Any refund reaches you in 5-7 days.,,77,GSM-7,1
+otp/verify,Transactional,JEFFIS,,{#var#}: {#var#} is your verification code. Valid for {#var#} min. Do not share.,,86,GSM-7,1
+otp/login,Transactional,JEFFIS,,{#var#}: {#var#} is your login code. Valid for {#var#} min. Do not share.,,79,GSM-7,1
+cart/abandoned,Service-Explicit,JEFFIS,,{#var#}: You left items in your cart. Complete your order: {#url#},jeffistores.in,70,GSM-7,1
+promo/offer,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,{#var#}: {#var#}% off storewide with {#var#}. Valid till {#var#}. {#url#},jeffistores.in,83,GSM-7,1
+winback,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: We miss you! {#var#}% off, code {#var#}. {#url#}",jeffistores.in,65,GSM-7,1
+restock,Service-Explicit,JEFFIS,,{#var#}: {#var#} is back in stock. {#url#},jeffistores.in,48,GSM-7,1
+delivery/eta,Service-Implicit,JEFFIS,,{#var#}: #{#var#} arriving {#var#}. Track: {#url#},jeffistores.in,58,GSM-7,1
+order/access-granted,Service-Implicit,JEFFIS,,{#var#}: Access granted for order {#var#}. Open your vault: {#url#},jeffistores.in,73,GSM-7,1
+order/variant-change-requested,Service-Implicit,JEFFIS,,{#var#}: Order {#var#} needs your approval for a variant change. Review: {#url#},jeffistores.in,86,GSM-7,1
+order/payment-failed,Service-Implicit,JEFFIS,,{#var#}: Payment for order {#var#} failed. Retry: {#url#},jeffistores.in,63,GSM-7,1
+campaign/abandoned_cart,Service-Implicit,JEFFIS,,{#var#}: You left {#var#} in your cart. Complete your order before it's gone.,,81,GSM-7,1
+campaign/abandoned_checkout,Service-Implicit,JEFFIS,,{#var#}: You left {#var#} in your cart. Complete your order before it's gone.,,81,GSM-7,1
+campaign/post_purchase,Service-Implicit,JEFFIS,,{#var#}: How was order {#var#}? Share a quick review: {#url#},jeffistores.in,67,GSM-7,1
+campaign/review_reminder,Service-Implicit,JEFFIS,,{#var#}: How was order {#var#}? Share a quick review: {#url#},jeffistores.in,67,GSM-7,1
+campaign/review_request,Service-Implicit,JEFFIS,,{#var#}: How was order {#var#}? Share a quick review: {#url#},jeffistores.in,67,GSM-7,1
+campaign/winback_90,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/winback_180,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/restock,Service-Explicit,JEFFIS,,{#var#}: {#var#} is back in stock. Grab it before it sells out.,,67,GSM-7,1
+campaign/price_drop,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/viewed_product,Service-Explicit,JEFFIS,,{#var#}: Still thinking about {#var#}? Take another look before it's gone.,,78,GSM-7,1
+campaign/viewed_category,Service-Explicit,JEFFIS,,{#var#}: Still thinking about {#var#}? Take another look before it's gone.,,78,GSM-7,1
+campaign/high_value_cart,Service-Implicit,JEFFIS,,{#var#}: You left {#var#} in your cart. Complete your order before it's gone.,,81,GSM-7,1
+campaign/cart_price_drop,Service-Explicit,JEFFIS,,{#var#}: Good news: {#var#} in your cart just dropped in price.,,67,GSM-7,1
+campaign/wishlist_reminder,Service-Explicit,JEFFIS,,{#var#}: Still thinking about {#var#}? Take another look before it's gone.,,78,GSM-7,1
+campaign/review_photo_followup,Service-Explicit,JEFFIS,,{#var#}: Add a photo to your {#var#} review and help other shoppers.,,72,GSM-7,1
+campaign/back_in_stock_wishlist,Service-Explicit,JEFFIS,,{#var#}: {#var#} is back in stock. Grab it before it sells out.,,67,GSM-7,1
+campaign/first_purchase_nudge,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/second_purchase_nudge,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/signup_anniversary,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/replenishment,Service-Explicit,JEFFIS,,{#var#}: Running low on {#var#}? Reorder in a tap.,,54,GSM-7,1
+campaign/subscription_renewal,Service-Explicit,JEFFIS,,{#var#}: Running low on {#var#}? Reorder in a tap.,,54,GSM-7,1
+campaign/loyalty_tier_upgrade,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/loyalty_points_reminder,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/referral_invite,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1
+campaign/birthday,Promotional,NUMERIC-PROMO (not registered),needs a promotional numeric header; or send via WhatsApp/email instead,"{#var#}: {#var#}, use code {#var#}.",,41,GSM-7,1

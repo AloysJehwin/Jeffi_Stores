@@ -17,9 +17,14 @@ import { smsDltEntityId } from './policy.js'
 // shapes as twilio.ts. Env is read per call; a missing id means not configured. A store's own AWS account
 // (tenant_messaging_senders) comes in as `ov` and replaces every env value, including the credentials.
 
+// An India DLT sender ("use the platform's AWS account"): sends with the platform env credentials from ap-south-1,
+// the only region with AWS's local DLT route. No keys are stored on its row.
+export const IN_DLT_REGION = 'ap-south-1'
+export const usesPlatformCredentials = (ov?: SenderOverride) => ov?.config.credentials === 'platform'
+
 const env = (ov?: SenderOverride) => ov
   ? {
-      region: ov.config.region || process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
+      region: usesPlatformCredentials(ov) ? IN_DLT_REGION : ov.config.region || process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
       waPhoneId: ov.config.whatsapp_phone_number_id || '',
       wabaId: ov.config.waba_id || '',
       metaApiVersion: process.env.AWS_WHATSAPP_META_API_VERSION || 'v20.0',
@@ -36,14 +41,20 @@ const env = (ov?: SenderOverride) => ov
       configurationSet: process.env.AWS_SMS_CONFIGURATION_SET || '',
       dltEntityId: '',
     }
+const platformCredentials = () =>
+  process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
+    : undefined
 const credentials = (ov?: SenderOverride) =>
-  ov
+  ov && usesPlatformCredentials(ov)
+    ? platformCredentials()
+    : ov
     ? { accessKeyId: ov.config.access_key_id, secretAccessKey: ov.config.secret_access_key }
     : process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
       ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
       : undefined
 // Per-store clients are kept by account + region so a tenant's sends reuse one connection pool.
-const ovKey = (ov: SenderOverride) => `${env(ov).region}:${ov.config.access_key_id}`
+const ovKey = (ov: SenderOverride) => `${env(ov).region}:${usesPlatformCredentials(ov) ? 'platform' : ov.config.access_key_id}`
 
 export const awsSmsConfigured = () => !!env().smsOrigination
 export const awsWhatsAppConfigured = () => !!env().waPhoneId
@@ -104,17 +115,26 @@ export function indiaDltParams(to: string, entityId: string, templateId?: string
   return Object.keys(p).length ? p : undefined
 }
 
+/** A promotional SMS to India with no promotional DLT header configured: the sender skips and logs it. */
+export class PromoHeaderMissingError extends Error {
+  constructor() { super('promotional_header_missing') }
+}
+
 export async function sendSms(o: { to: string; body: string; messageId: string; tenantId?: string; dltTemplateId?: string | null; dltHeader?: string | null; messageType?: 'TRANSACTIONAL' | 'PROMOTIONAL'; templateSlug?: string | null }, ov?: SenderOverride): Promise<string> {
   const { smsOrigination, configurationSet, dltEntityId } = env(ov)
   if (!smsOrigination) throw notConfigured('AWS_SMS_ORIGINATION')
   const to = normalizePhone(o.to)
+  if (usesPlatformCredentials(ov) && !to.startsWith('+91')) throw new Error('This India DLT sender only sends to +91 numbers')
+  // A promotional SMS never goes out on a Service/Transactional header: it needs its own promotional DLT header.
+  const promoIndia = o.messageType === 'PROMOTIONAL' && to.startsWith('+91')
+  if (promoIndia && !o.dltHeader) throw new PromoHeaderMissingError()
   // Entity id order: sender config, tenant/platform provider setting, then env.
   const entity = dltEntityId || await smsDltEntityId(o.tenantId) || process.env.AWS_SMS_DLT_ENTITY_ID || ''
   const dest = indiaDltParams(to, entity, o.dltTemplateId, o.templateSlug)
   const r = await sendText({
     DestinationPhoneNumber: to,
     // An Indian send uses the template's registered DLT header as the sender id, when it has one.
-    OriginationIdentity: dest && o.dltHeader ? o.dltHeader : smsOrigination,
+    OriginationIdentity: promoIndia ? o.dltHeader! : usesPlatformCredentials(ov) ? smsOrigination : dest && o.dltHeader ? o.dltHeader : smsOrigination,
     MessageBody: o.body,
     MessageType: o.messageType ?? 'TRANSACTIONAL',
     ...(configurationSet ? { ConfigurationSetName: configurationSet } : {}),

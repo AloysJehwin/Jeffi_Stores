@@ -182,15 +182,19 @@ describe('sendMessage', () => {
       expect(awsSend.mock.calls[1][0].input.DestinationCountryParameters).toEqual({ IN_ENTITY_ID: 'PE1', IN_TEMPLATE_ID: 'OVR' })
     })
 
-    it('sends a template without a DLT row, and a marketing category, by its category', async () => {
+    it('skips (and logs) a marketing-category SMS when no promotional DLT header is configured, sending nothing', async () => {
       Object.assign(process.env, env)
       vi.mocked(messagingProvider).mockResolvedValue('aws')
       awsSend.mockResolvedValue({ MessageId: 'aws-sms-3' })
       const tpl: any = v2(null, 'Sale on')
       tpl.family.category = 'marketing'
       vi.mocked(findBySlugWithDefaults).mockResolvedValue(tpl)
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       await sendMessage(ctx, { channel: 'sms', to: '+919999999999', template: 'promo/sale' } as any)
-      expect(awsSend.mock.calls[0][0].input).toMatchObject({ MessageType: 'PROMOTIONAL', OriginationIdentity: 'sender-1', DestinationCountryParameters: { IN_ENTITY_ID: 'PE1' } })
+      expect(awsSend).not.toHaveBeenCalled()
+      expect(warn.mock.calls.map(c => String(c[0])).join('')).toContain('sms_promotional_header_missing')
+      expect(warn.mock.calls.map(c => String(c[0])).join('')).not.toContain('9999999999')
+      warn.mockRestore()
     })
 
     it('sends an aws: template ref as a Cloud API template with the body variables in order', async () => {

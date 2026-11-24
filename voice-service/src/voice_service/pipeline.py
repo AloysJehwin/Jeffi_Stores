@@ -23,6 +23,7 @@ from . import phrases
 from .calls import Call, Outcome
 from .controller import ControllerClient, Session, TranscriptBuffer
 from .conversation import Action, TurnState
+from .llm_client import build_llm_client
 from .log import get_logger
 from .provider_config import VoiceConfig
 from .recording import CallRecorder, RecordingGate, Uploader, store_recording
@@ -330,6 +331,7 @@ def build_pipeline(websocket: Any, rt: CallRuntime, serializer: Any) -> Built:
     tts = SarvamTTSService(api_key=cfg.sarvam_api_key, settings=tts_settings)
     llm = AnthropicLLMService(
         api_key=cfg.anthropic_api_key,
+        client=build_llm_client(cfg),
         settings=AnthropicLLMService.Settings(
             model=cfg.llm_model or s.llm_model,
             system_instruction=session.systemPrompt,

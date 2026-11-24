@@ -165,6 +165,8 @@ Where each id comes from:
 - Sender id: the row's `dlt_header`, else `sms_dlt.default_header`, replaces the origination identity for Indian sends.
 - Message type: the row's `dlt_route` (`promotional` sends as PROMOTIONAL; transactional, service and otp as TRANSACTIONAL); with no row, a marketing/promotional/campaign template category sends as PROMOTIONAL.
 
+**India SMS (DLT) via AWS sender.** An SMS sender of this type (Settings → Numbers for the flagship, Ecom → store → Numbers for a store) is an `aws` row with `credentials: 'platform'`: messaging-service sends with the platform's own AWS credentials from **ap-south-1**, so no keys are stored or shown. Pick a header from the platform's registered headers (`sms_dlt_sender_ids`; shared under Jeffi's entity) or enter the store's own header plus its own entity ID. "Check sender ID" calls `DescribeSenderIds` in ap-south-1 and shows Registered or Not registered; it requests nothing. Only the platform administrator can create, change or remove senders. The DLT sheet to approve before registering templates is `docs/DLT_SMS_TEMPLATES.csv` (`node scripts/dlt-template-sheet.mjs > docs/DLT_SMS_TEMPLATES.csv`). SMS bodies start with the brand, say "Rs." (a rupee sign forces UCS-2: 70 characters a segment) and stay GSM-7.
+
 One-time steps for the founder:
 1. On the Airtel DLT portal, add PE–TM chains for **Karix and Sinch**, AWS's Indian aggregators.
 2. Register transactional sender IDs in the AWS console in **ap-south-1**; promotional ones go through an AWS Support case.

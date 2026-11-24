@@ -8,6 +8,7 @@ import { handleInboundWhatsApp } from '@controller/lib/support/inbound'
 import { onCustomerMessage } from '@/lib/support/agent'
 import { routeAdminWhatsApp } from '@controller/lib/admin-agent/whatsapp'
 import { resolveInbound, type InboundTarget } from '@controller/lib/messaging/inbound-number'
+import { routeOutreachWhatsApp } from '@controller/lib/outreach/inbound'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,6 +77,8 @@ async function handle(params: Record<string, string>, target: InboundTarget): Pr
       await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media, audience: 'ecom' })
       return
     }
+    // An owner the outreach program is talking to (flagship customer number): handled there, never by the shopper bot.
+    if (!target.tenantId && (await routeOutreachWhatsApp({ from, text: body, providerMessageId: sid, hasMedia: media.length > 0 }))) return
     // On a shared number an admin's verified mobile still reaches the assistant, where the store has it on.
     if (await routeAdminWhatsApp({ providerSid: sid, from, to, text: body, hasMedia: media.length > 0, repliedToSid, receivedOn: 'customer', separateAdminNumber: target.separateAdminNumber })) return
     const r = await handleInboundWhatsApp({ provider: 'twilio', providerSid: sid, from, to, text: body, profileName: params.ProfileName || null, media })

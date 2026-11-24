@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { controlPlanePool, deleteIntegrationCredential, getIntegrationCredential, saveIntegrationCredential } from '@/lib/tenant-registry'
 import { decryptToken, encryptToken } from '@/lib/crypto/token-cipher'
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
+import { getAnthropicIdentity } from './policy'
 import { VOICE_PROVIDERS, mergeVoiceSettings, type VoiceProviderName, type VoiceSettings } from './voice-settings'
 
 // Outreach voice config: non-secret settings from platform_provider_settings (platform default rows
@@ -34,6 +35,13 @@ type Creds = { [P in VoiceCredentialProvider]: z.infer<(typeof VOICE_CREDENTIAL_
 export const isVoiceCredentialProvider = (v: unknown): v is VoiceCredentialProvider =>
   VOICE_CREDENTIAL_PROVIDERS.includes(v as VoiceCredentialProvider)
 
+export interface AnthropicVoiceIdentity {
+  organizationId: string
+  workspaceId: string
+  serviceAccountId: string
+  federationRuleId: string
+}
+
 export interface SecretStatus {
   configured: boolean
   last4: string | null
@@ -50,7 +58,9 @@ export interface VoiceConfig extends Omit<VoiceSettings, 'exotel' | 'sarvam'> {
     configured: boolean
   }
   sarvam: VoiceSettings['sarvam'] & { apiKey: string | null; configured: boolean }
-  anthropic: { apiKey: string | null; source: 'stored' | 'env' | null; configured: boolean }
+  anthropic: { apiKey: string | null; source: 'stored' | 'env' | null; federation: boolean; configured: boolean }
+  /** Workload-identity federation for Claude (the platform's ai_provider_identities row + ANTHROPIC_ORGANIZATION_ID). Preferred over the key. */
+  anthropicIdentity: AnthropicVoiceIdentity | null
   /** The chosen call provider, Sarvam and Claude all have what they need. */
   ready: boolean
 }
@@ -65,7 +75,7 @@ export interface VoiceConfigPublic extends Omit<VoiceSettings, 'exotel' | 'sarva
     configured: boolean
   }
   sarvam: VoiceSettings['sarvam'] & { apiKey: SecretStatus; configured: boolean }
-  anthropic: { apiKey: SecretStatus; source: 'stored' | 'env' | null; configured: boolean }
+  anthropic: { apiKey: SecretStatus; source: 'stored' | 'env' | null; federation: boolean; configured: boolean }
   ready: boolean
 }
 
@@ -99,12 +109,13 @@ async function readSettings(): Promise<{ provider: VoiceProviderName; settings: 
 
 /** Non-secret settings over the defaults, the decrypted secrets, and whether each part is usable. */
 export async function getVoiceConfig(): Promise<VoiceConfig> {
-  const [{ provider, settings }, exotel, sarvam, twilio, anthropic] = await Promise.all([
+  const [{ provider, settings }, exotel, sarvam, twilio, anthropic, identity] = await Promise.all([
     readSettings(),
     readStored('exotel'),
     readStored('sarvam'),
     readStored('twilio_voice'),
     readStored('anthropic_voice'),
+    getAnthropicIdentity(null),
   ])
 
   const ex = settings.exotel
@@ -123,6 +134,8 @@ export async function getVoiceConfig(): Promise<VoiceConfig> {
   const sarvamReady = !!sarvam.value.apiKey
   const envClaude = process.env.ANTHROPIC_API_KEY || null
   const claudeKey = anthropic.value.apiKey || envClaude
+  const organizationId = process.env.ANTHROPIC_ORGANIZATION_ID?.trim() || ''
+  const anthropicIdentity: AnthropicVoiceIdentity | null = identity && organizationId ? { organizationId, ...identity } : null
   const claudeSource = anthropic.value.apiKey ? ('stored' as const) : envClaude ? ('env' as const) : null
 
   return {
@@ -131,8 +144,9 @@ export async function getVoiceConfig(): Promise<VoiceConfig> {
     exotel: { ...ex, apiKey: exotel.value.apiKey ?? null, apiToken: exotel.value.apiToken ?? null, configured: exotelReady },
     twilioTest: { ...settings.twilioTest, ...tw, configured: twilioReady },
     sarvam: { ...settings.sarvam, apiKey: sarvam.value.apiKey ?? null, configured: sarvamReady },
-    anthropic: { apiKey: claudeKey, source: claudeSource, configured: !!claudeKey },
-    ready: (provider === 'exotel' ? exotelReady : twilioReady) && sarvamReady && !!claudeKey,
+    anthropic: { apiKey: claudeKey, source: claudeSource, federation: !!anthropicIdentity, configured: !!claudeKey || !!anthropicIdentity },
+    anthropicIdentity,
+    ready: (provider === 'exotel' ? exotelReady : twilioReady) && sarvamReady && (!!claudeKey || !!anthropicIdentity),
   }
 }
 
@@ -169,7 +183,12 @@ export async function getVoiceConfigPublic(): Promise<VoiceConfigPublic> {
       configured: c.sarvam.configured,
     },
     llmModel: c.llmModel,
-    anthropic: { apiKey: status(c.anthropic.apiKey, c.anthropic.source === 'env'), source: c.anthropic.source, configured: c.anthropic.configured },
+    anthropic: {
+      apiKey: status(c.anthropic.apiKey, c.anthropic.source === 'env'),
+      source: c.anthropic.source,
+      federation: c.anthropic.federation,
+      configured: c.anthropic.configured,
+    },
     ready: c.ready,
   }
 }
