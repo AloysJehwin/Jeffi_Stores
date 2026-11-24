@@ -14,9 +14,8 @@ vi.mock('next/dynamic', () => ({
     },
 }))
 vi.mock('@/hooks/useStoreFlags', () => ({ updateChannelsLabel: (c: any) => `via-${c}`, useMessagingChannels: () => 'whatsapp' }))
-// Specifiers split so the component-tests check doesn't count a stub as coverage of the media components.
-vi.mock('@/components/media/' + 'MediaItemView', () => ({ DocumentList: ({ items, title }: any) => <div data-testid="docs">{`${title}:${items.length}`}</div> }))
-vi.mock('@/components/media/' + 'ProductMediaGallery', () => ({ default: ({ items }: any) => <div data-testid="media">{`media:${items.length}`}</div> }))
+vi.mock('@/components/media/MediaItemView',  () => ({ DocumentList: ({ items, title }: any) => <div data-testid="docs">{`${title}:${items.length}`}</div> }))
+vi.mock('@/components/media/ProductMediaGallery',  () => ({ default: ({ items }: any) => <div data-testid="media">{`media:${items.length}`}</div> }))
 vi.mock('@/components/visitor/ProductImageGallery', () => ({
   default: ({ images, productName, discountPct }: any) => <div data-testid="gallery">{`${productName}:${images.length}:${discountPct}`}</div>,
 }))

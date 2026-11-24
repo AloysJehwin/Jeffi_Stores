@@ -21,10 +21,9 @@ vi.mock('@/contexts/StoreConfigContext', () => ({ useStoreConfig: () => cfg }))
 vi.mock('@/lib/tenancy/forms-host', () => ({ documentUrlForLocation: (kind: string, _loc: any, token: string) => `https://docs.test/${kind}/${token}` }))
 vi.mock('@/components/visitor/AccountMobileHeader', () => ({ default: () => <div data-testid="mobile-header" /> }))
 vi.mock('@/components/visitor/CustomSelect', () => ({ default: () => <div data-testid="select" /> }))
-// Specifiers split so the component-tests check doesn't count a stub as coverage of these shared components.
-vi.mock('@/components/' + 'DelhiveryTracking',() => ({ default: ({ trackPath }: any) => <div data-testid="tracking">{trackPath ?? 'fwd'}</div> }))
+vi.mock('@/components/DelhiveryTracking', () => ({ default: ({ trackPath }: any) => <div data-testid="tracking">{trackPath ?? 'fwd'}</div> }))
 vi.mock('@/components/shared/ProductWarningBadges', () => ({ default: () => null }))
-vi.mock('@/components/shared/' + 'OrderAddressChange',() => ({ default: () => <div data-testid="address-change" /> }))
+vi.mock('@/components/shared/OrderAddressChange', () => ({ default: () => <div data-testid="address-change" /> }))
 vi.mock('@/components/visitor/skeletons/account', () => ({ OrderDetailSkeleton: () => <div role="status">loading order</div> }))
 vi.mock('@storefront/app/(storefront)/account/orders/[id]/ReviewModal', () => ({
   default: ({ onClose }: any) => (

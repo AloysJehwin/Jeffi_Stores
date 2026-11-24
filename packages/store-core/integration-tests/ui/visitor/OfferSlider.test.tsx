@@ -35,8 +35,7 @@ vi.mock('@/components/visitor/slides/PromoCard', () => ({
     </a>
   ),
 }))
-// Specifier split so the component-tests check doesn't count a stub as coverage of BannerSides.
-vi.mock('@/components/visitor/home/' + 'BannerSides',() => ({
+vi.mock('@/components/visitor/home/BannerSides', () => ({
   default: ({ sides, children }: any) => <div data-sides={sides}>{children}</div>,
 }))
 vi.mock('@/lib/catalog/product-offers-shared', () => ({ offerHref: (slug: string) => `/offers/${slug}` }))
