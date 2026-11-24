@@ -645,6 +645,8 @@ jobs:
       SKIP_DB_CHECK: true
       UI_BASE_URL: http://localhost:3000
       SITE_EDITOR_E2E: '1'
+      # The AI spec's stand-in gateway (tests/site-editor/ai-mock.ts), which it starts on this port.
+      AI_GATEWAY_URL: http://localhost:8098
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
