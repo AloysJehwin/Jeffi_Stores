@@ -65,7 +65,7 @@ class Settings:
     # Turn-taking knobs (README: latency tuning).
     vad_start_s: float = 0.2
     turn_silence_s: float = 0.48
-    turn_max_wait_s: float = 3.0
+    turn_max_wait_s: float = 2.0
     greeting_delay_s: float = 0.4
     filler_after_s: float = 1.8
     dead_air_s: float = 3.0
@@ -143,7 +143,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         tts_model=e.get("VOICE_TTS_MODEL", "") or "bulbul:v3",
         vad_start_s=_num(e, "VOICE_VAD_START_S", 0.2),
         turn_silence_s=_num(e, "VOICE_TURN_SILENCE_S", 0.48),
-        turn_max_wait_s=_num(e, "VOICE_TURN_MAX_WAIT_S", 3.0),
+        turn_max_wait_s=_num(e, "VOICE_TURN_MAX_WAIT_S", 2.0),
         greeting_delay_s=_num(e, "VOICE_GREETING_DELAY_S", 0.4),
         filler_after_s=_num(e, "VOICE_FILLER_AFTER_S", 1.8),
         dead_air_s=_num(e, "VOICE_DEAD_AIR_S", 3.0),
