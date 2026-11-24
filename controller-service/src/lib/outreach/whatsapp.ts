@@ -114,6 +114,7 @@ async function saveOut(contactId: string, slug: string | null, body: string, pro
   return r.rows[0].id
 }
 
+const CLAIM_MASK = '[claim link]'
 const URL_RE = /^https?:\/\/\S+$/i
 
 /** One approved outreach template, in the contact's language, with its URL button. */
@@ -128,11 +129,16 @@ export async function sendOutreachTemplate(contactId: string, input: TemplateSen
 
   const slug = templateSlug(input.template, contact.language)
   const variables = templateVariables(contact, input)
-  const base = { template: input.template, slug, to: contact.phone, language: templateLanguage(contact.language), variables, button_url: input.url }
+  // The claim link is a bearer credential: never stored readable in events (or messages in production).
+  const claim = input.template === 'claim'
+  const shown = claim ? CLAIM_MASK : input.url
+  const base = { template: input.template, slug, to: contact.phone, language: templateLanguage(contact.language), variables, button_url: shown, ...(claim ? { claimLinkSent: true } : {}) }
 
   if (captureMode()) {
-    const body = `[${slug}] ${Object.entries(variables).map(([k, v]) => `{{${k}}}=${v}`).join(' · ')} → ${input.url}`
-    const messageId = await saveOut(contact.id, slug, body, null, 'captured')
+    const head = `[${slug}] ${Object.entries(variables).map(([k, v]) => `{{${k}}}=${v}`).join(' · ')} → `
+    const body = head + shown
+    // Outside production the captured message keeps the real link: the E2E harness needs it for the claim step.
+    const messageId = await saveOut(contact.id, slug, claim && process.env.NODE_ENV !== 'production' ? head + input.url : body, null, 'captured')
     await recordEvent(contact.id, 'whatsapp_out', { actor, callId: input.callId, data: { ...base, body, message_id: messageId, mode: 'captured' } })
     return { ok: true, mode: 'captured', messageId, providerMessageId: null }
   }
@@ -142,7 +148,7 @@ export async function sendOutreachTemplate(contactId: string, input: TemplateSen
     asPlatform: true, audience: 'customer', reference: `outreach:${contact.id}`,
   })
   const ok = res.status !== 'failed' && res.status !== 'skipped'
-  const body = res.body || `[${slug}]`
+  const body = claim ? (res.body || `[${slug}]`).split(input.url).join(CLAIM_MASK) : res.body || `[${slug}]`
   const messageId = await saveOut(contact.id, slug, body, res.providerSid ?? null, ok ? res.status || 'sent' : 'failed')
   await recordEvent(contact.id, 'whatsapp_out', {
     actor, callId: input.callId,
@@ -225,18 +231,23 @@ export interface CapturedWhatsApp {
 
 /** What test mode captured instead of sending, oldest first (the E2E harness reads this). */
 export async function readCapturedWhatsApp(opts: { contactId?: string; phone?: string; since?: Date } = {}): Promise<CapturedWhatsApp[]> {
-  const where = [`kind = 'whatsapp_out'`, `data->>'mode' = 'captured'`]
+  const where = [`e.kind = 'whatsapp_out'`, `e.data->>'mode' = 'captured'`]
   const params: unknown[] = []
   const add = (sql: string, v: unknown) => {
     params.push(v)
     where.push(sql.replace('?', `$${params.length}`))
   }
-  if (opts.contactId) add('contact_id = ?', opts.contactId)
-  if (opts.phone) add(`data->>'to' = ?`, opts.phone)
-  if (opts.since) add('created_at >= ?', opts.since)
-  const r = await outreachPool().query(`SELECT id, contact_id, data, created_at FROM outreach_events WHERE ${where.join(' AND ')} ORDER BY id`, params)
-  return r.rows.map((row: { id: number | string; contact_id: string; data: Record<string, any>; created_at: string | Date }) => {
+  if (opts.contactId) add('e.contact_id = ?', opts.contactId)
+  if (opts.phone) add(`e.data->>'to' = ?`, opts.phone)
+  if (opts.since) add('e.created_at >= ?', opts.since)
+  const r = await outreachPool().query(`SELECT e.id, e.contact_id, e.data, e.created_at, m.body AS message_body
+       FROM outreach_events e LEFT JOIN outreach_messages m ON m.id::text = e.data->>'message_id' WHERE ${where.join(' AND ')} ORDER BY e.id`, params)
+  return r.rows.map((row: { id: number | string; contact_id: string; data: Record<string, any>; created_at: string | Date; message_body?: string | null }) => {
     const d = row.data ?? {}
+    // Claim links are masked in the event; the captured message holds the real one outside production.
+    const masked = d.button_url === CLAIM_MASK
+    const real = masked ? row.message_body?.split('→ ').pop()?.trim() : undefined
+    const link = real && URL_RE.test(real) ? real : null
     return {
       eventId: Number(row.id),
       messageId: d.message_id,
@@ -247,8 +258,8 @@ export async function readCapturedWhatsApp(opts: { contactId?: string; phone?: s
       slug: d.slug ?? null,
       language: d.language ?? null,
       variables: d.variables ?? {},
-      buttonUrl: d.button_url ?? null,
-      body: d.body ?? '',
+      buttonUrl: masked ? link : d.button_url ?? null,
+      body: masked && link ? row.message_body! : d.body ?? '',
       at: new Date(row.created_at).toISOString(),
     }
   })

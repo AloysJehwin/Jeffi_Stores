@@ -47,7 +47,7 @@ export function fakeDb(): FakeDb {
     if (sql.includes('FROM outreach_events')) {
       let rows = db.events.filter(e => e.kind === 'whatsapp_out' && e.data?.mode === 'captured')
       if (sql.includes('contact_id = $1')) rows = rows.filter(e => e.contact_id === p[0])
-      return { rows }
+      return { rows: rows.map(e => ({ ...e, message_body: db.messages.find(m => m.id === e.data?.message_id)?.body ?? null })) }
     }
     throw new Error(`fake db: unexpected SQL ${sql.slice(0, 80)}`)
   })

@@ -91,6 +91,34 @@ describe('sendOutreachTemplate', () => {
     ])
   })
 
+  describe('claim link', () => {
+    const claim = { template: 'claim' as const, url: 'https://ecom.jeffistores.in/claim/tok.secret' }
+
+    it('is masked in the event; captured outside production keeps it for the harness', async () => {
+      await sendOutreachTemplate(CONTACT.id, claim)
+      expect(db.events[0].data).toMatchObject({ button_url: '[claim link]', claimLinkSent: true })
+      expect(JSON.stringify(db.events)).not.toContain('tok.secret')
+      expect(db.messages[0].body).toContain(claim.url)
+      expect(await readCapturedWhatsApp({ contactId: CONTACT.id })).toEqual([expect.objectContaining({ buttonUrl: claim.url })])
+    })
+
+    it('is masked in the stored message in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('OUTREACH_TEST_MODE', '1')
+      await sendOutreachTemplate(CONTACT.id, claim)
+      expect(db.messages[0].body).toContain('[claim link]')
+      expect(JSON.stringify([db.events, db.messages])).not.toContain('tok.secret')
+    })
+
+    it('is masked in the event and message when really sent', async () => {
+      vi.stubEnv('OUTREACH_TEST_MODE', '0')
+      h.sendByTemplate.mockResolvedValue({ status: 'sent', providerSid: 'SM1', body: `Hi ${claim.url}` })
+      await sendOutreachTemplate(CONTACT.id, claim)
+      expect(h.sendByTemplate).toHaveBeenCalledWith(expect.objectContaining({ buttonUrl: claim.url }))
+      expect(JSON.stringify([db.events, db.messages])).not.toContain('tok.secret')
+    })
+  })
+
   it('sends as the platform from the customer number with the link button outside test mode', async () => {
     vi.stubEnv('OUTREACH_TEST_MODE', '0')
     db.contact!.language = 'hi'
