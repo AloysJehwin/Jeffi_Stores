@@ -102,7 +102,7 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, preheader: live.preheader ?? null, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
+    return { subject: live.subject, preheader: live.preheader ?? null, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, dlt: t.variant.dlt ?? undefined, category: t.family.category ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
   }
   return null
 }
@@ -204,6 +204,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let subject = req.subject ?? null
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
+  let dlt: { templateId?: string; header?: string; messageType: 'TRANSACTIONAL' | 'PROMOTIONAL' } = { templateId: req.dlt_template_id, messageType: 'TRANSACTIONAL' }
   let layout: 'store' | 'none' = req.layout ?? 'store'
   let preheader: string | null = null
   let mediaHosted = false
@@ -218,6 +219,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     body = t.body
     preheader = t.preheader
     providerRef = providerRef ?? t.provider_ref ?? undefined
+    dlt = { templateId: dlt.templateId ?? t.dlt?.dlt_template_id, header: t.dlt?.dlt_header || undefined, messageType: aws.smsMessageType(t.dlt?.dlt_route, t.category) }
     layout = req.layout ?? ((t as any).layout === 'none' ? 'none' : 'store')
     if (req.channel === 'whatsapp') {
       // Slots follow the approved body: its own {{n}}, then {{brand_name}}, then header and button.
@@ -233,7 +235,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, preheader: preheader ? render(preheader, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, waHeader, layout, mediaHosted }
+  return { subject: subject ? render(subject, vars) : null, preheader: preheader ? render(preheader, vars) : null, body: render(body, vars, html), providerRef, dlt, vars, waVars, waHeader, layout, mediaHosted }
 }
 
 // The store's Site Controls switches (feature_sms_enabled / feature_whatsapp_enabled) have the last word on
@@ -322,7 +324,7 @@ async function outboundSender(ctx: Ctx, channel: 'sms' | 'whatsapp', audience: S
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
   await ensurePricing()
-  const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
+  const { subject, preheader, body, providerRef, dlt, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
   // A sender row (number + credentials) when one applies; the platform env otherwise.
   const sender = req.channel === 'email'
@@ -370,7 +372,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
       // The store's own sender names its provider; else the tenant's provider policy decides, and a tenant on
       // AWS never falls back to Twilio.
       provider = sender?.provider ?? await messagingProvider(ctx.tenantId, 'sms')
-      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id }, sender ?? undefined) : await sendSms({ to: req.to, body, messageId: id }, sender ?? undefined)
+      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id, tenantId: ctx.tenantId, dltTemplateId: dlt.templateId, dltHeader: dlt.header, messageType: dlt.messageType, templateSlug: req.template }, sender ?? undefined) : await sendSms({ to: req.to, body, messageId: id }, sender ?? undefined)
     } else {
       // A raw content SID (no template) gets the caller's numbered variables as given.
       const variables = waVars ?? Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))

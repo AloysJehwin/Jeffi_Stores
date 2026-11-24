@@ -8,7 +8,7 @@
 import type { UpsertInput } from '../src/templates-v2.js'
 import campaignCatalog from './campaign-catalog.json' with { type: 'json' }
 
-export type TemplateSeed = Omit<UpsertInput, 'publish'> & { tags?: string[] }
+export type TemplateSeed = Omit<UpsertInput, 'publish' | 'dlt_template_id'> & { tags?: string[]; /** SMS: India DLT content template id. */ dltTemplateId?: string }
 
 // Short helpers to keep the catalog readable.
 const email = (slug: string, name: string, category: string, subject: string, preheader: string, body: string, tags?: string[]): TemplateSeed =>
@@ -34,8 +34,8 @@ const order = (scenario: string) => ['page:order', `scenario:order.${scenario}`]
 /** Order details the order page fills in for its templates, on top of the store and customer ones. */
 export const ORDER_PAGE_VARS = ['order_number', 'order_date', 'total', 'order_url', 'tracking_url', 'courier', 'awb', 'expected_delivery', 'refund_amount', 'payment_url', 'item_name', 'delivery_address']
 
-const sms = (slug: string, name: string, category: string, body: string, tags?: string[]): TemplateSeed =>
-  ({ slug, channel: 'sms', name, category, body, blocks_format: 'sms-text', tags })
+const sms = (slug: string, name: string, category: string, body: string, tags?: string[], dltTemplateId?: string): TemplateSeed =>
+  ({ slug, channel: 'sms', name, category, body, blocks_format: 'sms-text', tags, ...(dltTemplateId ? { dltTemplateId } : {}) })
 
 // samples = Meta approval sample values per {{n}} (required before submission).
 const wa = (slug: string, name: string, category: string, body: string, metaCategory: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION', samples?: Record<string, string>, tags?: string[]): TemplateSeed =>

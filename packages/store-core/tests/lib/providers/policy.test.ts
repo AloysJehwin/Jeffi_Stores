@@ -26,6 +26,18 @@ beforeEach(() => {
   getFeatureFlags.mockResolvedValue({ smsProvider: 'twilio', whatsappProvider: 'twilio' })
 })
 
+describe('sms_dlt_entity_id setting', () => {
+  it('tenant row beats platform default; blank or oversized values are ignored', async () => {
+    query.mockResolvedValue(rows([{ tenant_id: null, key: 'sms_dlt_entity_id', value: 'PLAT' }, { tenant_id: T, key: 'sms_dlt_entity_id', value: ' TEN ' }]))
+    const p = await getProviderPolicy(T)
+    expect(p.smsDltEntityId).toBe('TEN')
+    expect(p.source.sms_dlt_entity_id).toBe('tenant')
+    expect(normalizeProviderValue('sms_dlt_entity_id', '  ')).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_entity_id', 'x'.repeat(41))).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_entity_id', 5)).toBeNull()
+  })
+})
+
 describe('provider policy resolution', () => {
   it('tenant override beats platform default', async () => {
     query.mockResolvedValue(

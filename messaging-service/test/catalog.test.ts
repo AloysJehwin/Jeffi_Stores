@@ -25,3 +25,10 @@ describe('email catalog', () => {
     expect(emails.filter(t => !old.has(t.slug) && !t.tags?.includes('page:order')).map(t => t.slug)).toEqual([])
   })
 })
+
+describe('sms catalog DLT ids', () => {
+  it('carries an optional dltTemplateId on SMS seeds and never on other channels', () => {
+    expect(CATALOG.filter(t => t.channel !== 'sms' && t.dltTemplateId)).toEqual([])
+    expect(CATALOG.every(t => t.dltTemplateId === undefined || /^\d{10,40}$/.test(t.dltTemplateId))).toBe(true)
+  })
+})

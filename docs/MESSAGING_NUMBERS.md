@@ -135,3 +135,18 @@ WhatsApp shows a preview of the first link.
    - flagship: Settings → Numbers
    - each store: Ecom → store → Numbers
 4. WhatsApp templates belong to the WhatsApp Business account. A number on the same account (the flagship's three) shares its approved templates. A store's own account needs its templates approved there.
+
+## India DLT on AWS
+
+Indian SMS must carry the Principal Entity ID and the content template ID. On AWS End User Messaging both go in `DestinationCountryParameters` (`IN_ENTITY_ID`, `IN_TEMPLATE_ID`), and only for +91 numbers. A send with an entity ID but no template ID still goes out (AWS may reject it) and logs one `sms_dlt_template_id_missing` warning naming the template slug, never the number.
+
+Where each id comes from:
+- Entity ID, first match wins: the store sender's `dlt_entity_id`, then the Providers setting `sms_dlt_entity_id` (the store's row, then the platform default), then env `AWS_SMS_DLT_ENTITY_ID`.
+- Template ID, first match wins: the per-send `dlt_template_id`, then the template's `sms_dlt_template` row (set by `dltTemplateId` on a seed catalog SMS entry, the "DLT template ID" field in the SMS template editor, or `dlt_template_id` on the template API).
+- Sender id: the row's `dlt_header`, else `sms_dlt.default_header`, replaces the origination identity for Indian sends.
+- Message type: the row's `dlt_route` (`promotional` sends as PROMOTIONAL; transactional, service and otp as TRANSACTIONAL); with no row, a marketing/promotional/campaign template category sends as PROMOTIONAL.
+
+One-time steps for the founder:
+1. On the Airtel DLT portal, add PE–TM chains for **Karix and Sinch**, AWS's Indian aggregators.
+2. Register transactional sender IDs in the AWS console in **ap-south-1**; promotional ones go through an AWS Support case.
+3. Set the entity ID (`sms_dlt_entity_id` in Providers, or `AWS_SMS_DLT_ENTITY_ID`) and fill each SMS template's DLT template ID.
