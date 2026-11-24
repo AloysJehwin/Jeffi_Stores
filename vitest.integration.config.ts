@@ -7,6 +7,15 @@ import path from 'path'
 // RTL (.tsx) tests now; a Playwright E2E runner is a documented follow-up (see
 // packages/store-core/integration-tests/README.md), not wired here.
 // Alias + env literals mirror vitest.config.ts intentionally — keep them in sync.
+const APP_PROJECTS: [string, string][] = [
+  ['store-core', 'packages/store-core'],
+  ['storefront', 'storefront-service'],
+  ['admin', 'admin-service'],
+  ['business', 'business-service'],
+  ['controller', 'controller-service'],
+  ['showcase', 'showcase-service'],
+]
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
@@ -28,7 +37,9 @@ export default defineConfig({
       DELHIVERY_API_KEY: 'test-delhivery-key',
       GOOGLE_CLIENT_ID: 'test-google-client-id',
     },
-    include: ['{packages/store-core,storefront-service,admin-service,business-service,controller-service}/integration-tests/**/*.test.{ts,tsx}'],
+    // One project per app (and store-core), so CI runs `--project <app>`; with no --project every project runs,
+    // the same files the single glob matched.
+    projects: APP_PROJECTS.map(([name, dir]) => ({ extends: true as const, test: { name, include: [`${dir}/integration-tests/**/*.test.{ts,tsx}`] } })),
     // No coverage block: coverage stays on the unit run so the #524 baseline is untouched.
   },
   resolve: {
@@ -37,6 +48,7 @@ export default defineConfig({
       '@storefront': path.resolve(__dirname, './storefront-service/src'),
       '@admin': path.resolve(__dirname, './admin-service/src'),
       '@business': path.resolve(__dirname, './business-service/src'),
+      '@showcase': path.resolve(__dirname, './showcase-service/src'),
       '@': path.resolve(__dirname, './packages/store-core/src'),
       'server-only': path.resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },
