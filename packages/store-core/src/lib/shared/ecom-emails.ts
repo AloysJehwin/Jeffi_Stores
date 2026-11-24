@@ -85,18 +85,26 @@ function baseHtml(preheader: string, title: string, body: string): string {
   })
 }
 
+/** Removes every match, repeating until none is left (a removal can join the halves of another). */
+function stripAll(s: string, re: RegExp): string {
+  for (let prev = ''; prev !== s; ) {
+    prev = s
+    s = s.replace(re, '')
+  }
+  return s
+}
+
 /** Crude HTML-to-text for the multipart alternative — improves deliverability. */
 function toText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
+  const breaks = stripAll(html, /<style[\s\S]*?<\/style>/gi)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|tr|h1|h2|div|table)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+  return stripAll(breaks, /<[^>]+>/g)
     .replace(/&middot;/g, '·')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .split('\n')
     .map(l => l.trim())
