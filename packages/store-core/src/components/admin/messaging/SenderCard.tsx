@@ -237,7 +237,7 @@ export default function SenderCard({
                 {!sender.meta.dlt_entity_id && (
                   <div className="min-w-0">
                     <dt className="text-xs text-foreground-muted">DLT entity</dt>
-                    <dd className="text-foreground">Jeffi Stores (shared)</dd>
+                    <dd className="text-foreground">Platform (shared)</dd>
                   </div>
                 )}
                 <div className="min-w-0 sm:col-span-2 flex flex-wrap items-center gap-2">
@@ -267,7 +267,7 @@ export default function SenderCard({
             </FormField>
             {inDlt ? (
               <>
-                <FormField label="DLT header" required hint="The platform's registered headers share Jeffi's entity; or bring your own header and entity.">
+                <FormField label="DLT header" required hint="The platform's registered headers share the platform's entity; or bring your own header and entity.">
                   <AdminSelect
                     value={pick}
                     options={[...dltHeaders.map(h => ({ value: h, label: `${h} (platform)` })), { value: OWN_HEADER, label: 'My own header' }]}

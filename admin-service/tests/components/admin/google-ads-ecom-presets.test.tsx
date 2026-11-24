@@ -16,7 +16,7 @@ import { draftFromPreset, newDraft, toSpec } from '@admin/app/(admin)/admin/goog
 import { CampaignSpecSchema, specProblems } from '@/lib/google-ads/campaign-spec'
 import { buildEcomPresets } from '@/lib/google-ads/ecom-presets'
 
-const PRESETS = buildEcomPresets('https://ecom.jeffistores.in')
+const PRESETS = buildEcomPresets('https://ecom.jeffistores.in', 'Jeffi Stores')
 const BOOTSTRAP = {
   store: { name: 'Jeffi Stores', baseUrl: 'https://jeffistores.in', logoUrl: null, currency: 'INR' },
   budget: { revenue30d: 0, orders30d: 0, dailyRevenue: 0, suggestedDaily: 200 },
