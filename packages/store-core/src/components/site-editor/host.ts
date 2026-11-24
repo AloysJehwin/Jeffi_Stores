@@ -54,8 +54,9 @@ export interface SiteEditorHost {
   convertBlock?(block: Block): Promise<AiResult<{ block: Block }>>
   /** Publishes (the host confirms first). */
   publish?(): Promise<void>
-  /** Back to the host's own editor. */
+  /** Back to the host's own editor (saved first), named by `closeLabel`. */
   onClose?(): void
+  closeLabel?: string
   /** A classic block's name (code sections carry their own label). */
   blockLabel?(type: string): string
 }

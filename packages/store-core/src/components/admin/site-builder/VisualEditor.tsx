@@ -62,6 +62,7 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       },
       publish: onPublish,
       onClose,
+      closeLabel: 'Classic editor',
       blockLabel: type => siteRegistry.get(type)?.label ?? type,
       blockLocked: type => !!siteRegistry.get(type)?.locked,
       // A classic block's fields: the forms editor's own inspector.

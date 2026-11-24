@@ -1,7 +1,9 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **phases 0–4 built, phase 5 in progress** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
-per page with Phone/Tablet/Desktop breakpoints (2), a per-tenant rollout flag (8); the rest stay open. This replaces
+Status: **phases 0–5 built** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
+per page with Phone/Tablet/Desktop breakpoints (2), classic blocks kept until converted or redesigned (3), a
+per-tenant rollout flag with the old editors as "Classic editor" (8); fonts and colours (5, 6) run on the defaults
+until decided (see section 6). This replaces
 the form-based block editor with direct manipulation, Canva-style, for Showcase sites and the store's own site.
 AI-generated pages must be editable with it.
 
@@ -125,6 +127,13 @@ AI-generated pages must be editable with it.
    a freshly installed page read as changed by hand (`keep-words.ts` `handEdited` looks for trees), so "Design this
    page again" would ask to keep words nobody wrote. A template section gets its tree the first time the editor saves
    it.
+4. Retired behind the flag (decision 8). With `site_editor_enabled` on, the admin Site Builder opens a draft in the
+   visual editor, with the store/business and page pickers above it; its close button is "Classic editor", which
+   shows the forms (block list, `BlockInspector`, `CodeSectionPanel`'s `literals.ts` fields, templates, theme) marked
+   "Classic editor", with "Visual editor" to go back. The app layout, pages the canvas can't show and new custom pages
+   stay in the classic editor. On a Showcase, "Edit on the page" is the build step's main button; arranging (the
+   section list and the preview's move handles) and the words form come back only with "Classic editor". The editor
+   saves a waiting change when it closes or another page is picked. With the flag off, nothing changes.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
@@ -252,13 +261,22 @@ bridge security (same allowlist, sanitise pasted content).
 
 ## 6. Decisions
 
-1. Flow with free layers (**recommended**) or a pure absolute canvas.
+1. Flow with free layers (**recommended**) or a pure absolute canvas. **Taken: flow with free layers** (phase 3).
 2. One responsive document for desktop and phone web with breakpoints (**recommended**; reverses the 2026-11-15
-   "six separate layouts" decision for web) or separate phone documents.
+   "six separate layouts" decision for web) or separate phone documents. **Taken: one responsive document**; the
+   editor edits the desktop web layout and saves the phone one too while it is the same document.
 3. Legacy homepage sections: keep as classic blocks, convert, or require an AI redesign; and when the old Homepage
-   builder (`settings/homepage`) goes.
-4. The native app home: stays on classic blocks, or out of scope.
-5. Fonts: the theme's pair only, or a per-element choice from `FONT_CHOICES` (at most 3 families).
-6. Colours: theme colours only, or any hex with contrast warnings.
-7. Showcase inline edits to services and reviews: write to content (**recommended**) or freeze as literal text.
-8. Rollout: a per-tenant flag, and how long the old editor stays.
+   builder (`settings/homepage`) goes. **Taken: kept as classic blocks** (single units in the editor, their fields in
+   `BlockInspector`) until converted (six content kinds, on demand) or designed again with AI. When the old Homepage
+   builder goes is still open.
+4. The native app home: stays on classic blocks, or out of scope. **As built: stays on classic blocks** (the app layout
+   is edited in the classic editor).
+5. Fonts: the theme's pair only, or a per-element choice from `FONT_CHOICES` (at most 3 families). **Open**; runs on
+   the theme's pair.
+6. Colours: theme colours only, or any hex with contrast warnings. **Open**; runs on theme scales plus any hex, with
+   the critique's contrast check (phase 4).
+7. Showcase inline edits to services and reviews: write to content (**recommended**) or freeze as literal text. **As
+   built:** words drawn from content stay bound to it (locked in the tree); words typed in the section are literal.
+8. Rollout: a per-tenant flag, and how long the old editor stays. **Taken: the per-tenant `site_editor_enabled` flag**
+   (the flagship's row for all Showcases); with it on, the old editors are the "Classic editor" fallback. How long they
+   stay is open.

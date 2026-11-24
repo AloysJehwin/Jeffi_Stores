@@ -142,7 +142,16 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     clearTimeout(timer.current)
     timer.current = setTimeout(() => void flush(), SAVE_AFTER_MS)
   }, [state, flush])
-  useEffect(() => () => clearTimeout(timer.current), [])
+  // Leaving (another page picked, the host closing it): a change still waiting goes out.
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current)
+      const s = latest.current.state
+      if (!s || s.rev === saved.current.rev) return
+      void saved.current.chain.then(() => (s.rev !== saved.current.rev ? hostRef.current.save(docToSave(s)) : undefined)).catch(() => {})
+    },
+    []
+  )
 
   const flushNow = async () => {
     clearTimeout(timer.current)
@@ -543,7 +552,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onClick={async () => (await flushNow(), hostRef.current.onClose?.())}
               className="inline-flex items-center gap-1.5 px-3 h-9 text-sm rounded-lg border border-border-default text-foreground-secondary"
             >
-              <X className="w-4 h-4" /> Forms editor
+              <X className="w-4 h-4" /> {host.closeLabel ?? 'Close'}
             </button>
           )}
           {host.publish && host.canWrite && (

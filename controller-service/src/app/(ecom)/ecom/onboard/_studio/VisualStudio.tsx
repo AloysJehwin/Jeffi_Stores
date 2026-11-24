@@ -67,6 +67,7 @@ export default function VisualStudio({ session, allowance: initial, onClose }: {
       renderImagePicker: ({ value, disabled, onPick }) =>
         disabled ? null : <ImageField value={value || null} onChange={u => u && onPick(u)} kind="work" label="Upload a picture" siteId={site} className="h-24 w-24" />,
       onClose,
+      closeLabel: 'Done',
     }
   }, [session.id, session.theme, site, onClose, allowance])
 
