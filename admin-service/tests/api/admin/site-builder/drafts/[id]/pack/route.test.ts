@@ -5,7 +5,9 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/site/apply-pack', () => ({ applySitePack: vi.fn() }))
 vi.mock('@/lib/site/store', () => {
   class SiteDocInvalid extends Error {
-    issues = [{ message: 'bad block' }]
+    constructor(readonly issues: { blockId?: string; message: string }[], message = 'Invalid') {
+      super(message)
+    }
   }
   return { SiteDocInvalid }
 })
@@ -68,7 +70,7 @@ describe('POST /api/admin/site-builder/drafts/[id]/pack', () => {
   })
 
   it('returns 400 with the issues when the pack makes an invalid document', async () => {
-    vi.mocked(applySitePack).mockRejectedValue(new SiteDocInvalid('Invalid'))
+    vi.mocked(applySitePack).mockRejectedValue(new SiteDocInvalid([{ message: 'bad block' }]))
     const res = await POST(req({ packId: 'starter' }), ctx)
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Invalid', issues: [{ message: 'bad block' }] })

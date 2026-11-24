@@ -19,7 +19,11 @@ vi.mock('@/lib/integrations/resolve', () => ({ hasOwnDelhiveryToken: mockHasToke
 vi.mock('@/lib/shipping/delhivery', () => ({ verifyDelhiveryToken: mockVerify }))
 vi.mock('@/lib/crypto/token-cipher', () => ({ encryptToken: (s: string) => `enc(${s})` }))
 
-import { GET, PUT } from '@controller/app/api/(ecom)/ecom/delivery-account/route'
+import { GET as rawGET, PUT as rawPUT } from '@controller/app/api/(ecom)/ecom/delivery-account/route'
+
+// the route's gate union types its early return as possibly undefined; it is always a response
+const GET = rawGET as (r: NextRequest) => Promise<Response>
+const PUT = rawPUT as (r: NextRequest) => Promise<Response>
 
 const base = 'https://ecom.jeffistores.in/api/ecom/delivery-account'
 const put = (body: unknown) => new NextRequest(base, { method: 'PUT', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })

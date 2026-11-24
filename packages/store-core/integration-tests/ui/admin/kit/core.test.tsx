@@ -43,7 +43,7 @@ describe('Section / Empty / Banner / Badge', () => {
   })
 
   it('Badge renders its children', () => {
-    render(<Badge tone="success">Live</Badge>)
+    render(<Badge tone="green">Live</Badge>)
     expect(screen.getByText('Live')).toBeInTheDocument()
   })
 })

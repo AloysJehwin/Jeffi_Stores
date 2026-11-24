@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 const lib = vi.hoisted(() => ({ sweepStaleHolds: vi.fn() }))
 vi.mock('@/lib/ai/paid-generation', () => lib)
-const alert = vi.hoisted(() => ({ sendPlatformAlert: vi.fn(async () => {}) }))
+const alert = vi.hoisted(() => ({ sendPlatformAlert: vi.fn<(subject: string, body: string) => Promise<void>>(async () => {}) }))
 vi.mock('@controller/lib/provisioning/alerts', () => alert)
 
 import { POST } from '@controller/app/api/(internal)/cron/ai-hold-sweep/route'

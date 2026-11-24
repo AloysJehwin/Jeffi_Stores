@@ -19,7 +19,7 @@ const ok = (result: string) => fetchMock.mockResolvedValue({ ok: true, json: () 
 describe('AIEnrichButton (corner)', () => {
   it('wraps the field and offers Enrich when it has text', () => {
     render(
-      <AIEnrichButton fieldLabel="Title" value="Cotton shirt" onChange={() => {}} scope="products">
+      <AIEnrichButton fieldLabel="Title" value="Cotton shirt" onChange={() => {}} scope="products:write">
         <input aria-label="title" />
       </AIEnrichButton>
     )
@@ -29,16 +29,16 @@ describe('AIEnrichButton (corner)', () => {
   })
 
   it('is disabled for an empty field unless it may write from scratch', () => {
-    const { rerender } = render(<AIEnrichButton fieldLabel="Title" value="  " onChange={() => {}} scope="products" />)
+    const { rerender } = render(<AIEnrichButton fieldLabel="Title" value="  " onChange={() => {}} scope="products:write" />)
     expect(screen.getByRole('button', { name: 'AI enrich' })).toBeDisabled()
-    rerender(<AIEnrichButton fieldLabel="Title" value="" write onChange={() => {}} scope="products" />)
+    rerender(<AIEnrichButton fieldLabel="Title" value="" write onChange={() => {}} scope="products:write" />)
     expect(screen.getByRole('button', { name: 'AI enrich' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'AI enrich' })).toHaveAttribute('title', 'Write with AI')
   })
 
   it('is hidden when the admin may not use AI', () => {
     aiAllowed = false
-    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products"><input aria-label="t" /></AIEnrichButton>)
+    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products:write"><input aria-label="t" /></AIEnrichButton>)
     expect(screen.queryByRole('button', { name: 'AI enrich' })).toBeNull()
     expect(screen.getByLabelText('t')).toBeInTheDocument()
   })
@@ -46,12 +46,12 @@ describe('AIEnrichButton (corner)', () => {
   it('posts the field, applies the result and offers Undo that restores the original', async () => {
     ok('A better title')
     const onChange = vi.fn()
-    render(<AIEnrichButton fieldLabel="Title" value="Cotton shirt" onChange={onChange} scope="products" context="Men" format={'plain' as any} maxLength={60} variables={['name']} broadcast />)
+    render(<AIEnrichButton fieldLabel="Title" value="Cotton shirt" onChange={onChange} scope="products:write" context="Men" format={'plain' as any} maxLength={60} variables={['name']} broadcast />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('A better title'))
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/admin/ai-enrich-field')
-    expect(JSON.parse(init.body)).toMatchObject({ fieldLabel: 'Title', value: 'Cotton shirt', context: 'Men', scope: 'products', maxLength: 60, variables: ['name'], broadcast: true })
+    expect(JSON.parse(init.body)).toMatchObject({ fieldLabel: 'Title', value: 'Cotton shirt', context: 'Men', scope: 'products:write', maxLength: 60, variables: ['name'], broadcast: true })
     fireEvent.click(await screen.findByRole('button', { name: 'Undo AI enrichment' }))
     expect(onChange).toHaveBeenLastCalledWith('Cotton shirt')
     expect(screen.queryByRole('button', { name: 'Undo AI enrichment' })).toBeNull()
@@ -59,7 +59,7 @@ describe('AIEnrichButton (corner)', () => {
 
   it('uses a custom endpoint and shows the error from the server', async () => {
     fetchMock.mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'Quota used up' }) })
-    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products" endpoint={ECOM_ENRICH_ENDPOINT} />)
+    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products:write" endpoint={ECOM_ENRICH_ENDPOINT} />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     expect(await screen.findByText('Quota used up')).toBeInTheDocument()
     expect(fetchMock.mock.calls[0][0]).toBe(ECOM_ENRICH_ENDPOINT)
@@ -67,7 +67,7 @@ describe('AIEnrichButton (corner)', () => {
 
   it('falls back to a generic message when the call has no result or the network fails', async () => {
     fetchMock.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
-    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products" />)
+    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products:write" />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     expect(await screen.findByText('Enrichment failed')).toBeInTheDocument()
     fetchMock.mockRejectedValueOnce(new Error('offline'))
@@ -76,13 +76,13 @@ describe('AIEnrichButton (corner)', () => {
   })
 
   it('does not call the API for an empty field', () => {
-    render(<AIEnrichButton fieldLabel="Title" value="" onChange={() => {}} scope="products" />)
+    render(<AIEnrichButton fieldLabel="Title" value="" onChange={() => {}} scope="products:write" />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('disables the button while the external busy flag is set', () => {
-    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products" aiBusy />)
+    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products:write" aiBusy />)
     expect(screen.getByRole('button', { name: 'AI enrich' })).toBeDisabled()
   })
 })
@@ -90,7 +90,7 @@ describe('AIEnrichButton (corner)', () => {
 describe('AIEnrichButton (aiFill)', () => {
   it('calls the caller handler instead of the endpoint, even for an empty field', async () => {
     const aiFill = vi.fn().mockResolvedValue(undefined)
-    render(<AIEnrichButton fieldLabel="Title" value="" onChange={() => {}} scope="products" aiFill={aiFill} />)
+    render(<AIEnrichButton fieldLabel="Title" value="" onChange={() => {}} scope="products:write" aiFill={aiFill} />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     await waitFor(() => expect(aiFill).toHaveBeenCalledTimes(1))
     expect(fetchMock).not.toHaveBeenCalled()
@@ -98,7 +98,7 @@ describe('AIEnrichButton (aiFill)', () => {
   })
 
   it('shows an error when the handler throws', async () => {
-    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products" aiFill={() => Promise.reject(new Error('x'))} />)
+    render(<AIEnrichButton fieldLabel="Title" value="x" onChange={() => {}} scope="products:write" aiFill={() => Promise.reject(new Error('x'))} />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     expect(await screen.findByText('AI call failed')).toBeInTheDocument()
   })
@@ -106,20 +106,20 @@ describe('AIEnrichButton (aiFill)', () => {
 
 describe('AIEnrichButton placements', () => {
   it('in-field renders only the sparkle with the anchor class', () => {
-    const { container } = render(<AIEnrichButton fieldLabel="T" value="x" onChange={() => {}} scope="products" placement="in-field" anchorClassName="absolute left-1 top-1" />)
+    const { container } = render(<AIEnrichButton fieldLabel="T" value="x" onChange={() => {}} scope="products:write" placement="in-field" anchorClassName="absolute left-1 top-1" />)
     expect(container.firstElementChild).toHaveClass('absolute', 'left-1', 'top-1')
     expect(screen.getByRole('button', { name: 'AI enrich' })).toBeInTheDocument()
   })
 
   it('inline renders a sibling row and shows its error beneath', async () => {
     fetchMock.mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'Nope' }) })
-    render(<AIEnrichButton fieldLabel="T" value="x" onChange={() => {}} scope="products" placement="inline" />)
+    render(<AIEnrichButton fieldLabel="T" value="x" onChange={() => {}} scope="products:write" placement="inline" />)
     fireEvent.click(screen.getByRole('button', { name: 'AI enrich' }))
     expect(await screen.findByText('Nope')).toBeInTheDocument()
   })
 
   it('multiline fields put the sparkle at the bottom right', () => {
-    const { container } = render(<AIEnrichButton fieldLabel="T" value="x" onChange={() => {}} scope="products" multiline><textarea aria-label="d" /></AIEnrichButton>)
+    const { container } = render(<AIEnrichButton fieldLabel="T" value="x" onChange={() => {}} scope="products:write" multiline><textarea aria-label="d" /></AIEnrichButton>)
     expect(container.querySelector('.bottom-2.right-2')).not.toBeNull()
   })
 })
