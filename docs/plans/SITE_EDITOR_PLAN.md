@@ -71,6 +71,35 @@ AI-generated pages must be editable with it.
    too" (`free-ops.ts` `placedWider`). `lib/site/critique.ts` `offScreenOnPhones` reports (`off_screen`, per element)
    layers placed on phones whose box runs past the section's edges; the owner moves them on Phone (no auto-fix).
 
+**Phase 4 (AI in the editor), in slices**
+1. Change with AI on a selection. `lib/site/studio/selection.ts`: the section printed with its `data-e` ids, the
+   selected ids named, rewritten through `tweakSection`, read back as a tree; `changedIds` tells what it touched. The
+   tweak prompt adds `EDITOR_RULES` for a section the editor opened (keep `data-e`, prefer theme colours, free layers
+   only inside a `relative` section from a breakpoint up). Admin: `POST /api/admin/site-builder/ai/selection`, billed
+   to the store's AI wallet. Showcase: `POST /studio/design/ai`, one AI correction (3 free a day, then ₹20 at the price
+   shown), working on the saved section and saving inside the run, so an unsaved change isn't charged. The editor
+   saves first, applies the reply as one undoable `replace`, and the changed nodes light up after the reload.
+2. Cheap element actions (values, not code). `lib/site/studio/element-ai.ts`: words rewritten, shortened or
+   translated (ten Indian languages and English) through the studio chat; a picture for an image slot's aspect
+   through `pictureFor`, stock first, generated at draft quality otherwise. Admin `POST ai/element` (store AI wallet;
+   stock photos go to the gallery with their credit, so the store's credits line names them). Showcase
+   `POST /studio/design/element` (the day's free AI help, platform-funded); its pictures stay out of any gallery and
+   their credits travel with the page in `settings.credits` (`addCredit`), which the live page and the preview list
+   while the page shows them (`pageCredits`).
+3. Critique on trees. `lib/site/code/tree-critique.ts` (pure): words too pale for their background (theme scales,
+   page/text tokens and hex resolved; 4.5:1, 3:1 for h1–h3), words too long for their slot, pictures without a
+   description, headings out of order across the page (one h1, no skipped level), free layers off a phone's screen.
+   Fixes are design operations (text colour, alt from the nearest heading, the heading's level, the layer brought
+   inside), or an AI shorten. The editor's "Check page" lists them with Show and Fix; `lib/site/critique.ts` reports
+   them for code sections while the editor is on (read from their trees), and its off-screen check now uses the same
+   code.
+4. A redesign over manual edits asks first and offers "keep my words". A page whose code sections carry editor
+   trees counts as changed by hand (`keep-words.ts` `handEdited`; the studio outline says `edited`). "Design this
+   page again" then confirms that it replaces those changes and asks "Keep my words" or "Start fresh": the Showcase
+   studio writes the page's words into the brief (`POST /studio/design/keep-words`, `StudioBrief.keepWords`), the admin
+   page redo passes `keepWords` to `startPageRedo`. The section writer's brief reuses them where they fit; section
+   changes (tweaks) leave them out. The generation rules for editor sections (`EDITOR_RULES`) came with slice 1.
+
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
 all Showcase owners), since their studio runs on the platform.

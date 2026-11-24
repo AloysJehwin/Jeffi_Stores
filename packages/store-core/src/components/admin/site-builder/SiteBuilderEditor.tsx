@@ -365,7 +365,14 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     if (!draftId || !doc || !canWrite) return
     const keys = [key, ...(isLinked && siblingKey ? [siblingKey] : [])]
     const surfaces = [ref.surface, ...(isLinked && siblingRef ? [siblingRef.surface] : [])]
-    const { ok, data } = await api<{ error?: string }>('/api/admin/site-builder/ai/page', { method: 'POST', json: { draftId, ref: { audience: ref.audience, page: ref.page }, surfaces } })
+    // Changed by hand in the visual editor: ask first, and offer to keep the words written on it.
+    let keepWords = false
+    if (visual && Object.values(doc.blocks).some(b => b.type === 'code_section' && !!b.props?.tree)) {
+      const go = await showConfirm({ title: 'Design this page again?', message: 'You changed this page by hand. A new design replaces those changes (Undo brings them back).', confirmText: 'Design again' })
+      if (!go) return
+      keepWords = await showConfirm({ title: 'Keep your words?', message: 'The new design can reuse the words you wrote on this page, or start from fresh copy.', confirmText: 'Keep my words', cancelText: 'Start fresh' })
+    }
+    const { ok, data } = await api<{ error?: string }>('/api/admin/site-builder/ai/page', { method: 'POST', json: { draftId, ref: { audience: ref.audience, page: ref.page }, surfaces, ...(keepWords ? { keepWords: true } : {}) } })
     if (!ok) return showToast(data.error || 'The AI could not start; try again shortly', 'error')
     const label = PAGES.find(p => p.key === ref.page)?.label ?? ref.page
     setPageRedo({ key: `${ref.audience}:${ref.page}`, label, keys, before: Object.fromEntries(keys.filter(k => docs[k]).map(k => [k, docs[k]])), status: 'running' })
@@ -766,6 +773,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         previewUrl={homepagePreviewUrl(audience, token, 'desktop', previewPath)}
         canWrite={canWrite}
         theme={theme}
+        canAi={canAi}
         onClose={closeVisual}
         onPublish={publish}
       />

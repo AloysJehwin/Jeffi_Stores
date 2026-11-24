@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react'
-import type { PageDoc, ThemeTokens } from '@jeffi/site-blocks'
+import type { CodeNode, PageDoc, ThemeTokens } from '@jeffi/site-blocks'
 
 // What a host (the admin Site Builder, the Showcase studio) gives the visual editor for one page. The editor never
 // fetches on its own: loading, saving, the canvas address, picture uploads and publishing are the host's.
 
 export type SaveResult = { ok: true; doc: PageDoc } | { ok: false; error: string }
+export type AiResult<T> = ({ ok: true } & T) | { ok: false; error: string }
+export type ElementAsk =
+  | { kind: 'text'; action: 'rewrite' | 'shorten' | 'translate'; text: string; language?: string; context?: string }
+  | { kind: 'picture'; subject: string; aspect?: string | null }
 
 export interface SiteEditorHost {
   /** Names what is being edited (the toolbar). */
@@ -25,6 +29,18 @@ export interface SiteEditorHost {
   renderImagePicker?(p: { value: string; disabled: boolean; onPick: (url: string) => void }): ReactNode
   /** A classic block the page can't lose (its core block), so it can't be duplicated or removed. */
   blockLocked?(type: string): boolean
+  /**
+   * "Change with AI" on the selection (the section's root, or none, for the whole section): the section's new tree and
+   * the ids it changed. The editor saves before asking; the host charges as its AI does.
+   */
+  changeWithAi?(p: { block: string; label: string; tree: CodeNode; ids: string[]; instruction: string }): Promise<AiResult<{ tree: CodeNode; changed: string[] }>>
+  /** A line under the AI box: what a change costs here. */
+  aiNote?: string
+  /**
+   * Cheap element actions that return values, not code: words rewritten, shortened or translated, or a picture for
+   * an image slot (stock first, with its credit when it is one).
+   */
+  elementAi?(p: ElementAsk): Promise<AiResult<{ text?: string; url?: string; alt?: string | null; credit?: unknown }>>
   /** Publishes (the host confirms first). */
   publish?(): Promise<void>
   /** Back to the host's own editor. */

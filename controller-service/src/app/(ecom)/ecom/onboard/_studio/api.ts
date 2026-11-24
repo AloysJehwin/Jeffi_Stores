@@ -8,6 +8,8 @@ import type { DesignDirection, StudioAnswers, StudioBrief, StudioPlan } from '@/
 
 export interface PageOutline {
   sections: { id: string; label: string }[]
+  /** Changed by hand in the visual editor. */
+  edited?: boolean
 }
 
 export type SessionView = Omit<StudioSession, 'catalog' | 'owner_id' | 'brief' | 'plan' | 'directions' | 'direction' | 'answers' | 'pages'> & {

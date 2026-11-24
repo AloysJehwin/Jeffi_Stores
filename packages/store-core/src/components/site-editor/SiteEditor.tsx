@@ -2,18 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Monitor, Move, Plus, Redo2, Rocket, Smartphone, Tablet, Trash2, Undo2, X } from 'lucide-react'
-import { insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
+import { DEFAULT_THEME, insertBlock, isTagNode, moveBlock, removeBlock, type CodeNode } from '@jeffi/site-blocks'
 import { DesignError, findNode, freshId, treeIds, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps, setPanelValue, type PanelProp } from '@/lib/site/code/classes'
 import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
 import Layers from './Layers'
 import FreePanel from './FreePanel'
+import AiBox from './AiBox'
+import CritiquePanel from './CritiquePanel'
+import { critiqueTrees, type TreeFinding } from '@/lib/site/code/tree-critique'
 import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
-import { hasLocked, insertPlace, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
+import { hasLocked, insertPlace, litProp, nodeName, nodeWords, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
-import { adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
+import { addCredit, adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, redo, undo, type EditorState, type Shown } from './state'
 
 // The visual site editor (docs/plans/SITE_EDITOR_PLAN.md, phase 2): the real page on a canvas (an iframe with a
 // preview token, where components/visitor/site/editor/SiteEditorBridge selects and edits in place), the page's
@@ -58,6 +61,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const scrollY = useRef(0)
   const seq = useRef({ n: 0, sent: new Map<number, number>() })
   const measures = useRef({ n: 0, wait: new Map<number, (m: Measured | null) => void>() })
+  const [aiBusy, setAiBusy] = useState(false)
+  const [checking, setChecking] = useState(false)
+  /** Elements an AI change touched, lit up on the canvas once it reloads. */
+  const flash = useRef<{ block: string; ids: string[] } | null>(null)
 
   useEffect(() => {
     let stop = false
@@ -235,6 +242,62 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   }
   /** A style property at the breakpoint being edited, as per-breakpoint class operations. New classes need the
    * section's CSS compiled again, so the canvas reloads after the save. */
+  // ── AI ──
+  /** The section changed as asked, focused on the selection, as one undoable step; what it touched lights up. */
+  const changeWithAi = async (block: string, id: string | null, instruction: string) => {
+    const ask = hostRef.current.changeWithAi
+    if (!ask || aiBusy) return
+    setAiBusy(true)
+    try {
+      // The saved section is what the AI changes (a Showcase charges and saves on the server).
+      await flushNow()
+      const tree = treeAt(block)
+      const b = latest.current.state?.doc.blocks[block]
+      if (!tree || !b) return
+      const r = await ask({ block, label: (typeof b.props.label === 'string' && b.props.label) || 'Section', tree, ids: id ? [id] : [], instruction })
+      if (!r.ok) return say(r.error)
+      if (!update(s => editSection(s, block, [{ op: 'replace', tree: r.tree }]))) return
+      flash.current = { block, ids: r.changed }
+      requestReload()
+      setStatus({ kind: 'pending' })
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  /** A cheap action's words written into the element, as one step. */
+  const elementText = async (block: string, fieldId: string, text: string, action: 'rewrite' | 'shorten' | 'translate', language?: string) => {
+    const ask = hostRef.current.elementAi
+    if (!ask || aiBusy) return
+    setAiBusy(true)
+    try {
+      const r = await ask({ kind: 'text', action, text, language, context: label(block) })
+      if (!r.ok) return say(r.error)
+      if (r.text) edit(block, [{ op: 'text', id: fieldId, value: r.text }])
+    } finally {
+      setAiBusy(false)
+    }
+  }
+  /** A picture for an image slot (its shape, what it shows), its description when it had none, its credit kept. */
+  const elementPicture = async (block: string, id: string) => {
+    const ask = hostRef.current.elementAi
+    const tree = treeAt(block)
+    const node = tree && findNode(tree, id)?.node
+    if (!ask || aiBusy || !tree || !node) return
+    const alt = litProp(node, 'alt') ?? ''
+    setAiBusy(true)
+    try {
+      const r = await ask({ kind: 'picture', subject: alt || nodeWords(tree, 80) || label(block), aspect: litProp(node, 'aspect') })
+      if (!r.ok) return say(r.error)
+      if (!r.url) return
+      const ops: DesignOp[] = [{ op: 'attr', id, name: 'src', value: r.url }]
+      if (!alt && r.alt && litProp(node, 'alt') !== null) ops.push({ op: 'attr', id, name: 'alt', value: r.alt.slice(0, 200) })
+      if (edit(block, ops) && r.credit) update(s => addCredit(s, r.url!, r.credit))
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   // ── Free layers ──
   /** An element's box in % of its frame, as the canvas measures it. */
   const measure = (block: string, id: string) =>
@@ -301,6 +364,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       const at = latest.current.sel
       if (at) post({ type: 'select', block: at.block, id: at.id })
       if (scrollY.current) post({ type: 'scroll-to', y: scrollY.current })
+      if (flash.current) {
+        post({ type: 'flash', ...flash.current })
+        flash.current = null
+      }
     } else if (kind === 'select' && typeof m.block === 'string') setSel({ block: m.block, id: typeof m.id === 'string' ? m.id : null })
     else if (kind === 'ops' && typeof m.block === 'string' && Array.isArray(m.ops)) {
       // Typed in place: the canvas shows it already. Refused (it changed since), the reload puts the page right.
@@ -355,6 +422,17 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
 
   const ready = !!state
   const trees = useMemo(() => (state ? currentTrees(state) : {}), [state])
+  // The page checked in reading order (contrast, lengths, picture descriptions, headings, free layers).
+  const findings = useMemo(() => {
+    if (!state) return []
+    const name = (id: string) => String(state.doc.blocks[id]?.props?.label || 'Section')
+    return critiqueTrees(state.doc.order.filter(id => trees[id]).map(id => ({ block: id, label: name(id), tree: trees[id] })), host.theme ?? DEFAULT_THEME)
+  }, [state, trees, host.theme])
+  const fixFinding = (f: TreeFinding) => {
+    if (!f.fix) return
+    if ('shorten' in f.fix) return void elementText(f.block, f.fix.shorten.fieldId, f.fix.shorten.text, 'shorten')
+    if (edit(f.block, f.fix.ops)) requestReload()
+  }
   useEffect(() => {
     const el = box.current
     if (!el) return
@@ -406,6 +484,14 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setChecking(c => !c)}
+          aria-pressed={checking}
+          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 h-8 text-xs font-medium ${checking ? 'border-accent-500 text-accent-600' : 'border-border-default text-foreground-secondary hover:text-foreground'}`}
+        >
+          Check page{findings.length ? ` · ${findings.length}` : ''}
+        </button>
         <span role="status" className={`text-xs ${status.kind === 'error' ? 'text-red-600' : 'text-foreground-muted'}`}>
           {statusText}
         </span>
@@ -475,6 +561,19 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
         </div>
 
         <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-4 min-w-0 xl:min-h-0 xl:overflow-y-auto [scrollbar-width:thin]">
+          {checking && (
+            <div className="space-y-2 border-b border-border-default pb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Check page</p>
+              <CritiquePanel
+                findings={findings}
+                canWrite={host.canWrite}
+                canShorten={!!host.elementAi}
+                busy={aiBusy}
+                onShow={f => select(f.block, f.id)}
+                onFix={fixFinding}
+              />
+            </div>
+          )}
           {block && host.canWrite && (
             <div className="space-y-2 border-b border-border-default pb-3">
               <p className="truncate text-xs font-semibold uppercase tracking-wide text-foreground-muted">Section · {label(block.id)}</p>
@@ -491,6 +590,15 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               </div>
             </div>
           )}
+          {sel && tree && host.changeWithAi && host.canWrite && (
+            <AiBox
+              key={`${sel.block}:${sel.id ?? ''}`}
+              target={sel.id && sel.id !== tree.id ? nodeName(findNode(tree, sel.id)?.node ?? tree) : 'this section'}
+              note={host.aiNote}
+              busy={aiBusy}
+              onAsk={instruction => void changeWithAi(sel.block, sel.id, instruction)}
+            />
+          )}
           {sel && tree && sel.id ? (
             <Inspector
               key={`${sel.block}:${sel.id}`}
@@ -505,6 +613,15 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onDuplicate={() => duplicateNode(sel.block, sel.id!)}
               onDelete={() => deleteNode(sel.block, sel.id!)}
               renderImagePicker={host.renderImagePicker}
+              ai={
+                host.elementAi
+                  ? {
+                      busy: aiBusy,
+                      text: (fieldId, current, action, language) => void elementText(sel.block, fieldId, current, action, language),
+                      picture: () => void elementPicture(sel.block, sel.id!),
+                    }
+                  : undefined
+              }
             >
               {layerAt(tree, sel.id, bp) && (
                 <FreePanel

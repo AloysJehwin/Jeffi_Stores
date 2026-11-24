@@ -606,14 +606,17 @@ async function redoPage(
   audience: SiteAudience,
   page: PageKey,
   job: PageRedoJob,
-  adminId: string | null
+  adminId: string | null,
+  keepWords: string[] = []
 ): Promise<void> {
   const key = job.key
   let skipped = 0
   let last = 0
   const write = (patch: Partial<PageRedoJob> = {}) => putState(redoKey(draftId), draftId, JSON.stringify(Object.assign(job, patch, { at: now() })))
   try {
-    const ctx = own ? { ...own, direction: withTheme(own.direction, draftTheme) } : await siteCtx(draftTheme)
+    const base = own ? { ...own, direction: withTheme(own.direction, draftTheme) } : await siteCtx(draftTheme)
+    // "Keep my words": what the owner wrote on the page goes to the AI with the brief.
+    const ctx = keepWords.length ? { ...base, brief: { ...base.brief, keepWords } } : base
     let doc: PageDoc
     let planned: PlannedPage | null = null
     if (page === CARD_PAGE) doc = await generateCard(ctx)
@@ -658,7 +661,8 @@ export async function startPageRedo(
   draftId: string,
   ref: { audience: SiteAudience; page: PageKey },
   surfaces: SiteSurface[],
-  adminId: string | null
+  adminId: string | null,
+  opts: { keepWords?: string[] } = {}
 ): Promise<PageRedoJob> {
   const draft = await queryOne<{ studio: unknown; theme: Partial<Record<SiteAudience, Partial<ThemeTokens>>> | null }>(
     `SELECT docs -> 'studio' AS studio, docs -> 'theme' AS theme FROM site_drafts WHERE id = $1`,
@@ -679,7 +683,7 @@ export async function startPageRedo(
   )
   if (!claimed) throw new PageRedoRefused('The AI is already designing a page of this draft', 409)
   const theme = draft.theme?.[ref.audience] ?? draft.theme?.store
-  void runMetered(PAGE_REDO_BUDGET_INR(), () => redoPage(draftId, draftStudio(draft.studio), theme, ref.audience, ref.page, { ...job }, adminId)).catch(err =>
+  void runMetered(PAGE_REDO_BUDGET_INR(), () => redoPage(draftId, draftStudio(draft.studio), theme, ref.audience, ref.page, { ...job }, adminId, opts.keepWords ?? [])).catch(err =>
     console.error('[page-redo]', errText(err))
   )
   return job

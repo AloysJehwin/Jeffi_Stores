@@ -15,7 +15,8 @@ import { boxIn, createHandles } from './handles'
 // or an arrow key reports its new box in % of its frame, and `measure` reports an element's box before it is placed.
 //
 // Messages in (from the parent only): mode { on, write }, select { block, id }, apply { block, ops, seq },
-// scroll-to { y }, measure { block, id, req }, place { block, id, rect | null, frame?, frameMinHeight? }.
+// scroll-to { y }, measure { block, id, req }, place { block, id, rect | null, frame?, frameMinHeight? },
+// flash { block, ids } (what an AI change touched, lit up for a moment).
 // Messages out: ready, select { block, id, tag, cmp, text }, ops { block, ops }, applied { block, ops, seq },
 // scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' }, measured { req, rect, frame, frameHeight },
 // placed { block, id, rect, sized }.
@@ -215,6 +216,11 @@ export default function SiteEditorBridge() {
         const el = findAll(e.data.block, e.data.id)[0]
         const frame = el && frameOf(el)
         send({ type: 'measured', req: e.data.req, rect: el && frame ? boxIn(el, frame) : null, frame: frame?.dataset.e ?? null, frameHeight: frame ? frame.getBoundingClientRect().height : null })
+      } else if (kind === 'flash' && Array.isArray(e.data.ids)) {
+        const els = (e.data.ids as unknown[]).flatMap(id => findAll(e.data.block, id))
+        els.forEach(el => el.setAttribute('data-e-flash', ''))
+        els[0]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        setTimeout(() => els.forEach(el => el.removeAttribute('data-e-flash')), 2600)
       } else if (kind === 'place') {
         // Shown at once with inline styles; the classes draw it after the save's reload.
         const r = e.data.rect as { left: number; top: number; width: number; height?: number } | null
@@ -256,6 +262,6 @@ export default function SiteEditorBridge() {
     }
   }, [])
   return (
-    <style>{`[data-site-editing] [data-block-id]{cursor:default}[data-site-editing] [data-block-id] [data-e]:hover{outline:1px dashed rgb(var(--c-accent-500) / .7);outline-offset:1px}[data-e-selected]{outline:2px solid rgb(var(--c-accent-500))!important;outline-offset:1px}[data-e][contenteditable]{cursor:text;outline:2px solid rgb(var(--c-accent-500))!important}`}</style>
+    <style>{`[data-site-editing] [data-block-id]{cursor:default}[data-site-editing] [data-block-id] [data-e]:hover{outline:1px dashed rgb(var(--c-accent-500) / .7);outline-offset:1px}[data-e-selected]{outline:2px solid rgb(var(--c-accent-500))!important;outline-offset:1px}[data-e][contenteditable]{cursor:text;outline:2px solid rgb(var(--c-accent-500))!important}[data-e-flash]{outline:2px solid rgb(var(--c-accent-500))!important;outline-offset:2px;animation:site-e-flash 1.3s ease-in-out 2}@keyframes site-e-flash{50%{outline-color:transparent}}`}</style>
   )
 }
