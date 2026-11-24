@@ -27,7 +27,7 @@ describe('GoogleTaxonomyPicker', () => {
 
   it('shows the stored value and submits it under the field name', async () => {
     const { container } = mount({ defaultValue: 'Apparel > Shirts' })
-    expect(screen.getByRole('textbox')).toHaveValue('Apparel > Shirts')
+    expect(screen.getByPlaceholderText(/Search Google categories/)).toHaveValue('Apparel > Shirts')
     expect(container.querySelector('input[type="hidden"][name="google_category"]')).toHaveValue('Apparel > Shirts')
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/admin/categories/google-taxonomy?value=Apparel%20%3E%20Shirts'))
   })
