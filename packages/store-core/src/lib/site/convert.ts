@@ -34,6 +34,9 @@ const cmp = (name: string, props: Record<string, CodeValue>, children: CodeNode[
   ...(render ? { render } : {}),
 })
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
+/** A picture as the Image part: responsive, and the first one in the page's LCP section loads eagerly at high priority. */
+const pic = (src: string, alt: string, cls: string, sizes?: string): CodeNode =>
+  cmp('Image', { src: lit(src), alt: lit(alt), className: lit(cls.replace(/\s+/g, ' ').trim()), ...(sizes ? { sizes: lit(sizes) } : {}) })
 const paras = (text: string) => text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
 const some = (...nodes: (CodeNode | null | false | undefined | '')[]) => nodes.filter((n): n is CodeNode => !!n)
 
@@ -69,7 +72,7 @@ function imageText(p: P): CodeNode {
       el(
         'div',
         `${RATIO[String(p.aspect)] ?? RATIO['4:5']} relative overflow-hidden rounded-[var(--radius-card,0.75rem)] bg-surface-secondary ${p.imageSide === 'right' ? 'md:order-2' : ''}`,
-        image ? [el('img', 'absolute inset-0 h-full w-full object-cover', [], { src: lit(image), alt: lit(str(p.heading) ?? '') })] : []
+        image ? [pic(image, str(p.heading) ?? '', 'absolute inset-0 h-full w-full object-cover')] : []
       ),
       el('div', 'space-y-4', some(heading(str(p.heading), ''), paragraphs(String(p.body ?? '')), button(str(p.ctaLabel), str(p.ctaUrl)))),
     ]),
@@ -82,11 +85,12 @@ function imageBanner(p: P): CodeNode {
   const overlay = p.overlay === 'light' ? 'bg-white/45' : p.overlay === 'none' ? '' : 'bg-black/40'
   const light = p.overlay !== 'light'
   const left = p.align === 'left'
-  const picture = (src: string, cls: string) => el('img', `absolute inset-0 h-full w-full object-cover ${cls}`, [], { src: lit(src), alt: lit(str(p.heading) ?? '') })
+  const picture = (src: string, cls: string) => pic(src, str(p.heading) ?? '', `absolute inset-0 h-full w-full object-cover ${cls}`, '100vw')
   return el('section', `relative flex items-center overflow-hidden bg-secondary-800 ${HEIGHT[String(p.height)] ?? HEIGHT.medium}`, [
-    // A phone picture of its own shows below md, the main one from md up (the block's <picture> source).
-    ...(img ? [picture(img, mobile ? 'hidden md:block' : '')] : []),
+    // A phone picture of its own shows below md, the main one from md up (the block's <picture> source). The phone one
+    // comes first, so on a first section it is the one loaded at high priority (a lazy picture hidden by CSS never loads).
     ...(img && mobile ? [picture(mobile, 'md:hidden')] : []),
+    ...(img ? [picture(img, mobile ? 'hidden md:block' : '')] : []),
     ...(overlay ? [el('div', `absolute inset-0 ${overlay}`)] : []),
     el('div', `relative container mx-auto px-4 py-10 ${left ? 'text-left' : 'text-center'}`, [
       el(
@@ -206,7 +210,7 @@ function composedNode(n: ComposedNode): CodeNode | null {
     case 'image': {
       const has = aspectClass(n.aspect).trim()
       const box = el('div', `group relative overflow-hidden bg-surface-secondary ${RADIUS[n.radius]} ${aspectClass(n.aspect)}`, [
-        el('img', `${has ? 'absolute inset-0 h-full' : 'block'} w-full object-cover transition-opacity duration-500 ${n.hoverSrc ? 'group-hover:opacity-0' : ''}`, [], { src: lit(n.src), alt: lit(n.alt) }),
+        pic(n.src, n.alt, `${has ? 'absolute inset-0 h-full' : 'block'} w-full object-cover transition-opacity duration-500 ${n.hoverSrc ? 'group-hover:opacity-0' : ''}`),
         ...(n.hoverSrc ? [el('img', 'absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100', [], { src: lit(n.hoverSrc), alt: lit('') })] : []),
       ])
       return n.href ? cmp('Link', { href: lit(n.href) }, [box]) : box

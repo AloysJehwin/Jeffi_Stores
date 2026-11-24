@@ -25,6 +25,15 @@ Separate from the responsive sweep (`tests/responsive/`).
 `ui-tests` job: ephemeral `jeffi_test` Postgres (schema + seed), Chromium install, build +
 start storefront on :3010, `npm run test:ui`. Serialized (workers: 1). In the merge-gate `checks`.
 
+## Visual editor end-to-end
+
+`storefront-service/ui-tests/site-editor` (the canvas bridge on a draft preview) and
+`admin-service/ui-tests/site-editor` (the editor in the Site Builder) skip unless `SITE_EDITOR_E2E=1`: they switch
+`site_editor_enabled` on and write drafts through `tests/site-editor/seed.ts`, which refuses any DB but a test one.
+The admin spec needs the admin and the storefront on one origin, so run both behind the dev router and point
+`UI_BASE_URL` at it (`http://localhost:3000`), then `npm run test:ui:editor`. CI runs them in the advisory
+`site-editor-e2e` job.
+
 ## Adding a component
 
 Create `<app>-service/ui-tests/<component>/<component>.spec.ts` and drive the real page
