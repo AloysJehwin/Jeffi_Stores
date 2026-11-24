@@ -2,6 +2,8 @@ import type pg from 'pg'
 import sharp from 'sharp'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
+import type { IncomingMessage } from 'node:http'
+import { publicGet, PrivateAddressError } from '../public-fetch.js'
 import { getPdf, putObject } from '../storage.js'
 import { isFontKey, isHexColor, resolveDesign } from './index.js'
 import type { Branding, FontKey } from './model.js'
@@ -54,12 +56,28 @@ async function fetchLogo(url: string): Promise<Buffer> {
   let u: URL
   try { u = new URL(url) } catch { throw bad('branding.logo_url must be a valid URL') }
   if (u.protocol !== 'https:') throw bad('branding.logo_url must be https')
-  const addrs = isIP(u.hostname) ? [u.hostname] : (await lookup(u.hostname, { all: true }).catch(() => { throw bad('branding.logo_url host not found') })).map(a => a.address)
+  const host = u.hostname.replace(/^\[|\]$/g, '')
+  const addrs = isIP(host) ? [host] : (await lookup(host, { all: true }).catch(() => { throw bad('branding.logo_url host not found') })).map(a => a.address)
   if (!addrs.length || addrs.some(isPrivate)) throw bad('branding.logo_url must be a public address')
-  const r = await fetch(u, { signal: AbortSignal.timeout(5000), redirect: 'error' }).catch(() => null)
-  if (!r?.ok) throw bad('branding.logo_url could not be fetched')
-  const buf = Buffer.from(await r.arrayBuffer())
-  if (buf.length > 2_000_000) throw bad('branding.logo_url is larger than 2 MB')
+  // The socket only connects to a vetted address (DNS rebinding); a redirect is a failure, only 2xx is accepted.
+  let r: IncomingMessage
+  try { r = await publicGet(u, { timeoutMs: 5000, isPrivate }) } catch (e) {
+    throw e instanceof PrivateAddressError ? bad('branding.logo_url must be a public address') : bad('branding.logo_url could not be fetched')
+  }
+  if ((r.statusCode ?? 0) < 200 || r.statusCode! >= 300) { r.destroy(); throw bad('branding.logo_url could not be fetched') }
+  const chunks: Buffer[] = []
+  let size = 0
+  try {
+    for await (const c of r as AsyncIterable<Buffer>) {
+      size += c.length
+      if (size > 2_000_000) throw bad('branding.logo_url is larger than 2 MB')
+      chunks.push(c)
+    }
+  } catch (e) {
+    r.destroy()
+    throw (e as { code?: string }).code === 'validation_error' ? e : bad('branding.logo_url could not be fetched')
+  }
+  const buf = Buffer.concat(chunks)
   return normalizeLogo(buf).catch(() => { throw bad('branding.logo_url is not an image') })
 }
 

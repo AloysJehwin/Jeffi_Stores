@@ -2,6 +2,7 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import sharp from 'sharp'
 import { uploadCdnAsset } from '@jeffi/tenancy'
+import { publicGet, PrivateAddressError } from './public-fetch.js'
 
 // WhatsApp header media from anywhere: a URL (any host, any image format — e.g. a Google image link with no
 // extension) or uploaded bytes is fetched, turned into something WhatsApp accepts and re-hosted on our CDN,
@@ -38,19 +39,30 @@ export async function fetchMedia(raw: string): Promise<{ bytes: Buffer; type: st
   try { url = new URL(raw) } catch { throw new MediaError(422, 'invalid_media_url', 'media_url is not a valid link') }
   for (let hop = 0; hop < 4; hop++) {
     await assertPublic(url)
-    const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15_000), headers: { 'user-agent': 'JeffiMedia/1.0', accept: 'image/*,video/mp4,application/pdf;q=0.9,*/*;q=0.5' } })
-      .catch(e => { throw new MediaError(422, 'media_unreachable', `Could not download media_url: ${(e as Error).message}`) })
-    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) { url = new URL(res.headers.get('location')!, url); continue }
-    if (!res.ok || !res.body) throw new MediaError(422, 'media_unreachable', `Downloading media_url returned HTTP ${res.status}`)
-    if (Number(res.headers.get('content-length') ?? 0) > MAX_INPUT) throw new MediaError(413, 'media_too_large', 'media_url is larger than 15 MB')
+    const res = await publicGet(url, { timeoutMs: 15_000, isPrivate: privateAddress, headers: { 'user-agent': 'JeffiMedia/1.0', accept: 'image/*,video/mp4,application/pdf;q=0.9,*/*;q=0.5' } })
+      .catch(e => {
+        if (e instanceof PrivateAddressError) throw new MediaError(422, 'invalid_media_url', 'media_url points at a private address')
+        throw new MediaError(422, 'media_unreachable', `Could not download media_url: ${(e as Error).message}`)
+      })
+    const status = res.statusCode ?? 0
+    const location = res.headers.location
+    if (status >= 300 && status < 400 && location) { res.destroy(); url = new URL(location, url); continue }
+    if (status < 200 || status >= 300) { res.destroy(); throw new MediaError(422, 'media_unreachable', `Downloading media_url returned HTTP ${status}`) }
+    if (Number(res.headers['content-length'] ?? 0) > MAX_INPUT) { res.destroy(); throw new MediaError(413, 'media_too_large', 'media_url is larger than 15 MB') }
     const chunks: Buffer[] = []
     let size = 0
-    for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-      size += chunk.length
-      if (size > MAX_INPUT) throw new MediaError(413, 'media_too_large', 'media_url is larger than 15 MB')
-      chunks.push(Buffer.from(chunk))
+    try {
+      for await (const chunk of res as AsyncIterable<Buffer>) {
+        size += chunk.length
+        if (size > MAX_INPUT) throw new MediaError(413, 'media_too_large', 'media_url is larger than 15 MB')
+        chunks.push(chunk)
+      }
+    } catch (e) {
+      res.destroy()
+      if (e instanceof MediaError) throw e
+      throw new MediaError(422, 'media_unreachable', `Could not download media_url: ${(e as Error).message}`)
     }
-    return { bytes: Buffer.concat(chunks), type: (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() }
+    return { bytes: Buffer.concat(chunks), type: String(res.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase() }
   }
   throw new MediaError(422, 'media_unreachable', 'media_url redirects too many times')
 }
