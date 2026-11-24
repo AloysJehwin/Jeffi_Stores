@@ -12,11 +12,19 @@ const h = vi.hoisted(() => ({
 }))
 vi.mock('@controller/lib/outreach/db', () => ({ outreachPool: () => ({ query: h.query }) }))
 vi.mock('@controller/lib/outreach/session', () => ({ loadCallContext: h.loadCallContext, readVoiceSettings: vi.fn() }))
-vi.mock('@controller/lib/outreach/build.stub', () => ({ startDraft: h.startDraft, mergeBrief: h.mergeBrief, requestChange: h.requestChange, publish: h.publish }))
+vi.mock('@controller/lib/outreach/build', () => {
+  class OutreachBuildError extends Error {
+    constructor(readonly code: string, message: string) {
+      super(message)
+    }
+  }
+  return { startDraft: h.startDraft, mergeBrief: h.mergeBrief, requestChange: h.requestChange, publish: h.publish, OutreachBuildError }
+})
 vi.mock('@controller/lib/outreach/whatsapp', () => ({ sendOutreachTemplate: h.send }))
 vi.mock('@controller/lib/outreach/state', async orig => ({ ...(await orig<typeof import('@controller/lib/outreach/state')>()), transition: h.transition }))
 
 import { runTool, callbackTime } from '@controller/lib/outreach/tools'
+import { OutreachBuildError } from '@controller/lib/outreach/build'
 import { InvalidTransitionError } from '@controller/lib/outreach/state'
 import { LINES, SCRIPT_VERSION } from '@controller/lib/outreach/prompt'
 
@@ -105,14 +113,34 @@ describe('startPreview', () => {
 
   it('with consent: draft, WhatsApp link, preview_sent, and the success line', async () => {
     setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z' })
-    h.startDraft.mockResolvedValue({ siteId: 's1', previewUrl: 'https://site-x/preview?t=abc' })
+    // build.startDraft moves the contact to building itself
+    h.startDraft.mockImplementation(async () => {
+      status = 'building'
+      return { siteId: 's1', previewUrl: 'https://site-x/preview?t=abc' }
+    })
     h.send.mockResolvedValue({ ok: true, mode: 'captured', messageId: 'm1', providerMessageId: null })
     const r = await run('startPreview', { business_name: 'Ravi Stores' })
     expect(r.body).toEqual({ ok: true, say: LINES.en.previewSent })
     expect(h.startDraft).toHaveBeenCalledWith('k1', { businessName: 'Ravi Stores', language: 'en' })
     expect(h.send).toHaveBeenCalledWith('k1', { template: 'preview_ready', url: 'https://site-x/preview?t=abc', actor: 'voice', callId: CALL })
-    expect(moves()).toEqual(['interested', 'building', 'preview_sent'])
+    expect(moves()).toEqual(['preview_sent'])
     expect(JSON.stringify(events())).not.toContain('t=abc')
+  })
+
+  it('build refusals: spoken as they are in English, in the call language otherwise; opted out ends the call', async () => {
+    setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z' })
+    h.startDraft.mockRejectedValueOnce(new OutreachBuildError('details', 'I need the name of the business to start the site.'))
+    expect((await run('startPreview', { business_name: 'R' })).body).toEqual({ ok: false, say: 'I need the name of the business to start the site.' })
+    h.startDraft.mockRejectedValueOnce(new OutreachBuildError('opted_out', 'This business asked us not to contact them.'))
+    expect((await run('startPreview', { business_name: 'Ravi' })).body).toEqual({ ok: false, say: LINES.en.optedOut, end: true })
+    setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z', language: 'ta' }, { language: 'ta' })
+    h.publish.mockRejectedValueOnce(new OutreachBuildError('building', "Your site is still being designed."))
+    expect((await run('publishSite')).body).toEqual({ ok: false, say: LINES.ta.buildBusy })
+    h.publish.mockRejectedValueOnce(new OutreachBuildError('details', 'Before it goes live I need a phone number.'))
+    expect((await run('publishSite')).body).toEqual({ ok: false, say: LINES.ta.needContact })
+    h.publish.mockRejectedValueOnce(new OutreachBuildError('publish_failed', "The site couldn't go live just now."))
+    expect((await run('publishSite')).body).toEqual({ ok: false, say: LINES.ta.publishFailed })
+    expect(events().at(-1)!.data).toMatchObject({ tool: 'publishSite', ok: false, detail: { code: 'publish_failed' } })
   })
 
   it('does not claim the link went out when WhatsApp fails', async () => {
@@ -126,13 +154,13 @@ describe('startPreview', () => {
 })
 
 describe('addDetails / requestChange', () => {
-  it('merges the brief, moves to building once building, and lets the LLM carry on', async () => {
+  it('merges the brief and lets the LLM carry on; build.ts owns the status', async () => {
     setup({ status: 'interested' })
     h.mergeBrief.mockResolvedValue({ building: true, missing: ['hours'] })
     const r = await run('addDetails', { what_they_do: 'sarees', highlights: ['handloom'] })
     expect(r.body).toEqual({ ok: true })
     expect(h.mergeBrief).toHaveBeenCalledWith('k1', { whatTheyDo: 'sarees', highlights: ['handloom'] })
-    expect(moves()).toEqual(['building'])
+    expect(moves()).toEqual([])
     expect(events().at(-1)!.data).toMatchObject({ tool: 'addDetails', ok: true, args: { what_they_do: 'sarees' } })
   })
 
@@ -146,6 +174,8 @@ describe('addDetails / requestChange', () => {
     expect((await run('requestChange', { instruction: 'make it blue' })).body).toEqual({ ok: true, say: LINES.en.changeDone })
     h.requestChange.mockResolvedValueOnce({ ok: false, summary: '' })
     expect((await run('requestChange', { instruction: 'make it blue' })).body).toEqual({ ok: false, say: LINES.en.changeFailed })
+    h.requestChange.mockResolvedValueOnce({ ok: false, summary: "I haven't started your site yet. Let me do that first." })
+    expect((await run('requestChange', { instruction: 'make it blue' })).body.say).toBe("I haven't started your site yet. Let me do that first.")
   })
 })
 
@@ -159,13 +189,17 @@ describe('publishSite', () => {
     setup({ consent_whatsapp_at: '2026-11-25T05:59:00Z', status: 'preview_sent' })
     h.publish.mockResolvedValue({ liveUrl: 'https://ravi.example', claimUrl: 'https://ecom/claim/x' })
     h.send.mockResolvedValue({ ok: true, mode: 'sent', messageId: 'm', providerMessageId: 'p' })
-    expect((await run('publishSite')).body).toEqual({ ok: true, say: LINES.en.published })
-    expect(moves()).toEqual(['published'])
+    const r = await run('publishSite')
+    expect(r.body).toEqual({ ok: true, say: LINES.en.published })
+    expect(moves()).toEqual([])
     expect(sqls().some(s => s.startsWith('UPDATE outreach_calls SET outcome'))).toBe(true)
     expect(h.send.mock.calls.map(c => [c[1].template, c[1].url])).toEqual([
       ['site_live', 'https://ravi.example'],
       ['claim', 'https://ecom/claim/x'],
     ])
+    // the claim link is a bearer credential: never in the reply or the audit trail
+    expect(JSON.stringify(r)).not.toContain('claim/x')
+    expect(JSON.stringify(events())).not.toContain('claim/x')
   })
 
   it('live but links not sent: says so honestly', async () => {

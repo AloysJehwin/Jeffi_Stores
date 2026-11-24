@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import * as build from './build.stub'
+import * as build from './build'
 import { sendOutreachTemplate } from './whatsapp'
 import { outreachPool } from './db'
 import { recordEvent } from './events'
@@ -162,16 +162,15 @@ const HANDLERS: { [T in ToolName]: (ctx: Ctx, args: Args<T>) => Promise<Result> 
   async startPreview({ call, contact, language }, a) {
     const L = LINES[language]
     if (!contact.consent_whatsapp_at) return { ok: false, say: L.consentNeeded, detail: { reason: 'no_whatsapp_consent' } }
+    // build.startDraft is idempotent, moves the contact to building and mints a fresh preview link each time.
     const draft = await build.startDraft(contact.id, { businessName: a.business_name, language })
-    await outreachPool().query(`UPDATE outreach_contacts SET showcase_site_id = $2, updated_at = now() WHERE id = $1`, [contact.id, draft.siteId])
-    await advance(contact.id, 'building', call.id, { siteId: draft.siteId })
     const sent = await sendOutreachTemplate(contact.id, { template: 'preview_ready', url: draft.previewUrl, actor: ACTOR, callId: call.id })
     if (!sent.ok) return { ok: false, say: L.failedSoft, detail: { siteId: draft.siteId, whatsapp: sent.reason } }
     await advance(contact.id, 'preview_sent', call.id, { siteId: draft.siteId })
     return { ok: true, say: L.previewSent, detail: { siteId: draft.siteId, messageId: sent.messageId, mode: sent.mode } }
   },
 
-  async addDetails({ call, contact }, a) {
+  async addDetails({ contact }, a) {
     const brief: build.OutreachBrief = {
       whatTheyDo: a.what_they_do,
       audience: a.audience,
@@ -185,20 +184,22 @@ const HANDLERS: { [T in ToolName]: (ctx: Ctx, args: Args<T>) => Promise<Result> 
     const given = Object.fromEntries(Object.entries(brief).filter(([, v]) => v !== undefined)) as build.OutreachBrief
     if (!Object.keys(given).length) return { ok: true, detail: { empty: true } }
     const r = await build.mergeBrief(contact.id, given)
-    if (r.building) await advance(contact.id, 'building', call.id)
     return { ok: true, detail: { building: r.building, missing: r.missing } }
   },
 
   async requestChange({ contact, language }, a) {
     const r = await build.requestChange(contact.id, a.instruction)
-    return r.ok ? { ok: true, say: LINES[language].changeDone, detail: { summary: r.summary } } : { ok: false, say: LINES[language].changeFailed, detail: { summary: r.summary } }
+    if (r.ok) return { ok: true, say: LINES[language].changeDone, detail: { summary: r.summary } }
+    // build.ts words its refusals in English: spoken as they are on an English call.
+    return { ok: false, say: language === 'en' && r.summary ? r.summary : LINES[language].changeFailed, detail: { summary: r.summary } }
   },
 
   async publishSite({ call, contact, language }) {
     const L = LINES[language]
     if (!contact.consent_whatsapp_at) return { ok: false, say: L.publishNeedsConsent, detail: { reason: 'no_whatsapp_consent' } }
+    // build.publish moves the contact to published. The claim link is a bearer credential: it goes only into the
+    // outreach/claim template, never into this reply or its audit row.
     const r = await build.publish(contact.id)
-    await advance(contact.id, 'published', call.id)
     await setCall(call.id, { outcome: 'published' })
     const live = await sendOutreachTemplate(contact.id, { template: 'site_live', url: r.liveUrl, actor: ACTOR, callId: call.id })
     const claim = await sendOutreachTemplate(contact.id, { template: 'claim', url: r.claimUrl, actor: ACTOR, callId: call.id })
@@ -245,6 +246,20 @@ const HANDLERS: { [T in ToolName]: (ctx: Ctx, args: Args<T>) => Promise<Result> 
   },
 }
 
+/**
+ * A build.ts refusal, said to the caller. Its message is a speakable English sentence, used as it is on an English
+ * call; other languages get the matching line from prompt.ts. An opted-out contact ends the call.
+ */
+function buildRefusal(tool: ToolName, e: InstanceType<typeof build.OutreachBuildError>, language: OutreachLanguage): Result {
+  const L = LINES[language]
+  const detail = { code: e.code, error: e.message }
+  if (e.code === 'opted_out') return { ok: false, say: L.optedOut, end: true, detail }
+  if (language === 'en') return { ok: false, say: e.message, detail }
+  const local =
+    e.code === 'building' ? L.buildBusy : e.code === 'not_built' ? L.buildNeedsMore : e.code === 'details' && tool === 'publishSite' ? L.needContact : null
+  return { ok: false, say: local ?? (tool === 'publishSite' ? L.publishFailed : L.failedSoft), detail }
+}
+
 export async function runTool(callId: string, tool: string, rawArgs: unknown, now: Date = new Date()): Promise<ToolResponse> {
   if (!isToolName(tool)) return { status: 404, body: { ok: false, error: `Unknown tool: ${tool}` } }
   const ctx = await loadCallContext(callId)
@@ -263,8 +278,11 @@ export async function runTool(callId: string, tool: string, rawArgs: unknown, no
   try {
     result = await (HANDLERS[tool] as (c: Ctx, a: unknown) => Promise<Result>)({ ...ctx, language, now }, args)
   } catch (e) {
-    console.error(`[outreach] tool ${tool} failed for call ${callId}:`, (e as Error)?.message)
-    result = { ok: false, say: LINES[language].failedSoft, detail: { error: (e as Error)?.message ?? 'error' } }
+    if (e instanceof build.OutreachBuildError) result = buildRefusal(tool, e, language)
+    else {
+      console.error(`[outreach] tool ${tool} failed for call ${callId}:`, (e as Error)?.message)
+      result = { ok: false, say: LINES[language].failedSoft, detail: { error: (e as Error)?.message ?? 'error' } }
+    }
   }
   const { detail, ...reply } = result
   await recordEvent(ctx.contact.id, 'tool_call', { callId, actor: ACTOR, data: { tool, args, ...reply, ...(detail ? { detail } : {}) } }).catch(() => {})

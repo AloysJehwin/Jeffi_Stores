@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "69549486543185f9ac853fd9dc600c36d1c70ae131c301d1170e1e9fcec005e7",
+ "manifestHash": "cfa374e01765f76105ee6a65c8acd8ab32d2abd4fc19106b4413868d8f3b36a6",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -39182,7 +39182,114 @@
        "config"
       ]
      },
-     {}
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "region": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "access_key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "secret_access_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "whatsapp_phone_number_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "waba_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "sms_origination": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "region",
+         "access_key_id",
+         "secret_access_key"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9]{3,11}$"
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "credentials": {
+          "const": "platform",
+          "type": "string"
+         },
+         "region": {
+          "const": "ap-south-1",
+          "type": "string"
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "pattern": "^\\d{15,25}$"
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "credentials"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     }
     ]
    },
    "bodySource": "zod",
@@ -39239,6 +39346,36 @@
    "bodyContentType": "application/json",
    "summary": "Delete a messaging number (settings)",
    "command": "settings-messaging-numbers delete"
+  },
+  {
+   "id": "admin GET /api/admin/settings/messaging-numbers/check-sender-id",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/settings/messaging-numbers/check-sender-id",
+   "gatewayPath": "/v1/admin/settings/messaging-numbers/check-sender-id",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/messaging-numbers/check-sender-id/route.ts",
+   "pathParams": [],
+   "query": [
+    "header"
+   ],
+   "queryParams": [
+    {
+     "name": "header",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Read-only \"Check sender ID\": is ?header= registered on the platform's AWS account in ap-south-1. The flagship's administrator only; a store's numbers are the platform's to manage.",
+   "command": "settings-messaging-numbers check-sender-id"
   },
   {
    "id": "admin GET /api/admin/settings/providers",
@@ -46287,6 +46424,49 @@
        "sender",
        "config"
       ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9]{3,11}$"
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "credentials": {
+          "const": "platform",
+          "type": "string"
+         },
+         "region": {
+          "const": "ap-south-1",
+          "type": "string"
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "pattern": "^\\d{15,25}$"
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "credentials"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
      }
     ]
    },
@@ -46347,6 +46527,40 @@
    "bodyContentType": "application/json",
    "summary": "Delete a messaging sender",
    "command": "platform messaging-senders delete"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/{tenantId}/messaging-senders/check-sender-id",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/{tenantId}/messaging-senders/check-sender-id",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/messaging-senders/check-sender-id",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/messaging-senders/check-sender-id/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "header"
+   ],
+   "queryParams": [
+    {
+     "name": "header",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Read-only \"Check sender ID\": is ?header= registered on the platform's AWS account in ap-south-1. Platform admins only.",
+   "command": "platform messaging-senders check-sender-id"
   },
   {
    "id": "platform GET /api/admin/ecom/{tenantId}/numbers",
@@ -48465,6 +48679,31 @@
    "command": "platform numbers available"
   },
   {
+   "id": "platform GET /api/admin/ecom/outreach/calls/{id}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/calls/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/calls/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/calls/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET → { call, recordingUrl, events }: the call row (transcript as { role: agent|caller, text, at }, consent), a 15-minute signed URL for the recording, and the call's audit events. Platform admin only.",
+   "command": "platform outreach-calls get"
+  },
+  {
    "id": "platform GET /api/admin/ecom/outreach/contacts",
    "host": "platform",
    "method": "GET",
@@ -48921,6 +49160,70 @@
    "bodyContentType": "application/json",
    "summary": "DELETE ?phone= (or { phone }) → lift the suppression. Contacts already suppressed stay so until requeued.",
    "command": "platform outreach suppressions-delete"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/test-call",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/test-call",
+   "gatewayPath": "/v1/platform/ecom/outreach/test-call",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/test-call/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "phone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20
+     },
+     "language": {
+      "type": "string",
+      "enum": [
+       "en",
+       "hi",
+       "ta",
+       "te",
+       "kn",
+       "ml",
+       "mr",
+       "bn",
+       "gu"
+      ],
+      "default": "en"
+     },
+     "program": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "showcase-offer"
+     },
+     "businessName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "ownerName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     }
+    },
+    "required": [
+     "phone"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { phone, language } → { callId }: a real call to one of the program's test numbers (platform admin only).",
+   "command": "platform outreach test-call"
   },
   {
    "id": "platform GET /api/admin/ecom/store-status/overview",
