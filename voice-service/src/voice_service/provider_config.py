@@ -66,6 +66,10 @@ class VoiceConfig:
     anthropic_identity_token_file: str = ""
     llm_model: str = ""
     source: str = "env"  # controller | env
+    sources: dict[str, str] = field(default_factory=dict)  # field name -> controller | env (names only, never values)
+
+    def sources_report(self) -> dict[str, list[str]]:
+        return {k: sorted(n for n, v in self.sources.items() if v == k) for k in ("controller", "env")}
 
     def voice_for(self, language: str) -> str:
         base = (language or "").split("-")[0].lower()
@@ -123,51 +127,74 @@ def _s(v: Any) -> str:
 
 
 def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
-    """Field by field: the controller's value when non-empty, else the env var."""
+    """Reads the controller's getVoiceConfig() shape (packages/store-core/src/lib/providers/voice-config.ts), field by
+    field: the controller's value when non-empty, else the env var. `sources` records which one each field used."""
     r = remote or {}
-    cfg = r.get("voice_config") if isinstance(r.get("voice_config"), dict) else {}
-    sec = r.get("secrets") if isinstance(r.get("secrets"), dict) else {}
+    sources: dict[str, str] = {}
 
-    def pick(remote_value: Any, env_value: str) -> str:
-        return _s(remote_value) or env_value
+    def pick(name: str, remote_value: Any, env_value: str) -> str:
+        rv = _s(remote_value)
+        if rv:
+            sources[name] = "controller"
+            return rv
+        if env_value:
+            sources[name] = "env"
+        return env_value
 
-    provider = PROVIDER_ALIASES.get(_s(r.get("voice_provider")).lower(), "") or env.telephony_provider
-    remote_numbers = _get(cfg, "testNumbers")
+    provider = PROVIDER_ALIASES.get(_s(r.get("provider")).lower(), "")
+    sources["provider"] = "controller" if provider else "env"
+    provider = provider or env.telephony_provider
+    remote_numbers = r.get("testNumbers")
     numbers = set(env.test_numbers)
     if isinstance(remote_numbers, list):
         numbers |= {normalize_number(n) for n in remote_numbers if isinstance(n, str) and normalize_number(n)}
-    voices_raw = _get(cfg, "sarvam", "voices")
-    voices = {k: v for k, v in voices_raw.items() if isinstance(k, str) and _s(v)} if isinstance(voices_raw, dict) else {}
+        sources["testNumbers"] = "controller"
+    elif numbers:
+        sources["testNumbers"] = "env"
+    voices_raw = _get(r, "sarvam", "voices")
+    voices = {k: v.strip() for k, v in voices_raw.items() if isinstance(k, str) and _s(v)} if isinstance(voices_raw, dict) else {}
+    if voices:
+        sources["sarvam.voices"] = "controller"
     ident_raw = r.get("anthropicIdentity") if isinstance(r.get("anthropicIdentity"), dict) else {}
-    # Env wins here (unlike the keys): the pod's own env names a rule that trusts this pod's issuer, while the
-    # controller serves the platform row that the gateway's rule belongs to.
+
+    def ident(key: str, env_value: str) -> str:
+        # Env wins here (unlike the rest): the pod's own env names a rule that trusts this pod's issuer, while the
+        # controller serves the platform row that the gateway's rule belongs to.
+        rv = _s(ident_raw.get(key))
+        if env_value:
+            sources[f"anthropicIdentity.{key}"] = "env"
+        elif rv:
+            sources[f"anthropicIdentity.{key}"] = "controller"
+        return env_value or rv
+
     identity = AnthropicIdentity(
-        organization_id=env.anthropic_organization_id or _s(_get(ident_raw, "organizationId")),
-        workspace_id=env.anthropic_workspace_id or _s(_get(ident_raw, "workspaceId")),
-        service_account_id=env.anthropic_service_account_id or _s(_get(ident_raw, "serviceAccountId")),
-        federation_rule_id=env.anthropic_federation_rule_id or _s(_get(ident_raw, "federationRuleId")),
+        organization_id=ident("organizationId", env.anthropic_organization_id),
+        workspace_id=ident("workspaceId", env.anthropic_workspace_id),
+        service_account_id=ident("serviceAccountId", env.anthropic_service_account_id),
+        federation_rule_id=ident("federationRuleId", env.anthropic_federation_rule_id),
     )
     return VoiceConfig(
         provider=provider,
-        exotel_sid=pick(_get(cfg, "exotel", "accountSid"), env.exotel_sid),
-        exotel_subdomain=pick(_get(cfg, "exotel", "subdomain"), env.exotel_subdomain),
-        exotel_caller_id=normalize_number(pick(_get(cfg, "exotel", "callerId"), env.exotel_caller_id)),
-        exotel_app_id=pick(_get(cfg, "exotel", "appId"), env.exotel_app_id),
-        exotel_api_key=pick(_get(sec, "exotel", "apiKey"), env.exotel_api_key),
-        exotel_api_token=pick(_get(sec, "exotel", "apiToken"), env.exotel_api_token),
-        twilio_account_sid=pick(_get(sec, "twilio_voice", "accountSid"), env.twilio_account_sid),
-        twilio_auth_token=pick(_get(sec, "twilio_voice", "authToken"), env.twilio_auth_token),
-        twilio_from=normalize_number(pick(_get(cfg, "twilioTest", "from"), env.twilio_voice_from)),
+        exotel_sid=pick("exotel.accountSid", _get(r, "exotel", "accountSid"), env.exotel_sid),
+        exotel_subdomain=pick("exotel.subdomain", _get(r, "exotel", "subdomain"), env.exotel_subdomain),
+        exotel_caller_id=normalize_number(pick("exotel.callerId", _get(r, "exotel", "callerId"), env.exotel_caller_id)),
+        exotel_app_id=pick("exotel.appId", _get(r, "exotel", "appId"), env.exotel_app_id),
+        exotel_api_key=pick("exotel.apiKey", _get(r, "exotel", "apiKey"), env.exotel_api_key),
+        exotel_api_token=pick("exotel.apiToken", _get(r, "exotel", "apiToken"), env.exotel_api_token),
+        twilio_account_sid=pick("twilioTest.accountSid", _get(r, "twilioTest", "accountSid"), env.twilio_account_sid),
+        twilio_auth_token=pick("twilioTest.authToken", _get(r, "twilioTest", "authToken"), env.twilio_auth_token),
+        twilio_from=normalize_number(pick("twilioTest.from", _get(r, "twilioTest", "from"), env.twilio_voice_from)),
         test_numbers=frozenset(numbers),
-        sarvam_api_key=pick(_get(sec, "sarvam", "apiKey"), env.sarvam_api_key),
-        stt_model=pick(_get(cfg, "sarvam", "sttModel"), env.stt_model),
-        tts_model=pick(_get(cfg, "sarvam", "ttsModel"), env.tts_model),
+        sarvam_api_key=pick("sarvam.apiKey", _get(r, "sarvam", "apiKey"), env.sarvam_api_key),
+        stt_model=pick("sarvam.sttModel", _get(r, "sarvam", "sttModel"), env.stt_model),
+        tts_model=pick("sarvam.ttsModel", _get(r, "sarvam", "ttsModel"), env.tts_model),
         voices=voices,
-        anthropic_api_key=pick(_get(sec, "anthropic_voice", "apiKey"), env.anthropic_api_key),
+        anthropic_api_key=pick("anthropic.apiKey", _get(r, "anthropic", "apiKey"), env.anthropic_api_key),
         anthropic_identity=identity,
         anthropic_identity_token_file=env.anthropic_identity_token_file,
-        llm_model=pick(_get(cfg, "llmModel"), env.llm_model),
+        llm_model=pick("llmModel", r.get("llmModel"), env.llm_model),
         source="controller" if remote else "env",
+        sources=dict(sources),
     )
 
 

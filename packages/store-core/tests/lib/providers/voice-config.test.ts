@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 vi.mock('server-only', () => ({}))
 const query = vi.hoisted(() => vi.fn())
@@ -113,6 +115,34 @@ describe('getVoiceConfig', () => {
 
     await saveVoiceCredential('twilio_voice', { accountSid: 'AC' + 'a'.repeat(32), authToken: 'stored-auth-token-6666' })
     expect((await getVoiceConfig()).twilioTest).toMatchObject({ source: 'stored', authToken: 'stored-auth-token-6666' })
+  })
+})
+
+// The wire contract with voice-service: voice-service/tests/fixtures/voice-config.sample.json is what
+// voice-service's provider_config.merge is tested against. If getVoiceConfig's shape changes, this fails until
+// the fixture (and merge) follow.
+describe('voice-service contract fixture', () => {
+  it('equals a fully configured getVoiceConfig() result', async () => {
+    const fixture = JSON.parse(readFileSync(resolve(process.cwd(), 'voice-service/tests/fixtures/voice-config.sample.json'), 'utf8'))
+    settings([
+      { key: 'voice_provider', value: 'exotel' },
+      {
+        key: 'voice_config',
+        value: {
+          exotel: { accountSid: 'fakeacct', callerId: '+911401234567', appId: '12345' },
+          twilioTest: { from: '+14155550100' },
+          testNumbers: ['+919876543210', '+919876543211'],
+        },
+      },
+    ])
+    await saveVoiceCredential('exotel', { apiKey: 'fake-exotel-key-0001', apiToken: 'fake-exotel-token-0002' })
+    await saveVoiceCredential('sarvam', { apiKey: 'fake-sarvam-key-0004' })
+    await saveVoiceCredential('twilio_voice', { accountSid: 'AC' + '0'.repeat(32), authToken: 'fake-twilio-auth-0003' })
+    await saveVoiceCredential('anthropic_voice', { apiKey: 'sk-ant-fake-voice-key-0005' })
+    identity.mockResolvedValue({ workspaceId: 'wrkspc_fake', serviceAccountId: 'svac_fake', federationRuleId: 'fdrl_fake' })
+    vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', '00000000-0000-0000-0000-000000000001')
+    const c = await getVoiceConfig()
+    expect(JSON.parse(JSON.stringify(c))).toEqual(fixture)
   })
 })
 

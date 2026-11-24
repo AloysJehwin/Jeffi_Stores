@@ -1,4 +1,6 @@
+import json
 import logging
+from pathlib import Path
 from dataclasses import replace
 from typing import Any
 
@@ -7,23 +9,24 @@ import pytest
 
 from voice_service.auth import bearer, verify_service_token
 from voice_service.config import Settings
-from voice_service.provider_config import ProviderConfigSource, merge
+from voice_service.provider_config import AnthropicIdentity, ProviderConfigSource, merge
 
+FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "voice-config.sample.json").read_text())
+# The controller's getVoiceConfig() shape, trimmed; the full one is FIXTURE.
 REMOTE = {
-    "voice_provider": "exotel",
-    "voice_config": {
-        "exotel": {"accountSid": "remote-sid", "subdomain": "api.in.exotel.com", "callerId": "+91 140 111 2222", "appId": "999"},
-        "twilioTest": {"from": "+15559990000"},
-        "testNumbers": ["+919000000001"],
-        "sarvam": {"sttModel": "saaras:v3", "ttsModel": "bulbul:v3", "voices": {"hi": "priya", "ta": "kavya", "kn": ""}},
-        "llmModel": "claude-haiku-5-5",
+    "provider": "exotel",
+    "exotel": {
+        "accountSid": "remote-sid", "subdomain": "api.in.exotel.com", "callerId": "+91 140 111 2222", "appId": "999",
+        "apiKey": "remote-key", "apiToken": "remote-token-SECRET",
     },
-    "secrets": {
-        "exotel": {"apiKey": "remote-key", "apiToken": "remote-token-SECRET"},
-        "sarvam": {"apiKey": "remote-sarvam-SECRET"},
-        "anthropic_voice": {"apiKey": "remote-anthropic-SECRET"},
-    },
-    "configured": {"exotel": True},
+    "twilioTest": {"from": "+15559990000", "accountSid": None, "authToken": None},
+    "testNumbers": ["+919000000001"],
+    "sarvam": {"sttModel": "saaras:v3", "ttsModel": "bulbul:v3", "voices": {"hi": "priya", "ta": "kavya", "kn": ""},
+               "apiKey": "remote-sarvam-SECRET"},
+    "llmModel": "claude-haiku-5-5",
+    "anthropic": {"apiKey": "remote-anthropic-SECRET", "source": "stored", "federation": False, "configured": True},
+    "anthropicIdentity": None,
+    "ready": True,
 }
 
 
@@ -75,21 +78,58 @@ async def test_unreachable_falls_back_to_env(settings: Settings) -> None:
 
 def test_field_by_field_fallback(settings: Settings) -> None:
     partial = {
-        "voice_provider": "exotel",
-        "voice_config": {"exotel": {"accountSid": "", "appId": "555"}, "testNumbers": ["+919000000001"]},
-        "secrets": {"sarvam": {"apiKey": ""}},
+        "provider": "exotel",
+        "exotel": {"accountSid": "", "appId": "555"},
+        "testNumbers": ["+919000000001"],
+        "sarvam": {"apiKey": ""},
     }
     cfg = merge(partial, replace(settings, test_numbers=frozenset({"+919000000002"})))
     assert cfg.exotel_sid == "exo-sid"  # empty remote -> env
     assert cfg.exotel_app_id == "555"  # remote wins
     assert cfg.sarvam_api_key == "sarvam-test"
     assert cfg.test_numbers == frozenset({"+919000000001", "+919000000002"})  # union with TEST_NUMBERS
+    src = cfg.sources_report()
+    assert "exotel.appId" in src["controller"] and "exotel.accountSid" in src["env"] and "sarvam.apiKey" in src["env"]
 
 
 def test_twilio_test_provider_alias(settings: Settings) -> None:
-    cfg = merge({"voice_provider": "twilio_test", "voice_config": {"twilioTest": {"from": "+15550001111"}},
-                 "secrets": {"twilio_voice": {"accountSid": "AC1", "authToken": "tok"}}}, settings)
+    cfg = merge({"provider": "twilio_test", "twilioTest": {"from": "+15550001111", "accountSid": "AC1", "authToken": "tok"}}, settings)
     assert cfg.provider == "twilio" and cfg.twilio_from == "+15550001111" and cfg.missing() == []
+
+
+def test_every_field_of_the_controllers_sample_lands_in_voice_config(tmp_path: Any) -> None:
+    bare = Settings(public_base_url="https://v.test", controller_url="http://c.test", service_secret="s", state_dir=str(tmp_path))
+    f = FIXTURE
+    cfg = merge(f, bare)
+    assert cfg.provider == "exotel" and cfg.source == "controller"
+    assert (cfg.exotel_sid, cfg.exotel_subdomain, cfg.exotel_caller_id, cfg.exotel_app_id) == (
+        f["exotel"]["accountSid"], f["exotel"]["subdomain"], f["exotel"]["callerId"], f["exotel"]["appId"])
+    assert (cfg.exotel_api_key, cfg.exotel_api_token) == (f["exotel"]["apiKey"], f["exotel"]["apiToken"])
+    assert (cfg.twilio_from, cfg.twilio_account_sid, cfg.twilio_auth_token) == (
+        f["twilioTest"]["from"], f["twilioTest"]["accountSid"], f["twilioTest"]["authToken"])
+    assert cfg.test_numbers == frozenset(f["testNumbers"])
+    assert (cfg.sarvam_api_key, cfg.stt_model, cfg.tts_model) == (f["sarvam"]["apiKey"], f["sarvam"]["sttModel"], f["sarvam"]["ttsModel"])
+    assert cfg.voices == f["sarvam"]["voices"] and cfg.voice_for("ta-IN") == "ishita"
+    assert cfg.llm_model == f["llmModel"] and cfg.anthropic_api_key == f["anthropic"]["apiKey"]
+    i = f["anthropicIdentity"]
+    assert cfg.anthropic_identity == AnthropicIdentity(i["organizationId"], i["workspaceId"], i["serviceAccountId"], i["federationRuleId"])
+    # every non-secret and secret leaf of the sample is accounted for in `sources`, and none came from env
+    assert cfg.sources_report()["env"] == []
+    assert set(cfg.sources) >= {
+        "provider", "exotel.accountSid", "exotel.subdomain", "exotel.callerId", "exotel.appId", "exotel.apiKey",
+        "exotel.apiToken", "twilioTest.from", "twilioTest.accountSid", "twilioTest.authToken", "testNumbers",
+        "sarvam.apiKey", "sarvam.sttModel", "sarvam.ttsModel", "sarvam.voices", "llmModel", "anthropic.apiKey",
+        "anthropicIdentity.organizationId", "anthropicIdentity.workspaceId", "anthropicIdentity.serviceAccountId",
+        "anthropicIdentity.federationRuleId",
+    }
+    # the sample is exactly the keys merge reads: a new controller field must be added to both, or this fails
+    assert set(f) == {"provider", "exotel", "twilioTest", "testNumbers", "sarvam", "llmModel", "anthropic", "anthropicIdentity", "ready"}
+
+
+def test_sources_report_never_carries_values(settings: Settings) -> None:
+    cfg = merge(FIXTURE, settings)
+    text = json.dumps(cfg.sources_report())
+    assert "fake-" not in text and "SECRET" not in text
 
 
 async def test_fail_closed_with_no_config_anywhere(tmp_path: Any) -> None:

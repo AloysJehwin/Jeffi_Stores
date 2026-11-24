@@ -133,7 +133,9 @@ class CallService:
         missing = cfg.missing()
         if missing:
             raise NotConfigured(
-                "no provider config: set it in admin Settings -> Providers (or the env fallback)", missing=missing
+                "no provider config: set it in admin Settings -> Providers (or the env fallback)",
+                missing=missing,
+                sources=cfg.sources_report(),
             )
         to_n = normalize_number(to)
         if cfg.provider == "twilio":
