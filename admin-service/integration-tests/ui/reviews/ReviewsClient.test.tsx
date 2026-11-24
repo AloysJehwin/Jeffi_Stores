@@ -70,10 +70,10 @@ describe('ReviewsClient', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/admin/reviews?')
     expect(String(fetchMock.mock.calls[0][0])).toContain('filter=all')
     expect(screen.getByText('Solid drill')).toBeInTheDocument()
-    expect(screen.getByText('Verified')).toBeInTheDocument()
+    expect(screen.getAllByText('Verified').length).toBeGreaterThan(0)
     expect(screen.getByText('Pending')).toBeInTheDocument()
     expect(screen.getByText('Approved')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Power Drill' })).toHaveAttribute('href', '/products/power-drill')
+    expect(screen.getAllByRole('link', { name: 'Power Drill' })[0]).toHaveAttribute('href', '/products/power-drill')
   })
 
   it('shows the empty state', async () => {
@@ -123,7 +123,7 @@ describe('ReviewsClient', () => {
     await screen.findAllByText('Asha Rao')
     fireEvent.click(screen.getByRole('button', { name: 'Read more' }))
     expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument()
-    fireEvent.click(screen.getAllByRole('img')[0].closest('button')!)
+    fireEvent.click(document.querySelector('img[src="https://cdn.test/a-t.jpg"]')!.closest('button')!)
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 })

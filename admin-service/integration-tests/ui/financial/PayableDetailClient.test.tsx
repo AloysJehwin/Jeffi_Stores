@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('next/link', () => ({ default: ({ href, children, ...r }: any) => <a href={href} {...r}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }), usePathname: () => '/admin/financial/payables/e1' }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }), usePathname: () => '/admin/financial/payables/e1', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/components/admin/change-log', () => ({ ChangeLog: ({ kind, id }: any) => <div>changelog:{kind}:{id}</div> }))
 
 const confirm = vi.fn()
