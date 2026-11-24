@@ -202,6 +202,25 @@ describe('a replacement taking effect', () => {
     expect(issuePlatformInvoiceLater).toHaveBeenCalledWith(expect.objectContaining({ externalRef: 'pay_up', amountInr: 120 }))
   })
 
+  it('the upfront payment arriving as a charge authorises the replacement and is recorded as the proration only', async () => {
+    const oldEnd = iso(Date.now() + 10 * DAY)
+    st.subs.sub_cur = sub({ currentEnd: oldEnd })
+    st.subs.sub_new = sub({ id: 'bs-new', razorpaySubscriptionId: 'sub_new', status: 'created', isCurrent: false, replacesId: 'bs-cur', upfrontPaise: 12000, startAt: oldEnd })
+    st.lines = [line({ kind: 'store_plan' }), line({ status: 'awaiting_payment', subscriptionId: 'bs-new' })]
+    // As Razorpay reports it: subscription.authenticated has no payment; the paid upfront invoice is a charge.
+    await onBillingSubscription('subscription.charged', ev('sub_new', { id: 'pay_up', amount: 12000, invoice_id: 'inv_up' }, { status: 'authenticated', current_start: null, current_end: null }), ctx)
+    expect(sqls('SET is_current = true')[0].params).toEqual(['bs-new'])
+    expect(rz.cancelSubscription).toHaveBeenCalledWith('sub_cur', { cancelAtCycleEnd: true })
+    expect(sqls('UPDATE billing_subscriptions SET status = $2').map(c => c.params[1])).toEqual(['authenticated'])
+    expect(sqls('INSERT INTO billing_charges')).toHaveLength(1)
+    expect(issuePlatformInvoiceLater).toHaveBeenCalledTimes(1)
+    expect(issuePlatformInvoiceLater).toHaveBeenCalledWith(expect.objectContaining({ externalRef: 'pay_up', amountInr: 120 }))
+    // Paid through the old cycle's end (takeEffect), not a month from now; no cycle side effects.
+    expect(extendEntitlements).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(extendEntitlements).mock.calls[0][2].getTime()).toBe(Date.parse(oldEnd) + DAY)
+    expect(startStoreIfReady).not.toHaveBeenCalled()
+  })
+
   it('Pay now cancels the halted one at once', async () => {
     st.subs.sub_cur = sub({ status: 'halted' })
     st.subs.sub_new = sub({ id: 'bs-new', razorpaySubscriptionId: 'sub_new', status: 'created', isCurrent: false, replacesId: 'bs-cur', pendingChange: { replaceNow: true } })
@@ -223,6 +242,15 @@ describe('cancelled / completed', () => {
     await onBillingSubscription('subscription.cancelled', ev('sub_old'), ctx)
     expect(sqls('UPDATE billing_lines')).toHaveLength(0)
     expect(closeStore).not.toHaveBeenCalled()
+  })
+
+  it('a replacement nobody authorised that expired releases its lines and leaves the paying one alone', async () => {
+    st.subs.sub_new = sub({ id: 'bs-new', razorpaySubscriptionId: 'sub_new', status: 'created', isCurrent: false, replacesId: 'bs-cur' })
+    await onBillingSubscription('subscription.expired', ev('sub_new'), ctx)
+    expect(sqls("SET status = 'ended', ends_at = now()")[0].params).toEqual(['bs-new'])
+    expect(sqls("SET subscription_id = NULL")[0].params).toEqual(['bs-new'])
+    expect(sqls('UPDATE billing_lines SET status = $2')).toHaveLength(0)
+    expect(setSubscriptionStatus).not.toHaveBeenCalled()
   })
 
   it('ends the lines; only a store is closed, a Showcase-only workspace stays', async () => {

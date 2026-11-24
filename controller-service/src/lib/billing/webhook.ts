@@ -7,7 +7,7 @@ import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { saveDesiredCompute } from '@controller/lib/compute/store'
 import type { ComputeSpec } from '@/lib/compute/spec'
-import { chargedAt, cyclePaise, DAY_MS, listLines, monthlyTotal, patchLine, toLine, type BillingLine } from './lines'
+import { chargedAt, cyclePaise, DAY_MS, listLines, monthlyTotal, patchLine, releaseUnstartedLines, toLine, type BillingLine } from './lines'
 import { getBillingSubscription, subscriptionByRazorpayId, type BillingSubscription } from './subscription'
 import { extendEntitlements } from './entitlements'
 import { applyMigrationCredits } from './migrate'
@@ -219,6 +219,13 @@ async function insertCharge(sub: BillingSubscription, payment: any, start: Date 
   return (ins.rows[0]?.id as string | undefined) ?? null
 }
 
+/**
+ * The upfront add-on's payment: what a replacement collects at authorisation, always less than a cycle. Razorpay's
+ * subscription.authenticated carries no payment, so it arrives as a charge (a webhook, or the sweep's invoice replay).
+ */
+const isUpfront = (sub: BillingSubscription, payment: any) =>
+  sub.upfrontPaise > 0 && sub.upfrontPaise < sub.amountPaise && Number(payment?.amount) === sub.upfrontPaise
+
 /** The upfront proration a replacement collects at authorisation: recorded and invoiced like a charge. */
 async function recordUpfront(sub: BillingSubscription, payment: any): Promise<void> {
   if (!(sub.upfrontPaise > 0) || !payment?.id || !(Number(payment.amount) >= sub.upfrontPaise)) return
@@ -251,6 +258,12 @@ async function onCharged(sub: BillingSubscription, entity: any, payment: any): P
       await pool.query(`UPDATE billing_charges SET refunded_paise = $2 WHERE id = $1`, [id, amount])
     }
     return
+  }
+  // Not a cycle: the replacement is authorised (it takes effect) and the proration is recorded, nothing else moves.
+  if (isUpfront(sub, payment)) {
+    if (sub.status === 'created') await setStatus(sub, 'authenticated')
+    if (!sub.isCurrent && !ENDED.includes(sub.status)) await takeEffect({ ...sub, status: 'authenticated' })
+    return recordUpfront(sub, payment)
   }
   if (!sub.isCurrent && sub.replacesId) await takeEffect(sub)
   else if (!sub.isCurrent && !ENDED.includes(sub.status)) {
@@ -392,7 +405,11 @@ async function onResumed(sub: BillingSubscription): Promise<void> {
 async function onEnded(sub: BillingSubscription, status: string, entity: any): Promise<void> {
   if (GONE.includes(sub.status)) return
   await setStatus(sub, status, ', is_current = false')
-  if (!sub.isCurrent) return
+  // A replacement nobody authorised (Razorpay expires it once its start_at passes; the sweep replays that).
+  if (!sub.isCurrent) {
+    if (sub.status === 'created') await releaseUnstartedLines(sub.id)
+    return
+  }
   const store = hasStore(await listLines(sub.tenantId))
   const end = sec(entity.current_end) ?? sec(entity.ended_at) ?? new Date()
   const ended = end.getTime() <= Date.now()

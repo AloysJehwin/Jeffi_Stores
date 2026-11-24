@@ -177,7 +177,8 @@ describe('cancelSubscription', () => {
     rz.subscriptions.cancel.mockResolvedValue({ status: 'active', current_end: 1700000000 })
     const { cancelSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
     const out = await cancelSubscription('sub_1')
-    expect(rz.subscriptions.cancel).toHaveBeenCalledWith('sub_1', { cancel_at_cycle_end: 1 })
+    // The SDK's second argument is a boolean (true sends cancel_at_cycle_end=1).
+    expect(rz.subscriptions.cancel).toHaveBeenCalledWith('sub_1', true)
     expect(out).toEqual({ status: 'active', endsAt: 1700000000 })
   })
 
@@ -185,8 +186,25 @@ describe('cancelSubscription', () => {
     rz.subscriptions.cancel.mockResolvedValue({ status: 'cancelled', ended_at: 1699999999 })
     const { cancelSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
     const out = await cancelSubscription('sub_1', { cancelAtCycleEnd: false })
-    expect(rz.subscriptions.cancel).toHaveBeenCalledWith('sub_1', { cancel_at_cycle_end: 0 })
+    expect(rz.subscriptions.cancel).toHaveBeenCalledWith('sub_1', false)
     expect(out).toEqual({ status: 'cancelled', endsAt: 1699999999 })
+  })
+
+  it('cancels at once when Razorpay refuses a cycle-end cancel before any cycle has started', async () => {
+    rz.subscriptions.cancel
+      .mockRejectedValueOnce({ statusCode: 400, error: { code: 'BAD_REQUEST_ERROR', description: 'Subscription cannot be cancelled since no billing cycle is going on' } })
+      .mockResolvedValueOnce({ status: 'cancelled', ended_at: 1699999999 })
+    const { cancelSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
+    const out = await cancelSubscription('sub_1')
+    expect(rz.subscriptions.cancel.mock.calls).toEqual([['sub_1', true], ['sub_1', false]])
+    expect(out).toEqual({ status: 'cancelled', endsAt: 1699999999 })
+  })
+
+  it('rethrows any other refusal', async () => {
+    rz.subscriptions.cancel.mockRejectedValueOnce({ statusCode: 400, error: { description: 'The id provided does not exist' } })
+    const { cancelSubscription } = await import('@controller/lib/payments/razorpay-subscriptions')
+    await expect(cancelSubscription('sub_1')).rejects.toMatchObject({ statusCode: 400 })
+    expect(rz.subscriptions.cancel).toHaveBeenCalledTimes(1)
   })
 
   it('falls back to cancelled status + null endsAt when Razorpay returns nothing useful', async () => {
