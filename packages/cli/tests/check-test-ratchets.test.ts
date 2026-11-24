@@ -106,6 +106,25 @@ describe('check-component-tests', () => {
     expect(readList(LIST)).toEqual(['storefront-service/src/components/E.tsx'])
   })
 
+  it('does not count a component that a test only mocks, but counts real imports of every form', () => {
+    for (const n of ['M1', 'M2', 'M3', 'I1', 'I2', 'I3', 'I4', 'I5']) put(`packages/store-core/src/components/${n}.tsx`, COMP)
+    put(
+      'packages/store-core/tests/mocks.test.tsx',
+      [
+        "vi.mock('@/components/M1', () => ({}))",
+        "vi.doMock('@/components/M2', () => ({}))",
+        "const m = await vi.importMock('@/components/M3')",
+        "import X from '@/components/I1'",
+        "import '@/components/I2'",
+        "const a = await import('@/components/I3')",
+        "const b = require('@/components/I4')",
+        "const c = await vi.importActual('@/components/I5')",
+      ].join('\n'),
+    )
+    expect(run(COMPONENT, '--init').code).toBe(0)
+    expect(readList(LIST)).toEqual(['M1', 'M2', 'M3'].map((n) => `packages/store-core/src/components/${n}.tsx`))
+  })
+
   it('--init refuses to overwrite and --prune only drops fixed entries', () => {
     put('packages/store-core/src/components/A.tsx', COMP)
     put('packages/store-core/src/components/B.tsx', COMP)
@@ -159,6 +178,17 @@ describe('check-route-tests', () => {
     expect(run(ROUTE, '--prune').code).toBe(0)
     expect(readList(LIST)).toEqual([])
     expect(run(ROUTE).code).toBe(0)
+  })
+
+  it('does not count a route that a test only mocks', () => {
+    put('admin-service/src/app/api/(admin)/a/route.ts', ROUTE_SRC)
+    put('admin-service/src/app/api/(admin)/b/route.ts', ROUTE_SRC)
+    put(
+      'admin-service/tests/api/x.test.ts',
+      "vi.mock('@admin/app/api/(admin)/a/route', () => ({}))\nimport { GET } from '@admin/app/api/(admin)/b/route'\n",
+    )
+    expect(run(ROUTE, '--init').code).toBe(0)
+    expect(readList(LIST)).toEqual(['admin-service/src/app/api/(admin)/a/route.ts'])
   })
 
   it('fails on an allowlisted route that no longer exists', () => {

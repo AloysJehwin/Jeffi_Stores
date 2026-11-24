@@ -60,7 +60,8 @@ function resolveSpecifier(root, aliases, spec, fromDir) {
   return null
 }
 
-const SPEC_RE = /(?:\bfrom|\bimport|\brequire|\bmock|\bdoMock|\bimportActual|\bimportMock)\s*\(?\s*(['"`])([^'"`\n]+)\1/g
+// Real imports only. vi.mock / vi.doMock / vi.importMock replace a module, they do not exercise it.
+const SPEC_RE = /(?:\bfrom|\bimport|\brequire|\bimportActual)\s*\(?\s*(['"`])([^'"`\n]+)\1/g
 const REEXPORT_RE = /export\s+(?:type\s+)?(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s*from\s*(['"])([^'"]+)\1/g
 
 export function specifiers(src) {
