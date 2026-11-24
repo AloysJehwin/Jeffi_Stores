@@ -29,7 +29,7 @@ def cfg_for(settings: Settings, remote: dict[str, Any] | None = None, **kw: Any)
 
 
 def test_identity_wins_over_a_key(settings: Settings, token_file: str) -> None:
-    cfg = cfg_for(settings, {"anthropicIdentity": IDENT}, anthropic_api_key="sk-ant-key", anthropic_identity_token_file=token_file)
+    cfg = cfg_for(settings, {"anthropicIdentity": IDENT}, anthropic_api_key="not-a-key-fixture", anthropic_identity_token_file=token_file)
     assert cfg.identity_ready()
     client = build_llm_client(cfg)
     assert isinstance(client.credentials, WorkloadIdentityCredentials)
@@ -40,7 +40,7 @@ def test_a_stray_env_auth_token_or_key_does_not_shadow_federation(
     settings: Settings, token_file: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "stray-token")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stray")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-key-stray")
     cfg = cfg_for(settings, {"anthropicIdentity": IDENT}, anthropic_api_key="", anthropic_identity_token_file=token_file)
     client = build_llm_client(cfg)
     assert isinstance(client.credentials, WorkloadIdentityCredentials)
@@ -48,10 +48,10 @@ def test_a_stray_env_auth_token_or_key_does_not_shadow_federation(
 
 
 def test_the_key_is_the_fallback_without_an_identity(settings: Settings) -> None:
-    cfg = cfg_for(settings, None, anthropic_api_key="sk-ant-key")
+    cfg = cfg_for(settings, None, anthropic_api_key="not-a-key-fixture")
     assert not cfg.identity_ready()
     client = build_llm_client(cfg)
-    assert client.api_key == "sk-ant-key" and client.credentials is None
+    assert client.api_key == "not-a-key-fixture" and client.credentials is None
 
 
 def test_identity_from_env_when_the_controller_has_none(settings: Settings, token_file: str) -> None:

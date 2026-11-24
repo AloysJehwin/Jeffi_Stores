@@ -263,10 +263,20 @@ async def run(names: list[str], groups: list[str], live: bool, max_minutes: floa
         await h.close()
     meta = {"started": started, "mode": mode, "cold_greeting_s": locals().get("cold_greeting"), "providers": providers.label(), "claude": claude_note if live else "",
             "commit": git_commit(), "pipecat": _pipecat_version(), "llm_model": keys.llm_model,
-            "max_concurrent": h.max_concurrent, "seconds": round(time.monotonic() - t_start), "live_minutes": round(spent_min, 2)}
+            "max_concurrent": h.max_concurrent, "seconds": round(time.monotonic() - t_start), "live_minutes": round(spent_min, 2),
+            "turn_max_wait_s": _turn_max_wait(h.voice_env())}
     jp, mp = report.write(out, meta, results)
     log(f"report: {mp}")
     return 1 if any(r.status in ("fail", "error") for r in results) else 0
+
+
+def _turn_max_wait(env: dict[str, str]) -> float | None:
+    try:
+        from voice_service.config import load_settings
+
+        return load_settings(env).turn_max_wait_s
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _pipecat_version() -> str:

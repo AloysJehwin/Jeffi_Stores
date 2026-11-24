@@ -178,7 +178,10 @@ class Harness:
             if self.proc.poll() is not None:
                 raise RuntimeError(f"voice-service exited ({self.proc.returncode}); see {self.voice_log}")
             try:
-                r = await self.http.get(f"{self.url('voice')}/healthz", timeout=2.0)
+                # Ready the way k8s sees it: /readyz (models preloaded), or /healthz on a build without it.
+                r = await self.http.get(f"{self.url('voice')}/readyz", timeout=2.0)
+                if r.status_code == 404:
+                    r = await self.http.get(f"{self.url('voice')}/healthz", timeout=2.0)
                 if r.status_code == 200:
                     return
             except httpx.HTTPError:

@@ -107,8 +107,8 @@ def markdown(meta: dict[str, Any], kn: dict[str, Any], results: list[ScenarioRes
     if meta.get("claude"):
         L.append(f"- Claude: {meta['claude']}")
     if meta.get("cold_greeting_s") is not None:
-        L.append(f"- Cold start: the first call after voice-service started greeted after {meta['cold_greeting_s']:.2f}s "
-                 "(VAD and Smart Turn models loading); an unreported warm-up call takes that, and the scenarios run warm")
+        L.append(f"- Cold start: the first call after voice-service became ready (/readyz) greeted after "
+                 f"{meta['cold_greeting_s']:.2f}s; an unreported warm-up call takes that, and the scenarios run warm")
     L.append("")
     if mocked:
         L.append("> No-key run: Sarvam and Claude are replaced by mocks (an energy-segmenting STT that reports the caller's "
@@ -127,8 +127,9 @@ def markdown(meta: dict[str, Any], kn: dict[str, Any], results: list[ScenarioRes
     L.append(f"| Barge-in: bot audio stopped after | p50 {_fmt(bi['stop_p50'])}, max {_fmt(bi['stop_max'])}; clear sent after p50 {_fmt(bi['clear_p50'])} ({bi['n']}) |")
     L.append(f"| Terminal events | {te['exactly_one']}/{te['placed']} placed calls had exactly one |")
     tt = kn["turn_timeouts"]
-    L.append(f"| Smart Turn waited the full VOICE_TURN_MAX_WAIT_S (3 s) | {tt['timeouts']} of {tt['caller_turns']} caller turns "
-             "(each adds about 3 s to that reply) |")
+    wait = f"{meta['turn_max_wait_s']:g} s" if meta.get("turn_max_wait_s") else "?"
+    L.append(f"| Smart Turn waited the full VOICE_TURN_MAX_WAIT_S ({wait}) | {tt['timeouts']} of {tt['caller_turns']} caller "
+             f"turns (each adds about {wait} to that reply) |")
     L.append(f"| Tool-call checks | {tl['passed']}/{tl['total']} passed |")
     L.append(f"| Transcript fidelity (bot audio re-transcribed vs bot text) | "
              + (f"mean WER {fi['wer_mean']:.3f} ({fi['n']} calls) |" if fi["wer_mean"] is not None else "skipped: needs Sarvam STT (live run) |"))
