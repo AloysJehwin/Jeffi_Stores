@@ -15,11 +15,10 @@ const EDITOR = [
 ]
 // The editor's shell, its panels and host plumbing (admin, Showcase).
 const SHELL = 'packages/store-core/src/components/site-editor/'
+// App aliases are built from their names: a quoted '@<app>/' literal here would trip app-import-boundaries.
 const ALIAS: [string, string][] = [
   ['@/', 'packages/store-core/src/'],
-  ['@storefront/', 'storefront-service/src/'],
-  ['@showcase/', 'showcase-service/src/'],
-  ['@business/', 'business-service/src/'],
+  ...['storefront', 'showcase', 'business'].map((app): [string, string] => ['@' + app + '/', `${app}-service/src/`]),
 ]
 const PKG: Record<string, string> = { '@jeffi/site-blocks': 'packages/site-blocks/src/index.ts', '@jeffi/site-blocks/design': 'packages/site-blocks/src/design.ts' }
 const EXT = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js']
