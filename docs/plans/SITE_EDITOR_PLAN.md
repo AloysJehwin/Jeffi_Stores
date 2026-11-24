@@ -93,6 +93,12 @@ AI-generated pages must be editable with it.
    inside), or an AI shorten. The editor's "Check page" lists them with Show and Fix; `lib/site/critique.ts` reports
    them for code sections while the editor is on (read from their trees), and its off-screen check now uses the same
    code.
+4. A redesign over manual edits asks first and offers "keep my words". A page whose code sections carry editor
+   trees counts as changed by hand (`keep-words.ts` `handEdited`; the studio outline says `edited`). "Design this
+   page again" then confirms that it replaces those changes and asks "Keep my words" or "Start fresh": the Showcase
+   studio writes the page's words into the brief (`POST /studio/design/keep-words`, `StudioBrief.keepWords`), the admin
+   page redo passes `keepWords` to `startPageRedo`. The section writer's brief reuses them where they fit; section
+   changes (tweaks) leave them out. The generation rules for editor sections (`EDITOR_RULES`) came with slice 1.
 
 **Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
 scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for

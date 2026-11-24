@@ -82,6 +82,13 @@ ${libraryText(page)}`
 }
 
 export function briefText(b: StudioBrief): string {
+  const keep = b.keepWords?.length
+    ? `\nThe owner wrote these words on the page being designed again; reuse them as written where they fit (headings, lines, buttons): ${b.keepWords.map(w => `"${w}"`).join(' · ')}`
+    : ''
+  return `${ownBriefText(b)}${keep}`
+}
+
+function ownBriefText(b: StudioBrief): string {
   if (b.kind === 'showcase') return showcaseBriefText(b)
   const st = uiStyle(b.uiStyle)
   const refs = b.references ?? []
@@ -122,7 +129,7 @@ Fix exactly these problems, keep the design, and return the whole component agai
 }
 
 export function tweakUser(b: StudioBrief, d: DesignDirection, label: string, source: string, instruction: string): string {
-  return `${briefText(b)}
+  return `${ownBriefText(b)}
 
 ${directionText(d)}
 

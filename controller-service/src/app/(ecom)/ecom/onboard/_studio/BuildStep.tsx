@@ -387,7 +387,19 @@ export default function BuildStep({
               confirmLabel: `Design again · ₹${charge}`,
             }
           : { title: `Design the ${currentPage.label} page again?`, message: `It counts as ${units} of today’s free changes.`, confirmLabel: 'Design again' }
-    if (!(await confirm(ask))) return
+    // Changed by hand in the visual editor: say so, then offer to keep the owner's words in the new design.
+    const edited = visualOk && !!s.pages[current]?.edited
+    if (!(await confirm(edited ? { ...ask, message: `${ask.message} It replaces the changes you made by hand.` } : ask))) return
+    if (edited) {
+      const keep = await confirm({
+        title: 'Keep your words?',
+        message: 'The new design can reuse the words you wrote on this page, or start from fresh copy.',
+        confirmLabel: 'Keep my words',
+        cancelLabel: 'Start fresh',
+      })
+      const ok = await fetch(studioUrl('design/keep-words'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: current, keep }) }).then(r => r.ok, () => false)
+      if (!ok) return showToast('Your choice could not be saved. Try again.', 'error')
+    }
     setWorking('rebuild')
     setPicked(null)
     try {

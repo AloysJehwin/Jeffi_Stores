@@ -73,6 +73,8 @@ export interface StudioBrief extends StudioStoreDetails {
   stockQueries?: string[]
   /** What the site is for: a store (absent) or a Showcase, a business's one-page site (studio/showcase.ts). */
   kind?: StudioProduct
+  /** "Keep my words": what the owner wrote on a page being designed again, to reuse where it fits (keep-words.ts). */
+  keepWords?: string[]
 }
 
 /** The product a studio session designs for: a store's site, or a Showcase. */

@@ -1,5 +1,6 @@
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
+import { handEdited } from '@/lib/site/studio/keep-words'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
@@ -45,7 +46,11 @@ export function studioView(s: StudioSession | null) {
   const outline = Object.fromEntries(
     Object.entries(pages ?? {}).map(([key, doc]) => [
       key,
-      { sections: (doc.order ?? []).map(id => ({ id, label: String(doc.blocks?.[id]?.props?.label ?? 'Section'), ...(doc.blocks?.[id]?.visibility?.hidden ? { hidden: true } : {}) })) },
+      {
+        sections: (doc.order ?? []).map(id => ({ id, label: String(doc.blocks?.[id]?.props?.label ?? 'Section'), ...(doc.blocks?.[id]?.visibility?.hidden ? { hidden: true } : {}) })),
+        // Changed by hand in the visual editor: a redesign asks first and offers to keep the owner's words.
+        ...(handEdited(doc) ? { edited: true } : {}),
+      },
     ])
   )
   const products = ((catalog as { products?: { images?: string[]; imagePrompt?: string }[] } | null)?.products ?? [])
