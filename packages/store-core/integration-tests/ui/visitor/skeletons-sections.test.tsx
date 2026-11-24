@@ -48,9 +48,14 @@ describe('HomeLayoutSkeleton', () => {
 
   it('puts a left/right pair side by side in one row', () => {
     const { container } = render(<HomeLayoutSkeleton sections={[sec('trust_strip', 'left'), sec('about', 'right'), sec('hero')]} />)
-    const root = container.firstChild as HTMLElement
-    expect(root.childNodes).toHaveLength(2)
-    expect((root.firstChild as HTMLElement).childNodes).toHaveLength(2)
+    const rows = Array.from((container.firstChild as HTMLElement).children).filter(c => c.tagName !== 'STYLE')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].childNodes).toHaveLength(2)
+  })
+
+  it('hides the footer while it shows', () => {
+    const { container } = render(<HomeLayoutSkeleton sections={[sec('hero')]} />)
+    expect(container.querySelector('style')?.textContent).toContain('footer{visibility:hidden}')
   })
 })
 
