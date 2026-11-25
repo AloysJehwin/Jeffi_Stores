@@ -10,7 +10,8 @@ vi.mock('@/lib/queries', () => ({
   EFFECTIVE_STOCK_SQL: 'COALESCE(stock, 0)',
 }))
 vi.mock('@/lib/shared/rag', () => ({
-  embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+  embedWithModel: vi.fn().mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' }),
+  LEGACY_EMBED_MODEL: 'nomic-embed-text',
   findSimilarProductIds: vi.fn(),
   queryManyReplica: vi.fn(),
   runWithHnswTuning: vi.fn(),
@@ -42,7 +43,7 @@ import * as aiClient from '@/lib/shared/ai-client'
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)
 const mockQuery = vi.mocked(db.query)
-const mockEmbed = vi.mocked(rag.embed)
+const mockEmbed = vi.mocked(rag.embedWithModel)
 const mockQueryManyReplica = vi.mocked(rag.queryManyReplica)
 const mockRunWithHnswTuning = vi.mocked(rag.runWithHnswTuning)
 const mockOcrPdfPages = vi.mocked(vision.ocrPdfPages)
@@ -344,7 +345,7 @@ describe('match_quotation_items', () => {
   })
 
   it('marks line unmatched when requestedText is empty string', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     const lines = JSON.stringify([{ requestedText: '', qty: 1 }])
     const result = (await getTool('match_quotation_items').handler({ lines })) as any
     expect(result.ok).toBe(true)
@@ -352,28 +353,28 @@ describe('match_quotation_items', () => {
   })
 
   it('marks line unmatched when qty is 0', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: 0 }])
     const result = (await getTool('match_quotation_items').handler({ lines })) as any
     expect(result.data.lines[0].status).toBe('unmatched')
   })
 
   it('marks line unmatched when qty is negative', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: -5 }])
     const result = (await getTool('match_quotation_items').handler({ lines })) as any
     expect(result.data.lines[0].status).toBe('unmatched')
   })
 
   it('marks line unmatched when qty is NaN (non-numeric string)', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: 'abc' }])
     const result = (await getTool('match_quotation_items').handler({ lines })) as any
     expect(result.data.lines[0].status).toBe('unmatched')
   })
 
   it('returns unmatched when embeddings query returns empty', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     const lines = JSON.stringify([{ requestedText: 'obscure item nobody sells', qty: 1 }])
     const result = (await getTool('match_quotation_items').handler({ lines })) as any
     expect(result.data.lines[0].status).toBe('unmatched')
@@ -381,7 +382,7 @@ describe('match_quotation_items', () => {
   })
 
   it('returns unmatched when top candidate sim < 0.45', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // embeddings query → low sim product
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [{ source_table: 'products', source_id: 'p1', sim: 0.3 }],
@@ -393,7 +394,7 @@ describe('match_quotation_items', () => {
   })
 
   it('returns matched when top sim >= threshold with single candidate', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // embeddings returns 1 product result with high sim; no variants
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [{ source_table: 'products', source_id: 'p1', sim: 0.9 }],
@@ -406,7 +407,7 @@ describe('match_quotation_items', () => {
   })
 
   it('returns matched when score ≥ 90 and lead ≥ 5 over second', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // p1: sim=0.92, name='Bolt M20', query='bolt m20'
     //   → embedding=0.92, tokenOverlap=1.0 (both tokens hit), specNum=0.5 (neutral, no numeric specs), skuFrag=0.5 (neutral)
     //   → score=round((0.92*0.50 + 1.0*0.20 + 0.5*0.20 + 0.5*0.10)*100)=round(0.66*100)=66... no, m20 IS a spec
@@ -433,7 +434,7 @@ describe('match_quotation_items', () => {
   })
 
   it('returns ambiguous when two candidates are close in score', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // sim 0.82 vs 0.80 — diff 0.02 < 0.05, both >= 0.45, top >= default threshold 0.62
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [
@@ -452,7 +453,7 @@ describe('match_quotation_items', () => {
   })
 
   it('returns ambiguous when top sim is between 0.45 and threshold', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // sim 0.55 < default threshold 0.62, but >= 0.45 → ambiguous
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [{ source_table: 'products', source_id: 'p1', sim: 0.55 }],
@@ -464,7 +465,7 @@ describe('match_quotation_items', () => {
   })
 
   it('handles product_variants source_table — resolves via variant→product mapping', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // sim=0.95, name='Bolt M20', query='bolt m20' → specNum=1.0 (m20 matches), tokenOverlap=1.0, skuFrag=0.5
     // score=round((0.95*0.50 + 1.0*0.20 + 1.0*0.20 + 0.5*0.10)*100) = round(0.925*100) = 93 → matched
     mockRunWithHnswTuning.mockResolvedValueOnce({
@@ -479,7 +480,7 @@ describe('match_quotation_items', () => {
   })
 
   it('handles mix of products and variants in same embeddings result', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [
         { source_table: 'products', source_id: 'p1', sim: 0.88 },
@@ -499,7 +500,7 @@ describe('match_quotation_items', () => {
   })
 
   it('score ≥ 90 with exact text match and high sim → matched (haiku tiebreaker lifts score)', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // sim=0.92, query='widget', name='Widget'
     // JS score ≈ 76 (no numeric specs → specNum=0.5 neutral, skuFrag=0.5 neutral)
     // haiku tiebreaker fires (76 is in ambiguous band 45–89) and returns 95 → matched
@@ -521,7 +522,7 @@ describe('match_quotation_items', () => {
   })
 
   it('score 45–89 → ambiguous (moderate sim, no token/spec overlap)', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // sim=0.75, query='bolt', name='SomeWidget'
     // tokenOverlap=0, specNum=0.5 (neutral, no numeric specs), skuFrag=0.5 (neutral)
     // score=round((0.75*0.50 + 0*0.20 + 0.5*0.20 + 0.5*0.10)*100)=round(0.525*100)=53 → ambiguous band
@@ -538,7 +539,7 @@ describe('match_quotation_items', () => {
   })
 
   it('returns ok with summary counts across multiple lines', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // Line 1: no embeddings → unmatched
     // Line 2: empty text → unmatched (skips embed)
     mockRunWithHnswTuning.mockResolvedValueOnce({ rows: [] } as any) // line 1 embeddings
@@ -897,7 +898,7 @@ describe('match_quotation_items embeddings catch fallback', () => {
   })
 
   it('treats line as unmatched when embeddings query rejects', async () => {
-    mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockEmbed.mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' } as any)
     // queryManyReplica (embeddings SELECT) rejects — .catch(() => []) should fire
     mockRunWithHnswTuning.mockRejectedValueOnce(new Error('DB down'))
     const lines = JSON.stringify([{ requestedText: 'M16 bolt', qty: 2 }])
@@ -1054,8 +1055,8 @@ describe('extract_quotation_lines_from_attachment', () => {
   it('returns err for unsupported mime type', async () => {
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1',
-      mime_type: 'audio/mpeg',
-      filename: 'note.mp3',
+      mime_type: 'video/mp4',
+      filename: 'note.mp4',
       byte_size: 300,
       data: Buffer.from('id3'),
       extracted_text: null,
@@ -1063,6 +1064,6 @@ describe('extract_quotation_lines_from_attachment', () => {
     })
     const result = (await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' })) as any
     expect(result.ok).toBe(false)
-    expect(result.reason).toMatch(/cannot listen to audio/i)
+    expect(result.reason).toMatch(/cannot watch video/i)
   })
 })

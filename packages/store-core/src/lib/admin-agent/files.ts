@@ -5,10 +5,11 @@ import { query } from '@/lib/shared/db'
 import { ocrImage, ocrPdfPages } from './vision'
 import { KIND_BY_MIME, unsupportedMessage } from './file-types'
 import { pdfText } from './pdf'
+import { transcribeAudio } from '@/lib/shared/transcribe'
 
 // How an attachment's text is read: PDFs (text layer, else page OCR), images (vision), Word /
-// PowerPoint / OpenDocument (their XML), spreadsheets (CSV per sheet) and plain text. Audio and video
-// are not read: there is no transcription model.
+// PowerPoint / OpenDocument (their XML), spreadsheets (CSV per sheet), plain text and audio (speech
+// to text through the gateway's audio provider). Video is not read.
 
 export type ReadResult =
   | { ok: true; text: string; source: string; pages?: number; model?: string; truncated?: boolean }
@@ -113,6 +114,17 @@ export async function readAttachment(buf: Buffer, mime: string, purpose: ReadPur
       if (!img.ok) return img
       const v = await ocrImage(img.buf, purpose)
       return v.ok ? done(v.text, 'vision_ocr', { model: v.model }) : v
+    }
+    if (kind === 'audio') {
+      const t = await transcribeAudio({ audio: buf, mimeType: mime, feature: 'agent_file_read' })
+      if (!t.ok) {
+        return {
+          ok: false,
+          reason: t.reason,
+          hint: t.code === 'too_large' ? 'Trim the recording or attach a shorter one.' : t.code === 'unavailable' ? undefined : 'Type out what it says, or attach a document or photo.',
+        }
+      }
+      return done(t.text, 'audio_transcript', { model: t.model })
     }
     if (kind === 'docx') return done(await readDocx(buf), 'docx')
     if (kind === 'pptx') return done(await readPptx(buf), 'pptx')

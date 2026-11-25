@@ -103,18 +103,43 @@ export async function embed(text: string): Promise<number[]> {
   return vector
 }
 
+/** Rows written before `embedding_model` existed (NULL) are nomic-embed-text vectors. */
+export const LEGACY_EMBED_MODEL = 'nomic-embed-text'
+
+interface EmbedWithModelFn {
+  aiEmbedWithModel: (input: string | string[]) => Promise<{ vectors: number[][]; model: string; provider?: string }>
+}
+
+/** Embeds one text and reports the model that produced the vector (stored and compared per row). */
+export async function embedWithModel(text: string): Promise<{ vector: number[]; model: string }> {
+  const { aiEmbedWithModel } = (await import('@/lib/shared/ai-client')) as unknown as EmbedWithModelFn
+  const r = await aiEmbedWithModel(text)
+  const vector = r?.vectors?.[0]
+  if (!vector || !Array.isArray(vector)) throw new Error('Gateway embed response missing embedding array')
+  return { vector, model: r.model || LEGACY_EMBED_MODEL }
+}
+
+/**
+ * SQL predicate that keeps only rows embedded by `model` (NULL counts as the legacy model), so a
+ * query vector is never compared with a vector from another model. Appends the param.
+ */
+export function embeddingModelPredicate(params: unknown[], model: string, column = 'embedding_model'): string {
+  params.push(model)
+  return `COALESCE(${column}, '${LEGACY_EMBED_MODEL}') = $${params.length}`
+}
+
 export async function findSimilar(query: string, opts: FindSimilarOptions = {}): Promise<RagResult[]> {
   const limit = opts.limit ?? 10
   const minSimilarity = opts.minSimilarity
   const tables = opts.sourceTables ?? (opts.sourceTable ? [opts.sourceTable] : undefined)
 
-  const vec = await embed(query)
+  const { vector: vec, model } = await embedWithModel(query)
   const vecLiteral = toVectorLiteral(vec)
   const tenantId = await currentRagTenantId()
 
   const params: unknown[] = [vecLiteral]
   // A tenant reads only its own embeddings; the platform reads its own (NULL). No fallback.
-  const where: string[] = [tenantPredicate(params, tenantId)]
+  const where: string[] = [tenantPredicate(params, tenantId), embeddingModelPredicate(params, model)]
 
   if (tables && tables.length > 0) {
     params.push(tables)
@@ -197,7 +222,7 @@ export interface SimilarProductId {
 }
 
 export async function findSimilarProductIds(query: string, limit = 20): Promise<SimilarProductId[]> {
-  const vec = await embed(query)
+  const { vector: vec, model } = await embedWithModel(query)
   const vecLiteral = toVectorLiteral(vec)
 
   // Read the CURRENT TENANT's own embeddings table (flagship = its own DB). Within a tenant DB every
@@ -205,20 +230,20 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
   const productSql = `
     SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-     WHERE source_table = 'products'
+     WHERE source_table = 'products' AND COALESCE(embedding_model, '${LEGACY_EMBED_MODEL}') = $3
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
   const variantSql = `
     SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-     WHERE source_table = 'product_variants'
+     WHERE source_table = 'product_variants' AND COALESCE(embedding_model, '${LEGACY_EMBED_MODEL}') = $3
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
   const [productRows, variantRows, keywordRows] = await Promise.all([
-    tenantHnswQuery<{ source_id: string; similarity: number | string }>(productSql, [vecLiteral, limit]),
-    tenantHnswQuery<{ source_id: string; similarity: number | string }>(variantSql, [vecLiteral, limit]),
+    tenantHnswQuery<{ source_id: string; similarity: number | string }>(productSql, [vecLiteral, limit, model]),
+    tenantHnswQuery<{ source_id: string; similarity: number | string }>(variantSql, [vecLiteral, limit, model]),
     keywordProductIds(query, limit),
   ])
 

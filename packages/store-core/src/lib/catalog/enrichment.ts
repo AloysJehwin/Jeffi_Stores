@@ -293,7 +293,7 @@ export async function promoteEnrichment(row: EnrichmentLogRow) {
 /** Rebuilds the product's search embedding in the current store's own DB (#489). */
 export async function reEmbedProduct(productId: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const { embed } = await import('@/lib/shared/rag')
+    const { embedWithModel } = await import('@/lib/shared/rag')
     const product = await queryOne<{
       name: string
       sku: string | null
@@ -335,19 +335,19 @@ export async function reEmbedProduct(productId: string): Promise<{ ok: boolean; 
       .filter(Boolean)
       .join('\n')
 
-    const vec = await embed(content)
+    const { vector: vec, model } = await embedWithModel(content)
     const vecLit = '[' + vec.join(',') + ']'
     const crypto = await import('node:crypto')
     const hash = crypto.createHash('sha256').update(content).digest('hex')
     const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
     const tenantId = await resolveTenantId()
     await query(
-      `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, updated_at)
-       VALUES ($5, 'products', $1, $2, $3, $4::vector, NOW())
+      `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, embedding_model, updated_at)
+       VALUES ($5, 'products', $1, $2, $3, $4::vector, $6, NOW())
        ON CONFLICT (tenant_id, source_table, source_id)
        DO UPDATE SET content = EXCLUDED.content, content_hash = EXCLUDED.content_hash,
-                     embedding = EXCLUDED.embedding, updated_at = NOW()`,
-      [productId, content, hash, vecLit, tenantId]
+                     embedding = EXCLUDED.embedding, embedding_model = EXCLUDED.embedding_model, updated_at = NOW()`,
+      [productId, content, hash, vecLit, tenantId, model]
     )
     return { ok: true }
   } catch (err: any) {

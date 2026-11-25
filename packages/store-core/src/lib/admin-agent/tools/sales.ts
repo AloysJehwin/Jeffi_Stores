@@ -7,7 +7,7 @@ import { quotationLineRow, quotationLineSchema, quotationTotals, type QuotationL
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { unitChainsFor, asSellingUnit, type LineUnit } from '@/lib/catalog/unit-factor'
 import { normUnit, validatePurchaseQuantity } from '@/lib/catalog/selling-unit'
-import { embed, queryManyReplica, runWithHnswTuning } from '@/lib/shared/rag'
+import { embedWithModel, queryManyReplica, runWithHnswTuning, LEGACY_EMBED_MODEL } from '@/lib/shared/rag'
 import { aiChat } from '@/lib/shared/ai-client'
 import type { ToolDef } from '../tools'
 import { ok, err } from '../tool-envelope'
@@ -581,13 +581,14 @@ const match_quotation_items: ToolDef = {
         results.push({ requestedText: text, qty, requestedUnit, status: 'unmatched', candidates: [] })
         continue
       }
-      const v = await embed(text)
+      const { vector: v, model } = await embedWithModel(text)
       const hnswResult = await runWithHnswTuning(
         `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
          FROM embeddings
          WHERE source_table IN ('products', 'product_variants')
+           AND COALESCE(embedding_model, '${LEGACY_EMBED_MODEL}') = $2
          ORDER BY embedding <=> $1::vector LIMIT 30`,
-        [vec(v)]
+        [vec(v), model]
       ).catch(() => ({ rows: [] as { source_table: string; source_id: string; sim: number }[] }))
       const ids = hnswResult.rows.map(r => ({ ...r, sim: typeof r.sim === 'string' ? parseFloat(r.sim) : r.sim }))
 

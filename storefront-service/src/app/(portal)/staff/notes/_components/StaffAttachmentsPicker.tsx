@@ -63,7 +63,10 @@ export default function StaffAttachmentsPicker({ d, layout }: { d: StaffNoteDraf
           Up to {MAX_FILES} attachments. Handwritten notes, sketches, measurements.
         </p>
       </div>
-      <StaffVoiceMemo onRecorded={(blob, duration) => d.setAudio(blob ? { blob, duration } : null)} />
+      <StaffVoiceMemo
+        onRecorded={(blob, duration) => d.setAudio(blob ? { blob, duration } : null)}
+        onTranscript={text => d.setBody(prev => (prev.trim() ? `${prev.trimEnd()}\n\n${text}` : text))}
+      />
     </div>
   )
 }

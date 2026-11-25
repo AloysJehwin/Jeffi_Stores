@@ -5,14 +5,15 @@
 //   npx tsx scripts/backfill-tenant-embeddings.ts --tenant <slug>   # one tenant
 //   npx tsx scripts/backfill-tenant-embeddings.ts --all             # every active tenant
 //   npx tsx scripts/backfill-tenant-embeddings.ts --flagship        # the platform store (no tenant ctx)
+//   add --force to re-embed everything regardless of content hash / embedding model
 //
 // Reads products from, and writes embeddings into, the tenant's own database (via db.ts tenant pool).
 import { config as loadEnv } from 'dotenv'
 loadEnv({ path: '.env.local' })
 loadEnv()
-import { runWithTenantContext, type TenantContext } from '@/lib/tenancy/tenant-context'
+import type { TenantContext } from '@/lib/tenancy/tenant-context'
 import { lookupTenantContextBySlug, listTenants } from '@/lib/tenant-registry'
-import { backfillProductEmbeddings } from '@/lib/shared/embed-products'
+import { runStoreBackfill } from '@/lib/shared/embed-backfill-run'
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find(a => a === `--${name}` || a.startsWith(`--${name}=`))
@@ -21,11 +22,7 @@ function arg(name: string): string | undefined {
 }
 
 async function runOne(label: string, ctx: TenantContext | null): Promise<void> {
-  const fn = () => backfillProductEmbeddings({ onlyMissing: true })
-  const result = ctx ? await runWithTenantContext(ctx, fn) : await fn()
-  console.log(
-    `[${label}] total=${result.total} embedded=${result.embedded} skipped=${result.skipped} failed=${result.failed}`
-  )
+  await runStoreBackfill(label, ctx, { force: arg('force') !== undefined })
 }
 
 async function main() {
@@ -55,7 +52,7 @@ async function main() {
     return
   }
 
-  console.error('usage: --tenant <slug> | --all | --flagship')
+  console.error('usage: --tenant <slug> | --all | --flagship [--force]')
   process.exit(2)
 }
 
