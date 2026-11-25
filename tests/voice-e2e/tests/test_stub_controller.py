@@ -79,7 +79,7 @@ def test_voice_service_reads_the_stub_config() -> None:
     from voice_service.provider_config import merge
 
     c, _ = _client()
-    cfg = merge(c.get("/api/internal/outreach/voice-config", headers=_h(None)).json(), Settings(sarvam_api_key="k"))
+    cfg = merge(c.get("/api/internal/outreach/voice-config", headers=_h(None)).json(), Settings(sarvam_api_key="k", anthropic_api_key="k"))  # credentials are env-only
     assert cfg.provider == "exotel" and cfg.voice_for("ta") == "kavya" and cfg.claude_missing() == []
 
 

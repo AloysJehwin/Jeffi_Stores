@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "bdd82b226a072c8a17bf757ed71966aa08c91c0d2333b818672df07cbe95582e",
+ "manifestHash": "b0c43e10190f6036ccb78740e3fb218fab71933c43d96fb4f3842216cdd396c4",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -39520,84 +39520,6 @@
    "command": "settings-providers credentials"
   },
   {
-   "id": "admin PUT /api/admin/settings/providers/credentials",
-   "host": "admin",
-   "method": "PUT",
-   "path": "/api/admin/settings/providers/credentials",
-   "gatewayPath": "/v1/admin/settings/providers/credentials",
-   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
-   "pathParams": [],
-   "query": [],
-   "queryParams": [],
-   "scope": "settings:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "settings:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": {
-    "type": "object",
-    "properties": {
-     "provider": {
-      "type": "string",
-      "enum": [
-       "exotel",
-       "sarvam",
-       "azure_speech",
-       "twilio_voice",
-       "anthropic_voice"
-      ]
-     },
-     "values": {
-      "description": "any JSON value (type not inferred)"
-     }
-    }
-   },
-   "bodySource": "inferred",
-   "bodyContentType": "application/json",
-   "summary": "Update credentials (settings providers)",
-   "command": "settings-providers credentials-update"
-  },
-  {
-   "id": "admin DELETE /api/admin/settings/providers/credentials",
-   "host": "admin",
-   "method": "DELETE",
-   "path": "/api/admin/settings/providers/credentials",
-   "gatewayPath": "/v1/admin/settings/providers/credentials",
-   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
-   "pathParams": [],
-   "query": [
-    "provider"
-   ],
-   "queryParams": [
-    {
-     "name": "provider",
-     "schema": {
-      "type": "string",
-      "enum": [
-       "exotel",
-       "sarvam",
-       "azure_speech",
-       "twilio_voice",
-       "anthropic_voice"
-      ]
-     }
-    }
-   ],
-   "scope": "settings:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "settings:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": null,
-   "noBody": true,
-   "summary": "Delete credentials (settings providers)",
-   "command": "settings-providers credentials-delete"
-  },
-  {
    "id": "admin POST /api/admin/settings/providers/credentials/test",
    "host": "admin",
    "method": "POST",
@@ -39621,17 +39543,16 @@
       "type": "string",
       "enum": [
        "exotel",
-       "azure_speech"
+       "twilio_voice",
+       "azure_speech",
+       "sarvam"
       ]
      }
-    },
-    "required": [
-     "provider"
-    ]
+    }
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
-   "summary": "Read-only check of saved Outreach credentials. Exotel: a balance read, no call placed. Azure Speech: a token request, nothing spoken or transcribed. Sarvam has no read-only endpoint, so it has no test. Platform owner on the flagship only.",
+   "summary": "Test (settings providers credentials)",
    "command": "settings-providers-credentials test"
   },
   {

@@ -103,10 +103,13 @@ event goes out 30 s later with what is known (`durationSource: "local"`, `provid
 
 ## Configuration
 
-**Primary source: admin Settings → Providers.** The controller serves it at
-`/api/internal/outreach/voice-config`; it is fetched when a call starts, cached for 60 s in memory only, and each field
-falls back to its env var below when the endpoint is unreachable or leaves the field empty. With neither, `/calls`
-refuses with `503` and lists what is missing.
+**Settings: admin Settings → Providers; credentials: this service's env only.** The controller serves the
+non-secret config at `/api/internal/outreach/voice-config`; it is fetched when a call starts, cached for 60 s in memory
+only, and each field falls back to its env var below when the endpoint is unreachable or leaves the field empty.
+Credentials (`EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `SARVAM_API_KEY`,
+`AZURE_SPEECH_KEY`, optional `ANTHROPIC_API_KEY`) are read from env only (the voice-service Secret); the endpoint carries
+none, and any it sent would be ignored. With a setting or credential missing, `/calls` refuses with `503` and lists
+what is missing.
 
 | Env | Default | Purpose |
 |---|---|---|
@@ -116,12 +119,15 @@ refuses with `503` and lists what is missing.
 | `TELEPHONY_PROVIDER` | `exotel` | fallback for `voice_provider` (`exotel`, or `twilio` = test only) |
 | `MAX_CONCURRENT_CALLS` | `2` | per pod |
 | `TEST_NUMBERS` | | comma-separated E.164; joined with the Providers tab's test numbers (Twilio allowlist) |
-| `EXOTEL_SID`, `EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`, `EXOTEL_SUBDOMAIN` (`api.in.exotel.com`), `EXOTEL_APP_ID`, `EXOTEL_CALLER_ID` | | Exotel fallbacks |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VOICE_FROM` | | Twilio fallbacks (test calls only) |
+| `EXOTEL_API_KEY`, `EXOTEL_API_TOKEN` | | Exotel credentials (env only) |
+| `EXOTEL_SID`, `EXOTEL_SUBDOMAIN` (`api.in.exotel.com`), `EXOTEL_APP_ID`, `EXOTEL_CALLER_ID` | | Exotel fallbacks |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | | Twilio credentials (env only; test calls only) |
+| `TWILIO_VOICE_FROM` | | fallback for `twilioTest.from` |
 | `ANTHROPIC_ORGANIZATION_ID`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_SERVICE_ACCOUNT_ID`, `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_IDENTITY_TOKEN_FILE` | | Claude via workload identity federation (preferred); the first four override the controller's `anthropicIdentity` field by field, the token file is always local |
-| `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | region `centralindia` | Azure AI Speech key and region (fallbacks for `azureSpeech.apiKey` / `.region`) |
+| `AZURE_SPEECH_KEY` | | Azure AI Speech key (env only) |
+| `AZURE_SPEECH_REGION` | `centralindia` | fallback for `azureSpeech.region` |
 | `VOICE_STT_PROVIDER` / `VOICE_TTS_PROVIDER` | `sarvam` | fallbacks for `speech.sttProvider` / `.ttsProvider` (`sarvam` or `azure`) |
-| `SARVAM_API_KEY`, `ANTHROPIC_API_KEY` | | key fallbacks (the Anthropic key only if federation isn't set up) |
+| `SARVAM_API_KEY`, `ANTHROPIC_API_KEY` | | keys (env only; the Anthropic key only if federation isn't set up) |
 | `VOICE_LLM_MODEL` | `claude-haiku-5-5` | fallback for `llmModel` |
 | `VOICE_STT_MODEL` / `VOICE_TTS_MODEL` | `saaras:v3` / `bulbul:v3` | fallbacks for the Sarvam models |
 | `S3_BUCKET` (or `S3_BUCKET_NAME`), `S3_KEY_PREFIX`, `AWS_REGION` | | recordings; unset bucket = no recording |
@@ -138,7 +144,8 @@ default.
 ## Founder setup checklist
 
 1. **Exotel (production).** In admin Settings → Providers:
-   - account SID, API key and API token, and the subdomain (`api.in.exotel.com` for the Mumbai cluster);
+   - account SID and the subdomain (`api.in.exotel.com` for the Mumbai cluster); the API key and token go in the platform
+     secrets (`EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`), not the page;
    - the virtual number: a **140-series ExoPhone**, as `callerId`;
    - an **App Bazaar flow** (its app ID as `appId`): `[Voicebot applet] → [Hangup applet]`. Set the Voicebot (AgentStream)
      applet's stream URL to `wss://voice.jeffistores.in/ws/exotel?k=<VOICE_WS_KEY>`, bidirectional, 8 kHz.
@@ -150,11 +157,13 @@ default.
 2. **Twilio (test calls only).** Twilio can't place compliant promotional calls in India (foreign caller ID, no
    140-series), so with `twilio_test` selected `/calls` refuses every number that isn't on the test allowlist (the
    Providers tab's test numbers, `TEST_NUMBERS`, or the session's `testNumbers`), and an empty allowlist refuses
-   everything. Set the account SID, auth token and a Twilio voice number as `from`.
-3. **Sarvam** API key, and optionally a voice per language. **Claude** through federation (next section); the
-   Anthropic API key in Providers is only a fallback.
+   everything. Set a Twilio voice number as `from` on the page; the account SID and auth token are the platform's
+   `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` secrets.
+3. **Sarvam** (`SARVAM_API_KEY`) and optionally **Azure Speech** (`AZURE_SPEECH_KEY`), with a voice per language on the
+   page. **Claude** through federation (next section); `ANTHROPIC_API_KEY` is only a fallback.
 4. **Secret.** `kubectl -n jeffi create secret generic voice-service --from-literal=SERVICE_AUTH_SECRET=<the shared
-   secret> --from-literal=VOICE_WS_KEY=<random>` (optionally the env fallbacks too).
+   secret> --from-literal=VOICE_WS_KEY=<random>` plus the provider credentials (`EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`,
+   `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `SARVAM_API_KEY`, `AZURE_SPEECH_KEY`, optionally `ANTHROPIC_API_KEY`).
 5. **DNS.** An A record `voice.jeffistores.in` → the cluster IP, as `deploy/k8s/bootstrap/doc-hosts-dns.sh` does for the
    document hosts. Keep it off any CDN: the media WebSockets must reach Traefik directly. Keep `voice` reserved as a
    store slug.
