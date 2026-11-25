@@ -1,6 +1,7 @@
 {
   "name": "@jeffi/ai-platform",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "Tier-1 AI inference platform: portable gateway + SDK fronting Ollama/PaddleOCR, HA on Razer via k8s, cloud-migratable.",
   "workspaces": [

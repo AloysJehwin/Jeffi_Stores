@@ -77,7 +77,7 @@ personal data (`razorpay-route-payload`, `shipping/courier-consignee`, `showcase
 6. **Merge the Jeffi_Stores change that adds `oss/` and this workflow.** Until it's on `main`, nothing exports
    automatically. After it's merged, check the first **OSS export** run in Actions.
 7. Recommended: org Settings → Authentication security → **Require two-factor authentication**, and have a lawyer
-   read the contributor licence grant in `CONTRIBUTING.md` (BSL 1.1 plus the right to relicense).
+   read the contributor licence grant in `CONTRIBUTING.md` (AGPL-3.0-only plus the right to relicense).
 
 ## Day to day
 

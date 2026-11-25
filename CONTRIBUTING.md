@@ -1,8 +1,8 @@
 # Contributing
 
 Thanks for your interest in Jeffi Stores. This repository is the source of a live, multi-tenant
-commerce platform, published under the Business Source License 1.1 (see `LICENSE`). Issues and
-pull requests are welcome.
+commerce platform, published under the GNU Affero General Public License v3.0 (`AGPL-3.0-only`,
+see `LICENSE`). Issues and pull requests are welcome.
 
 ## Reporting bugs and requesting features
 
@@ -62,4 +62,4 @@ files for new tables.
 ## License of contributions
 
 By submitting a contribution you agree that it is licensed under the same terms as the project
-(`LICENSE`), and that you have the right to submit it.
+(`AGPL-3.0-only`, see `LICENSE`), and that you have the right to submit it.

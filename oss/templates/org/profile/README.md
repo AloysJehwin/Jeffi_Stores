@@ -64,7 +64,7 @@ Nothing runs on a pull request until a maintainer adds `ok-to-test`. Guard fails
 
 ## Licence
 
-[Business Source License 1.1](https://github.com/Jeffi-ERP/workspace/blob/main/LICENSE). You can read, modify, redistribute and make non-production use of the code. Production use needs a commercial licence from Jeffi Stores until the Change Date, 2030-09-30, when the code becomes available under the Apache License 2.0. It is source-available, not open source. For a commercial licence, email support@jeffistores.in.
+[GNU Affero General Public License v3.0](https://github.com/Jeffi-ERP/workspace/blob/main/LICENSE) (`AGPL-3.0-only`). It is open source: you can use, study, modify and redistribute the code, including in production. If you distribute a modified version, or run one as a service that people use over a network, you must make its source available to those users under the same licence. If you can't meet those terms, for example because you want to keep your changes private, Jeffi Stores offers a commercial licence: email support@jeffistores.in.
 
 Contributions are licensed the same way, and contributors grant Jeffi Stores the right to relicense them. Details are in [CONTRIBUTING.md](https://github.com/Jeffi-ERP/.github/blob/main/CONTRIBUTING.md#licensing-of-contributions).
 
