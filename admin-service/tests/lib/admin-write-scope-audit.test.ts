@@ -131,6 +131,8 @@ function mutatingRoutesWithoutWriteScope(): string[] {
     // Drive and support route helpers that authenticate and check the named scope (lib/drive/http,
     // lib/support/http).
     if (/(driveActor|adminChat|adminFor)\([^)]*:write'/.test(src)) continue
+    // Outreach: outreachGuard(req, 'write') checks ecom_outreach:write plus platform admin (lib/outreach/guard).
+    if (/outreachGuard\([^)]*'write'\)/.test(src)) continue
     // hasScope over a const list/map whose scope literals are all :write (uploads/image EDIT_SCOPES.some(...),
     // editor-sessions WRITE_SCOPE[resourceType]).
     const lits = src.match(/'[a-z_]+:(?:read|write)'/g) ?? []

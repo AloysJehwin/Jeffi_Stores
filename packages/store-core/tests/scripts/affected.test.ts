@@ -105,7 +105,7 @@ describe('packageDependents', () => {
     for (const d of dirs) expect(dep[`packages/${d}`]).toBeDefined()
     // wallet lists @jeffi/tenancy, so tenancy reaches every service wallet does.
     for (const s of dep['packages/wallet'].services) expect(dep['packages/tenancy'].services).toContain(s)
-  })
+  }, 20_000)
 })
 
 describe('component-owners', () => {

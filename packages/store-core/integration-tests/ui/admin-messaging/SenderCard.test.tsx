@@ -155,7 +155,7 @@ describe('SenderCard', () => {
       render(<SenderCard url="/api/n" channel="sms" audience="customer" initial={inDlt} badge={badge} empty="" checkUrl="/api/check" />)
       expect(screen.getByText('India SMS (DLT) via AWS')).toBeInTheDocument()
       expect(screen.getByText(/Platform AWS account/)).toBeInTheDocument()
-      expect(screen.getByText('Jeffi Stores (shared)')).toBeInTheDocument()
+      expect(screen.getByText('Platform (shared)')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: /Check sender ID/ }))
       expect(await screen.findByText('Not registered on AWS')).toBeInTheDocument()
       expect(fetchMock).toHaveBeenCalledWith('/api/check?header=JEFFIS')

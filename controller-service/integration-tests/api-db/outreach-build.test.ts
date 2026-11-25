@@ -123,6 +123,7 @@ describe.skipIf(!API_DB_ENABLED)('outreach build pipeline (real DB)', () => {
     const tokens = (await cp.query(`SELECT expires_at FROM showcase_preview_tokens WHERE site_id = $1 AND revoked_at IS NULL`, [siteId])).rows
     for (const t of tokens) expect(new Date(t.expires_at).getTime()).toBeLessThanOrEqual(Date.now() + 31 * 60_000)
     const published = (await kinds()).find((e: any) => e.kind === 'published')
-    expect(published.data).toMatchObject({ liveUrl: r.liveUrl, claimUrl: r.claimUrl, first: true })
+    expect(published.data).toMatchObject({ liveUrl: r.liveUrl, first: true })
+    expect(JSON.stringify(published.data)).not.toContain(r.claimUrl.split('/claim/')[1])
   }, 60_000)
 })
