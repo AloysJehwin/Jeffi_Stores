@@ -34,6 +34,26 @@
     "apiKey": "fake-sarvam-key-0004",
     "configured": true
   },
+  "speech": {
+    "sttProvider": "azure",
+    "ttsProvider": "sarvam"
+  },
+  "azureSpeech": {
+    "region": "centralindia",
+    "voices": {
+      "en": "en-IN-NeerjaNeural",
+      "hi": "hi-IN-SwaraNeural",
+      "ta": "ta-IN-PallaviNeural",
+      "te": "te-IN-ShrutiNeural",
+      "kn": "kn-IN-SapnaNeural",
+      "ml": "ml-IN-SobhanaNeural",
+      "mr": "mr-IN-AarohiNeural",
+      "bn": "bn-IN-TanishaaNeural",
+      "gu": "gu-IN-DhwaniNeural"
+    },
+    "apiKey": "fake-azure-speech-key-0006",
+    "configured": true
+  },
   "llmModel": "claude-haiku-5-5",
   "anthropic": {
     "apiKey": "sk-ant-fake-voice-key-0005",

@@ -19,6 +19,15 @@ Real-time AI calling for Outreach (plan §8): a Pipecat pipeline per call, drive
      └── outreach/recordings/{callId}.mp3 ◀─┘ S3
 ```
 
+**Speech engines.** STT and TTS are chosen separately per call, Sarvam by default or Azure AI Speech (`speech.sttProvider` /
+`speech.ttsProvider` in the voice-config, env `VOICE_STT_PROVIDER` / `VOICE_TTS_PROVIDER`). The chosen engine is tried
+first; when it has no credentials or can't be built at call start, the other one is used and the call goes on
+(`speech.py`, logged as `speech engines`). A failure after the call has started is the failure path below (apology, one
+`error`). Azure voices are per language (`azureSpeech.voices`; defaults `hi-IN-SwaraNeural`, `ta-IN-PallaviNeural`,
+`te-IN-ShrutiNeural`, `kn-IN-SapnaNeural`, `ml-IN-SobhanaNeural`, `mr-IN-AarohiNeural`, `bn-IN-TanishaaNeural`,
+`gu-IN-DhwaniNeural`, `en-IN-NeerjaNeural`); a session `persona.voiceId` is used only when it is an Azure voice name for
+Azure and only when it is not one for Sarvam. One usable engine (a Sarvam key or an Azure key) is enough to take calls.
+
 The persona, script, greeting and tools all come from the controller's session (`GET .../session`); nothing about
 what the agent says is hard-coded here, apart from a filler ("one moment") and the failure apology, per language.
 
@@ -110,6 +119,8 @@ refuses with `503` and lists what is missing.
 | `EXOTEL_SID`, `EXOTEL_API_KEY`, `EXOTEL_API_TOKEN`, `EXOTEL_SUBDOMAIN` (`api.in.exotel.com`), `EXOTEL_APP_ID`, `EXOTEL_CALLER_ID` | | Exotel fallbacks |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VOICE_FROM` | | Twilio fallbacks (test calls only) |
 | `ANTHROPIC_ORGANIZATION_ID`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_SERVICE_ACCOUNT_ID`, `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_IDENTITY_TOKEN_FILE` | | Claude via workload identity federation (preferred); the first four override the controller's `anthropicIdentity` field by field, the token file is always local |
+| `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | region `centralindia` | Azure AI Speech key and region (fallbacks for `azureSpeech.apiKey` / `.region`) |
+| `VOICE_STT_PROVIDER` / `VOICE_TTS_PROVIDER` | `sarvam` | fallbacks for `speech.sttProvider` / `.ttsProvider` (`sarvam` or `azure`) |
 | `SARVAM_API_KEY`, `ANTHROPIC_API_KEY` | | key fallbacks (the Anthropic key only if federation isn't set up) |
 | `VOICE_LLM_MODEL` | `claude-haiku-5-5` | fallback for `llmModel` |
 | `VOICE_STT_MODEL` / `VOICE_TTS_MODEL` | `saaras:v3` / `bulbul:v3` | fallbacks for the Sarvam models |

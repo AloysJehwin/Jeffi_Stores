@@ -1,6 +1,7 @@
 """One call's Pipecat pipeline:
 
-  telephony WS in -> Sarvam STT (saaras) -> user turn (Silero VAD + Smart Turn) -> Claude -> Sarvam TTS (bulbul)
+  telephony WS in -> STT (Sarvam saaras or Azure) -> user turn (Silero VAD + Smart Turn) -> Claude -> TTS (Sarvam bulbul
+  or Azure)
   -> telephony WS out -> recorder (gated) -> assistant context
 
 Barge-in: the user turn starts on VAD speech after `vad_start_s` and interrupts the bot. End of turn is semantic
@@ -28,6 +29,7 @@ from .llm_client import build_llm_client
 from .log import get_logger
 from .provider_config import VoiceConfig
 from .recording import CallRecorder, RecordingGate, Uploader, store_recording
+from .speech import build_stt, build_tts
 from .tools import ToolDispatcher, tool_schemas
 from .voicemail import Verdict, VoicemailDetector, is_beep
 
@@ -344,8 +346,6 @@ def build_pipeline(websocket: Any, rt: CallRuntime, serializer: Any) -> Built:
     from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
     from pipecat.services.anthropic.llm import AnthropicLLMService
     from pipecat.services.llm_service import FunctionCallParams
-    from pipecat.services.sarvam.stt import SarvamSTTService
-    from pipecat.services.sarvam.tts import SarvamTTSService
     from pipecat.services.stt_service import STTService
     from pipecat.services.tts_service import TTSService
     from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
@@ -366,16 +366,9 @@ def build_pipeline(websocket: Any, rt: CallRuntime, serializer: Any) -> Built:
             audio_in_enabled=True, audio_out_enabled=True, add_wav_header=False, serializer=serializer
         ),
     )
-    stt = SarvamSTTService(
-        api_key=cfg.sarvam_api_key,
-        mode=s.stt_mode,
-        settings=SarvamSTTService.Settings(model=cfg.stt_model or s.stt_model, language=lang),
-    )
-    voice = session.persona.voiceId or cfg.voice_for(session.language)
-    tts_settings = SarvamTTSService.Settings(model=cfg.tts_model or s.tts_model, language=lang)
-    if voice:
-        tts_settings.voice = voice
-    tts = SarvamTTSService(api_key=cfg.sarvam_api_key, settings=tts_settings)
+    stt, stt_engine = build_stt(cfg, s, lang)
+    tts, tts_engine = build_tts(cfg, s, lang, session.language, session.persona.voiceId)
+    log.info("speech engines", callId=call.call_id, stt=stt_engine, tts=tts_engine)
     llm = AnthropicLLMService(
         api_key=cfg.anthropic_api_key,
         client=build_llm_client(cfg),
@@ -545,7 +538,6 @@ async def run_apology_only(websocket: Any, serializer: Any, cfg: VoiceConfig, se
     from pipecat.pipeline.pipeline import Pipeline
     from pipecat.workers.runner import WorkerRunner
     from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-    from pipecat.services.sarvam.tts import SarvamTTSService
     from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
     transport = FastAPIWebsocketTransport(
@@ -553,10 +545,7 @@ async def run_apology_only(websocket: Any, serializer: Any, cfg: VoiceConfig, se
         params=FastAPIWebsocketParams(audio_in_enabled=True, audio_out_enabled=True, serializer=serializer),
     )
     lang = pipecat_language(language)
-    tts_settings = SarvamTTSService.Settings(model=cfg.tts_model or settings.tts_model, language=lang)
-    if cfg.voice_for(language):
-        tts_settings.voice = cfg.voice_for(language)
-    tts = SarvamTTSService(api_key=cfg.sarvam_api_key, settings=tts_settings)
+    tts, _ = build_tts(cfg, settings, lang, language)
     worker = PipelineWorker(
         Pipeline([transport.input(), tts, transport.output()]),
         params=PipelineParams(audio_in_sample_rate=16000, audio_out_sample_rate=8000),
@@ -579,6 +568,8 @@ CALL_PATH_MODULES = (
     "pipecat.services.anthropic.llm",
     "pipecat.services.sarvam.stt",
     "pipecat.services.sarvam.tts",
+    "pipecat.services.azure.stt",
+    "pipecat.services.azure.tts",
     "pipecat.processors.aggregators.llm_response_universal",
     "pipecat.processors.audio.audio_buffer_processor",
     "pipecat.pipeline.worker",

@@ -11,7 +11,7 @@ import { VOICE_PROVIDERS, mergeVoiceSettings, type VoiceProviderName, type Voice
 // PLATFORM_TENANT_ID. Set from the flagship's Settings → Providers; read by voice-service through
 // GET /api/internal/outreach/voice-config. Never log what this returns.
 
-export const VOICE_CREDENTIAL_PROVIDERS = ['exotel', 'sarvam', 'twilio_voice', 'anthropic_voice'] as const
+export const VOICE_CREDENTIAL_PROVIDERS = ['exotel', 'sarvam', 'azure_speech', 'twilio_voice', 'anthropic_voice'] as const
 export type VoiceCredentialProvider = (typeof VOICE_CREDENTIAL_PROVIDERS)[number]
 
 const secret = (min: number) =>
@@ -26,6 +26,7 @@ const secret = (min: number) =>
 export const VOICE_CREDENTIAL_SCHEMAS = {
   exotel: z.object({ apiKey: secret(8), apiToken: secret(8) }).strict(),
   sarvam: z.object({ apiKey: secret(8) }).strict(),
+  azure_speech: z.object({ apiKey: secret(16) }).strict(),
   twilio_voice: z.object({ accountSid: z.string().trim().regex(/^AC[0-9a-fA-F]{32}$/, 'An Account SID starts with AC'), authToken: secret(16) }).strict(),
   anthropic_voice: z.object({ apiKey: secret(20).refine(s => s.startsWith('sk-ant-'), 'An Anthropic key starts with sk-ant-') }).strict(),
 } as const
@@ -47,7 +48,7 @@ export interface SecretStatus {
   last4: string | null
 }
 
-export interface VoiceConfig extends Omit<VoiceSettings, 'exotel' | 'sarvam'> {
+export interface VoiceConfig extends Omit<VoiceSettings, 'exotel' | 'sarvam' | 'azureSpeech'> {
   provider: VoiceProviderName
   exotel: VoiceSettings['exotel'] & { apiKey: string | null; apiToken: string | null; configured: boolean }
   twilioTest: VoiceSettings['twilioTest'] & {
@@ -58,14 +59,16 @@ export interface VoiceConfig extends Omit<VoiceSettings, 'exotel' | 'sarvam'> {
     configured: boolean
   }
   sarvam: VoiceSettings['sarvam'] & { apiKey: string | null; configured: boolean }
+  /** Azure AI Speech: the alternative STT/TTS engine, and Sarvam's fallback (see `speech`). */
+  azureSpeech: VoiceSettings['azureSpeech'] & { apiKey: string | null; configured: boolean }
   anthropic: { apiKey: string | null; source: 'stored' | 'env' | null; federation: boolean; configured: boolean }
   /** Workload-identity federation for Claude (the platform's ai_provider_identities row + ANTHROPIC_ORGANIZATION_ID). Preferred over the key. */
   anthropicIdentity: AnthropicVoiceIdentity | null
-  /** The chosen call provider, Sarvam and Claude all have what they need. */
+  /** The chosen call provider, at least one speech engine (Sarvam or Azure) and Claude all have what they need. */
   ready: boolean
 }
 
-export interface VoiceConfigPublic extends Omit<VoiceSettings, 'exotel' | 'sarvam'> {
+export interface VoiceConfigPublic extends Omit<VoiceSettings, 'exotel' | 'sarvam' | 'azureSpeech'> {
   provider: VoiceProviderName
   exotel: VoiceSettings['exotel'] & { apiKey: SecretStatus; apiToken: SecretStatus; configured: boolean }
   twilioTest: VoiceSettings['twilioTest'] & {
@@ -75,6 +78,7 @@ export interface VoiceConfigPublic extends Omit<VoiceSettings, 'exotel' | 'sarva
     configured: boolean
   }
   sarvam: VoiceSettings['sarvam'] & { apiKey: SecretStatus; configured: boolean }
+  azureSpeech: VoiceSettings['azureSpeech'] & { apiKey: SecretStatus; configured: boolean }
   anthropic: { apiKey: SecretStatus; source: 'stored' | 'env' | null; federation: boolean; configured: boolean }
   ready: boolean
 }
@@ -109,10 +113,11 @@ async function readSettings(): Promise<{ provider: VoiceProviderName; settings: 
 
 /** Non-secret settings over the defaults, the decrypted secrets, and whether each part is usable. */
 export async function getVoiceConfig(): Promise<VoiceConfig> {
-  const [{ provider, settings }, exotel, sarvam, twilio, anthropic, identity] = await Promise.all([
+  const [{ provider, settings }, exotel, sarvam, azure, twilio, anthropic, identity] = await Promise.all([
     readSettings(),
     readStored('exotel'),
     readStored('sarvam'),
+    readStored('azure_speech'),
     readStored('twilio_voice'),
     readStored('anthropic_voice'),
     getAnthropicIdentity(null),
@@ -132,6 +137,7 @@ export async function getVoiceConfig(): Promise<VoiceConfig> {
   const twilioReady = !!(tw.source && settings.twilioTest.from && settings.testNumbers.length)
 
   const sarvamReady = !!sarvam.value.apiKey
+  const azureReady = !!azure.value.apiKey
   const envClaude = process.env.ANTHROPIC_API_KEY || null
   const claudeKey = anthropic.value.apiKey || envClaude
   const organizationId = process.env.ANTHROPIC_ORGANIZATION_ID?.trim() || ''
@@ -144,9 +150,10 @@ export async function getVoiceConfig(): Promise<VoiceConfig> {
     exotel: { ...ex, apiKey: exotel.value.apiKey ?? null, apiToken: exotel.value.apiToken ?? null, configured: exotelReady },
     twilioTest: { ...settings.twilioTest, ...tw, configured: twilioReady },
     sarvam: { ...settings.sarvam, apiKey: sarvam.value.apiKey ?? null, configured: sarvamReady },
+    azureSpeech: { ...settings.azureSpeech, apiKey: azure.value.apiKey ?? null, configured: azureReady },
     anthropic: { apiKey: claudeKey, source: claudeSource, federation: !!anthropicIdentity, configured: !!claudeKey || !!anthropicIdentity },
     anthropicIdentity,
-    ready: (provider === 'exotel' ? exotelReady : twilioReady) && sarvamReady && (!!claudeKey || !!anthropicIdentity),
+    ready: (provider === 'exotel' ? exotelReady : twilioReady) && (sarvamReady || azureReady) && (!!claudeKey || !!anthropicIdentity),
   }
 }
 
@@ -181,6 +188,13 @@ export async function getVoiceConfigPublic(): Promise<VoiceConfigPublic> {
       voices: c.sarvam.voices,
       apiKey: status(c.sarvam.apiKey),
       configured: c.sarvam.configured,
+    },
+    speech: c.speech,
+    azureSpeech: {
+      region: c.azureSpeech.region,
+      voices: c.azureSpeech.voices,
+      apiKey: status(c.azureSpeech.apiKey),
+      configured: c.azureSpeech.configured,
     },
     llmModel: c.llmModel,
     anthropic: {
@@ -246,5 +260,26 @@ export async function testExotelCredentials(): Promise<ProviderTestResult> {
     return { ok: false, message: `Exotel answered ${r.status}.` }
   } catch {
     return { ok: false, message: 'Exotel did not answer.' }
+  }
+}
+
+/** Read-only check of the saved Azure Speech key: asks the region's token endpoint for a 10-minute token. Speaks and transcribes nothing. */
+export async function testAzureSpeechCredentials(): Promise<ProviderTestResult> {
+  const c = await getVoiceConfig()
+  const { apiKey, region } = c.azureSpeech
+  if (!apiKey) return { ok: false, message: 'Save the Azure Speech key first.' }
+  try {
+    const r = await fetch(`https://${encodeURIComponent(region)}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, {
+      method: 'POST',
+      headers: { 'Ocp-Apim-Subscription-Key': apiKey, 'content-length': '0' },
+      redirect: 'manual',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    })
+    if (r.ok) return { ok: true, message: `Azure Speech accepted the key (${region}).` }
+    if (r.status === 401 || r.status === 403) return { ok: false, message: `Azure Speech rejected the key for ${region}. Check the key and the region.` }
+    return { ok: false, message: `Azure Speech answered ${r.status}.` }
+  } catch {
+    return { ok: false, message: 'Azure Speech did not answer.' }
   }
 }

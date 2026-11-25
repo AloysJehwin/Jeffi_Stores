@@ -10,10 +10,13 @@ anthropic==1.17.0         # via pipecat-ai
 anyio==4.16.0             # via anthropic, fastapi, httpx, httpx2, openai, starlette
 attrs==26.1.0             # via aiohttp
 audioop-lts==0.2.2 ; python_full_version >= '3.13'  # via pipecat-ai
+azure-cognitiveservices-speech==1.53.0  # via pipecat-ai
+azure-core==1.41.0        # via azure-cognitiveservices-speech
 boto3==1.43.127           # via -r voice-service/requirements.in
 botocore==1.43.127        # via boto3, s3transfer
-certifi==2026.10.23       # via httpcore, httpx
+certifi==2026.10.23       # via httpcore, httpx, requests
 cffi==2.1.1               # via soundfile
+charset-normalizer==3.5.2  # via requests
 click==8.5.1              # via uvicorn
 colorama==0.4.6 ; sys_platform == 'win32'  # via loguru
 docopt==0.6.2             # via num2words
@@ -27,7 +30,7 @@ httpcore2==2.16.0 ; sys_platform != 'emscripten'  # via httpx2
 httpx==0.28.1             # via sarvamai, -r voice-service/requirements.in
 httpx2==2.16.0            # via anthropic, openai
 httpx2-jsfetch==1.0 ; sys_platform == 'emscripten'  # via httpx2
-idna==3.20                # via anyio, httpx, httpx2, yarl
+idna==3.20                # via anyio, httpx, httpx2, requests, yarl
 jiter==0.19.0             # via anthropic, openai
 jmespath==1.1.0           # via boto3, botocore
 lameenc==1.9.0            # via -r voice-service/requirements.in
@@ -53,6 +56,7 @@ pydantic-core==2.50.4     # via pydantic, sarvamai
 python-dateutil==2.9.0.post0  # via botocore
 python-dotenv==1.2.4      # via pipecat-ai
 pyyaml==6.0.3             # via pipecat-ai
+requests==2.34.2          # via azure-core
 resampy==0.4.3            # via pipecat-ai
 s3transfer==0.19.3        # via boto3
 sarvamai==0.1.28          # via pipecat-ai
@@ -63,9 +67,9 @@ soundfile==0.13.1         # via pipecat-ai
 soxr==1.0.0               # via pipecat-ai
 starlette==1.10.0         # via fastapi
 truststore==0.10.5 ; sys_platform != 'emscripten'  # via httpcore2, httpx2
-typing-extensions==4.16.0  # via aiohttp, aiosignal, anthropic, anyio, fastapi, httpx2, openai, opentelemetry-api, pipecat-ai, pydantic, pydantic-core, sarvamai, starlette, typing-inspection
+typing-extensions==4.16.0  # via aiohttp, aiosignal, anthropic, anyio, azure-core, fastapi, httpx2, openai, opentelemetry-api, pipecat-ai, pydantic, pydantic-core, sarvamai, starlette, typing-inspection
 typing-inspection==0.4.5  # via fastapi, pydantic
-urllib3==2.8.0            # via botocore
+urllib3==2.8.0            # via botocore, requests
 uvicorn==0.54.0           # via -r voice-service/requirements.in
 websockets==17.4          # via pipecat-ai, sarvamai
 win32-setctime==1.2.1 ; sys_platform == 'win32'  # via loguru

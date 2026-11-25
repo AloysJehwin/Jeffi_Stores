@@ -11,6 +11,14 @@ export type VoiceLang = (typeof VOICE_LANGS)[number]
 export const EXOTEL_SUBDOMAINS = ['api.in.exotel.com', 'api.exotel.com'] as const
 export type ExotelSubdomain = (typeof EXOTEL_SUBDOMAINS)[number]
 
+/** Speech engines for a call's STT and TTS, each chosen separately. The other one is the fallback when it can't start. */
+export const SPEECH_ENGINES = ['sarvam', 'azure'] as const
+export type SpeechEngine = (typeof SPEECH_ENGINES)[number]
+
+/** Azure AI Speech regions voice-service may call (Central India is where the Speech resource lives). */
+export const AZURE_SPEECH_REGIONS = ['centralindia', 'southindia', 'westindia', 'southeastasia', 'eastasia', 'uaenorth'] as const
+export const DEFAULT_AZURE_SPEECH_REGION = 'centralindia'
+
 export const SARVAM_STT_MODELS = ['saaras:v3', 'saaras:v4'] as const
 export const SARVAM_TTS_MODELS = ['bulbul:v3', 'bulbul:v2'] as const
 
@@ -29,6 +37,19 @@ export const DEFAULT_SARVAM_VOICES: Record<VoiceLang, string> = {
   gu: 'priya',
 }
 
+/** Azure neural voices per language (voice-service/src/voice_service/speech.py keeps the same defaults). */
+export const DEFAULT_AZURE_VOICES: Record<VoiceLang, string> = {
+  en: 'en-IN-NeerjaNeural',
+  hi: 'hi-IN-SwaraNeural',
+  ta: 'ta-IN-PallaviNeural',
+  te: 'te-IN-ShrutiNeural',
+  kn: 'kn-IN-SapnaNeural',
+  ml: 'ml-IN-SobhanaNeural',
+  mr: 'mr-IN-AarohiNeural',
+  bn: 'bn-IN-TanishaaNeural',
+  gu: 'gu-IN-DhwaniNeural',
+}
+
 export const MAX_TEST_NUMBERS = 20
 export const MAX_SENDER_IDS = 20
 /** Exotel's telemarketer ID on DLT, for the PE–TM chain behind its 140-series calls. */
@@ -39,6 +60,8 @@ export interface VoiceSettings {
   twilioTest: { from: string }
   testNumbers: string[]
   sarvam: { sttModel: string; ttsModel: string; voices: Record<VoiceLang, string> }
+  speech: { sttProvider: SpeechEngine; ttsProvider: SpeechEngine }
+  azureSpeech: { region: string; voices: Record<VoiceLang, string> }
   llmModel: string
 }
 
@@ -48,6 +71,8 @@ export interface StoredVoiceConfig {
   twilioTest?: Partial<VoiceSettings['twilioTest']>
   testNumbers?: string[]
   sarvam?: { sttModel?: string; ttsModel?: string; voices?: Partial<Record<VoiceLang, string>> }
+  speech?: Partial<VoiceSettings['speech']>
+  azureSpeech?: { region?: string; voices?: Partial<Record<VoiceLang, string>> }
   llmModel?: string
 }
 
@@ -56,6 +81,8 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   twilioTest: { from: '' },
   testNumbers: [],
   sarvam: { sttModel: 'saaras:v3', ttsModel: 'bulbul:v3', voices: { ...DEFAULT_SARVAM_VOICES } },
+  speech: { sttProvider: 'sarvam', ttsProvider: 'sarvam' },
+  azureSpeech: { region: DEFAULT_AZURE_SPEECH_REGION, voices: { ...DEFAULT_AZURE_VOICES } },
   llmModel: DEFAULT_VOICE_LLM,
 }
 
@@ -66,6 +93,7 @@ const MODEL = /^[a-z0-9-]+:[a-z0-9.-]+$/i
 const LLM = /^[A-Za-z0-9][A-Za-z0-9.:@_-]{2,99}$/
 const SPEAKER = /^[a-z][a-z0-9_-]{0,39}$/
 const DLT_ENTITY = /^\d{10,30}$/
+const AZURE_VOICE = /^[a-z]{2,3}-[A-Z]{2,4}-[A-Za-z0-9:_-]+Neural$/
 const SENDER = /^[A-Z0-9]{6}$/
 
 const compact = (s: string) => s.replace(/[\s()-]/g, '')
@@ -141,6 +169,26 @@ export function normalizeVoiceConfig(v: unknown): StoredVoiceConfig | null {
     if (Object.keys(sarvam).length) out.sarvam = sarvam
   }
 
+  if (v.speech !== undefined) {
+    const speech: Record<string, string> = {}
+    if (!fields(v.speech, { sttProvider: oneOf(SPEECH_ENGINES), ttsProvider: oneOf(SPEECH_ENGINES) }, speech)) return null
+    if (Object.keys(speech).length) out.speech = speech as StoredVoiceConfig['speech']
+  }
+
+  if (v.azureSpeech !== undefined) {
+    if (!isObj(v.azureSpeech)) return null
+    const region: Record<string, string> = {}
+    if (!fields(v.azureSpeech, { region: oneOf(AZURE_SPEECH_REGIONS) }, region, s => s.trim().toLowerCase())) return null
+    const voices: Record<string, string> = {}
+    if (v.azureSpeech.voices !== undefined) {
+      if (!isObj(v.azureSpeech.voices)) return null
+      if (!fields(v.azureSpeech.voices, Object.fromEntries(VOICE_LANGS.map(l => [l, re(AZURE_VOICE)])), voices)) return null
+    }
+    const azure: StoredVoiceConfig['azureSpeech'] = { ...region }
+    if (Object.keys(voices).length) azure.voices = voices
+    if (Object.keys(azure).length) out.azureSpeech = azure
+  }
+
   const llm: Record<string, string> = {}
   if (!fields({ llmModel: v.llmModel }, { llmModel: re(LLM) }, llm)) return null
   if (llm.llmModel) out.llmModel = llm.llmModel
@@ -159,6 +207,11 @@ export function mergeVoiceSettings(stored: unknown): VoiceSettings {
       sttModel: s.sarvam?.sttModel ?? d.sarvam.sttModel,
       ttsModel: s.sarvam?.ttsModel ?? d.sarvam.ttsModel,
       voices: { ...d.sarvam.voices, ...s.sarvam?.voices },
+    },
+    speech: { ...d.speech, ...s.speech },
+    azureSpeech: {
+      region: s.azureSpeech?.region ?? d.azureSpeech.region,
+      voices: { ...d.azureSpeech.voices, ...s.azureSpeech?.voices },
     },
     llmModel: s.llmModel ?? d.llmModel,
   }

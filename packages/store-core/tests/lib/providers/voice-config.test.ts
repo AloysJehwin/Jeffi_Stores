@@ -25,6 +25,7 @@ import {
   saveVoiceCredential,
   clearVoiceCredential,
   testExotelCredentials,
+  testAzureSpeechCredentials,
   VoiceCredentialError,
 } from '@/lib/providers/voice-config'
 import { saveIntegrationCredential } from '@/lib/tenant-registry'
@@ -33,6 +34,7 @@ const P = '00000000-0000-0000-0000-000000000000'
 const KEY = 'exotel-key-AAAA1111'
 const TOKEN = 'exotel-token-BBBB2222'
 const SARVAM = 'sarvam-secret-CCCC3333'
+const AZURE = 'azure-speech-key-DDDD4444'
 const settings = (rows: { key: string; value: unknown }[]) => query.mockResolvedValue({ rows })
 const exotelSettings = { exotel: { accountSid: 'jeffi1', callerId: '+911401234567', appId: '12345' } }
 
@@ -132,17 +134,92 @@ describe('voice-service contract fixture', () => {
           exotel: { accountSid: 'fakeacct', callerId: '+911401234567', appId: '12345' },
           twilioTest: { from: '+14155550100' },
           testNumbers: ['+919876543210', '+919876543211'],
+          speech: { sttProvider: 'azure' },
         },
       },
     ])
     await saveVoiceCredential('exotel', { apiKey: 'fake-exotel-key-0001', apiToken: 'fake-exotel-token-0002' })
     await saveVoiceCredential('sarvam', { apiKey: 'fake-sarvam-key-0004' })
+    await saveVoiceCredential('azure_speech', { apiKey: 'fake-azure-speech-key-0006' })
     await saveVoiceCredential('twilio_voice', { accountSid: 'AC' + '0'.repeat(32), authToken: 'fake-twilio-auth-0003' })
     await saveVoiceCredential('anthropic_voice', { apiKey: 'sk-ant-fake-voice-key-0005' })
     identity.mockResolvedValue({ workspaceId: 'wrkspc_fake', serviceAccountId: 'svac_fake', federationRuleId: 'fdrl_fake' })
     vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', '00000000-0000-0000-0000-000000000001')
     const c = await getVoiceConfig()
     expect(JSON.parse(JSON.stringify(c))).toEqual(fixture)
+  })
+})
+
+describe('Azure Speech', () => {
+  const claude = () => vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-env-key-0000')
+  const exotelReady = async () => {
+    settings([{ key: 'voice_config', value: exotelSettings }])
+    await saveVoiceCredential('exotel', { apiKey: KEY, apiToken: TOKEN })
+  }
+
+  it('stores its key encrypted, validated, and masked', async () => {
+    expect(await saveVoiceCredential('azure_speech', { apiKey: AZURE })).toEqual({ apiKey: { configured: true, last4: '4444' } })
+    const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
+    expect(saved.provider).toBe('azure_speech')
+    expect(saved.configEnc).not.toContain(AZURE)
+    await expect(saveVoiceCredential('azure_speech', { apiKey: 'short' })).rejects.toBeInstanceOf(VoiceCredentialError)
+    await expect(saveVoiceCredential('azure_speech', { apiKey: AZURE, region: 'centralindia' })).rejects.toBeInstanceOf(VoiceCredentialError)
+    const p = await getVoiceConfigPublic()
+    expect(JSON.stringify(p)).not.toContain(AZURE)
+    expect(p.azureSpeech.apiKey).toEqual({ configured: true, last4: '4444' })
+  })
+
+  it('defaults to Sarvam for both engines, Central India and one neural voice per language', async () => {
+    const c = await getVoiceConfig()
+    expect(c.speech).toEqual({ sttProvider: 'sarvam', ttsProvider: 'sarvam' })
+    expect(c.azureSpeech).toMatchObject({ region: 'centralindia', apiKey: null, configured: false })
+    expect(Object.keys(c.azureSpeech.voices).sort()).toEqual(['bn', 'en', 'gu', 'hi', 'kn', 'ml', 'mr', 'ta', 'te'])
+    expect(c.azureSpeech.voices.hi).toBe('hi-IN-SwaraNeural')
+  })
+
+  it('takes the stored engine, region and voices over the defaults', async () => {
+    settings([
+      {
+        key: 'voice_config',
+        value: { speech: { ttsProvider: 'azure' }, azureSpeech: { region: 'SouthIndia', voices: { hi: 'hi-IN-MadhurNeural' } } },
+      },
+    ])
+    const c = await getVoiceConfig()
+    expect(c.speech).toEqual({ sttProvider: 'sarvam', ttsProvider: 'azure' })
+    expect(c.azureSpeech.region).toBe('southindia')
+    expect(c.azureSpeech.voices).toMatchObject({ hi: 'hi-IN-MadhurNeural', ta: 'ta-IN-PallaviNeural' })
+  })
+
+  it('is ready with Azure alone (no Sarvam key), and not with neither', async () => {
+    claude()
+    await exotelReady()
+    expect((await getVoiceConfig()).ready).toBe(false)
+    await saveVoiceCredential('azure_speech', { apiKey: AZURE })
+    const c = await getVoiceConfig()
+    expect(c.azureSpeech.configured).toBe(true)
+    expect(c.sarvam.configured).toBe(false)
+    expect(c.ready).toBe(true)
+  })
+
+  it('tests the saved key against its region token endpoint, read-only', async () => {
+    expect(await testAzureSpeechCredentials()).toEqual({ ok: false, message: 'Save the Azure Speech key first.' })
+    await saveVoiceCredential('azure_speech', { apiKey: AZURE })
+    settings([{ key: 'voice_config', value: { azureSpeech: { region: 'southindia' } } }])
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const r = await testAzureSpeechCredentials()
+    expect(r).toEqual({ ok: true, message: 'Azure Speech accepted the key (southindia).' })
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://southindia.api.cognitive.microsoft.com/sts/v1.0/issueToken')
+    expect((init.headers as Record<string, string>)['Ocp-Apim-Subscription-Key']).toBe(AZURE)
+    expect(r.message).not.toContain(AZURE)
+
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
+    expect((await testAzureSpeechCredentials()).message).toMatch(/rejected the key for southindia/)
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 500 })
+    expect(await testAzureSpeechCredentials()).toEqual({ ok: false, message: 'Azure Speech answered 500.' })
+    fetchMock.mockRejectedValueOnce(new Error('network'))
+    expect(await testAzureSpeechCredentials()).toEqual({ ok: false, message: 'Azure Speech did not answer.' })
   })
 })
 

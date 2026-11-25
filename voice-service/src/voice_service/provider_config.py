@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from .auth import outbound_token
-from .config import Settings, normalize_number
+from .config import Settings, normalize_number, speech_engine
 from .llm_client import token_file_ok
 from .log import get_logger
 
@@ -61,6 +61,11 @@ class VoiceConfig:
     stt_model: str = ""
     tts_model: str = ""
     voices: dict[str, str] = field(default_factory=dict)
+    azure_api_key: str = ""
+    azure_region: str = ""
+    azure_voices: dict[str, str] = field(default_factory=dict)
+    stt_provider: str = "sarvam"  # sarvam | azure: the engine tried first; the other is the fallback
+    tts_provider: str = "sarvam"
     anthropic_api_key: str = ""
     anthropic_identity: AnthropicIdentity = field(default_factory=AnthropicIdentity)
     anthropic_identity_token_file: str = ""
@@ -74,6 +79,18 @@ class VoiceConfig:
     def voice_for(self, language: str) -> str:
         base = (language or "").split("-")[0].lower()
         return self.voices.get(language) or self.voices.get(base) or ""
+
+    def azure_voice_for(self, language: str) -> str:
+        from .speech import DEFAULT_AZURE_VOICES
+
+        base = (language or "").split("-")[0].lower()
+        return self.azure_voices.get(language) or self.azure_voices.get(base) or DEFAULT_AZURE_VOICES.get(base, DEFAULT_AZURE_VOICES["en"])
+
+    def sarvam_ready(self) -> bool:
+        return bool(self.sarvam_api_key)
+
+    def azure_ready(self) -> bool:
+        return bool(self.azure_api_key and self.azure_region)
 
     def identity_ready(self) -> bool:
         """Federation is usable: every id set and the token file present."""
@@ -94,7 +111,12 @@ class VoiceConfig:
         return gaps
 
     def missing(self) -> list[str]:
-        need: dict[str, str] = {"sarvam.apiKey": self.sarvam_api_key}
+        need: dict[str, str] = {}
+        if not (self.sarvam_ready() or self.azure_ready()):
+            # One usable speech engine is enough (the other is only the fallback).
+            need["sarvam.apiKey"] = ""
+            if "azure" in (self.stt_provider, self.tts_provider):
+                need["azureSpeech.apiKey"] = ""
         if self.provider == "exotel":
             need |= {
                 "exotel.accountSid": self.exotel_sid,
@@ -155,6 +177,21 @@ def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
     voices = {k: v.strip() for k, v in voices_raw.items() if isinstance(k, str) and _s(v)} if isinstance(voices_raw, dict) else {}
     if voices:
         sources["sarvam.voices"] = "controller"
+    speech_raw = r.get("speech") if isinstance(r.get("speech"), dict) else {}
+    stt_provider = speech_engine(speech_raw.get("sttProvider"), "")
+    tts_provider = speech_engine(speech_raw.get("ttsProvider"), "")
+    if stt_provider or tts_provider:
+        sources["speech"] = "controller"
+    elif env.stt_provider != "sarvam" or env.tts_provider != "sarvam":
+        sources["speech"] = "env"
+    azure_voices_raw = _get(r, "azureSpeech", "voices")
+    azure_voices = (
+        {k: v.strip() for k, v in azure_voices_raw.items() if isinstance(k, str) and _s(v)}
+        if isinstance(azure_voices_raw, dict)
+        else {}
+    )
+    if azure_voices:
+        sources["azureSpeech.voices"] = "controller"
     ident_raw = r.get("anthropicIdentity") if isinstance(r.get("anthropicIdentity"), dict) else {}
 
     def ident(key: str, env_value: str) -> str:
@@ -189,6 +226,11 @@ def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
         stt_model=pick("sarvam.sttModel", _get(r, "sarvam", "sttModel"), env.stt_model),
         tts_model=pick("sarvam.ttsModel", _get(r, "sarvam", "ttsModel"), env.tts_model),
         voices=voices,
+        azure_api_key=pick("azureSpeech.apiKey", _get(r, "azureSpeech", "apiKey"), env.azure_speech_key),
+        azure_region=pick("azureSpeech.region", _get(r, "azureSpeech", "region"), env.azure_speech_region).lower(),
+        azure_voices=azure_voices,
+        stt_provider=stt_provider or env.stt_provider,
+        tts_provider=tts_provider or env.tts_provider,
         anthropic_api_key=pick("anthropic.apiKey", _get(r, "anthropic", "apiKey"), env.anthropic_api_key),
         anthropic_identity=identity,
         anthropic_identity_token_file=env.anthropic_identity_token_file,

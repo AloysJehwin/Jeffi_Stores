@@ -9,6 +9,8 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import type { SecretStatus, VoiceConfigPublic } from '@/lib/providers/voice-config'
 import type { SmsDltConfig } from '@/lib/providers/sms-dlt'
 import {
+  AZURE_SPEECH_REGIONS,
+  DEFAULT_AZURE_VOICES,
   DEFAULT_SARVAM_VOICES,
   DEFAULT_VOICE_LLM,
   EXOTEL_SUBDOMAINS,
@@ -17,7 +19,9 @@ import {
   MAX_TEST_NUMBERS,
   SARVAM_STT_MODELS,
   SARVAM_TTS_MODELS,
+  SPEECH_ENGINES,
   VOICE_LANGS,
+  type SpeechEngine,
   type StoredVoiceConfig,
   type VoiceLang,
   isE164,
@@ -46,6 +50,15 @@ const LANG_LABEL: Record<VoiceLang, string> = {
   gu: 'Gujarati',
 }
 const REGION_LABEL: Record<string, string> = { 'api.in.exotel.com': 'Mumbai (api.in.exotel.com)', 'api.exotel.com': 'Singapore (api.exotel.com)' }
+const ENGINE_LABEL: Record<SpeechEngine, string> = { sarvam: 'Sarvam', azure: 'Azure AI Speech' }
+const AZURE_REGION_LABEL: Record<string, string> = {
+  centralindia: 'Central India',
+  southindia: 'South India',
+  westindia: 'West India',
+  southeastasia: 'Southeast Asia',
+  eastasia: 'East Asia',
+  uaenorth: 'UAE North',
+}
 const MODEL_LABEL: Record<string, string> = { 'saaras:v3': 'Saaras v3', 'saaras:v4': 'Saaras v4', 'bulbul:v3': 'Bulbul v3', 'bulbul:v2': 'Bulbul v2' }
 
 const valid = (cfg: StoredVoiceConfig) => normalizeVoiceConfig(cfg) !== null
@@ -58,6 +71,8 @@ function storedOf(v: VoiceConfigPublic): StoredVoiceConfig {
     twilioTest: { from: v.twilioTest.from },
     testNumbers: v.testNumbers,
     sarvam: { sttModel: v.sarvam.sttModel, ttsModel: v.sarvam.ttsModel, voices: v.sarvam.voices },
+    speech: v.speech,
+    azureSpeech: { region: v.azureSpeech.region, voices: v.azureSpeech.voices },
     llmModel: v.llmModel,
   }
 }
@@ -220,7 +235,7 @@ function SecretGroup({
   disabled,
   onChanged,
 }: {
-  provider: 'exotel' | 'sarvam' | 'twilio_voice' | 'anthropic_voice'
+  provider: 'exotel' | 'sarvam' | 'azure_speech' | 'twilio_voice' | 'anthropic_voice'
   title: string
   help: string
   fields: { key: string; label: string }[]
@@ -578,21 +593,64 @@ function VoiceAi({ data, disabled, saveVoice, reload }: { data: Data; disabled: 
   const [tts, setTts] = useState(v.sarvam.ttsModel)
   const [voices, setVoices] = useState(v.sarvam.voices)
   const [llm, setLlm] = useState(v.llmModel)
+  const [engines, setEngines] = useState(v.speech)
+  const [region, setRegion] = useState(v.azureSpeech.region)
+  const [azureVoices, setAzureVoices] = useState(v.azureSpeech.voices)
+  const [azureTest, setAzureTest] = useState<{ ok: boolean; message: string } | null>(null)
+  const [azureTesting, setAzureTesting] = useState(false)
   useEffect(() => {
     setStt(v.sarvam.sttModel)
     setTts(v.sarvam.ttsModel)
     setVoices(v.sarvam.voices)
     setLlm(v.llmModel)
+    setEngines(v.speech)
+    setRegion(v.azureSpeech.region)
+    setAzureVoices(v.azureSpeech.voices)
   }, [v])
+
+  async function runAzureTest() {
+    setAzureTesting(true)
+    const { ok, data: d } = await api<{ ok: boolean; message: string }>('/api/admin/settings/providers/credentials/test', { method: 'POST', json: { provider: 'azure_speech' } })
+    setAzureTesting(false)
+    setAzureTest({ ok: ok && d.ok, message: d.message || d.error || 'Test failed' })
+  }
 
   const voiceErr = (l: VoiceLang) => (valid({ sarvam: { voices: { [l]: voices[l] } } }) ? null : 'Lower-case speaker name.')
   const llmErr = llm.trim() && valid({ llmModel: llm }) ? null : 'A model ID, e.g. claude-haiku-5-5.'
-  const dirty = stt !== v.sarvam.sttModel || tts !== v.sarvam.ttsModel || llm !== v.llmModel || VOICE_LANGS.some(l => voices[l] !== v.sarvam.voices[l])
-  const bad = !!llmErr || VOICE_LANGS.some(l => voiceErr(l))
+  const azureVoiceErr = (l: VoiceLang) => (valid({ azureSpeech: { voices: { [l]: azureVoices[l] } } }) ? null : 'A voice name like hi-IN-SwaraNeural.')
+  const dirty =
+    stt !== v.sarvam.sttModel ||
+    tts !== v.sarvam.ttsModel ||
+    llm !== v.llmModel ||
+    VOICE_LANGS.some(l => voices[l] !== v.sarvam.voices[l]) ||
+    engines.sttProvider !== v.speech.sttProvider ||
+    engines.ttsProvider !== v.speech.ttsProvider ||
+    region !== v.azureSpeech.region ||
+    VOICE_LANGS.some(l => azureVoices[l] !== v.azureSpeech.voices[l])
+  const bad = !!llmErr || VOICE_LANGS.some(l => voiceErr(l) || azureVoiceErr(l))
+  const engineOpts = SPEECH_ENGINES.map(e => ({ value: e, label: ENGINE_LABEL[e] }))
   const opts = (list: readonly string[], cur: string) => [...new Set([...list, cur])].map(m => ({ value: m, label: MODEL_LABEL[m] ?? m }))
 
   return (
-    <Part title="Voice AI" status={ready(v.sarvam.configured && v.anthropic.configured)}>
+    <Part title="Voice AI" status={ready((v.sarvam.configured || v.azureSpeech.configured) && v.anthropic.configured)}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-2xl">
+        <SelectField
+          label="Speech-to-text engine"
+          help="Sarvam is the default. If the chosen engine can't start for a call, the other one is used."
+          value={engines.sttProvider}
+          disabled={disabled}
+          onChange={e => setEngines({ ...engines, sttProvider: e as SpeechEngine })}
+          options={engineOpts}
+        />
+        <SelectField
+          label="Text-to-speech engine"
+          help="Chosen separately from speech-to-text. Voices are set per engine below."
+          value={engines.ttsProvider}
+          disabled={disabled}
+          onChange={e => setEngines({ ...engines, ttsProvider: e as SpeechEngine })}
+          options={engineOpts}
+        />
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Box title="Sarvam" status={ready(v.sarvam.configured)}>
           <SecretGroup
@@ -609,6 +667,39 @@ function VoiceAi({ data, disabled, saveVoice, reload }: { data: Data; disabled: 
             <SelectField label="Speech-to-text model" help="Saaras v3 handles 22 Indian languages and code-mixing." value={stt} disabled={disabled} onChange={setStt} options={opts(SARVAM_STT_MODELS, stt)} />
             <SelectField label="Text-to-speech model" help="Bulbul v3. The voices below are Bulbul v3 speakers." value={tts} disabled={disabled} onChange={setTts} options={opts(SARVAM_TTS_MODELS, tts)} />
           </div>
+        </Box>
+        <Box title="Azure AI Speech" status={ready(v.azureSpeech.configured)}>
+          <SecretGroup
+            provider="azure_speech"
+            title="Azure Speech key"
+            help="Azure portal → the Speech resource → Keys and Endpoint. Used for speech-to-text and text-to-speech."
+            fields={[{ key: 'apiKey', label: 'Speech key' }]}
+            statuses={{ apiKey: v.azureSpeech.apiKey }}
+            stored={v.azureSpeech.apiKey.configured}
+            disabled={disabled}
+            onChanged={reload}
+          />
+          <SelectField
+            label="Azure Speech region"
+            help="The region of the Speech resource (Central India by default)."
+            value={region}
+            disabled={disabled}
+            onChange={setRegion}
+            options={[...new Set([...AZURE_SPEECH_REGIONS, region])].map(r => ({ value: r, label: AZURE_REGION_LABEL[r] ?? r }))}
+          />
+          {!disabled && (
+            <div className="space-y-2">
+              <button type="button" className={btnGhost} disabled={!v.azureSpeech.apiKey.configured || azureTesting} onClick={runAzureTest}>
+                {azureTesting ? 'Testing…' : 'Test Azure Speech'}
+              </button>
+              <p className="text-xs text-foreground-muted">Asks the region for a short-lived token with the saved key. Nothing is spoken or transcribed.</p>
+              {azureTest && (
+                <div role="status">
+                  <Banner ok={azureTest.ok}>{azureTest.message}</Banner>
+                </div>
+              )}
+            </div>
+          )}
         </Box>
         <Box title="Claude" status={ready(v.anthropic.configured)}>
           <Field label="Claude model ID" help={`Runs the call dialogue. Default ${DEFAULT_VOICE_LLM}.`} value={llm} error={llmErr} disabled={disabled} onChange={setLlm} />
@@ -643,11 +734,34 @@ function VoiceAi({ data, disabled, saveVoice, reload }: { data: Data; disabled: 
         </div>
         <p className="text-xs text-foreground-muted mt-2">Speaker names from Sarvam&apos;s Bulbul voice list. An empty field uses the default.</p>
       </div>
+      <div>
+        <span className="block text-xs text-foreground-muted mb-2">Azure voice per language</span>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {VOICE_LANGS.map(l => (
+            <Field
+              key={l}
+              label={`Azure ${LANG_LABEL[l]} voice`}
+              help={`Default ${DEFAULT_AZURE_VOICES[l]}.`}
+              value={azureVoices[l]}
+              placeholder={DEFAULT_AZURE_VOICES[l]}
+              error={azureVoiceErr(l)}
+              disabled={disabled}
+              onChange={s => setAzureVoices({ ...azureVoices, [l]: s })}
+            />
+          ))}
+        </div>
+        <p className="text-xs text-foreground-muted mt-2">Azure neural voice names (Speech Studio → Voice Gallery). An empty field uses the default.</p>
+      </div>
       {!disabled && (
         <SaveRow
           label="Save voice AI settings"
           disabled={!dirty || bad}
-          onSave={() => saveVoice({ sarvam: { sttModel: stt, ttsModel: tts, voices }, llmModel: llm.trim() }, 'Voice AI settings')}
+          onSave={() =>
+            saveVoice(
+              { sarvam: { sttModel: stt, ttsModel: tts, voices }, speech: engines, azureSpeech: { region, voices: azureVoices }, llmModel: llm.trim() },
+              'Voice AI settings'
+            )
+          }
         />
       )}
     </Part>
