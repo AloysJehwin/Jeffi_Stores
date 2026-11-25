@@ -12,7 +12,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=/home/voice \
     PYTHONPATH=/app/src
 
-RUN useradd --uid 10001 --create-home --home-dir /home/voice --shell /usr/sbin/nologin voice
+# Debian already has a "voice" group (gid 22), so the user gets its own name and the pod's gid 10001.
+RUN groupadd --gid 10001 voicesvc \
+ && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/voice --shell /usr/sbin/nologin voicesvc
 
 WORKDIR /app
 COPY voice-service/requirements.txt ./

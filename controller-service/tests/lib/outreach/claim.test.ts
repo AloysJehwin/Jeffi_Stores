@@ -144,7 +144,8 @@ describe('outreach claim', () => {
   it('peeks without using the link', async () => {
     const { token } = (await createClaimToken(CONTACT))!
     expect(await peekClaim(token)).toEqual({ state: 'valid', siteName: 'Latte Cafe' })
-    expect(await peekClaim(`${token.slice(0, -1)}A`)).toEqual({ state: 'invalid' })
+    const last = token.slice(-1)
+    expect(await peekClaim(`${token.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`)).toEqual({ state: 'invalid' })
     expect(await peekClaim('junk')).toEqual({ state: 'invalid' })
     vi.setSystemTime(T0 + CLAIM_TTL_MS)
     expect(await peekClaim(token)).toEqual({ state: 'expired' })
