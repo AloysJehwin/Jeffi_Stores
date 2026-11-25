@@ -70,9 +70,17 @@ spec:
             - { name: VOICE_STATE_DIR, value: /state }
             - { name: LOG_LEVEL, value: INFO }
             - { name: ANTHROPIC_IDENTITY_TOKEN_FILE, value: /wif/token }
-            # The org UUID: also taken from the controller's voice-config; set here only as the env fallback.
+            # The org UUID: the other federation ids come from the controller's voice-config (non-secret).
             - { name: ANTHROPIC_ORGANIZATION_ID, valueFrom: { secretKeyRef: { name: voice-service, key: ANTHROPIC_ORGANIZATION_ID, optional: true } } }
-          # SERVICE_AUTH_SECRET (required), VOICE_WS_KEY, and optional env fallbacks for the provider keys.
+            # Provider credentials: only ever from the voice-service Secret, never from the controller or the UI.
+            - { name: EXOTEL_API_KEY, valueFrom: { secretKeyRef: { name: voice-service, key: EXOTEL_API_KEY, optional: true } } }
+            - { name: EXOTEL_API_TOKEN, valueFrom: { secretKeyRef: { name: voice-service, key: EXOTEL_API_TOKEN, optional: true } } }
+            - { name: TWILIO_ACCOUNT_SID, valueFrom: { secretKeyRef: { name: voice-service, key: TWILIO_ACCOUNT_SID, optional: true } } }
+            - { name: TWILIO_AUTH_TOKEN, valueFrom: { secretKeyRef: { name: voice-service, key: TWILIO_AUTH_TOKEN, optional: true } } }
+            - { name: SARVAM_API_KEY, valueFrom: { secretKeyRef: { name: voice-service, key: SARVAM_API_KEY, optional: true } } }
+            - { name: AZURE_SPEECH_KEY, valueFrom: { secretKeyRef: { name: voice-service, key: AZURE_SPEECH_KEY, optional: true } } }
+            - { name: ANTHROPIC_API_KEY, valueFrom: { secretKeyRef: { name: voice-service, key: ANTHROPIC_API_KEY, optional: true } } }
+          # SERVICE_AUTH_SECRET (required) and VOICE_WS_KEY.
           envFrom: [{ secretRef: { name: voice-service, optional: true } }]
           resources:
             requests: { cpu: 250m, memory: 512Mi }

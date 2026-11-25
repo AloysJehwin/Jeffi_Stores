@@ -12,7 +12,8 @@ from voice_service import speech
 from voice_service.config import Settings, load_settings
 from voice_service.provider_config import merge
 
-AZURE = {"azureSpeech": {"apiKey": "fake-azure-key", "region": "centralindia"}}
+AZURE = {"azureSpeech": {"region": "centralindia"}}
+AZ = {"azure_speech_key": "fake-azure-key"}  # credentials are env-only
 
 
 def cfg_for(settings: Settings, remote: dict[str, Any] | None = None, **env: Any):
@@ -20,7 +21,7 @@ def cfg_for(settings: Settings, remote: dict[str, Any] | None = None, **env: Any
 
 
 def test_sarvam_is_the_default_engine(settings: Settings) -> None:
-    cfg = cfg_for(settings, AZURE)
+    cfg = cfg_for(settings, AZURE, **AZ)
     assert (cfg.stt_provider, cfg.tts_provider) == ("sarvam", "sarvam")
     assert speech.engine_order("sarvam", cfg) == ["sarvam", "azure"]
 
@@ -28,7 +29,7 @@ def test_sarvam_is_the_default_engine(settings: Settings) -> None:
 def test_engine_order_skips_an_engine_without_credentials(settings: Settings) -> None:
     sarvam_only = cfg_for(settings)
     assert speech.engine_order("azure", sarvam_only) == ["sarvam"]
-    azure_only = cfg_for(settings, AZURE, sarvam_api_key="")
+    azure_only = cfg_for(settings, AZURE, sarvam_api_key="", **AZ)
     assert speech.engine_order("sarvam", azure_only) == ["azure"]
     assert speech.engine_order("azure", azure_only) == ["azure"]
     none = cfg_for(settings, sarvam_api_key="")
@@ -69,7 +70,7 @@ def test_azure_services_are_built_with_the_region_and_voice(settings: Settings) 
     from pipecat.services.azure.stt import AzureSTTService
     from pipecat.services.azure.tts import AzureTTSService
 
-    cfg = cfg_for(settings, {**AZURE, "speech": {"sttProvider": "azure", "ttsProvider": "azure"}})
+    cfg = cfg_for(settings, {**AZURE, "speech": {"sttProvider": "azure", "ttsProvider": "azure"}}, **AZ)
     stt, stt_engine = speech.build_stt(cfg, settings, lang("ta"))
     tts, tts_engine = speech.build_tts(cfg, settings, lang("ta"), "ta")
     assert (stt_engine, tts_engine) == ("azure", "azure")
@@ -116,7 +117,7 @@ def test_a_chosen_engine_that_fails_to_start_falls_back_to_the_other(settings: S
 
     monkeypatch.setattr(speech, "_build_stt", boom_stt)
     monkeypatch.setattr(speech, "_build_tts", boom_tts)
-    cfg = cfg_for(settings, {**AZURE, "speech": {"sttProvider": "azure", "ttsProvider": "sarvam"}})
+    cfg = cfg_for(settings, {**AZURE, "speech": {"sttProvider": "azure", "ttsProvider": "sarvam"}}, **AZ)
     assert speech.build_stt(cfg, settings, lang("hi"))[1] == "sarvam"
     assert speech.build_tts(cfg, settings, lang("hi"), "hi")[1] == "azure"
 
@@ -126,7 +127,7 @@ def test_both_engines_failing_raises_the_last_error(settings: Settings, monkeypa
         raise RuntimeError(f"{engine} down")
 
     monkeypatch.setattr(speech, "_build_stt", boom)
-    cfg = cfg_for(settings, AZURE)
+    cfg = cfg_for(settings, AZURE, **AZ)
     with pytest.raises(RuntimeError, match="azure down"):
         speech.build_stt(cfg, settings, lang("hi"))
 
@@ -145,7 +146,7 @@ async def test_the_pipeline_wires_up_with_azure_engines(settings: Settings, monk
     real = pl.build_stt
     monkeypatch.setattr(pl, "build_stt", lambda *a: built.append(real(*a)) or built[-1])
     rt = runtime(settings, persona={"name": "Priya", "voiceId": "priya"})
-    rt.cfg = cfg_for(settings, {**AZURE, "speech": {"sttProvider": "azure", "ttsProvider": "azure"}})
+    rt.cfg = cfg_for(settings, {**AZURE, "speech": {"sttProvider": "azure", "ttsProvider": "azure"}}, **AZ)
     rt.worker = None
     pl.build_pipeline(MagicMock(), rt, ExotelFrameSerializer(stream_sid="s1", call_sid="c1"))
     assert isinstance(built[0][0], AzureSTTService) and built[0][1] == "azure"
