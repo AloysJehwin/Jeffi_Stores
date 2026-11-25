@@ -228,7 +228,8 @@ jobs:
   security:
     name: Security
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' }}
     permissions: { contents: read, pull-requests: write } # pull-requests: the dependency review's comment
     steps:
       - uses: actions/checkout@v4
@@ -315,7 +316,8 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, security] # security only orders the graph
+    if: ${{ !cancelled() && needs.test.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -332,8 +334,8 @@ jobs:
   integration:
     name: Integration tests · ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.rtl != '[]'
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.rtl != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -397,8 +399,8 @@ jobs:
   browser:
     name: Build + browser · ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # a commit failing either never spends a build
-    if: needs.init.outputs.apps != '[]'
+    needs: [init, lint, typecheck, security] # a commit failing lint or typecheck never spends a build; security only orders the graph
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.init.outputs.apps != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -475,7 +477,8 @@ jobs:
   ui-kit:
     name: UI kit
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -491,7 +494,7 @@ jobs:
   api-db-required:
     name: API tests (real DB)
     runs-on: ubuntu-latest
-    needs: [init, api-db-tests]
+    needs: [init, api-db-tests, security] # security only orders the graph
     if: always()
     steps:
       - name: Every API tests (real DB) card passed
@@ -519,8 +522,8 @@ jobs:
   service-api:
     name: Service API · ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.fastify != '[]'
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.fastify != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -541,7 +544,8 @@ jobs:
   ratchets:
     name: Test ratchets
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -554,8 +558,8 @@ jobs:
   ocr:
     name: OCR tests (advisory)
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.ocr == 'true'
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.ocr == 'true' }}
     continue-on-error: true
     timeout-minutes: 20
     steps:
@@ -573,8 +577,8 @@ jobs:
   voice:
     name: Voice service tests
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.voice == 'true'
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.voice == 'true' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -589,12 +593,12 @@ jobs:
   responsive:
     name: Responsive sweep (advisory)
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
     # Advisory: not in `checks`' needs and continue-on-error, so it never blocks a merge. Skipped on a release run (its
     # PR already ran it, and Post fails a release on any failed job). Promote it once it has proven reliable.
     # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5), and the visual
     # editor's page (free layers, converted blocks), with a CLS and LCP budget per page (docs/plans/SITE_EDITOR_PLAN.md).
-    if: needs.init.outputs.release != 'true'
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.release != 'true' }}
     continue-on-error: true
     timeout-minutes: 60
     services:
@@ -664,12 +668,12 @@ jobs:
   site-editor-e2e:
     name: Site editor end-to-end (advisory)
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
     # Advisory, like the responsive sweep: not in `checks`' needs and continue-on-error, skipped on a release run.
     # The visual editor in a real browser (docs/plans/SITE_EDITOR_PLAN.md phase 6): the canvas bridge on the storefront
     # and the editor in the admin Site Builder, behind the dev router so both share an origin as the editor's canvas
     # needs. tests/site-editor/seed.ts seeds jeffi_test (flag on, a draft, an admin session). Promote once reliable.
-    if: needs.init.outputs.release != 'true'
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.release != 'true' }}
     continue-on-error: true
     timeout-minutes: 45
     services:
@@ -734,7 +738,8 @@ jobs:
   build:
     name: Build · ${{ matrix.app }}
     runs-on: ubuntu-24.04-arm
-    needs: [lint, typecheck] # a commit failing either never spends a build
+    needs: [lint, typecheck, security] # a commit failing lint or typecheck never spends a build; security only orders the graph
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -757,8 +762,8 @@ jobs:
   images:
     name: Image · ${{ matrix.service }}
     runs-on: ubuntu-24.04-arm
-    needs: [init, lint, typecheck]
-    if: needs.init.outputs.release == 'true'
+    needs: [init, lint, typecheck, security]
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.init.outputs.release == 'true' }}
     permissions:
       id-token: write
       contents: read
