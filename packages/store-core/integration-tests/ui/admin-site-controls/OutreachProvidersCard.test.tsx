@@ -25,6 +25,13 @@ const data = () => ({
       apiKey: unset,
       configured: false,
     },
+    speech: { sttProvider: 'sarvam', ttsProvider: 'sarvam' },
+    azureSpeech: {
+      region: 'centralindia',
+      voices: { en: 'en-IN-NeerjaNeural', hi: 'hi-IN-SwaraNeural', ta: 'ta-IN-PallaviNeural', te: 'te-IN-ShrutiNeural', kn: 'kn-IN-SapnaNeural', ml: 'ml-IN-SobhanaNeural', mr: 'mr-IN-AarohiNeural', bn: 'bn-IN-TanishaaNeural', gu: 'gu-IN-DhwaniNeural' },
+      apiKey: unset,
+      configured: false,
+    },
     llmModel: 'claude-haiku-5-5',
     anthropic: { apiKey: set(null), source: 'env', federation: false, configured: true },
     ready: false,
@@ -156,11 +163,73 @@ describe('OutreachProvidersCard', () => {
     expect(calls.find(c => c.url.endsWith('/test'))!.body).toEqual({ provider: 'exotel' })
   })
 
+  it('saves the engine per direction, the region and Azure voices through voice_config, secrets excluded', async () => {
+    await load()
+    const save = screen.getByRole('button', { name: 'Save voice AI settings' })
+    expect(save).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Azure Hindi voice'), { target: { value: 'hi-IN-MadhurNeural' } })
+    expect(save).not.toBeDisabled()
+    fireEvent.click(screen.getByLabelText('Speech-to-text engine'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Azure AI Speech' }))
+    fireEvent.click(save)
+    await waitFor(() => expect(calls.some(c => c.method === 'PUT' && c.url === '/api/admin/settings/providers')).toBe(true))
+    const put = calls.find(c => c.method === 'PUT' && c.url === '/api/admin/settings/providers')!
+    expect(put.body.key).toBe('voice_config')
+    expect(put.body.value.speech).toEqual({ sttProvider: 'azure', ttsProvider: 'sarvam' })
+    expect(put.body.value.azureSpeech.region).toBe('centralindia')
+    expect(put.body.value.azureSpeech.voices.hi).toBe('hi-IN-MadhurNeural')
+    expect(put.body.value.sarvam.voices.hi).toBe('priya')
+    expect(JSON.stringify(put.body)).not.toMatch(/configured|last4|apiKey/)
+  })
+
+  it('blocks an Azure voice that is not a neural voice name', async () => {
+    await load()
+    fireEvent.change(screen.getByLabelText('Azure Tamil voice'), { target: { value: 'priya' } })
+    expect(screen.getByText('A voice name like hi-IN-SwaraNeural.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save voice AI settings' })).toBeDisabled()
+  })
+
+  it('stores the Azure Speech key write-only under azure_speech', async () => {
+    await load()
+    const box = within(screen.getByTestId('secret-azure_speech'))
+    const key = box.getByLabelText('Speech key') as HTMLInputElement
+    expect(key.type).toBe('password')
+    fireEvent.change(key, { target: { value: 'azure-speech-key-1234567890' } })
+    fireEvent.click(box.getByRole('button', { name: 'Save Azure Speech key' }))
+    await waitFor(() => expect(calls.some(c => c.method === 'PUT' && c.url.endsWith('/credentials'))).toBe(true))
+    expect(calls.find(c => c.method === 'PUT' && c.url.endsWith('/credentials'))!.body).toEqual({
+      provider: 'azure_speech',
+      values: { apiKey: 'azure-speech-key-1234567890' },
+    })
+    await waitFor(() => expect(screen.queryByDisplayValue('azure-speech-key-1234567890')).toBeNull())
+  })
+
+  it('tests the saved Azure Speech key and shows the result inline', async () => {
+    const d = data()
+    d.voice.azureSpeech.apiKey = set('4444') as any
+    d.voice.azureSpeech.configured = true
+    mockFetch({
+      'GET /api/admin/settings/providers/credentials': d,
+      'POST /api/admin/settings/providers/credentials/test': { ok: true, message: 'Azure Speech accepted the key (centralindia).' },
+    })
+    await load()
+    expect(within(screen.getByTestId('secret-azure_speech')).getByText('Configured · ••••4444')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Test Azure Speech' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Azure Speech accepted the key (centralindia).'))
+    expect(calls.find(c => c.url.endsWith('/test'))!.body).toEqual({ provider: 'azure_speech' })
+  })
+
+  it('disables the Azure test until a key is saved', async () => {
+    await load()
+    expect(screen.getByRole('button', { name: 'Test Azure Speech' })).toBeDisabled()
+  })
+
   it('is read-only without settings:write', async () => {
     canWrite = false
     await load()
     expect(screen.queryByRole('button', { name: 'Replace' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Test Exotel' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Test Azure Speech' })).toBeNull()
     expect(screen.queryByLabelText('Add to Test numbers')).toBeNull()
     expect(screen.getByText('+919876543210')).toBeInTheDocument()
   })

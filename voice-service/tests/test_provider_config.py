@@ -110,6 +110,10 @@ def test_every_field_of_the_controllers_sample_lands_in_voice_config(tmp_path: A
     assert cfg.test_numbers == frozenset(f["testNumbers"])
     assert (cfg.sarvam_api_key, cfg.stt_model, cfg.tts_model) == (f["sarvam"]["apiKey"], f["sarvam"]["sttModel"], f["sarvam"]["ttsModel"])
     assert cfg.voices == f["sarvam"]["voices"] and cfg.voice_for("ta-IN") == "ishita"
+    assert (cfg.stt_provider, cfg.tts_provider) == (f["speech"]["sttProvider"], f["speech"]["ttsProvider"])
+    assert (cfg.azure_api_key, cfg.azure_region, cfg.azure_voices) == (
+        f["azureSpeech"]["apiKey"], f["azureSpeech"]["region"], f["azureSpeech"]["voices"])
+    assert cfg.azure_voice_for("ta-IN") == "ta-IN-PallaviNeural"
     assert cfg.llm_model == f["llmModel"] and cfg.anthropic_api_key == f["anthropic"]["apiKey"]
     i = f["anthropicIdentity"]
     assert cfg.anthropic_identity == AnthropicIdentity(i["organizationId"], i["workspaceId"], i["serviceAccountId"], i["federationRuleId"])
@@ -118,12 +122,38 @@ def test_every_field_of_the_controllers_sample_lands_in_voice_config(tmp_path: A
     assert set(cfg.sources) >= {
         "provider", "exotel.accountSid", "exotel.subdomain", "exotel.callerId", "exotel.appId", "exotel.apiKey",
         "exotel.apiToken", "twilioTest.from", "twilioTest.accountSid", "twilioTest.authToken", "testNumbers",
-        "sarvam.apiKey", "sarvam.sttModel", "sarvam.ttsModel", "sarvam.voices", "llmModel", "anthropic.apiKey",
+        "sarvam.apiKey", "sarvam.sttModel", "sarvam.ttsModel", "sarvam.voices", "speech", "azureSpeech.apiKey", "azureSpeech.region", "azureSpeech.voices", "llmModel",
+        "anthropic.apiKey",
         "anthropicIdentity.organizationId", "anthropicIdentity.workspaceId", "anthropicIdentity.serviceAccountId",
         "anthropicIdentity.federationRuleId",
     }
     # the sample is exactly the keys merge reads: a new controller field must be added to both, or this fails
-    assert set(f) == {"provider", "exotel", "twilioTest", "testNumbers", "sarvam", "llmModel", "anthropic", "anthropicIdentity", "ready"}
+    assert set(f) == {"provider", "exotel", "twilioTest", "testNumbers", "sarvam", "speech", "azureSpeech", "llmModel", "anthropic",
+                     "anthropicIdentity", "ready"}
+
+
+def test_azure_speech_env_fallback_and_defaults(tmp_path: Any) -> None:
+    env = Settings(azure_speech_key="env-azure-key", azure_speech_region="southindia", stt_provider="azure",
+                   state_dir=str(tmp_path))
+    cfg = merge(None, env)
+    assert (cfg.azure_api_key, cfg.azure_region, cfg.stt_provider, cfg.tts_provider) == ("env-azure-key", "southindia", "azure", "sarvam")
+    assert cfg.sources["azureSpeech.apiKey"] == "env" and cfg.sources["speech"] == "env"
+    assert cfg.azure_ready() and cfg.azure_voice_for("hi") == "hi-IN-SwaraNeural" and cfg.azure_voice_for("fr") == "en-IN-NeerjaNeural"
+    # the controller's value wins over env, field by field; an unknown engine name is ignored
+    cfg = merge({"speech": {"sttProvider": "bogus", "ttsProvider": "azure"}, "azureSpeech": {"region": "CentralIndia", "voices": {"hi": "hi-IN-MadhurNeural"}}}, env)
+    assert (cfg.stt_provider, cfg.tts_provider, cfg.azure_region, cfg.azure_api_key) == ("azure", "azure", "centralindia", "env-azure-key")
+    assert cfg.azure_voice_for("hi-IN") == "hi-IN-MadhurNeural"
+
+
+def test_one_speech_engine_is_enough_to_take_calls(settings: Settings) -> None:
+    base = {k: FIXTURE[k] for k in ("exotel", "anthropic")}
+    sarvam_only = merge({"provider": "exotel", **base, "sarvam": {"apiKey": "k"}}, settings)
+    assert "sarvam.apiKey" not in sarvam_only.missing()
+    azure_only = merge({**base, "speech": {"sttProvider": "azure", "ttsProvider": "azure"}, "azureSpeech": {"apiKey": "az"}},
+                       replace(settings, sarvam_api_key=""))
+    assert azure_only.missing() == []
+    neither = merge({"speech": {"sttProvider": "azure"}}, replace(settings, sarvam_api_key=""))
+    assert "sarvam.apiKey" in neither.missing() and "azureSpeech.apiKey" in neither.missing()
 
 
 def test_sources_report_never_carries_values(settings: Settings) -> None:
