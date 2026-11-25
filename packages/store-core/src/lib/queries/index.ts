@@ -34,6 +34,7 @@ export type { OrdersSummary } from './orders'
 export { getCustomers, queryCustomers, getCustomersSummary, getCustomerById } from './customers'
 export { getDashboardStats, getDashboardMetrics, getDashboardAnalytics, type DashboardAnalytics } from './dashboard'
 export { getDashboardActivity } from './dashboard-activity'
+export { getInsightsSeries, type InsightsSeriesSpec, type InsightsSeriesPart } from './insights-series'
 export {
   getRevenueTrendBySource,
   getProductBreakdowns,

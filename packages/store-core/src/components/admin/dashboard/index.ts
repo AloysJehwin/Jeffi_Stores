@@ -6,7 +6,7 @@ export { CompareArea, type CompareAreaProps, type ComparePoint } from './Compare
 export { FlowStream, type FlowStreamProps } from './FlowStream'
 export { WeekdayBars, type WeekdayBarsProps } from './WeekdayBars'
 export { DotCalendar, ActivityLegend, type DotCalendarProps } from './DotCalendar'
-export { IsoColumns, DEFAULT_YAW, type IsoColumnsProps } from './IsoColumns'
+export { IsoColumns, DEFAULT_YAW, type IsoColumnsProps, type IsoDay } from './IsoColumns'
 export { MetricList, type MetricListProps, type Metric } from './MetricList'
 export { WeekdayRhythm, type WeekdayRhythmProps } from './WeekdayRhythm'
 export { TimeToShip, type TimeToShipProps } from './TimeToShip'
