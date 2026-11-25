@@ -1,4 +1,5 @@
 import type { ActivityDay, DashboardActivity } from '@/lib/dashboard/activity-types'
+import type { IsoDay } from '@/components/admin/dashboard/IsoColumns'
 
 /** Stubs window.matchMedia for the reduced-motion preference. */
 export function mockReducedMotion(reduce: boolean) {
@@ -33,6 +34,11 @@ export function makeDays(weeks: number): ActivityDay[] {
       top: shipped >= 4 ? [{ name: 'Shirts', count: Math.floor(shipped / 2) }, { name: 'Shoes', count: Math.floor(shipped / 4) }] : [],
     }
   })
+}
+
+/** makeDays as the 3D chart's cells: value = shipped, parts = top categories, note = customers. */
+export function makeIsoDays(weeks: number): IsoDay[] {
+  return makeDays(weeks).map(d => ({ date: d.date, value: d.shipped, parts: d.top, note: `${d.customers} ${d.customers === 1 ? 'customer' : 'customers'}` }))
 }
 
 export function makeActivity(weeks = 4): DashboardActivity {

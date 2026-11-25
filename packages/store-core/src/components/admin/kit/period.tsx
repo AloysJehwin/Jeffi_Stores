@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, AlertCircle, Info, CheckCircle2, RefreshCw } from 'lucide-react'
 import { PERIOD_PRESETS, matchPreset, parsePeriod, previousPeriod, type Period, type PeriodPreset } from '@/lib/overview/period'
 import { api } from './core'
 import DatePicker, { formatDisplay } from '@/components/ui/DatePicker'
+import { SegmentedControl } from './segmented'
 
 // Shared pieces for admin overview tabs: the period bar (presets + custom, kept in ?from&to), a
 // loader that only ever returns data fetched for the current URL, and the needs-attention list.
@@ -29,31 +30,27 @@ export function usePeriod(fallback: PeriodPreset = '30d'): [Period, (p: Period) 
   return [period, set]
 }
 
-export function PeriodBar({ value, onChange, onRefresh, busy }: { value: Period; onChange: (p: Period) => void; onRefresh?: () => void; busy?: boolean }) {
+/** `actions` sit at the right of the bar, before Refresh (e.g. the page's insights button). */
+export function PeriodBar({ value, onChange, onRefresh, busy, actions }: { value: Period; onChange: (p: Period) => void; onRefresh?: () => void; busy?: boolean; actions?: ReactNode }) {
   const active = matchPreset(value)
   const prev = previousPeriod(value)
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex h-control max-w-full overflow-x-auto gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg">
-        {PERIOD_PRESETS.map(p => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onChange(parsePeriod(null, null, undefined, p.id))}
-            className={`flex items-center px-2.5 text-xs font-medium rounded-md whitespace-nowrap ${active === p.id ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        ariaLabel="Period presets"
+        options={PERIOD_PRESETS.map(p => ({ value: p.id, label: p.label }))}
+        value={active}
+        onChange={id => onChange(parsePeriod(null, null, undefined, id))}
+      />
       <div className="flex items-center gap-1 text-xs">
 <DatePicker aria-label="From" value={value.from} max={value.to} onChange={v => v && onChange({ from: v, to: value.to })} />
         <span className="text-foreground-muted">to</span>
 <DatePicker aria-label="To" value={value.to} min={value.from} onChange={v => v && onChange({ from: value.from, to: v })} />
       </div>
       <span className="text-xs text-foreground-muted">vs {formatDisplay(prev.from) || prev.from} to {formatDisplay(prev.to) || prev.to}</span>
+      {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       {onRefresh && (
-        <button type="button" onClick={onRefresh} aria-label="Refresh" className="ml-auto control-md control-icon text-foreground-muted hover:text-foreground hover:bg-surface-elevated">
+        <button type="button" onClick={onRefresh} aria-label="Refresh" className={`${actions ? '' : 'ml-auto '}control-md control-icon text-foreground-muted hover:text-foreground hover:bg-surface-elevated`}>
           <RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} />
         </button>
       )}
