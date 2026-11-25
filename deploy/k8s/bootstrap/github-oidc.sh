@@ -8,7 +8,7 @@
 #                        environments: read jeffi/production (the RDS
 #                        master password for 05-table-owner.sh), SSM tunnels to the core and through it to RDS,
 #                        log in to RDS as app_user (schema diff, migrations), invalidate CloudFront, and run one
-#                        SSM command on the core to release the AI gateway on the Razer box (razer-release.sh).
+#                        SSM command on the core to release the Razer LLM service (razer-release.sh).
 # Idempotent; --dry-run prints the policies and what build-secret.sh would write. Then set the secrets it prints.
 # Usage: bash deploy/k8s/bootstrap/github-oidc.sh [--dry-run]
 source "$(dirname "$0")/../db/lib.sh"

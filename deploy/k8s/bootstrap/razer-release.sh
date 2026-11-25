@@ -1,22 +1,21 @@
 #!/bin/bash
-# Release the AI gateway on the Razer box from the pipeline: SSM RunShellScript on the EC2 core, which SSHes over
+# Release the Razer box's LLM service from the pipeline: SSM RunShellScript on the EC2 core, which SSHes over
 # Tailscale to the Razer box with a key that can only run /usr/local/sbin/ai-gateway-release (razer-trust.sh sets
-# that up once). That script (ai-platform/deploy/overlays/razer/host/ai-gateway-release.sh) builds the gateway and
-# PaddleOCR images on the box, rolls both out and reads a sample through /v1/ocr. Prints the remote output; fails
-# when the remote release fails. `smoke` checks the gateway the way the platform reaches it: from the core over
-# Tailscale, /healthz and /readyz on :8080 (whose `ocr` entry shows the sidecar), then prints the status a /v1 call
-# without a token gets: 200 while AI_GATEWAY_TOKEN is unset on the gateway, 401 once it is enforced. The core holds
-# no token, so the smoke never needs one.
+# that up once). That script (ai-platform/deploy/overlays/razer/host/ai-gateway-release.sh) builds PaddleOCR on the
+# box, applies the razer overlay, rolls PaddleOCR out and reads a sample through it. The AI gateway is no longer
+# released here: it is a platform service (rollout.sh platform ai-gateway). Prints the remote output; fails when the
+# remote release fails. `smoke` checks the three backends the gateway uses, the way the gateway reaches them: from the
+# core over Tailscale, Ollama :11434, the image server :7860 and PaddleOCR :8866.
 # Usage: razer-release.sh <sha> [--dry-run] | razer-release.sh smoke
 source "$(dirname "$0")/../db/lib.sh"
 SHA=${1:?sha or smoke}
 RAZER=${RAZER_HOST:-aloysjehwin@100.82.208.8}
-GATEWAY=${GATEWAY_URL:-http://100.82.208.8:8080}
+HOST=${RAZER_TAILNET_IP:-100.82.208.8}
 KEY=/etc/jeffi/razer-deploy
 core=$(aws ec2 describe-addresses --public-ips "$CORE_IP" --query 'Addresses[0].InstanceId' --output text)
 if [ "$SHA" = smoke ]; then
-  remote="gateway smoke test"
-  cmd="curl -fsS --max-time 15 $GATEWAY/healthz && echo && curl -sS --max-time 15 $GATEWAY/readyz && echo && curl -sS -i --max-time 15 $GATEWAY/v1/providers | head -1"
+  remote="LLM service smoke test"
+  cmd="curl -fsS --max-time 15 http://$HOST:11434/api/version && echo && curl -fsS --max-time 15 -o /dev/null http://$HOST:7860/sdapi/v1/options && echo 'image server up' && curl -fsS --max-time 15 'http://$HOST:8866/health?ready=1' && echo"
 else
   remote="release $SHA$($DRY_RUN && echo ' --dry-run' || true)"
   cmd="ssh -i $KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 $RAZER '$remote'"
@@ -48,13 +47,13 @@ transient() {
   [ -z "$last" ] || [[ $last == "== Fetching"* ]]
 }
 
-say "AI gateway on the Razer box: $remote (via $core)"
+say "Razer LLM service: $remote (via $core)"
 for attempt in 1 2 3; do
   run_remote
   [ "$st" = Success ] && exit 0
   [ $attempt -lt 3 ] && transient || break
-  echo "AI gateway $remote: $st on attempt $attempt, looks transient; retrying in 30s" >&2
+  echo "Razer LLM service $remote: $st on attempt $attempt, looks transient; retrying in 30s" >&2
   sleep 30
 done
-echo "AI gateway release $st" >&2
+echo "Razer LLM service release $st" >&2
 exit 1

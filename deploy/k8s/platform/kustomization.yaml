@@ -17,6 +17,7 @@ resources:
   - 48-mobile-service.yaml
   - 48-showcase-service.yaml
   - 48-voice-service.yaml
+  - 48-ai-gateway-service.yaml
   - 49-routes.yaml
   - release.yaml
   - cronjobs.yaml
@@ -42,4 +43,6 @@ images:
   - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-showcase-service
     newTag: set-by-rollout
   - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-voice-service
+    newTag: set-by-rollout
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-ai-gateway-service
     newTag: set-by-rollout
