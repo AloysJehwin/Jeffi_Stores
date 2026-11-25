@@ -230,4 +230,5 @@ Grouped by domain. Required-for-prod marked with `*`.
 
 ## License
 
-Proprietary — © Jeffi Stores. All rights reserved.
+GNU Affero General Public License v3.0 (`AGPL-3.0-only`), © 2026 Jeffi Stores. See [`LICENSE`](../LICENSE).
+A commercial license is available from Jeffi Stores for use without the AGPL's conditions.

@@ -2,7 +2,7 @@
 
 Jeffi ERP holds the source of Jeffi Stores, a commerce platform for Indian merchants, with one repository per service. Bug fixes, features, tests and docs are welcome. This guide applies to every repository in the org.
 
-The code is under the Business Source License 1.1 (the `LICENSE` file in each repository). Read [Licensing of contributions](#licensing-of-contributions) before you send code.
+The code is under the GNU Affero General Public License v3.0, `AGPL-3.0-only` (the `LICENSE` file in each repository). Read [Licensing of contributions](#licensing-of-contributions) before you send code.
 
 ## Before you start
 
@@ -194,8 +194,8 @@ Add a `Signed-off-by` line to every commit with `git commit -s`. It certifies th
 
 By opening a pull request you agree that:
 
-- your contribution is licensed under the Business Source License 1.1 in the repository's `LICENSE` file, on the same terms as the rest of the code, including the change to the Apache License 2.0 on the Change Date; and
-- you grant Jeffi Stores a perpetual, worldwide, non-exclusive, royalty-free, irrevocable licence to use, copy, modify, distribute, sublicense and relicense your contribution under other terms, including commercial licences. Jeffi Stores needs this to keep offering commercial licences for the platform.
+- your contribution is licensed under the GNU Affero General Public License v3.0 (`AGPL-3.0-only`) in the repository's `LICENSE` file, on the same terms as the rest of the code; and
+- you grant Jeffi Stores a perpetual, worldwide, non-exclusive, royalty-free, irrevocable licence to use, copy, modify, distribute, sublicense and relicense your contribution under other terms, including commercial licences. Jeffi Stores needs this to keep offering a commercial licence alongside the AGPL.
 
 You keep the copyright in your contribution. If your employer has rights in your work, make sure you are allowed to contribute it.
 

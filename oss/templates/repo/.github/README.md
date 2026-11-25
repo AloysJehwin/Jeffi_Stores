@@ -35,4 +35,4 @@ Run a stage locally from the workspace root: `node oss/checks.mjs %%repo%% pr`.
 
 ## Licence
 
-[Business Source License 1.1](../LICENSE). You may read, modify and make non-production use of this code. Production use needs a commercial licence from Jeffi Stores until the Change Date in the licence, when it becomes Apache-2.0. Contributions are accepted on the terms in [CONTRIBUTING](https://github.com/%%org%%/.github/blob/main/CONTRIBUTING.md).
+[GNU Affero General Public License v3.0](../LICENSE) (`AGPL-3.0-only`). You may use, modify and redistribute this code, including in production. If you distribute a modified version, or run one as a service that people use over a network, you must make its source available to those users under the same licence. Jeffi Stores also offers a commercial licence for use without those conditions. Contributions are accepted on the terms in [CONTRIBUTING](https://github.com/%%org%%/.github/blob/main/CONTRIBUTING.md).

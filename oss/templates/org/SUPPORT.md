@@ -18,7 +18,7 @@ Report vulnerabilities privately as described in [SECURITY.md](https://github.co
 
 ## Commercial licensing
 
-Production use of the code needs a commercial licence from Jeffi Stores until the Change Date, 2030-09-30. Email support@jeffistores.in.
+The code is open source under the GNU Affero General Public License v3.0 (`AGPL-3.0-only`). If you want to use it without the AGPL's conditions, for example to run a modified version as a service without publishing your changes, Jeffi Stores offers a commercial licence. Email support@jeffistores.in.
 
 ## Anything private
 
