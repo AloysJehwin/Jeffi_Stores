@@ -298,6 +298,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
         quality: opts.quality ?? policy?.aiImageDefaultQuality ?? 'standard',
         provider: opts.provider,
         providers: policy?.aiImageProviders.length ? policy.aiImageProviders : undefined,
+        models: policy?.aiModels.image,
         referenceImageUrl: opts.referenceImageUrl,
         seed: opts.seed,
         transparent: opts.transparent || undefined,
@@ -325,6 +326,11 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     status: 'ok',
   })
   return { images, usageId, priceInr: await finalPrice(usageId, priceInr), provider: gw.provider, model: gw.model }
+}
+
+async function videoRouting(): Promise<{ providers?: string[]; models?: Record<string, string> }> {
+  const r = await getAiRouting().catch(() => ({}) as { video?: string[]; models?: { video?: Record<string, string> } })
+  return { providers: r.video, models: r.models?.video }
 }
 
 export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVideoResult> {
@@ -367,7 +373,7 @@ export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVi
         durationSec,
         aspect,
         provider: opts.provider,
-        providers: (await getAiRouting().catch(() => ({}) as { video?: string[] })).video,
+        ...(await videoRouting()),
         namespace: await namespace(),
       }),
     })

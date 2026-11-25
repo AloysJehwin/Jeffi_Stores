@@ -117,7 +117,7 @@ ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_unit_type_che
 ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_key_check
     CHECK (key IN ('sms_provider','whatsapp_provider','ai_text_providers','ai_image_providers','ai_video_providers','ai_image_default_quality',
-                   'ai_audio_providers','ai_embed_provider','voice_provider','voice_config','sms_dlt_entity_id','sms_dlt_sender_ids'));
+                   'ai_stt_providers','ai_tts_providers','ai_models','ai_embed_provider','voice_provider','voice_config','sms_dlt_entity_id','sms_dlt_sender_ids'));
 ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_pkey PRIMARY KEY (tenant_id, provider);
 ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_provider_check
     CHECK (provider IN ('anthropic'));

@@ -102,8 +102,10 @@ describe('Azure, audio and embeddings', () => {
     expect(normalizeProviderValue('ai_text_providers', ['anthropic', 'razer', 'azure'])).toEqual(['anthropic', 'razer', 'azure'])
     expect(normalizeProviderValue('ai_image_providers', ['azure', 'razer'])).toEqual(['azure', 'razer'])
     expect(normalizeProviderValue('ai_video_providers', ['google', 'azure'])).toEqual(['google', 'azure'])
-    expect(normalizeProviderValue('ai_audio_providers', ['azure', 'azure'])).toEqual(['azure'])
-    expect(normalizeProviderValue('ai_audio_providers', ['sarvam'])).toBeNull()
+    expect(normalizeProviderValue('ai_stt_providers', ['azure', 'azure'])).toEqual(['azure'])
+    expect(normalizeProviderValue('ai_stt_providers', ['sarvam', 'azure'])).toEqual(['sarvam', 'azure'])
+    expect(normalizeProviderValue('ai_tts_providers', ['azure', 'sarvam'])).toEqual(['azure', 'sarvam'])
+    expect(normalizeProviderValue('ai_tts_providers', ['razer'])).toBeNull()
   })
 
   it('ai_embed_provider is a single razer or azure value', () => {
@@ -116,29 +118,75 @@ describe('Azure, audio and embeddings', () => {
   it('resolves audio like the other orders and embed from the platform default', async () => {
     query.mockResolvedValue(
       rows([
-        { tenant_id: null, key: 'ai_audio_providers', value: ['azure'] },
+        { tenant_id: null, key: 'ai_stt_providers', value: ['azure'] },
+        { tenant_id: null, key: 'ai_tts_providers', value: ['sarvam', 'azure'] },
         { tenant_id: null, key: 'ai_embed_provider', value: 'azure' },
       ])
     )
     const p = await getProviderPolicy(T)
-    expect(p.aiAudioProviders).toEqual(['azure'])
-    expect(p.source.ai_audio_providers).toBe('platform')
+    expect(p.aiSttProviders).toEqual(['azure'])
+    expect(p.source.ai_stt_providers).toBe('platform')
     expect(p.aiEmbedProvider).toBe('azure')
-    expect(await getAiRouting(T)).toMatchObject({ audio: ['azure'], embed: 'azure' })
+    expect(await getAiRouting(T)).toMatchObject({ stt: ['azure'], tts: ['sarvam', 'azure'], embed: 'azure' })
   })
 
   it('defaults: no audio order (gateway default), embed razer', async () => {
     query.mockResolvedValue(rows([]))
     const p = await getProviderPolicy(T)
-    expect(p.aiAudioProviders).toEqual([])
+    expect(p.aiSttProviders).toEqual([])
+    expect(p.aiModels).toEqual({})
     expect(p.aiEmbedProvider).toBe('razer')
     expect(p.source.ai_embed_provider).toBe('fallback')
-    expect((await getAiRouting(T)).audio).toBeUndefined()
+    const r = await getAiRouting(T)
+    expect(r.stt).toBeUndefined()
+    expect(r.models).toBeUndefined()
   })
 
   it('a tenant audio row beats the platform one', async () => {
-    query.mockResolvedValue(rows([{ tenant_id: T, key: 'ai_audio_providers', value: ['azure'] }]))
-    expect((await getProviderPolicy(T)).source.ai_audio_providers).toBe('tenant')
+    query.mockResolvedValue(rows([{ tenant_id: T, key: 'ai_stt_providers', value: ['azure'] }]))
+    expect((await getProviderPolicy(T)).source.ai_stt_providers).toBe('tenant')
+  })
+
+  it('a store overrides the embeddings provider', async () => {
+    query.mockResolvedValue(rows([
+      { tenant_id: null, key: 'ai_embed_provider', value: 'razer' },
+      { tenant_id: T, key: 'ai_embed_provider', value: 'azure' },
+    ]))
+    const p = await getProviderPolicy(T)
+    expect(p.aiEmbedProvider).toBe('azure')
+    expect(p.source.ai_embed_provider).toBe('tenant')
+  })
+})
+
+describe('ai_models', () => {
+  const ok = { text: { anthropic: 'claude-sonnet-5-5', razer: 'llama3.1:8b' }, stt: { sarvam: 'saarika:v2.5' }, embed: { azure: 'text-embedding-3-small' } }
+
+  it('accepts known capabilities and providers with safe ids, dropping empty capabilities', () => {
+    expect(normalizeProviderValue('ai_models', ok)).toEqual(ok)
+    expect(normalizeProviderValue('ai_models', { text: {} })).toEqual({})
+    expect(normalizeProviderValue('ai_models', {})).toEqual({})
+  })
+
+  it('rejects unknown capabilities or providers, unsafe ids and non-objects', () => {
+    expect(normalizeProviderValue('ai_models', { audio: { azure: 'x' } })).toBeNull()
+    expect(normalizeProviderValue('ai_models', { stt: { razer: 'x' } })).toBeNull()
+    expect(normalizeProviderValue('ai_models', { text: { anthropic: 'bad id; drop' } })).toBeNull()
+    expect(normalizeProviderValue('ai_models', { text: { anthropic: '' } })).toBeNull()
+    expect(normalizeProviderValue('ai_models', { text: { anthropic: 5 } })).toBeNull()
+    expect(normalizeProviderValue('ai_models', { text: ['anthropic'] })).toBeNull()
+    expect(normalizeProviderValue('ai_models', ['text'])).toBeNull()
+    expect(normalizeProviderValue('ai_models', 'x')).toBeNull()
+  })
+
+  it('resolves with tenant over platform and getAiRouting returns the models', async () => {
+    query.mockResolvedValue(rows([
+      { tenant_id: null, key: 'ai_models', value: { text: { anthropic: 'claude-haiku-5-5' } } },
+      { tenant_id: T, key: 'ai_models', value: ok },
+    ]))
+    const p = await getProviderPolicy(T)
+    expect(p.aiModels).toEqual(ok)
+    expect(p.source.ai_models).toBe('tenant')
+    expect((await getAiRouting(T)).models).toEqual(ok)
   })
 })
 
@@ -186,9 +234,9 @@ describe('normalizeProviderValue', () => {
 })
 
 describe('Outreach keys', () => {
-  it('are provider setting keys, the voice and embed ones platform-only', () => {
+  it('are provider setting keys, the voice ones platform-only', () => {
     for (const k of ['voice_provider', 'voice_config', 'sms_dlt_entity_id', 'sms_dlt_sender_ids']) expect(PROVIDER_SETTING_KEYS).toContain(k)
-    expect([...PLATFORM_ONLY_PROVIDER_KEYS].sort()).toEqual(['ai_embed_provider', 'voice_config', 'voice_provider'])
+    expect([...PLATFORM_ONLY_PROVIDER_KEYS].sort()).toEqual(['voice_config', 'voice_provider'])
   })
 
   it('validates voice_provider and the DLT ids', () => {
