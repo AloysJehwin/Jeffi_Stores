@@ -80,6 +80,10 @@ next-env.d.ts
 !/scripts/component-owners.json
 !/scripts/check-service-routes.mjs
 !/scripts/service-routes-allowlist.json
+# Every AI call goes through the gateway (CI ratchet).
+!/scripts/check-ai-routing.mjs
+!/scripts/check-ai-routing.test.mjs
+!/scripts/ai-routing-allowlist.txt
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md

@@ -548,6 +548,9 @@ jobs:
       - run: npm run check:component-tests
       - run: npm run check:route-tests
       - run: node scripts/component-owners.mjs --check
+      - name: Every AI call goes through the AI gateway
+        run: npm run check:ai-routing
+      - run: npm run test:ai-routing
 
   # Advisory (not in Checks passed): paddlepaddle and its tree are heavy to install; promote it once it has proven
   # reliable and quick.
