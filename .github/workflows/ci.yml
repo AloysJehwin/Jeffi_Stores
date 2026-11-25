@@ -228,7 +228,7 @@ jobs:
   security:
     name: Security
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' }}
     permissions: { contents: read, pull-requests: write } # pull-requests: the dependency review's comment
     steps:
@@ -334,7 +334,7 @@ jobs:
   integration:
     name: Integration tests · ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.rtl != '[]' }}
     strategy:
       fail-fast: false
@@ -477,7 +477,7 @@ jobs:
   ui-kit:
     name: UI kit
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
@@ -522,7 +522,7 @@ jobs:
   service-api:
     name: Service API · ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.fastify != '[]' }}
     strategy:
       fail-fast: false
@@ -544,7 +544,7 @@ jobs:
   ratchets:
     name: Test ratchets
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
@@ -558,7 +558,7 @@ jobs:
   ocr:
     name: OCR tests (advisory)
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.ocr == 'true' }}
     continue-on-error: true
     timeout-minutes: 20
@@ -577,7 +577,7 @@ jobs:
   voice:
     name: Voice service tests
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.voice == 'true' }}
     timeout-minutes: 15
     steps:
@@ -593,7 +593,7 @@ jobs:
   responsive:
     name: Responsive sweep (advisory)
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     # Advisory: not in `checks`' needs and continue-on-error, so it never blocks a merge. Skipped on a release run (its
     # PR already ran it, and Post fails a release on any failed job). Promote it once it has proven reliable.
     # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5), and the visual
@@ -668,7 +668,7 @@ jobs:
   site-editor-e2e:
     name: Site editor end-to-end (advisory)
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # stage 3: after the static checks, whatever their result
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     # Advisory, like the responsive sweep: not in `checks`' needs and continue-on-error, skipped on a release run.
     # The visual editor in a real browser (docs/plans/SITE_EDITOR_PLAN.md phase 6): the canvas bridge on the storefront
     # and the editor in the admin Site Builder, behind the dev router so both share an origin as the editor's canvas
