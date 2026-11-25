@@ -1,6 +1,9 @@
-import type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName } from '../../../sdk/types'
+import type {
+  ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName,
+  AudioProviderName, AudioFormat,
+} from '../../../sdk/types'
 
-export type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName }
+export type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName, AudioProviderName, AudioFormat }
 
 /** A normalised stock search as providers see it. */
 export interface StockQuery {
@@ -40,6 +43,8 @@ export interface GeneratedImage {
 export interface ImageGenOutput {
   images: GeneratedImage[]
   model: string
+  /** Set when the price depends on more than the model (quality, size); else the router prices per image. */
+  costInr?: number
 }
 
 export interface VideoGenInput {
@@ -81,6 +86,45 @@ export interface MediaProvider {
   videoModel?(req: VideoGenInput): string
   startVideo?(req: VideoGenInput): Promise<VideoStart>
   pollVideo?(opId: string, model: string): Promise<VideoPoll>
+}
+
+/** Validated speech-to-text request as providers see it. */
+export interface TranscribeInput {
+  audio: Buffer
+  mimeType: string
+  /** BCP-47 (hi-IN), when the caller knows it. */
+  language?: string
+}
+
+export interface TranscribeOutput {
+  text: string
+  /** Detected or requested language, when known. */
+  language?: string
+  /** Provider-reported length; the router measures the file when this is absent. */
+  durationSeconds?: number
+  model: string
+}
+
+export interface SpeakInput {
+  text: string
+  language: string
+  voice?: string
+  format: AudioFormat
+}
+
+export interface SpeakOutput {
+  audio: Buffer
+  mimeType: string
+  model: string
+}
+
+/** Speech-to-text and text-to-speech; each side is configured on its own. */
+export interface AudioProvider {
+  readonly name: AudioProviderName
+  transcribeConfigured(): boolean
+  speakConfigured(): boolean
+  transcribe(req: TranscribeInput): Promise<TranscribeOutput>
+  speak(req: SpeakInput): Promise<SpeakOutput>
 }
 
 /** Post-step that cuts the subject out to a transparent PNG. */

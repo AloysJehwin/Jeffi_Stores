@@ -8,7 +8,7 @@ import type {
   OcrRequest, OcrResponse,
   ImageGenerateRequest, ImageGenerateResponse,
   VideoGenerateRequest, VideoStartResponse, VideoJobResponse,
-  ProvidersResponse,
+  ProvidersResponse, TranscribeRequest, TranscribeResponse, SpeakRequest, SpeakResponse,
 } from './types'
 
 export * from './types'
@@ -49,9 +49,19 @@ export async function aiChatStream(
   throw new AiClientError('AI gateway stream ended without a result', 'gateway')
 }
 
-/** Text embeddings (RAG, semantic cache). */
+/** Text embeddings (RAG, semantic cache). `provider` picks razer or azure; store `model` with the vectors. */
 export async function embed(req: EmbedRequest): Promise<EmbedResponse> {
   return post<EmbedResponse>(cfg(), '/v1/embed', req)
+}
+
+/** Speech-to-text. `language` is BCP-47 (hi-IN); omit to detect. */
+export async function transcribe(req: TranscribeRequest): Promise<TranscribeResponse> {
+  return post<TranscribeResponse>(cfg(), '/v1/audio/transcribe', req)
+}
+
+/** Text-to-speech with a neural voice for `language`; audio comes back as base64. */
+export async function speak(req: SpeakRequest): Promise<SpeakResponse> {
+  return post<SpeakResponse>(cfg(), '/v1/audio/speak', req)
 }
 
 /** Vision / OCR over one or more base64 images. */

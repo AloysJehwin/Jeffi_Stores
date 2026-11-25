@@ -2,6 +2,7 @@ import { CONFIG, VISION_MODEL } from '../config'
 import type { OcrLine, OcrResponse, VisionResponse } from '../../../sdk/types'
 import { ollamaPool } from './ollama'
 import { isNetworkError } from './ollama-pool'
+import { BackendProbe } from '../razer-health'
 
 // PaddleOCR sidecar (ai-platform/paddleocr). runOcr() is the deterministic read behind /v1/ocr: the sidecar's
 // answer or an error, never a model. runVision() tries it first and falls back to the Ollama vision model. The
@@ -57,8 +58,26 @@ interface SidecarOcr {
   detail?: unknown
 }
 
+async function checkOcr(): Promise<string | null> {
+  try {
+    const res = await fetch(`${CONFIG.paddleOcrUrl}/health?ready=1`, { signal: AbortSignal.timeout(CONFIG.ollamaHealthTimeoutMs) })
+    if (res.ok) return null
+    const body = await res.json().catch(() => null) as { error?: string } | null
+    return body?.error || (res.status === 503 ? 'loading the model' : `HTTP ${res.status}`)
+  } catch (e: any) {
+    return e?.name === 'TimeoutError' ? `timeout ${CONFIG.ollamaHealthTimeoutMs}ms` : String(e?.cause?.code || e?.message || e)
+  }
+}
+
+/** The sidecar's circuit breaker (probed on the razer cadence; see razer-health.ts). */
+export const ocrProbe = new BackendProbe('paddleocr', checkOcr, {
+  intervalMs: CONFIG.razerProbeIntervalMs,
+  failures: CONFIG.razerBreakerFailures,
+})
+
 /** One file read by PaddleOCR. Throws OcrError: 400 when it rejects the input, 503 when it is down or fails. */
 export async function runOcr(base64: string, mime: string, timeoutMs = CONFIG.paddleOcrTimeoutMs): Promise<OcrResponse> {
+  if (ocrProbe.isOpen()) throw new OcrError(503, `PaddleOCR is down (${ocrProbe.status().reason}); retry once it recovers`)
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   let status: number
@@ -73,6 +92,7 @@ export async function runOcr(base64: string, mime: string, timeoutMs = CONFIG.pa
     status = res.status
     raw = await res.text()
   } catch (e: any) {
+    ocrProbe.recordFailure()
     throw new OcrError(503, e?.name === 'AbortError'
       ? `PaddleOCR timed out after ${timeoutMs / 1000}s`
       : `PaddleOCR unreachable: ${e?.cause?.code || e?.message || e}`)
@@ -85,7 +105,10 @@ export async function runOcr(base64: string, mime: string, timeoutMs = CONFIG.pa
     const detail = typeof body?.detail === 'string' ? body.detail : JSON.stringify(body?.detail ?? raw).slice(0, 300)
     throw new OcrError(400, `PaddleOCR rejected the file: ${detail}`)
   }
-  if (status !== 200 || !body) throw new OcrError(503, `PaddleOCR HTTP ${status}: ${raw.slice(0, 200)}`)
+  if (status !== 200 || !body) {
+    if (status >= 502) ocrProbe.recordFailure()
+    throw new OcrError(503, `PaddleOCR HTTP ${status}: ${raw.slice(0, 200)}`)
+  }
   const pages = body.pages || 1
   if (body.ok && typeof body.text === 'string') {
     return { ok: true, text: body.text, lines: body.lines ?? [], meanScore: body.mean_score ?? null, pages, model: OCR_MODEL, provider: 'paddleocr' }
@@ -97,34 +120,15 @@ export async function runOcr(base64: string, mime: string, timeoutMs = CONFIG.pa
 
 export interface OcrHealth { ok: boolean; reason?: string; checkedAt: number | null }
 
-let ocrHealth: OcrHealth = { ok: false, reason: 'not probed yet', checkedAt: null }
-
 /** The last sidecar probe (startOcrProbe keeps it fresh), for /readyz and /v1/providers. */
 export function ocrStatus(): OcrHealth {
-  return ocrHealth
+  const s = ocrProbe.status()
+  return { ok: s.ok, reason: s.reason, checkedAt: s.checkedAt }
 }
 
-async function probeOcr(): Promise<OcrHealth> {
-  try {
-    const res = await fetch(`${CONFIG.paddleOcrUrl}/health?ready=1`, { signal: AbortSignal.timeout(CONFIG.ollamaHealthTimeoutMs) })
-    if (res.ok) return { ok: true, checkedAt: Date.now() }
-    const body = await res.json().catch(() => null) as { error?: string } | null
-    return { ok: false, reason: body?.error || (res.status === 503 ? 'loading the model' : `HTTP ${res.status}`), checkedAt: Date.now() }
-  } catch (e: any) {
-    return { ok: false, reason: e?.name === 'TimeoutError' ? `timeout ${CONFIG.ollamaHealthTimeoutMs}ms` : String(e?.cause?.code || e?.message || e), checkedAt: Date.now() }
-  }
-}
-
-/** Probe the sidecar now and on the Ollama probe cadence, logging each change like the Ollama pool. */
+/** Probe the sidecar now and on the razer cadence, logging each change like the Ollama pool. */
 export function startOcrProbe(): void {
-  const tick = async () => {
-    const next = await probeOcr()
-    // eslint-disable-next-line no-console
-    if (next.ok !== ocrHealth.ok || ocrHealth.checkedAt === null) console.log(`[ai-gateway] paddleocr ${next.ok ? 'ready' : `UNAVAILABLE: ${next.reason}`}`)
-    ocrHealth = next
-  }
-  void tick()
-  setInterval(() => void tick(), CONFIG.ollamaProbeIntervalMs).unref()
+  ocrProbe.start()
 }
 
 async function paddle(base64: string): Promise<VisionResponse | null> {

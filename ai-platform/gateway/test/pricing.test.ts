@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { costFor, loadPrices, resetPrices, tokenUsage, unitPrice, DEFAULT_PRICES } from '../src/pricing'
+import { costFor, loadPrices, resetPrices, tokenUsage, unitPrice, openAiUsage, usdInr, DEFAULT_PRICES } from '../src/pricing'
 
 afterEach(() => { resetPrices() })
 
@@ -34,6 +34,30 @@ describe('pricing', () => {
 
   it('rejects malformed overrides', () => {
     expect(() => loadPrices('{nope')).toThrow(/AI_PRICES_JSON/)
+  })
+
+  it('prices every Azure capability, with a wildcard for unknown deployments', () => {
+    loadPrices('')
+    const usd = usdInr()
+    expect(unitPrice('azure', 'gpt-4.1-mini-2025-04-14', 'token_1k_in')).toBeCloseTo(0.0004 * usd, 6)
+    expect(unitPrice('azure', 'gpt-4o-mini-2024-07-18', 'token_1k_out')).toBeCloseTo(0.0006 * usd, 6)
+    expect(unitPrice('azure', 'text-embedding-3-small', 'token_1k_in')).toBeCloseTo(0.00002 * usd, 8)
+    expect(unitPrice('azure', 'gpt-image-1:medium', 'image')).toBeCloseTo(0.042 * usd, 6)
+    expect(unitPrice('azure', 'gpt-image-1-mini:low', 'image')).toBeCloseTo(0.005 * usd, 6)
+    expect(unitPrice('azure', 'sora-2', 'video_second')).toBeCloseTo(0.1 * usd, 6)
+    expect(unitPrice('azure', 'whisper', 'audio_minute')).toBeCloseTo(0.006 * usd, 6)
+    expect(unitPrice('azure', 'azure-speech-stt', 'audio_minute')).toBeCloseTo(usd / 60, 6)
+    expect(unitPrice('azure', 'azure-speech-tts', 'tts_1k_chars')).toBeCloseTo(0.015 * usd, 6)
+    expect(unitPrice('azure', 'my-deployment', 'audio_minute')).toBe(DEFAULT_PRICES.azure['*'].audio_minute)
+    expect(costFor('azure', 'azure-speech-tts', { tts_1k_chars: 2 })).toBeCloseTo(0.03 * usd, 4)
+  })
+
+  it('bills cached OpenAI prompt tokens at the cache-read price', () => {
+    loadPrices(JSON.stringify({ azure: { m: { token_1k_in: 1, token_1k_out: 4, token_1k_cache_read: 0.25 } } }))
+    expect(openAiUsage('azure', 'm', { prompt_tokens: 2000, completion_tokens: 1000, prompt_tokens_details: { cached_tokens: 1000 } }))
+      .toEqual({ promptTokens: 2000, completionTokens: 1000, costInr: 1 + 0.25 + 4, cacheReadTokens: 1000, billedPromptTokens: 1250 })
+    expect(openAiUsage('azure', 'm', { prompt_tokens: 1000, completion_tokens: 0 })).toEqual({ promptTokens: 1000, completionTokens: 0, costInr: 1 })
+    expect(openAiUsage('azure', 'm', undefined)).toEqual({ promptTokens: 0, completionTokens: 0, costInr: 0 })
   })
 
   it('maps token counts to thousands for cost', () => {

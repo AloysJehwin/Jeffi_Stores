@@ -67,9 +67,10 @@ describe('request validation and clamping', () => {
 
 describe('routing order', () => {
   it('parses provider env with defaults and drops unknowns', () => {
-    expect(parseImageProviders(undefined)).toEqual(['razer', 'google', 'replicate'])
+    expect(parseImageProviders(undefined)).toEqual(['razer', 'google', 'replicate', 'azure'])
     expect(parseImageProviders('replicate, bogus,razer,replicate')).toEqual(['replicate', 'razer'])
-    expect(parseVideoProviders('')).toEqual(['google', 'replicate'])
+    expect(parseVideoProviders('')).toEqual(['google', 'replicate', 'azure'])
+    expect(parseVideoProviders('azure')).toEqual(['azure'])
   })
 
   it('premium prefers google, draft prefers razer, pinned goes first', () => {
@@ -133,6 +134,15 @@ describe('image generation', () => {
     await handleImageGenerate({ prompt: 'same', namespace: 't1', seed: 7 }, d)
     await handleImageGenerate({ prompt: 'same', namespace: 't2' }, d)
     expect(razer.calls).toHaveLength(3)
+  })
+
+  it('uses a provider-computed cost when one is returned', async () => {
+    const azure: MediaProvider = {
+      name: 'azure', configured: () => true,
+      async generateImage() { return { model: 'gpt-image-1', costInr: 5.25, images: [{ bytes: PNG, mime: 'image/png', width: 64, height: 64 }] } },
+    }
+    const r = await handleImageGenerate({ prompt: 'x', provider: 'azure' }, deps({ providers: { ...deps().providers, azure } }))
+    expect(r).toMatchObject({ provider: 'azure', model: 'gpt-image-1', usage: { units: 1, unitType: 'image', costInr: 5.25 } })
   })
 
   it('stores bytes retrievable through the file store', async () => {
