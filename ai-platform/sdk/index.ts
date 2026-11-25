@@ -54,12 +54,12 @@ export async function embed(req: EmbedRequest): Promise<EmbedResponse> {
   return post<EmbedResponse>(cfg(), '/v1/embed', req)
 }
 
-/** Speech-to-text. `language` is BCP-47 (hi-IN); omit to detect. */
+/** Speech-to-text in the stt order (sarvam, azure). `language` is BCP-47 (hi-IN); omit to detect. */
 export async function transcribe(req: TranscribeRequest): Promise<TranscribeResponse> {
   return post<TranscribeResponse>(cfg(), '/v1/audio/transcribe', req)
 }
 
-/** Text-to-speech with a neural voice for `language`; audio comes back as base64. */
+/** Text-to-speech in the tts order (sarvam, azure), a voice for `language`; audio comes back as base64. */
 export async function speak(req: SpeakRequest): Promise<SpeakResponse> {
   return post<SpeakResponse>(cfg(), '/v1/audio/speak', req)
 }
@@ -91,7 +91,7 @@ export async function videoJob(jobId: string): Promise<VideoJobResponse> {
   return r.result ? { ...r, result: { ...r.result, videoUrl: absolute(r.result.videoUrl) } } : r
 }
 
-/** Which providers the gateway can route to, and its default order per capability. */
+/** Which providers the gateway can route to, the models each offers, and its default order per capability. */
 export async function providers(): Promise<ProvidersResponse> {
   return get<ProvidersResponse>(cfg(), '/v1/providers')
 }

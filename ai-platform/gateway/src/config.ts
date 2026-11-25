@@ -3,6 +3,22 @@
 // in cloud, the same keys point at managed endpoints. The app never sees any of this.
 import { parseTokens } from './auth'
 
+const env = process.env
+
+export function parseList(raw: string | undefined): string[] {
+  return [...new Set((raw || '').split(',').map(s => s.trim()).filter(Boolean))]
+}
+/** An Azure capability's deployments: the singular var first (the default), then the comma list. */
+const deployments = (name: string) => parseList(`${env[name] || ''},${env[`${name}S`] || ''}`)
+const AZ = {
+  chat: deployments('AZURE_OPENAI_CHAT_DEPLOYMENT'),
+  image: deployments('AZURE_OPENAI_IMAGE_DEPLOYMENT'),
+  embed: deployments('AZURE_OPENAI_EMBED_DEPLOYMENT'),
+  transcribe: deployments('AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT'),
+  tts: deployments('AZURE_OPENAI_TTS_DEPLOYMENT'),
+  video: deployments('AZURE_OPENAI_VIDEO_DEPLOYMENT'),
+}
+
 export const CONFIG = {
   // Tried in order; the first healthy one is used (see providers/ollama-pool.ts).
   ollamaBaseUrls: parseUrls(process.env.OLLAMA_BASE_URLS || process.env.OLLAMA_BASE_URL || 'http://ollama:11434'),
@@ -49,9 +65,22 @@ export const CONFIG = {
   anthropicFallbacks: (process.env.ANTHROPIC_FALLBACKS || 'default') !== 'off',
   // Text provider order (anthropic, razer, azure). Default: anthropic first when the key is set, azure last.
   textProviders: process.env.AI_TEXT_PROVIDERS || '',
-  // Audio order (azure). Embeddings use one provider, never an order: razer (Ollama) or azure.
-  audioProviders: process.env.AI_AUDIO_PROVIDERS || '',
+  // Claude models a request may pick (`models.anthropic`); the hint defaults below stay the defaults.
+  anthropicModels: parseList(env.AI_ANTHROPIC_MODELS || 'claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5'),
+  // Speech-to-text and text-to-speech orders (default sarvam,azure each). Embeddings use one provider, never an
+  // order: razer (Ollama) or azure.
+  sttProviders: env.AI_STT_PROVIDERS || '',
+  ttsProviders: env.AI_TTS_PROVIDERS || '',
   embedProvider: process.env.AI_EMBED_PROVIDER || 'razer',
+
+  // Sarvam (Indian-language speech): SARVAM_API_KEY; no key = skipped.
+  sarvam: {
+    apiKey: env.SARVAM_API_KEY || '',
+    baseUrl: (env.SARVAM_BASE_URL || 'https://api.sarvam.ai').replace(/\/$/, ''),
+    sttModel: env.SARVAM_STT_MODEL || 'saaras:v3',
+    ttsModel: env.SARVAM_TTS_MODEL || 'bulbul:v3',
+    timeoutMs: Number(env.SARVAM_TIMEOUT_MS) || 60_000,
+  },
 
   // Razer (LLM service) circuit breaker: SD and PaddleOCR are probed like the Ollama pool; razer is
   // skipped for a capability after this many failed probes in a row, and re-enters on the next good one.
@@ -61,17 +90,24 @@ export const CONFIG = {
   razerProbeIntervalMs: Number(process.env.RAZER_PROBE_INTERVAL_MS) || Number(process.env.OLLAMA_PROBE_INTERVAL_MS) || 15_000,
   razerBreakerFailures: Number(process.env.RAZER_BREAKER_FAILURES) || 2,
 
-  // Azure (Microsoft-sold models only): every call names a deployment from here, never a model id.
+  // Azure (Microsoft-sold models only): every call names a deployment from here, never a model id. Each capability
+  // takes AZURE_OPENAI_<X>_DEPLOYMENT (the default) plus AZURE_OPENAI_<X>_DEPLOYMENTS (more a request may pick).
   azure: {
     endpoint: (process.env.AZURE_OPENAI_ENDPOINT || '').replace(/\/$/, ''),
     apiKey: process.env.AZURE_OPENAI_API_KEY || '',
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2025-04-01-preview',
-    chatDeployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || '',
-    imageDeployment: process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || '',
-    embedDeployment: process.env.AZURE_OPENAI_EMBED_DEPLOYMENT || '',
-    transcribeDeployment: process.env.AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT || '',
-    ttsDeployment: process.env.AZURE_OPENAI_TTS_DEPLOYMENT || '',
-    videoDeployment: process.env.AZURE_OPENAI_VIDEO_DEPLOYMENT || '',
+    chatDeployment: AZ.chat[0] || '',
+    imageDeployment: AZ.image[0] || '',
+    embedDeployment: AZ.embed[0] || '',
+    transcribeDeployment: AZ.transcribe[0] || '',
+    ttsDeployment: AZ.tts[0] || '',
+    videoDeployment: AZ.video[0] || '',
+    chatDeployments: AZ.chat,
+    imageDeployments: AZ.image,
+    embedDeployments: AZ.embed,
+    transcribeDeployments: AZ.transcribe,
+    ttsDeployments: AZ.tts,
+    videoDeployments: AZ.video,
     speechKey: process.env.AZURE_SPEECH_KEY || '',
     speechRegion: process.env.AZURE_SPEECH_REGION || 'centralindia',
     timeoutMs: Number(process.env.AZURE_OPENAI_TIMEOUT_MS) || 120_000,
@@ -85,7 +121,7 @@ export function parseUrls(raw: string): string[] {
   return [...new Set(urls)]
 }
 
-import type { ModelHint } from '../../sdk/types'
+import type { ModelChoice, ModelHint } from '../../sdk/types'
 
 const AGENT = process.env.OLLAMA_AGENT_MODEL || 'qwen2.5:7b'
 const FAST = process.env.OLLAMA_FAST_MODEL || process.env.OLLAMA_EMAIL_MODEL || 'gemma3:4b'
@@ -105,6 +141,11 @@ export function modelForHint(hint: ModelHint | undefined): string {
 }
 
 export const VISION_MODEL = process.env.OLLAMA_VISION_MODEL || 'gemma4:12b'
+
+/** The request's razer model (`models.razer`), else the hint's. */
+export function ollamaModelFor(req: { modelHint?: ModelHint; models?: ModelChoice }): string {
+  return req.models?.razer || modelForHint(req.modelHint)
+}
 
 export type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
@@ -126,6 +167,12 @@ export function claudeModelForHint(hint: ModelHint | undefined): { model: string
     case 'copy':
     default: return { model: env.ANTHROPIC_COPY_MODEL || CLAUDE_HAIKU, effort: effort(env.ANTHROPIC_COPY_EFFORT, 'low') }
   }
+}
+
+/** The request's Claude model (`models.anthropic`) with the hint's effort, else the hint's model. */
+export function claudeModelFor(req: { modelHint?: ModelHint; models?: ModelChoice }): { model: string; effort: ClaudeEffort } {
+  const r = claudeModelForHint(req.modelHint)
+  return req.models?.anthropic ? { ...r, model: req.models.anthropic } : r
 }
 
 export const CLAUDE_VISION_MODEL = process.env.ANTHROPIC_VISION_MODEL || CLAUDE_SONNET

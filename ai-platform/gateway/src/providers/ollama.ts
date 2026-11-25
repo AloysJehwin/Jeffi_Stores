@@ -1,4 +1,4 @@
-import { CONFIG, modelForHint } from '../config'
+import { CONFIG, ollamaModelFor } from '../config'
 import { AiClientError, type AiChatRequest, type AiToolCall } from '../../../sdk/types'
 import { OllamaPool } from './ollama-pool'
 
@@ -18,7 +18,7 @@ export function ollamaChat(req: AiChatRequest): Promise<OllamaChatResult> {
 }
 
 async function chatAt(base: string, req: AiChatRequest): Promise<OllamaChatResult> {
-  const model = modelForHint(req.modelHint)
+  const model = ollamaModelFor(req)
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), CONFIG.ollamaRequestTimeoutMs)
   try {
@@ -105,4 +105,14 @@ async function embedAt(base: string, text: string, model: string): Promise<{ emb
 
 export function estimateTokens(text: string): number {
   return Math.ceil((text || '').length / 4)
+}
+
+/** Installed model names (GET /api/tags) on the active Ollama. */
+export function ollamaInstalledModels(): Promise<string[]> {
+  return ollamaPool.withOllama(async base => {
+    const res = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(CONFIG.ollamaHealthTimeoutMs * 2) })
+    if (!res.ok) throw new AiClientError(`Ollama tags HTTP ${res.status}`, 'ollama')
+    const data = (await res.json()) as { models?: { name?: string; model?: string }[] }
+    return (data.models ?? []).map(m => m.name || m.model || '').filter(Boolean)
+  })
 }

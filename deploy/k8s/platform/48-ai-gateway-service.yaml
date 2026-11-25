@@ -91,6 +91,11 @@ spec:
             - { name: GOOGLE_TIMEOUT_MS, value: '120000' }
             - { name: REPLICATE_TIMEOUT_MS, value: '180000' }
             - { name: AI_STOCK_PROVIDERS, value: 'pexels,pixabay' }
+            - { name: AI_STT_PROVIDERS, value: 'sarvam,azure' }
+            - { name: AI_TTS_PROVIDERS, value: 'sarvam,azure' }
+            - { name: SARVAM_STT_MODEL, value: 'saaras:v3' }
+            - { name: SARVAM_TTS_MODEL, value: 'bulbul:v3' }
+            - { name: AI_ANTHROPIC_MODELS, value: 'claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5' }
             - { name: ANTHROPIC_IDENTITY_TOKEN_FILE, value: /var/run/secrets/anthropic/token }
             - { name: ANTHROPIC_FEDERATION_AUDIENCE, value: 'https://api.anthropic.com' }
             - { name: ANTHROPIC_AGENT_MODEL, value: 'claude-sonnet-5-5' }
@@ -104,10 +109,11 @@ spec:
             - { name: ANTHROPIC_MIN_MAX_TOKENS, value: '8000' }
           # From the Secret (all optional): AI_GATEWAY_TOKEN, AI_CACHE_PG_URL, ANTHROPIC_ORGANIZATION_ID,
           # ANTHROPIC_API_KEY (local fallback only), OPENAI_API_KEY, GOOGLE_AI_API_KEY, REPLICATE_API_TOKEN,
-          # PEXELS_API_KEY, PIXABAY_API_KEY, AI_TEXT_PROVIDERS, AI_PRICES_JSON, AI_EMBED_PROVIDER, and Azure:
-          # AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_CHAT_DEPLOYMENT,
+          # PEXELS_API_KEY, PIXABAY_API_KEY, SARVAM_API_KEY, AI_TEXT_PROVIDERS, AI_PRICES_JSON, AI_EMBED_PROVIDER, and
+          # Azure: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_CHAT_DEPLOYMENT,
           # AZURE_OPENAI_IMAGE_DEPLOYMENT, AZURE_OPENAI_EMBED_DEPLOYMENT, AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT,
-          # AZURE_OPENAI_TTS_DEPLOYMENT, AZURE_OPENAI_VIDEO_DEPLOYMENT, AZURE_SPEECH_KEY, AZURE_SPEECH_REGION.
+          # AZURE_OPENAI_TTS_DEPLOYMENT, AZURE_OPENAI_VIDEO_DEPLOYMENT, AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, and the
+          # pickable lists AZURE_OPENAI_{CHAT,IMAGE,EMBED,TRANSCRIBE,TTS,VIDEO}_DEPLOYMENTS (comma-separated).
           envFrom: [{ secretRef: { name: ai-gateway, optional: true } }]
           # Process-level probes on purpose: Redis and the Razer box are shared by every replica, so gating
           # readiness on them would only flip all replicas off together. /readyz is the truthful dependency check.

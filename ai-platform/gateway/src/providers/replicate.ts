@@ -10,6 +10,7 @@
 // Background removal (transparent images): REPLICATE_BG_REMOVAL_MODEL, default bria/remove-background
 // (RMBG 2.0, takes `image`, returns a PNG URL). An `owner/name:version` id runs a pinned community model.
 
+import { options, type Capability, type ModelList } from '../models'
 import type { BackgroundRemover, GeneratedImage, ImageGenInput, ImageGenOutput, MediaProvider, VideoGenInput, VideoPoll, VideoStart } from './types'
 import { ProviderError, fetchBytes, fetchJson, loadImage, nearestAspect, toImage } from './types'
 
@@ -43,6 +44,12 @@ export class ReplicateProvider implements MediaProvider, BackgroundRemover {
 
   configured(): boolean { return !!this.token }
 
+  models(cap: Capability): ModelList | null {
+    if (cap === 'image') return { models: options(Object.values(IMAGE_MODELS), IMAGE_MODELS.standard) }
+    if (cap === 'video') return { models: options([VIDEO_T2V, VIDEO_I2V], VIDEO_T2V) }
+    return null
+  }
+
   cutoutModel(): string { return this.bgModel }
 
   async removeBackground(img: GeneratedImage): Promise<GeneratedImage> {
@@ -57,7 +64,7 @@ export class ReplicateProvider implements MediaProvider, BackgroundRemover {
 
   async generateImage(req: ImageGenInput): Promise<ImageGenOutput> {
     this.assert()
-    const model = IMAGE_MODELS[req.quality] ?? IMAGE_MODELS.standard
+    const model = req.model || (IMAGE_MODELS[req.quality] ?? IMAGE_MODELS.standard)
     const input: Record<string, unknown> = {
       prompt: req.prompt,
       num_outputs: req.n,
@@ -80,6 +87,7 @@ export class ReplicateProvider implements MediaProvider, BackgroundRemover {
     return { images, model }
   }
 
+  /** Wan 2.2 either way: a chosen t2v or i2v still follows the request (i2v needs the image, t2v cannot take one). */
   videoModel(req: VideoGenInput): string {
     return req.imageUrl ? VIDEO_I2V : VIDEO_T2V
   }

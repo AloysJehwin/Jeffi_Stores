@@ -9,17 +9,20 @@
 //   video        Sora 2 on the v1 API: POST {endpoint}/openai/v1/videos, GET .../videos/{id}, GET .../videos/{id}/content
 
 import { CONFIG } from '../config'
+import { options, type Capability, type ModelList } from '../models'
 import { costFor, openAiUsage, tokenUsage } from '../pricing'
 import type {
   AiChatMessage, AiChatRequest, AiChatStreamEvent, AiToolCall, TokenUsage, VisionRequest, VisionResponse,
 } from '../../../sdk/types'
 import {
-  ProviderError, loadImage, toImage,
+  ProviderError, audioExt, loadImage, toImage,
   type AudioFormat, type AudioProvider, type ImageGenInput, type ImageGenOutput, type MediaProvider,
   type SpeakInput, type SpeakOutput, type TranscribeInput, type TranscribeOutput, type VideoGenInput, type VideoPoll, type VideoStart,
 } from './types'
 
-export type AzureConfig = typeof CONFIG.azure
+type DeploymentLists = 'chatDeployments' | 'imageDeployments' | 'embedDeployments' | 'transcribeDeployments' | 'ttsDeployments' | 'videoDeployments'
+/** The lists are optional: without one a capability offers only its singular deployment. */
+export type AzureConfig = Omit<typeof CONFIG.azure, DeploymentLists> & Partial<Pick<typeof CONFIG.azure, DeploymentLists>>
 
 export const AZURE_EMBED_MODEL = 'text-embedding-3-small'
 export const AZURE_EMBED_DIMENSIONS = 768
@@ -50,6 +53,9 @@ export const DEFAULT_VOICES: Record<string, string> = {
   'en-US': 'en-US-JennyNeural',
   'en-GB': 'en-GB-SoniaNeural',
 }
+
+/** A Speech voice name carries its locale (hi-IN-SwaraNeural); anything else (a Sarvam speaker) is not one. */
+const SPEECH_VOICE = /^[a-z]{2,3}-[A-Za-z]{2,4}-\S+$/
 
 /** Exact locale, else the language's Indian locale (hi → hi-IN), else a multilingual voice. */
 export function defaultVoice(language: string): string {
@@ -158,16 +164,6 @@ function escapeXml(s: string): string {
   return s.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]!))
 }
 
-function extFor(mime: string): string {
-  const m = mime.split(';')[0].trim().toLowerCase()
-  const map: Record<string, string> = {
-    'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a',
-    'audio/m4a': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'm4a', 'audio/ogg': 'ogg', 'audio/opus': 'ogg', 'audio/webm': 'webm',
-    'audio/flac': 'flac', 'audio/x-flac': 'flac', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mp4',
-  }
-  return map[m] ?? 'webm'
-}
-
 /** Speech short audio takes only PCM WAV or Ogg Opus; null for anything else. */
 export function speechContentType(mime: string, audio: Buffer): string | null {
   const m = mime.split(';')[0].trim().toLowerCase()
@@ -190,8 +186,38 @@ export class AzureProvider {
   speechConfigured(): boolean { return !!(this.cfg.speechKey && this.cfg.speechRegion) }
   transcribeConfigured(): boolean { return this.openai(this.cfg.transcribeDeployment) || this.speechConfigured() }
   speakConfigured(): boolean { return this.speechConfigured() || this.openai(this.cfg.ttsDeployment) }
-  /** Cache key model for chat answers. */
-  chatModel(): string { return this.cfg.chatDeployment }
+  /** Cache key model for chat answers: the request's deployment, else the default. */
+  chatModel(choice?: string): string { return choice || this.cfg.chatDeployment }
+
+  /** Deployments per capability (the default first); Speech is `azure-speech-stt` / `azure-speech-tts`. */
+  models(cap: Capability): ModelList | null {
+    const c = this.cfg
+    const list = (one: string, more: string[] | undefined) => [one, ...(more ?? [])]
+    switch (cap) {
+      case 'text': return { models: options(list(c.chatDeployment, c.chatDeployments), c.chatDeployment) }
+      case 'image': return { models: options(list(c.imageDeployment, c.imageDeployments), c.imageDeployment) }
+      case 'video': return { models: options(list(c.videoDeployment, c.videoDeployments), c.videoDeployment) }
+      case 'embed': {
+        const ids = list(c.embedDeployment, c.embedDeployments).filter(Boolean)
+        return { models: options(ids, c.embedDeployment), aliases: Object.fromEntries(ids.map(d => [this.embedModelId(d), d])) }
+      }
+      case 'stt': {
+        const speech = this.speechConfigured() ? [SPEECH_STT_MODEL] : []
+        const def = c.transcribeDeployment || speech[0]
+        return { models: options([...list(c.transcribeDeployment, c.transcribeDeployments), ...speech], def), aliases: { 'azure-speech': SPEECH_STT_MODEL } }
+      }
+      case 'tts': {
+        const speech = this.speechConfigured() ? [SPEECH_TTS_MODEL] : []
+        const def = speech[0] || c.ttsDeployment
+        return { models: options([...speech, ...list(c.ttsDeployment, c.ttsDeployments)], def), aliases: { 'azure-speech': SPEECH_TTS_MODEL } }
+      }
+    }
+  }
+
+  /** Vector-space id stored with vectors from an embeddings deployment. */
+  embedModelId(deployment = this.cfg.embedDeployment): string {
+    return deployment === this.cfg.embedDeployment ? AZURE_EMBED_MODEL_ID : `${deployment}@${AZURE_EMBED_DIMENSIONS}`
+  }
 
   private url(deployment: string, op: string): string {
     return `${this.cfg.endpoint}/openai/deployments/${encodeURIComponent(deployment)}/${op}?api-version=${encodeURIComponent(this.cfg.apiVersion)}`
@@ -225,8 +251,8 @@ export class AzureProvider {
   }
 
   /** Reasoning deployments reject a custom temperature: retry once without it. */
-  private async postChat(body: Record<string, unknown>, signal?: AbortSignal): Promise<Response> {
-    const url = this.url(this.cfg.chatDeployment, 'chat/completions')
+  private async postChat(body: Record<string, unknown>, signal?: AbortSignal, deployment = this.cfg.chatDeployment): Promise<Response> {
+    const url = this.url(deployment, 'chat/completions')
     try {
       return await this.postJson(url, body, signal)
     } catch (err) {
@@ -242,23 +268,24 @@ export class AzureProvider {
     if (!this.chatConfigured()) throw new ProviderError('azure', 'chat is not configured (AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_CHAT_DEPLOYMENT)')
   }
 
-  /** One chat turn; streams text deltas and tool-call starts through `emit` when given. */
+  /** One chat turn on the request's deployment (`models.azure`); streams text deltas and tool-call starts through `emit`. */
   async chat(req: AiChatRequest, emit?: (e: AiChatStreamEvent) => void, signal?: AbortSignal): Promise<AzureChatResult> {
     this.assertChat()
+    const deployment = this.chatModel(req.models?.azure)
     const body: Record<string, unknown> = {
       messages: toOpenAi(req),
       max_completion_tokens: Math.max(req.maxTokens ?? 0, this.cfg.minMaxTokens),
       temperature: req.temperature ?? 0.2,
     }
     if (req.tools?.length) body.tools = req.tools
-    if (!emit) return this.finish(await (await this.postChat(body, signal)).json() as ChatResponse, req.jsonMode)
-    const res = await this.postChat({ ...body, stream: true, stream_options: { include_usage: true } }, signal)
-    return this.finish(await readStream(res, emit), req.jsonMode)
+    if (!emit) return this.finish(await (await this.postChat(body, signal, deployment)).json() as ChatResponse, deployment, req.jsonMode)
+    const res = await this.postChat({ ...body, stream: true, stream_options: { include_usage: true } }, signal, deployment)
+    return this.finish(await readStream(res, emit), deployment, req.jsonMode)
   }
 
-  private finish(r: ChatResponse, jsonMode?: boolean): AzureChatResult {
+  private finish(r: ChatResponse, deployment: string, jsonMode?: boolean): AzureChatResult {
     const choice = r.choices?.[0]
-    const model = r.model || this.cfg.chatDeployment
+    const model = r.model || deployment
     const finish = choice?.finish_reason ?? ''
     if (finish === 'content_filter' && !choice?.message?.content) throw new ProviderError('azure', 'blocked by the content filter')
     const calls = choice?.message?.tool_calls ?? []
@@ -278,6 +305,7 @@ export class AzureProvider {
   /** Vision over base64 images with the chat deployment. Throws so the caller can fall back. */
   async vision(req: VisionRequest): Promise<VisionResponse> {
     this.assertChat()
+    const deployment = this.chatModel(req.models?.azure)
     const content: Record<string, unknown>[] = [
       { type: 'text', text: req.prompt },
       ...req.images.map(b64 => ({ type: 'image_url', image_url: { url: `data:${imageMime(b64)};base64,${b64}` } })),
@@ -286,20 +314,21 @@ export class AzureProvider {
       messages: [{ role: 'user', content }],
       max_completion_tokens: Math.max(this.cfg.minMaxTokens, 4000),
       temperature: 0.1,
-    })
-    const r = this.finish(await res.json() as ChatResponse)
+    }, undefined, deployment)
+    const r = this.finish(await res.json() as ChatResponse, deployment)
     const text = r.content.trim()
     return { ok: !!text, text, model: r.model, provider: 'azure', pages: req.images.length, usage: r.usage }
   }
 
-  /** text-embedding-3-small at 768 dimensions, so the vectors fit the existing vector(768) columns. */
-  async embed(input: string[]): Promise<{ embeddings: number[][]; promptTokens: number; usage: TokenUsage }> {
+  /** 768 dimensions, so the vectors fit the existing vector(768) columns; `model` is the vector-space id. */
+  async embed(input: string[], deployment?: string): Promise<{ embeddings: number[][]; promptTokens: number; usage: TokenUsage; model: string }> {
     if (!this.embedConfigured()) throw new ProviderError('azure', 'embeddings are not configured (AZURE_OPENAI_EMBED_DEPLOYMENT)')
+    const d = deployment || this.cfg.embedDeployment
     const embeddings: number[][] = []
     let promptTokens = 0
     for (let i = 0; i < input.length; i += EMBED_BATCH) {
       const batch = input.slice(i, i + EMBED_BATCH)
-      const res = await this.postJson(this.url(this.cfg.embedDeployment, 'embeddings'), { input: batch, dimensions: AZURE_EMBED_DIMENSIONS })
+      const res = await this.postJson(this.url(d, 'embeddings'), { input: batch, dimensions: AZURE_EMBED_DIMENSIONS })
       const r = await res.json() as { data?: { embedding?: number[]; index?: number }[]; usage?: { prompt_tokens?: number } }
       const rows = [...(r.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
       if (rows.length !== batch.length) throw new ProviderError('azure', `embeddings returned ${rows.length} vectors for ${batch.length} inputs`)
@@ -311,12 +340,14 @@ export class AzureProvider {
       }
       promptTokens += Number(r.usage?.prompt_tokens) || 0
     }
-    return { embeddings, promptTokens, usage: tokenUsage('azure', AZURE_EMBED_MODEL, promptTokens, 0) }
+    const priced = d === this.cfg.embedDeployment ? AZURE_EMBED_MODEL : d
+    return { embeddings, promptTokens, usage: tokenUsage('azure', priced, promptTokens, 0), model: this.embedModelId(d) }
   }
 
   // ── Images (gpt-image) ──────────────────────────────────────────────────────
   async generateImage(req: ImageGenInput): Promise<ImageGenOutput> {
     if (!this.imageConfigured()) throw new ProviderError('azure', 'images are not configured (AZURE_OPENAI_IMAGE_DEPLOYMENT)')
+    const model = req.model || this.cfg.imageDeployment
     const ratio = req.width / req.height
     const size = ratio > 1.2 ? '1536x1024' : ratio < 1 / 1.2 ? '1024x1536' : '1024x1024'
     const [w, h] = size.split('x').map(Number)
@@ -331,37 +362,37 @@ export class AzureProvider {
       form.append('n', String(req.n))
       form.append('size', size)
       form.append('quality', quality)
-      res = await this.send(this.url(this.cfg.imageDeployment, 'images/edits'), { method: 'POST', body: form })
+      res = await this.send(this.url(model, 'images/edits'), { method: 'POST', body: form })
     } else {
-      res = await this.postJson(this.url(this.cfg.imageDeployment, 'images/generations'), { prompt, n: req.n, size, quality, output_format: 'png' })
+      res = await this.postJson(this.url(model, 'images/generations'), { prompt, n: req.n, size, quality, output_format: 'png' })
     }
     const r = await res.json() as { data?: { b64_json?: string }[] }
     const images = (r.data ?? []).filter(d => d.b64_json).slice(0, req.n)
       .map(d => toImage(Buffer.from(d.b64_json!, 'base64'), 'image/png', { width: w, height: h }))
     if (!images.length) throw new ProviderError('azure', 'no images returned')
-    const model = this.cfg.imageDeployment
     const costInr = costFor('azure', `${model}:${quality}`, { image: images.length }) * (size === '1024x1024' ? 1 : 1.5)
     return { images, model, costInr }
   }
 
   // ── Video (Sora 2) ──────────────────────────────────────────────────────────
-  videoModel(): string { return this.cfg.videoDeployment }
+  videoModel(req?: VideoGenInput): string { return req?.model || this.cfg.videoDeployment }
 
   async startVideo(req: VideoGenInput): Promise<VideoStart> {
     if (!this.videoConfigured()) throw new ProviderError('azure', 'video is not configured (AZURE_OPENAI_VIDEO_DEPLOYMENT)')
     // A reference image must match the output size exactly; the gateway does not resize, so text only.
     if (req.imageUrl) throw new ProviderError('azure', 'image-to-video is not supported on Azure')
     const aspect = req.aspect === '16:9' ? '16:9' : '9:16'
+    const deployment = this.videoModel(req)
     const seconds = SORA_SECONDS.reduce((best, s) => (Math.abs(s - req.durationSec) < Math.abs(best - req.durationSec) ? s : best), SORA_SECONDS[0])
     const form = new FormData()
-    form.append('model', this.cfg.videoDeployment)
+    form.append('model', deployment)
     form.append('prompt', req.prompt)
     form.append('size', aspect === '16:9' ? '1280x720' : '720x1280')
     form.append('seconds', String(seconds))
     const res = await this.send(`${this.cfg.endpoint}/openai/v1/videos`, { method: 'POST', body: form })
     const r = await res.json() as { id?: string }
     if (!r.id) throw new ProviderError('azure', 'video job returned no id')
-    return { opId: r.id, model: this.cfg.videoDeployment, durationSec: seconds, aspect }
+    return { opId: r.id, model: deployment, durationSec: seconds, aspect }
   }
 
   async pollVideo(opId: string): Promise<VideoPoll> {
@@ -375,8 +406,17 @@ export class AzureProvider {
   }
 
   // ── Speech to text ──────────────────────────────────────────────────────────
-  /** Azure OpenAI transcription when its deployment is set (Speech short audio after a failure); else Speech only. */
+  /** The request's model only (`azure-speech-stt` or a transcription deployment); else Azure OpenAI transcription
+   *  when its deployment is set (Speech short audio after a failure), else Speech. */
   async transcribe(req: TranscribeInput): Promise<TranscribeOutput> {
+    if (req.model === SPEECH_STT_MODEL) {
+      if (!this.speechConfigured()) throw new ProviderError('azure', 'Azure Speech is not configured (AZURE_SPEECH_KEY)')
+      return this.transcribeSpeech(req)
+    }
+    if (req.model) {
+      if (!this.openai(req.model)) throw new ProviderError('azure', 'speech to text is not configured (AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY)')
+      return this.transcribeOpenAi(req, req.model)
+    }
     const speechOk = this.speechConfigured() && !!speechContentType(req.mimeType, req.audio)
     if (this.openai(this.cfg.transcribeDeployment)) {
       try {
@@ -389,15 +429,15 @@ export class AzureProvider {
     return this.transcribeSpeech(req)
   }
 
-  private async transcribeOpenAi(req: TranscribeInput): Promise<TranscribeOutput> {
+  private async transcribeOpenAi(req: TranscribeInput, deployment = this.cfg.transcribeDeployment): Promise<TranscribeOutput> {
     const form = new FormData()
-    form.append('file', new Blob([new Uint8Array(req.audio)], { type: req.mimeType.split(';')[0] }), `audio.${extFor(req.mimeType)}`)
+    form.append('file', new Blob([new Uint8Array(req.audio)], { type: req.mimeType.split(';')[0] }), `audio.${audioExt(req.mimeType)}`)
     form.append('response_format', 'json')
     if (req.language) form.append('language', req.language.split('-')[0].toLowerCase())
-    const res = await this.send(this.url(this.cfg.transcribeDeployment, 'audio/transcriptions'), { method: 'POST', body: form })
+    const res = await this.send(this.url(deployment, 'audio/transcriptions'), { method: 'POST', body: form })
     const r = await res.json() as { text?: string; language?: string; duration?: number; usage?: { type?: string; seconds?: number } }
     const duration = typeof r.duration === 'number' ? r.duration : r.usage?.type === 'duration' ? r.usage.seconds : undefined
-    return { text: (r.text ?? '').trim(), language: req.language ?? (r.language || undefined), durationSeconds: duration, model: this.cfg.transcribeDeployment }
+    return { text: (r.text ?? '').trim(), language: req.language ?? (r.language || undefined), durationSeconds: duration, model: deployment }
   }
 
   private async transcribeSpeech(req: TranscribeInput): Promise<TranscribeOutput> {
@@ -417,16 +457,26 @@ export class AzureProvider {
   }
 
   // ── Text to speech ──────────────────────────────────────────────────────────
-  /** Speech neural voices first (Indian languages); the OpenAI TTS deployment for an OpenAI voice name or as the fallback. */
+  /** The request's model only (`azure-speech-tts` or a TTS deployment); else Speech neural voices first (Indian
+   *  languages), the OpenAI TTS deployment for an OpenAI voice name or as the fallback. */
   async speak(req: SpeakInput): Promise<SpeakOutput> {
     const openaiVoice = !!req.voice && OPENAI_VOICES.has(req.voice.toLowerCase())
+    const speechVoice = req.voice && SPEECH_VOICE.test(req.voice) ? req.voice : undefined
+    if (req.model === SPEECH_TTS_MODEL) {
+      if (!this.speechConfigured()) throw new ProviderError('azure', 'Azure Speech is not configured (AZURE_SPEECH_KEY)')
+      return this.speakSpeech(req, speechVoice)
+    }
+    if (req.model) {
+      if (!this.openai(req.model)) throw new ProviderError('azure', 'text to speech is not configured (AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY)')
+      return this.speakOpenAi(req, openaiVoice ? req.voice : undefined, req.model)
+    }
     const ways: ('speech' | 'openai')[] = openaiVoice ? ['openai', 'speech'] : ['speech', 'openai']
     const usable = ways.filter(w => (w === 'speech' ? this.speechConfigured() : this.openai(this.cfg.ttsDeployment)))
     if (!usable.length) throw new ProviderError('azure', 'text to speech is not configured (AZURE_SPEECH_KEY or AZURE_OPENAI_TTS_DEPLOYMENT)')
     let last: unknown
     for (const w of usable) {
       try {
-        return w === 'speech' ? await this.speakSpeech(req, openaiVoice ? undefined : req.voice) : await this.speakOpenAi(req, openaiVoice ? req.voice! : undefined)
+        return w === 'speech' ? await this.speakSpeech(req, speechVoice) : await this.speakOpenAi(req, openaiVoice ? req.voice! : undefined)
       } catch (err) { last = err }
     }
     throw last
@@ -450,14 +500,14 @@ export class AzureProvider {
     return { audio, mimeType: fmt.mime, model: SPEECH_TTS_MODEL }
   }
 
-  private async speakOpenAi(req: SpeakInput, voice?: string): Promise<SpeakOutput> {
+  private async speakOpenAi(req: SpeakInput, voice?: string, deployment = this.cfg.ttsDeployment): Promise<SpeakOutput> {
     const fmt = OPENAI_TTS_FORMATS[req.format]
-    const res = await this.postJson(this.url(this.cfg.ttsDeployment, 'audio/speech'), {
-      model: this.cfg.ttsDeployment, input: req.text, voice: (voice || 'coral').toLowerCase(), response_format: fmt.format,
+    const res = await this.postJson(this.url(deployment, 'audio/speech'), {
+      model: deployment, input: req.text, voice: (voice || 'coral').toLowerCase(), response_format: fmt.format,
     })
     const audio = Buffer.from(await res.arrayBuffer())
     if (!audio.length) throw new ProviderError('azure', 'speech returned no audio')
-    return { audio, mimeType: fmt.mime, model: this.cfg.ttsDeployment }
+    return { audio, mimeType: fmt.mime, model: deployment }
   }
 
   // ── Views for the routers (each capability is configured on its own) ────────
@@ -469,7 +519,7 @@ export class AzureProvider {
     return {
       name: 'azure',
       configured: () => this.videoConfigured(),
-      videoModel: () => this.videoModel(),
+      videoModel: req => this.videoModel(req),
       startVideo: req => this.startVideo(req),
       pollVideo: opId => this.pollVideo(opId),
     }

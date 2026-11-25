@@ -5,8 +5,9 @@ import {
   chatRoute, visionRoute, orderedStatus, defaultTextOrder, parseImageProviders, parseVideoProviders,
   parseTextOrder, parseImageOrder, parseVideoOrder, IMAGE_PROVIDER_ORDER, VIDEO_PROVIDER_ORDER,
 } from '../src/media'
-import { parseAudioOrder } from '../src/audio'
+import { parseSttOrder, parseTtsOrder } from '../src/audio'
 import { createFileStore } from '../src/files'
+import { modelSource, options } from '../src/models'
 import { createVideoJobStore } from '../src/video-jobs'
 import { loadPrices } from '../src/pricing'
 import type { MediaProvider } from '../src/providers/types'
@@ -116,6 +117,48 @@ describe('routing end to end', () => {
   })
 })
 
+describe('models per provider', () => {
+  const source = modelSource({
+    replicate: cap => (cap === 'image' ? { models: options(['flux-dev', 'flux-pro'], 'flux-dev') } : cap === 'video' ? { models: options(['wan']) } : null),
+    google: cap => (cap === 'image' || cap === 'video' ? { models: options(['gemini-x', 'veo-x']) } : null),
+    razer: cap => (cap === 'image' ? { models: options(['sdxl-turbo']) } : null),
+  })
+
+  it('hands each image provider its own model and reports the model used', async () => {
+    const seen: (string | undefined)[] = []
+    const rep: MediaProvider = {
+      name: 'replicate', configured: () => true,
+      async generateImage(r) { seen.push(r.model); return { model: r.model ?? 'flux-dev', images: [{ bytes: PNG, mime: 'image/png', width: 1, height: 1 }] } },
+    }
+    const deps: ImageRouterDeps = { providers: { replicate: rep }, order: ['replicate'], files: createFileStore(null), models: source }
+    const r = await handleImageGenerate({ prompt: 'x', models: { replicate: 'flux-pro', google: 'gemini-x' } }, deps)
+    expect(r.model).toBe('flux-pro')
+    expect(seen).toEqual(['flux-pro'])
+    await expect(handleImageGenerate({ prompt: 'x', models: { replicate: 'sdxl-turbo' } }, deps)).rejects.toThrow(/replicate has no image model "sdxl-turbo"/)
+    await expect(handleImageGenerate({ prompt: 'x', models: { azure: 'gpt-image-1' } }, deps)).rejects.toThrow('azure is not a image provider')
+  })
+
+  it('partitions the image cache by models, whatever their order', () => {
+    const a = parseImageRequest({ prompt: 'x', namespace: 't' })
+    const b = parseImageRequest({ prompt: 'x', namespace: 't', models: { replicate: 'flux-pro', google: 'gemini-x' } }, source)
+    const c = parseImageRequest({ prompt: 'x', namespace: 't', models: { google: 'gemini-x', replicate: 'flux-pro' } }, source)
+    expect(b.cacheKey).not.toBe(a.cacheKey)
+    expect(b.cacheKey).toBe(c.cacheKey)
+  })
+
+  it('starts video with the chosen model and validates it', async () => {
+    const starts: (string | undefined)[] = []
+    const g: MediaProvider = {
+      name: 'google', configured: () => true,
+      async startVideo(r) { starts.push(r.model); return { opId: 'op', model: r.model ?? 'veo-default', durationSec: 4 } },
+    }
+    const deps: VideoRouterDeps = { providers: { google: g }, order: ['google'], jobs: createVideoJobStore(null), files: createFileStore(null), models: source }
+    expect((await handleVideoStart({ prompt: 'x', models: { google: 'veo-x' } }, deps)).model).toBe('veo-x')
+    expect(starts).toEqual(['veo-x'])
+    await expect(handleVideoStart({ prompt: 'x', models: { replicate: 'nope' } }, deps)).rejects.toBeInstanceOf(ValidationError)
+  })
+})
+
 describe('azure in every order', () => {
   it('is appended to the existing defaults, which keep their order', () => {
     expect(defaultTextOrder(undefined, true)).toEqual(['anthropic', 'razer', 'azure'])
@@ -129,8 +172,9 @@ describe('azure in every order', () => {
     expect(parseTextOrder(['azure'])).toEqual(['azure'])
     expect(parseImageOrder(['azure', 'razer'])).toEqual(['azure', 'razer'])
     expect(parseVideoOrder(['azure'])).toEqual(['azure'])
-    expect(parseAudioOrder(['azure'])).toEqual(['azure'])
-    expect(() => parseAudioOrder(['razer'])).toThrow(ValidationError)
+    expect(parseSttOrder(['azure'])).toEqual(['azure'])
+    expect(parseTtsOrder(['azure'])).toEqual(['azure'])
+    expect(() => parseSttOrder(['razer'])).toThrow(ValidationError)
     expect(textRoute({ forceProvider: 'anthropic', providers: ['azure', 'anthropic'] })).toEqual(['anthropic'])
   })
 

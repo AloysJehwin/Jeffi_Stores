@@ -332,3 +332,58 @@ describe('transport', () => {
     expect(err.message).toMatch(/timed out/)
   })
 })
+
+describe('chosen models', () => {
+  const vec = Array.from({ length: AZURE_EMBED_DIMENSIONS }, () => 0)
+
+  it('chat, vision and embeddings run on the requested deployment and report it', async () => {
+    const calls = mockFetch(url => (url.includes('/embeddings')
+      ? { data: [{ index: 0, embedding: vec }], usage: { prompt_tokens: 2 } }
+      : { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] }))
+    const r = await az().chat({ messages: [{ role: 'user', content: 'x' }], models: { azure: 'gpt-5' } })
+    expect(calls[0].url).toContain('/deployments/gpt-5/chat/completions')
+    expect(r.model).toBe('gpt-5')
+    expect(az().chatModel('gpt-5')).toBe('gpt-5')
+    expect((await az().vision({ images: [PNG_B64], prompt: 'p', models: { azure: 'gpt-5' } })).model).toBe('gpt-5')
+    expect(calls[1].url).toContain('/deployments/gpt-5/')
+    const e = await az().embed(['x'], 'emb-large')
+    expect(calls[2].url).toContain('/deployments/emb-large/embeddings')
+    expect(e.model).toBe('emb-large@768')
+    expect((await az().embed(['x'])).model).toBe('text-embedding-3-small@768')
+  })
+
+  it('images and video use the chosen deployment for the call and the price', async () => {
+    const calls = mockFetch(url => (url.includes('/videos') ? { id: 'v' } : { data: [{ b64_json: PNG_B64 }] }))
+    const img = await az().generateImage({ prompt: 'x', width: 1024, height: 1024, n: 1, quality: 'draft', model: 'gpt-image-1-mini' })
+    expect(calls[0].url).toContain('/deployments/gpt-image-1-mini/images/generations')
+    expect(img.model).toBe('gpt-image-1-mini')
+    expect(img.costInr).toBeCloseTo(unitPrice('azure', 'gpt-image-1-mini:low', 'image'), 6)
+    const s = await az({ videoDeployment: 'sora-2' }).startVideo({ prompt: 'x', durationSec: 4, aspect: '16:9', model: 'sora-2-pro' })
+    expect((calls[1].init?.body as FormData).get('model')).toBe('sora-2-pro')
+    expect(s.model).toBe('sora-2-pro')
+  })
+
+  it('speech to text: azure-speech-stt goes to Speech only, a deployment to Azure OpenAI only', async () => {
+    const wav = Buffer.concat([Buffer.from('RIFF\0\0\0\0WAVEfmt '), Buffer.alloc(32)])
+    const calls = mockFetch(url => (url.includes('stt.speech') ? { RecognitionStatus: 'Success', DisplayText: 'hi' } : { text: 'hey' }))
+    expect(await az().transcribe({ audio: wav, mimeType: 'audio/wav', model: 'azure-speech-stt' })).toMatchObject({ text: 'hi', model: 'azure-speech-stt' })
+    expect(calls[0].url).toContain('stt.speech.microsoft.com')
+    expect(await az().transcribe({ audio: wav, mimeType: 'audio/wav', model: 'whisper' })).toMatchObject({ text: 'hey', model: 'whisper' })
+    expect(calls[1].url).toContain('/deployments/whisper/audio/transcriptions')
+    await expect(az({ speechKey: '' }).transcribe({ audio: wav, mimeType: 'audio/wav', model: 'azure-speech-stt' })).rejects.toThrow(/Speech is not configured/)
+    await expect(az({ apiKey: '' }).transcribe({ audio: wav, mimeType: 'audio/wav', model: 'whisper' })).rejects.toThrow(/not configured/)
+  })
+
+  it('text to speech: azure-speech-tts or a deployment alone; a voice that is not a Speech voice is dropped', async () => {
+    const calls = mockFetch(() => new Response(Buffer.from('mp3')))
+    expect((await az().speak({ text: 'x', language: 'hi-IN', format: 'mp3', model: 'azure-speech-tts', voice: 'ishita' })).model).toBe('azure-speech-tts')
+    expect(String(calls[0].init?.body)).toContain('hi-IN-SwaraNeural')
+    expect((await az().speak({ text: 'x', language: 'hi-IN', format: 'mp3', model: 'tts-1-hd', voice: 'nova' })).model).toBe('tts-1-hd')
+    expect(calls[1].url).toContain('/deployments/tts-1-hd/audio/speech')
+    expect(body(calls[1]).voice).toBe('nova')
+    await az().speak({ text: 'x', language: 'hi-IN', format: 'mp3', voice: 'hi-IN-MadhurNeural' })
+    expect(String(calls[2].init?.body)).toContain('hi-IN-MadhurNeural')
+    await expect(az({ speechKey: '' }).speak({ text: 'x', language: 'hi-IN', format: 'mp3', model: 'azure-speech-tts' })).rejects.toThrow(/Speech is not configured/)
+    await expect(az({ apiKey: '' }).speak({ text: 'x', language: 'hi-IN', format: 'mp3', model: 'tts-1' })).rejects.toThrow(/not configured/)
+  })
+})

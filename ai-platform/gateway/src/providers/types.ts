@@ -1,9 +1,12 @@
 import type {
   ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName,
-  AudioProviderName, AudioFormat,
+  SttProviderName, TtsProviderName, AudioFormat,
 } from '../../../sdk/types'
 
-export type { ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName, AudioProviderName, AudioFormat }
+export type {
+  ImageProviderName, VideoProviderName, ImageQuality, VideoAspect, StockImage, StockOrientation, StockProviderName,
+  SttProviderName, TtsProviderName, AudioFormat,
+}
 
 /** A normalised stock search as providers see it. */
 export interface StockQuery {
@@ -31,6 +34,8 @@ export interface ImageGenInput {
   referenceImageUrl?: string
   /** Subject will be cut out afterwards; providers see the prompt with the isolation hint already added. */
   transparent?: boolean
+  /** The request's model for this provider (checked against its list); else the quality's model. */
+  model?: string
 }
 
 export interface GeneratedImage {
@@ -53,6 +58,7 @@ export interface VideoGenInput {
   /** Snapped to what the provider supports; 2..8 at the API edge. */
   durationSec: number
   aspect: VideoAspect
+  model?: string
 }
 
 export interface VideoStart {
@@ -94,6 +100,9 @@ export interface TranscribeInput {
   mimeType: string
   /** BCP-47 (hi-IN), when the caller knows it. */
   language?: string
+  model?: string
+  /** Length read from the file's headers, when readable. */
+  durationSeconds?: number
 }
 
 export interface TranscribeOutput {
@@ -110,6 +119,7 @@ export interface SpeakInput {
   language: string
   voice?: string
   format: AudioFormat
+  model?: string
 }
 
 export interface SpeakOutput {
@@ -118,13 +128,30 @@ export interface SpeakOutput {
   model: string
 }
 
-/** Speech-to-text and text-to-speech; each side is configured on its own. */
-export interface AudioProvider {
-  readonly name: AudioProviderName
+export interface SttProvider {
+  readonly name: SttProviderName
   transcribeConfigured(): boolean
-  speakConfigured(): boolean
   transcribe(req: TranscribeInput): Promise<TranscribeOutput>
+}
+
+export interface TtsProvider {
+  readonly name: TtsProviderName
+  speakConfigured(): boolean
   speak(req: SpeakInput): Promise<SpeakOutput>
+}
+
+/** Both sides, each configured on its own. */
+export type AudioProvider = SttProvider & TtsProvider
+
+/** File extension for an audio mime type (multipart uploads name the file by it). */
+export function audioExt(mime: string): string {
+  const m = mime.split(';')[0].trim().toLowerCase()
+  const map: Record<string, string> = {
+    'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a',
+    'audio/m4a': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'm4a', 'audio/ogg': 'ogg', 'audio/opus': 'ogg', 'audio/webm': 'webm',
+    'audio/flac': 'flac', 'audio/x-flac': 'flac', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mp4',
+  }
+  return map[m] ?? 'webm'
 }
 
 /** Post-step that cuts the subject out to a transparent PNG. */
