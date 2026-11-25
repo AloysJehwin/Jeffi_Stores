@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 import pg from 'pg'
 import crypto from 'node:crypto'
+import { gatewayEmbed, gatewayUrl } from './lib/ai-gateway.mjs'
 
 const PG_HOST = process.env.RAZER_PG_HOST || '100.82.208.8'
 const PG_PORT = parseInt(process.env.RAZER_PG_PORT || '5432', 10)
 const PG_USER = process.env.RAZER_PG_USER || 'jeffi_replica'
 const PG_PASS = process.env.RAZER_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
 const PG_DB   = process.env.RAZER_PG_DB || 'jeffi_replica'
-const OLLAMA_URL = process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434'
-const EMBED_MODEL = process.env.EMBED_MODEL || 'nomic-embed-text'
+// Embeddings come from the AI gateway; EMBED_PROVIDER (razer | azure) overrides its default provider.
+const EMBED_PROVIDER = process.env.EMBED_PROVIDER || undefined
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10)
 const CONCURRENCY = parseInt(process.env.EMBED_CONCURRENCY || '4', 10)
 // Which tenant these embeddings belong to (#489). Default null = the platform/flagship's own rows.
@@ -32,16 +33,12 @@ const pool = new pg.Pool({
 function sha256(s) { return crypto.createHash('sha256').update(s).digest('hex') }
 
 async function embed(text) {
-  const res = await fetch(`${OLLAMA_URL}/api/embeddings`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: EMBED_MODEL, prompt: text }),
-  })
-  if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`)
-  const data = await res.json()
-  if (!Array.isArray(data.embedding)) throw new Error('No embedding returned')
-  return data.embedding
+  const r = await gatewayEmbed(text, { provider: EMBED_PROVIDER })
+  return { vector: r.vectors[0], model: r.model }
 }
+
+// The model the gateway embeds with now; a row embedded by another model is redone (vectors never mix).
+let currentModel = null
 
 function vectorLiteral(v) {
   return '[' + v.join(',') + ']'
@@ -124,11 +121,11 @@ async function processSource(src) {
   const existingHashes = new Map()
   {
     const r = await pool.query(
-      `SELECT source_id, content_hash FROM embeddings
+      `SELECT source_id, content_hash, COALESCE(embedding_model, 'nomic-embed-text') AS model FROM embeddings
         WHERE source_table = $1 AND tenant_id IS NOT DISTINCT FROM $2`,
       [src.table, TENANT_ID]
     )
-    for (const row of r.rows) existingHashes.set(row.source_id, row.content_hash)
+    for (const row of r.rows) existingHashes.set(row.source_id, `${row.content_hash}|${row.model}`)
   }
 
   let embedded = 0, skipped = 0, errors = 0
@@ -140,16 +137,16 @@ async function processSource(src) {
       const content = src.text(row).slice(0, 4000)
       if (!content.trim()) { skipped++; continue }
       const hash = sha256(content)
-      if (existingHashes.get(String(row.id)) === hash) { skipped++; continue }
+      if (existingHashes.get(String(row.id)) === `${hash}|${currentModel}`) { skipped++; continue }
       try {
-        const vec = await embed(content)
+        const { vector, model } = await embed(content)
         await pool.query(
-          `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, updated_at)
-           VALUES ($6, $1, $2, $3, $4, $5::vector, NOW())
+          `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, embedding_model, updated_at)
+           VALUES ($6, $1, $2, $3, $4, $5::vector, $7, NOW())
            ON CONFLICT (tenant_id, source_table, source_id)
            DO UPDATE SET content = EXCLUDED.content, content_hash = EXCLUDED.content_hash,
-                         embedding = EXCLUDED.embedding, updated_at = NOW()`,
-          [src.table, String(row.id), content, hash, vectorLiteral(vec), TENANT_ID]
+                         embedding = EXCLUDED.embedding, embedding_model = EXCLUDED.embedding_model, updated_at = NOW()`,
+          [src.table, String(row.id), content, hash, vectorLiteral(vector), TENANT_ID, model]
         )
         embedded++
         if (embedded % BATCH_SIZE === 0) process.stdout.write(`    progress: ${embedded}/${rows.length}\r`)
@@ -166,8 +163,8 @@ async function processSource(src) {
 
 (async () => {
   const start = Date.now()
-  console.log(`embedding host: ${OLLAMA_URL}`)
-  console.log(`embedding model: ${EMBED_MODEL}`)
+  currentModel = (await embed('model probe')).model
+  console.log(`AI gateway: ${gatewayUrl()}  embedding model: ${currentModel}`)
   console.log(`postgres: ${PG_USER}@${PG_HOST}:${PG_PORT}/${PG_DB}`)
 
   const results = []

@@ -12,7 +12,7 @@ Claude Desktop ──ssh──► /opt/jeffi-mcp/run.sh ──┬──► live 
                                                 │      → live products, orders, customers, stock, prices
                                                 └──► Razer pgvector (Tailscale)
                                                        → embeddings table only (~15.4k rows)
-                                                       → Ollama at the same host (embeddings)
+                                                       → query vectors from the AI gateway (/v1/embed)
 ```
 
 **Two pools, two sources of truth:**
