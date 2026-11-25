@@ -16,6 +16,7 @@ import {
 } from '@/lib/providers/policy'
 import { messagingProviderReadiness } from '@/lib/shared/messaging'
 import { aiGatewayHeaders } from '@/lib/shared/ai-client'
+import { getVoiceConfigView, voiceSecretsStatus, type VoiceConfigView } from '@/lib/providers/voice-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,19 +89,25 @@ function messagingSecrets(): Secret[] {
   ]
 }
 
-const CALLING_ENV = ['EXOTEL_API_KEY', 'EXOTEL_API_TOKEN', 'SARVAM_API_KEY', 'AZURE_SPEECH_KEY']
+/** The voice view in the shape the Providers page reads: V2's per-part readiness folded into each part. */
+function pageVoice(v: VoiceConfigView) {
+  return {
+    provider: v.provider,
+    exotel: { ...v.exotel, configured: v.parts.exotel },
+    twilioTest: { ...v.twilioTest, configured: v.parts.twilio },
+    testNumbers: v.testNumbers,
+    sarvam: { ...v.sarvam, configured: v.parts.sarvam },
+    speech: v.speech,
+    azureSpeech: { ...v.azureSpeech, configured: v.parts.azure },
+    llmModel: v.llmModel,
+    anthropic: { federation: !!v.anthropicIdentity, configured: v.parts.claude },
+    ready: v.ready,
+  }
+}
 
-/** Calling/voice secrets and the voice view come from voice-config.ts (V2); loaded lazily with a plain
- *  env-presence fallback so this route stands on its own. */
-async function voiceParts(): Promise<{ secrets: Secret[]; voice: unknown }> {
-  const m: any = await import('@/lib/providers/voice-config').catch(() => ({}))
-  const secrets: Secret[] =
-    typeof m.voiceSecretsStatus === 'function'
-      ? m.voiceSecretsStatus()
-      : CALLING_ENV.map(name => ({ name, group: 'calling' as const, present: !!(process.env[name] || '').trim() }))
-  const view = typeof m.getVoiceConfigView === 'function' ? m.getVoiceConfigView : m.getVoiceConfigPublic
-  const voice = typeof view === 'function' ? await Promise.resolve(view()).catch(() => null) : null
-  return { secrets, voice }
+async function voiceParts(): Promise<{ secrets: Secret[]; voice: ReturnType<typeof pageVoice> | null }> {
+  const voice = await getVoiceConfigView().then(pageVoice).catch(() => null)
+  return { secrets: voiceSecretsStatus(), voice }
 }
 
 const asMap = (rows: { key: string; value: unknown }[]) => Object.fromEntries(rows.map(r => [r.key, r.value]))
