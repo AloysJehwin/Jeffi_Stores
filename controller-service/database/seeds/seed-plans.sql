@@ -706,7 +706,19 @@ INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_i
   ('video', 'google',    '*',                              'video_second',  8.5000, 15.0000),
   ('video', 'replicate', 'wan-video/wan-2.2-t2v-fast',     'video_second',  2.0000,  5.0000),
   ('video', 'replicate', 'wan-video/wan-2.2-i2v-fast',     'video_second',  2.0000,  5.0000),
-  ('video', 'replicate', '*',                              'video_second',  2.0000,  5.0000)
+  ('video', 'replicate', '*',                              'video_second',  2.0000,  5.0000),
+  -- Azure (Microsoft-sold models; deployments named in the gateway config), same margins as above.
+  ('text',  'azure',     '*',                              'token_1k_in',   0.0340,  0.1020),
+  ('text',  'azure',     '*',                              'token_1k_out',  0.1360,  0.4080),
+  ('vision','azure',     '*',                              'token_1k_in',   0.0340,  0.1020),
+  ('vision','azure',     '*',                              'token_1k_out',  0.1360,  0.4080),
+  ('embed', 'azure',     '*',                              'token_1k_in',   0.0017,  0.0051),
+  ('image', 'azure',     '*',                              'image',         3.5700,  6.0000),
+  ('video', 'azure',     '*',                              'video_second',  8.5000, 15.0000),
+  -- Audio: transcription per audio minute (Speech STT $1/h; OpenAI transcribe ~$0.006/min), speech per 1k characters.
+  ('audio', 'azure',     'azure-speech-stt',               'audio_minute',  1.4200,  3.0000),
+  ('audio', 'azure',     '*',                              'audio_minute',  0.5100,  1.5000),
+  ('audio', 'azure',     '*',                              'tts_1k_chars',  1.2800,  3.0000)
 ON CONFLICT (capability, provider, model, unit_type) DO NOTHING;
 
 -- Compute prices: AWS us-east-1 on-demand, Linux / PostgreSQL, USD (checked 2026-10-30; the 16-32 GB sizes

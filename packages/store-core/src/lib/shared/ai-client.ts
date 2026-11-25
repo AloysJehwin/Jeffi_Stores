@@ -56,7 +56,7 @@ export interface AiChatUsage {
 export interface AiChatResponse {
   content: string
   toolCalls?: AiToolCall[]
-  provider: 'openai' | 'ollama' | 'anthropic'
+  provider: 'openai' | 'ollama' | 'anthropic' | 'azure'
   model: string
   latencyMs: number
   fallbackUsed: boolean
