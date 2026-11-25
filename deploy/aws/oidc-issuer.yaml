@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  The k3s cluster's service-account issuer as a public OIDC discovery endpoint (self-hosted IRSA,
+  docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md): a private S3 bucket behind CloudFront (origin access control) at
+  https://oidc.jeffistores.in. deploy/azure/irsa/publish-oidc.sh uploads .well-known/openid-configuration and
+  openid/v1/jwks; AWS STS (deploy/azure/irsa/aws-roles.sh) and Entra federated credentials trust the issuer.
+  Deploy in us-east-1 (CloudFront certificates live there).
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: oidc.jeffistores.in
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Default: Z08094881XKVZ9XSGBKG1
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'jeffi-oidc-issuer-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      VersioningConfiguration: { Status: Enabled }
+
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: jeffi-oidc-issuer
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: k3s service-account issuer (OIDC discovery + JWKS)
+        Aliases: [!Ref DomainName]
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Origins:
+          - Id: issuer
+            DomainName: !GetAtt Bucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig: { OriginAccessIdentity: '' }
+        DefaultCacheBehavior:
+          TargetOriginId: issuer
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # Managed-CachingOptimized; publish-oidc.sh invalidates after a key rotation.
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudFrontReadsTheIssuerDocuments
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub '${Bucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt Distribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront's fixed alias zone
+
+Outputs:
+  IssuerUrl:
+    Value: !Sub 'https://${DomainName}'
+  BucketName:
+    Value: !Ref Bucket
+  DistributionId:
+    Value: !Ref Distribution

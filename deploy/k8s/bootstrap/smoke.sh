@@ -18,9 +18,11 @@ k8s_tunnel
 bad=0
 fail() { echo "   FAIL $*" >&2; bad=1; }
 
+# SMOKE_CONNECT_TO (curl --connect-to, e.g. ::<Azure core IP>:) tests public hosts against an ingress DNS doesn't
+# point at yet (the Azure release before cutover); unset, public hosts resolve as usual.
 check() { # check <url> [require-commit]
   local body code
-  body=$(curl -s --max-time 15 -w '\n%{http_code}' "$1" || true)
+  body=$(curl -s --max-time 15 ${SMOKE_CONNECT_TO:+--connect-to "$SMOKE_CONNECT_TO"} -w '\n%{http_code}' "$1" || true)
   code=${body##*$'\n'}; body=${body%$'\n'*}
   printf '   %s %s\n' "$code" "$1"
   case $code in 000|5??) fail "$1 answered $code" ;; esac

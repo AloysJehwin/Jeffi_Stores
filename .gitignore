@@ -46,6 +46,9 @@ next-env.d.ts
 # run them on the runner, so an ignored script means "No such file" in Actions.
 !.github/scripts/*.sh
 !deploy/k8s/**/*.sh
+# Azure landing zone, self-hosted IRSA and the AWS tenant edge (deploy/azure/README.md).
+!deploy/azure/**/*.sh
+!deploy/aws/edge/*.sh
 # Razer host scripts: the box installs them from the release's GitHub tarball.
 !ai-platform/deploy/**/*.sh
 /scripts/*

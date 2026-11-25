@@ -1,8 +1,19 @@
 # Shared helpers for the production DB release scripts (sourced, never run directly).
 # RDS is reached through an SSH tunnel via the k3s core node (it sits in the VPC, next to RDS), as app_user
 # with IAM tokens: app_user owns the app tables. rehearse.sh sets REHEARSAL=true and PG* at a local copy.
+# JEFFI_CLOUD=azure (or --cloud=azure): the Azure core and its Postgres Flexible Server, both reached directly over
+# Tailscale (the core advertises the Postgres subnet), with passwords from Key Vault (deploy/azure/README.md).
 set -euo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+CLOUD=${JEFFI_CLOUD:-aws}
+for a in "$@"; do case $a in --cloud=*) CLOUD=${a#--cloud=} ;; esac; done
+case $CLOUD in aws|azure) export JEFFI_CLOUD=$CLOUD ;; *) echo "unknown cloud: $CLOUD" >&2; exit 2 ;; esac
+AZ_RG=${AZ_RG:-jeffi-prod-cin}
+AZ_KEY_VAULT=${AZ_KEY_VAULT:-jeffi-prod-kv}
+AZ_PG_HOST=${AZ_PG_HOST:-jeffi-prod-pg.postgres.database.azure.com}
+AZ_PG_ADMIN=${AZ_PG_ADMIN:-jeffiadmin}
+# The database's master login (owner of the oldest tables): RDS's postgres, the Flexible Server's admin.
+MASTER_ROLE=postgres; [ "$CLOUD" = azure ] && MASTER_ROLE=$AZ_PG_ADMIN
 RDS_HOST=${RDS_HOST:-jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com}
 RDS_INSTANCE=${RDS_INSTANCE:-jeffi-stores-db}
 CORE=${CORE_HOST:-ec2-user@32.196.38.130}
@@ -11,7 +22,8 @@ PORT=${TUNNEL_PORT:-15432}
 REHEARSAL=${REHEARSAL:-false}
 CTRL=jeffi-stores-controller-service
 export AWS_REGION=${AWS_REGION:-us-east-1}
-export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/jeffi-k3s.yaml}
+if [ "$CLOUD" = azure ]; then export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/jeffi-azure.yaml}
+else export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/jeffi-k3s.yaml}; fi
 export PGGSSENCMODE=disable  # no Kerberos attempt (a corporate krb5 realm only adds noise to auth errors)
 STAMP=${STAMP:-$(date +%Y%m%d-%H%M)}
 OUT_DIR=${OUT_DIR:-$HOME/Documents/db-backups/release-$STAMP}
@@ -110,8 +122,42 @@ ssm_forward() {
   return 1
 }
 pg_up() { pg_isready -h 127.0.0.1 -p "$PORT" -t 10 -q 2>/dev/null; }
+
+# Azure: a Key Vault value, for command substitution only (never echo it).
+kv_secret() { az keyvault secret show --vault-name "$AZ_KEY_VAULT" --name "$1" --query value -o tsv; }
+# The Postgres address: its name when this machine resolves the private zone (Tailscale split DNS to Azure DNS
+# through the core), else the zone's A record (the GitHub deploy identity has Reader on the group).
+az_pg_addr() {
+  if python3 -I -c 'import socket, sys; socket.gethostbyname(sys.argv[1])' "$AZ_PG_HOST" 2>/dev/null; then echo "$AZ_PG_HOST"; return; fi
+  local zone
+  zone=$(az network private-dns zone list -g "$AZ_RG" --query "[?ends_with(name, 'private.postgres.database.azure.com')].name | [0]" -o tsv)
+  az network private-dns record-set a list -g "$AZ_RG" -z "$zone" --query '[0].aRecords[0].ipv4Address' -o tsv
+}
+# app_user's and the admin's passwords in a 0600 PGPASSFILE (libpq, psql and migra read it), removed on exit:
+# no password in argv or the environment. Children of this script reuse it.
+az_pgpass() {
+  [ -n "${PGPASSFILE:-}" ] && [ -s "$PGPASSFILE" ] && return 0
+  local d app admin
+  d=$(mktemp -d); chmod 700 "$d"; on_exit "rm -rf '$d'"
+  esc() { sed 's/[\\:]/\\&/g'; }
+  app=$(kv_secret pg-app-password 2>/dev/null | esc || true)
+  admin=$(kv_secret pg-admin-password | esc)
+  [ -n "$admin" ] || { echo "pg-admin-password is not readable in $AZ_KEY_VAULT" >&2; exit 1; }
+  (umask 077; { [ -z "$app" ] || printf '*:5432:*:app_user:%s\n' "$app"; printf '*:5432:*:%s:%s\n' "$AZ_PG_ADMIN" "$admin"; } > "$d/pgpass")
+  export PGPASSFILE=$d/pgpass
+}
+az_db() {
+  if [ -z "${PG_ADDR:-}" ]; then PG_ADDR=$(az_pg_addr); export PG_ADDR; fi
+  [ -n "$PG_ADDR" ] || { echo "Could not find the address of $AZ_PG_HOST" >&2; exit 1; }
+  az_pgpass
+  for _ in $(seq 1 15); do pg_isready -h "$PG_ADDR" -p 5432 -t 10 -q 2>/dev/null && return 0; sleep 2; done
+  echo "$AZ_PG_HOST ($PG_ADDR) does not answer: is the core advertising its Postgres subnet route, and is this machine on the tailnet accepting routes?" >&2
+  exit 1
+}
+
 tunnel() {
   $REHEARSAL && return 0
+  if [ "$CLOUD" = azure ]; then az_db; return 0; fi
   if listening "$PORT"; then for _ in 1 2 3; do pg_up && return 0; sleep 2; done; fi
   ssh_forward "$PORT" "$RDS_HOST:5432"
   for _ in $(seq 1 15); do pg_up && return 0; sleep 1; done
@@ -121,12 +167,14 @@ tunnel() {
 # libpq env for app_user (a fresh IAM token per call; they expire after 15 minutes) and for the master user postgres.
 pg_env() {
   if $REHEARSAL; then export PGUSER=app_user PGPASSWORD=$REHEARSAL_PW; return 0; fi
+  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=5432 PGUSER=app_user PGSSLMODE=require; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=app_user PGSSLMODE=require
   PGPASSWORD=$(aws rds generate-db-auth-token --hostname "$RDS_HOST" --port 5432 --username app_user)
   export PGPASSWORD
 }
 pg_master_env() {
   if $REHEARSAL; then export PGUSER=postgres PGPASSWORD=$REHEARSAL_PW; return 0; fi
+  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=5432 PGUSER=$AZ_PG_ADMIN PGSSLMODE=require; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=postgres PGSSLMODE=require
   PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id jeffi/production --query SecretString --output text |
     python3 -I -c 'import json, sys; print(json.load(sys.stdin)["RDS_MASTER_PASSWORD"])')
@@ -149,6 +197,9 @@ schema_diff() {
   if $REHEARSAL; then
     RDS_DB=$db TARGET_URL="postgresql://app_user:$REHEARSAL_PW@127.0.0.1:$PGPORT/$db" SCHEMA_DIFF_OUT=$OUT_DIR \
       bash "$REPO/deploy/schema-diff.sh" "$@"
+  elif [ "$CLOUD" = azure ]; then # the password comes from PGPASSFILE
+    RDS_DB=$db TARGET_URL="postgresql://app_user@${PG_ADDR:?tunnel first}:5432/$db?sslmode=require" SCHEMA_DIFF_OUT=$OUT_DIR \
+      bash "$REPO/deploy/schema-diff.sh" "$@"
   else
     RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=$db \
       SCHEMA_DIFF_OUT=$OUT_DIR bash "$REPO/deploy/schema-diff.sh" "$@"
@@ -156,13 +207,22 @@ schema_diff() {
 }
 
 # The platform manifests with every jeffi-stores-* image at <tag> (rollout.sh, and 40-tenant-fanout.sh's Job).
+# On Azure, the overlay (cluster identity for AWS and Key Vault, the AWS tenant edge); it refuses to render while a
+# placeholder is left in it (deploy/k8s/overlays/azure/kustomization.yaml).
 platform_manifests() {
-  kubectl kustomize "$REPO/deploy/k8s/platform" |
-    sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:$1#g"
+  local dir=$REPO/deploy/k8s/platform out
+  [ "$CLOUD" = azure ] && dir=$REPO/deploy/k8s/overlays/azure
+  out=$(kubectl kustomize "$dir")
+  if grep -q 'REPLACE_ME' <<<"$out"; then echo "$dir still has REPLACE_ME placeholders" >&2; return 1; fi
+  sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:$1#g" <<<"$out"
 }
 
 k8s_up() { kubectl get nodes --request-timeout=10s >/dev/null 2>&1; }
 k8s_tunnel() {
+  if [ "$CLOUD" = azure ]; then # the kubeconfig's server is the core's Tailscale address
+    for _ in 1 2 3; do k8s_up && return 0; sleep 3; done
+    echo "The Azure cluster does not answer over Tailscale (KUBECONFIG=$KUBECONFIG)" >&2; exit 1
+  fi
   if listening 16443; then for _ in 1 2 3; do k8s_up && return 0; sleep 2; done; fi
   ssh_forward 16443 127.0.0.1:6443 || { echo "Could not open a tunnel to the cluster through $CORE" >&2; exit 1; }
   for _ in $(seq 1 10); do k8s_up && return 0; sleep 2; done

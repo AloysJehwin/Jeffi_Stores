@@ -1,0 +1,13 @@
+# The flagship Postgres has only a private address: its name resolves through Azure DNS, reached from the core
+# directly and from AWS nodes over the core's Tailscale route to 168.63.129.16 (nodes run tailscale --accept-routes).
+# k3s's CoreDNS imports every *.server key of this ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: coredns-custom, namespace: kube-system }
+data:
+  azure-postgres.server: |
+    postgres.database.azure.com:53 {
+      errors
+      cache 30
+      forward . 168.63.129.16
+    }

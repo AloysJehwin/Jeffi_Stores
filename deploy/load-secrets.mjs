@@ -24,9 +24,12 @@
  * overwritten in prod mode. In dev mode, existing .env.local entries win
  * because Next.js loads the file and process.env is already set by the time
  * the app reads it (so SM values written to .env.local act as defaults).
+ *
+ * SECRETS_BACKEND=keyvault reads the same secret from Azure Key Vault under its
+ * dash name (jeffi/production -> jeffi-production); see secrets-backend.mjs.
  */
 
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+import { readSecret, secretsBackend, keyVaultName } from './secrets-backend.mjs'
 import { writeFileSync, existsSync, readFileSync, lstatSync, symlinkSync, unlinkSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -43,21 +46,21 @@ let SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
 const SECRET_FALLBACK_ID = process.env.SM_SECRET_FALLBACK_ID
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
 const FALLBACK = process.env.ALLOW_ENV_FALLBACK === 'true'
+const BACKEND = secretsBackend()
+const STORE = BACKEND === 'keyvault' ? 'Key Vault' : 'Secrets Manager'
+const shown = id => (BACKEND === 'keyvault' ? `${id}" (Key Vault "${keyVaultName(id)}` : id)
 
 async function loadSecrets() {
-  const client = new SecretsManagerClient({ region: REGION })
-
   let secretString
   try {
-    const res = await client.send(new GetSecretValueCommand({ SecretId: SECRET_ID })).catch(err => {
+    secretString = await readSecret(SECRET_ID, { region: REGION }).catch(err => {
       if (!SECRET_FALLBACK_ID || !/ResourceNotFound|AccessDenied/.test(`${err.name} ${err.message}`)) throw err
-      process.stderr.write(`[load-secrets] "${SECRET_ID}" unavailable (${err.name}); using "${SECRET_FALLBACK_ID}"\n`)
+      process.stderr.write(`[load-secrets] "${shown(SECRET_ID)}" unavailable (${err.name}); using "${shown(SECRET_FALLBACK_ID)}"\n`)
       SECRET_ID = SECRET_FALLBACK_ID
-      return client.send(new GetSecretValueCommand({ SecretId: SECRET_ID }))
+      return readSecret(SECRET_ID, { region: REGION })
     })
-    secretString = res.SecretString
   } catch (err) {
-    const msg = `[load-secrets] Failed to fetch "${SECRET_ID}" from Secrets Manager: ${err.message}`
+    const msg = `[load-secrets] Failed to fetch "${shown(SECRET_ID)}" from ${STORE}: ${err.message}`
     if (FALLBACK) {
       process.stderr.write(`${msg} — continuing (ALLOW_ENV_FALLBACK=true)\n`)
       return

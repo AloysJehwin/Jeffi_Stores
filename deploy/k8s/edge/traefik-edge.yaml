@@ -1,0 +1,95 @@
+# The AWS tenant edge (plan §6a, decision D4): a second Traefik on nodes labelled jeffi.io/edge=true (one t4g.small in
+# the stores' VPC with an Elastic IP, deploy/aws/edge). Store hosts and custom domains resolve to it, so a shopper's
+# request stays inside AWS: edge -> the store's node -> its pods. The flagship and platform hosts resolve to the Azure
+# core, whose bundled Traefik (platform/10-traefik.yaml) keeps serving them. Both read the same IngressRoutes,
+# TLSStore and certificates, so a store's routes need nothing new.
+# hostPort rather than hostNetwork: the pod keeps its kube-system pod address, which every store's NetworkPolicy
+# already admits (a host-network pod's traffic leaves from the node address over flannel and is refused). ServiceLB
+# runs only on the core (svccontroller.k3s.cattle.io/enablelb, deploy/azure/cloud-init/core.sh), so 80/443 are free.
+# The edge never writes Ingress status (no ingressEndpoint), leaving that to the core's Traefik.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: traefik-edge, namespace: kube-system }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: traefik-edge }
+rules:
+  - apiGroups: ['']
+    resources: [services, endpoints, secrets, nodes, configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list, watch]
+  - apiGroups: [extensions, networking.k8s.io]
+    resources: [ingresses, ingressclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [traefik.io]
+    resources: [middlewares, middlewaretcps, ingressroutes, traefikservices, ingressroutetcps, ingressrouteudps, tlsoptions, tlsstores, serverstransports, serverstransporttcps]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: traefik-edge }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: traefik-edge }
+subjects: [{ kind: ServiceAccount, name: traefik-edge, namespace: kube-system }]
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: { name: traefik-edge, namespace: kube-system, labels: { app: traefik-edge } }
+spec:
+  selector: { matchLabels: { app: traefik-edge } }
+  updateStrategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 1 } }
+  template:
+    metadata:
+      labels: { app: traefik-edge }
+    spec:
+      serviceAccountName: traefik-edge
+      nodeSelector: { jeffi.io/edge: 'true' }
+      tolerations:
+        - { key: jeffi.io/edge, operator: Exists, effect: NoSchedule }
+      priorityClassName: system-node-critical
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: traefik
+          image: traefik:v3.3.6
+          args:
+            - --entryPoints.web.address=:8000/tcp
+            - --entryPoints.web.forwardedHeaders.insecure=true
+            - --entryPoints.websecure.address=:8443/tcp
+            - --entryPoints.websecure.http.tls=true
+            - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=300s
+            - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
+            - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
+            - --entryPoints.traefik.address=:9000/tcp
+            - --ping=true
+            - --providers.kubernetescrd
+            - --providers.kubernetescrd.allowCrossNamespace=true
+            - --providers.kubernetesingress
+            - --accesslog=true
+            - --global.checkNewVersion=false
+            - --global.sendAnonymousUsage=false
+          ports:
+            - { name: web, containerPort: 8000, hostPort: 80, protocol: TCP }
+            - { name: websecure, containerPort: 8443, hostPort: 443, protocol: TCP }
+          readinessProbe:
+            httpGet: { path: /ping, port: 9000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /ping, port: 9000 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
