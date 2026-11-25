@@ -3,11 +3,11 @@ import {
   aiChat,
   aiChatStream,
   activeTextProvider,
-  AiClientError,
   type AiToolDef,
   type AiChatMessage,
   type AiChatResponse,
 } from '@/lib/shared/ai-client'
+import { assistantFailure } from '@/lib/shared/ai-unavailable'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
 import { autoQuotationItems } from '@/lib/admin-agent/tools/sales'
 import { normUnit } from '@/lib/catalog/selling-unit'
@@ -1114,15 +1114,8 @@ export async function runTurn(ctx: TurnContext, emit: Emit | null, signal: Abort
     if (signal?.aborted) {
       stopped = true
     } else {
-      const raw = err instanceof AiClientError ? err.message : String(err?.message || 'AI request failed')
-      // Never surface provider/billing internals (e.g. OpenAI "no credits", Ollama
-      // unreachable) to the admin — map those to a clean, generic message.
-      const unavailable =
-        /no credits|unreachable|fallback disabled|billing|quota|rate limit|timeout|abort|ECONNREFUSED|fetch failed/i.test(
-          raw
-        )
-      const msg = unavailable ? 'The assistant is temporarily unavailable. Please try again in a moment.' : raw
-      return { status: 502, body: { error: msg } }
+      // No model could answer: an explicit "unavailable", never provider internals or a stand-in reply.
+      return assistantFailure(err)
     }
   }
 

@@ -205,26 +205,36 @@ describe('POST /api/customer-agent/chat', () => {
     expect(json.message).toBe('Something went wrong with that order.')
   })
 
-  it('degrades gracefully to a friendly message when aiChat throws', async () => {
+  it('says plainly that the assistant is unavailable when no model can answer, with search results apart', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockAiChat.mockRejectedValueOnce(new AiClientError('Model unavailable', 'ollama'))
+    mockAiChat.mockRejectedValueOnce(new AiClientError('AI gateway HTTP 503: all text providers failed', 'gateway'))
+    const search = {
+      handler: vi.fn().mockResolvedValueOnce({ products: [{ id: 'p1', name: 'Hex Bolt M10', slug: 'hex-bolt-m10', price: '85.00', stock_status: 'in_stock' }] }),
+    }
+    mockGetTool.mockReturnValueOnce(search as any)
 
-    const res = await POST(makeRequest({ message: 'Hello there' }) as any)
-    expect(res.status).toBe(200)
+    const res = await POST(makeRequest({ message: 'hex bolts' }) as any)
+    expect(res.status).toBe(503)
     const json = await res.json()
-    expect(json.message).toMatch(/trouble responding|try again/i)
-    expect(json.error).toBeUndefined()
+    expect(json).toEqual({
+      unavailable: true,
+      message: 'The assistant is unavailable right now. Please try again in a few minutes.',
+      searchResults: [{ name: 'Hex Bolt M10', slug: 'hex-bolt-m10', price: '85.00' }],
+    })
+    expect(mockGetTool).toHaveBeenCalledWith('search_products')
+    expect(search.handler).toHaveBeenCalledWith({ query: 'hex bolts', limit: 5 }, { authenticatedUserId: USER_ID })
   })
 
-  it('degrades gracefully to a friendly message on generic AI error', async () => {
+  it('stays explicit when the search fails too, on any AI error', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockAiChat.mockRejectedValueOnce(new Error('Connection reset'))
+    mockGetTool.mockReturnValueOnce({ handler: vi.fn().mockRejectedValueOnce(new Error('DB down')) } as any)
 
     const res = await POST(makeRequest({ message: 'Hello' }) as any)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(503)
     const json = await res.json()
-    expect(json.message).toMatch(/trouble responding|try again/i)
-    expect(json.error).toBeUndefined()
+    expect(json).toMatchObject({ unavailable: true, searchResults: [] })
+    expect(json.message).toMatch(/unavailable right now/)
   })
 
   it('returns fallback message when max iterations exhausted with only tool calls', async () => {
@@ -486,133 +496,33 @@ describe('POST /api/customer-agent/chat', () => {
     expect(json.message).toBe('Something went wrong.')
   })
 
-  // ── resolveIntent direct-dispatch paths ────────────────────────────────────
+  // ── No keyword shortcut: every answer comes from the model ─────────────────
 
-  it('resolveIntent: "my orders" skips LLM, dispatches directly, returns provider=local', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const mockTool = {
-      handler: vi.fn().mockResolvedValueOnce({
-        orders: [
-          { order_number: 'ORD-123', status: 'delivered', total_amount: '450.00', created_at: '2026-03-01T00:00:00Z' },
-        ],
-      }),
+  it.each(['show my orders', 'what should I buy based on my history', "what's new arrivals", 'show featured products'])(
+    '"%s" goes to the model, never a canned reply',
+    async message => {
+      mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
+      mockAiChat.mockResolvedValueOnce({ content: 'From the model.', toolCalls: undefined, provider: 'anthropic', model: 'claude-haiku-5-5', latencyMs: 300, fallbackUsed: false } as any)
+      const res = await POST(makeRequest({ message }) as any)
+      const json = await res.json()
+      expect(mockAiChat).toHaveBeenCalledOnce()
+      expect(mockAiChat.mock.calls[0][0]).toMatchObject({ feature: 'storefront_assistant', modelHint: 'agent' })
+      expect(json).toMatchObject({ message: 'From the model.', provider: 'anthropic' })
+      expect(mockGetTool).not.toHaveBeenCalled()
     }
-    mockGetTool.mockReturnValueOnce(mockTool as any)
+  )
+
+  it('a keyword message with every model down is "unavailable", not a scripted order list', async () => {
+    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
+    mockAiChat.mockRejectedValueOnce(new AiClientError('AI gateway unreachable', 'gateway'))
+    mockGetTool.mockReturnValueOnce({ handler: vi.fn().mockResolvedValueOnce({ products: [] }) } as any)
 
     const res = await POST(makeRequest({ message: 'show my orders' }) as any)
+    expect(res.status).toBe(503)
     const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.model).toBe('direct')
-    expect(json.message).toContain('ORD-123')
-    expect(mockAiChat).not.toHaveBeenCalled()
-  })
-
-  it('resolveIntent: "recommendations" dispatches directly and formats server-side', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const mockTool = {
-      handler: vi.fn().mockResolvedValueOnce({
-        products: [{ name: 'Steel Bolt', slug: 'steel-bolt', price: '35.00' }],
-      }),
-    }
-    mockGetTool.mockReturnValueOnce(mockTool as any)
-
-    const res = await POST(makeRequest({ message: 'what should I buy based on my history' }) as any)
-    const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.message).toContain('steel-bolt')
-  })
-
-  it('resolveIntent: recommendations fallback to featured when empty', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-
-    const recTool = { handler: vi.fn().mockResolvedValueOnce({ products: [] }) }
-    const featuredTool = {
-      handler: vi.fn().mockResolvedValueOnce({
-        products: [{ name: 'Popular Nut', slug: 'popular-nut', price: '10.00' }],
-      }),
-    }
-    mockGetTool.mockReturnValueOnce(recTool as any).mockReturnValueOnce(featuredTool as any)
-
-    const res = await POST(makeRequest({ message: 'recommend something based on what I bought' }) as any)
-    const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.message).toContain('popular-nut')
-    expect(json.message).toContain("don't have any purchases")
-  })
-
-  it('resolveIntent: recommendations — empty featured fallback still returns a message', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-
-    const recTool = { handler: vi.fn().mockResolvedValueOnce({ products: [] }) }
-    const featuredTool = { handler: vi.fn().mockResolvedValueOnce({ products: [] }) }
-    mockGetTool.mockReturnValueOnce(recTool as any).mockReturnValueOnce(featuredTool as any)
-
-    const res = await POST(makeRequest({ message: 'recommend products based on my purchases' }) as any)
-    const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.message).toBeTruthy()
-  })
-
-  it('resolveIntent: "what is new" dispatches get_recent_products directly', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const mockTool = {
-      handler: vi.fn().mockResolvedValueOnce({
-        products: [{ name: 'Fresh Product', slug: 'fresh-product', price: '75.00' }],
-      }),
-    }
-    mockGetTool.mockReturnValueOnce(mockTool as any)
-
-    const res = await POST(makeRequest({ message: "what's new arrivals" }) as any)
-    const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.message).toContain('fresh-product')
-    expect(mockAiChat).not.toHaveBeenCalled()
-  })
-
-  it('resolveIntent: "popular" dispatches get_featured_products directly', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const mockTool = {
-      handler: vi.fn().mockResolvedValueOnce({
-        products: [{ name: 'Best Seller', slug: 'best-seller', price: '120.00' }],
-      }),
-    }
-    mockGetTool.mockReturnValueOnce(mockTool as any)
-
-    const res = await POST(makeRequest({ message: 'show featured products' }) as any)
-    const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.message).toContain('best-seller')
-  })
-
-  it('resolveIntent: tool handler error returns friendly message with provider=local', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const mockTool = { handler: vi.fn().mockRejectedValueOnce(new Error('DB timeout')) }
-    mockGetTool.mockReturnValueOnce(mockTool as any)
-
-    const res = await POST(makeRequest({ message: 'my recent orders' }) as any)
-    const json = await res.json()
-    expect(json.provider).toBe('local')
-    expect(json.model).toBe('direct')
-    expect(json.toolCalls[0].isError).toBe(true)
-    expect(json.message).toMatch(/couldn't fetch|try again/i)
-  })
-
-  it('resolveIntent: tool not found falls through to LLM', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockGetTool.mockReturnValueOnce(null)
-    mockAiChat.mockResolvedValueOnce({
-      content: 'Let me look that up for you.',
-      toolCalls: undefined,
-      provider: 'ollama',
-      model: 'gemma4:12b',
-      latencyMs: 500,
-      fallbackUsed: false,
-    } as any)
-
-    const res = await POST(makeRequest({ message: 'my order history' }) as any)
-    const json = await res.json()
-    expect(json.message).toBe('Let me look that up for you.')
-    expect(mockAiChat).toHaveBeenCalledOnce()
+    expect(json.unavailable).toBe(true)
+    expect(json.message).not.toMatch(/Here are your recent orders/)
+    expect(json.provider).toBeUndefined()
   })
 
   // ── sanitizeUserInput ──────────────────────────────────────────────────────
