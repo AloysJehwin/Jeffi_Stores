@@ -356,7 +356,7 @@ Instead of an Elastic IP and Traefik on every store node, run one small always-o
 
 ## 8. Decisions needed (D1, D2 and D3 are now decided; D4 is open)
 
-- **D4 Store traffic:** per-node ingress on AWS (recommended), or everything through the Azure core (simpler, but every store page crosses clouds twice).
+- **D4 Store traffic: decided 2026-11-25, the AWS tenant edge** (§6a). All store hosts and custom domains go to one small AWS edge node; flagship and platform hosts go to Azure.
 
 Earlier list, kept for the record:
 
