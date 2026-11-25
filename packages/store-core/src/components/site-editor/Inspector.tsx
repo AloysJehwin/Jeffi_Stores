@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Copy, Plus, Trash2 } from 'lucide-react'
+import { Copy, ImageIcon, Languages, Loader2, Plus, Scissors, Sparkles, Trash2 } from 'lucide-react'
+import { LANGUAGES } from '@/lib/site/studio/languages'
 import type { CodeNode } from '@jeffi/site-blocks'
 import { findNode } from '@jeffi/site-blocks/design'
 import { NEW_KINDS, insideData, litProp, nodeName, pathTo, textChildren, wordsOnly, type NewKind } from './nodes'
@@ -23,13 +24,19 @@ export interface InspectorProps {
   onDuplicate: () => void
   onDelete: () => void
   renderImagePicker?: (p: { value: string; disabled: boolean; onPick: (url: string) => void }) => ReactNode
+  /** Cheap AI actions on this element (values, not code), when the host has them. */
+  ai?: {
+    busy: boolean
+    text: (fieldId: string, current: string, action: 'rewrite' | 'shorten' | 'translate', language?: string) => void
+    picture: () => void
+  }
   children?: ReactNode
 }
 
 const isPicture = (n: CodeNode) => (n.t === 'cmp' && n.name === 'Image') || (n.t === 'el' && n.tag === 'img')
 const isLink = (n: CodeNode) => (n.t === 'cmp' && n.name === 'Link') || (n.t === 'el' && n.tag === 'a')
 
-export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone, onAttr, onAdd, onDuplicate, onDelete, renderImagePicker, children }: InspectorProps) {
+export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone, onAttr, onAdd, onDuplicate, onDelete, renderImagePicker, ai, children }: InspectorProps) {
   const node = findNode(tree, id)?.node
   if (!node) return <p className="text-sm text-foreground-muted">That element is gone. Pick another on the canvas.</p>
   const crumbs = pathTo(tree, id)
@@ -75,6 +82,34 @@ export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone
             />
           ))}
           {whole && <p className="text-[11px] text-foreground-muted">Or double-click the words on the canvas to type in place.</p>}
+          {ai && canWrite && fields.length === 1 && fields[0].value.trim() && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {ai.busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground-muted" aria-label="Working" />}
+              <button type="button" className={btn} disabled={ai.busy} onClick={() => ai.text(fields[0].id, fields[0].value, 'rewrite')}>
+                <Sparkles className="h-3.5 w-3.5" /> Rewrite
+              </button>
+              <button type="button" className={btn} disabled={ai.busy} onClick={() => ai.text(fields[0].id, fields[0].value, 'shorten')}>
+                <Scissors className="h-3.5 w-3.5" /> Shorten
+              </button>
+              <label className="inline-flex items-center gap-1 text-xs text-foreground-secondary">
+                <Languages className="h-3.5 w-3.5" />
+                <select
+                  aria-label="Translate into"
+                  className="h-7 rounded-md border border-border-default bg-surface px-1 text-xs"
+                  disabled={ai.busy}
+                  value=""
+                  onChange={e => e.target.value && ai.text(fields[0].id, fields[0].value, 'translate', e.target.value)}
+                >
+                  <option value="">Translate…</option>
+                  {LANGUAGES.map(l => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
         </div>
       )}
       {isPicture(node) && (
@@ -86,6 +121,11 @@ export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone
             renderImagePicker({ value: litProp(node, 'src') ?? '', disabled: !canWrite, onPick: url => onAttr(id, 'src', url) })
           ) : (
             <AttrField label="Picture address" value={litProp(node, 'src') ?? ''} placeholder="https://" disabled={!canWrite} onCommit={v => onAttr(id, 'src', v)} />
+          )}
+          {ai && canWrite && litProp(node, 'src') !== null && (
+            <button type="button" className={btn} disabled={ai.busy} onClick={ai.picture}>
+              {ai.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />} Find a picture for this spot
+            </button>
           )}
           {litProp(node, 'alt') !== null && <AttrField label="Description (read aloud)" value={litProp(node, 'alt') ?? ''} disabled={!canWrite} onCommit={v => onAttr(id, 'alt', v)} />}
         </div>

@@ -1,7 +1,7 @@
 // Global teardown: findings.jsonl → summary.json + summary.md (also printed), then the throwaway drafts are deleted.
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { runTsx } from './tsx'
 import { FINDINGS_PATH, MANIFEST_PATH, OUTPUT_DIR, WIDTHS, type Manifest } from './pages'
 import type { FindingsLine } from './sweep.spec'
 
@@ -70,6 +70,6 @@ export default async function globalTeardown() {
     const text = writeSummary()
     if (text) process.stdout.write('\n' + text + '\n')
   } finally {
-    execFileSync(path.join('node_modules', '.bin', 'tsx'), ['--tsconfig', 'tests/responsive/tsconfig.sweep.json', 'tests/responsive/cleanup.ts'], { stdio: 'inherit' })
+    runTsx('tests/responsive/cleanup.ts')
   }
 }

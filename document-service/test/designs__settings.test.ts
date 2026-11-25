@@ -14,6 +14,24 @@ vi.mock('sharp', () => ({ default: (...a: any[]) => sharpMock(...a) }))
 const lookupMock = vi.fn()
 vi.mock('node:dns/promises', () => ({ lookup: (...a: any[]) => lookupMock(...a) }))
 
+// node:https stand-in: runs the request's lookup (as Node would at connect time), then answers with httpsMock(url, addrs).
+const { httpsMock } = vi.hoisted(() => ({ httpsMock: vi.fn() }))
+vi.mock('node:https', async () => {
+  const { EventEmitter } = await import('node:events')
+  const { isIP } = await import('node:net')
+  return { default: { request: (url: URL, opts: any, cb: (r: any) => void) => {
+    const req: any = new EventEmitter()
+    const answer = (addrs: any[]) => Promise.resolve().then(() => httpsMock(url, addrs)).then(cb, (e: Error) => req.emit('error', e))
+    // Node skips the lookup for IP literals.
+    req.end = () => isIP(url.hostname.replace(/^\[|\]$/g, '')) ? answer([]) : opts.lookup(url.hostname, { all: true }, (err: Error | null, addrs: any[]) => err ? req.emit('error', err) : answer(addrs))
+    return req
+  } } }
+})
+const reply = (statusCode: number, body: Buffer = Buffer.alloc(0)) => {
+  const r: any = Readable.from([body]); r.statusCode = statusCode; r.headers = {}; return r
+}
+
+import { Readable } from 'node:stream'
 import {
   getSettings, saveSettings, normalizeLogo, saveLogo, loadLogo, resolveBranding,
 } from '../src/designs/settings.js'
@@ -26,6 +44,7 @@ beforeEach(() => {
   toBufferMock.mockReset().mockResolvedValue(Buffer.from('png'))
   sharpMock.mockClear(); sharpChain.resize.mockClear(); sharpChain.png.mockClear()
   lookupMock.mockReset()
+  httpsMock.mockReset()
   vi.restoreAllMocks()
 })
 
@@ -149,7 +168,7 @@ describe('resolveBranding', () => {
       .rejects.toMatchObject({ status: 400 })
   })
   it('rejects a private resolved address', async () => {
-    lookupMock.mockResolvedValue({ address: '10.0.0.5' })
+    lookupMock.mockResolvedValue([{ address: '10.0.0.5' }])
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://internal.example/logo.png' }))
       .rejects.toMatchObject({ status: 400 })
   })
@@ -158,30 +177,50 @@ describe('resolveBranding', () => {
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://nope.example/logo.png' }))
       .rejects.toMatchObject({ status: 400 })
   })
-  it('rejects when fetch is not ok', async () => {
-    lookupMock.mockResolvedValue({ address: '93.184.216.34' })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+  it('rejects when the response is not 2xx (a redirect is a failure too)', async () => {
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
+    httpsMock.mockResolvedValue(reply(404))
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://cdn.example/logo.png' }))
-      .rejects.toMatchObject({ status: 400 })
+      .rejects.toMatchObject({ status: 400, message: 'branding.logo_url could not be fetched' })
+    httpsMock.mockResolvedValue(reply(302))
+    await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://cdn.example/logo.png' }))
+      .rejects.toMatchObject({ status: 400, message: 'branding.logo_url could not be fetched' })
   })
-  it('rejects a body larger than 2 MB', async () => {
-    lookupMock.mockResolvedValue({ address: '93.184.216.34' })
-    const big = new Uint8Array(2_000_001).buffer
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => big }))
+  it('rejects a transport error', async () => {
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
+    httpsMock.mockRejectedValue(new Error('ECONNRESET'))
     await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://cdn.example/logo.png' }))
-      .rejects.toMatchObject({ status: 400 })
+      .rejects.toMatchObject({ status: 400, message: 'branding.logo_url could not be fetched' })
+  })
+  it('rejects a body larger than 2 MB while streaming', async () => {
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
+    httpsMock.mockResolvedValue(reply(200, Buffer.alloc(2_000_001)))
+    await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://cdn.example/logo.png' }))
+      .rejects.toMatchObject({ status: 400, message: 'branding.logo_url is larger than 2 MB' })
   })
   it('fetches, normalizes and returns the logo on success', async () => {
-    lookupMock.mockResolvedValue({ address: '93.184.216.34' })
-    const small = new Uint8Array([1, 2, 3]).buffer
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => small }))
+    lookupMock.mockResolvedValue([{ address: '93.184.216.34' }])
+    httpsMock.mockResolvedValue(reply(200, Buffer.from([1, 2, 3])))
     const out = await resolveBranding(fakeDb([{ design: null, accent: null, font: null, logo_key: null }]), 't1', null, { logo_url: 'https://cdn.example/logo.png' })
     expect(sharpMock).toHaveBeenCalled()
     expect(out.branding.logo?.toString()).toBe('png')
   })
+  it('refuses a host that resolves public for the pre-check but private at connect time, without connecting', async () => {
+    lookupMock.mockResolvedValueOnce([{ address: '93.184.216.34' }]).mockResolvedValueOnce([{ address: '10.0.0.5' }])
+    await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: 'https://rebind.example/logo.png' }))
+      .rejects.toMatchObject({ status: 400, message: 'branding.logo_url must be a public address' })
+    expect(lookupMock).toHaveBeenCalledTimes(2)
+    expect(httpsMock).not.toHaveBeenCalled()
+  })
+  it('refuses private IP literals without connecting', async () => {
+    for (const ip of ['10.0.0.5', '127.0.0.1', '169.254.169.254', '[::1]', '[fd00::1]']) {
+      await expect(resolveBranding(fakeDb([]), 't1', null, { logo_url: `https://${ip}/logo.png` }))
+        .rejects.toMatchObject({ status: 400, message: 'branding.logo_url must be a public address' })
+    }
+    expect(httpsMock).not.toHaveBeenCalled()
+  })
   it('skips DNS lookup when host is already an IP (literal)', async () => {
-    const small = new Uint8Array([9]).buffer
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => small }))
+    httpsMock.mockResolvedValue(reply(200, Buffer.from([9])))
     const out = await resolveBranding(fakeDb([{ design: null, accent: null, font: null, logo_key: null }]), 't1', null, { logo_url: 'https://93.184.216.34/logo.png' })
     expect(lookupMock).not.toHaveBeenCalled()
     expect(out.branding.logo?.toString()).toBe('png')

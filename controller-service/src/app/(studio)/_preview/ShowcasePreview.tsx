@@ -4,7 +4,7 @@ import CodeSection, { planSections } from '@/components/visitor/site/code/CodeSe
 import SiteEditorLazy from '@/components/visitor/site/editor/SiteEditorLazy'
 import { canvasCodeSections } from '@/lib/site/code/compile'
 import PhotoCredits from '@/components/visitor/site/PhotoCredits'
-import { pictureCredits } from '@/lib/ai/stock-credits'
+import { pageCredits, pictureCredits } from '@/lib/ai/stock-credits'
 import { runWithSiteData } from '@/lib/site/data'
 import { showcaseSiteData } from '@/lib/showcase/site-data'
 import { emptyShowcaseContent, SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
@@ -55,7 +55,7 @@ html{scroll-behavior:smooth}`
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="studio-preview">
         {body}
-        <PhotoCredits credits={pictureCredits(site?.content.pictures)} className="px-4 py-4 text-center text-xs text-foreground-muted" />
+        <PhotoCredits credits={[...pictureCredits(site?.content.pictures), ...pageCredits(stored)]} className="px-4 py-4 text-center text-xs text-foreground-muted" />
       </div>
       <PreviewBridge audience="store" pages={[SHOWCASE_PAGE_KEY]} />
       {editing && <SiteEditorLazy />}

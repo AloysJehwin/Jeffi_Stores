@@ -20,7 +20,7 @@ function makeReq(pincode?: string) {
 }
 
 function mockHttpsGet(responseBody: string) {
-  vi.mocked(https.get).mockImplementation((_url: any, _opts: any, callback: any) => {
+  vi.mocked(https.get).mockImplementation((_url: any, callback: any) => {
     const { EventEmitter } = require('events')
     const res = new EventEmitter()
     const req = new EventEmitter()
@@ -34,7 +34,7 @@ function mockHttpsGet(responseBody: string) {
 }
 
 function mockHttpsGetError(err: Error) {
-  vi.mocked(https.get).mockImplementation((_url: any, _opts: any, _callback: any) => {
+  vi.mocked(https.get).mockImplementation((_url: any, _callback: any) => {
     const { EventEmitter } = require('events')
     const req = new EventEmitter()
     setImmediate(() => req.emit('error', err))

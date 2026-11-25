@@ -13,6 +13,9 @@ const EDITOR = [
   'packages/store-core/src/lib/site/code/classes.ts',
   'packages/store-core/src/lib/site/code/free.ts',
   'packages/store-core/src/lib/site/code/snap.ts',
+  'packages/store-core/src/lib/site/code/tree-critique.ts',
+  'packages/store-core/src/lib/site/studio/selection.ts',
+  'packages/store-core/src/lib/site/studio/element-ai.ts',
   'packages/store-core/src/components/visitor/site/editor/SiteEditorBridge.tsx',
   'packages/store-core/src/components/visitor/site/editor/handles.ts',
 ]

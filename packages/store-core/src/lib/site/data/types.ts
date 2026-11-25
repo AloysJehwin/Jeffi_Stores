@@ -179,6 +179,11 @@ export interface StoreView {
   whatsapp?: string
   /** Profile links (absolute https URLs), only the networks the store set. Absent when none. */
   socials?: Partial<Record<StoreSocialNetwork, string>>
+  /** Opening hours as rows (lib/site/hours.ts); empty when the store gave none. */
+  hours?: { label: string; value: string }[]
+  /** The phone number as a `tel:` link and the address as a map search link; empty when not set. */
+  phoneUrl?: string
+  mapsUrl?: string
 }
 
 export interface SiteData {

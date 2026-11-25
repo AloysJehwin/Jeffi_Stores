@@ -1,7 +1,7 @@
 /* eslint-env browser */
 // Runs inside the page (page.evaluate): self-contained, no imports used at runtime. Chromium (typed OM).
 
-export type FindingKind = 'overflow' | 'clipped-text' | 'tap-target' | 'image-size' | 'render'
+export type FindingKind = 'overflow' | 'clipped-text' | 'tap-target' | 'image-size' | 'render' | 'free-layer' | 'cls' | 'lcp'
 
 export interface Finding {
   kind: FindingKind
@@ -241,5 +241,94 @@ export function auditInPage(opts: AuditOptions): AuditResult {
     })
   }
 
+  // 5. Free layers (the visual editor's, lib/site/code/free.ts): an element of a code section placed absolutely with a
+  // percentage left. Past its section's sides it is off the screen on a phone (an error below 768px, as the editor's
+  // critique says), or covering what is beside it wider up; past the section's foot it runs into the next section.
+  const FREE = /(?:^|\s)(?:(?:sm|md|lg|xl|2xl):)?left-\[-?\d+(?:\.\d+)?%\]/
+  for (const el of Array.from(document.querySelectorAll('[data-code-section] [class*="left-["]'))) {
+    if (ignored(el) || !visible(el) || !FREE.test(typeof el.className === 'string' ? el.className : '')) continue
+    if (getComputedStyle(el).position !== 'absolute') continue
+    const section = el.closest('[data-block-id]') ?? el.closest('[data-code-section]')
+    if (!section) continue
+    // A decoration its section clips on purpose (overflow hidden) shows only what is inside.
+    let clipped = false
+    for (let a = el.parentElement; a && a !== section.parentElement; a = a.parentElement) {
+      const cs = getComputedStyle(a)
+      if (hides(cs.overflowX) || hides(cs.overflowY)) {
+        clipped = true
+        break
+      }
+    }
+    if (clipped) continue
+    const r = el.getBoundingClientRect()
+    const box = section.getBoundingClientRect()
+    const tol = 2
+    const past = Math.round(Math.max(r.right - Math.min(box.right, vw), Math.max(box.left, 0) - r.left))
+    if (past > tol) {
+      findings.push({ kind: 'free-layer', severity: opts.width < 768 ? 'error' : 'warning', element: describe(el), blockId: blockOf(el), detail: `a free layer ${past}px past its section's side${opts.width < 768 ? ' on a phone' : ''}` })
+    }
+    const below = Math.round(r.bottom - box.bottom)
+    if (below > tol) findings.push({ kind: 'free-layer', severity: 'warning', element: describe(el), blockId: blockOf(el), detail: `a free layer ${below}px past its section's foot, over the next section` })
+  }
+
   return { findings, viewport: vw, docWidth, blocks: document.querySelectorAll('[data-block-id]').length }
+}
+
+export interface VitalsBudget {
+  cls: { warn: number; error: number }
+  lcpMs: { warn: number; error: number }
+  /** Over the error line is an error (a production build in CI); else only warnings (a dev server compiles on load). */
+  strict: boolean
+}
+
+/**
+ * Before the page loads (context.addInitScript): layout shifts not caused by input, and the largest contentful paint,
+ * kept on window for vitalsInPage. Self-contained.
+ */
+export function installVitals() {
+  type Shift = PerformanceEntry & { value: number; hadRecentInput: boolean; sources?: { node?: Node | null }[] }
+  type Paint = PerformanceEntry & { element?: Element | null; url?: string }
+  const v = { cls: 0, lcp: 0, lcpEl: null as Element | null, shiftEl: null as Element | null, top: 0 }
+  ;(window as unknown as { __sweepVitals: typeof v }).__sweepVitals = v
+  try {
+    new PerformanceObserver(list => {
+      for (const e of list.getEntries() as Shift[]) {
+        if (e.hadRecentInput) continue
+        v.cls += e.value
+        if (e.value > v.top) {
+          v.top = e.value
+          const n = e.sources?.find(s => s.node instanceof Element)?.node
+          v.shiftEl = n instanceof Element ? n : v.shiftEl
+        }
+      }
+    }).observe({ type: 'layout-shift', buffered: true })
+    new PerformanceObserver(list => {
+      const last = list.getEntries().pop() as Paint | undefined
+      if (!last) return
+      v.lcp = last.startTime
+      v.lcpEl = last.element ?? null
+    }).observe({ type: 'largest-contentful-paint', buffered: true })
+  } catch {
+    // An engine without these entry types: nothing measured, nothing reported.
+  }
+}
+
+/** The page's CLS and LCP against the budget (page.evaluate, after load and before any scrolling). Self-contained. */
+export function vitalsInPage(budget: VitalsBudget): Finding[] {
+  const v = (window as unknown as { __sweepVitals?: { cls: number; lcp: number; lcpEl: Element | null; shiftEl: Element | null } }).__sweepVitals
+  if (!v) return []
+  const name = (el: Element | null) => {
+    if (!el) return 'document'
+    const cls = typeof el.className === 'string' ? el.className.split(/\s+/).filter(Boolean).slice(0, 3).map(c => `.${c}`).join('') : ''
+    const src = el instanceof HTMLImageElement ? ` src=${(el.currentSrc || el.src).slice(0, 60)}` : ''
+    return `${el.tagName.toLowerCase()}${cls}${src}`
+  }
+  const block = (el: Element | null) => el?.closest('[data-block-id]')?.getAttribute('data-block-id') ?? null
+  const out: Finding[] = []
+  const level = (n: number, b: { warn: number; error: number }) => (n > b.error && budget.strict ? 'error' : n > b.warn ? 'warning' : null)
+  const cls = level(v.cls, budget.cls)
+  if (cls) out.push({ kind: 'cls', severity: cls, element: name(v.shiftEl), blockId: block(v.shiftEl), detail: `layout shift ${v.cls.toFixed(3)} while loading (budget ${budget.cls.warn}, fails over ${budget.cls.error})` })
+  const lcp = level(v.lcp, budget.lcpMs)
+  if (lcp) out.push({ kind: 'lcp', severity: lcp, element: name(v.lcpEl), blockId: block(v.lcpEl), detail: `largest paint at ${Math.round(v.lcp)}ms (budget ${budget.lcpMs.warn}ms, fails over ${budget.lcpMs.error}ms)` })
+  return out
 }

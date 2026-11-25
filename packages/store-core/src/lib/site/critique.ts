@@ -9,9 +9,10 @@ import { isSectionBlock } from './blocks'
 import { docToRows } from './legacy'
 import { DATA_KINDS, cleanTree, updateNode, walkTree, type ComposedNode } from './composed'
 import { loadComposedData, productsFor } from './composed-data'
-import { getSiteDraft, saveDraftPage, saveDraftTheme } from './store'
-import { freeAt } from './code/free'
+import { getSiteDraft, saveDraftPage, saveDraftTheme, siteEditorEnabled } from './store'
 import type { CodeNode } from './code/ast'
+import { critiqueTrees, offScreen } from './code/tree-critique'
+import { upgradeCodeProps } from './code/compile'
 
 // The critique pass: a page checked the way a careful designer would before it goes live, without a browser. It finds
 // blocks that would render empty (no products, reviews or offers behind them), banners with no picture, text too long
@@ -22,7 +23,7 @@ import type { CodeNode } from './code/ast'
 
 export interface Finding {
   severity: 'error' | 'warn'
-  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page' | 'off_screen'
+  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page' | 'off_screen' | 'no_alt' | 'heading_order'
   message: string
   blockId?: string
   /** It can be fixed without asking (removed, set, shortened). */
@@ -154,6 +155,15 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
       }
     })
   )
+  // Code sections read as the visual editor's trees, while it is on: contrast, lengths, picture descriptions and
+  // heading order (fixed in the editor, as design operations).
+  if (await siteEditorEnabled().catch(() => false)) {
+    const sections = blocks
+      .filter(b => b.type === 'code_section')
+      .map(b => ({ block: b.id, label: String(b.props.label ?? 'a section'), tree: upgradeCodeProps(b.props, ref.page).tree as CodeNode | undefined }))
+      .filter((x): x is { block: string; label: string; tree: CodeNode } => !!x.tree)
+    for (const f of critiqueTrees(sections, theme)) if (f.code !== 'off_screen') out.push({ severity: f.severity, code: f.code, blockId: f.id ? `${f.block}#${f.id}` : f.block, message: f.message, fixable: false })
+  }
   // Colours: buttons and brand sections put white text on the accent and brand colours.
   const pal = { accent: paletteFrom(theme.accent)[500], primary: paletteFrom(theme.primary)[600] }
   if (contrast(pal.accent, '#ffffff') < 3) out.push({ severity: 'warn', code: 'contrast', message: `White text on your accent colour (${theme.accent}) is hard to read; buttons use it.`, fixable: true })
@@ -168,27 +178,7 @@ export async function critiquePage(doc: PageDoc, ref: Pick<PageRef, 'audience' |
  * or top below 0, or right or bottom past 100%. Their node ids ('' without one). Placed only on wider screens, an
  * element sits in the flow on phones, so it can't fall off.
  */
-export function offScreenOnPhones(ast: CodeNode | null | undefined): string[] {
-  const out: string[] = []
-  const walk = (n: CodeNode | null | undefined) => {
-    if (!n || typeof n !== 'object') return
-    if (n.t === 'el' || n.t === 'cmp') {
-      const c = n.props?.className
-      const layer = c && c.k === 'lit' && typeof c.v === 'string' ? freeAt(c.v, 'base') : null
-      const r = layer?.rect
-      if (r && (r.left < 0 || r.top < 0 || r.left + r.width > 100.5 || (r.height !== undefined && r.top + r.height > 100.5))) out.push(n.id ?? '')
-    }
-    if (n.t === 'el' || n.t === 'cmp' || n.t === 'frag') n.children?.forEach(walk)
-    if (n.t === 'cmp') walk(n.render?.body)
-    if (n.t === 'cond') {
-      walk(n.then)
-      walk(n.else)
-    }
-    if (n.t === 'each') walk(n.body)
-  }
-  walk(ast)
-  return out
-}
+export const offScreenOnPhones = (ast: CodeNode | null | undefined): string[] => (ast && typeof ast === 'object' ? offScreen(ast).map(o => o.id) : [])
 
 function countContent(tree: ComposedNode) {
   let n = 0

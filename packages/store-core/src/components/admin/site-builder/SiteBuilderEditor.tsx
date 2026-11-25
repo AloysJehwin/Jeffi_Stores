@@ -137,7 +137,10 @@ export interface SiteBuilderEditorProps {
   /** Custom pages (/p/<slug>) that already have a layout. */
   customPages?: { slug: string; title: string | null }[]
   drafts: { id: string; title: string | null; updated_at: string }[]
-  /** The visual editor is switched on for this store (site_settings site_editor_enabled); the forms stay the default. */
+  /**
+   * The visual editor is switched on for this store (site_settings site_editor_enabled): it is then the main editor and
+   * these forms are the "Classic editor", for what it can't show (the app layout) or as a fallback. Off, nothing changes.
+   */
   visual?: boolean
 }
 
@@ -166,7 +169,9 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [busy, setBusy] = useState(false)
   const [pageRedo, setPageRedo] = useState<(PageRedo & { keys: string[]; before: Record<string, PageDoc> }) | null>(null)
-  const [visualOn, setVisualOn] = useState(false)
+  const [visualOn, setVisualOn] = useState(visual)
+  /** The draft whose preview token was asked for (got or not), so the visual editor waits for it instead of the forms flashing. */
+  const [tokenFor, setTokenFor] = useState<string | null>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const frameBox = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -259,7 +264,9 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         return
       }
       const tk = await api<{ token: string }>(`/api/admin/site-builder/drafts/${draftId}/preview?audience=${audience}`)
-      if (!stop && tk.ok) setToken(tk.data.token)
+      if (stop) return
+      if (tk.ok) setToken(tk.data.token)
+      setTokenFor(draftId)
     })()
     return () => {
       stop = true
@@ -365,7 +372,14 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     if (!draftId || !doc || !canWrite) return
     const keys = [key, ...(isLinked && siblingKey ? [siblingKey] : [])]
     const surfaces = [ref.surface, ...(isLinked && siblingRef ? [siblingRef.surface] : [])]
-    const { ok, data } = await api<{ error?: string }>('/api/admin/site-builder/ai/page', { method: 'POST', json: { draftId, ref: { audience: ref.audience, page: ref.page }, surfaces } })
+    // Changed by hand in the visual editor: ask first, and offer to keep the words written on it.
+    let keepWords = false
+    if (visual && Object.values(doc.blocks).some(b => b.type === 'code_section' && !!b.props?.tree)) {
+      const go = await showConfirm({ title: 'Design this page again?', message: 'You changed this page by hand. A new design replaces those changes (Undo brings them back).', confirmText: 'Design again' })
+      if (!go) return
+      keepWords = await showConfirm({ title: 'Keep your words?', message: 'The new design can reuse the words you wrote on this page, or start from fresh copy.', confirmText: 'Keep my words', cancelText: 'Start fresh' })
+    }
+    const { ok, data } = await api<{ error?: string }>('/api/admin/site-builder/ai/page', { method: 'POST', json: { draftId, ref: { audience: ref.audience, page: ref.page }, surfaces, ...(keepWords ? { keepWords: true } : {}) } })
     if (!ok) return showToast(data.error || 'The AI could not start; try again shortly', 'error')
     const label = PAGES.find(p => p.key === ref.page)?.label ?? ref.page
     setPageRedo({ key: `${ref.audience}:${ref.page}`, label, keys, before: Object.fromEntries(keys.filter(k => docs[k]).map(k => [k, docs[k]])), status: 'running' })
@@ -665,7 +679,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
 
   // ── Drafts ─────────────────────────────────────────────────────────────────────────────────────
   function openDraft(id: string | null) {
-    setVisualOn(false)
+    setToken(null)
     setDraftId(id)
     setDocs({})
     setHistory({})
@@ -755,39 +769,88 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     )
   }
 
-  // The visual editor works on the desktop web layout of a page the canvas can show.
+  const tab = (on: boolean) => `px-3 h-8 text-xs font-medium rounded-md ${on ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`
+  const audienceTabs = business && (
+    <div className="flex gap-0.5 rounded-lg border border-border-default p-0.5">
+      {(['store', 'business'] as const).map(a => (
+        <button key={a} type="button" className={tab(audience === a)} onClick={() => (setAudience(a), setSelected(null))}>
+          {a === 'store' ? 'Store' : 'Business'}
+        </button>
+      ))}
+    </div>
+  )
+  /** The page picker; the visual editor's has no "New page" (that starts in the classic editor). */
+  const pagePicker = (withNew: boolean) => (
+    <>
+      {audience === 'business' && (
+        <div className="w-44">
+          <AdminSelect
+            sm
+            value={BUSINESS_PAGES.includes(page) ? page : 'home'}
+            options={BUSINESS_PAGES.filter(p => surfaceAllows(surface, p)).map(p => ({ value: p, label: PAGES.find(x => x.key === p)?.label ?? p }))}
+            onChange={v => (setPage(v as PageKey), setSelected(null))}
+          />
+        </div>
+      )}
+      {audience === 'store' && (
+        <div className="w-52">
+          <AdminSelect
+            sm
+            value={page === 'custom' ? `custom:${slug}` : page}
+            options={[
+              ...STORE_PAGES.filter(p => surfaceAllows(surface, p.key)).map(p => ({ value: p.key, label: p.label })),
+              ...(surface === 'app' ? [] : customs.map(c => ({ value: `custom:${c.slug}`, label: `Page: ${c.title ?? c.slug} (/p/${c.slug})` }))),
+              ...(surface === 'app' || !canWrite || !withNew ? [] : [{ value: '__new', label: '+ New page…' }]),
+            ]}
+            onChange={v => {
+              setSelected(null)
+              if (v === '__new') return setNewPage('')
+              if (v.startsWith('custom:')) return (setPage('custom'), setSlug(v.slice(7)))
+              setPage(v as PageKey)
+              setSlug('')
+            }}
+          />
+        </div>
+      )}
+    </>
+  )
+
+  // The visual editor works on the desktop web layout of a page the canvas can show. With the flag on it is the main
+  // editor; the forms below are the classic one, for the app layout and pages it can't show, or by choice.
   const canVisual = visual && previewable && !!token && surface !== 'app'
+  if (visual && visualOn && draftId && surface !== 'app' && tokenFor !== draftId)
+    return <p className="rounded-xl border border-border-default bg-surface-elevated p-5 text-sm text-foreground-muted">Opening the visual editor…</p>
   if (canVisual && visualOn && draftId && token) {
     return (
-      <VisualEditor
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
+          {audienceTabs}
+          {pagePicker(false)}
+          <span className="text-xs text-foreground-muted">The desktop layout; phones share it while Same on phone is on.</span>
+        </div>
+        <VisualEditor
         draftId={draftId}
         pageRef={ref}
         title={`${PAGES.find(p => p.key === ref.page)?.label ?? ref.slug ?? ref.page} · ${audience === 'business' ? 'Business' : 'Store'}`}
         previewUrl={homepagePreviewUrl(audience, token, 'desktop', previewPath)}
         canWrite={canWrite}
         theme={theme}
+        canAi={canAi}
+        options={options}
         onClose={closeVisual}
         onPublish={publish}
       />
+      </div>
     )
   }
 
-  const tab = (on: boolean) => `px-3 h-8 text-xs font-medium rounded-md ${on ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`
   const iconBtn = 'p-1.5 rounded-md border border-border-default text-foreground-muted hover:text-foreground disabled:opacity-40'
   const h = history[key]
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
-        {business && (
-          <div className="flex gap-0.5 rounded-lg border border-border-default p-0.5">
-            {(['store', 'business'] as const).map(a => (
-              <button key={a} type="button" className={tab(audience === a)} onClick={() => (setAudience(a), setSelected(null))}>
-                {a === 'store' ? 'Store' : 'Business'}
-              </button>
-            ))}
-          </div>
-        )}
+        {audienceTabs}
         <div className="flex gap-0.5 rounded-lg border border-border-default p-0.5">
           {(['web', 'web_mobile', 'app'] as const).map(s => (
             <button key={s} type="button" className={tab(surface === s)} onClick={() => (setSurface(s), !(isLinked && s !== 'app') && setSelected(null))}>
@@ -810,36 +873,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
             {isLinked ? <Link2 className="w-3.5 h-3.5" /> : <Unlink2 className="w-3.5 h-3.5" />} Same on {sibling === 'web_mobile' ? 'phone' : 'desktop'}
           </button>
         )}
-        {audience === 'business' && (
-          <div className="w-44">
-            <AdminSelect
-              sm
-              value={BUSINESS_PAGES.includes(page) ? page : 'home'}
-              options={BUSINESS_PAGES.filter(p => surfaceAllows(surface, p)).map(p => ({ value: p, label: PAGES.find(x => x.key === p)?.label ?? p }))}
-              onChange={v => (setPage(v as PageKey), setSelected(null))}
-            />
-          </div>
-        )}
-        {audience === 'store' && (
-          <div className="w-52">
-            <AdminSelect
-              sm
-              value={page === 'custom' ? `custom:${slug}` : page}
-              options={[
-                ...STORE_PAGES.filter(p => surfaceAllows(surface, p.key)).map(p => ({ value: p.key, label: p.label })),
-                ...(surface === 'app' ? [] : customs.map(c => ({ value: `custom:${c.slug}`, label: `Page: ${c.title ?? c.slug} (/p/${c.slug})` }))),
-                ...(surface === 'app' || !canWrite ? [] : [{ value: '__new', label: '+ New page…' }]),
-              ]}
-              onChange={v => {
-                setSelected(null)
-                if (v === '__new') return setNewPage('')
-                if (v.startsWith('custom:')) return (setPage('custom'), setSlug(v.slice(7)))
-                setPage(v as PageKey)
-                setSlug('')
-              }}
-            />
-          </div>
-        )}
+        {pagePicker(true)}
         {audience === 'store' && newPage !== null && (
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-foreground-muted">/p/</span>
@@ -872,12 +906,13 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
           <button
             type="button"
             onClick={() => setVisualOn(true)}
-            title="Click and type on the page itself (beta). Edits the desktop layout, which phones share when Same on phone is on."
+            title="Back to the visual editor: click and type on the page itself. It edits the desktop layout, which phones share when Same on phone is on."
             className="inline-flex items-center gap-1.5 px-2.5 h-8 text-xs font-medium rounded-lg border border-accent-500 text-accent-600 hover:bg-accent-500/10"
           >
             <WandSparkles className="w-3.5 h-3.5" /> Visual editor
           </button>
         )}
+        {visual && <span className="text-xs font-medium text-foreground-muted">Classic editor</span>}
         <div className="ml-auto flex flex-wrap gap-2">
           {canWrite && (
             <div className="w-48">

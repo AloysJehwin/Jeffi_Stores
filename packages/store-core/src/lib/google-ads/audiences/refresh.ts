@@ -169,7 +169,7 @@ export async function ensureUserList(ads: GoogleAdsClient, segment: Segment, act
   } catch (e) {
     if (e instanceof AdsMutationError && e.problems.some(p => /DUPLICATE_NAME|NAME_ALREADY_USED/.test(p.code))) {
       const found = await ads.searchStream(
-        `SELECT user_list.resource_name FROM user_list WHERE user_list.name = '${name.replace(/'/g, "\\'")}'`
+        `SELECT user_list.resource_name FROM user_list WHERE user_list.name = '${name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
       )
       const rn = found[0]?.userList?.resourceName
       if (rn) return String(rn)

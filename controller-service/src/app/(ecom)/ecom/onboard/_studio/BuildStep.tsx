@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, WandSparkles, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, Circle, Copy, Eye, EyeOff, GripVertical, ImageIcon, ListOrdered, Loader2, MousePointerClick, Paintbrush, RefreshCw, Sparkles, Trash2, WandSparkles, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import CodeContentFields from '@/components/admin/site-builder/CodeContentFields'
@@ -255,6 +255,8 @@ export default function BuildStep({
   // The visual editor (a Showcase's page, while site_editor_enabled is on): whether it may open, and whether it is.
   const [visualOk, setVisualOk] = useState(false)
   const [visual, setVisual] = useState(false)
+  /** With the visual editor on it is the main way to edit; arranging and the words form are the "Classic editor". */
+  const [classic, setClassic] = useState(false)
 
   useEffect(() => {
     if (!showcase) return
@@ -387,7 +389,19 @@ export default function BuildStep({
               confirmLabel: `Design again · ₹${charge}`,
             }
           : { title: `Design the ${currentPage.label} page again?`, message: `It counts as ${units} of today’s free changes.`, confirmLabel: 'Design again' }
-    if (!(await confirm(ask))) return
+    // Changed by hand in the visual editor: say so, then offer to keep the owner's words in the new design.
+    const edited = visualOk && !!s.pages[current]?.edited
+    if (!(await confirm(edited ? { ...ask, message: `${ask.message} It replaces the changes you made by hand.` } : ask))) return
+    if (edited) {
+      const keep = await confirm({
+        title: 'Keep your words?',
+        message: 'The new design can reuse the words you wrote on this page, or start from fresh copy.',
+        confirmLabel: 'Keep my words',
+        cancelLabel: 'Start fresh',
+      })
+      const ok = await fetch(studioUrl('design/keep-words'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: current, keep }) }).then(r => r.ok, () => false)
+      if (!ok) return showToast('Your choice could not be saved. Try again.', 'error')
+    }
     setWorking('rebuild')
     setPicked(null)
     try {
@@ -528,7 +542,8 @@ export default function BuildStep({
   const showOutline = homeReady && !!currentPage && !currentPage.themed && stateOf(current) === 'done'
 
   // The preview shows move handles while arranging is possible, and its drops arrive here.
-  const arrange = canArrange && !picking
+  const visualFirst = showcase && visualOk
+  const arrange = canArrange && !picking && (!visualFirst || classic)
   const latest = useRef({ arrange, move: moveSection, outlineOf, showcase })
   latest.current = { arrange, move: moveSection, outlineOf, showcase }
   useEffect(() => {
@@ -584,6 +599,7 @@ export default function BuildStep({
     return (
       <VisualStudio
         session={s}
+        allowance={view.allowance}
         onClose={() => {
           setVisual(false)
           setPicked(null)
@@ -693,8 +709,8 @@ export default function BuildStep({
         <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 ecom-scroll-y">
           {homeReady && !building && !aiDown && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              {showcase && visualOk && (
-                <button type="button" onClick={() => setVisual(true)} disabled={!!working || editing} className={`${secondaryBtn} px-4 py-2`} title="Click and type on your page itself (beta)">
+              {visualFirst && (
+                <button type="button" onClick={() => setVisual(true)} disabled={!!working || editing} className={`${primaryBtn} px-4 py-2`} title="Click and type on your page itself">
                   <WandSparkles className="h-4 w-4" /> Edit on the page
                 </button>
               )}
@@ -705,6 +721,11 @@ export default function BuildStep({
               <button type="button" onClick={rebuild} disabled={!canTweak || !!working} className={`${ghostBtn} px-3 py-2`}>
                 <RefreshCw className="h-4 w-4" /> {paid ? `Design this page again · ₹${paid.priceInr}` : showcase ? 'Design this page again · Free' : chargeFor(correctionUnits.page) ? `Design this page again · ₹${chargeFor(correctionUnits.page)}` : 'Design this page again'}
               </button>
+              {visualFirst && showOutline && (
+                <button type="button" onClick={() => setClassic(c => !c)} aria-pressed={classic} className={`${ghostBtn} px-3 py-2`} title="Arrange sections and edit their words in a list">
+                  <ListOrdered className="h-4 w-4" /> Classic editor
+                </button>
+              )}
               {currentPage?.themed && <span className="text-xs text-foreground-muted">Themed page: it takes your look; the AI designs the main pages.</span>}
             </div>
           )}
@@ -765,7 +786,7 @@ export default function BuildStep({
             </form>
           )}
           </div>
-          {showOutline && (
+          {showOutline && (!visualFirst || classic) && (
             <aside aria-label="Sections on this page" className="mt-4 space-y-4 xl:mt-0">
               <div>
                 <div className="mb-2 flex items-center justify-between gap-2">

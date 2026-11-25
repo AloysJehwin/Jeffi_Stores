@@ -1,7 +1,10 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **phases 0–1 built** (2026-11-24). Decided: flow first with free layers later (1), one responsive document
-per page with Phone/Tablet/Desktop breakpoints (2), a per-tenant rollout flag (8); the rest stay open. This replaces
+Status: **phases 0–6 built** (2026-11-24); phases 4–6 verified end to end in a local browser (see "Verified"), CI runs
+pending. Decided: flow first with free layers later (1), one responsive document
+per page with Phone/Tablet/Desktop breakpoints (2), classic blocks kept until converted or redesigned (3), a
+per-tenant rollout flag with the old editors as "Classic editor" (8); fonts and colours (5, 6) run on the defaults
+until decided (see section 6). This replaces
 the form-based block editor with direct manipulation, Canva-style, for Showcase sites and the store's own site.
 AI-generated pages must be editable with it.
 
@@ -71,9 +74,131 @@ AI-generated pages must be editable with it.
    too" (`free-ops.ts` `placedWider`). `lib/site/critique.ts` `offScreenOnPhones` reports (`off_screen`, per element)
    layers placed on phones whose box runs past the section's edges; the owner moves them on Phone (no auto-fix).
 
-**Open for the user:** decisions 5 and 6 run on the recommended defaults (fonts: the theme's pair; colours: theme
-scales plus any hex, no contrast warning yet). The Showcase flag is the flagship's `site_settings` row (one switch for
-all Showcase owners), since their studio runs on the platform.
+**Phase 4 (AI in the editor), in slices**
+1. Change with AI on a selection. `lib/site/studio/selection.ts`: the section printed with its `data-e` ids, the
+   selected ids named, rewritten through `tweakSection`, read back as a tree; `changedIds` tells what it touched. The
+   tweak prompt adds `EDITOR_RULES` for a section the editor opened (keep `data-e`, prefer theme colours, free layers
+   only inside a `relative` section from a breakpoint up). Admin: `POST /api/admin/site-builder/ai/selection`, billed
+   to the store's AI wallet. Showcase: `POST /studio/design/ai`, one AI correction (3 free a day, then ₹20 at the price
+   shown), working on the saved section and saving inside the run, so an unsaved change isn't charged. The editor
+   saves first, applies the reply as one undoable `replace`, and the changed nodes light up after the reload.
+2. Cheap element actions (values, not code). `lib/site/studio/element-ai.ts`: words rewritten, shortened or
+   translated (ten Indian languages and English) through the studio chat; a picture for an image slot's aspect
+   through `pictureFor`, stock first, generated at draft quality otherwise. Admin `POST ai/element` (store AI wallet;
+   stock photos go to the gallery with their credit, so the store's credits line names them). Showcase
+   `POST /studio/design/element` (the day's free AI help, platform-funded); its pictures stay out of any gallery and
+   their credits travel with the page in `settings.credits` (`addCredit`), which the live page and the preview list
+   while the page shows them (`pageCredits`).
+3. Critique on trees. `lib/site/code/tree-critique.ts` (pure): words too pale for their background (theme scales,
+   page/text tokens and hex resolved; 4.5:1, 3:1 for h1–h3), words too long for their slot, pictures without a
+   description, headings out of order across the page (one h1, no skipped level), free layers off a phone's screen.
+   Fixes are design operations (text colour, alt from the nearest heading, the heading's level, the layer brought
+   inside), or an AI shorten. The editor's "Check page" lists them with Show and Fix; `lib/site/critique.ts` reports
+   them for code sections while the editor is on (read from their trees), and its off-screen check now uses the same
+   code.
+4. A redesign over manual edits asks first and offers "keep my words". A page whose code sections carry editor
+   trees counts as changed by hand (`keep-words.ts` `handEdited`; the studio outline says `edited`). "Design this
+   page again" then confirms that it replaces those changes and asks "Keep my words" or "Start fresh": the Showcase
+   studio writes the page's words into the brief (`POST /studio/design/keep-words`, `StudioBrief.keepWords`), the admin
+   page redo passes `keepWords` to `startPageRedo`. The section writer's brief reuses them where they fit; section
+   changes (tweaks) leave them out. The generation rules for editor sections (`EDITOR_RULES`) came with slice 1.
+5. Screen sizes (the headless overflow check, added 2026-11-24). "Check page" has "Check screen sizes": the editor
+   flushes, loads the saved page in three hidden frames at 390, 768 and 1280 px (the canvas's own URL, so no server
+   browser), and the bridge answers `overflow` with the outermost element of each section that runs past the frame's
+   width with no ancestor clipping it (`SiteEditorBridge` `overflowing`). Each is listed with its screen and "Show"
+   (switches to that breakpoint and selects it); no auto-fix. The CI sweep runs the same kind of check headless on the
+   editor's fixture page.
+
+**Phase 5 (migration), in slices**
+1. Converters. `lib/site/convert.ts` `convertBlock` rewrites `rich_text`, `image_text`, `image_banner`, `faq`,
+   `contact_details` and `composed` blocks (`convertible.ts`) as v2 code sections, by rule, mirroring their renderers'
+   classes; the block keeps its id, place and visibility. Store details stay live: contact rows read `<Store>`, which
+   now also gives `hours` (rows), `phoneUrl` and `mapsUrl` (`lib/site/hours.ts`, shared with `ContactDetails`), and a
+   row exists only where the block showed it; composed product, category, brand, review and offer lists keep their
+   parts and queries. On demand only: "Convert to editable section" in the editor's section bar, for a selected
+   classic block of those kinds; the editor saves, asks the host (admin `POST /api/admin/site-builder/convert`,
+   Showcase `POST /studio/design/convert`, which converts the saved block), and puts the result in place as one
+   undoable step (undo makes it classic again; `state.ts` `liveTree`). Tests: `tests/lib/site-convert.test.ts`
+   renders each kind before and after and compares the words, links and pictures a visitor sees.
+2. Classic blocks in the editor (decision 3: kept as classic blocks until converted or designed again with AI). The
+   legacy homepage sections and page-core blocks are single rows in the layers, marked "Classic", with a lock where
+   the page needs them (`blockLocked`). They drag among the sections, delete from the section bar or with the Delete
+   key (not when locked; undoable), and a click on the canvas or the row opens their fields: the host's
+   `renderBlockFields` (admin: the forms editor's `BlockInspector`, with its section options). Field changes are
+   block-list steps (`editDoc` with a gesture, so typing in one block joins one undo step per visit) and the canvas
+   redraws after the save. Showcase pages hold only code sections and their required parts, so it passes no fields.
+3. Theme templates stay v1 (source and compiled, no tree); not regenerated. They are editable at once already: every
+   load into the editor upgrades a code section to v2 (`upgradeCodeSections`, admin and Showcase), and
+   `site-code-roundtrip.test.ts` checks each of the 225 template sections parses, prints and compiles back to the same
+   tree. Storing trees in the templates would add weight to `themes/templates` (1.3 MB) for no gain, and would make
+   a freshly installed page read as changed by hand (`keep-words.ts` `handEdited` looks for trees), so "Design this
+   page again" would ask to keep words nobody wrote. A template section gets its tree the first time the editor saves
+   it.
+4. Retired behind the flag (decision 8). With `site_editor_enabled` on, the admin Site Builder opens a draft in the
+   visual editor, with the store/business and page pickers above it; its close button is "Classic editor", which
+   shows the forms (block list, `BlockInspector`, `CodeSectionPanel`'s `literals.ts` fields, templates, theme) marked
+   "Classic editor", with "Visual editor" to go back. The app layout, pages the canvas can't show and new custom pages
+   stay in the classic editor. On a Showcase, "Edit on the page" is the build step's main button; arranging (the
+   section list and the preview's move handles) and the words form come back only with "Classic editor". The editor
+   saves a waiting change when it closes or another page is picked. With the flag off, nothing changes.
+
+**Phase 6 (harden), in slices**
+1. LCP. Converted pictures use the Image part (`convert.ts` `pic`), so the first one in the page's LCP section loads
+   eagerly at high priority, as the classic blocks' do; a banner's phone picture comes first (a lazy picture hidden by
+   CSS never loads), and each has a `sizes` hint. `site-convert.test.ts` checks it.
+2. Responsive sweep and load budgets (`tests/responsive`). The sweep adds the editor's page (`editor-pack.ts`, built
+   through the editor's own operations: free layers on Desktop and Tablet and the badge on Phone, panel styles per
+   breakpoint, every convertible kind converted; `SWEEP_PACKS=editor` alone). The audit flags a free layer past its
+   section's side (an error below 768px, a warning wider) or foot. Each page is held to CLS 0.1 / 0.25 and LCP
+   2.5 s / 4 s (`pages.ts` `VITALS`), measured as it first paints, before any scrolling: over the first line a
+   warning, over the second an error in CI (a production build) or with `SWEEP_VITALS=budget`. The CI job stays
+   advisory. `site-editor-pack.test.ts` keeps the fixture compiling.
+3. Playwright end to end, opt-in with `SITE_EDITOR_E2E=1` (`npm run test:ui:editor`). The canvas
+   (`storefront-service/ui-tests/site-editor`): a seeded draft framed as the editor frames it; click selects,
+   double-click types in place and reports a `text` operation, a free layer gets handles and reports its drag in %, a
+   phone placement stays on screen, and a live page has no bridge, no `data-e` and no editing mode. The editor
+   (`admin-service/ui-tests/site-editor`): the draft opens in the visual editor, a typed change autosaves to the draft
+   and undoes, a classic block opens its fields and converts, "Classic editor" and back. `tests/site-editor/seed.ts`
+   seeds a test DB only (flag, draft, admin session, the first pages if none) and undoes it all. CI: the advisory
+   `site-editor-e2e` job (storefront and admin behind the dev router).
+
+4. The AI end to end (`admin-service/ui-tests/site-editor/ai.spec.ts`), against a stand-in gateway
+   (`tests/site-editor/ai-mock.ts`, port 8098; start the apps with `AI_GATEWAY_URL=http://localhost:8098`, as the CI job
+   does): the real routes, prompts, compiler and billing run, only the model's words are fixed. Covers phase 4's flows.
+
+**Verified (2026-11-24), locally in headless Chromium.** The storefront and admin as dev servers (webpack) behind the dev
+router on `jeffi_test` (`tests/site-editor/seed.ts` up and down; never the real-data DB), started and stopped in one
+locked session each. The laptop AI gateway (:8090) was down (its token had expired), so no real AI call was made; the
+AI ran through the stand-in gateway.
+- Phase 4: Change with AI on the hero's heading: the prompt names the selection (`data-e`) and carries `EDITOR_RULES`,
+  the reply lands as one change, the touched node flashes, the draft saves it and one Undo takes it back. Rewrite,
+  Shorten and Translate (Hindi) change the words in place and undo one by one; "Find a picture" shows the route's
+  error when nothing is found, and a found picture (the route's reply stubbed in the browser, since stock and generated
+  pictures upload to S3) swaps the slot and saves. Check page: a cleared picture description is listed and Fix fills
+  it; an overlong heading is listed and "Shorten with AI" shortens it. Check screen sizes: nothing past the screen at
+  first; the badge pushed past the hero's edge on Desktop is listed for Desktop and Show selects it. Design this page
+  again on a hand-edited page asks first, "Keep my words" sends `keepWords`, the section writer's prompt carries the
+  page's words, and the new page (written with them) replaces the old one in the draft.
+- Phase 5: a classic `rich_text` block opens its fields, converts to a code section with its words (saved, drawn on
+  the canvas); "Classic editor" shows the forms and "Visual editor" comes back. Theme templates and the Showcase host
+  were not exercised in a browser (unit tests cover the upgrade; Showcase needs the controller app).
+- Phase 6: the canvas spec (select, type in place, free-layer drag in %, phone placement on screen, no editor code on
+  a live page) and the admin spec pass; with the AI spec, 12 of 12. The sweep's editor pack (`SWEEP_PACKS=editor`,
+  `SWEEP_VITALS=budget`): 7 renders, 0 errors, 24 warnings (product-card buttons 44px where 48 is wanted), no CLS or
+  LCP finding.
+- Fixes found by running them: the canvas spec framed the page from `about:blank`, which the store's CSP refuses (now
+  a page on the store's origin); the admin specs clicked before the bridge loaded (they wait for editing mode now) and
+  each test opened a new browser, which the admin session's binding refuses (one browser per file); the tsx steps
+  failed in a git worktree (tsx and the `server-only` stub are found up the tree). A dev server restarts near its heap
+  limit, which drops requests mid-test: run them with `--max-old-space-size=6144`.
+
+**Left:** the advisory `responsive` and `site-editor-e2e` CI jobs have not run on CI yet (production builds); promote
+them to `checks` once reliable. A run against the real Claude (the laptop gateway) is still to do, at most a few calls.
+
+**Open for the user:** fonts (decision 5) and colours (6) run on the recommended defaults (fonts: the theme's pair;
+colours: theme scales plus any hex, with the page check's contrast finding); when the old Homepage builder
+(`settings/homepage`) goes (3); how long the Classic editor stays once the flag is on (8). The Showcase flag is the
+flagship's `site_settings` row (one switch for all Showcase owners), since their studio runs on the platform.
 
 ## What exists
 
@@ -197,13 +322,22 @@ bridge security (same allowlist, sanitise pasted content).
 
 ## 6. Decisions
 
-1. Flow with free layers (**recommended**) or a pure absolute canvas.
+1. Flow with free layers (**recommended**) or a pure absolute canvas. **Taken: flow with free layers** (phase 3).
 2. One responsive document for desktop and phone web with breakpoints (**recommended**; reverses the 2026-11-15
-   "six separate layouts" decision for web) or separate phone documents.
+   "six separate layouts" decision for web) or separate phone documents. **Taken: one responsive document**; the
+   editor edits the desktop web layout and saves the phone one too while it is the same document.
 3. Legacy homepage sections: keep as classic blocks, convert, or require an AI redesign; and when the old Homepage
-   builder (`settings/homepage`) goes.
-4. The native app home: stays on classic blocks, or out of scope.
-5. Fonts: the theme's pair only, or a per-element choice from `FONT_CHOICES` (at most 3 families).
-6. Colours: theme colours only, or any hex with contrast warnings.
-7. Showcase inline edits to services and reviews: write to content (**recommended**) or freeze as literal text.
-8. Rollout: a per-tenant flag, and how long the old editor stays.
+   builder (`settings/homepage`) goes. **Taken: kept as classic blocks** (single units in the editor, their fields in
+   `BlockInspector`) until converted (six content kinds, on demand) or designed again with AI. When the old Homepage
+   builder goes is still open.
+4. The native app home: stays on classic blocks, or out of scope. **As built: stays on classic blocks** (the app layout
+   is edited in the classic editor).
+5. Fonts: the theme's pair only, or a per-element choice from `FONT_CHOICES` (at most 3 families). **Open**; runs on
+   the theme's pair.
+6. Colours: theme colours only, or any hex with contrast warnings. **Open**; runs on theme scales plus any hex, with
+   the critique's contrast check (phase 4).
+7. Showcase inline edits to services and reviews: write to content (**recommended**) or freeze as literal text. **As
+   built:** words drawn from content stay bound to it (locked in the tree); words typed in the section are literal.
+8. Rollout: a per-tenant flag, and how long the old editor stays. **Taken: the per-tenant `site_editor_enabled` flag**
+   (the flagship's row for all Showcases); with it on, the old editors are the "Classic editor" fallback. How long they
+   stay is open.
