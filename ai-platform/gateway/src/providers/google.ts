@@ -13,6 +13,8 @@
 //     -> { name }; GET /v1beta/<name> -> { done, response.generateVideoResponse.generatedSamples[0].video.uri }
 //   The uri is downloaded with the x-goog-api-key header. Aspect 16:9 or 9:16 only.
 
+import { options, type Capability, type ModelList } from '../models'
+import { pricedModels } from '../pricing'
 import type { ImageGenInput, ImageGenOutput, MediaProvider, VideoGenInput, VideoPoll, VideoStart } from './types'
 import { ProviderError, fetchBytes, fetchJson, loadImage, nearestAspect, toImage } from './types'
 
@@ -57,8 +59,20 @@ export class GoogleProvider implements MediaProvider {
 
   configured(): boolean { return !!this.apiKey }
 
+  /** The configured models first, then the others priced in pricing.ts. */
+  models(cap: Capability): ModelList | null {
+    if (cap === 'image') {
+      const ids = [this.imageModel, this.premiumImageModel, this.draftImageModel, this.imagenModel, ...pricedModels('google', 'image')]
+      return { models: options(ids, this.imageModel) }
+    }
+    if (cap === 'video') return { models: options([this.veoModel, this.veoFallback, ...pricedModels('google', 'video_second')], this.veoModel) }
+    return null
+  }
+
   async generateImage(req: ImageGenInput): Promise<ImageGenOutput> {
     this.assert()
+    // A chosen model runs alone: no draft or Imagen fallback.
+    if (req.model) return req.model.startsWith('imagen') ? this.imagenAt(req.model, req) : this.geminiAt(req.model, req)
     const model = req.quality === 'premium' ? this.premiumImageModel : req.quality === 'draft' ? this.draftImageModel : this.imageModel
     try { return await this.geminiAt(model, req) }
     catch (err) {
@@ -137,12 +151,13 @@ export class GoogleProvider implements MediaProvider {
     return { images, model }
   }
 
-  videoModel(_req: VideoGenInput): string {
-    return this.veoModel
+  videoModel(req: VideoGenInput): string {
+    return req.model || this.veoModel
   }
 
   async startVideo(req: VideoGenInput): Promise<VideoStart> {
     this.assert()
+    if (req.model) return this.veoAt(req.model, req)
     try { return await this.veoAt(this.veoModel, req) }
     catch (err) {
       if (!this.veoFallback || this.veoFallback === this.veoModel) throw err

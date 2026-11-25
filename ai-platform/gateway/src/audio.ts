@@ -1,15 +1,19 @@
-// Routing + validation for /v1/audio/transcribe and /v1/audio/speak. Same order rules as images: the requested
-// order (tenant policy) else the gateway default, unconfigured providers skipped, a failing one falls through.
+// Routing + validation for /v1/audio/transcribe (stt order) and /v1/audio/speak (tts order). Same order rules as
+// images: the requested order (tenant policy) else the gateway default, unconfigured providers skipped, a failing one
+// falls through. `models` picks each provider's model.
 
 import type {
-  AudioFormat, AudioProviderName, SpeakRequest, SpeakResponse, TranscribeRequest, TranscribeResponse,
+  AudioFormat, ModelChoice, SpeakRequest, SpeakResponse, SttProviderName, TranscribeRequest, TranscribeResponse, TtsProviderName,
 } from '../../sdk/types'
 import { NotConfiguredError, UpstreamError, ValidationError, parseProviders, parseRequestedProviders } from './media'
+import { parseModels, type ModelSource } from './models'
 import { costFor, round } from './pricing'
-import { ProviderError, type AudioProvider } from './providers/types'
+import { ProviderError, type SttProvider, type TtsProvider } from './providers/types'
 
-export const AUDIO_PROVIDER_ORDER: AudioProviderName[] = ['azure']
-const AUDIO_PROVIDER_SET = new Set<AudioProviderName>(['azure'])
+export const STT_PROVIDER_ORDER: SttProviderName[] = ['sarvam', 'azure']
+export const TTS_PROVIDER_ORDER: TtsProviderName[] = ['sarvam', 'azure']
+const STT_SET = new Set<SttProviderName>(STT_PROVIDER_ORDER)
+const TTS_SET = new Set<TtsProviderName>(TTS_PROVIDER_ORDER)
 /** Decoded audio cap, and the base64 length that carries it. */
 export const AUDIO_MAX_BYTES = 25 * 1024 * 1024
 export const AUDIO_MAX_BASE64 = Math.ceil(AUDIO_MAX_BYTES / 3) * 4
@@ -24,14 +28,21 @@ const BCP47 = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}$/
 const VOICE = /^[A-Za-z0-9:_-]{1,80}$/
 const BASE64 = /^[A-Za-z0-9+/=\s]+$/
 
-export function parseAudioProviders(raw: string | undefined): AudioProviderName[] {
-  return parseProviders(raw, AUDIO_PROVIDER_ORDER, AUDIO_PROVIDER_SET)
-}
-export const parseAudioOrder = (raw: unknown) => parseRequestedProviders(raw, AUDIO_PROVIDER_SET, 'audio')
+export const parseSttProviders = (raw: string | undefined) => parseProviders(raw, STT_PROVIDER_ORDER, STT_SET)
+export const parseTtsProviders = (raw: string | undefined) => parseProviders(raw, TTS_PROVIDER_ORDER, TTS_SET)
+export const parseSttOrder = (raw: unknown) => parseRequestedProviders(raw, STT_SET, 'stt')
+export const parseTtsOrder = (raw: unknown) => parseRequestedProviders(raw, TTS_SET, 'tts')
 
-export interface AudioRouterDeps {
-  providers: Partial<Record<AudioProviderName, AudioProvider>>
-  order: AudioProviderName[]
+export interface SttRouterDeps {
+  providers: Partial<Record<SttProviderName, SttProvider>>
+  order: SttProviderName[]
+  models?: ModelSource
+}
+
+export interface TtsRouterDeps {
+  providers: Partial<Record<TtsProviderName, TtsProvider>>
+  order: TtsProviderName[]
+  models?: ModelSource
 }
 
 function language(raw: unknown, required: boolean): string | undefined {
@@ -43,7 +54,9 @@ function language(raw: unknown, required: boolean): string | undefined {
   return raw.trim()
 }
 
-export function parseTranscribeRequest(raw: unknown): { audio: Buffer; mimeType: string; language?: string; providers?: AudioProviderName[] } {
+export function parseTranscribeRequest(raw: unknown, source?: ModelSource): {
+  audio: Buffer; mimeType: string; language?: string; providers?: SttProviderName[]; models?: ModelChoice
+} {
   const r = (raw ?? {}) as Partial<TranscribeRequest>
   const b64 = r.audioBase64
   if (typeof b64 !== 'string' || !b64) throw new ValidationError('audioBase64 is required')
@@ -54,10 +67,12 @@ export function parseTranscribeRequest(raw: unknown): { audio: Buffer; mimeType:
   if (!AUDIO_MIMES.has(mimeType.split(';')[0].trim())) throw new ValidationError(`mimeType must be one of ${[...AUDIO_MIMES].join(', ')}`)
   const audio = Buffer.from(b64, 'base64')
   if (!audio.length) throw new ValidationError('audio is empty')
-  return { audio, mimeType, language: language(r.language, false), providers: parseAudioOrder(r.providers) }
+  return { audio, mimeType, language: language(r.language, false), providers: parseSttOrder(r.providers), models: parseModels(r.models, 'stt', source) }
 }
 
-export function parseSpeakRequest(raw: unknown): { text: string; language: string; voice?: string; format: AudioFormat; providers?: AudioProviderName[] } {
+export function parseSpeakRequest(raw: unknown, source?: ModelSource): {
+  text: string; language: string; voice?: string; format: AudioFormat; providers?: TtsProviderName[]; models?: ModelChoice
+} {
   const r = (raw ?? {}) as Partial<SpeakRequest>
   const text = typeof r.text === 'string' ? r.text.trim() : ''
   if (!text) throw new ValidationError('text is required')
@@ -66,13 +81,12 @@ export function parseSpeakRequest(raw: unknown): { text: string; language: strin
   if (voice !== undefined && (typeof voice !== 'string' || !VOICE.test(voice))) throw new ValidationError('voice is not a valid voice name')
   const format = (r.format ?? 'mp3') as AudioFormat
   if (!FORMATS.has(format)) throw new ValidationError('format must be mp3, wav or ogg')
-  return { text, language: language(r.language, true)!, voice, format, providers: parseAudioOrder(r.providers) }
+  return { text, language: language(r.language, true)!, voice, format, providers: parseTtsOrder(r.providers), models: parseModels(r.models, 'tts', source) }
 }
 
-function route(deps: AudioRouterDeps, requested: AudioProviderName[] | undefined, side: 'transcribe' | 'speak'): AudioProvider[] {
-  const ok = (p: AudioProvider | undefined): p is AudioProvider => !!p && (side === 'transcribe' ? p.transcribeConfigured() : p.speakConfigured())
-  const list = (requested ?? deps.order).map(n => deps.providers[n]).filter(ok)
-  if (!list.length) throw new NotConfiguredError(`no ${side === 'transcribe' ? 'speech-to-text' : 'text-to-speech'} provider configured`)
+function route<N extends string, P>(order: N[], providers: Partial<Record<N, P>>, ok: (p: P) => boolean, what: string): P[] {
+  const list = order.map(n => providers[n]).filter((p): p is P => !!p && ok(p))
+  if (!list.length) throw new NotConfiguredError(`no ${what} provider configured`)
   return list
 }
 
@@ -83,14 +97,17 @@ function failure(message: string, tried: { provider: string; error: string }[], 
   return new UpstreamError(message, tried)
 }
 
-export async function handleTranscribe(raw: unknown, deps: AudioRouterDeps): Promise<TranscribeResponse> {
-  const p = parseTranscribeRequest(raw)
+export async function handleTranscribe(raw: unknown, deps: SttRouterDeps): Promise<TranscribeResponse> {
+  const p = parseTranscribeRequest(raw, deps.models)
+  const fromHeaders = audioDurationSeconds(p.audio, p.mimeType) ?? undefined
   const tried: { provider: string; error: string }[] = []
   let last: unknown
-  for (const provider of route(deps, p.providers, 'transcribe')) {
+  for (const provider of route(p.providers ?? deps.order, deps.providers, s => s.transcribeConfigured(), 'speech-to-text')) {
     try {
-      const out = await provider.transcribe({ audio: p.audio, mimeType: p.mimeType, language: p.language })
-      const measured = out.durationSeconds ?? audioDurationSeconds(p.audio, p.mimeType) ?? estimateSeconds(p.audio.length)
+      const out = await provider.transcribe({
+        audio: p.audio, mimeType: p.mimeType, language: p.language, model: p.models?.[provider.name], durationSeconds: fromHeaders,
+      })
+      const measured = out.durationSeconds ?? fromHeaders ?? estimateSeconds(p.audio.length)
       const durationSeconds = round(Math.max(0, measured), 1)
       const minutes = durationSeconds / 60
       return {
@@ -109,14 +126,14 @@ export async function handleTranscribe(raw: unknown, deps: AudioRouterDeps): Pro
   throw failure('speech-to-text failed on all providers', tried, last)
 }
 
-export async function handleSpeak(raw: unknown, deps: AudioRouterDeps): Promise<SpeakResponse> {
-  const p = parseSpeakRequest(raw)
+export async function handleSpeak(raw: unknown, deps: TtsRouterDeps): Promise<SpeakResponse> {
+  const p = parseSpeakRequest(raw, deps.models)
   const characters = [...p.text].length
   const tried: { provider: string; error: string }[] = []
   let last: unknown
-  for (const provider of route(deps, p.providers, 'speak')) {
+  for (const provider of route(p.providers ?? deps.order, deps.providers, s => s.speakConfigured(), 'text-to-speech')) {
     try {
-      const out = await provider.speak({ text: p.text, language: p.language, voice: p.voice, format: p.format })
+      const out = await provider.speak({ text: p.text, language: p.language, voice: p.voice, format: p.format, model: p.models?.[provider.name] })
       const k = characters / 1000
       return {
         audioBase64: out.audio.toString('base64'),

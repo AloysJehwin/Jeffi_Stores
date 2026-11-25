@@ -1,16 +1,21 @@
 import { createServer } from 'node:http'
 import IORedis from 'ioredis'
 import pg from 'pg'
-import { CONFIG, modelForHint, claudeModelForHint } from './config'
+import { CONFIG, claudeModelFor, ollamaModelFor } from './config'
 import { authorized } from './auth'
-import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
+import { ollamaChat, ollamaEmbed, ollamaInstalledModels, ollamaPool } from './providers/ollama'
 import { startUsdInrRefresh } from './fx'
-import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicVision } from './providers/anthropic'
-import { runVision, runOcr, parseOcrRequest, OcrError, OCR_MAX_BASE64, ocrStatus, startOcrProbe, ocrProbe, type OcrHealth } from './providers/paddleocr'
+import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicModels, anthropicVision } from './providers/anthropic'
+import { runVision, runOcr, parseOcrRequest, OcrError, OCR_MAX_BASE64, OCR_MODEL, ocrStatus, startOcrProbe, ocrProbe, type OcrHealth } from './providers/paddleocr'
 import { azureProvider } from './providers/azure'
+import { sarvamProvider } from './providers/sarvam'
 import { BackendProbe, RazerHealthMonitor, guardedMedia, httpCheck, poolSource } from './razer-health'
-import { AUDIO_MAX_BASE64, handleSpeak, handleTranscribe, parseAudioProviders, type AudioRouterDeps } from './audio'
+import {
+  AUDIO_MAX_BASE64, handleSpeak, handleTranscribe, parseSttProviders, parseTtsProviders, type SttRouterDeps, type TtsRouterDeps,
+} from './audio'
 import { defaultEmbedProvider, handleEmbed, type EmbedDeps } from './embed'
+import { InstalledModels, modelSource, parseModels, razerModels } from './models'
+import { providersReport } from './providers-report'
 import { runJob, startWorker, queueHealth, pendingWaiters, type JobData } from './queue'
 import { policyFor } from './cache/policy'
 import { cacheKey, kvGet, kvSet } from './cache/kv'
@@ -26,14 +31,13 @@ import { pixabayProvider } from './providers/pixabay'
 import { handleStockSearch, parseStockProviders, type StockDeps } from './stock'
 import {
   handleImageGenerate, handleVideoStart, readVideoJob, advanceVideoJob, readImageCache,
-  parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, chatRoute, visionRoute, providerStatus, orderedStatus,
+  parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, chatRoute, visionRoute,
   TEXT_PROVIDER_ORDER, ValidationError, UpstreamError, NotConfiguredError, TRANSPARENT_NEEDS_REPLICATE,
   type ImageRouterDeps, type VideoRouterDeps,
 } from './media'
 import type {
   AiChatRequest, AiChatResponse, AiChatStreamEvent, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse,
-  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse, OcrResponse, OcrErrorResponse, ProviderStatus,
-  TextProviderName, ImageProviderName,
+  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse, OcrResponse, OcrErrorResponse, TextProviderName,
 } from '../../sdk/types'
 
 const redis = new IORedis(CONFIG.redisUrl, { maxRetriesPerRequest: 3 })
@@ -47,6 +51,17 @@ const sdProbe = new BackendProbe('sd', httpCheck(`${CONFIG.sdWebuiUrl}${CONFIG.s
 })
 const razer = new RazerHealthMonitor({ ollama: poolSource(ollamaPool), sd: sdProbe, paddleocr: ocrProbe })
 
+// Model lists per provider and capability: requests' `models` are checked against them, /v1/providers reports them.
+const ollamaModels = new InstalledModels(ollamaInstalledModels, CONFIG.ollamaProbeIntervalMs * 4)
+const models = modelSource({
+  anthropic: anthropicModels,
+  razer: razerModels(() => ollamaModels.list()),
+  azure: cap => azureProvider.models(cap),
+  google: cap => googleProvider.models(cap),
+  replicate: cap => replicateProvider.models(cap),
+  sarvam: cap => sarvamProvider.models(cap),
+})
+
 // Media: Redis-backed so any replica can serve a file or advance a job another replica started.
 const files = createFileStore(redis)
 const imageDeps: ImageRouterDeps = {
@@ -58,11 +73,11 @@ const imageDeps: ImageRouterDeps = {
   ttlSec: CONFIG.imageCacheTtlSeconds,
   cutout: replicateProvider,
   available: name => name !== 'razer' || razer.up('image'),
+  models,
 }
-const audioDeps: AudioRouterDeps = {
-  providers: { azure: azureProvider.asAudioProvider() },
-  order: parseAudioProviders(CONFIG.audioProviders),
-}
+const azureAudio = azureProvider.asAudioProvider()
+const sttDeps: SttRouterDeps = { providers: { sarvam: sarvamProvider, azure: azureAudio }, order: parseSttProviders(CONFIG.sttProviders), models }
+const ttsDeps: TtsRouterDeps = { providers: { sarvam: sarvamProvider, azure: azureAudio }, order: parseTtsProviders(CONFIG.ttsProviders), models }
 const embedDeps: EmbedDeps = {
   defaultProvider: defaultEmbedProvider(CONFIG.embedProvider),
   razer: {
@@ -71,6 +86,7 @@ const embedDeps: EmbedDeps = {
     embed: (input, model) => runJob<EmbedResponse>({ kind: 'embed', payload: { input, model } }),
   },
   azure: azureProvider,
+  models,
 }
 const videoDeps: VideoRouterDeps = {
   providers: { google: googleProvider, replicate: replicateProvider, azure: azureProvider.asVideoProvider() },
@@ -78,6 +94,7 @@ const videoDeps: VideoRouterDeps = {
   jobs: createVideoJobStore(redis),
   files,
   fileBaseUrl: CONFIG.publicUrl,
+  models,
 }
 const stockDeps: StockDeps = {
   providers: { pexels: pexelsProvider, pixabay: pixabayProvider },
@@ -121,6 +138,7 @@ async function processJob(data: JobData): Promise<unknown> {
 
 startWorker(processJob)
 ollamaPool.start()
+void ollamaModels.refresh()
 startOcrProbe()
 sdProbe.start()
 startUsdInrRefresh()
@@ -148,7 +166,8 @@ async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boole
 // ── Chat: providers in route order; each answer goes through the two-tier cache ──────────────
 type Emit = (e: AiChatStreamEvent) => void
 
-async function handleChat(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
+async function handleChat(raw: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
+  const req: AiChatRequest = { ...raw, models: parseModels(raw.models, 'text', models) }
   const ready = (p: TextProviderName) => (p === 'anthropic' ? anthropicAvailable(req) : p === 'azure' ? azureProvider.chatConfigured() : true)
   const route = chatRoute(textRoute(req), ready, razer.up('text'))
   if (!route.length) throw new NotConfiguredError('no text provider in the requested order is available')
@@ -196,7 +215,7 @@ async function remember(req: AiChatRequest, model: string, content: string): Pro
 
 async function chatAnthropic(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
   const start = Date.now()
-  const { model } = claudeModelForHint(req.modelHint)
+  const { model } = claudeModelFor(req)
   const hit = await cached(req, model, 'anthropic', start)
   if (hit) { emit?.({ type: 'text', text: hit.content }); return hit }
   const r = await anthropicChat(req, emit, signal)
@@ -210,7 +229,7 @@ async function chatAnthropic(req: AiChatRequest, emit?: Emit, signal?: AbortSign
 
 async function chatAzure(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
   const start = Date.now()
-  const model = azureProvider.chatModel()
+  const model = azureProvider.chatModel(req.models?.azure)
   const hit = await cached(req, model, 'azure', start)
   if (hit) { emit?.({ type: 'text', text: hit.content }); return hit }
   const r = await azureProvider.chat(req, emit, signal)
@@ -223,7 +242,7 @@ async function chatAzure(req: AiChatRequest, emit?: Emit, signal?: AbortSignal):
 
 async function chatRazer(req: AiChatRequest, emit?: Emit): Promise<AiChatResponse> {
   const start = Date.now()
-  const model = modelForHint(req.modelHint)
+  const model = ollamaModelFor(req)
   const hit = await cached(req, model, 'ollama', start)
   if (hit) { emit?.({ type: 'text', text: hit.content }); return hit }
 
@@ -239,8 +258,10 @@ async function chatRazer(req: AiChatRequest, emit?: Emit): Promise<AiChatRespons
   return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: null, usage }
 }
 
-/** Cloud providers ahead of razer in the text order read the image in turn; PaddleOCR/Ollama when razer is reached. */
-async function handleVision(body: VisionRequest): Promise<VisionResponse> {
+/** Cloud providers ahead of razer in the text order read the image in turn (with the request's text models);
+ *  PaddleOCR/Ollama when razer is reached. razer's text model is not used: an Ollama text model may not read images. */
+async function handleVision(raw: VisionRequest): Promise<VisionResponse> {
+  const body: VisionRequest = { ...raw, models: parseModels(raw.models, 'text', models) }
   const ready = (p: TextProviderName) => !body.model && (p === 'anthropic' ? anthropicAvailable(body) : p === 'azure' && azureProvider.chatConfigured())
   // A single image can still be read by PaddleOCR while Ollama is down.
   const razerUp = razer.up('vision') || (body.images?.length === 1 && razer.up('ocr'))
@@ -272,32 +293,34 @@ async function handleOcr(req: import('node:http').IncomingMessage): Promise<{ st
   }
 }
 
-function providersReport(): ProvidersResponse {
-  const text: Record<TextProviderName, ProviderStatus<TextProviderName>> = {
-    anthropic: { name: 'anthropic', configured: anthropicConfigured(), keyFallback: !!CONFIG.anthropicApiKey },
-    razer: { name: 'razer', configured: !ollamaPool.knownDown(), healthy: razer.up('text') },
-    azure: { name: 'azure', configured: azureProvider.chatConfigured() },
-  }
-  const image = providerStatus(imageDeps.order, imageDeps.providers)
-    .map((s): ProviderStatus<ImageProviderName> => (s.name === 'razer' ? { ...s, healthy: razer.up('image') } : s))
-  const audio = audioDeps.providers.azure!
-  return {
-    text: orderedStatus(TEXT_PROVIDER_ORDER, text),
-    image,
-    video: providerStatus(videoDeps.order, videoDeps.providers),
-    audio: providerStatus(audioDeps.order, { azure: { configured: () => audio.transcribeConfigured() || audio.speakConfigured() } }),
-    embed: [
-      { name: 'razer', configured: !ollamaPool.knownDown(), healthy: razer.up('embed') },
-      { name: 'azure', configured: azureProvider.embedConfigured() },
-    ],
-    ocr: [{ name: 'paddleocr', configured: ocrStatus().ok, healthy: razer.up('ocr') }],
-    stock: providerStatus(stockDeps.order, stockDeps.providers),
-    razer: razer.report(),
-    defaults: {
-      text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order, audio: audioDeps.order,
-      embed: embedDeps.defaultProvider, stock: stockDeps.order,
+// Cached model lists only: the admin reads this with a short timeout, so a slow Ollama must not hold it up.
+function report(): ProvidersResponse {
+  return providersReport({
+    models,
+    text: {
+      order: TEXT_PROVIDER_ORDER,
+      status: {
+        anthropic: { name: 'anthropic', configured: anthropicConfigured(), keyFallback: !!CONFIG.anthropicApiKey },
+        razer: { name: 'razer', configured: !ollamaPool.knownDown(), healthy: razer.up('text') },
+        azure: { name: 'azure', configured: azureProvider.chatConfigured() },
+      },
     },
-  }
+    image: { order: imageDeps.order, providers: imageDeps.providers, healthy: { razer: razer.up('image') } },
+    video: videoDeps,
+    stt: sttDeps,
+    tts: ttsDeps,
+    embed: {
+      default: embedDeps.defaultProvider,
+      status: {
+        razer: { name: 'razer', configured: !ollamaPool.knownDown(), healthy: razer.up('embed') },
+        azure: { name: 'azure', configured: azureProvider.embedConfigured() },
+      },
+    },
+    ocr: [{ name: 'paddleocr', configured: ocrStatus().ok, healthy: razer.up('ocr') }],
+    ocrModel: OCR_MODEL,
+    stock: stockDeps,
+    razer: razer.report(),
+  })
 }
 
 // Cache hits cost nothing.
@@ -307,7 +330,7 @@ const FREE = { promptTokens: 0, completionTokens: 0, costInr: 0 }
 // falls through providers, and a queue retry would pay for paid providers twice) ──────────
 async function handleImage(body: ImageGenerateRequest): Promise<ImageGenerateResponse> {
   const start = Date.now()
-  const p = parseImageRequest(body)
+  const p = parseImageRequest(body, models)
   // Checked here too: inside the queue a 400 would surface as a 502.
   if (p.transparent && !replicateProvider.configured()) throw new ValidationError(TRANSPARENT_NEEDS_REPLICATE)
   if (typeof p.seed !== 'number') {
@@ -405,7 +428,7 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true, ollama: { ok: o.ok, active: o.active, checkedAt: o.checkedAt }, razer: razer.report(), waiters: pendingWaiters() })
     }
     if (req.method === 'GET' && path === '/v1/providers') {
-      return json(res, 200, providersReport())
+      return json(res, 200, report())
     }
     if (req.method === 'POST' && path === '/v1/chat') {
       return json(res, 200, await handleChat(await readBody(req)))
@@ -418,10 +441,10 @@ const server = createServer(async (req, res) => {
     }
     // Not queued: cloud calls, nothing to serialise on the GPU.
     if (req.method === 'POST' && path === '/v1/audio/transcribe') {
-      return json(res, 200, await handleTranscribe(await readBody(req, AUDIO_MAX_BASE64 + 64 * 1024), audioDeps))
+      return json(res, 200, await handleTranscribe(await readBody(req, AUDIO_MAX_BASE64 + 64 * 1024), sttDeps))
     }
     if (req.method === 'POST' && path === '/v1/audio/speak') {
-      return json(res, 200, await handleSpeak(await readBody(req, 256 * 1024), audioDeps))
+      return json(res, 200, await handleSpeak(await readBody(req, 256 * 1024), ttsDeps))
     }
     if (req.method === 'POST' && path === '/v1/images/generate') {
       return json(res, 200, await handleImage(await readBody(req)))
@@ -467,5 +490,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(CONFIG.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}], embed ${embedDeps.defaultProvider}, auth ${CONFIG.gatewayTokens.length ? 'on' : 'OFF (AI_GATEWAY_TOKEN unset)'}`)
+  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}], stt [${sttDeps.order.join(', ')}], tts [${ttsDeps.order.join(', ')}], embed ${embedDeps.defaultProvider}, auth ${CONFIG.gatewayTokens.length ? 'on' : 'OFF (AI_GATEWAY_TOKEN unset)'}`)
 })

@@ -29,6 +29,18 @@ export interface AiToolDef {
 /** Text providers the gateway can route chat to ('razer' = the Ollama pool, 'azure' = an Azure OpenAI chat deployment). */
 export type TextProviderName = 'anthropic' | 'razer' | 'azure'
 
+/** Provider -> model id for one capability; each id must be on that provider's list in GET /v1/providers, else 400. */
+export type ModelChoice = Partial<Record<string, string>>
+
+/** A selectable model in GET /v1/providers. */
+export interface ModelOption {
+  id: string
+  /** Human-friendly, e.g. 'Claude Sonnet 5.5'. */
+  label: string
+  /** What the provider uses when the request names no model. */
+  default?: boolean
+}
+
 /** 'deep' = hardest reasoning (Opus on Anthropic; the agent model on Ollama). */
 export type ModelHint = 'sql' | 'copy' | 'agent' | 'fast' | 'enrich' | 'email' | 'deep'
 
@@ -41,6 +53,8 @@ export interface AiChatRequest {
   forceProvider?: 'openai' | 'ollama' | 'anthropic'
   /** Allowed text providers in order; overrides the gateway default. forceProvider still wins. */
   providers?: TextProviderName[]
+  /** Model per text provider (replaces the modelHint's model on that provider). */
+  models?: ModelChoice
   tools?: AiToolDef[]
   /** Bypass the LLM cache (both KV and semantic) for this request. */
   noCache?: boolean
@@ -103,7 +117,8 @@ export type EmbedProviderName = 'razer' | 'azure'
 
 export interface EmbedRequest {
   input: string | string[]
-  /** razer only (an Ollama model); azure always uses its embeddings deployment at 768 dimensions. */
+  /** The provider's model: an Ollama embeddings model (razer) or an embeddings deployment (azure, always 768
+   *  dimensions); must be on the provider's embed list in GET /v1/providers. Default: the provider's default. */
   model?: string
   /** Default: the gateway's AI_EMBED_PROVIDER (razer). No fallback to the other provider. */
   provider?: EmbedProviderName
@@ -111,7 +126,8 @@ export interface EmbedRequest {
 
 export interface EmbedResponse {
   embeddings: number[][]
-  /** Vector-space id to store with the vectors: 'nomic-embed-text' (razer) or 'text-embedding-3-small@768' (azure). */
+  /** Vector-space id to store with the vectors: the Ollama model (razer), or 'text-embedding-3-small@768' for azure's
+   *  default deployment and '<deployment>@768' for another. */
   model: string
   provider: EmbedProviderName
   dimensions: number
@@ -134,6 +150,8 @@ export interface ImageGenerateRequest {
   provider?: ImageProviderName
   /** Allowed providers in order; overrides the gateway's AI_IMAGE_PROVIDERS. `provider` still wins. */
   providers?: ImageProviderName[]
+  /** Model per image provider (replaces the quality's model on that provider). */
+  models?: ModelChoice
   /** Image-to-image / edit when the provider supports it. */
   referenceImageUrl?: string
   seed?: number
@@ -218,6 +236,7 @@ export interface VideoGenerateRequest {
   provider?: VideoProviderName
   /** Allowed providers in order; overrides the gateway's AI_VIDEO_PROVIDERS. `provider` still wins. */
   providers?: VideoProviderName[]
+  models?: ModelChoice
   namespace?: string
 }
 
@@ -254,7 +273,9 @@ export interface VideoJobResponse {
 }
 
 // ── Audio (POST /v1/audio/transcribe, /v1/audio/speak) ──────────────────────
-export type AudioProviderName = 'azure'
+/** Speech to text (AI_STT_PROVIDERS) and text to speech (AI_TTS_PROVIDERS) are ordered separately. */
+export type SttProviderName = 'sarvam' | 'azure'
+export type TtsProviderName = 'sarvam' | 'azure'
 export type AudioFormat = 'mp3' | 'wav' | 'ogg'
 
 export interface AudioUsage {
@@ -269,7 +290,9 @@ export interface TranscribeRequest {
   mimeType: string
   /** BCP-47, e.g. hi-IN. Omit to let the model detect it. */
   language?: string
-  providers?: AudioProviderName[]
+  /** Speech-to-text providers in order; overrides AI_STT_PROVIDERS. */
+  providers?: SttProviderName[]
+  models?: ModelChoice
 }
 
 export interface TranscribeResponse {
@@ -277,7 +300,7 @@ export interface TranscribeResponse {
   /** The requested language, else the detected one, else 'und'. */
   language: string
   durationSeconds: number
-  provider: AudioProviderName
+  provider: SttProviderName
   model: string
   usage?: AudioUsage
 }
@@ -290,14 +313,16 @@ export interface SpeakRequest {
   voice?: string
   /** Default mp3. */
   format?: AudioFormat
-  providers?: AudioProviderName[]
+  /** Text-to-speech providers in order; overrides AI_TTS_PROVIDERS. */
+  providers?: TtsProviderName[]
+  models?: ModelChoice
 }
 
 export interface SpeakResponse {
   audioBase64: string
   mimeType: string
   characters: number
-  provider: AudioProviderName
+  provider: TtsProviderName
   model: string
   usage?: AudioUsage
 }
@@ -311,6 +336,8 @@ export interface ProviderStatus<N extends string = string> {
   keyFallback?: boolean
   /** razer: false while its backend's circuit breaker is open (routing skips it). */
   healthy?: boolean
+  /** The models a request may pick for this provider and capability (`models` / embed `model`). */
+  models: ModelOption[]
 }
 
 /** The LLM service's backends: Ollama (text, vision, embed), SD (image), PaddleOCR (ocr). */
@@ -332,8 +359,8 @@ export interface ProvidersResponse {
   text: ProviderStatus<TextProviderName>[]
   image: ProviderStatus<ImageProviderName>[]
   video: ProviderStatus<VideoProviderName>[]
-  /** configured = a speech-to-text or text-to-speech path is set. */
-  audio: ProviderStatus<AudioProviderName>[]
+  stt: ProviderStatus<SttProviderName>[]
+  tts: ProviderStatus<TtsProviderName>[]
   /** One provider serves embeddings (defaults.embed); the other is never a fallback. */
   embed: ProviderStatus<EmbedProviderName>[]
   /** configured = the sidecar answered its last probe with the model loaded. */
@@ -343,8 +370,8 @@ export interface ProvidersResponse {
   razer?: RazerHealth
   /** The gateway's own default order per capability (embed: the single provider). */
   defaults: {
-    text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[]; audio: AudioProviderName[]
-    embed: EmbedProviderName; stock?: StockProviderName[]
+    text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[]
+    stt: SttProviderName[]; tts: TtsProviderName[]; embed: EmbedProviderName; stock?: StockProviderName[]
   }
 }
 
@@ -357,6 +384,8 @@ export interface VisionRequest {
   anthropicIdentity?: AnthropicIdentity
   /** The store's text order (Site Controls): cloud providers before razer read images in order; OCR/Ollama only when razer is in it. */
   providers?: TextProviderName[]
+  /** The store's text models: anthropic and azure read images with theirs; razer keeps `model` / OLLAMA_VISION_MODEL. */
+  models?: ModelChoice
 }
 
 export interface VisionResponse {

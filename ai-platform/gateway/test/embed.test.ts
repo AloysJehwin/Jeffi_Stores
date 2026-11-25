@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { defaultEmbedProvider, handleEmbed, parseEmbedRequest, type EmbedDeps } from '../src/embed'
 import { NotConfiguredError, UpstreamError, ValidationError } from '../src/media'
+import { modelSource, options } from '../src/models'
 
 const usage = { promptTokens: 4, completionTokens: 0, costInr: 0.001 }
 
@@ -32,6 +33,31 @@ describe('embed provider selection', () => {
     expect(() => parseEmbedRequest({ input: 3 }, 'razer')).toThrow(ValidationError)
     expect(() => parseEmbedRequest({ input: ['a', 1] }, 'razer')).toThrow(ValidationError)
     expect(() => parseEmbedRequest({ input: 'a', provider: 'google' }, 'razer')).toThrow(ValidationError)
+  })
+})
+
+describe('embed model', () => {
+  const models = modelSource({
+    razer: cap => (cap === 'embed' ? { models: options(['nomic-embed-text', 'mxbai-embed-large'], 'nomic-embed-text') } : null),
+    azure: cap => (cap === 'embed' ? { models: options(['emb', 'emb-large'], 'emb'), aliases: { 'text-embedding-3-small@768': 'emb' } } : null),
+  })
+
+  it('passes the chosen model to the provider and stores the vector-space id it reports', async () => {
+    const { d, razerEmbed, azureEmbed } = deps()
+    azureEmbed.mockImplementationOnce(async (input: string[]) => ({ embeddings: input.map(() => Array(768).fill(0)), usage, model: 'emb-large@768' }))
+    const r = await handleEmbed({ input: 'x', provider: 'azure', model: 'emb-large' }, { ...d, models })
+    expect(azureEmbed).toHaveBeenCalledWith(['x'], 'emb-large')
+    expect(r.model).toBe('emb-large@768')
+    await handleEmbed({ input: 'x', provider: 'azure', model: 'text-embedding-3-small@768' }, { ...d, models })
+    expect(azureEmbed).toHaveBeenLastCalledWith(['x'], 'emb')
+    expect((await handleEmbed({ input: 'x', model: 'mxbai-embed-large' }, { ...d, models })).model).toBe('mxbai-embed-large')
+    expect(razerEmbed).toHaveBeenCalledWith(['x'], 'mxbai-embed-large')
+  })
+
+  it('400s a model that is not on the provider\'s embed list', async () => {
+    const { d } = deps()
+    await expect(handleEmbed({ input: 'x', provider: 'azure', model: 'nomic-embed-text' }, { ...d, models })).rejects.toThrow(/azure has no embeddings model "nomic-embed-text"/)
+    await expect(handleEmbed({ input: 'x', model: 'gpt-5' }, { ...d, models })).rejects.toBeInstanceOf(ValidationError)
   })
 })
 

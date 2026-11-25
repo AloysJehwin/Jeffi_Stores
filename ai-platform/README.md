@@ -85,6 +85,8 @@ over to the next URL on a connection error. It logs `ollama active: <url>` on ev
 resolved to a stale address and took every AI feature down while `/healthz` stayed green.
 
 - `GET /healthz`: liveness only (process up); used by both k8s probes.
+- `GET /v1/providers`: per capability (`text`, `image`, `video`, `stt`, `tts`, `embed`, `ocr`, `stock`) each provider's
+  `configured`, `healthy` (razer) and `models`, plus `defaults` (each capability's order, `embed` its one provider).
 - `GET /readyz` (or `/healthz?deep=1`): truthful dependency check, 503 + `reason` when Redis or
   every Ollama URL is unreachable. Cached for one probe interval so it never hammers Ollama.
 - While Ollama is known down, `/v1/chat` (cache misses), `/v1/embed` and failed `/v1/vision` answer
@@ -178,9 +180,9 @@ Providers:
 | capability | default | providers |
 |---|---|---|
 | text, vision (`/v1/chat`, `/v1/chat/stream`, `/v1/vision`) | `AI_TEXT_PROVIDERS`, else `anthropic,razer,azure` (`razer,azure` without Claude auth) | anthropic (Claude), razer (Ollama by `modelHint`), azure (`AZURE_OPENAI_CHAT_DEPLOYMENT`, streamed over SSE) |
-| embeddings (`/v1/embed`) | one provider, `AI_EMBED_PROVIDER` (`razer`), or `provider` per request | razer: Ollama `nomic-embed-text`; azure: `AZURE_OPENAI_EMBED_DEPLOYMENT` (text-embedding-3-small) at `dimensions: 768`, model id `text-embedding-3-small@768` |
-| speech to text (`/v1/audio/transcribe`) | `AI_AUDIO_PROVIDERS`, else `azure` | azure: `AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT` (whisper / gpt-4o-transcribe), else Azure Speech short audio with `AZURE_SPEECH_KEY` (60 s, WAV or Ogg Opus) |
-| text to speech (`/v1/audio/speak`) | `AI_AUDIO_PROVIDERS`, else `azure` | azure: Azure Speech neural voices (`AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`, default `centralindia`), one default voice per Indian language and en-IN; `AZURE_OPENAI_TTS_DEPLOYMENT` for an OpenAI voice name or as the fallback |
+| embeddings (`/v1/embed`) | one provider, `AI_EMBED_PROVIDER` (`razer`), or `provider` per request | razer: Ollama `nomic-embed-text`; azure: `AZURE_OPENAI_EMBED_DEPLOYMENT` (text-embedding-3-small) at `dimensions: 768`, model id `text-embedding-3-small@768` (`<deployment>@768` for another deployment) |
+| speech to text (`/v1/audio/transcribe`) | `AI_STT_PROVIDERS`, else `sarvam,azure` | sarvam: Saaras (`SARVAM_API_KEY`, `SARVAM_STT_MODEL` default `saaras:v3`; 23 Indian languages and en-IN, `unknown` detects; the REST route takes audio under 30 s, longer files fall through); azure: `AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT` (whisper / gpt-4o-transcribe), else Azure Speech short audio with `AZURE_SPEECH_KEY` (60 s, WAV or Ogg Opus) |
+| text to speech (`/v1/audio/speak`) | `AI_TTS_PROVIDERS`, else `sarvam,azure` | sarvam: Bulbul (`SARVAM_TTS_MODEL` default `bulbul:v3`; 11 Indian languages, a default speaker per language, text over 2,500 characters sent in parts for mp3 and wav); azure: Azure Speech neural voices (`AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`, default `centralindia`), one default voice per Indian language and en-IN; `AZURE_OPENAI_TTS_DEPLOYMENT` for an OpenAI voice name or as the fallback |
 
 - **Azure means Microsoft-sold models only.** Every call names a deployment from the env above, never a model id;
   `AZURE_OPENAI_API_VERSION` defaults to `2025-04-01-preview`. A capability is configured only when the endpoint, the
@@ -194,7 +196,34 @@ Providers:
   BCP-47) answers `{text, language, durationSeconds, provider, model, usage}`. The length comes from the provider, else
   the file's headers (WAV, MP3, Ogg, MP4), else an estimate.
 - `POST /v1/audio/speak` `{text, language, voice?, format?: 'mp3'|'wav'|'ogg', providers?}` (at most 5,000
-  characters) answers `{audioBase64, mimeType, characters, provider, model, usage}`.
+  characters) answers `{audioBase64, mimeType, characters, provider, model, usage}`. A `voice` goes only to the provider
+  it belongs to (an Azure voice name such as `hi-IN-SwaraNeural`, a Sarvam speaker such as `ishita`); the other one
+  uses its default voice for the language.
+- Sarvam follows docs.sarvam.ai (`POST /speech-to-text` multipart, `POST /text-to-speech` JSON, header
+  `api-subscription-key`). Its gateway cost is Sarvam's pay-as-you-go list price in INR: ₹0.49 per audio minute, Bulbul
+  v3 ₹3 and v4 Flash ₹2 per 1,000 characters.
+
+### Model per provider
+
+Every AI request may carry `models: { <provider>: <model id> }` (chat, stream, vision, images, video, transcribe,
+speak); `/v1/embed` takes `model` for its one `provider`. The provider that answers uses its model; one not on that
+provider's list for the capability is a 400 naming the allowed ids. `usage` and the response `model` are always the
+model actually used. `GET /v1/providers` lists each provider's models per capability as
+`models: [{ id, label, default? }]`:
+
+| provider | text | image | video | stt / tts | embed |
+|---|---|---|---|---|---|
+| anthropic | `AI_ANTHROPIC_MODELS` (default `claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5`); without a choice each `modelHint` keeps its model | - | - | - | - |
+| razer | the hint models plus Ollama's installed models (`/api/tags`, cached a minute; while Ollama has never answered any id passes) | `sdxl-turbo` | - | - | the embed model plus installed `*embed*` models |
+| azure | `AZURE_OPENAI_CHAT_DEPLOYMENT` (default) + `AZURE_OPENAI_CHAT_DEPLOYMENTS` | `..._IMAGE_DEPLOYMENT(S)` | `..._VIDEO_DEPLOYMENT(S)` | `..._TRANSCRIBE_DEPLOYMENT(S)` / `..._TTS_DEPLOYMENT(S)`, plus `azure-speech-stt` / `azure-speech-tts` (Azure Speech) | `..._EMBED_DEPLOYMENT(S)` |
+| google | - | the configured Gemini models, then those priced in `pricing.ts` (an `imagen-*` id uses `:predict`) | the Veo model and fallback, then the priced ones | - | - |
+| replicate | - | Flux schnell / dev / 1.1 pro | Wan 2.2 t2v / i2v (an image request always runs i2v) | - | - |
+| sarvam | - | - | - | `saaras:v3`, `saaras:v4` / `bulbul:v3`, `bulbul:v4-flash` | - |
+
+A chosen model runs alone on its provider (no quality model, draft or Imagen fallback, no Speech/OpenAI swap); a
+failure falls through to the next provider as usual. Vision uses the text models for anthropic and azure; razer keeps
+`model` / `OLLAMA_VISION_MODEL`, since an Ollama text model may not read images. An empty list (a capability the
+provider has no deployment for) checks nothing: the provider is skipped as unconfigured anyway.
 
 ### Razer circuit breaker
 

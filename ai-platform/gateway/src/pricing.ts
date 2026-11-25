@@ -113,6 +113,16 @@ const buildDefaults = (): PriceTable => ({
     'azure-speech-tts': { tts_1k_chars: usd(0.015) },
     '*': { ...gpt(0.4, 1.6, 0.1), image: usd(0.042), video_second: usd(0.10), audio_minute: usd(0.006), tts_1k_chars: usd(0.015) },
   },
+  // Sarvam pay-as-you-go list prices, INR excluding GST (docs.sarvam.ai/api/getting-started/pricing, read 2026-11-26):
+  // speech to text ₹0.49 per minute (billed per second, every Saaras model); Bulbul v3 ₹3.00 and v4 Flash ₹2.00 per
+  // 1,000 characters.
+  sarvam: {
+    'saaras:v3': { audio_minute: 0.49 },
+    'saaras:v4': { audio_minute: 0.49 },
+    'bulbul:v3': { tts_1k_chars: 3 },
+    'bulbul:v4-flash': { tts_1k_chars: 2 },
+    '*': { audio_minute: 0.49, tts_1k_chars: 3 },
+  },
 })
 export let DEFAULT_PRICES: PriceTable = buildDefaults()
 
@@ -153,6 +163,11 @@ function cellsFor(provider: string, model: string): PriceCells {
   if (models[model]) return { ...(models['*'] || {}), ...models[model] }
   const prefix = Object.keys(models).filter(k => k !== '*' && model.startsWith(k)).sort((a, b) => b.length - a.length)[0]
   return { ...(models['*'] || {}), ...(prefix ? models[prefix] : {}) }
+}
+
+/** The provider's priced models for a unit, in table order (no wildcard). */
+export function pricedModels(provider: string, unit: PriceUnit): string[] {
+  return Object.entries(DEFAULT_PRICES[provider] ?? {}).filter(([m, c]) => m !== '*' && c[unit] != null).map(([m]) => m)
 }
 
 /** Unit price in INR for one unit of `unit` (0 when unknown). */

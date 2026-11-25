@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  AUDIO_MAX_BASE64, AUDIO_PROVIDER_ORDER, TTS_MAX_CHARS, audioDurationSeconds, estimateSeconds, handleSpeak, handleTranscribe,
-  parseAudioProviders, parseSpeakRequest, parseTranscribeRequest, type AudioRouterDeps,
+  AUDIO_MAX_BASE64, STT_PROVIDER_ORDER, TTS_MAX_CHARS, TTS_PROVIDER_ORDER, audioDurationSeconds, estimateSeconds, handleSpeak, handleTranscribe,
+  parseSpeakRequest, parseSttOrder, parseSttProviders, parseTranscribeRequest, parseTtsOrder, parseTtsProviders,
+  type SttRouterDeps, type TtsRouterDeps,
 } from '../src/audio'
 import { NotConfiguredError, UpstreamError, ValidationError } from '../src/media'
+import { modelSource, options } from '../src/models'
 import { loadPrices, unitPrice } from '../src/pricing'
 import { ProviderError, type AudioProvider, type SpeakInput, type TranscribeInput } from '../src/providers/types'
 
@@ -19,33 +21,79 @@ function wav(seconds: number, rate = 16000): Buffer {
   return Buffer.concat([h, data])
 }
 
-function provider(opts: { stt?: boolean; tts?: boolean; fail?: Error; duration?: number; language?: string } = {}) {
+function provider(opts: { name?: 'sarvam' | 'azure'; stt?: boolean; tts?: boolean; fail?: Error; duration?: number; language?: string } = {}) {
   const calls: { transcribe: TranscribeInput[]; speak: SpeakInput[] } = { transcribe: [], speak: [] }
   const p: AudioProvider & { calls: typeof calls } = {
-    name: 'azure',
+    name: opts.name ?? 'azure',
     calls,
     transcribeConfigured: () => opts.stt ?? true,
     speakConfigured: () => opts.tts ?? true,
     async transcribe(req) {
       calls.transcribe.push(req)
       if (opts.fail) throw opts.fail
-      return { text: 'hello', language: opts.language, durationSeconds: opts.duration, model: 'gpt-4o-transcribe' }
+      return { text: 'hello', language: opts.language, durationSeconds: opts.duration, model: req.model ?? 'gpt-4o-transcribe' }
     },
     async speak(req) {
       calls.speak.push(req)
       if (opts.fail) throw opts.fail
-      return { audio: Buffer.from('mp3-bytes'), mimeType: 'audio/mpeg', model: 'azure-speech-tts' }
+      return { audio: Buffer.from('mp3-bytes'), mimeType: 'audio/mpeg', model: req.model ?? 'azure-speech-tts' }
     },
   }
   return p
 }
-const deps = (p: AudioProvider | undefined): AudioRouterDeps => ({ providers: p ? { azure: p } : {}, order: AUDIO_PROVIDER_ORDER })
+const deps = (p: AudioProvider | undefined): SttRouterDeps & TtsRouterDeps => ({ providers: p ? { azure: p } : {}, order: ['azure'] })
 
 describe('order', () => {
-  it('defaults to azure; env order drops unknown names', () => {
-    expect(parseAudioProviders(undefined)).toEqual(['azure'])
-    expect(parseAudioProviders('bogus, azure')).toEqual(['azure'])
-    expect(parseAudioProviders('bogus')).toEqual(['azure'])
+  it('stt and tts each default to sarvam, azure; env order drops unknown names', () => {
+    expect(parseSttProviders(undefined)).toEqual(['sarvam', 'azure'])
+    expect(parseTtsProviders(undefined)).toEqual(['sarvam', 'azure'])
+    expect(STT_PROVIDER_ORDER).toEqual(TTS_PROVIDER_ORDER)
+    expect(parseSttProviders('bogus, azure')).toEqual(['azure'])
+    expect(parseTtsProviders('azure,sarvam')).toEqual(['azure', 'sarvam'])
+    expect(parseSttProviders('bogus')).toEqual(['sarvam', 'azure'])
+  })
+
+  it('caller orders accept sarvam and azure only', () => {
+    expect(parseSttOrder(['azure', 'sarvam'])).toEqual(['azure', 'sarvam'])
+    expect(parseTtsOrder(['sarvam'])).toEqual(['sarvam'])
+    expect(() => parseSttOrder(['razer'])).toThrow(ValidationError)
+    expect(() => parseTtsOrder('sarvam')).toThrow(ValidationError)
+  })
+})
+
+describe('stt and tts routing', () => {
+  const b64 = wav(1).toString('base64')
+  const source = modelSource({
+    sarvam: cap => (cap === 'stt' ? { models: options(['saaras:v3', 'saaras:v4'], 'saaras:v3') } : cap === 'tts' ? { models: options(['bulbul:v3', 'bulbul:v4-flash'], 'bulbul:v3') } : null),
+    azure: cap => (cap === 'stt' || cap === 'tts' ? { models: options(['azure-speech-stt', 'azure-speech-tts']) } : null),
+  })
+
+  it('transcribe and speak follow their own orders and fall through', async () => {
+    const sarvam = provider({ name: 'sarvam', fail: new ProviderError('sarvam', 'HTTP 503', 503) })
+    const azure = provider()
+    const stt: SttRouterDeps = { providers: { sarvam, azure }, order: ['sarvam', 'azure'] }
+    expect((await handleTranscribe({ audioBase64: b64, mimeType: 'audio/wav' }, stt)).provider).toBe('azure')
+    expect(sarvam.calls.transcribe[0].durationSeconds).toBeCloseTo(1, 3)
+    const tts: TtsRouterDeps = { providers: { sarvam: provider({ name: 'sarvam' }), azure }, order: ['sarvam', 'azure'] }
+    expect((await handleSpeak({ text: 'x', language: 'hi-IN' }, tts)).provider).toBe('sarvam')
+    expect((await handleSpeak({ text: 'x', language: 'hi-IN', providers: ['azure'] }, tts)).provider).toBe('azure')
+  })
+
+  it('passes each provider its model and reports the one used', async () => {
+    const sarvam = provider({ name: 'sarvam' })
+    const d = { providers: { sarvam, azure: provider() }, order: ['sarvam', 'azure'] as ('sarvam' | 'azure')[], models: source }
+    const t = await handleTranscribe({ audioBase64: b64, mimeType: 'audio/wav', models: { sarvam: 'saaras:v4', azure: 'azure-speech-stt' } }, d)
+    expect(t).toMatchObject({ provider: 'sarvam', model: 'saaras:v4' })
+    const s = await handleSpeak({ text: 'x', language: 'ta-IN', models: { sarvam: 'bulbul:v4-flash' } }, d)
+    expect(s).toMatchObject({ provider: 'sarvam', model: 'bulbul:v4-flash' })
+    expect(sarvam.calls.speak[0].model).toBe('bulbul:v4-flash')
+  })
+
+  it('400 for a model off the list or a provider of the other side', async () => {
+    const d = { providers: { sarvam: provider({ name: 'sarvam' }) }, order: ['sarvam'] as 'sarvam'[], models: source }
+    await expect(handleTranscribe({ audioBase64: b64, mimeType: 'audio/wav', models: { sarvam: 'bulbul:v3' } }, d)).rejects.toThrow(/sarvam has no speech-to-text model "bulbul:v3"/)
+    await expect(handleSpeak({ text: 'x', language: 'hi-IN', models: { razer: 'x' } }, d)).rejects.toThrow('razer is not a text-to-speech provider')
+    await expect(handleSpeak({ text: 'x', language: 'hi-IN', models: 'bulbul:v3' }, d)).rejects.toBeInstanceOf(ValidationError)
   })
 })
 
@@ -53,8 +101,8 @@ describe('transcribe validation', () => {
   const b64 = wav(0.1).toString('base64')
 
   it('accepts base64 audio with a known type and BCP-47 language', () => {
-    const r = parseTranscribeRequest({ audioBase64: b64, mimeType: 'Audio/WebM;codecs=opus', language: 'hi-IN', providers: ['azure'] })
-    expect(r).toMatchObject({ mimeType: 'audio/webm;codecs=opus', language: 'hi-IN', providers: ['azure'] })
+    const r = parseTranscribeRequest({ audioBase64: b64, mimeType: 'Audio/WebM;codecs=opus', language: 'hi-IN', providers: ['azure'], models: { sarvam: 'saaras:v4', azure: '' } })
+    expect(r).toMatchObject({ mimeType: 'audio/webm;codecs=opus', language: 'hi-IN', providers: ['azure'], models: { sarvam: 'saaras:v4' } })
     expect(r.audio.length).toBeGreaterThan(0)
     expect(parseTranscribeRequest({ audioBase64: b64, mimeType: 'audio/wav', language: '' }).language).toBeUndefined()
   })
@@ -76,7 +124,7 @@ describe('transcribe validation', () => {
 
 describe('speak validation', () => {
   it('trims text, defaults to mp3 and requires a language', () => {
-    expect(parseSpeakRequest({ text: ' hi ', language: 'ta-IN' })).toEqual({ text: 'hi', language: 'ta-IN', voice: undefined, format: 'mp3', providers: undefined })
+    expect(parseSpeakRequest({ text: ' hi ', language: 'ta-IN' })).toEqual({ text: 'hi', language: 'ta-IN', voice: undefined, format: 'mp3', providers: undefined, models: undefined })
     expect(parseSpeakRequest({ text: 'hi', language: 'en-IN', voice: 'en-IN-PrabhatNeural', format: 'ogg' })).toMatchObject({ voice: 'en-IN-PrabhatNeural', format: 'ogg' })
   })
 
@@ -99,7 +147,7 @@ describe('handleTranscribe', () => {
     const r = await handleTranscribe({ audioBase64: wav(30).toString('base64'), mimeType: 'audio/wav', language: 'hi-IN' }, deps(p))
     expect(r).toMatchObject({ text: 'hello', language: 'hi-IN', durationSeconds: 30, provider: 'azure', model: 'gpt-4o-transcribe' })
     expect(r.usage).toEqual({ units: 0.5, unitType: 'audio_minute', costInr: expect.closeTo(unitPrice('azure', 'gpt-4o-transcribe', 'audio_minute') * 0.5, 4) })
-    expect(p.calls.transcribe[0]).toMatchObject({ mimeType: 'audio/wav', language: 'hi-IN' })
+    expect(p.calls.transcribe[0]).toMatchObject({ mimeType: 'audio/wav', language: 'hi-IN', durationSeconds: 30 })
   })
 
   it('prefers the provider length and detected language, else und', async () => {
@@ -131,7 +179,7 @@ describe('handleSpeak', () => {
     expect(r).toMatchObject({ audioBase64: Buffer.from('mp3-bytes').toString('base64'), mimeType: 'audio/mpeg', characters: chars, provider: 'azure', model: 'azure-speech-tts' })
     expect(r.usage?.unitType).toBe('tts_1k_chars')
     expect(r.usage?.costInr).toBeCloseTo(unitPrice('azure', 'azure-speech-tts', 'tts_1k_chars') * chars / 1000, 4)
-    expect(p.calls.speak[0]).toEqual({ text, language: 'hi-IN', voice: undefined, format: 'mp3' })
+    expect(p.calls.speak[0]).toEqual({ text, language: 'hi-IN', voice: undefined, format: 'mp3', model: undefined })
   })
 
   it('503 when no TTS path is configured, 502 when it fails', async () => {

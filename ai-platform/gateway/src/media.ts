@@ -5,10 +5,12 @@ import { createHash } from 'node:crypto'
 import type { Redis } from 'ioredis'
 import type {
   GeneratedImageRef, ImageGenerateRequest, ImageGenerateResponse,
-  ImageProviderName, ImageQuality, ProviderStatus, TextProviderName,
+  ImageProviderName, ImageQuality, ModelChoice, ProviderStatus, TextProviderName,
   VideoAspect, VideoGenerateRequest, VideoJobResponse, VideoProviderName, VideoStartResponse,
 } from '../../sdk/types'
+import { NotConfiguredError, UpstreamError, ValidationError } from './errors'
 import type { FileStore } from './files'
+import { parseModels, type ModelSource } from './models'
 import { costFor, round } from './pricing'
 import { ProviderError, type BackgroundRemover, type GeneratedImage, type ImageGenInput, type MediaProvider, type VideoGenInput } from './providers/types'
 import { createVideoJobStore, resultFrom, toResponse, type VideoJobStore } from './video-jobs'
@@ -16,12 +18,10 @@ import { createVideoJobStore, resultFrom, toResponse, type VideoJobStore } from 
 export const IMAGE_PROVIDER_ORDER: ImageProviderName[] = ['razer', 'google', 'replicate', 'azure']
 export const VIDEO_PROVIDER_ORDER: VideoProviderName[] = ['google', 'replicate', 'azure']
 
-export class ValidationError extends Error { readonly status = 400 }
-export class UpstreamError extends Error {
-  constructor(message: string, readonly tried: { provider: string; error: string }[]) { super(message) }
-  readonly status = 502
-}
-export class NotConfiguredError extends Error { readonly status = 503 }
+export { NotConfiguredError, UpstreamError, ValidationError }
+
+/** A provider's status before its model list is attached (providers-report.ts). */
+export type StatusBase<N extends string = string> = Omit<ProviderStatus<N>, 'models'>
 
 export const TRANSPARENT_NEEDS_REPLICATE = 'Transparent background needs the Replicate provider'
 // Isolating the subject on a flat contrasting backdrop gives the cutout model clean edges.
@@ -31,8 +31,10 @@ export function withCutoutHint(prompt: string): string {
   return `${prompt.replace(/[\s.]+$/, '')}. ${CUTOUT_HINT}`
 }
 
-interface ParsedImageReq extends ImageGenInput { provider?: ImageProviderName; providers?: ImageProviderName[]; namespace: string; cacheKey: string }
-interface ParsedVideoReq extends VideoGenInput { provider?: VideoProviderName; providers?: VideoProviderName[]; namespace: string }
+interface ParsedImageReq extends ImageGenInput {
+  provider?: ImageProviderName; providers?: ImageProviderName[]; models?: ModelChoice; namespace: string; cacheKey: string
+}
+interface ParsedVideoReq extends VideoGenInput { provider?: VideoProviderName; providers?: VideoProviderName[]; models?: ModelChoice; namespace: string }
 
 const TEXT_PROVIDER_SET = new Set<TextProviderName>(['anthropic', 'razer', 'azure'])
 const ANTHROPIC_READY = !!process.env.ANTHROPIC_API_KEY || !!(process.env.ANTHROPIC_ORGANIZATION_ID && process.env.ANTHROPIC_IDENTITY_TOKEN_FILE)
@@ -114,7 +116,7 @@ export function visionRoute(route: TextProviderName[], ready: (p: TextProviderNa
 }
 
 /** Status entries in the gateway's default order, then the rest. */
-export function orderedStatus<N extends string>(order: N[], entries: Record<N, ProviderStatus<N>>): ProviderStatus<N>[] {
+export function orderedStatus<N extends string, S extends { name: N }>(order: N[], entries: Record<N, S>): S[] {
   const names = [...order, ...(Object.keys(entries) as N[]).filter(n => !order.includes(n))]
   return names.filter(n => entries[n]).map(n => entries[n])
 }
@@ -136,12 +138,13 @@ export function videoRoute(req: VideoGenerateRequest, configured: VideoProviderN
 }
 
 /** Configured state per provider, in the gateway's default order then the rest. */
-export function providerStatus<N extends string>(order: N[], providers: Partial<Record<N, { configured(): boolean }>>): ProviderStatus<N>[] {
+export function providerStatus<N extends string>(order: N[], providers: Partial<Record<N, { configured(): boolean }>>): StatusBase<N>[] {
   const names = [...order, ...(Object.keys(providers) as N[]).filter(n => !order.includes(n))]
   return names.map(name => ({ name, configured: !!providers[name]?.configured() }))
 }
 
-export function parseImageRequest(raw: unknown): ParsedImageReq {
+/** `models` is checked against each provider's image list when a source is given. */
+export function parseImageRequest(raw: unknown, source?: ModelSource): ParsedImageReq {
   const r = (raw ?? {}) as Partial<ImageGenerateRequest>
   const prompt = typeof r.prompt === 'string' ? r.prompt.trim() : ''
   if (!prompt) throw new ValidationError('prompt is required')
@@ -156,11 +159,12 @@ export function parseImageRequest(raw: unknown): ParsedImageReq {
   const referenceImageUrl = typeof r.referenceImageUrl === 'string' && r.referenceImageUrl ? r.referenceImageUrl : undefined
   const seed = typeof r.seed === 'number' && Number.isFinite(r.seed) ? Math.floor(r.seed) : undefined
   const transparent = r.transparent === true || undefined
-  const cacheKey = imageCacheKey({ prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, namespace, transparent })
-  return { prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, seed, transparent, namespace, cacheKey }
+  const models = parseModels(r.models, 'image', source)
+  const cacheKey = imageCacheKey({ prompt, negativePrompt, width, height, n, quality, provider, providers, models, referenceImageUrl, namespace, transparent })
+  return { prompt, negativePrompt, width, height, n, quality, provider, providers, models, referenceImageUrl, seed, transparent, namespace, cacheKey }
 }
 
-export function parseVideoRequest(raw: unknown): ParsedVideoReq {
+export function parseVideoRequest(raw: unknown, source?: ModelSource): ParsedVideoReq {
   const r = (raw ?? {}) as Partial<VideoGenerateRequest>
   const prompt = typeof r.prompt === 'string' ? r.prompt.trim() : ''
   if (!prompt) throw new ValidationError('prompt is required')
@@ -170,13 +174,13 @@ export function parseVideoRequest(raw: unknown): ParsedVideoReq {
   const providers = parseVideoOrder(r.providers)
   const namespace = typeof r.namespace === 'string' && r.namespace ? r.namespace : 'platform'
   const imageUrl = typeof r.imageUrl === 'string' && r.imageUrl ? r.imageUrl : undefined
-  return { prompt, imageUrl, durationSec, aspect, provider, providers, namespace }
+  return { prompt, imageUrl, durationSec, aspect, provider, providers, models: parseModels(r.models, 'video', source), namespace }
 }
 
 /** Stable hash of the provider-agnostic request (no seed), partitioned by namespace. */
 export function imageCacheKey(req: {
   prompt: string; negativePrompt?: string; width: number; height: number
-  n: number; quality: ImageQuality; provider?: ImageProviderName; providers?: ImageProviderName[]
+  n: number; quality: ImageQuality; provider?: ImageProviderName; providers?: ImageProviderName[]; models?: ModelChoice
   referenceImageUrl?: string; namespace: string; transparent?: boolean
 }): string {
   const shape = {
@@ -187,6 +191,7 @@ export function imageCacheKey(req: {
     provider: req.provider || '*',
     // A restricted order must not be served an image another provider made; unset keeps old keys.
     ...(req.providers ? { providers: req.providers.join(',') } : {}),
+    ...(req.models ? { models: Object.entries(req.models).sort(([a], [b]) => a.localeCompare(b)) } : {}),
     ref: req.referenceImageUrl || '',
     ...(req.transparent ? { transparent: true } : {}),
   }
@@ -214,10 +219,12 @@ export interface ImageRouterDeps {
   cutout?: BackgroundRemover
   /** False while a provider's backend is known down (razer's circuit breaker): skipped like an unconfigured one. */
   available?: (name: ImageProviderName) => boolean
+  /** Model lists that `models` is checked against. */
+  models?: ModelSource
 }
 
 export async function handleImageGenerate(req: ImageGenerateRequest, deps: ImageRouterDeps): Promise<ImageGenerateResponse> {
-  const p = parseImageRequest(req)
+  const p = parseImageRequest(req, deps.models)
   const start = Date.now()
   const configured = imageRoute(req, deps.order).filter(name => deps.providers[name]?.configured())
   if (!configured.length) throw new NotConfiguredError('no image provider configured')
@@ -237,7 +244,7 @@ export async function handleImageGenerate(req: ImageGenerateRequest, deps: Image
     const provider = deps.providers[name]!
     try {
       if (!provider.generateImage) throw new ProviderError(name, 'no image support')
-      const out = await provider.generateImage(input)
+      const out = await provider.generateImage({ ...input, model: p.models?.[name] })
       const { images, removal } = await cutoutImages(out.images, p.transparent ? deps.cutout : undefined)
       const refs = await Promise.all(images.map(img => storeImage(deps, img.bytes, img.mime, img.width, img.height)))
       const costInr = round((out.costInr ?? costFor(name, out.model, { image: refs.length })) + (removal?.costInr ?? 0))
@@ -298,10 +305,11 @@ export interface VideoRouterDeps {
   jobs: VideoJobStore
   files: FileStore
   fileBaseUrl?: string
+  models?: ModelSource
 }
 
 export async function handleVideoStart(req: VideoGenerateRequest, deps: VideoRouterDeps): Promise<VideoStartResponse> {
-  const p = parseVideoRequest(req)
+  const p = parseVideoRequest(req, deps.models)
   const route = videoRoute(req, deps.order).filter(name => deps.providers[name]?.configured())
   if (!route.length) throw new NotConfiguredError('no video provider configured')
   const tried: { provider: string; error: string }[] = []
@@ -309,7 +317,7 @@ export async function handleVideoStart(req: VideoGenerateRequest, deps: VideoRou
     const provider = deps.providers[name]!
     try {
       if (!provider.startVideo) throw new ProviderError(name, 'no video support')
-      const start = await provider.startVideo(p)
+      const start = await provider.startVideo({ ...p, model: p.models?.[name] })
       const state = await deps.jobs.create({
         provider: name,
         model: start.model,

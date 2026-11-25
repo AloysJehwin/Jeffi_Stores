@@ -49,6 +49,13 @@ data:
   AI_STOCK_PROVIDERS: "pexels,pixabay"
   # Claude text. Text order; empty = anthropic,razer when Claude auth is configured.
   AI_TEXT_PROVIDERS: ""
+  # Claude models a request may pick per store (`models.anthropic`); the hint models below stay the defaults.
+  AI_ANTHROPIC_MODELS: "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5"
+  # Speech to text and text to speech orders (sarvam needs SARVAM_API_KEY, azure its Speech key or deployments).
+  AI_STT_PROVIDERS: "sarvam,azure"
+  AI_TTS_PROVIDERS: "sarvam,azure"
+  SARVAM_STT_MODEL: "saaras:v3"
+  SARVAM_TTS_MODEL: "bulbul:v3"
   # Workload identity federation: org-wide id + the projected token (gateway.yaml). Per-store
   # workspace/service-account/rule ids come with each request from ai_provider_identities.
   ANTHROPIC_ORGANIZATION_ID: ""
@@ -73,7 +80,9 @@ data:
 # PEXELS_API_KEY / PIXABAY_API_KEY: stock photo search keys. Empty = that library skipped.
 # ANTHROPIC_API_KEY: local dev only (production uses workload identity). Leave empty in clusters.
 # AZURE_*: Azure OpenAI endpoint/key/api version/deployment names and AZURE_SPEECH_KEY/REGION; AI_EMBED_PROVIDER (razer|azure).
+#   AZURE_OPENAI_<X>_DEPLOYMENTS: more deployments a store may pick (comma list; the singular one stays the default).
 #   Empty = azure skipped. See ai-platform/README.md.
+# SARVAM_API_KEY: Sarvam speech to text and text to speech. Empty = sarvam skipped.
 # AI_GATEWAY_TOKEN: bearer token every /v1 call must carry ("new,old" during a rotation). Empty = no auth.
 apiVersion: v1
 kind: Secret
@@ -101,4 +110,11 @@ stringData:
   AZURE_OPENAI_VIDEO_DEPLOYMENT: ""
   AZURE_SPEECH_KEY: ""
   AZURE_SPEECH_REGION: ""
+  AZURE_OPENAI_CHAT_DEPLOYMENTS: ""
+  AZURE_OPENAI_IMAGE_DEPLOYMENTS: ""
+  AZURE_OPENAI_EMBED_DEPLOYMENTS: ""
+  AZURE_OPENAI_TRANSCRIBE_DEPLOYMENTS: ""
+  AZURE_OPENAI_TTS_DEPLOYMENTS: ""
+  AZURE_OPENAI_VIDEO_DEPLOYMENTS: ""
   AI_EMBED_PROVIDER: ""
+  SARVAM_API_KEY: ""
