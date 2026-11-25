@@ -1,21 +1,14 @@
-# Razer (k3s, single GPU box) overlay. Deploy with:
+# Razer (k3s, single GPU box) overlay: the LLM service only (Ollama, PaddleOCR, the GPU device plugin; the image
+# server and the GPU guards live in host/). The AI gateway and its Redis run in the main cluster
+# (deploy/k8s/platform/48-ai-gateway-service.yaml) and reach this box over Tailscale. Deploy with:
 #   kubectl apply -k deploy/overlays/razer
 # k3s runs with --disable traefik (the host nginx owns :80) and --default-runtime nvidia.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
-  - gateway-lb.yaml
+  - paddleocr-lb.yaml
 patches:
-  # Images are built on the box into containerd (k8s.io); never resolve them from a registry.
-  - target: { kind: Deployment, name: ai-gateway }
-    patch: |
-      - op: replace
-        path: /spec/replicas
-        value: 2
-      - op: add
-        path: /spec/template/spec/containers/0/imagePullPolicy
-        value: Never
   # Ollama replaces the host's systemd service: same user, same model store, same 0.0.0.0:11434,
   # so callers that still hit the host port directly keep working.
   - target: { kind: Deployment, name: ollama }
@@ -47,33 +40,14 @@ patches:
       - op: replace
         path: /spec/template/spec/volumes/0
         value: { name: models, hostPath: { path: /usr/share/ollama/.ollama, type: Directory } }
-  # Ollama runs as the host's systemd service, so the gateway targets the node's :11434. Never a
-  # hostname (it once resolved to a stale address and took every AI feature down): first the k3s
-  # cni0 bridge (the host as seen from pods; no DNS/DHCP/Tailscale), then the Tailscale IP.
-  - target: { kind: ConfigMap, name: ai-gateway-config }
-    patch: |
-      - op: replace
-        path: /data/OLLAMA_BASE_URLS
-        value: "http://10.42.0.1:11434,http://100.82.208.8:11434"
-      # Razer image server (host/sd_server.py, A1111 API over SDXL-Turbo), same addressing rule
-      # as Ollama: the k3s cni0 bridge, never a hostname.
-      - op: replace
-        path: /data/SD_WEBUI_URL
-        value: "http://10.42.0.1:7860"
-      - op: replace
-        path: /data/SD_TIMEOUT_MS
-        value: "120000"
-      # Tailnet address of the gateway LB, so returned /v1/files URLs are fetchable by the app.
-      - op: replace
-        path: /data/AI_PUBLIC_URL
-        value: "http://100.82.208.8:8080"
   - patch: |
       apiVersion: v1
       kind: PersistentVolumeClaim
       metadata: { name: ollama-models, namespace: ai-platform }
       $patch: delete
-  # PaddleOCR (paddleocr/Dockerfile) is built on the box like the gateway (host/ai-gateway-release.sh). CPU only,
-  # next to the GPU work: 4 cores with as many inference threads; ~1.5 GiB resident with the models loaded.
+  # PaddleOCR (paddleocr/Dockerfile) is built on the box (host/ai-gateway-release.sh). CPU only, next to the GPU
+  # work: 4 cores with as many inference threads; ~1.5 GiB resident with the models loaded. Reached from the main
+  # cluster through paddleocr-lb (:8866 on the tailnet address).
   - target: { kind: Deployment, name: paddleocr }
     patch: |
       - op: add
@@ -85,10 +59,50 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/resources
         value: { requests: { cpu: 500m, memory: 1536Mi }, limits: { cpu: "4", memory: 4Gi } }
-  # The Secret holds real keys set on the box (scripts/razer-set-secrets.sh); applying the base's
-  # empty placeholders would wipe them, so it is never managed by apply.
+  # The gateway and its Redis moved to the main cluster; drop their base objects here. A delete patch removes
+  # nothing already running: `ai-gateway-release retire-gateway` on the box does, once the platform gateway serves.
+  - patch: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata: { name: ai-gateway, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: ai-gateway, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: v1
+      kind: Service
+      metadata: { name: ai-gateway, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata: { name: ai-gateway, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: { name: ai-gateway-config, namespace: ai-platform }
+      $patch: delete
   - patch: |
       apiVersion: v1
       kind: Secret
       metadata: { name: ai-gateway-secret, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata: { name: ai-redis, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: v1
+      kind: Service
+      metadata: { name: ai-redis, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata: { name: ai-redis-data, namespace: ai-platform }
       $patch: delete

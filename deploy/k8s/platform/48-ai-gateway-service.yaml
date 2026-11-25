@@ -1,0 +1,195 @@
+# ai-gateway: the platform's AI layer (ai-platform/gateway). Every app pod, the flagship's and each store's, calls it
+# in-cluster at http://ai-gateway.jeffi.svc.cluster.local:8080. It holds the provider settings, order, cache and
+# pricing; the Razer box is only its `razer` provider (Ollama :11434, SDXL server :7860, PaddleOCR :8866, over
+# Tailscale), so a Razer outage costs the `razer` provider, never the gateway. ai-redis is its durable job queue.
+#
+# Secrets: the `ai-gateway` Secret in this namespace (never in git), written by
+# deploy/k8s/bootstrap/ai-gateway-secret.sh from Secrets Manager (jeffi/ai-gateway/production, plus AI_GATEWAY_TOKEN
+# from jeffi/production so the apps and the gateway agree). Provider endpoints, deployment names and keys live there
+# too, so a value set in the Secret is never shadowed by an empty env entry here. Without the Secret the pods still
+# start and every keyed provider reports unconfigured.
+#
+# Claude goes through Anthropic workload identity federation. The gateway's token is this cluster's projected
+# service-account token (subject system:serviceaccount:jeffi:ai-gateway, audience https://api.anthropic.com), NOT the
+# Razer k3s token the existing federation rule trusts. BEFORE the cutover the founder must add this cluster's
+# service-account issuer in the Anthropic console (Settings, Workload identity federation) and a rule for the subject
+# above that targets the same service accounts as the Razer rule (the same kind of step as the voice-service
+# `wif-voice` issuer: voice-service/README.md, "Claude through federation"). The issuer URL is whatever this k3s
+# serves (`kubectl get --raw /.well-known/openid-configuration`); Anthropic must be able to read its JWKS, so if it is
+# not reachable from the internet register the JWKS inline, or copy voice-service's `wif-minter` sidecar instead.
+# Until then Claude requests fail at the exchange and the gateway falls through to the next text provider.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: ai-gateway, namespace: jeffi }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-ai-gateway-service
+  namespace: jeffi
+  labels: { app: ai-gateway-service, jeffi.io/service: ai-gateway, jeffi.io/tenant: jeffi-stores }
+spec:
+  # 2 replicas: one restarting never stops the queue draining or the cache answering.
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: ai-gateway-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: ai-gateway-service, jeffi.io/service: ai-gateway, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      serviceAccountName: ai-gateway
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 150
+      securityContext: { runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, runAsNonRoot: true }
+      containers:
+        - name: gateway
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-ai-gateway-service:latest
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - { name: PORT, value: '8080' }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@ai-redis:6379' }
+            # The Razer box (the `razer` provider) over Tailscale: tailnet address, never a hostname.
+            - { name: OLLAMA_BASE_URLS, value: 'http://100.82.208.8:11434' }
+            - { name: OLLAMA_PROBE_INTERVAL_MS, value: '15000' }
+            - { name: SD_WEBUI_URL, value: 'http://100.82.208.8:7860' }
+            - { name: SD_TIMEOUT_MS, value: '120000' }
+            - { name: PADDLE_OCR_URL, value: 'http://100.82.208.8:8866' }
+            - { name: PADDLE_OCR_TIMEOUT_MS, value: '120000' }
+            # Returned /v1/files URLs must be fetchable by the app pods.
+            - { name: AI_PUBLIC_URL, value: 'http://ai-gateway.jeffi.svc.cluster.local:8080' }
+            - { name: OLLAMA_REQUEST_TIMEOUT_MS, value: '120000' }
+            - { name: OLLAMA_AGENT_MODEL, value: 'qwen2.5:7b' }
+            - { name: OLLAMA_SQL_MODEL, value: 'gemma4:12b' }
+            - { name: OLLAMA_COPY_MODEL, value: 'gemma4:12b' }
+            - { name: OLLAMA_EMAIL_MODEL, value: 'gemma3:4b' }
+            - { name: OLLAMA_FAST_MODEL, value: 'gemma3:4b' }
+            - { name: OLLAMA_VISION_MODEL, value: 'gemma4:12b' }
+            - { name: RAG_EMBED_MODEL, value: 'nomic-embed-text' }
+            - { name: AI_JOB_ATTEMPTS, value: '3' }
+            - { name: AI_WORKER_CONCURRENCY, value: '2' }
+            - { name: AI_IMAGE_PROVIDERS, value: 'razer,google,replicate,azure' }
+            - { name: AI_VIDEO_PROVIDERS, value: 'google,replicate,azure' }
+            - { name: AI_IMAGE_CACHE_TTL_SECONDS, value: '3600' }
+            - { name: AI_FILES_TTL_SECONDS, value: '3600' }
+            - { name: AI_VIDEO_TTL_SECONDS, value: '86400' }
+            - { name: AI_VIDEO_POLL_MS, value: '10000' }
+            - { name: AI_USD_INR, value: '84' } # fallback only: the gateway fetches the live rate every six hours
+            - { name: SD_STEPS, value: '25' }
+            - { name: SD_CFG, value: '7' }
+            - { name: SD_SAMPLER, value: 'DPM++ 2M Karras' }
+            - { name: GOOGLE_IMAGE_MODEL, value: 'gemini-3.1-flash-image' }
+            - { name: GOOGLE_IMAGE_PREMIUM_MODEL, value: 'gemini-3-pro-image' }
+            - { name: GOOGLE_IMAGE_DRAFT_MODEL, value: 'gemini-3.1-flash-lite-image' }
+            - { name: GOOGLE_VEO_MODEL, value: 'veo-3.1-fast-generate-preview' }
+            - { name: GOOGLE_VEO_FALLBACK, value: 'veo-3.0-generate-001' }
+            - { name: GOOGLE_TIMEOUT_MS, value: '120000' }
+            - { name: REPLICATE_TIMEOUT_MS, value: '180000' }
+            - { name: AI_STOCK_PROVIDERS, value: 'pexels,pixabay' }
+            - { name: ANTHROPIC_IDENTITY_TOKEN_FILE, value: /var/run/secrets/anthropic/token }
+            - { name: ANTHROPIC_FEDERATION_AUDIENCE, value: 'https://api.anthropic.com' }
+            - { name: ANTHROPIC_AGENT_MODEL, value: 'claude-sonnet-5-5' }
+            - { name: ANTHROPIC_AGENT_EFFORT, value: 'medium' }
+            - { name: ANTHROPIC_FAST_MODEL, value: 'claude-haiku-5-5' }
+            - { name: ANTHROPIC_COPY_MODEL, value: 'claude-haiku-5-5' }
+            - { name: ANTHROPIC_DEEP_MODEL, value: 'claude-opus-5-5' }
+            - { name: ANTHROPIC_VISION_MODEL, value: 'claude-sonnet-5-5' }
+            - { name: ANTHROPIC_FALLBACKS, value: 'default' }
+            - { name: ANTHROPIC_TIMEOUT_MS, value: '120000' }
+            - { name: ANTHROPIC_MIN_MAX_TOKENS, value: '8000' }
+          # From the Secret (all optional): AI_GATEWAY_TOKEN, AI_CACHE_PG_URL, ANTHROPIC_ORGANIZATION_ID,
+          # ANTHROPIC_API_KEY (local fallback only), OPENAI_API_KEY, GOOGLE_AI_API_KEY, REPLICATE_API_TOKEN,
+          # PEXELS_API_KEY, PIXABAY_API_KEY, AI_TEXT_PROVIDERS, AI_PRICES_JSON, AI_EMBED_PROVIDER, and Azure:
+          # AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_CHAT_DEPLOYMENT,
+          # AZURE_OPENAI_IMAGE_DEPLOYMENT, AZURE_OPENAI_EMBED_DEPLOYMENT, AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT,
+          # AZURE_OPENAI_TTS_DEPLOYMENT, AZURE_OPENAI_VIDEO_DEPLOYMENT, AZURE_SPEECH_KEY, AZURE_SPEECH_REGION.
+          envFrom: [{ secretRef: { name: ai-gateway, optional: true } }]
+          # Process-level probes on purpose: Redis and the Razer box are shared by every replica, so gating
+          # readiness on them would only flip all replicas off together. /readyz is the truthful dependency check.
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 3 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, initialDelaySeconds: 15, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          securityContext: { allowPrivilegeEscalation: false }
+          volumeMounts:
+            - { name: anthropic-identity, mountPath: /var/run/secrets/anthropic, readOnly: true }
+          resources:
+            requests: { cpu: 200m, memory: 256Mi }
+            limits: { cpu: '1', memory: 512Mi }
+      volumes:
+        - name: anthropic-identity
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  # Keep equal to ANTHROPIC_FEDERATION_AUDIENCE above and to the federation rule's audience.
+                  audience: https://api.anthropic.com
+                  expirationSeconds: 3600
+---
+apiVersion: v1
+kind: Service
+metadata: { name: ai-gateway, namespace: jeffi }
+spec:
+  selector: { app: ai-gateway-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+# The namespace's ingress-from-edge policy admits only this namespace; the stores' pods call the gateway too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: ai-gateway-from-stores, namespace: jeffi }
+spec:
+  podSelector: { matchLabels: { app: ai-gateway-service } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { jeffi.io/tier: tenant } }
+      ports: [{ port: 8080 }]
+---
+# ai-redis: the gateway's durable job queue (AOF), password from the shared `redis` Secret. One replica on the core.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: ai-redis, namespace: jeffi, labels: { app: ai-redis } }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: ai-redis } }
+  template:
+    metadata: { labels: { app: ai-redis } }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: [--requirepass, $(REDIS_PASSWORD), --appendonly, 'yes', --maxmemory, 192mb, --maxmemory-policy, noeviction]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+          ports: [{ containerPort: 6379 }]
+          readinessProbe: { exec: { command: [sh, -c, 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping'] }, periodSeconds: 10 }
+          resources:
+            requests: { cpu: 10m, memory: 64Mi }
+            limits: { memory: 256Mi }
+          volumeMounts: [{ name: data, mountPath: /data }]
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: ai-redis-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: ai-redis-data, namespace: jeffi }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources: { requests: { storage: 2Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: ai-redis, namespace: jeffi }
+spec:
+  selector: { app: ai-redis }
+  ports: [{ port: 6379 }]

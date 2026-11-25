@@ -1,0 +1,14 @@
+# Publishes PaddleOCR on the node's :8866 through k3s ServiceLB (tailnet: 100.82.208.8:8866), for the gateway that
+# runs in the main cluster (PADDLE_OCR_URL). Ollama (:11434) and the image server (:7860) are host services and are
+# already on the tailnet address.
+apiVersion: v1
+kind: Service
+metadata:
+  name: paddleocr-lb
+  namespace: ai-platform
+spec:
+  type: LoadBalancer
+  selector: { app: paddleocr }
+  ports:
+    - port: 8866
+      targetPort: 8866

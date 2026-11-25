@@ -6,13 +6,13 @@
 #             own host, reporting <sha>. Suspended stores (scaled to 0) are skipped.
 # No service: every one. A host that does not answer (000) or answers 5xx fails it. --dry-run reports what is
 # live and never fails.
-# Usage: smoke.sh <sha> [controller|storefront|admin|business|messaging|documents|public-api|mobile|showcase] [flagship|tenants] [--dry-run]
+# Usage: smoke.sh <sha> [controller|storefront|admin|business|messaging|documents|public-api|mobile|showcase|ai-gateway] [flagship|tenants] [--dry-run]
 source "$(dirname "$0")/../db/lib.sh"
 SHA=${1:?image sha}
-SCOPE=all SERVICES="controller storefront admin business messaging documents public-api mobile showcase"
+SCOPE=all SERVICES="controller storefront admin business messaging documents public-api mobile showcase ai-gateway"
 for a in "${@:2}"; do case $a in
   flagship|tenants) SCOPE=$a ;;
-  controller|storefront|admin|business|messaging|documents|public-api|mobile|showcase) SERVICES=$a ;;
+  controller|storefront|admin|business|messaging|documents|public-api|mobile|showcase|ai-gateway) SERVICES=$a ;;
 esac; done
 k8s_tunnel
 bad=0
@@ -32,7 +32,7 @@ health() {
   case $1 in
     controller|storefront|admin|business|showcase) echo "3000 /api/health commit" ;;
     messaging) echo "3101 /healthz" ;; documents) echo "3102 /healthz" ;;
-    public-api) echo "3100 /healthz" ;; mobile) echo "3103 /api/health" ;;
+    public-api) echo "3100 /healthz" ;; ai-gateway) echo "8080 /healthz" ;; mobile) echo "3103 /api/health" ;;
   esac
 }
 in_pod() { # in_pod <namespace> <deployment> <service>

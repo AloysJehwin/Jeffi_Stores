@@ -22,8 +22,8 @@ data:
   AI_JOB_ATTEMPTS: "3"
   AI_WORKER_CONCURRENCY: "2"
   # Images and video (see README "Images and video").
-  AI_IMAGE_PROVIDERS: "razer,google,replicate"
-  AI_VIDEO_PROVIDERS: "google,replicate"
+  AI_IMAGE_PROVIDERS: "razer,google,replicate,azure"
+  AI_VIDEO_PROVIDERS: "google,replicate,azure"
   AI_PUBLIC_URL: ""
   AI_IMAGE_CACHE_TTL_SECONDS: "3600"
   AI_FILES_TTL_SECONDS: "3600"
@@ -72,6 +72,8 @@ data:
 # REPLICATE_API_TOKEN: Replicate token (Flux, Wan video). Empty = replicate skipped.
 # PEXELS_API_KEY / PIXABAY_API_KEY: stock photo search keys. Empty = that library skipped.
 # ANTHROPIC_API_KEY: local dev only (production uses workload identity). Leave empty in clusters.
+# AZURE_*: Azure OpenAI endpoint/key/api version/deployment names and AZURE_SPEECH_KEY/REGION; AI_EMBED_PROVIDER (razer|azure).
+#   Empty = azure skipped. See ai-platform/README.md.
 # AI_GATEWAY_TOKEN: bearer token every /v1 call must carry ("new,old" during a rotation). Empty = no auth.
 apiVersion: v1
 kind: Secret
@@ -88,3 +90,15 @@ stringData:
   PIXABAY_API_KEY: ""
   ANTHROPIC_API_KEY: ""
   AI_GATEWAY_TOKEN: ""
+  AZURE_OPENAI_ENDPOINT: ""
+  AZURE_OPENAI_API_KEY: ""
+  AZURE_OPENAI_API_VERSION: ""
+  AZURE_OPENAI_CHAT_DEPLOYMENT: ""
+  AZURE_OPENAI_IMAGE_DEPLOYMENT: ""
+  AZURE_OPENAI_EMBED_DEPLOYMENT: ""
+  AZURE_OPENAI_TRANSCRIBE_DEPLOYMENT: ""
+  AZURE_OPENAI_TTS_DEPLOYMENT: ""
+  AZURE_OPENAI_VIDEO_DEPLOYMENT: ""
+  AZURE_SPEECH_KEY: ""
+  AZURE_SPEECH_REGION: ""
+  AI_EMBED_PROVIDER: ""

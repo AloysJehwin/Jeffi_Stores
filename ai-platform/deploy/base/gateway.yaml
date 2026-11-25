@@ -1,3 +1,5 @@
+# NOTE: production runs the gateway in the main cluster (deploy/k8s/platform/48-ai-gateway-service.yaml); this base is
+# the self-contained form (cloud overlay, local clusters). The Razer overlay deletes these objects.
 # Gateway pod identity: its projected token is the OIDC subject token the Anthropic SDK exchanges
 # (workload identity federation) for per-store, workspace-scoped access tokens.
 apiVersion: v1
