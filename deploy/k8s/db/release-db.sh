@@ -9,7 +9,14 @@
 #                (local-<image sha of HEAD>; CI's Images stage or release.sh --build-only pushes it first).
 # Neither target: both, the flagship first. Neither --schema nor --migrations: both, schema first.
 # --dry-run shows the SQL (flagship) or validates the Job (tenants) and applies nothing; --yes skips the prompts (CI).
-# Usage: bash deploy/k8s/db/release-db.sh [--flagship] [--tenants] [--schema] [--migrations] [--dry-run] [--yes]
+# Usage: bash deploy/k8s/db/release-db.sh [--flagship] [--tenants] [--schema] [--migrations] [--dry-run] [--yes] [--cloud=aws|azure]
+# --cloud=aws (default) or --cloud=azure: the flagship database's target (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md).
+CLOUD=aws; for a in "$@"; do case $a in --cloud=*) CLOUD=${a#--cloud=} ;; esac; done
+case $CLOUD in
+  aws) ;;
+  azure) echo "release-db: the Azure flagship database is not wired yet (plan Phase C)" >&2; exit 1 ;;
+  *) echo "release-db: unknown --cloud=$CLOUD" >&2; exit 2 ;;
+esac
 source "$(dirname "$0")/lib.sh"
 FLAGSHIP=false; TENANTS=false; SCHEMA=false; MIGRATIONS=false
 for a in "$@"; do case $a in

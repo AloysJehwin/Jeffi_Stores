@@ -839,6 +839,36 @@ jobs:
         uses: ./.github/actions/db-report
         with: { name: "db-${{ matrix.db }}" }
 
+  # The flagship database on Azure (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md). The job above targets AWS; the stores'
+  # databases stay there. Off until the Azure landing zone exists: repository variable AZURE_TARGET=true.
+  db-azure:
+    name: DB · Azure · ${{ matrix.db }}
+    runs-on: ubuntu-latest
+    needs: checks
+    if: vars.AZURE_TARGET == 'true'
+    environment: production-release
+    concurrency: { group: "deploy-production-db-azure-${{ matrix.db }}", cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [flagship]
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Schema · jeffi_stores on Azure Postgres (platform set diff, manual.sql, control-plane diff, plan seed)
+        run: bash deploy/k8s/db/release-db.sh --${{ matrix.db }} --schema --yes --cloud=azure ${{ env.DRY_FLAG }}
+      - name: Migrations · pending files on jeffi_stores (Azure)
+        run: bash deploy/k8s/db/release-db.sh --${{ matrix.db }} --migrations --yes --cloud=azure ${{ env.DRY_FLAG }}
+      - if: always()
+        uses: ./.github/actions/db-report
+        with: { name: "db-azure-${{ matrix.db }}" }
+
   deploy-prep:
     name: Deploy · prepare
     runs-on: ubuntu-latest
@@ -957,6 +987,42 @@ jobs:
         name: Smoke · AI gateway (/healthz and /v1/providers from the core, the way the platform reaches it)
         run: bash deploy/k8s/bootstrap/razer-release.sh smoke
 
+  # The platform's services on the Azure core (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md). The job above targets AWS,
+  # where the stores stay; at cutover the flagship and platform steps move here. Off until AZURE_TARGET=true.
+  release-azure:
+    name: Release · Azure · ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: [deploy-prep, db-azure]
+    if: vars.AZURE_TARGET == 'true'
+    environment: production-release
+    concurrency: { group: "deploy-production-release-azure-${{ matrix.service }}", cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase]
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Kubeconfig for the Azure core (over Tailscale)
+        run: |
+          mkdir -p ~/.kube && echo "${{ secrets.KUBECONFIG_AZURE_B64 }}" | base64 -d > ~/.kube/config && chmod 600 ~/.kube/config
+          echo "TAG=$(bash deploy/k8s/bootstrap/image-tag.sh)" >> "$GITHUB_ENV" # as release-setup computes it
+      - name: Flagship ${{ matrix.service }} at the release tag (Azure)
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ matrix.service }} ${{ env.DRY_FLAG }}
+      - name: Smoke · flagship ${{ matrix.service }} (Azure)
+        run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" ${{ matrix.service }} flagship ${{ env.DRY_FLAG }}
+
   cdn:
     name: CloudFront
     runs-on: ubuntu-latest
@@ -1026,7 +1092,7 @@ jobs:
   post:
     name: Post
     runs-on: ubuntu-latest
-    needs: [release, cdn, mobile-android] # the last stage of each lane; the summary reads every stage from the run
+    needs: [release, release-azure, cdn, mobile-android] # the last stage of each lane; the summary reads every stage from the run
     if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy))
     permissions: { actions: read, contents: read }
     steps:
