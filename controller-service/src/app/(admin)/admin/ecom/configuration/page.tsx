@@ -4,8 +4,8 @@ import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { PageBody, PageHeader } from '@/components/admin/kit/layout'
-import { TabActionsHost, TabLinks } from '@/components/admin/kit/core'
-import ProvidersCard from '@/components/admin/site-controls/ProvidersCard'
+import { TabLinks } from '@/components/admin/kit/core'
+import ProvidersPage from '@/components/admin/providers/ProvidersPage'
 import ServerPricingClient from './ServerPricingClient'
 import MessagingAddonPricingClient from './MessagingAddonPricingClient'
 import MessagePricingClient from './MessagePricingClient'
@@ -34,17 +34,15 @@ export default async function ConfigurationPage({ searchParams }: { searchParams
         title="Configuration"
         description="Server pricing and margins, the SMS & WhatsApp add-on fee, message pricing and the stores that use their own providers."
       />
+      <TabLinks tabs={TABS} value={tab} replace />
       {tab === 'overrides' ? (
-        // The card's Add override button sits on this tab line.
-        <TabActionsHost>
-          <TabLinks tabs={TABS} value={tab} replace />
-          <ProvidersCard view="overrides" />
-        </TabActionsHost>
+        <ProvidersPage variant="overrides" />
+      ) : tab === 'pricing' ? (
+        <ServerPricingClient />
+      ) : tab === 'messaging' ? (
+        <MessagingAddonPricingClient />
       ) : (
-        <>
-          <TabLinks tabs={TABS} value={tab} replace />
-          {tab === 'pricing' ? <ServerPricingClient /> : tab === 'messaging' ? <MessagingAddonPricingClient /> : <MessagePricingClient />}
-        </>
+        <MessagePricingClient />
       )}
     </PageBody>
   )
