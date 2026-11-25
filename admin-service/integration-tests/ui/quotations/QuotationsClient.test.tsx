@@ -213,14 +213,44 @@ describe('QuotationsClient', () => {
     expect(screen.getByLabelText(/^Credit/)).toBeChecked()
   })
 
-  it('UPI QR conversion shows the QR code', async () => {
-    convertRes = json(true, { orderId: 'o1', qrImageUrl: 'https://cdn.test/qr.png' })
+  it('UPI QR conversion opens a payment QR first and converts nothing until paid', async () => {
+    const intent = { intentId: 'pi_1', qrImageUrl: 'https://cdn.test/qr.png', amount: 1180, expiresAt: new Date(Date.now() + 600_000).toISOString() }
+    fetchMock.mockImplementation(async (url: string, init?: any) => {
+      if (url.startsWith('/api/admin/quotations?')) return json(true, { quotations: quotes, total: quotes.length })
+      if (url.startsWith('/api/admin/inventory/batches/available')) return json(true, batchAvail)
+      if (url === '/api/admin/payments/qr-intents' && init?.method === 'POST') return json(true, intent)
+      if (url === '/api/admin/payments/qr-intents/pi_1') return json(true, { status: 'pending' })
+      if (/^\/api\/admin\/quotations\/q\d$/.test(url) && !init?.method) return json(true, detail)
+      return json(true, {})
+    })
     render(asAdmin(<QuotationsClient canWrite />))
     await screen.findByRole('link', { name: 'QT-001' })
     fireEvent.click(screen.getByRole('button', { name: /→ Invoice/ }))
     fireEvent.click(await screen.findByLabelText(/^UPI QR/))
-    fireEvent.click(screen.getByRole('button', { name: 'Convert →' }))
-    expect(await screen.findByAltText('UPI QR Code')).toHaveAttribute('src', 'https://cdn.test/qr.png')
+    fireEvent.click(screen.getByRole('button', { name: 'Show payment QR' }))
+    expect(await screen.findByAltText('UPI QR code')).toHaveAttribute('src', 'https://cdn.test/qr.png')
+    expect(screen.getByText('Waiting for payment…')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(c => c[0] === '/api/admin/payments/qr-intents')!
+    expect(JSON.parse(post[1].body)).toEqual({ kind: 'quotation_convert', payload: { quotationId: 'q1', paymentMode: 'upi_qr', enableDelivery: false } })
+    expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/convert-to-invoice'))).toBe(false)
+    expect(screen.queryByText('Payment Mode')).not.toBeInTheDocument()
+  })
+
+  it('a UPI QR intent failure is toasted and the dialog stays open', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: any) => {
+      if (url.startsWith('/api/admin/quotations?')) return json(true, { quotations: quotes, total: quotes.length })
+      if (url.startsWith('/api/admin/inventory/batches/available')) return json(true, batchAvail)
+      if (url === '/api/admin/payments/qr-intents') return json(false, { error: 'Insufficient stock for Drill' }, 409)
+      if (/^\/api\/admin\/quotations\/q\d$/.test(url) && !init?.method) return json(true, detail)
+      return json(true, {})
+    })
+    render(asAdmin(<QuotationsClient canWrite />))
+    await screen.findByRole('link', { name: 'QT-001' })
+    fireEvent.click(screen.getByRole('button', { name: /→ Invoice/ }))
+    fireEvent.click(await screen.findByLabelText(/^UPI QR/))
+    fireEvent.click(screen.getByRole('button', { name: 'Show payment QR' }))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Insufficient stock for Drill', 'error'))
+    expect(screen.getByText('Payment Mode')).toBeInTheDocument()
   })
 
   it('a conversion failure is toasted and the dialog stays open', async () => {

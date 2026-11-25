@@ -21,7 +21,15 @@ vi.mock('@/hooks/useDraftLock', async orig => ({
 vi.mock('@/components/ui/HoverCard', () => ({ default: ({ trigger }: any) => <>{trigger}</> }))
 vi.mock('@/components/ui/DatePicker', () => ({ default: ({ value }: any) => <input aria-label="date" value={value} readOnly /> }))
 vi.mock('@/components/admin/kit/list-filters', async orig => ({ ...(await orig<any>()), ListFilters: ({ entity }: any) => <div>filters:{entity}</div> }))
-vi.mock('@/components/admin/LineItemsSection', async orig => ({ ...(await orig<any>()), default: () => <div>line-items-section</div> }))
+vi.mock('@/components/admin/LineItemsSection', async orig => ({
+  ...(await orig<any>()),
+  default: ({ items, onChange }: any) => (
+    <div>
+      line-items-section
+      <button type="button" onClick={() => onChange([{ ...items[0], product_name: 'Drill', unit_price: '1180', quantity: 2, gst_rate: 18, inventory_quantity: null }])}>fill-line</button>
+    </div>
+  ),
+}))
 vi.mock('@/components/admin/BatchPickerModal', () => ({
   default: ({ items, onConfirm, onCancel }: any) => (
     <div>
@@ -168,6 +176,34 @@ describe('InvoicesClient', () => {
     expect(screen.getByText('line-items-section')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create Invoice' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save as Draft' })).toBeInTheDocument()
+  })
+
+  it('UPI QR shows a "Show payment QR" action that opens the QR and creates no invoice', async () => {
+    sp = new URLSearchParams('view=create')
+    const intent = { intentId: 'pi_1', qrImageUrl: 'https://cdn.test/qr.png', amount: 2360, expiresAt: new Date(Date.now() + 600_000).toISOString() }
+    fetchMock.mockImplementation(async (url: string, init?: any) => {
+      if (url.startsWith('/api/admin/invoices?')) return json(true, { invoices, total: invoices.length })
+      if (url === '/api/admin/invoices/drafts' && !init?.method) return json(true, { drafts })
+      if (url === '/api/admin/payments/qr-intents' && init?.method === 'POST') return json(true, intent)
+      if (url === '/api/admin/payments/qr-intents/pi_1') return json(true, { status: 'pending' })
+      return json(true, {})
+    })
+    render(asAdmin(<InvoicesClient canWrite />))
+    await screen.findByText('New Offline Invoice')
+    const fill = (label: RegExp, v: string) => fireEvent.change(screen.getByText(label).closest('div')!.querySelector('input')!, { target: { value: v } })
+    fill(/^Name/, 'Asha Rao')
+    fill(/^Phone/, '9999999999')
+    fill(/^Address Line 1/, '1 MG Road')
+    fill(/^City/, 'Bengaluru')
+    fireEvent.click(screen.getByText('fill-line'))
+    fireEvent.click(screen.getByLabelText(/UPI \(QR Scan\)/))
+    fireEvent.click(screen.getByRole('button', { name: 'Show payment QR' }))
+    expect(await screen.findByAltText('UPI QR code')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(c => c[0] === '/api/admin/payments/qr-intents')!
+    const body = JSON.parse(post[1].body)
+    expect(body.kind).toBe('invoice')
+    expect(body.payload).toMatchObject({ customerName: 'Asha Rao', paymentMode: 'upi_qr' })
+    expect(fetchMock.mock.calls.some(c => c[0] === '/api/admin/orders/create')).toBe(false)
   })
 
   it('hides the create form actions without write access', async () => {

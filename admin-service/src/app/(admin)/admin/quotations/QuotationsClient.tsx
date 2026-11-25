@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import QrPaymentDialog, { createQrIntent, type QrIntent, type QrResult } from '@/components/admin/payments/QrPaymentDialog'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Check, Plus } from 'lucide-react'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
@@ -165,8 +166,8 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
   const [convertPendingQuoteId, setConvertPendingQuoteId] = useState<string | null>(null)
   const [convertPaymentMode, setConvertPaymentMode] = useState('cash')
   const [convertEnableDelivery, setConvertEnableDelivery] = useState(false)
-  const [convertQrImageUrl, setConvertQrImageUrl] = useState<string | null>(null)
-  const [convertQrTotal, setConvertQrTotal] = useState(0)
+  const [qrIntent, setQrIntent] = useState<QrIntent | null>(null)
+  const qrArgs = useRef<{ quoteId: string; enableDelivery: boolean; batch?: BatchAssignment[]; serial?: SerialAssignment[] } | null>(null)
   const [convertResultOrderId, setConvertResultOrderId] = useState<string | null>(null)
   const [convertSavedAsDraft, setConvertSavedAsDraft] = useState(false)
   const [convertInsufficientItems, setConvertInsufficientItems] = useState<string[]>([])
@@ -446,16 +447,24 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
 
     setConvertingInvoice(true)
     try {
+      const payload = {
+        paymentMode,
+        enableDelivery,
+        ...(batchAssignments && batchAssignments.length > 0 ? { batch_assignments: batchAssignments } : {}),
+        ...(serialAssignments && serialAssignments.length > 0 ? { serial_assignments: serialAssignments } : {}),
+      }
+      if (paymentMode === 'upi_qr') {
+        const intent = await createQrIntent('quotation_convert', { quotationId: quoteId, ...payload })
+        qrArgs.current = { quoteId, enableDelivery, batch: batchAssignments, serial: serialAssignments }
+        setShowConvertModal(false)
+        setQrIntent(intent)
+        return
+      }
       const res = await fetch(`/api/admin/quotations/${quoteId}/convert-to-invoice`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentMode,
-          enableDelivery,
-          ...(batchAssignments && batchAssignments.length > 0 ? { batch_assignments: batchAssignments } : {}),
-          ...(serialAssignments && serialAssignments.length > 0 ? { serial_assignments: serialAssignments } : {}),
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -472,18 +481,30 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
           `Saved as draft invoice — not enough stock for ${(data.insufficientItems || []).length} item(s)`,
           'error'
         )
-      } else if (data.qrImageUrl) {
-        setConvertQrImageUrl(data.qrImageUrl)
       } else {
         setShowConvertModal(false)
         showToast(`Invoice ${data.invoiceNumber} created`, 'success')
         if (data.orderId) window.location.href = ap(`/admin/invoices/${data.orderId}/view`)
       }
-    } catch {
-      showToast('Failed to convert quotation', 'error')
+    } catch (e: any) {
+      showToast(paymentMode === 'upi_qr' && e?.message ? e.message : 'Failed to convert quotation', 'error')
     } finally {
       setConvertingInvoice(false)
     }
+  }
+
+  function qrDone(r: QrResult) {
+    setQrIntent(null)
+    loadList()
+    showToast('Invoice created', 'success')
+    const id = r.resultRef
+    window.location.href = r.resultUrl || ap(id ? `/admin/invoices/${id}/view` : '/admin/invoices')
+  }
+
+  function newQr() {
+    const a = qrArgs.current
+    setQrIntent(null)
+    if (a) void convertToInvoice(a.quoteId, 'upi_qr', a.enableDelivery, a.batch, a.serial)
   }
 
   /** No status = autosave; 'draft' = the explicit Save as Draft; 'final' = finalise. */
@@ -711,8 +732,6 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
     setConvertPendingQuoteId(q.id)
     setConvertPaymentMode('cash')
     setConvertEnableDelivery(false)
-    setConvertQrImageUrl(null)
-    setConvertQrTotal(q.total_amount || 0)
     setConvertSavedAsDraft(false)
     setConvertInsufficientItems([])
     setConvertHasStockIssue(false)
@@ -992,13 +1011,14 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
         )}
         {section === 'drafts' ? <Pager control={draftList.pager} noun="drafts" /> : <InfiniteFooter shown={quotations.length} control={list} noun="quotations" />}
         <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />
+        <QrPaymentDialog intent={qrIntent} onClose={() => setQrIntent(null)} onDone={qrDone} onNewQr={newQr} />
         <Dialog
           open={showConvertModal}
-          onClose={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}
+          onClose={() => !convertingInvoice && (setShowConvertModal(false), setConvertSavedAsDraft(false))}
           zIndex="z-[400]"
           size={convertStep === 'assign' ? 'xl' : 'md'}
-          hideClose={convertSavedAsDraft || (!(convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems)) && !!convertQrImageUrl)}
-          title={convertSavedAsDraft ? 'Saved as Draft' : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? 'Assign Stock' : !convertQrImageUrl ? 'Convert to Invoice' : 'UPI QR Code'}
+          hideClose={convertSavedAsDraft}
+          title={convertSavedAsDraft ? 'Saved as Draft' : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? 'Assign Stock' : 'Convert to Invoice'}
           description={
             !convertSavedAsDraft && convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
               <span className="flex flex-wrap items-center gap-3">
@@ -1388,7 +1408,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
                 </button>
               </div>
             </>
-          ) : !convertQrImageUrl ? (
+          ) : (
             <>
               <div className="space-y-5">
                 <div>
@@ -1487,41 +1507,8 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
                   disabled={convertingInvoice || !convertPendingQuoteId}
                   className="px-4 h-control text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
                 >
-                  {convertingInvoice ? 'Converting…' : 'Convert →'}
+                  {convertingInvoice ? 'Converting…' : convertPaymentMode === 'upi_qr' ? 'Show payment QR' : 'Convert →'}
                 </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col items-center gap-4">
-                <img
-                  src={convertQrImageUrl!}
-                  alt="UPI QR Code"
-                  className="max-w-[240px] w-full rounded-lg border border-border-default"
-                />
-                <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
-                <p className="text-xs text-foreground-secondary text-center">
-                  Payment status will update automatically once scanned.
-                </p>
-              </div>
-              <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
-                <button
-                  onClick={() => {
-                    setShowConvertModal(false)
-                    setConvertQrImageUrl(null)
-                  }}
-                  className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                >
-                  Done
-                </button>
-                {convertResultOrderId && (
-                  <a
-                    href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
-                    className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
-                  >
-                    View Invoice →
-                  </a>
-                )}
               </div>
             </>
           )}
@@ -1558,7 +1545,6 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
                 setConvertPendingQuoteId(editId)
                 setConvertPaymentMode('cash')
                 setConvertEnableDelivery(false)
-                setConvertQrImageUrl(null)
                 setConvertSavedAsDraft(false)
                 setConvertInsufficientItems([])
                 const stockIssue = items.some(item => {
@@ -1571,19 +1557,6 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
                 })
                 setConvertHasStockIssue(stockIssue)
                 if (stockIssue) setConvertPaymentMode('credit')
-                setConvertQrTotal(
-                  items.reduce((sum, i) => {
-                    const gst = parseFloat(String(i.gst_rate)) || 0
-                    // unit_price is per piece incl. GST; count units scale by factor
-                    const f = Number(i.sell_unit_factor) || 1
-                    const factor = i.product_id && i.sell_unit_dimension === 'count' && f > 1 ? f : 1
-                    const qty = (parseFloat(String(i.quantity)) || 0) * factor
-                    const rate = (parseFloat(String(i.unit_price)) || 0) / (1 + gst / 100)
-                    const disc = parseFloat(String(i.discount_pct)) || 0
-                    const ex = lineItemExGst(qty, rate, disc)
-                    return sum + ex + (ex * gst) / 100
-                  }, 0)
-                )
                 setConvertStep('payment')
                 setConvertBatchPickerItems(null)
                 setConvertSerialPickerItems(null)
@@ -1908,13 +1881,14 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
         )}
       </FormFooter>
 
+      <QrPaymentDialog intent={qrIntent} onClose={() => setQrIntent(null)} onDone={qrDone} onNewQr={newQr} />
       <Dialog
         open={showConvertModal}
-        onClose={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}
+        onClose={() => !convertingInvoice && (setShowConvertModal(false), setConvertSavedAsDraft(false))}
         zIndex="z-[400]"
         size={convertStep === 'assign' ? 'xl' : 'md'}
-        hideClose={convertSavedAsDraft || (!(convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems)) && !!convertQrImageUrl)}
-        title={convertSavedAsDraft ? 'Saved as Draft' : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? 'Assign Stock' : !convertQrImageUrl ? 'Convert to Invoice' : 'UPI QR Code'}
+        hideClose={convertSavedAsDraft}
+        title={convertSavedAsDraft ? 'Saved as Draft' : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? 'Assign Stock' : 'Convert to Invoice'}
         description={
           !convertSavedAsDraft && convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
             <span className="flex flex-wrap items-center gap-3">
@@ -2301,7 +2275,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
               </button>
             </div>
           </>
-        ) : !convertQrImageUrl ? (
+        ) : (
           <>
             <div className="space-y-5">
               <div>
@@ -2394,41 +2368,8 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
                 disabled={convertingInvoice || !convertPendingQuoteId}
                 className="px-4 h-control text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
               >
-                {convertingInvoice ? 'Converting…' : 'Convert →'}
+                {convertingInvoice ? 'Converting…' : convertPaymentMode === 'upi_qr' ? 'Show payment QR' : 'Convert →'}
               </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-col items-center gap-4">
-              <img
-                src={convertQrImageUrl}
-                alt="UPI QR Code"
-                className="w-60 h-60 rounded-lg border border-border-default"
-              />
-              <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
-              <p className="text-xs text-foreground-secondary text-center">
-                Payment status will update automatically once scanned.
-              </p>
-            </div>
-            <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
-              <button
-                onClick={() => {
-                  setShowConvertModal(false)
-                  setConvertQrImageUrl(null)
-                }}
-                className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-              >
-                Done
-              </button>
-              {convertResultOrderId && (
-                <a
-                  href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
-                  className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
-                >
-                  View Invoice →
-                </a>
-              )}
             </div>
           </>
         )}
