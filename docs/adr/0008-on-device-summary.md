@@ -1,6 +1,6 @@
 # ADR-0008: On-device checkout recap (browser-run Gemma 3 270M)
 
-- **Status**: Accepted (implemented behind a flag)
+- **Status**: Superseded (2026-11-26): every AI call goes through the AI gateway, so the in-browser model, its workers, weights and training scripts were removed. The recap, cart insight, pitch and order note now come from the storefront's `/api/ai-*` routes (the store's fast text model, charged to the store).
 - **Date**: 2026-07-20
 - **Authors**: eng
 - **Related**: ADR-0001 (server-side re-ranker/fine-tune) — this is a *separate* pipeline.

@@ -38,8 +38,9 @@ describe('POST /api/ai-pitch', () => {
   it('builds the prompt from the product context and returns the pitch', async () => {
     const res = await post({ productName: ' Drill ', brand: 'Bosch', category: null })
     expect(await res.json()).toEqual({ pitch: 'A sturdy drill.' })
-    const [prompt, field] = storefrontAiField.mock.calls[0]
+    const [prompt, field, feature] = storefrontAiField.mock.calls[0]
     expect(field).toBe('pitch')
+    expect(feature).toBe('storefront_pitch')
     expect(prompt).toContain('Product: Drill, Bosch')
   })
 

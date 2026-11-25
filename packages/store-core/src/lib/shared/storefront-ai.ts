@@ -4,7 +4,9 @@ import { AI_STOREFRONT_SCOPE, parseAiJson } from '@/lib/auth/ai-scope'
 
 // Shared by the customer-facing AI routes (recap, cart insight, pitch, affirmation). There is no
 // admin session on the storefront, so the gate is the tenant's plan alone. The platform's own
-// store is never plan-limited (currentTenantPlanGate returns allowed for it).
+// store is never plan-limited (currentTenantPlanGate returns allowed for it). Each line runs on the
+// store's fast text model through the gateway (its provider order and models), is charged to the
+// store under its own feature key, and reuses the gateway's short per-store cache for repeats.
 
 /** Whether the current store's plan includes storefront AI. */
 export async function storefrontAiAllowed(): Promise<boolean> {
@@ -24,11 +26,13 @@ export async function storefrontAiGate(): Promise<NextResponse | null> {
 }
 
 /** Run a single JSON-mode prompt through the gateway and return the named string field. */
-export async function storefrontAiField(prompt: string, field: string): Promise<NextResponse> {
+export async function storefrontAiField(prompt: string, field: string, feature: string): Promise<NextResponse> {
   try {
     const r = await aiChat({
-      modelHint: 'enrich',
+      feature,
+      modelHint: 'fast',
       jsonMode: true,
+      maxTokens: 300,
       temperature: 0.3,
       messages: [{ role: 'user', content: prompt }],
     })

@@ -13,8 +13,7 @@ interface CartLine {
   qty?: number
 }
 
-// Server (Ollama) fallback for the on-device cart-insight one-liner. Mirrors
-// buildCartInsightPrompt() intent for devices where on-device is off/unsupported.
+// The cart's one-line insight, written by the store's fast text model through the gateway.
 export async function POST(request: NextRequest) {
   const blocked = await storefrontAiGate()
   if (blocked) return blocked
@@ -43,5 +42,5 @@ export async function POST(request: NextRequest) {
     `### Cart\n${cartLines}\n\n` +
     'Return JSON: {"text":"<one sentence>"}'
 
-  return storefrontAiField(prompt, 'text')
+  return storefrontAiField(prompt, 'text', 'storefront_cart_insight')
 }

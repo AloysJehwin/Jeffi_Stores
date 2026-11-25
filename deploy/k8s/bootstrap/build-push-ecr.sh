@@ -40,8 +40,8 @@ for k,v in json.load(sys.stdin).items():
     if k.startswith("NEXT_PUBLIC_") and isinstance(v,str): print(f"{k}={v}")') ||
     { echo "cannot read jeffi/production/build: run bash deploy/k8s/bootstrap/build-secret.sh" >&2; exit 1; }
   while IFS= read -r line; do ARGS+=(--build-arg "$line"); done <<<"$PUBLIC"
-  # The on-device summary pair may live in the environment (CI repo vars) rather than the secret.
-  for k in NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY NEXT_PUBLIC_ONDEVICE_MODEL_BASE; do
+  # The AI summaries default may live in the environment (CI repo vars) rather than the secret.
+  for k in NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY; do
     grep -q "^$k=" <<<"$PUBLIC" || [ -z "${!k:-}" ] || ARGS+=(--build-arg "$k=${!k}")
   done
   ARGS+=(--build-arg "NEXT_PUBLIC_APP_VERSION=$(node -p "require('$CTX/package.json').version")" --build-arg "NEXT_PUBLIC_GIT_SHA=${TAG#local-}")

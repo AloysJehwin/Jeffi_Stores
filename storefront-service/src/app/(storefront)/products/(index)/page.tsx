@@ -10,7 +10,7 @@ import { previewRows } from '@/lib/site/preview'
 import { EAGER_CARDS, productPageItems } from '@/components/visitor/listing/listing-sections'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
-import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
+import SearchInsightBanner from '@/components/storefront-ai/SearchInsightBanner'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 
 // Each group is counted without its own filter so sibling brands/categories stay selectable.

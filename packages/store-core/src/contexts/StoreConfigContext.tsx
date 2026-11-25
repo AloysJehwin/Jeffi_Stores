@@ -107,9 +107,6 @@ export function StoreConfigProvider({ children, initialConfig }: { children: Rea
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (!active || !data) return
-        // Namespace on-device AI (LoRA adapter) to this tenant (#489). Lazy import so the worker
-        // runtime isn't pulled into every page bundle; best-effort.
-        import('@/lib/on-device/runtime').then(m => m.setOnDeviceStore(data.slug ?? null)).catch(() => {})
         setConfig(prev => {
           const next: StoreConfig = {
             slug: data.slug ?? prev.slug,

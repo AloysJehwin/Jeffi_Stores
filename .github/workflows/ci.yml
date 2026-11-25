@@ -781,7 +781,6 @@ jobs:
         env:
           BUILDX_CACHE_ARGS: --cache-from type=gha,scope=${{ matrix.service }} --cache-to type=gha,mode=max,scope=${{ matrix.service }}
           NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY: ${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
-          NEXT_PUBLIC_ONDEVICE_MODEL_BASE: ${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
         run: bash deploy/k8s/bootstrap/build-push-ecr.sh "${{ matrix.service }}" "${{ steps.tag.outputs.tag }}"
 
   checks:

@@ -1,6 +1,6 @@
-import ProductPitchLine from '@/components/on-device/ProductPitchLine'
+import ProductPitchLine from '@/components/storefront-ai/ProductPitchLine'
 
-/** The product description card, with the on-device pitch line; renders nothing without a description. */
+/** The product description card, with the AI pitch line; renders nothing without a description. */
 export default function ProductDescriptionCard({ product }: { product: Record<string, any> }) {
   if (!product.description) return null
   return (
