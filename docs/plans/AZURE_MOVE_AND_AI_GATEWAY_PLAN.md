@@ -1,6 +1,51 @@
 # Azure move, AI gateway split and Azure AI providers
 
-Status: plan, 2026-11-25. Nothing is built or created yet.
+Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing created yet (see "Phase B/C status").
+
+## Phase B/C status (2026-11-26)
+
+**Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
+- **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):
+  - resource group `jeffi-prod-cin`, VNet and NSG (80/443 public; the k3s API, SSH and Postgres only over Tailscale), static IP;
+  - the E4ps_v6 core with cloud-init (Tailscale subnet router, k3s server with flannel on `tailscale0`, issuer `https://oidc.jeffistores.in`);
+  - Postgres 16 B2s, private, with the four extensions allow-listed;
+  - Key Vault (RBAC) and the identities: GitHub deploy, plus cluster apps and controller through the k3s issuer.
+- **Self-hosted IRSA:**
+  - issuer site `deploy/aws/oidc-issuer.yaml` (S3 behind CloudFront; validated by CloudFormation);
+  - `irsa/publish-oidc.sh` and `irsa/aws-roles.sh`, which create one role per service account: app, controller (with store provisioning), cert-manager, ecr-pull;
+  - the pod side in `deploy/k8s/overlays/azure`, used only when `JEFFI_CLOUD=azure`. The AWS manifests render byte-identical.
+- **Secrets:**
+  - `kv-sync.sh` copies `jeffi/*` to Key Vault under dash names, dry run by default, values never printed;
+  - `deploy/load-secrets.mjs` reads Key Vault when `SECRETS_BACKEND=keyvault`, through `deploy/secrets-backend.mjs`. That file is a dependency-free shim standing in for the Phase C secrets library, so keep the two in step.
+- **AWS tenant edge** (`deploy/aws/edge`, `deploy/k8s/edge`): a Traefik DaemonSet on `jeffi.io/edge=true`, the launch and Elastic IP script, and a Route 53 plan with a saved rollback.
+- **CI:**
+  - `db-azure`, `deploy-prep-azure` and `release-azure` reach Azure over Tailscale;
+  - `release-db.sh --cloud=azure` talks to Postgres over the subnet route, with the password from Key Vault in a temporary PGPASSFILE;
+  - the AWS lanes are unchanged.
+
+**Founder steps.**
+1. Add admin@ as Owner.
+2. Resource providers: Compute, Network, DBforPostgreSQL, KeyVault, ManagedIdentity and Storage are *NotRegistered* today. `apply.sh --apply` registers them.
+3. Quota check: once Compute is registered, `apply.sh` prints the EPSv6 quota in Central India. The core needs 4 vCPUs.
+4. Tailscale:
+   - ACL for `tag:ci` to the core and the Postgres subnet;
+   - auto-approve the core's routes;
+   - split DNS for `postgres.database.azure.com`.
+5. A new Anthropic federation rule for issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`.
+6. GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. GitHub variables: `AZURE_INGRESS_IP`, then `AZURE_TARGET=true`.
+7. The DNS cutover window:
+   - lower TTLs the day before (`route53-plan.sh --lower-ttl`);
+   - on the day, store hosts move to the edge and platform hosts to Azure;
+   - CloudFront's origin moves to `origin.jeffistores.in`.
+
+**Left for the app code (Phase C).**
+- **Database TLS for Flexible Server.** The overlay only sets `DB_IAM_AUTH=false`.
+- **Store node cloud-init** (`node-user-data.ts`):
+  - `--flannel-iface tailscale0 --node-ip <Tailscale IP>`;
+  - `tailscale up --accept-routes`, so the node can reach the Postgres subnet and Azure DNS through the core.
+- **Store pods on AWS can't each get a Key Vault identity.** Entra federated credentials need an exact subject, at most 20 per identity. The suggested fix: the controller copies `jeffi-store` into each store namespace as a Secret.
+- **public-api and mobile replicas on the edge** for store hosts.
+- **Bicep compile.** The templates were not compiled here, because the Bicep CLI isn't installed and `az bicep install` downloads it. Run that and `az bicep build --file deploy/azure/main.bicep` before the first `apply.sh`.
 
 ## 0. Decisions so far (founder, 2026-11-25)
 
