@@ -32,7 +32,8 @@ vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
   resolveTenantId: vi.fn(async () => null),
 }))
 vi.mock('@/lib/shared/rag', () => ({
-  embed: vi.fn(),
+  embedWithModel: vi.fn(),
+  LEGACY_EMBED_MODEL: 'nomic-embed-text',
   findSimilarProductIds: vi.fn(),
   findSimilarCustomers: vi.fn(),
   queryManyReplica: vi.fn(),
@@ -56,7 +57,7 @@ import * as rag from '@/lib/shared/rag'
 const mockQuery = vi.mocked(db.query)
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)
-const mockEmbed = vi.mocked(rag.embed)
+const mockEmbed = vi.mocked(rag.embedWithModel)
 const mockFindSimilarCustomers = vi.mocked(rag.findSimilarCustomers)
 
 const mockFetch = vi.fn()
@@ -102,15 +103,36 @@ describe('admin-agent/tools', () => {
     const tool = () => getTool('search_products')!
 
     it('returns empty result when no embeddings found', async () => {
-      mockEmbed.mockResolvedValueOnce([0.1, 0.2])
+      mockEmbed.mockResolvedValueOnce({ vector: [0.1, 0.2], model: 'nomic-embed-text' } as any)
       mockQueryMany.mockResolvedValueOnce([]) // no embedding rows
+      mockQueryMany.mockResolvedValue([]) // name fallback (one query per word) finds nothing
       const result = await tool().handler({ query: 'nonexistent thing' })
       expect((result as any).ok).toBe(true)
       expect((result as any).data.products).toHaveLength(0)
     })
 
+    it('compares only vectors of the query model', async () => {
+      mockEmbed.mockResolvedValueOnce({ vector: [0.1, 0.2], model: 'text-embedding-3-small@768' } as any)
+      mockQueryMany.mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.9 }]).mockResolvedValueOnce([])
+      await tool().handler({ query: 'bolt', limit: 5 })
+      const [sql, params] = mockQueryMany.mock.calls[0] as [string, unknown[]]
+      expect(sql).toContain("COALESCE(embedding_model, 'nomic-embed-text') = $3")
+      expect(params).toEqual(['[0.1,0.2]', 10, 'text-embedding-3-small@768'])
+    })
+
+    it('falls back to name matching when no row has the query model', async () => {
+      mockEmbed.mockResolvedValueOnce({ vector: [0.1], model: 'text-embedding-3-small@768' } as any)
+      mockQueryMany
+        .mockResolvedValueOnce([]) // nothing embedded by this model yet
+        .mockResolvedValueOnce([{ id: 'p9' }]) // ILIKE hit for "bolt"
+        .mockResolvedValueOnce([{ id: 'p9', name: 'Hex Bolt', slug: 'hex-bolt', sku: 'HB', price: 5 }])
+      const result = await tool().handler({ query: 'bolt' })
+      expect((result as any).data.products.map((p: any) => p.id)).toEqual(['p9'])
+      expect(String(mockQueryMany.mock.calls[1][0])).toContain('ILIKE')
+    })
+
     it('returns products matched via products table', async () => {
-      mockEmbed.mockResolvedValueOnce([0.1, 0.2])
+      mockEmbed.mockResolvedValueOnce({ vector: [0.1, 0.2], model: 'nomic-embed-text' } as any)
       // embedding search returns product rows
       mockQueryMany
         .mockResolvedValueOnce([
@@ -146,7 +168,7 @@ describe('admin-agent/tools', () => {
     })
 
     it('resolves variant source_ids to product ids', async () => {
-      mockEmbed.mockResolvedValueOnce([0.1, 0.2])
+      mockEmbed.mockResolvedValueOnce({ vector: [0.1, 0.2], model: 'nomic-embed-text' } as any)
       // embedding search returns variant rows
       mockQueryMany
         .mockResolvedValueOnce([{ source_table: 'product_variants', source_id: 'v1', sim: 0.85 }])
@@ -161,7 +183,8 @@ describe('admin-agent/tools', () => {
     })
 
     it('clamps limit to valid range', async () => {
-      mockEmbed.mockResolvedValueOnce([0.1])
+      mockEmbed.mockResolvedValueOnce({ vector: [0.1], model: 'nomic-embed-text' } as any)
+      mockQueryMany.mockResolvedValueOnce([])
       mockQueryMany.mockResolvedValueOnce([])
       // limit 0 should be clamped to 1 (no throw)
       await expect(tool().handler({ query: 'test', limit: 0 })).resolves.toBeDefined()
@@ -246,6 +269,17 @@ describe('admin-agent/tools', () => {
       mockQueryMany.mockResolvedValueOnce([]) // no similar rows
       const result = await tool().handler({ productId: 'p1' })
       expect((result as any).products).toHaveLength(0)
+    })
+
+    it('only compares against rows of the source vector model (NULL is nomic-embed-text)', async () => {
+      mockQueryOne.mockResolvedValueOnce({ embedding: '[0.1]', embedding_model: 'text-embedding-3-small@768' })
+      mockQueryMany.mockResolvedValueOnce([])
+      await tool().handler({ productId: 'p1' })
+      expect(mockQueryMany.mock.calls[0][1]).toEqual(['[0.1]', 'p1', 10, 'text-embedding-3-small@768'])
+      mockQueryOne.mockResolvedValueOnce({ embedding: '[0.1]', embedding_model: null })
+      mockQueryMany.mockResolvedValueOnce([])
+      await tool().handler({ productId: 'p2' })
+      expect(mockQueryMany.mock.calls[1][1]).toEqual(['[0.1]', 'p2', 10, 'nomic-embed-text'])
     })
 
     it('returns similar products when embedding and matches exist', async () => {

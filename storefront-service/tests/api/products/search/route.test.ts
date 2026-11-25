@@ -3,18 +3,19 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 vi.mock('@/lib/shared/rag', () => ({
-  embed: vi.fn(),
+  embedWithModel: vi.fn(),
+  LEGACY_EMBED_MODEL: 'nomic-embed-text',
   runWithHnswTuning: vi.fn(),
 }))
 vi.mock('@/lib/shared/storefront-ai', () => ({ storefrontAiAllowed: vi.fn() }))
 
 import { GET } from '@storefront/app/api/(public)/products/search/route'
 import { queryMany } from '@/lib/shared/db'
-import { embed, runWithHnswTuning } from '@/lib/shared/rag'
+import { embedWithModel, runWithHnswTuning } from '@/lib/shared/rag'
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 
 const mockQueryMany = vi.mocked(queryMany)
-const mockEmbed = vi.mocked(embed)
+const mockEmbed = vi.mocked(embedWithModel)
 const mockRunWithHnswTuning = vi.mocked(runWithHnswTuning)
 const mockStorefrontAiAllowed = vi.mocked(storefrontAiAllowed)
 
@@ -61,7 +62,7 @@ describe('GET /api/products/search', () => {
     const fewRows = [PRODUCTS[0]]
     mockQueryMany.mockResolvedValueOnce(fewRows as any)
     // semantic: embed + runWithHnswTuning returns empty rows
-    mockEmbed.mockResolvedValueOnce([0.1, 0.2] as any)
+    mockEmbed.mockResolvedValueOnce({ vector: [0.1, 0.2], model: 'nomic-embed-text' } as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({ rows: [] } as any)
 
     const res = await GET(makeReq({ q: 'wid' }))
@@ -75,7 +76,7 @@ describe('GET /api/products/search', () => {
     mockQueryMany
       .mockResolvedValueOnce(ilikeRow as any) // ILIKE query
       .mockResolvedValueOnce(semanticRows as any) // semantic product fetch
-    mockEmbed.mockResolvedValueOnce([0.1, 0.2] as any)
+    mockEmbed.mockResolvedValueOnce({ vector: [0.1, 0.2], model: 'nomic-embed-text' } as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [
         { source_table: 'products', source_id: 'p2' },
@@ -93,7 +94,7 @@ describe('GET /api/products/search', () => {
   it('returns only ILIKE rows when semantic returns empty', async () => {
     const ilikeRow = [PRODUCTS[0]]
     mockQueryMany.mockResolvedValueOnce(ilikeRow as any)
-    mockEmbed.mockResolvedValueOnce([0.1] as any)
+    mockEmbed.mockResolvedValueOnce({ vector: [0.1], model: 'nomic-embed-text' } as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({ rows: [] } as any)
 
     const res = await GET(makeReq({ q: 'wid' }))
@@ -121,7 +122,7 @@ describe('GET /api/products/search', () => {
 
   it('caps limit at 20', async () => {
     mockQueryMany.mockResolvedValueOnce([] as any)
-    mockEmbed.mockResolvedValueOnce([] as any)
+    mockEmbed.mockResolvedValueOnce({ vector: [], model: 'nomic-embed-text' } as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({ rows: [] } as any)
     const res = await GET(makeReq({ q: 'bolt', limit: '99' }))
     expect(res.status).toBe(200)
@@ -139,7 +140,7 @@ describe('GET /api/products/search', () => {
       .mockResolvedValueOnce(variantProducts as any) // variant → product lookup
       .mockResolvedValueOnce(productRows as any) // final product fetch
 
-    mockEmbed.mockResolvedValueOnce([0.5] as any)
+    mockEmbed.mockResolvedValueOnce({ vector: [0.5], model: 'nomic-embed-text' } as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [{ source_table: 'product_variants', source_id: 'v1' }],
     } as any)

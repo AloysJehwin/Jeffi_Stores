@@ -19,7 +19,7 @@ vi.mock('pg', () => {
   return { Pool }
 })
 
-vi.mock('@/lib/shared/ai-client', () => ({ aiEmbed: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiEmbed: vi.fn(), aiEmbedWithModel: vi.fn() }))
 
 // Tenant resolver drives RAG isolation (#489): default null = platform/off-tenant.
 const { mockResolveTenantId } = vi.hoisted(() => ({ mockResolveTenantId: vi.fn().mockResolvedValue(null) }))
@@ -47,10 +47,15 @@ import {
   findSimilarProductIds,
   findSimilarCustomers,
   queryManyReplica,
+  embedWithModel,
+  embeddingModelPredicate,
 } from '@/lib/shared/rag'
-import { aiEmbed } from '@/lib/shared/ai-client'
+import * as aiClient from '@/lib/shared/ai-client'
 
-const mockAiEmbed = vi.mocked(aiEmbed)
+// aiEmbedWithModel is A-policy's export; typed loosely until it lands.
+const mockAiEmbed = vi.mocked(aiClient.aiEmbed)
+const mockAiEmbedWithModel = vi.mocked((aiClient as any).aiEmbedWithModel as (...a: any[]) => Promise<any>)
+const withModel = (model = 'nomic-embed-text') => ({ vectors: [[0.1, 0.2, 0.3]], model, provider: 'razer' })
 
 const MOCK_VEC = [0.1, 0.2, 0.3]
 
@@ -61,6 +66,7 @@ describe('embed', () => {
 
   it('returns the gateway embedding on success', async () => {
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockAiEmbedWithModel.mockResolvedValue(withModel())
     const result = await embed('hello')
     expect(result).toEqual(MOCK_VEC)
     expect(mockAiEmbed).toHaveBeenCalledWith('hello')
@@ -88,6 +94,7 @@ describe('findSimilar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockAiEmbedWithModel.mockResolvedValue(withModel())
   })
 
   it('returns empty array when no results', async () => {
@@ -157,6 +164,7 @@ describe('findSimilarProducts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockAiEmbedWithModel.mockResolvedValue(withModel())
     mockClientQuery.mockResolvedValue({ rows: [] })
   })
 
@@ -177,6 +185,7 @@ describe('findSimilarProductIds', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockAiEmbedWithModel.mockResolvedValue(withModel())
     mockQueryMany.mockResolvedValue([]) // keyword fallback: no extra hits
     mockDbGetClient.mockResolvedValue({ query: mockDbClientQuery, release: vi.fn() })
   })
@@ -284,6 +293,7 @@ describe('findSimilarCustomers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockAiEmbedWithModel.mockResolvedValue(withModel())
     mockClientQuery.mockResolvedValue({ rows: [] })
   })
 
@@ -299,6 +309,7 @@ describe('tenant isolation (#489)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockAiEmbedWithModel.mockResolvedValue(withModel())
     mockClientQuery.mockResolvedValue({ rows: [] })
   })
 
@@ -348,5 +359,69 @@ describe('tenant isolation (#489)', () => {
     const rows = await queryManyReplica('SELECT 1')
     expect(rows).toEqual([{ x: 1 }])
     expect(mockPoolConnect).toHaveBeenCalled()
+  })
+})
+
+// ── Per-store embedding model (Azure plan §7) ────────────────────────────────
+
+describe('embedWithModel', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns the vector and the model that produced it', async () => {
+    mockAiEmbedWithModel.mockResolvedValue(withModel('text-embedding-3-small@768'))
+    expect(await embedWithModel('hi')).toEqual({ vector: MOCK_VEC, model: 'text-embedding-3-small@768' })
+  })
+
+  it('falls back to the legacy model name when the gateway reports none', async () => {
+    mockAiEmbedWithModel.mockResolvedValue({ vectors: [MOCK_VEC], model: '', provider: 'razer' })
+    expect((await embedWithModel('hi')).model).toBe('nomic-embed-text')
+  })
+
+  it('throws when no vector comes back', async () => {
+    mockAiEmbedWithModel.mockResolvedValue({ vectors: [], model: 'm', provider: 'azure' })
+    await expect(embedWithModel('hi')).rejects.toThrow('Gateway embed response missing embedding array')
+  })
+})
+
+describe('embeddingModelPredicate', () => {
+  it('compares NULL as the legacy model and appends the param', () => {
+    const params: unknown[] = ['a']
+    expect(embeddingModelPredicate(params, 'text-embedding-3-small@768')).toBe(
+      "COALESCE(embedding_model, 'nomic-embed-text') = $2"
+    )
+    expect(params).toEqual(['a', 'text-embedding-3-small@768'])
+  })
+})
+
+describe('similarity search only compares vectors of the query model', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockResolveTenantId.mockResolvedValue(null)
+    mockClientQuery.mockResolvedValue({ rows: [] })
+    mockQueryMany.mockResolvedValue([])
+    mockDbGetClient.mockResolvedValue({ query: mockDbClientQuery, release: vi.fn() })
+    mockDbClientQuery.mockImplementation(async () => ({ rows: [] }))
+  })
+
+  it('findSimilar filters rows to the embed model of the query', async () => {
+    mockAiEmbedWithModel.mockResolvedValue(withModel('text-embedding-3-small@768'))
+    await findSimilar('q')
+    const [sql, params] = mockClientQuery.mock.calls.at(-1)!
+    expect(sql).toContain("COALESCE(embedding_model, 'nomic-embed-text') = $3")
+    expect(params).toContain('text-embedding-3-small@768')
+  })
+
+  it('findSimilarProductIds passes the model to both vector queries', async () => {
+    mockAiEmbedWithModel.mockResolvedValue(withModel('text-embedding-3-small@768'))
+    await findSimilarProductIds('bolt')
+    const vectorCalls = mockDbClientQuery.mock.calls.filter(c => String(c[0]).includes('embedding_model'))
+    expect(vectorCalls).toHaveLength(2)
+    for (const c of vectorCalls) expect(c[1]).toEqual([expect.any(String), 20, 'text-embedding-3-small@768'])
+  })
+
+  it('findSimilarProductIds falls back to keyword hits when no row matches the model', async () => {
+    mockQueryMany.mockResolvedValue([{ source_id: 'kw1' }])
+    const results = await findSimilarProductIds('bolt washer')
+    expect(results).toEqual([{ productId: 'kw1', similarity: 0.99, matchedVia: 'products', variantId: null }])
   })
 })
