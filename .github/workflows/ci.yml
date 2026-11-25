@@ -316,7 +316,7 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: [test, security] # security only orders the graph
+    needs: [test, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites
     if: ${{ !cancelled() && needs.test.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
@@ -399,7 +399,7 @@ jobs:
   browser:
     name: Build + browser · ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck, security] # a commit failing lint or typecheck never spends a build; security only orders the graph
+    needs: [init, lint, typecheck, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites; a lint or typecheck failure never spends a build
     if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.init.outputs.apps != '[]' }}
     strategy:
       fail-fast: false
@@ -494,7 +494,7 @@ jobs:
   api-db-required:
     name: API tests (real DB)
     runs-on: ubuntu-latest
-    needs: [init, api-db-tests, security] # security only orders the graph
+    needs: [init, api-db-tests, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites
     if: always()
     steps:
       - name: Every API tests (real DB) card passed
@@ -738,7 +738,7 @@ jobs:
   build:
     name: Build · ${{ matrix.app }}
     runs-on: ubuntu-24.04-arm
-    needs: [lint, typecheck, security] # a commit failing lint or typecheck never spends a build; security only orders the graph
+    needs: [lint, typecheck, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites; a lint or typecheck failure never spends a build
     if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' }}
     strategy:
       fail-fast: false
@@ -762,7 +762,7 @@ jobs:
   images:
     name: Image · ${{ matrix.service }}
     runs-on: ubuntu-24.04-arm
-    needs: [init, lint, typecheck, security]
+    needs: [init, lint, typecheck, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites
     if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.init.outputs.release == 'true' }}
     permissions:
       id-token: write
