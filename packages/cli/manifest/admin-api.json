@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "cfa374e01765f76105ee6a65c8acd8ab32d2abd4fc19106b4413868d8f3b36a6",
+ "manifestHash": "0638bcd1e0281e640f4259bc9414d9e82ec6a9fb0d8a1b96cf4a5cea94a5b9bb",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -39529,6 +39529,7 @@
       "enum": [
        "exotel",
        "sarvam",
+       "azure_speech",
        "twilio_voice",
        "anthropic_voice"
       ]
@@ -39562,6 +39563,7 @@
       "enum": [
        "exotel",
        "sarvam",
+       "azure_speech",
        "twilio_voice",
        "anthropic_voice"
       ]
@@ -39603,7 +39605,8 @@
      "provider": {
       "type": "string",
       "enum": [
-       "exotel"
+       "exotel",
+       "azure_speech"
       ]
      }
     },
@@ -39613,7 +39616,7 @@
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
-   "summary": "Read-only check of saved Outreach credentials. Exotel only: a balance read, no call placed. Sarvam has no read-only endpoint, so it has no test. Platform owner on the flagship only.",
+   "summary": "Read-only check of saved Outreach credentials. Exotel: a balance read, no call placed. Azure Speech: a token request, nothing spoken or transcribed. Sarvam has no read-only endpoint, so it has no test. Platform owner on the flagship only.",
    "command": "settings-providers-credentials test"
   },
   {
