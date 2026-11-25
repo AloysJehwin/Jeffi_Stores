@@ -3,8 +3,8 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { VOICE_PROVIDERS, normalizeDltEntityId, normalizeSenderIds, normalizeVoiceConfig, type VoiceProviderName } from './voice-settings'
 
-// Which provider serves SMS, WhatsApp and AI for a store. Set only by the platform admin
-// (flagship Site Controls, Providers card) in control-plane platform_provider_settings: a tenant row overrides the
+// Which provider serves SMS, WhatsApp and AI for a store. Messaging is set only by the platform admin; a store
+// edits its own AI routing and models (Settings → Providers) in control-plane platform_provider_settings: a tenant row overrides the
 // platform default (tenant_id NULL); with neither, behaviour is unchanged (the store's old Site
 // Controls messaging choice, the gateway's own AI order).
 
@@ -12,7 +12,8 @@ export const MESSAGING_PROVIDERS = ['twilio', 'aws'] as const
 export const AI_TEXT_PROVIDERS = ['anthropic', 'razer', 'azure'] as const
 export const AI_IMAGE_PROVIDERS = ['razer', 'google', 'replicate', 'azure'] as const
 export const AI_VIDEO_PROVIDERS = ['google', 'replicate', 'azure'] as const
-export const AI_AUDIO_PROVIDERS = ['azure'] as const
+export const AI_STT_PROVIDERS = ['sarvam', 'azure'] as const
+export const AI_TTS_PROVIDERS = ['sarvam', 'azure'] as const
 export const AI_EMBED_PROVIDERS = ['razer', 'azure'] as const
 export const AI_IMAGE_QUALITIES = ['draft', 'standard', 'premium'] as const
 
@@ -20,7 +21,8 @@ export type MessagingProviderName = (typeof MESSAGING_PROVIDERS)[number]
 export type AiTextProvider = (typeof AI_TEXT_PROVIDERS)[number]
 export type AiImageProvider = (typeof AI_IMAGE_PROVIDERS)[number]
 export type AiVideoProvider = (typeof AI_VIDEO_PROVIDERS)[number]
-export type AiAudioProvider = (typeof AI_AUDIO_PROVIDERS)[number]
+export type AiSttProvider = (typeof AI_STT_PROVIDERS)[number]
+export type AiTtsProvider = (typeof AI_TTS_PROVIDERS)[number]
 export type AiEmbedProvider = (typeof AI_EMBED_PROVIDERS)[number]
 export type AiImageQuality = (typeof AI_IMAGE_QUALITIES)[number]
 
@@ -30,7 +32,9 @@ export const PROVIDER_SETTING_KEYS = [
   'ai_text_providers',
   'ai_image_providers',
   'ai_video_providers',
-  'ai_audio_providers',
+  'ai_stt_providers',
+  'ai_tts_providers',
+  'ai_models',
   'ai_embed_provider',
   'ai_image_default_quality',
   // Outreach calls (platform scope only) and India SMS DLT ids; read by voice-config.ts and sms-dlt.ts.
@@ -39,8 +43,25 @@ export const PROVIDER_SETTING_KEYS = [
   'sms_dlt_entity_id',
   'sms_dlt_sender_ids',
 ] as const
-/** Keys set only as the platform default, never per store (ai_embed_provider: switching re-embeds every store). */
-export const PLATFORM_ONLY_PROVIDER_KEYS: readonly ProviderSettingKey[] = ['voice_provider', 'voice_config', 'ai_embed_provider']
+/** Keys set only as the platform default, never per store. */
+export const PLATFORM_ONLY_PROVIDER_KEYS: readonly ProviderSettingKey[] = ['voice_provider', 'voice_config']
+/** Keys a store admin may write for its own store (AI routing only). */
+export const STORE_EDITABLE_PROVIDER_KEYS: readonly ProviderSettingKey[] = [
+  'ai_text_providers', 'ai_image_providers', 'ai_video_providers', 'ai_stt_providers', 'ai_tts_providers', 'ai_embed_provider', 'ai_models',
+]
+
+export const AI_MODEL_CAPABILITIES = ['text', 'image', 'video', 'stt', 'tts', 'embed'] as const
+export type AiModelCapability = (typeof AI_MODEL_CAPABILITIES)[number]
+export type AiModels = Partial<Record<AiModelCapability, Record<string, string>>>
+const MODEL_PROVIDERS: Record<AiModelCapability, readonly string[]> = {
+  text: AI_TEXT_PROVIDERS,
+  image: AI_IMAGE_PROVIDERS,
+  video: AI_VIDEO_PROVIDERS,
+  stt: AI_STT_PROVIDERS,
+  tts: AI_TTS_PROVIDERS,
+  embed: AI_EMBED_PROVIDERS,
+}
+const MODEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:@\/-]{0,99}$/
 export type ProviderSettingKey = (typeof PROVIDER_SETTING_KEYS)[number]
 export type PolicySource = 'tenant' | 'platform' | 'fallback'
 
@@ -51,8 +72,11 @@ export interface ProviderPolicy {
   aiTextProviders: AiTextProvider[]
   aiImageProviders: AiImageProvider[]
   aiVideoProviders: AiVideoProvider[]
-  aiAudioProviders: AiAudioProvider[]
-  /** Single embeddings model for all stores; razer (nomic) unless the platform default says azure. */
+  aiSttProviders: AiSttProvider[]
+  aiTtsProviders: AiTtsProvider[]
+  /** Chosen model per capability and provider; the gateway uses its default for a provider with none. */
+  aiModels: AiModels
+  /** Single embeddings provider; razer (nomic) unless the store or platform says azure. */
   aiEmbedProvider: AiEmbedProvider
   aiImageDefaultQuality?: AiImageQuality
   /** India DLT Principal Entity id for AWS SMS (tenant row, else platform default). */
@@ -64,8 +88,10 @@ export interface AiRouting {
   text?: string[]
   image?: string[]
   video?: string[]
-  audio?: string[]
+  stt?: string[]
+  tts?: string[]
   embed?: AiEmbedProvider
+  models?: AiModels
 }
 
 const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
@@ -90,6 +116,24 @@ function orderOf<T extends string>(v: unknown, allow: readonly T[]): T[] | null 
   return out
 }
 
+/** capability -> provider -> model id; unknown capabilities, providers or unsafe ids make it invalid (null). */
+function modelsOf(v: unknown): AiModels | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: AiModels = {}
+  for (const [cap, byProvider] of Object.entries(v as Record<string, unknown>)) {
+    if (!(AI_MODEL_CAPABILITIES as readonly string[]).includes(cap)) return null
+    if (!byProvider || typeof byProvider !== 'object' || Array.isArray(byProvider)) return null
+    const clean: Record<string, string> = {}
+    for (const [prov, id] of Object.entries(byProvider as Record<string, unknown>)) {
+      if (!MODEL_PROVIDERS[cap as AiModelCapability].includes(prov)) return null
+      if (typeof id !== 'string' || !MODEL_ID_RE.test(id)) return null
+      clean[prov] = id
+    }
+    if (Object.keys(clean).length) out[cap as AiModelCapability] = clean
+  }
+  return out
+}
+
 /** Validates a value for a key; null when invalid. Arrays are de-duplicated, order kept. */
 export function normalizeProviderValue(key: ProviderSettingKey, v: unknown): unknown | null {
   switch (key) {
@@ -102,8 +146,12 @@ export function normalizeProviderValue(key: ProviderSettingKey, v: unknown): unk
       return orderOf(v, AI_IMAGE_PROVIDERS)
     case 'ai_video_providers':
       return orderOf(v, AI_VIDEO_PROVIDERS)
-    case 'ai_audio_providers':
-      return orderOf(v, AI_AUDIO_PROVIDERS)
+    case 'ai_stt_providers':
+      return orderOf(v, AI_STT_PROVIDERS)
+    case 'ai_tts_providers':
+      return orderOf(v, AI_TTS_PROVIDERS)
+    case 'ai_models':
+      return modelsOf(v)
     case 'ai_embed_provider':
       return AI_EMBED_PROVIDERS.includes(v as AiEmbedProvider) ? v : null
     case 'ai_image_default_quality':
@@ -176,7 +224,9 @@ export async function getProviderPolicy(tenantId?: string | null): Promise<Provi
     aiTextProviders: pick<AiTextProvider[]>('ai_text_providers') ?? ['anthropic', 'razer'],
     aiImageProviders: pick<AiImageProvider[]>('ai_image_providers') ?? [],
     aiVideoProviders: pick<AiVideoProvider[]>('ai_video_providers') ?? [],
-    aiAudioProviders: pick<AiAudioProvider[]>('ai_audio_providers') ?? [],
+    aiSttProviders: pick<AiSttProvider[]>('ai_stt_providers') ?? [],
+    aiTtsProviders: pick<AiTtsProvider[]>('ai_tts_providers') ?? [],
+    aiModels: pick<AiModels>('ai_models') ?? {},
     aiEmbedProvider: pick<AiEmbedProvider>('ai_embed_provider') ?? 'razer',
     aiImageDefaultQuality: pick<AiImageQuality>('ai_image_default_quality'),
     smsDltEntityId: pick<string>('sms_dlt_entity_id'),
@@ -191,7 +241,9 @@ export async function getAiRouting(tenantId?: string | null): Promise<AiRouting>
   if (p.aiTextProviders.length) out.text = p.aiTextProviders
   if (p.aiImageProviders.length) out.image = p.aiImageProviders
   if (p.aiVideoProviders.length) out.video = p.aiVideoProviders
-  if (p.aiAudioProviders.length) out.audio = p.aiAudioProviders
+  if (p.aiSttProviders.length) out.stt = p.aiSttProviders
+  if (p.aiTtsProviders.length) out.tts = p.aiTtsProviders
+  if (Object.keys(p.aiModels).length) out.models = p.aiModels
   out.embed = p.aiEmbedProvider
   return out
 }

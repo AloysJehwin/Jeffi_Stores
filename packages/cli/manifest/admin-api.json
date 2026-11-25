@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "0638bcd1e0281e640f4259bc9414d9e82ec6a9fb0d8a1b96cf4a5cea94a5b9bb",
+ "manifestHash": "bdd82b226a072c8a17bf757ed71966aa08c91c0d2333b818672df07cbe95582e",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -39385,15 +39385,30 @@
    "gatewayPath": "/v1/admin/settings/providers",
    "file": "admin-service/src/app/api/(admin)/admin/settings/providers/route.ts",
    "pathParams": [],
-   "query": [],
-   "queryParams": [],
+   "query": [
+    "tenant"
+   ],
+   "queryParams": [
+    {
+     "name": "tenant",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid",
+      "examples": [
+       ""
+      ]
+     }
+    }
+   ],
    "scope": "settings:read",
    "scopeSource": "literal",
    "scopes": [
-    "settings:read"
+    "settings:read",
+    "settings:write"
    ],
    "guard": "auth",
-   "platform": null,
+   "platform": "owner",
    "body": null,
    "summary": "List providers (settings)",
    "command": "settings providers"
@@ -39414,7 +39429,7 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": null,
+   "platform": "owner",
    "body": {
     "type": "object",
     "properties": {
@@ -39477,7 +39492,7 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": null,
+   "platform": "owner",
    "body": null,
    "noBody": true,
    "summary": "Delete providers (settings)",

@@ -220,7 +220,13 @@ async function currentTenant(): Promise<string | null> {
   }
 }
 
-type Routing = { text?: string[]; audio?: string[]; embed?: string }
+type Routing = {
+  text?: string[]
+  stt?: string[]
+  tts?: string[]
+  embed?: string
+  models?: Partial<Record<string, Record<string, string>>>
+}
 
 /** Policy follows the store the work is for: a tenant-id namespace, the flagship for 'platform',
  *  else (undefined) the tenant in the current request scope. */
@@ -241,12 +247,17 @@ async function gatewayContext(cacheNamespace: string | undefined) {
   const [routing, anthropicIdentity] = await Promise.all([
     Promise.resolve()
       .then(() => policy.getAiRouting(store))
-      .catch(() => ({}) as { text?: string[] }),
+      .catch(() => ({}) as Routing),
     Promise.resolve()
       .then(() => policy.getAnthropicIdentity(store))
       .catch(() => null),
   ])
-  return { cacheNamespace: ns, providers: routing.text, anthropicIdentity: anthropicIdentity ?? undefined }
+  return {
+    cacheNamespace: ns,
+    providers: routing.text,
+    ...(routing.models?.text ? { models: routing.models.text } : {}),
+    anthropicIdentity: anthropicIdentity ?? undefined,
+  }
 }
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
@@ -430,11 +441,13 @@ export async function aiEmbedWithModel(
   let usedModel = model || ''
   let usedProvider = ''
   const started = Date.now()
-  const provider = (await routingFor(undefined)).embed
+  const routing = await routingFor(undefined)
+  const provider = routing.embed
+  const embedModel = provider ? routing.models?.embed?.[provider] : undefined
   const out = await withFallback(
     'embed',
     async () => {
-      const r = await gatewayPost('/v1/embed', { input, model, ...(provider ? { provider } : {}) }, 'embed ', false)
+      const r = await gatewayPost('/v1/embed', { input, model: embedModel ?? model, ...(provider ? { provider } : {}) }, 'embed ', false)
       usage = r.usage
       usedModel = r.model || usedModel
       usedProvider = r.provider || provider || ''
@@ -519,7 +532,7 @@ async function logAudioUsage(
   }
 }
 
-/** Speech to text through the gateway (`/v1/audio/transcribe`), in the store's audio order. Metered under
+/** Speech to text through the gateway (`/v1/audio/transcribe`), in the store's speech order. Metered under
  *  capability 'audio' by the minute. Throws when the gateway or every provider fails. */
 export async function aiTranscribe(opts: {
   audio: Buffer
@@ -537,7 +550,8 @@ export async function aiTranscribe(opts: {
       audioBase64: opts.audio.toString('base64'),
       mimeType: opts.mimeType,
       ...(opts.language ? { language: opts.language } : {}),
-      ...(routing.audio?.length ? { providers: routing.audio } : {}),
+      ...(routing.stt?.length ? { providers: routing.stt } : {}),
+      ...(routing.models?.stt ? { models: routing.models.stt } : {}),
     },
     'transcribe ',
     true
@@ -555,7 +569,7 @@ export async function aiTranscribe(opts: {
   return res
 }
 
-/** Text to speech through the gateway (`/v1/audio/speak`), in the store's audio order. Metered under
+/** Text to speech through the gateway (`/v1/audio/speak`), in the store's speech order. Metered under
  *  capability 'audio' per 1k characters. Throws when the gateway or every provider fails. */
 export async function aiSpeak(opts: {
   text: string
@@ -575,7 +589,8 @@ export async function aiSpeak(opts: {
       language: opts.language,
       ...(opts.voice ? { voice: opts.voice } : {}),
       ...(opts.format ? { format: opts.format } : {}),
-      ...(routing.audio?.length ? { providers: routing.audio } : {}),
+      ...(routing.tts?.length ? { providers: routing.tts } : {}),
+      ...(routing.models?.tts ? { models: routing.models.tts } : {}),
     },
     'speak ',
     true

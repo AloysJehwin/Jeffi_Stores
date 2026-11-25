@@ -73,6 +73,18 @@ describe('aiChat (gateway client)', () => {
     expect(init.signal).toBeDefined()
   })
 
+  it('sends the store text models for the providers it orders, and none when unset', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic', 'razer'], models: { text: { anthropic: 'claude-sonnet-5-5', razer: 'llama3.1:8b' } } })
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody()).toMatchObject({ providers: ['anthropic', 'razer'], models: { anthropic: 'claude-sonnet-5-5', razer: 'llama3.1:8b' } })
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic'] })
+    mockFetch.mockClear()
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody()).not.toHaveProperty('models')
+  })
+
   it('forwards model hint, JSON mode, sampling, tools and noCache', async () => {
     mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
     const tools = [{ type: 'function' as const, function: { name: 'fn', description: 'd', parameters: {} } }]
@@ -189,6 +201,13 @@ describe('aiEmbedWithModel and the embeddings provider', () => {
     expect(recordUsage.mock.calls[0][0]).toMatchObject({ provider: 'azure' })
   })
 
+  it('sends the embed model chosen for the provider', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ embed: 'azure', models: { embed: { azure: 'text-embedding-3-large' } } })
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[3]], model: 'text-embedding-3-large@768', provider: 'azure' }))
+    await aiEmbedWithModel('x')
+    expect(sentBody()).toMatchObject({ provider: 'azure', model: 'text-embedding-3-large' })
+  })
+
   it('never falls back to direct Ollama while the embed provider is Azure', async () => {
     vi.stubEnv('OLLAMA_BASE_URL', 'http://ollama.test')
     vi.mocked(getAiRouting).mockResolvedValue({ embed: 'azure' })
@@ -201,11 +220,11 @@ describe('aiEmbedWithModel and the embeddings provider', () => {
 
 describe('aiTranscribe', () => {
   it('posts base64 audio with the audio order and meters minutes', async () => {
-    vi.mocked(getAiRouting).mockResolvedValue({ audio: ['azure'] })
+    vi.mocked(getAiRouting).mockResolvedValue({ stt: ['azure'], tts: ['sarvam'], models: { stt: { azure: 'gpt-4o-transcribe' }, tts: { sarvam: 'bulbul:v3' } } })
     mockFetch.mockResolvedValueOnce(okJson({ text: 'namaste', language: 'hi-IN', durationSeconds: 90, provider: 'azure', model: 'gpt-4o-transcribe' }))
     const r = await aiTranscribe({ audio: Buffer.from('abc'), mimeType: 'audio/ogg', language: 'hi-IN', feature: 'staff_voice_memo' })
     expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/audio\/transcribe$/)
-    expect(sentBody()).toEqual({ audioBase64: Buffer.from('abc').toString('base64'), mimeType: 'audio/ogg', language: 'hi-IN', providers: ['azure'] })
+    expect(sentBody()).toEqual({ audioBase64: Buffer.from('abc').toString('base64'), mimeType: 'audio/ogg', language: 'hi-IN', providers: ['azure'], models: { azure: 'gpt-4o-transcribe' } })
     expect(r).toEqual({ text: 'namaste', language: 'hi-IN', durationSeconds: 90, provider: 'azure', model: 'gpt-4o-transcribe' })
     await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
     expect(recordUsage.mock.calls[0][0]).toMatchObject({ feature: 'staff_voice_memo', capability: 'audio', provider: 'azure', model: 'gpt-4o-transcribe', units: [{ type: 'audio_minute', qty: 1.5 }] })
@@ -224,11 +243,11 @@ describe('aiTranscribe', () => {
 
 describe('aiSpeak', () => {
   it('returns the decoded audio and meters 1k characters', async () => {
-    vi.mocked(getAiRouting).mockResolvedValue({ audio: ['azure'] })
+    vi.mocked(getAiRouting).mockResolvedValue({ stt: ['azure'], tts: ['sarvam'], models: { stt: { azure: 'gpt-4o-transcribe' }, tts: { sarvam: 'bulbul:v3' } } })
     mockFetch.mockResolvedValueOnce(okJson({ audioBase64: Buffer.from('mp3bytes').toString('base64'), mimeType: 'audio/mpeg', characters: 500, provider: 'azure', model: 'hi-IN-SwaraNeural' }))
     const r = await aiSpeak({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', feature: 'voice_reply' })
     expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/audio\/speak$/)
-    expect(sentBody()).toEqual({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', providers: ['azure'] })
+    expect(sentBody()).toEqual({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', providers: ['sarvam'], models: { sarvam: 'bulbul:v3' } })
     expect(r.audio.toString()).toBe('mp3bytes')
     expect(r).toMatchObject({ mimeType: 'audio/mpeg', provider: 'azure', model: 'hi-IN-SwaraNeural' })
     await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
@@ -253,6 +272,13 @@ describe('aiVision (gateway client)', () => {
     expect(result).toEqual({ ok: true, text: 'line 1', model: 'PP-OCRv5' })
     expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/vision$/)
     expect(sentBody()).toMatchObject({ images: ['aGVsbG8='], prompt: 'extract' })
+  })
+
+  it('sends the text models with the vision call', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic'], models: { text: { anthropic: 'claude-haiku-5-5' } } })
+    mockFetch.mockResolvedValueOnce(okJson({ ok: true, text: 't', model: 'm' }))
+    await aiVision(['x'], 'extract')
+    expect(sentBody()).toMatchObject({ providers: ['anthropic'], models: { anthropic: 'claude-haiku-5-5' } })
   })
 
   it('reports a non-ok reply without throwing', async () => {
