@@ -13,6 +13,7 @@ import sharp from 'sharp'
 import type { Sharp } from 'sharp'
 import { encode as encodeBlurhash } from 'blurhash'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
+import { staticAwsCredentials } from '@/lib/shared/aws-credentials'
 
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
 const DEFAULT_BUCKET = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
@@ -56,10 +57,7 @@ function publicUrl(bucket: string, fullKey: string): string {
 
 const s3Client = new S3Client({
   region: AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
+  credentials: staticAwsCredentials(),
 })
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -405,10 +403,7 @@ export async function presignGalleryVideoUpload(
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
   presignClient ??= new S3Client({
     region: AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
+    credentials: staticAwsCredentials(),
     requestChecksumCalculation: 'WHEN_REQUIRED',
   })
   const key = `media/video/${randomUUID()}.${GALLERY_VIDEO_TYPES[mime]}`
@@ -791,10 +786,7 @@ export async function presignProductMediaUpload(
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
   presignClient ??= new S3Client({
     region: AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
+    credentials: staticAwsCredentials(),
     requestChecksumCalculation: 'WHEN_REQUIRED',
   })
   const key = `products/${productId}/media/${randomUUID()}.${ext}`
@@ -811,10 +803,7 @@ export async function presignPlatformObjectGet(fullKey: string, ttlSeconds = 15 
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
   presignClient ??= new S3Client({
     region: AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    },
+    credentials: staticAwsCredentials(),
     requestChecksumCalculation: 'WHEN_REQUIRED',
   })
   return getSignedUrl(presignClient, new GetObjectCommand({ Bucket: DEFAULT_BUCKET, Key: fullKey }), { expiresIn: ttlSeconds })

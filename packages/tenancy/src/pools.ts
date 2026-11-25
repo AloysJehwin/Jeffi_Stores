@@ -2,24 +2,9 @@ import pg from 'pg'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Signer } from '@aws-sdk/rds-signer'
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+// The shared secrets interface (Secrets Manager or Key Vault): plain ESM so the boot loader uses it too.
+import { fetchDbSecret } from '../../store-core/src/lib/secrets/index.mjs'
 import type { TenantContext, TenantInfra } from './context'
-
-interface DbSecret { username?: string; password: string; database?: string; expiresAt: number }
-const secretCache = new Map<string, DbSecret>()
-const SECRET_TTL_MS = 5 * 60 * 1000
-async function fetchDbSecret(ref: string, region: string): Promise<DbSecret> {
-  const now = Date.now()
-  const hit = secretCache.get(ref)
-  if (hit && hit.expiresAt > now) return hit
-  const client = new SecretsManagerClient({ region })
-  const res = await client.send(new GetSecretValueCommand({ SecretId: ref }))
-  const parsed = JSON.parse(res.SecretString || '{}')
-  if (!parsed.password) throw new Error(`Secret ${ref} has no password field`)
-  const entry: DbSecret = { username: parsed.username, password: parsed.password, database: parsed.database, expiresAt: now + SECRET_TTL_MS }
-  secretCache.set(ref, entry)
-  return entry
-}
 
 export function createPgPool(config: pg.PoolConfig): pg.Pool {
   const pool = new pg.Pool(config)
@@ -33,6 +18,23 @@ export function rdsSslOption(): pg.PoolConfig['ssl'] {
   const p = fs.existsSync(certPath) ? certPath : fs.existsSync(alt) ? alt : null
   return p ? { rejectUnauthorized: true, ca: fs.readFileSync(p).toString() } : { rejectUnauthorized: false }
 }
+
+// Platform-database TLS by config, as store-core's pg-pool: DB_SSL=disable|require|verify, DB_SSL_CA a CA
+// bundle path (or inline PEM) for verify, else the system roots. Unset: undefined, the RDS-host default applies.
+export function sslFromConfig(mode: string | undefined, ca?: string): pg.PoolConfig['ssl'] | undefined {
+  const m = (mode || '').trim().toLowerCase()
+  if (!m) return undefined
+  if (['disable', 'off', 'false', '0', 'no'].includes(m)) return false
+  if (['require', 'on', 'true', '1', 'yes', 'prefer'].includes(m)) return { rejectUnauthorized: false }
+  if (!['verify', 'verify-full', 'verify-ca'].includes(m)) throw new Error(`DB_SSL must be disable, require or verify (got "${mode}")`)
+  if (!ca) return { rejectUnauthorized: true }
+  if (ca.trimStart().startsWith('-----BEGIN')) return { rejectUnauthorized: true, ca }
+  const p = path.resolve(ca)
+  if (!fs.existsSync(p)) throw new Error(`DB_SSL_CA file not found: ${p}`)
+  return { rejectUnauthorized: true, ca: fs.readFileSync(p).toString() }
+}
+
+export const dbSslConfig = () => sslFromConfig(process.env.DB_SSL, process.env.DB_SSL_CA)
 
 export function rdsIamPassword(host: string, port: number, user: string, region: string): () => Promise<string> {
   const signer = new Signer({ hostname: host, port, region, username: user })
@@ -52,7 +54,7 @@ export function controlPlanePool(): pg.Pool {
     const host = process.env.CONTROL_PLANE_RDS_HOST!
     const port = parseInt(process.env.CONTROL_PLANE_RDS_PORT || '5432', 10)
     const user = process.env.CONTROL_PLANE_RDS_USER || 'app_user'
-    Object.assign(config, { host, port, user, database: process.env.CONTROL_PLANE_RDS_DB || 'jeffi_stores', ssl: rdsSslOption(), password: rdsIamPassword(host, port, user, process.env.AWS_REGION || 'us-east-1') })
+    Object.assign(config, { host, port, user, database: process.env.CONTROL_PLANE_RDS_DB || 'jeffi_stores', ssl: dbSslConfig() ?? rdsSslOption(), password: rdsIamPassword(host, port, user, process.env.AWS_REGION || 'us-east-1') })
   } else {
     cp = mainPool(url, 3)
     return cp
@@ -62,9 +64,9 @@ export function controlPlanePool(): pg.Pool {
 }
 
 /**
- * A pool on the main app DB from a postgres URL. RDS hosts get TLS with the RDS CA; DB_IAM_AUTH=true
- * signs an IAM token per connection instead of a password. Built from parts so `sslmode` in the URL
- * can't override the CA.
+ * A pool on the main app DB from a postgres URL. TLS from DB_SSL / DB_SSL_CA, else RDS hosts get TLS with
+ * the RDS CA; DB_IAM_AUTH=true signs an IAM token per connection instead of the URL's password. Built from
+ * parts so `sslmode` in the URL can't override the CA.
  */
 export function mainPool(url: string, max = 10): pg.Pool {
   const u = new URL(url)
@@ -72,7 +74,9 @@ export function mainPool(url: string, max = 10): pg.Pool {
   const user = decodeURIComponent(u.username)
   const config: any = { ...basePoolConfig(), max, host: u.hostname, port, database: decodeURIComponent(u.pathname.slice(1)), user }
   if (u.password) config.password = decodeURIComponent(u.password)
-  if (u.hostname.includes('rds.amazonaws.com')) config.ssl = rdsSslOption()
+  const ssl = dbSslConfig()
+  if (ssl !== undefined) config.ssl = ssl
+  else if (u.hostname.includes('rds.amazonaws.com')) config.ssl = rdsSslOption()
   if (process.env.DB_IAM_AUTH === 'true') config.password = rdsIamPassword(u.hostname, port, user, process.env.AWS_REGION || 'us-east-1')
   return createPgPool(config)
 }
@@ -131,7 +135,7 @@ function buildTenantPool(infra: TenantInfra, slug: string): pg.Pool {
     return createPgPool(config)
   }
   // Password auth: the store's own Postgres on its EC2 node, self-signed TLS (unverified). The
-  // password is the pod's env one, else the Secrets Manager secret at db_secret_ref (cached 5 min).
+  // password is the pod's env one, else the secret at db_secret_ref (cached 5 min).
   const envPw = podDbPassword(slug)
   if (!infra.dbSecretRef && !envPw) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
   const ref = infra.dbSecretRef!

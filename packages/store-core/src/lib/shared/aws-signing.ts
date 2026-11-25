@@ -18,9 +18,13 @@ export interface SignedAwsRequest {
   body?: string
 }
 
+// The SDK's default chain (env keys, AWS_WEB_IDENTITY_TOKEN_FILE + AWS_ROLE_ARN, ECS, instance metadata),
+// built once: it memoizes credentials until they expire instead of re-assuming the role per request.
+let credentials: ReturnType<typeof defaultProvider> | undefined
+export const awsCredentialProvider = () => (credentials ??= defaultProvider())
+
 // Build an HttpRequest, SigV4-sign it, and fetch it. Returns the raw Response so
-// each caller keeps its own status/body handling. Behaviour is identical to the
-// per-module inline signing this replaces.
+// each caller keeps its own status/body handling.
 export async function signedAwsFetch(req: SignedAwsRequest): Promise<Response> {
   const request = new HttpRequest({
     method: req.method,
@@ -33,7 +37,7 @@ export async function signedAwsFetch(req: SignedAwsRequest): Promise<Response> {
   const signer = new SignatureV4({
     service: req.service,
     region: req.region,
-    credentials: defaultProvider(),
+    credentials: awsCredentialProvider(),
     sha256: Sha256,
   })
   const signed = await signer.sign(request)

@@ -3,6 +3,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { mrpDiscountPct } from '@/lib/catalog/pricing'
 import { readFileSync } from 'fs'
 import { assetPath } from '@/lib/shared/paths'
+import { staticAwsCredentials } from '@/lib/shared/aws-credentials'
 
 const W = 1080
 const H = 1920
@@ -11,10 +12,7 @@ const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
 
 const s3Client = new S3Client({
   region: AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
+  credentials: staticAwsCredentials(),
 })
 
 function loadFont(name: string): Buffer {
