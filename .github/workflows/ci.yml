@@ -73,6 +73,8 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
+  # One heap ceiling for every Node step (tests, type checks, builds); runners have 16 GB.
+  NODE_OPTIONS: --max-old-space-size=12288
   DRY_FLAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
 
 jobs:
@@ -220,10 +222,7 @@ jobs:
         with:
           node-version: ${{ matrix.node || 20 }}
           install: ${{ matrix.install }}
-      # The apps' checks load store-core's site themes and blocks; tsc outgrows Node's default heap.
       - run: ${{ matrix.run }}
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
 
   security:
     name: Security
@@ -326,10 +325,7 @@ jobs:
           pattern: vitest-*
           path: .vitest-reports
           merge-multiple: true
-      # Merging every part's coverage outgrew Node's default heap (OOM on #641's run).
       - run: npx vitest run --merge-reports --coverage
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
 
   integration:
     name: Integration tests · ${{ matrix.app }}
@@ -439,7 +435,6 @@ jobs:
       - name: Next.js build
         run: npm run build:${{ matrix.app }}
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
           NEXT_PUBLIC_ENABLE_RAZORPAY: ${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
@@ -637,8 +632,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build storefront and business
         run: npm run build:storefront && npm run build:business
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
       - name: Start the apps behind the dev router
         run: |
           npx next start storefront-service -p 3010 > storefront.log 2>&1 &
@@ -714,8 +707,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build storefront and admin
         run: npm run build:storefront && npm run build:admin
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
       - name: Start the apps behind the dev router
         run: |
           npx next start storefront-service -p 3010 > storefront.log 2>&1 &

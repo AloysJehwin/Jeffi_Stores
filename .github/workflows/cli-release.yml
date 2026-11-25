@@ -14,6 +14,9 @@ concurrency:
   group: cli-release
   cancel-in-progress: false
 
+env:
+  NODE_OPTIONS: --max-old-space-size=12288
+
 jobs:
   publish:
     name: Publish @jeffi_erp/cli
