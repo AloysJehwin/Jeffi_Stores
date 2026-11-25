@@ -1,13 +1,16 @@
 #!/bin/bash
 # Apply the platform in dependency order (first install). Usage: apply-platform.sh <image-tag>
 # Without a tag the images keep the `set-by-rollout` placeholder and won't pull.
+# JEFFI_CLOUD=azure installs the Azure overlay (../overlays/azure) on the Azure core instead.
 set -euo pipefail
 cd "$(dirname "$0")/../platform"
 TAG=${1:-}
+SRC=.; [ "${JEFFI_CLOUD:-aws}" = azure ] && SRC=../overlays/azure
+if kubectl kustomize "$SRC" | grep -q REPLACE_ME; then echo "$SRC still has REPLACE_ME placeholders" >&2; exit 1; fi
 if [ -n "$TAG" ]; then
-  kubectl kustomize . | sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g" | kubectl apply -f -
+  kubectl kustomize "$SRC" | sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g" | kubectl apply -f -
 else
-  kubectl apply -k .
+  kubectl apply -k "$SRC"
 fi
 kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=300s
 kubectl wait --for condition=established crd/clusterissuers.cert-manager.io --timeout=120s

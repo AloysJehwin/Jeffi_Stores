@@ -1,0 +1,8 @@
+# Store nodes (AWS) join the core at its Tailscale address; store hosts point at the AWS tenant edge's Elastic IP
+# (deploy/aws/edge/launch-edge.sh prints it). The core no longer has an EC2 instance profile to hand out.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: provisioning, namespace: jeffi }
+data:
+  K8S_SERVER_URL: https://REPLACE_ME_core_tailscale_ip:6443
+  CLUSTER_INGRESS_IP: REPLACE_ME_edge_elastic_ip

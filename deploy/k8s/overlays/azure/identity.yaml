@@ -1,0 +1,5 @@
+# The platform services' identity: the subject of AWS role jeffi-irsa-app (deploy/azure/irsa/aws-roles.sh) and of
+# the Entra federated credential on jeffi-prod-cluster-apps (Key Vault Secrets User, deploy/azure/modules/foundation.bicep).
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: jeffi-app, namespace: jeffi }
