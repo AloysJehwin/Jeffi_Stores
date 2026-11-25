@@ -33,6 +33,8 @@ interface AdminSelectProps {
   sm?: boolean
   xs?: boolean
   md?: boolean
+  /** Accessible name when there is no visible `label`. */
+  ariaLabel?: string
 }
 
 export default function AdminSelect({
@@ -53,6 +55,7 @@ export default function AdminSelect({
   sm = false,
   xs = false,
   md = false,
+  ariaLabel,
 }: AdminSelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue)
   const [isOpen, setIsOpen] = useState(false)
@@ -184,6 +187,7 @@ export default function AdminSelect({
           type="button"
           id={id}
           role="combobox"
+          aria-label={ariaLabel}
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           disabled={disabled}

@@ -75,6 +75,26 @@ describe('PeriodBar', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('presets are a segmented control: a matching preset is pressed, a custom range presses none', () => {
+    const { rerender } = render(<PeriodBar value={value} onChange={() => {}} />)
+    expect(screen.getByRole('group', { name: 'Period presets' })).toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
+    const onChange = vi.fn()
+    rerender(<PeriodBar value={value} onChange={onChange} />)
+    fireEvent.click(screen.getByRole('button', { name: '30 days' }))
+    rerender(<PeriodBar value={onChange.mock.calls[0][0]} onChange={onChange} />)
+    expect(screen.getByRole('button', { name: '30 days' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '30 days' })).toHaveClass('bg-accent-500')
+  })
+
+  it('renders actions at the right, before Refresh', () => {
+    render(<PeriodBar value={value} onChange={() => {}} onRefresh={() => {}} actions={<button type="button">Insights</button>} />)
+    const insights = screen.getByRole('button', { name: 'Insights' })
+    expect(insights.parentElement).toHaveClass('ml-auto')
+    expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveClass('ml-auto')
+    expect(insights.compareDocumentPosition(screen.getByRole('button', { name: 'Refresh' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('refresh button calls onRefresh and spins while busy', () => {
     const onRefresh = vi.fn()
     render(<PeriodBar value={value} onChange={() => {}} onRefresh={onRefresh} busy />)
