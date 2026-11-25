@@ -220,11 +220,22 @@ async function currentTenant(): Promise<string | null> {
   }
 }
 
+type Routing = { text?: string[]; audio?: string[]; embed?: string }
+
+/** Policy follows the store the work is for: a tenant-id namespace, the flagship for 'platform',
+ *  else (undefined) the tenant in the current request scope. */
+async function routingFor(cacheNamespace: string | undefined): Promise<Routing> {
+  const ns = cacheNamespace ?? (await currentTenant()) ?? 'platform'
+  const store = UUID_RE.test(ns) ? ns : ns === 'platform' ? null : undefined
+  const policy = await import('@/lib/providers/policy')
+  return Promise.resolve()
+    .then(() => policy.getAiRouting(store))
+    .catch(() => ({}) as Routing)
+}
+
 /** Per-request gateway context: cache partition, the store's provider order and its Claude identity. */
 async function gatewayContext(cacheNamespace: string | undefined) {
   const ns = cacheNamespace ?? (await currentTenant()) ?? 'platform'
-  // Policy and identity follow the store the work is for: a tenant-id namespace, the flagship for
-  // 'platform', else (undefined) the tenant in the current request scope.
   const store = UUID_RE.test(ns) ? ns : ns === 'platform' ? null : undefined
   const policy = await import('@/lib/providers/policy')
   const [routing, anthropicIdentity] = await Promise.all([
@@ -400,24 +411,42 @@ export function getAiProvider(): 'openai' | 'ollama' {
   return (process.env.AI_PROVIDER || 'ollama').toLowerCase() as 'openai' | 'ollama'
 }
 
-/** Embeddings via the gateway (used by RAG). Returns one vector per input. */
-export async function aiEmbed(
+export interface AiEmbedResult {
+  vectors: number[][]
+  /** Model that produced the vectors ('nomic-embed-text', 'text-embedding-3-small@768', ...). */
+  model: string
+  provider: string
+}
+
+/** Embeddings via the gateway, with the model and provider that produced them. The platform's
+ *  embeddings provider (Settings → Providers) is sent along; direct Ollama is a fallback only
+ *  while that provider is Razer, since vectors from two models cannot be mixed. */
+export async function aiEmbedWithModel(
   input: string | string[],
   model?: string,
   opts: { feature?: string; billing?: boolean } = {}
-): Promise<number[][]> {
+): Promise<AiEmbedResult> {
   let usage: AiChatResponse['usage']
   let usedModel = model || ''
+  let usedProvider = ''
   const started = Date.now()
+  const provider = (await routingFor(undefined)).embed
   const out = await withFallback(
     'embed',
     async () => {
-      const r = await gatewayPost('/v1/embed', { input, model }, 'embed ', false)
+      const r = await gatewayPost('/v1/embed', { input, model, ...(provider ? { provider } : {}) }, 'embed ', false)
       usage = r.usage
       usedModel = r.model || usedModel
+      usedProvider = r.provider || provider || ''
       return r.embeddings as number[][]
     },
-    ms => directEmbed(input, model, ms),
+    provider === 'azure'
+      ? null
+      : async ms => {
+          const v = await directEmbed(input, model, ms)
+          usedProvider = 'razer'
+          return v
+        },
   )
   if (opts.billing !== false) {
     void (async () => {
@@ -425,7 +454,7 @@ export async function aiEmbed(
       await recordUsage({
         feature: opts.feature ?? 'embed',
         capability: 'embed',
-        provider: 'ollama',
+        provider: usedProvider === 'azure' ? 'azure' : 'ollama',
         model: usedModel,
         units: [{ type: 'token_1k_in', qty: Number(usage?.promptTokens ?? 0) / 1000 }],
         costInr: Number(usage?.costInr ?? 0),
@@ -435,7 +464,134 @@ export async function aiEmbed(
       })
     })().catch(err => console.warn('[ai-client] embed usage log failed:', (err as Error).message))
   }
-  return out
+  return {
+    vectors: out,
+    model: usedModel || (usedProvider === 'azure' ? 'text-embedding-3-small@768' : 'nomic-embed-text'),
+    provider: usedProvider || 'razer',
+  }
+}
+
+/** Embeddings via the gateway (used by RAG). Returns one vector per input. */
+export async function aiEmbed(
+  input: string | string[],
+  model?: string,
+  opts: { feature?: string; billing?: boolean } = {}
+): Promise<number[][]> {
+  return (await aiEmbedWithModel(input, model, opts)).vectors
+}
+
+export interface AiTranscribeResult {
+  text: string
+  language: string
+  durationSeconds: number
+  provider: string
+  model: string
+}
+
+export interface AiSpeakResult {
+  audio: Buffer
+  mimeType: string
+  provider: string
+  model: string
+}
+
+async function logAudioUsage(
+  feature: string,
+  r: { provider: string; model: string; usage?: AiChatUsage },
+  unit: { type: 'audio_minute' | 'tts_1k_chars'; qty: number },
+  latencyMs: number
+): Promise<void> {
+  try {
+    const { recordUsage, AiWalletError } = await import('@/lib/ai/billing')
+    await recordUsage({
+      feature,
+      capability: 'audio',
+      provider: r.provider,
+      model: r.model || '',
+      units: [unit],
+      costInr: Number(r.usage?.costInr ?? 0),
+      latencyMs,
+    }).catch(err => {
+      if (!(err instanceof AiWalletError)) throw err
+    })
+  } catch (err) {
+    console.warn('[ai-client] audio usage log failed:', (err as Error).message)
+  }
+}
+
+/** Speech to text through the gateway (`/v1/audio/transcribe`), in the store's audio order. Metered under
+ *  capability 'audio' by the minute. Throws when the gateway or every provider fails. */
+export async function aiTranscribe(opts: {
+  audio: Buffer
+  mimeType: string
+  language?: string
+  feature: string
+  billing?: boolean
+  cacheNamespace?: string
+}): Promise<AiTranscribeResult> {
+  const started = Date.now()
+  const routing = await routingFor(opts.cacheNamespace)
+  const r = await gatewayPost(
+    '/v1/audio/transcribe',
+    {
+      audioBase64: opts.audio.toString('base64'),
+      mimeType: opts.mimeType,
+      ...(opts.language ? { language: opts.language } : {}),
+      ...(routing.audio?.length ? { providers: routing.audio } : {}),
+    },
+    'transcribe ',
+    true
+  )
+  const res: AiTranscribeResult = {
+    text: String(r.text ?? ''),
+    language: String(r.language ?? opts.language ?? ''),
+    durationSeconds: Number(r.durationSeconds ?? 0),
+    provider: String(r.provider ?? ''),
+    model: String(r.model ?? ''),
+  }
+  if (opts.billing !== false) {
+    void logAudioUsage(opts.feature, { ...res, usage: r.usage }, { type: 'audio_minute', qty: res.durationSeconds / 60 }, Date.now() - started)
+  }
+  return res
+}
+
+/** Text to speech through the gateway (`/v1/audio/speak`), in the store's audio order. Metered under
+ *  capability 'audio' per 1k characters. Throws when the gateway or every provider fails. */
+export async function aiSpeak(opts: {
+  text: string
+  language: string
+  voice?: string
+  format?: 'mp3' | 'wav' | 'ogg'
+  feature: string
+  billing?: boolean
+  cacheNamespace?: string
+}): Promise<AiSpeakResult> {
+  const started = Date.now()
+  const routing = await routingFor(opts.cacheNamespace)
+  const r = await gatewayPost(
+    '/v1/audio/speak',
+    {
+      text: opts.text,
+      language: opts.language,
+      ...(opts.voice ? { voice: opts.voice } : {}),
+      ...(opts.format ? { format: opts.format } : {}),
+      ...(routing.audio?.length ? { providers: routing.audio } : {}),
+    },
+    'speak ',
+    true
+  )
+  if (typeof r.audioBase64 !== 'string') throw new AiClientError('AI gateway speak returned no audio', 'gateway')
+  const res: AiSpeakResult = {
+    audio: Buffer.from(r.audioBase64, 'base64'),
+    mimeType: String(r.mimeType ?? 'audio/mpeg'),
+    provider: String(r.provider ?? ''),
+    model: String(r.model ?? ''),
+  }
+  if (opts.billing !== false) {
+    const chars = Number(r.characters ?? opts.text.length)
+    void logAudioUsage(opts.feature, { ...res, usage: r.usage }, { type: 'tts_1k_chars', qty: chars / 1000 }, Date.now() - started)
+  }
+  return res
 }
 
 export interface AiVisionResult {

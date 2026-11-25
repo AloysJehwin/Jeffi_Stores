@@ -51,6 +51,7 @@ export const AI_CAPABILITY_LABEL: Record<string, string> = {
   vision: 'Vision',
   image: 'Images',
   video: 'Video',
+  audio: 'Audio',
 }
 
 /** Readable wallet note for an 'ai' ledger entry; billing writes 'AI: <label>', older rows 'AI <key>'. */

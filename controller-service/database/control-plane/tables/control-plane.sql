@@ -741,10 +741,10 @@ CREATE TABLE IF NOT EXISTS public.api_key_usage_daily (
 -- is still charged). Edited at /admin/ecom/ai-pricing; seeded in seed-plans.sql.
 CREATE TABLE IF NOT EXISTS public.ai_price_list (
     id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video
-    provider    character varying(32) NOT NULL,   -- ollama | razer | anthropic | google | replicate | openai
+    capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video | audio
+    provider    character varying(32) NOT NULL,   -- ollama | razer | anthropic | google | replicate | openai | azure
     model       character varying(128) NOT NULL,  -- '*' = default for the provider
-    unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call
+    unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call | audio_minute | tts_1k_chars
     cost_inr    numeric(10,4) NOT NULL DEFAULT 0,
     price_inr   numeric(10,4) NOT NULL DEFAULT 0,
     active      boolean NOT NULL DEFAULT true,

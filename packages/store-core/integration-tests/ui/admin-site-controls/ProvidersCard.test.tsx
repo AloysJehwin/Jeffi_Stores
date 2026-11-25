@@ -57,6 +57,31 @@ describe('ProvidersCard (default view)', () => {
     expect(screen.getByText('AI image order')).toBeInTheDocument()
   })
 
+  it('adds the audio order with Azure and the platform-only embeddings model selector', async () => {
+    const body = {
+      ...data,
+      settings: [...data.settings, { tenant_id: null, key: 'ai_embed_provider', value: 'azure', updated_by: 'root', updated_at: '2026-11-01T00:00:00Z' }],
+      gateway: { ...data.gateway, audio: [{ name: 'azure', configured: true }], embed: [{ name: 'azure', configured: true }], defaults: { ...data.gateway.defaults, audio: ['azure'] } },
+    }
+    vi.stubGlobal('fetch', dataFetch(body))
+    render(<ProvidersCard view="default" />)
+    await waitFor(() => expect(screen.getByText('AI audio order')).toBeInTheDocument())
+    expect(screen.getAllByText('Azure (Microsoft)').length).toBe(3)
+    expect(screen.getByText('1. Azure (Microsoft)')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Embeddings model' })).toBeInTheDocument()
+    expect(screen.getByText(/re-embeds every store/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset embeddings model' })).toBeInTheDocument()
+  })
+
+  it('locks the embeddings model for a read-only admin', async () => {
+    canWrite = false
+    vi.stubGlobal('fetch', dataFetch())
+    render(<ProvidersCard view="default" />)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Embeddings model' })).toBeInTheDocument())
+    expect(screen.getByRole('combobox', { name: 'Embeddings model' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Reset embeddings model' })).not.toBeInTheDocument()
+  })
+
   it('shows the gateway-unknown note when the gateway did not answer', async () => {
     vi.stubGlobal('fetch', dataFetch({ ...data, gateway: null }))
     render(<ProvidersCard view="default" />)

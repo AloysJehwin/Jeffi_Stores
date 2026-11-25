@@ -11,18 +11,33 @@ import { SectionCard } from './controls'
 // Flagship administrator only. view 'default': the provider policy every store follows (Settings → Providers).
 // view 'overrides': the stores that differ (Ecom → Configuration → Provider overrides).
 
-type Key = 'sms_provider' | 'whatsapp_provider' | 'ai_text_providers' | 'ai_image_providers' | 'ai_video_providers' | 'ai_image_default_quality'
+type Key =
+  | 'sms_provider'
+  | 'whatsapp_provider'
+  | 'ai_text_providers'
+  | 'ai_image_providers'
+  | 'ai_video_providers'
+  | 'ai_audio_providers'
+  | 'ai_embed_provider'
+  | 'ai_image_default_quality'
 type Setting = { tenant_id: string | null; key: Key; value: unknown; updated_by: string | null; updated_at: string }
 type Tenant = { id: string; slug: string; display_name: string }
 type Status = { name: string; configured: boolean }
-type Gateway = { text: Status[]; image: Status[]; video: Status[]; defaults: { text: string[]; image: string[]; video: string[] } }
+type Gateway = {
+  text: Status[]
+  image: Status[]
+  video: Status[]
+  audio?: Status[]
+  embed?: Status[]
+  defaults: { text: string[]; image: string[]; video: string[]; audio?: string[]; embed?: string[] | string }
+}
 type Data = {
   settings: Setting[]
   tenants: Tenant[]
   messaging: Record<'sms' | 'whatsapp', Record<'twilio' | 'aws', boolean>>
   gateway: Gateway | null
 }
-type Cap = 'text' | 'image' | 'video'
+type Cap = 'text' | 'image' | 'video' | 'audio'
 
 const KEY_LABEL: Record<Key, string> = {
   sms_provider: 'SMS provider',
@@ -30,12 +45,28 @@ const KEY_LABEL: Record<Key, string> = {
   ai_text_providers: 'AI text order',
   ai_image_providers: 'AI image order',
   ai_video_providers: 'AI video order',
+  ai_audio_providers: 'AI audio order',
+  ai_embed_provider: 'Embeddings model',
   ai_image_default_quality: 'Image default quality',
 }
-const ALL: Record<Cap, string[]> = { text: ['anthropic', 'razer'], image: ['razer', 'google', 'replicate'], video: ['google', 'replicate'] }
-const PROVIDER_LABEL: Record<string, string> = { anthropic: 'Claude', razer: 'Razer', google: 'Google', replicate: 'Replicate', twilio: 'Twilio', aws: 'AWS' }
+const ALL: Record<Cap, string[]> = {
+  text: ['anthropic', 'razer', 'azure'],
+  image: ['razer', 'google', 'replicate', 'azure'],
+  video: ['google', 'replicate', 'azure'],
+  audio: ['azure'],
+}
+const PROVIDER_LABEL: Record<string, string> = {
+  anthropic: 'Claude',
+  razer: 'Razer',
+  google: 'Google',
+  replicate: 'Replicate',
+  azure: 'Azure (Microsoft)',
+  twilio: 'Twilio',
+  aws: 'AWS',
+}
+const PLATFORM_ONLY: Key[] = ['ai_embed_provider']
 const QUALITY = ['draft', 'standard', 'premium']
-const capOf = (k: Key): Cap | null => (k === 'ai_text_providers' ? 'text' : k === 'ai_image_providers' ? 'image' : k === 'ai_video_providers' ? 'video' : null)
+const capOf = (k: Key): Cap | null => (k === 'ai_text_providers' ? 'text' : k === 'ai_image_providers' ? 'image' : k === 'ai_video_providers' ? 'video' : k === 'ai_audio_providers' ? 'audio' : null)
 const label = (p: string) => PROVIDER_LABEL[p] ?? p
 const describeValue = (k: Key, v: unknown) =>
   Array.isArray(v) ? (v.length ? v.map(x => label(String(x))).join(' > ') : 'Gateway default') : k === 'ai_image_default_quality' ? String(v) : label(String(v))
@@ -147,8 +178,8 @@ export default function ProvidersCard({ view }: { view: 'default' | 'overrides' 
           </Section>
           <Section title="AI">
             {!data.gateway && <p className="text-xs text-foreground-muted mb-3">The AI gateway did not answer; configured state is unknown.</p>}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {(['ai_text_providers', 'ai_image_providers', 'ai_video_providers'] as const).map(k => (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
+              {(['ai_text_providers', 'ai_image_providers', 'ai_video_providers', 'ai_audio_providers'] as const).map(k => (
                 <OrderEditor
                   key={k}
                   title={KEY_LABEL[k]}
@@ -160,6 +191,15 @@ export default function ProvidersCard({ view }: { view: 'default' | 'overrides' 
                   onReset={() => clear(null, k)}
                 />
               ))}
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <EmbedField
+                value={(platform.get('ai_embed_provider') as string) ?? null}
+                gateway={data.gateway}
+                disabled={!canWrite}
+                onSave={v => save(null, 'ai_embed_provider', v)}
+                onReset={() => clear(null, 'ai_embed_provider')}
+              />
             </div>
             <div className="mt-4 max-w-xs">
               <QualityField value={(platform.get('ai_image_default_quality') as string) ?? ''} disabled={!canWrite} onSave={v => (v ? save(null, 'ai_image_default_quality', v) : clear(null, 'ai_image_default_quality'))} />
@@ -220,6 +260,46 @@ function MessagingField({
         )}
       </div>
       {!value && unsetHint && <p className="text-xs text-foreground-muted mt-1">{unsetHint}</p>}
+    </div>
+  )
+}
+
+function EmbedField({
+  value,
+  gateway,
+  disabled,
+  onSave,
+  onReset,
+}: {
+  value: string | null
+  gateway: Gateway | null
+  disabled: boolean
+  onSave: (v: string) => void
+  onReset?: () => void
+}) {
+  const azure = gateway?.embed?.find(s => s.name === 'azure')
+  return (
+    <div>
+      <span className="block text-xs text-foreground-muted mb-1">{KEY_LABEL.ai_embed_provider}</span>
+      <div className="flex gap-2 items-center">
+        <Select
+          className="flex-1 min-w-0"
+          aria-label={KEY_LABEL.ai_embed_provider}
+          value={value ?? 'razer'}
+          disabled={disabled}
+          onChange={v => v && onSave(v)}
+          options={[
+            { value: 'razer', label: 'Razer (local)' },
+            { value: 'azure', label: 'Azure', hint: azure && !azure.configured ? 'Not configured' : undefined },
+          ]}
+        />
+        {value && onReset && !disabled && (
+          <button type="button" className={btnGhost} onClick={onReset} aria-label="Reset embeddings model" title="Reset">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-foreground-muted mt-1">Switching re-embeds every store&apos;s products. Search falls back to keywords until it finishes. Platform default only.</p>
     </div>
   )
 }
@@ -344,7 +424,7 @@ function AddOverride({ data, onCancel, onSave }: { data: Data; onCancel: () => v
         </div>
         <div>
           <span className="block text-xs text-foreground-muted mb-1">Setting</span>
-          <Select aria-label="Setting" value={key} onChange={v => setKey(v as Key)} options={(Object.keys(KEY_LABEL) as Key[]).map(k => ({ value: k, label: KEY_LABEL[k] }))} />
+          <Select aria-label="Setting" value={key} onChange={v => setKey(v as Key)} options={(Object.keys(KEY_LABEL) as Key[]).filter(k => !PLATFORM_ONLY.includes(k)).map(k => ({ value: k, label: KEY_LABEL[k] }))} />
         </div>
       </div>
       {!tenantId ? (

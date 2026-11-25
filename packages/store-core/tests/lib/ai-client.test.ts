@@ -4,12 +4,17 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 vi.mock('@/lib/providers/policy', () => ({ getAiRouting: vi.fn(async () => ({})) }))
+const recordUsage = vi.hoisted(() => vi.fn(async (_input: any) => ({ usageId: 'u1', priceInr: 0 })))
+vi.mock('@/lib/ai/billing', () => ({
+  recordUsage,
+  AiWalletError: class AiWalletError extends Error {},
+}))
 vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
 
-import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider, __resetAiClientState } from '@/lib/shared/ai-client'
+import { aiChat, aiEmbed, aiEmbedWithModel, aiSpeak, aiTranscribe, aiVision, AiClientError, getAiProvider, __resetAiClientState } from '@/lib/shared/ai-client'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getAiRouting } from '@/lib/providers/policy'
 
@@ -32,6 +37,8 @@ function sentBody(callIndex = 0) {
 
 beforeEach(() => {
   mockFetch.mockReset()
+  recordUsage.mockClear()
+  vi.mocked(getAiRouting).mockResolvedValue({})
   __resetAiClientState()
   vi.mocked(resolveTenantId).mockResolvedValue(null)
 })
@@ -159,6 +166,83 @@ describe('aiEmbed (gateway client)', () => {
   it('throws AiClientError on a non-ok reply', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) })
     await expect(aiEmbed('hello')).rejects.toThrow('AI gateway embed HTTP 502')
+  })
+})
+
+describe('aiEmbedWithModel and the embeddings provider', () => {
+  it('returns the vectors with the model and provider the gateway reports', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[1, 2]], model: 'nomic-embed-text', provider: 'razer', usage: { promptTokens: 2000 } }))
+    const r = await aiEmbedWithModel(['a'], undefined, { feature: 'embed_sync' })
+    expect(r).toEqual({ vectors: [[1, 2]], model: 'nomic-embed-text', provider: 'razer' })
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ feature: 'embed_sync', capability: 'embed', provider: 'ollama', units: [{ type: 'token_1k_in', qty: 2 }] })
+  })
+
+  it('sends the policy embed provider and meters Azure under azure', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ embed: 'azure' })
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[3]], model: 'text-embedding-3-small@768', provider: 'azure' }))
+    const r = await aiEmbedWithModel('x')
+    expect(sentBody()).toMatchObject({ input: 'x', provider: 'azure' })
+    expect(r).toMatchObject({ model: 'text-embedding-3-small@768', provider: 'azure' })
+    expect(await aiEmbed('y').catch(() => null)).toBeNull()
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ provider: 'azure' })
+  })
+
+  it('never falls back to direct Ollama while the embed provider is Azure', async () => {
+    vi.stubEnv('OLLAMA_BASE_URL', 'http://ollama.test')
+    vi.mocked(getAiRouting).mockResolvedValue({ embed: 'azure' })
+    mockFetch.mockResolvedValue({ ok: false, status: 502, json: async () => ({}), text: async () => '' })
+    await expect(aiEmbedWithModel('x')).rejects.toThrow('AI gateway embed HTTP 502')
+    expect(mockFetch.mock.calls.every(c => !String(c[0]).includes('ollama.test'))).toBe(true)
+    vi.unstubAllEnvs()
+  })
+})
+
+describe('aiTranscribe', () => {
+  it('posts base64 audio with the audio order and meters minutes', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ audio: ['azure'] })
+    mockFetch.mockResolvedValueOnce(okJson({ text: 'namaste', language: 'hi-IN', durationSeconds: 90, provider: 'azure', model: 'gpt-4o-transcribe' }))
+    const r = await aiTranscribe({ audio: Buffer.from('abc'), mimeType: 'audio/ogg', language: 'hi-IN', feature: 'staff_voice_memo' })
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/audio\/transcribe$/)
+    expect(sentBody()).toEqual({ audioBase64: Buffer.from('abc').toString('base64'), mimeType: 'audio/ogg', language: 'hi-IN', providers: ['azure'] })
+    expect(r).toEqual({ text: 'namaste', language: 'hi-IN', durationSeconds: 90, provider: 'azure', model: 'gpt-4o-transcribe' })
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ feature: 'staff_voice_memo', capability: 'audio', provider: 'azure', model: 'gpt-4o-transcribe', units: [{ type: 'audio_minute', qty: 1.5 }] })
+  })
+
+  it('omits language and providers when unset, skips billing when asked, and throws on a gateway error', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ text: 't', durationSeconds: 6, provider: 'azure', model: 'm' }))
+    const r = await aiTranscribe({ audio: Buffer.from('a'), mimeType: 'audio/mpeg', feature: 'f', billing: false })
+    expect(sentBody()).toEqual({ audioBase64: 'YQ==', mimeType: 'audio/mpeg' })
+    expect(r.language).toBe('')
+    expect(recordUsage).not.toHaveBeenCalled()
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}), text: async () => 'all providers failed' })
+    await expect(aiTranscribe({ audio: Buffer.from('a'), mimeType: 'audio/mpeg', feature: 'f' })).rejects.toThrow('AI gateway transcribe HTTP 502: all providers failed')
+  })
+})
+
+describe('aiSpeak', () => {
+  it('returns the decoded audio and meters 1k characters', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ audio: ['azure'] })
+    mockFetch.mockResolvedValueOnce(okJson({ audioBase64: Buffer.from('mp3bytes').toString('base64'), mimeType: 'audio/mpeg', characters: 500, provider: 'azure', model: 'hi-IN-SwaraNeural' }))
+    const r = await aiSpeak({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', feature: 'voice_reply' })
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/audio\/speak$/)
+    expect(sentBody()).toEqual({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', providers: ['azure'] })
+    expect(r.audio.toString()).toBe('mp3bytes')
+    expect(r).toMatchObject({ mimeType: 'audio/mpeg', provider: 'azure', model: 'hi-IN-SwaraNeural' })
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ capability: 'audio', units: [{ type: 'tts_1k_chars', qty: 0.5 }] })
+  })
+
+  it('falls back to the text length for metering and rejects a reply without audio', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ audioBase64: 'YQ==', provider: 'azure', model: 'm' }))
+    const r = await aiSpeak({ text: 'x'.repeat(2000), language: 'en-IN', feature: 'f' })
+    expect(r.mimeType).toBe('audio/mpeg')
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0].units).toEqual([{ type: 'tts_1k_chars', qty: 2 }])
+    mockFetch.mockResolvedValueOnce(okJson({ provider: 'azure' }))
+    await expect(aiSpeak({ text: 'hi', language: 'en-IN', feature: 'f' })).rejects.toThrow('returned no audio')
   })
 })
 

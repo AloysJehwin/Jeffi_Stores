@@ -9,15 +9,19 @@ import { VOICE_PROVIDERS, normalizeDltEntityId, normalizeSenderIds, normalizeVoi
 // Controls messaging choice, the gateway's own AI order).
 
 export const MESSAGING_PROVIDERS = ['twilio', 'aws'] as const
-export const AI_TEXT_PROVIDERS = ['anthropic', 'razer'] as const
-export const AI_IMAGE_PROVIDERS = ['razer', 'google', 'replicate'] as const
-export const AI_VIDEO_PROVIDERS = ['google', 'replicate'] as const
+export const AI_TEXT_PROVIDERS = ['anthropic', 'razer', 'azure'] as const
+export const AI_IMAGE_PROVIDERS = ['razer', 'google', 'replicate', 'azure'] as const
+export const AI_VIDEO_PROVIDERS = ['google', 'replicate', 'azure'] as const
+export const AI_AUDIO_PROVIDERS = ['azure'] as const
+export const AI_EMBED_PROVIDERS = ['razer', 'azure'] as const
 export const AI_IMAGE_QUALITIES = ['draft', 'standard', 'premium'] as const
 
 export type MessagingProviderName = (typeof MESSAGING_PROVIDERS)[number]
 export type AiTextProvider = (typeof AI_TEXT_PROVIDERS)[number]
 export type AiImageProvider = (typeof AI_IMAGE_PROVIDERS)[number]
 export type AiVideoProvider = (typeof AI_VIDEO_PROVIDERS)[number]
+export type AiAudioProvider = (typeof AI_AUDIO_PROVIDERS)[number]
+export type AiEmbedProvider = (typeof AI_EMBED_PROVIDERS)[number]
 export type AiImageQuality = (typeof AI_IMAGE_QUALITIES)[number]
 
 export const PROVIDER_SETTING_KEYS = [
@@ -26,6 +30,8 @@ export const PROVIDER_SETTING_KEYS = [
   'ai_text_providers',
   'ai_image_providers',
   'ai_video_providers',
+  'ai_audio_providers',
+  'ai_embed_provider',
   'ai_image_default_quality',
   // Outreach calls (platform scope only) and India SMS DLT ids; read by voice-config.ts and sms-dlt.ts.
   'voice_provider',
@@ -33,8 +39,8 @@ export const PROVIDER_SETTING_KEYS = [
   'sms_dlt_entity_id',
   'sms_dlt_sender_ids',
 ] as const
-/** Keys set only as the platform default, never per store. */
-export const PLATFORM_ONLY_PROVIDER_KEYS: readonly ProviderSettingKey[] = ['voice_provider', 'voice_config']
+/** Keys set only as the platform default, never per store (ai_embed_provider: switching re-embeds every store). */
+export const PLATFORM_ONLY_PROVIDER_KEYS: readonly ProviderSettingKey[] = ['voice_provider', 'voice_config', 'ai_embed_provider']
 export type ProviderSettingKey = (typeof PROVIDER_SETTING_KEYS)[number]
 export type PolicySource = 'tenant' | 'platform' | 'fallback'
 
@@ -45,6 +51,9 @@ export interface ProviderPolicy {
   aiTextProviders: AiTextProvider[]
   aiImageProviders: AiImageProvider[]
   aiVideoProviders: AiVideoProvider[]
+  aiAudioProviders: AiAudioProvider[]
+  /** Single embeddings model for all stores; razer (nomic) unless the platform default says azure. */
+  aiEmbedProvider: AiEmbedProvider
   aiImageDefaultQuality?: AiImageQuality
   /** India DLT Principal Entity id for AWS SMS (tenant row, else platform default). */
   smsDltEntityId?: string
@@ -55,6 +64,8 @@ export interface AiRouting {
   text?: string[]
   image?: string[]
   video?: string[]
+  audio?: string[]
+  embed?: AiEmbedProvider
 }
 
 const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
@@ -91,6 +102,10 @@ export function normalizeProviderValue(key: ProviderSettingKey, v: unknown): unk
       return orderOf(v, AI_IMAGE_PROVIDERS)
     case 'ai_video_providers':
       return orderOf(v, AI_VIDEO_PROVIDERS)
+    case 'ai_audio_providers':
+      return orderOf(v, AI_AUDIO_PROVIDERS)
+    case 'ai_embed_provider':
+      return AI_EMBED_PROVIDERS.includes(v as AiEmbedProvider) ? v : null
     case 'ai_image_default_quality':
       return AI_IMAGE_QUALITIES.includes(v as AiImageQuality) ? v : null
     case 'voice_provider':
@@ -161,6 +176,8 @@ export async function getProviderPolicy(tenantId?: string | null): Promise<Provi
     aiTextProviders: pick<AiTextProvider[]>('ai_text_providers') ?? ['anthropic', 'razer'],
     aiImageProviders: pick<AiImageProvider[]>('ai_image_providers') ?? [],
     aiVideoProviders: pick<AiVideoProvider[]>('ai_video_providers') ?? [],
+    aiAudioProviders: pick<AiAudioProvider[]>('ai_audio_providers') ?? [],
+    aiEmbedProvider: pick<AiEmbedProvider>('ai_embed_provider') ?? 'razer',
     aiImageDefaultQuality: pick<AiImageQuality>('ai_image_default_quality'),
     smsDltEntityId: pick<string>('sms_dlt_entity_id'),
     source,
@@ -174,6 +191,8 @@ export async function getAiRouting(tenantId?: string | null): Promise<AiRouting>
   if (p.aiTextProviders.length) out.text = p.aiTextProviders
   if (p.aiImageProviders.length) out.image = p.aiImageProviders
   if (p.aiVideoProviders.length) out.video = p.aiVideoProviders
+  if (p.aiAudioProviders.length) out.audio = p.aiAudioProviders
+  out.embed = p.aiEmbedProvider
   return out
 }
 

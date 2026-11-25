@@ -140,6 +140,7 @@ CREATE TABLE public.embeddings (
     embedding public.vector(768),
     metadata jsonb,
     updated_at timestamp with time zone,
+    embedding_model text,  -- NULL = legacy nomic-embed-text
     CONSTRAINT embeddings_pkey PRIMARY KEY (id),
     CONSTRAINT embeddings_tenant_source_key UNIQUE (tenant_id, source_table, source_id)
 );
