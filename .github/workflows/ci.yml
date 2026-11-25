@@ -1002,7 +1002,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase]
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase, ai-gateway]
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 } # the release tag is computed from history
