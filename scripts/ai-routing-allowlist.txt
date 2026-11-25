@@ -1,2 +1,3 @@
 # Justified exceptions to scripts/check-ai-routing.mjs: `<path>  # reason`. Keep it tiny.
 scripts/demo-films/music/make-music.py  # demo-film background music (Lyria); the gateway has no music capability; run by hand for marketing films, never in a store's context
+packages/store-core/src/lib/providers/voice-config.ts  # admin 'Test Sarvam' key check: an empty text-to-speech request (Sarvam answers 400 for a valid key, 401/403 for a bad one); nothing is generated or billed
