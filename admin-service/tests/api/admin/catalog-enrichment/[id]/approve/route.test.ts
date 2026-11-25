@@ -10,7 +10,10 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 // Mock dynamic imports used inside reEmbedProduct
-vi.mock('@/lib/shared/rag', () => ({ embed: vi.fn() }))
+vi.mock('@/lib/shared/rag', () => {
+  const embed = vi.fn()
+  return { embed, embedWithModel: vi.fn(async (t: string) => ({ vector: await embed(t), model: 'nomic-embed-text' })) }
+})
 vi.mock('pg', () => ({
   Pool: vi.fn(),
 }))

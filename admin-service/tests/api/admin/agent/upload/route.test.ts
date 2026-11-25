@@ -126,11 +126,11 @@ describe('POST /api/admin/agent/upload', () => {
   it('returns 415 for unsupported MIME type', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const clip = makeFile('voice.mp3', 'audio/mpeg', 100)
+    const clip = makeFile('clip.mp4', 'video/mp4', 100)
     const res = await POST(makeRequestWithFile(clip))
     expect(res.status).toBe(415)
     const body = await res.json()
-    expect(body.error).toMatch(/cannot listen to audio/i)
+    expect(body.error).toMatch(/cannot watch video/i)
   })
 
   it('returns 500 when DB insert fails', async () => {
