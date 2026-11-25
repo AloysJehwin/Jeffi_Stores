@@ -51,6 +51,12 @@ describe('/api/admin/ecom/ai-pricing', () => {
     expect((await POST(send('POST', { capability: 'image', provider: 'razer', unit_type: 'image' }))).status).toBe(409)
   })
 
+  it('adds audio rows in minutes and per 1k spoken characters', async () => {
+    expect((await POST(send('POST', { capability: 'audio', provider: 'azure', model: '*', unit_type: 'audio_minute', cost_inr: 0.5, price_inr: 1 }))).status).toBe(201)
+    expect(query.mock.calls[0][1]).toEqual(['audio', 'azure', '*', 'audio_minute', 0.5, 1, true])
+    expect((await POST(send('POST', { capability: 'audio', provider: 'azure', model: '*', unit_type: 'tts_1k_chars', cost_inr: 0.5, price_inr: 1 }))).status).toBe(201)
+  })
+
   it('validates input', async () => {
     expect((await POST(send('POST', { capability: 'music', provider: 'x', unit_type: 'image' }))).status).toBe(400)
     expect((await PATCH(send('PATCH', { id: ID, price_inr: -1 }))).status).toBe(400)

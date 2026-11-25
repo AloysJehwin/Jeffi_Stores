@@ -14,8 +14,8 @@ import { getTenantWallet } from '@/lib/payments/wallet'
 import { aiFeatureLabel } from './feature-labels'
 import { meterAiCost } from './cost-meter'
 
-export type Capability = 'text' | 'embed' | 'vision' | 'image' | 'video'
-export type UnitType = 'token_1k_in' | 'token_1k_out' | 'image' | 'video_second' | 'call'
+export type Capability = 'text' | 'embed' | 'vision' | 'image' | 'video' | 'audio'
+export type UnitType = 'token_1k_in' | 'token_1k_out' | 'image' | 'video_second' | 'call' | 'audio_minute' | 'tts_1k_chars'
 
 export interface UsageUnits {
   type: UnitType

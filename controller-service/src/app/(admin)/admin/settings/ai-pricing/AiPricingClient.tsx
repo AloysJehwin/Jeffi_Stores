@@ -23,16 +23,18 @@ type Row = {
   active: boolean
   updated_at: string
 }
-type Cap = 'all' | 'text' | 'embed' | 'vision' | 'image' | 'video'
+type Cap = 'all' | 'text' | 'embed' | 'vision' | 'image' | 'video' | 'audio'
 
-const CAPS: Cap[] = ['all', 'text', 'embed', 'vision', 'image', 'video']
-const UNITS = ['token_1k_in', 'token_1k_out', 'image', 'video_second', 'call']
+const CAPS: Cap[] = ['all', 'text', 'embed', 'vision', 'image', 'video', 'audio']
+const UNITS = ['token_1k_in', 'token_1k_out', 'image', 'video_second', 'call', 'audio_minute', 'tts_1k_chars']
 const UNIT_LABEL: Record<string, string> = {
   token_1k_in: 'per 1k input tokens',
   token_1k_out: 'per 1k output tokens',
   image: 'per image',
   video_second: 'per video second',
   call: 'per call',
+  audio_minute: 'per audio minute',
+  tts_1k_chars: 'per 1k spoken characters',
 }
 const margin = (r: { cost_inr: number; price_inr: number }) => (r.price_inr > 0 ? (r.price_inr - r.cost_inr) / r.price_inr : null)
 const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`

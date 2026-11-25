@@ -6,8 +6,8 @@ import { controlPlanePool } from '@/lib/tenant-registry'
 export const dynamic = 'force-dynamic'
 
 // Platform AI price list (control plane ai_price_list). Platform admin only; writes need ecom_billing:write.
-const CAPABILITIES = ['text', 'embed', 'vision', 'image', 'video'] as const
-const UNIT_TYPES = ['token_1k_in', 'token_1k_out', 'image', 'video_second', 'call'] as const
+const CAPABILITIES = ['text', 'embed', 'vision', 'image', 'video', 'audio'] as const
+const UNIT_TYPES = ['token_1k_in', 'token_1k_out', 'image', 'video_second', 'call', 'audio_minute', 'tts_1k_chars'] as const
 const COLS = 'id, capability, provider, model, unit_type, cost_inr::float8 AS cost_inr, price_inr::float8 AS price_inr, active, updated_at'
 
 function platformOnly(admin: Awaited<ReturnType<typeof requireAdminScope>>) {

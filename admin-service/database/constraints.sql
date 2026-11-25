@@ -205,7 +205,7 @@ ALTER TABLE ONLY public.ai_usage
 --
 
 ALTER TABLE ONLY public.ai_usage
-    ADD CONSTRAINT ai_usage_capability_check CHECK (((capability)::text = ANY (ARRAY['text'::text, 'embed'::text, 'vision'::text, 'image'::text, 'video'::text])));
+    ADD CONSTRAINT ai_usage_capability_check CHECK (((capability)::text = ANY (ARRAY['text'::text, 'embed'::text, 'vision'::text, 'image'::text, 'video'::text, 'audio'::text])));
 
 
 
