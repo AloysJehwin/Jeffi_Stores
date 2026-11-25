@@ -6,7 +6,11 @@ import { authorized } from './auth'
 import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
 import { startUsdInrRefresh } from './fx'
 import { anthropicAvailable, anthropicChat, anthropicConfigured, anthropicVision } from './providers/anthropic'
-import { runVision, runOcr, parseOcrRequest, OcrError, OCR_MAX_BASE64, ocrStatus, startOcrProbe, type OcrHealth } from './providers/paddleocr'
+import { runVision, runOcr, parseOcrRequest, OcrError, OCR_MAX_BASE64, ocrStatus, startOcrProbe, ocrProbe, type OcrHealth } from './providers/paddleocr'
+import { azureProvider } from './providers/azure'
+import { BackendProbe, RazerHealthMonitor, guardedMedia, httpCheck, poolSource } from './razer-health'
+import { AUDIO_MAX_BASE64, handleSpeak, handleTranscribe, parseAudioProviders, type AudioRouterDeps } from './audio'
+import { defaultEmbedProvider, handleEmbed, type EmbedDeps } from './embed'
 import { runJob, startWorker, queueHealth, pendingWaiters, type JobData } from './queue'
 import { policyFor } from './cache/policy'
 import { cacheKey, kvGet, kvSet } from './cache/kv'
@@ -22,31 +26,54 @@ import { pixabayProvider } from './providers/pixabay'
 import { handleStockSearch, parseStockProviders, type StockDeps } from './stock'
 import {
   handleImageGenerate, handleVideoStart, readVideoJob, advanceVideoJob, readImageCache,
-  parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, providerStatus, TEXT_PROVIDER_ORDER,
-  ValidationError, UpstreamError, NotConfiguredError, TRANSPARENT_NEEDS_REPLICATE,
+  parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, chatRoute, visionRoute, providerStatus, orderedStatus,
+  TEXT_PROVIDER_ORDER, ValidationError, UpstreamError, NotConfiguredError, TRANSPARENT_NEEDS_REPLICATE,
   type ImageRouterDeps, type VideoRouterDeps,
 } from './media'
 import type {
   AiChatRequest, AiChatResponse, AiChatStreamEvent, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse,
-  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse, OcrResponse, OcrErrorResponse,
+  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse, OcrResponse, OcrErrorResponse, ProviderStatus,
+  TextProviderName, ImageProviderName,
 } from '../../sdk/types'
 
 const redis = new IORedis(CONFIG.redisUrl, { maxRetriesPerRequest: 3 })
 const pgPool = CONFIG.pgUrl ? new pg.Pool({ connectionString: CONFIG.pgUrl, max: 3 }) : null
 
+// Razer (LLM service) circuit breaker: Ollama via its pool, SD and PaddleOCR via probes.
+const sdProbe = new BackendProbe('sd', httpCheck(`${CONFIG.sdWebuiUrl}${CONFIG.sdHealthPath}`, CONFIG.sdHealthTimeoutMs), {
+  configured: !!CONFIG.sdWebuiUrl,
+  intervalMs: CONFIG.razerProbeIntervalMs,
+  failures: CONFIG.razerBreakerFailures,
+})
+const razer = new RazerHealthMonitor({ ollama: poolSource(ollamaPool), sd: sdProbe, paddleocr: ocrProbe })
+
 // Media: Redis-backed so any replica can serve a file or advance a job another replica started.
 const files = createFileStore(redis)
 const imageDeps: ImageRouterDeps = {
-  providers: { razer: sdWebuiProvider, google: googleProvider, replicate: replicateProvider },
+  providers: { razer: guardedMedia(sdWebuiProvider, sdProbe), google: googleProvider, replicate: replicateProvider, azure: azureProvider.asImageProvider() },
   order: parseImageProviders(CONFIG.imageProviders),
   files,
   redis,
   fileBaseUrl: CONFIG.publicUrl,
   ttlSec: CONFIG.imageCacheTtlSeconds,
   cutout: replicateProvider,
+  available: name => name !== 'razer' || razer.up('image'),
+}
+const audioDeps: AudioRouterDeps = {
+  providers: { azure: azureProvider.asAudioProvider() },
+  order: parseAudioProviders(CONFIG.audioProviders),
+}
+const embedDeps: EmbedDeps = {
+  defaultProvider: defaultEmbedProvider(CONFIG.embedProvider),
+  razer: {
+    available: () => razer.up('embed'),
+    reason: () => ollamaPool.status().reason || 'Ollama is not reachable',
+    embed: (input, model) => runJob<EmbedResponse>({ kind: 'embed', payload: { input, model } }),
+  },
+  azure: azureProvider,
 }
 const videoDeps: VideoRouterDeps = {
-  providers: { google: googleProvider, replicate: replicateProvider },
+  providers: { google: googleProvider, replicate: replicateProvider, azure: azureProvider.asVideoProvider() },
   order: parseVideoProviders(CONFIG.videoProviders),
   jobs: createVideoJobStore(redis),
   files,
@@ -68,7 +95,10 @@ async function processJob(data: JobData): Promise<unknown> {
     const arr = Array.isArray(input) ? input : [input]
     const m = model || CONFIG.embedModel
     const r = await ollamaEmbed(arr, m)
-    const out: EmbedResponse = { embeddings: r.embeddings, model: m, usage: tokenUsage('ollama', m, r.promptTokens, 0) }
+    const out: EmbedResponse = {
+      embeddings: r.embeddings, model: m, provider: 'razer', dimensions: r.embeddings[0]?.length ?? 768,
+      usage: tokenUsage('ollama', m, r.promptTokens, 0),
+    }
     return out
   }
   if (data.kind === 'image') {
@@ -92,6 +122,7 @@ async function processJob(data: JobData): Promise<unknown> {
 startWorker(processJob)
 ollamaPool.start()
 startOcrProbe()
+sdProbe.start()
 startUsdInrRefresh()
 
 class HttpError extends Error {
@@ -105,19 +136,21 @@ function assertOllamaUp(): void {
 }
 
 /** Truthful dependency check (cached ~probe interval). */
-async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boolean; ollama: Awaited<ReturnType<typeof ollamaPool.health>>; ocr: OcrHealth }> {
+async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boolean; ollama: Awaited<ReturnType<typeof ollamaPool.health>>; ocr: OcrHealth; razer: ReturnType<typeof razer.report> }> {
   const [queue, ollama] = await Promise.all([queueHealth(), ollamaPool.health()])
-  // With Claude configured, chat survives an Ollama outage, so Ollama alone does not fail readiness.
-  const reasons = [!queue && 'redis queue unreachable', !ollama.ok && !anthropicConfigured() && (ollama.reason || 'Ollama unreachable')].filter(Boolean)
-  // PaddleOCR is reported, never fails readiness: vision falls back to Ollama and /v1/ocr answers 503 on its own.
-  return { ok: reasons.length === 0, reason: reasons.join('; ') || undefined, queue, ollama, ocr: ocrStatus() }
+  // With Claude or Azure chat configured, chat survives an Ollama outage, so Ollama alone does not fail readiness.
+  const cloudText = anthropicConfigured() || azureProvider.chatConfigured()
+  const reasons = [!queue && 'redis queue unreachable', !ollama.ok && !cloudText && (ollama.reason || 'Ollama unreachable')].filter(Boolean)
+  // PaddleOCR and SD are reported, never fail readiness: their breakers route around them.
+  return { ok: reasons.length === 0, reason: reasons.join('; ') || undefined, queue, ollama, ocr: ocrStatus(), razer: razer.report() }
 }
 
 // ── Chat: providers in route order; each answer goes through the two-tier cache ──────────────
 type Emit = (e: AiChatStreamEvent) => void
 
 async function handleChat(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
-  const route = textRoute(req).filter(p => p === 'razer' || anthropicAvailable(req))
+  const ready = (p: TextProviderName) => (p === 'anthropic' ? anthropicAvailable(req) : p === 'azure' ? azureProvider.chatConfigured() : true)
+  const route = chatRoute(textRoute(req), ready, razer.up('text'))
   if (!route.length) throw new NotConfiguredError('no text provider in the requested order is available')
   const failures: string[] = []
   for (const provider of route) {
@@ -125,7 +158,9 @@ async function handleChat(req: AiChatRequest, emit?: Emit, signal?: AbortSignal)
     let emitted = false
     const tracked: Emit | undefined = emit && (e => { emitted = true; emit(e) })
     try {
-      const r = provider === 'anthropic' ? await chatAnthropic(req, tracked, signal) : await chatRazer(req, tracked)
+      const r = provider === 'anthropic' ? await chatAnthropic(req, tracked, signal)
+        : provider === 'azure' ? await chatAzure(req, tracked, signal)
+          : await chatRazer(req, tracked)
       return failures.length ? { ...r, fallbackUsed: true } : r
     } catch (err) {
       // Partial output already reached the client, or nothing left to try: surface the error.
@@ -173,6 +208,19 @@ async function chatAnthropic(req: AiChatRequest, emit?: Emit, signal?: AbortSign
   }
 }
 
+async function chatAzure(req: AiChatRequest, emit?: Emit, signal?: AbortSignal): Promise<AiChatResponse> {
+  const start = Date.now()
+  const model = azureProvider.chatModel()
+  const hit = await cached(req, model, 'azure', start)
+  if (hit) { emit?.({ type: 'text', text: hit.content }); return hit }
+  const r = await azureProvider.chat(req, emit, signal)
+  if (!r.toolCalls?.length && r.content && r.stopReason === 'end_turn') await remember(req, model, r.content)
+  return {
+    content: r.content, toolCalls: r.toolCalls, provider: 'azure', model: r.model, latencyMs: Date.now() - start,
+    fallbackUsed: false, cache: null, usage: r.usage, stopReason: r.stopReason,
+  }
+}
+
 async function chatRazer(req: AiChatRequest, emit?: Emit): Promise<AiChatResponse> {
   const start = Date.now()
   const model = modelForHint(req.modelHint)
@@ -191,19 +239,23 @@ async function chatRazer(req: AiChatRequest, emit?: Emit): Promise<AiChatRespons
   return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: null, usage }
 }
 
-/** Claude first when it leads the text order; PaddleOCR/Ollama otherwise or on failure, only while the order has razer. */
+/** Cloud providers ahead of razer in the text order read the image in turn; PaddleOCR/Ollama when razer is reached. */
 async function handleVision(body: VisionRequest): Promise<VisionResponse> {
-  const route = textRoute(body)
-  if (route[0] === 'anthropic' && anthropicAvailable(body) && !body.model) {
+  const ready = (p: TextProviderName) => !body.model && (p === 'anthropic' ? anthropicAvailable(body) : p === 'azure' && azureProvider.chatConfigured())
+  // A single image can still be read by PaddleOCR while Ollama is down.
+  const razerUp = razer.up('vision') || (body.images?.length === 1 && razer.up('ocr'))
+  const route = visionRoute(textRoute(body), ready, razerUp)
+  if (!route.length) throw new NotConfiguredError('no vision provider in the requested order is available')
+  for (const [i, provider] of route.entries()) {
     try {
-      return await anthropicVision(body)
+      if (provider === 'razer') return await runJob<VisionResponse>({ kind: 'vision', payload: body })
+      return provider === 'anthropic' ? await anthropicVision(body) : await azureProvider.vision(body)
     } catch (err) {
-      if (!route.includes('razer')) throw err
-      console.warn(`[ai-gateway] Claude vision failed, falling back: ${(err as Error).message.slice(0, 300)}`)
+      if (i === route.length - 1) throw err
+      console.warn(`[ai-gateway] ${provider} vision failed, falling back: ${(err as Error).message.slice(0, 300)}`)
     }
   }
-  if (!route.includes('razer')) throw new NotConfiguredError('no vision provider in the requested order is available')
-  return runJob<VisionResponse>({ kind: 'vision', payload: body })
+  throw new NotConfiguredError('no vision provider in the requested order is available')
 }
 
 /** PaddleOCR only, never a model, so a document reads the same every time (KYB). Not queued: an OCR call must not
@@ -221,17 +273,30 @@ async function handleOcr(req: import('node:http').IncomingMessage): Promise<{ st
 }
 
 function providersReport(): ProvidersResponse {
-  const text: ProvidersResponse['text'] = [
-    { name: 'anthropic', configured: anthropicConfigured(), keyFallback: !!CONFIG.anthropicApiKey },
-    { name: 'razer', configured: !ollamaPool.knownDown() },
-  ]
+  const text: Record<TextProviderName, ProviderStatus<TextProviderName>> = {
+    anthropic: { name: 'anthropic', configured: anthropicConfigured(), keyFallback: !!CONFIG.anthropicApiKey },
+    razer: { name: 'razer', configured: !ollamaPool.knownDown(), healthy: razer.up('text') },
+    azure: { name: 'azure', configured: azureProvider.chatConfigured() },
+  }
+  const image = providerStatus(imageDeps.order, imageDeps.providers)
+    .map((s): ProviderStatus<ImageProviderName> => (s.name === 'razer' ? { ...s, healthy: razer.up('image') } : s))
+  const audio = audioDeps.providers.azure!
   return {
-    text: [...TEXT_PROVIDER_ORDER.map(n => text.find(t => t.name === n)!), ...text.filter(t => !TEXT_PROVIDER_ORDER.includes(t.name))],
-    image: providerStatus(imageDeps.order, imageDeps.providers),
+    text: orderedStatus(TEXT_PROVIDER_ORDER, text),
+    image,
     video: providerStatus(videoDeps.order, videoDeps.providers),
-    ocr: [{ name: 'paddleocr', configured: ocrStatus().ok }],
+    audio: providerStatus(audioDeps.order, { azure: { configured: () => audio.transcribeConfigured() || audio.speakConfigured() } }),
+    embed: [
+      { name: 'razer', configured: !ollamaPool.knownDown(), healthy: razer.up('embed') },
+      { name: 'azure', configured: azureProvider.embedConfigured() },
+    ],
+    ocr: [{ name: 'paddleocr', configured: ocrStatus().ok, healthy: razer.up('ocr') }],
     stock: providerStatus(stockDeps.order, stockDeps.providers),
-    defaults: { text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order, stock: stockDeps.order },
+    razer: razer.report(),
+    defaults: {
+      text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order, audio: audioDeps.order,
+      embed: embedDeps.defaultProvider, stock: stockDeps.order,
+    },
   }
 }
 
@@ -253,7 +318,7 @@ async function handleImage(body: ImageGenerateRequest): Promise<ImageGenerateRes
     return await runJob<ImageGenerateResponse>({ kind: 'image', payload: body }, { attempts: 1 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    throw new HttpError(/no image provider configured/.test(msg) ? 503 : 502, msg)
+    throw new HttpError(/no image provider (configured|available)/.test(msg) ? 503 : 502, msg)
   }
 }
 
@@ -337,7 +402,7 @@ const server = createServer(async (req, res) => {
     // Liveness: the process answers. Dependency state is reported, never fails the probe.
     if (req.method === 'GET' && path === '/healthz') {
       const o = ollamaPool.status()
-      return json(res, 200, { ok: true, ollama: { ok: o.ok, active: o.active, checkedAt: o.checkedAt }, waiters: pendingWaiters() })
+      return json(res, 200, { ok: true, ollama: { ok: o.ok, active: o.active, checkedAt: o.checkedAt }, razer: razer.report(), waiters: pendingWaiters() })
     }
     if (req.method === 'GET' && path === '/v1/providers') {
       return json(res, 200, providersReport())
@@ -349,9 +414,14 @@ const server = createServer(async (req, res) => {
       return await streamChat(await readBody(req), res)
     }
     if (req.method === 'POST' && path === '/v1/embed') {
-      const body = await readBody(req)
-      assertOllamaUp()
-      return json(res, 200, await runJob<EmbedResponse>({ kind: 'embed', payload: body }))
+      return json(res, 200, await handleEmbed(await readBody(req), embedDeps))
+    }
+    // Not queued: cloud calls, nothing to serialise on the GPU.
+    if (req.method === 'POST' && path === '/v1/audio/transcribe') {
+      return json(res, 200, await handleTranscribe(await readBody(req, AUDIO_MAX_BASE64 + 64 * 1024), audioDeps))
+    }
+    if (req.method === 'POST' && path === '/v1/audio/speak') {
+      return json(res, 200, await handleSpeak(await readBody(req, 256 * 1024), audioDeps))
     }
     if (req.method === 'POST' && path === '/v1/images/generate') {
       return json(res, 200, await handleImage(await readBody(req)))
@@ -397,5 +467,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(CONFIG.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}], auth ${CONFIG.gatewayTokens.length ? 'on' : 'OFF (AI_GATEWAY_TOKEN unset)'}`)
+  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}], text order [${TEXT_PROVIDER_ORDER.join(', ')}], embed ${embedDeps.defaultProvider}, auth ${CONFIG.gatewayTokens.length ? 'on' : 'OFF (AI_GATEWAY_TOKEN unset)'}`)
 })

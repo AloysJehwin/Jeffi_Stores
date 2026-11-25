@@ -4,6 +4,7 @@ import { ReplicateProvider } from '../src/providers/replicate'
 import { SdWebuiProvider } from '../src/providers/sd-webui'
 import { imageDims, nearestAspect } from '../src/providers/types'
 import { ollamaChat, ollamaEmbed } from '../src/providers/ollama'
+import { ocrProbe, ocrStatus, runOcr } from '../src/providers/paddleocr'
 
 const PNG_B64 = Buffer.from('89504e470d0a1a0a0000000d49484452000002000000030008060000', 'hex').toString('base64')
 
@@ -172,5 +173,30 @@ describe('ollama usage mapping', () => {
     })
     const r = await ollamaEmbed(['abcdefgh', 'other'])
     expect(r).toEqual({ embeddings: [[1, 2], [3]], promptTokens: 2 + 7 })
+  })
+})
+
+describe('paddleocr breaker', () => {
+  it('fails fast while open, re-probes after a failed call and recovers', async () => {
+    const down = mockFetch(url => url.includes('/health') ? new Response('{"error":"loading the model"}', { status: 503 }) : { ok: true, text: 'x' })
+    await ocrProbe.probe()
+    await ocrProbe.probe()
+    expect(ocrProbe.isOpen()).toBe(true)
+    expect(ocrStatus()).toMatchObject({ ok: false, reason: 'loading the model' })
+    const before = down.length
+    await expect(runOcr('AAAA', 'image/png')).rejects.toMatchObject({ status: 503, message: expect.stringContaining('PaddleOCR is down') })
+    expect(down.length).toBe(before)
+
+    mockFetch(url => url.includes('/health') ? new Response('{}') : { ok: true, text: 'hi', pages: 1, lines: [{ text: 'hi', score: 0.9 }], mean_score: 0.9 })
+    await ocrProbe.probe()
+    expect(ocrProbe.isOpen()).toBe(false)
+    expect(await runOcr('AAAA', 'image/png')).toMatchObject({ ok: true, text: 'hi', provider: 'paddleocr' })
+
+    const flaky = mockFetch(url => {
+      if (url.includes('/health')) return new Response('{}')
+      throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } })
+    })
+    await expect(runOcr('AAAA', 'image/png')).rejects.toMatchObject({ status: 503, message: expect.stringContaining('ECONNREFUSED') })
+    expect(flaky.some(c => c.url.includes('/health'))).toBe(true)
   })
 })

@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   handleImageGenerate, handleVideoStart, imageRoute, videoRoute, textRoute, parseImageRequest,
   providerStatus, ValidationError, NotConfiguredError, type ImageRouterDeps, type VideoRouterDeps,
+  chatRoute, visionRoute, orderedStatus, defaultTextOrder, parseImageProviders, parseVideoProviders,
+  parseTextOrder, parseImageOrder, parseVideoOrder, IMAGE_PROVIDER_ORDER, VIDEO_PROVIDER_ORDER,
 } from '../src/media'
+import { parseAudioOrder } from '../src/audio'
 import { createFileStore } from '../src/files'
 import { createVideoJobStore } from '../src/video-jobs'
 import { loadPrices } from '../src/pricing'
@@ -10,7 +13,7 @@ import type { MediaProvider } from '../src/providers/types'
 
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex')
 
-function img(name: 'razer' | 'google' | 'replicate', configured = true) {
+function img(name: 'razer' | 'google' | 'replicate' | 'azure', configured = true) {
   const calls: string[] = []
   const p: MediaProvider & { calls: string[] } = {
     name, calls,
@@ -57,8 +60,8 @@ describe('caller provider order', () => {
     expect(imageRoute({ prompt: 'x', quality: 'premium', providers: ['replicate', 'google'] }, [...env])).toEqual(['google', 'replicate'])
   })
 
-  it('text: razer only; forceProvider ignores the order', () => {
-    expect(textRoute({})).toEqual(['razer'])
+  it('text: razer then azure without Claude; forceProvider ignores the order', () => {
+    expect(textRoute({})).toEqual(['razer', 'azure'])
     expect(textRoute({ providers: ['razer'] })).toEqual(['razer'])
     expect(() => textRoute({ providers: ['google'] })).toThrow(ValidationError)
     expect(textRoute({ forceProvider: 'ollama', providers: [] })).toEqual(['razer'])
@@ -101,5 +104,69 @@ describe('routing end to end', () => {
   it('reports configured state in default order', () => {
     expect(providerStatus(['google'], { razer: img('razer', false), google: img('google') }))
       .toEqual([{ name: 'google', configured: true }, { name: 'razer', configured: false }])
+  })
+
+  it('skips razer while its breaker is open and says why when nothing is left', async () => {
+    const providers = { razer: img('razer'), google: img('google', false), replicate: img('replicate', false), azure: img('azure') }
+    const up: ImageRouterDeps = { providers, order: IMAGE_PROVIDER_ORDER, files: createFileStore(null), available: n => n !== 'razer' }
+    expect((await handleImageGenerate({ prompt: 'x' }, up)).provider).toBe('azure')
+    expect(providers.razer.calls).toHaveLength(0)
+    const onlyRazer: ImageRouterDeps = { ...up, providers: { razer: img('razer') } }
+    await expect(handleImageGenerate({ prompt: 'x' }, onlyRazer)).rejects.toThrow('no image provider available (razer down)')
+  })
+})
+
+describe('azure in every order', () => {
+  it('is appended to the existing defaults, which keep their order', () => {
+    expect(defaultTextOrder(undefined, true)).toEqual(['anthropic', 'razer', 'azure'])
+    expect(defaultTextOrder(undefined, false)).toEqual(['razer', 'azure'])
+    expect(defaultTextOrder('azure,anthropic', true)).toEqual(['azure', 'anthropic'])
+    expect(parseImageProviders(undefined)).toEqual(['razer', 'google', 'replicate', 'azure'])
+    expect(parseVideoProviders(undefined)).toEqual(['google', 'replicate', 'azure'])
+  })
+
+  it('is an allowed caller provider everywhere', () => {
+    expect(parseTextOrder(['azure'])).toEqual(['azure'])
+    expect(parseImageOrder(['azure', 'razer'])).toEqual(['azure', 'razer'])
+    expect(parseVideoOrder(['azure'])).toEqual(['azure'])
+    expect(parseAudioOrder(['azure'])).toEqual(['azure'])
+    expect(() => parseAudioOrder(['razer'])).toThrow(ValidationError)
+    expect(textRoute({ forceProvider: 'anthropic', providers: ['azure', 'anthropic'] })).toEqual(['anthropic'])
+  })
+
+  it('leaves the quality bias to the existing providers', () => {
+    const order = [...IMAGE_PROVIDER_ORDER]
+    expect(imageRoute({ prompt: 'x', quality: 'premium' }, order)).toEqual(['google', 'razer', 'replicate', 'azure'])
+    expect(imageRoute({ prompt: 'x', quality: 'draft' }, ['azure', 'google', 'razer'])).toEqual(['razer', 'azure', 'google'])
+    expect(imageRoute({ prompt: 'x', provider: 'azure' }, order)).toEqual(['azure', 'razer', 'google', 'replicate'])
+    expect(videoRoute({ prompt: 'x' }, [...VIDEO_PROVIDER_ORDER])).toEqual(['google', 'replicate', 'azure'])
+  })
+})
+
+describe('chat and vision routes', () => {
+  const all = () => true
+  const noClaude = (p: string) => p !== 'anthropic'
+
+  it('chat drops providers without credentials and skips razer while it is down', () => {
+    expect(chatRoute(['anthropic', 'razer', 'azure'], all, true)).toEqual(['anthropic', 'razer', 'azure'])
+    expect(chatRoute(['anthropic', 'razer', 'azure'], noClaude, true)).toEqual(['razer', 'azure'])
+    expect(chatRoute(['anthropic', 'razer', 'azure'], all, false)).toEqual(['anthropic', 'azure'])
+    // razer alone stays, so a cached answer is still served and a miss fails fast.
+    expect(chatRoute(['razer', 'azure'], () => false, false)).toEqual(['razer'])
+    expect(chatRoute(['anthropic'], () => false, true)).toEqual([])
+  })
+
+  it('vision tries cloud providers up to razer, which ends the route unless it is down', () => {
+    expect(visionRoute(['anthropic', 'razer', 'azure'], all, true)).toEqual(['anthropic', 'razer'])
+    expect(visionRoute(['razer', 'anthropic'], all, true)).toEqual(['razer'])
+    expect(visionRoute(['anthropic', 'razer', 'azure'], all, false)).toEqual(['anthropic', 'azure'])
+    expect(visionRoute(['azure', 'razer'], noClaude, true)).toEqual(['azure', 'razer'])
+    expect(visionRoute(['razer'], all, false)).toEqual(['razer'])
+    expect(visionRoute(['anthropic'], () => false, true)).toEqual([])
+  })
+
+  it('orders status entries by the default order, then the rest', () => {
+    const entries = { anthropic: { name: 'anthropic' as const, configured: true }, razer: { name: 'razer' as const, configured: false }, azure: { name: 'azure' as const, configured: true } }
+    expect(orderedStatus(['razer', 'azure'], entries).map(e => e.name)).toEqual(['razer', 'azure', 'anthropic'])
   })
 })

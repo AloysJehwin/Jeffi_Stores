@@ -4,6 +4,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { OllamaPool, isNetworkError, OllamaUnavailableError } from '../src/providers/ollama-pool'
 import { JobWaiters } from '../src/job-waiters'
 import { parseUrls } from '../src/config'
+import {
+  BackendProbe, RazerHealthMonitor, guardedMedia, httpCheck, isOutage, poolSource, RAZER_BACKEND,
+} from '../src/razer-health'
+import { ProviderError, type MediaProvider } from '../src/providers/types'
 
 const A = 'http://10.42.0.1:11434'
 const B = 'http://100.82.208.8:11434'
@@ -156,5 +160,127 @@ describe('JobWaiters', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('razer circuit breaker', () => {
+  function probe(results: (string | null)[], opts: { failures?: number; configured?: boolean; now?: () => number } = {}) {
+    let i = 0
+    const check = vi.fn(async () => results[Math.min(i++, results.length - 1)])
+    const log = vi.fn()
+    return { p: new BackendProbe('sd', check, { failures: opts.failures ?? 2, configured: opts.configured, now: opts.now, log }), check, log }
+  }
+
+  it('opens only after N failed probes in a row and closes on the first good one', async () => {
+    const { p, log } = probe(['down', 'down', null])
+    expect(p.isOpen()).toBe(false)
+    expect(p.status()).toMatchObject({ ok: false, open: false, checkedAt: null, reason: 'not probed yet' })
+    await p.probe()
+    expect(p.isOpen()).toBe(false)
+    await p.probe()
+    expect(p.isOpen()).toBe(true)
+    expect(p.status()).toMatchObject({ configured: true, ok: false, open: true, reason: 'down' })
+    expect(log).toHaveBeenCalledWith('sd UNAVAILABLE: down (breaker open, routing skips razer)')
+    await p.probe()
+    expect(p.isOpen()).toBe(false)
+    expect(log).toHaveBeenLastCalledWith('sd recovered (breaker closed)')
+  })
+
+  it('a check that throws counts as a failed probe', async () => {
+    const p = new BackendProbe('x', async () => { throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }) }, { failures: 1, log: () => {} })
+    expect(await p.probe()).toBe(false)
+    expect(p.status().reason).toBe('ECONNREFUSED')
+  })
+
+  it('an unconfigured backend is never probed and never open', async () => {
+    const { p, check } = probe(['down'], { configured: false, failures: 1 })
+    expect(await p.probe()).toBe(false)
+    p.start()
+    expect(check).not.toHaveBeenCalled()
+    expect(p.status()).toMatchObject({ configured: false, open: false, reason: 'not configured' })
+  })
+
+  it('re-probes on a failed call, rate-limited, and shares a running probe', async () => {
+    let t = 0
+    const { p, check } = probe(['down'], { now: () => t })
+    p.recordFailure()
+    p.recordFailure()
+    await new Promise(r => setTimeout(r, 0))
+    expect(check).toHaveBeenCalledTimes(1)
+    t += 2_000
+    p.recordFailure()
+    await Promise.all([p.probe(), p.probe()])
+    expect(check).toHaveBeenCalledTimes(2)
+  })
+
+  it('guard re-probes on outages only and always rethrows', async () => {
+    const { p, check } = probe([null])
+    await expect(p.guard(async () => { throw new ProviderError('razer', 'HTTP 400 bad prompt', 400) })).rejects.toThrow('bad prompt')
+    expect(check).not.toHaveBeenCalled()
+    await expect(p.guard(async () => { throw new ProviderError('razer', 'This operation was aborted') })).rejects.toThrow('aborted')
+    expect(check).toHaveBeenCalledTimes(1)
+    expect(await p.guard(async () => 'ok')).toBe('ok')
+  })
+
+  it('start probes now and on the interval; stop ends it', async () => {
+    vi.useFakeTimers()
+    try {
+      const { p, check } = probe([null])
+      p.start()
+      p.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(check).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(check).toHaveBeenCalledTimes(2)
+      p.stop()
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(check).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('classifies outages', () => {
+    expect(isOutage(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }))).toBe(true)
+    expect(isOutage(Object.assign(new Error('x'), { name: 'TimeoutError' }))).toBe(true)
+    expect(isOutage(new ProviderError('razer', 'HTTP 503 loading', 503))).toBe(true)
+    expect(isOutage(new ProviderError('razer', 'HTTP 500 oom', 500))).toBe(false)
+    expect(isOutage(new ProviderError('razer', 'fetch failed'))).toBe(true)
+    expect(isOutage(new Error('connect ETIMEDOUT 100.82.208.8:7860'))).toBe(true)
+    expect(isOutage(new Error('no images returned'))).toBe(false)
+    expect(isOutage(null)).toBe(false)
+  })
+
+  it('httpCheck reports status, timeout and network failures', async () => {
+    const f = (impl: () => Promise<Response>) => impl as unknown as typeof fetch
+    expect(await httpCheck('http://sd/health', 100, f(async () => new Response('{}')))()).toBeNull()
+    expect(await httpCheck('http://sd/health', 100, f(async () => new Response('', { status: 502 })))()).toBe('HTTP 502')
+    expect(await httpCheck('http://sd/health', 100, f(async () => { throw Object.assign(new Error('t'), { name: 'TimeoutError' }) }))()).toBe('timeout 100ms')
+    expect(await httpCheck('http://sd/health', 100, f(async () => { throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'EHOSTUNREACH' } }) }))()).toBe('EHOSTUNREACH')
+  })
+
+  it('maps capabilities to backends and reports every backend', async () => {
+    const { p: sd } = probe(['down'], { failures: 1 })
+    await sd.probe()
+    const { p: ocr } = probe([null])
+    const ollama = poolSource({ status: () => ({ ok: true, active: A, urls: [A], checkedAt: 1 }), knownDown: () => false })
+    const m = new RazerHealthMonitor({ ollama, sd, paddleocr: ocr })
+    expect(RAZER_BACKEND).toEqual({ text: 'ollama', vision: 'ollama', embed: 'ollama', image: 'sd', ocr: 'paddleocr' })
+    expect([m.up('text'), m.up('embed'), m.up('image'), m.up('ocr')]).toEqual([true, true, false, true])
+    expect(m.report()).toMatchObject({
+      ollama: { configured: true, ok: true, open: false, checkedAt: 1 },
+      sd: { ok: false, open: true, reason: 'down' },
+      paddleocr: { ok: false, open: false },
+    })
+  })
+
+  it('guardedMedia passes calls through the breaker', async () => {
+    const { p, check } = probe([null])
+    const inner: MediaProvider = { name: 'razer', configured: () => true, generateImage: vi.fn(async () => { throw new ProviderError('razer', 'fetch failed') }) }
+    const g = guardedMedia(inner, p)
+    expect(g.configured()).toBe(true)
+    await expect(g.generateImage!({ prompt: 'x', width: 64, height: 64, n: 1, quality: 'draft' })).rejects.toThrow('fetch failed')
+    expect(check).toHaveBeenCalledTimes(1)
+    expect(guardedMedia({ name: 'razer', configured: () => false }, p).generateImage).toBeUndefined()
   })
 })
