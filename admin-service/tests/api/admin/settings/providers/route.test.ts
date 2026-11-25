@@ -93,6 +93,19 @@ describe('/api/admin/settings/providers', () => {
     expect(policy.setProviderSetting).toHaveBeenLastCalledWith(T, 'sms_dlt_sender_ids', ['JEFFIS'], 'ops@x')
   })
 
+  it('takes the audio order per store and the embeddings model for the platform only', async () => {
+    expect((await PUT(put({ tenantId: T, key: 'ai_audio_providers', value: ['azure'] }))).status).toBe(200)
+    expect(policy.setProviderSetting).toHaveBeenLastCalledWith(T, 'ai_audio_providers', ['azure'], 'ops@x')
+    expect((await PUT(put({ key: 'ai_audio_providers', value: ['sarvam'] }))).status).toBe(400)
+    expect((await PUT(put({ key: 'ai_text_providers', value: ['anthropic', 'razer', 'azure'] }))).status).toBe(200)
+    expect((await PUT(put({ key: 'ai_embed_provider', value: 'azure' }))).status).toBe(200)
+    expect(policy.setProviderSetting).toHaveBeenLastCalledWith(null, 'ai_embed_provider', 'azure', 'ops@x')
+    expect((await PUT(put({ key: 'ai_embed_provider', value: ['azure'] }))).status).toBe(400)
+    const r = await PUT(put({ tenantId: T, key: 'ai_embed_provider', value: 'azure' }))
+    expect(r.status).toBe(400)
+    expect((await r.json()).error).toMatch(/platform only/)
+  })
+
   it('clears an override', async () => {
     const res = await DELETE(new NextRequest(`${url}?key=sms_provider&tenantId=${T}`, { method: 'DELETE' }))
     expect(res.status).toBe(200)
