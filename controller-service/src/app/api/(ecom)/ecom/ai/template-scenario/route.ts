@@ -8,7 +8,7 @@ import { ownerApi } from '@controller/lib/ecom/owner-api'
 import { hasService, listServiceApprovals, blockedServices } from '@/lib/tenant-registry'
 import { TemplateScenarioRequest } from '@/lib/ai/template-scenario.schema'
 import { fillFromScenario, rateLimit, TemplateScenarioError } from '@/lib/ai/template-scenario'
-import { AiWalletError } from '@/lib/ai/billing'
+import { AiWalletError, runBilledTo } from '@/lib/ai/billing'
 import { AiMediaError } from '@/lib/ai/media'
 
 // POST /api/ecom/ai/template-scenario: owner-tenant twin of /api/admin/ai/template-scenario.
@@ -40,9 +40,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Owner-tenant path: always store-owned, never a platform library. Billing lands on ctx.tenant.id
-    // at public pricing — the same behaviour as the admin route with isPlatformLibrary=false.
-    const fill = await fillFromScenario(body, ctx.tenant.id, false, ctx.owner.email ?? null)
+    // Owner-tenant path: always store-owned, never a platform library. runBilledTo charges ctx.tenant.id's wallet
+    // at public pricing and routes with that store's providers (this runs on the controller, outside its scope).
+    const fill = await runBilledTo(ctx.tenant.id, () => fillFromScenario(body, ctx.tenant.id, false, ctx.owner.email ?? null))
     return NextResponse.json(fill)
   } catch (err) {
     if (err instanceof AiWalletError) {

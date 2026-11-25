@@ -44,6 +44,7 @@ Rules:
 - Return ONLY the review text, nothing else`
 
     const result = await aiChat({
+      feature: 'review_draft',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.9,
       maxTokens: 150,

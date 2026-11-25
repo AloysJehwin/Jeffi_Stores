@@ -354,6 +354,7 @@ export async function narrate(data: BriefingData): Promise<string> {
 
   try {
     const r = await aiChat({
+      feature: 'daily_briefing',
       modelHint: 'copy',
       jsonMode: false,
       temperature: 0.3,

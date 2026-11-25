@@ -87,13 +87,9 @@ export async function ocrPdfPages(
   return { ok: true, text: collected.join('\n\n'), model: 'gateway-vision', pages }
 }
 
+/** Vision and OCR run only through the AI gateway. */
 export function isVisionConfigured(): boolean {
-  return (
-    !!process.env.AI_GATEWAY_URL ||
-    !!process.env.PADDLE_OCR_URL ||
-    !!process.env.OLLAMA_BASE_URL ||
-    process.env.AI_PROVIDER === 'ollama'
-  )
+  return !!process.env.AI_GATEWAY_URL
 }
 
 export const VISION_MODEL_NAME = process.env.OLLAMA_VISION_MODEL || 'gemma4:12b'

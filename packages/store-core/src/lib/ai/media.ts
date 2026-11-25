@@ -2,7 +2,7 @@
 // lib/ai/billing (preauthorize before, settle with the gateway's usage after) and persisted
 // to the store's S3 bucket (gateway URLs are temporary). Contract: docs/plans/AI_MEDIA_PLATFORM_PLAN.md.
 import { getAiRouting, getProviderPolicy } from '@/lib/providers/policy'
-import { preauthorize, settle, AiWalletError, type UsageUnits } from './billing'
+import { preauthorize, settle, billedTenantId, AiWalletError, type UsageUnits } from './billing'
 import { aiGatewayUrl, aiGatewayHeaders } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
 import { query, queryOne } from '@/lib/shared/db'
@@ -179,12 +179,7 @@ function gatewayError(status: number, body: { error?: string; tried?: { provider
 }
 
 async function namespace(): Promise<string> {
-  try {
-    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
-    return (await resolveTenantId()) ?? 'platform'
-  } catch {
-    return 'platform'
-  }
+  return (await resolveTenantIdSafe()) ?? 'platform'
 }
 
 async function fetchBytes(url: string): Promise<Buffer> {
@@ -245,6 +240,8 @@ async function persistImage(img: GatewayImage, opts: GenerateImageOpts, idx: num
 
 /** Dynamic resolveTenantId that never throws — mirrors namespace() so edge-safe. */
 async function resolveTenantIdSafe(): Promise<string | null> {
+  const billed = billedTenantId()
+  if (billed) return billed
   try {
     const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
     return await resolveTenantId()
@@ -284,7 +281,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     actor: opts.actor ?? null,
   })
   const started = Date.now()
-  const policy = await getProviderPolicy().catch(() => null)
+  const policy = await getProviderPolicy(billedTenantId() ?? undefined).catch(() => null)
   let gw: GatewayImageResponse
   try {
     gw = await gatewayFetch<GatewayImageResponse>('/v1/images/generate', {
@@ -329,7 +326,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
 }
 
 async function videoRouting(): Promise<{ providers?: string[]; models?: Record<string, string> }> {
-  const r = await getAiRouting().catch(() => ({}) as { video?: string[]; models?: { video?: Record<string, string> } })
+  const r = await getAiRouting(billedTenantId() ?? undefined).catch(() => ({}) as { video?: string[]; models?: { video?: Record<string, string> } })
   return { providers: r.video, models: r.models?.video }
 }
 

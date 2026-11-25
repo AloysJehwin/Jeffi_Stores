@@ -76,6 +76,7 @@ function aggregateSignals(sim: number, tokenOverlap: number, specNum: number, sk
 async function haikuTiebreakerScore(queryText: string, productName: string): Promise<number | null> {
   try {
     const r = await aiChat({
+      feature: 'admin_agent',
       modelHint: 'fast',
       jsonMode: false,
       temperature: 0,

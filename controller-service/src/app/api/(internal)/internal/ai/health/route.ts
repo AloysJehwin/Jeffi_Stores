@@ -4,7 +4,7 @@ import { runAiHealthCheck, recordAiHealth } from '@controller/lib/shared/ai-heal
 
 export const dynamic = 'force-dynamic'
 
-// ai_health cron (every 5 min): real gateway chat + direct Ollama check; alerts once per incident.
+// ai_health cron (every 5 min): real gateway chat + the gateway's /readyz and /v1/providers; alerts once per incident.
 // 503 when unhealthy so the cron status page shows it too. Auth: Bearer ${CRON_SECRET}.
 export async function GET(request: NextRequest) {
   if (!verifyCronRequest(request)) {
