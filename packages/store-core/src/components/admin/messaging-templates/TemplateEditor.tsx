@@ -48,6 +48,8 @@ export type EditorTemplate = {
   blocks?: unknown
   blocks_format?: string | null
   meta_category?: string | null
+  /** SMS: India DLT content template id. */
+  dlt_template_id?: string | null
   media_type?: string | null
   approval_status?: string | null
   approval_reason?: string | null
@@ -72,6 +74,7 @@ export function toEditorTemplate(api: any): EditorTemplate {
     blocks: v.blocks ?? api.blocks,
     blocks_format: v.blocks_format ?? api.blocks_format ?? null,
     meta_category: api.meta_category ?? null,
+    dlt_template_id: api.dlt_template_id ?? null,
     media_type: api.media_type ?? null,
     approval_status: api.approval_status ?? null,
     approval_reason: api.approval_reason ?? null,
@@ -793,6 +796,20 @@ export default function TemplateEditor({
                 {smsStats.encoding === 'UCS-2' && ' · emoji flips to UCS-2 (DLT may need re-registration)'}
               </p>
             )}
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-foreground mb-1" htmlFor="dlt-template-id">
+                DLT template ID
+              </label>
+              <input
+                id="dlt-template-id"
+                className="w-full px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground text-sm font-mono"
+                placeholder="Content template ID from the DLT portal"
+                maxLength={40}
+                value={value.dlt_template_id ?? ''}
+                onChange={e => onChange({ ...value, dlt_template_id: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-foreground-secondary">Sent with each SMS to India. Leave empty only if DLT does not apply.</p>
+            </div>
             {kind && (
               <div className="mt-2">
                 <CampaignVariables kind={kind} channel="sms" text={kindText} />

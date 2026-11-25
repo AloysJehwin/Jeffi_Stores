@@ -8,7 +8,7 @@
 import type { UpsertInput } from '../src/templates-v2.js'
 import campaignCatalog from './campaign-catalog.json' with { type: 'json' }
 
-export type TemplateSeed = Omit<UpsertInput, 'publish'> & { tags?: string[] }
+export type TemplateSeed = Omit<UpsertInput, 'publish' | 'dlt_template_id'> & { tags?: string[]; /** SMS: India DLT content template id. */ dltTemplateId?: string }
 
 // Short helpers to keep the catalog readable.
 const email = (slug: string, name: string, category: string, subject: string, preheader: string, body: string, tags?: string[]): TemplateSeed =>
@@ -34,12 +34,24 @@ const order = (scenario: string) => ['page:order', `scenario:order.${scenario}`]
 /** Order details the order page fills in for its templates, on top of the store and customer ones. */
 export const ORDER_PAGE_VARS = ['order_number', 'order_date', 'total', 'order_url', 'tracking_url', 'courier', 'awb', 'expected_delivery', 'refund_amount', 'payment_url', 'item_name', 'delivery_address']
 
-const sms = (slug: string, name: string, category: string, body: string, tags?: string[]): TemplateSeed =>
-  ({ slug, channel: 'sms', name, category, body, blocks_format: 'sms-text', tags })
+const sms = (slug: string, name: string, category: string, body: string, tags?: string[], dltTemplateId?: string): TemplateSeed =>
+  ({ slug, channel: 'sms', name, category, body, blocks_format: 'sms-text', tags, ...(dltTemplateId ? { dltTemplateId } : {}) })
 
 // samples = Meta approval sample values per {{n}} (required before submission).
 const wa = (slug: string, name: string, category: string, body: string, metaCategory: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION', samples?: Record<string, string>, tags?: string[]): TemplateSeed =>
   ({ slug, channel: 'whatsapp', name, category, body, meta_category: metaCategory, blocks_format: 'wa-content', blocks: { types: { 'twilio/text': { body } }, ...(samples ? { variables: samples } : {}) }, tags })
+
+// UTILITY with one URL button on the short-link host (the `_action` convention): Meta approves the host only; each
+// send passes button_url and messaging-service fills the code. Stored as {{k+2}}, after the body's k and {{brand_name}}.
+const WA_LINK_HOST = 'https://img.jeffistores.in'
+const waLink = (slug: string, name: string, body: string, label: string, samples: Record<string, string>, locale = 'en'): TemplateSeed => {
+  const k = new Set(body.match(/\{\{\s*\d+\s*\}\}/g) ?? []).size
+  const link = String(k + 2)
+  return {
+    slug, channel: 'whatsapp', name, category: 'transactional', locale, body, meta_category: 'UTILITY', blocks_format: 'wa-content', tags: ['outreach'],
+    blocks: { types: { 'twilio/text': { body } }, buttons: [{ type: 'url', label, value: `${WA_LINK_HOST}/{{${link}}}` }], variables: { ...samples, [String(k + 1)]: 'Jeffi Stores', [link]: 'demo' } },
+  }
+}
 
 export const CATALOG: TemplateSeed[] = [
   // ────────────── EMAIL — TRANSACTIONAL (order lifecycle) ──────────────
@@ -572,22 +584,24 @@ export const CATALOG: TemplateSeed[] = [
       bye('See you there'))),
 
   // ────────────── SMS — short, DLT-friendly ──────────────
+  // Start with the brand, say "Rs." (a ₹ forces UCS-2: 70 characters a segment, double the cost), keep to GSM-7 characters,
+  // single {{var}} placeholders, no free text, links only on jeffistores.in hosts. scripts/dlt-template-sheet.mjs turns these into DLT bodies.
   sms('order/confirmed', 'Order confirmed', 'transactional',
-    '{{store_name}}: Order #{{order_number}} confirmed. ₹{{total}}. Track {{short_url}}'),
+    '{{store_name}}: Order #{{order_number}} confirmed. Rs. {{total}}. Track {{short_url}}'),
   sms('order/shipped', 'Order shipped', 'transactional',
     '{{store_name}}: #{{order_number}} shipped via {{courier}}. AWB {{awb}}. {{short_url}}'),
   sms('order/out-for-delivery', 'Out for delivery', 'transactional',
-    '{{store_name}}: #{{order_number}} out for delivery today. Keep {{customer_phone}} reachable.'),
+    '{{store_name}}: Order #{{order_number}} is out for delivery today. Please keep your phone reachable.'),
   sms('order/delivered', 'Order delivered', 'transactional',
     '{{store_name}}: #{{order_number}} delivered. Review: {{short_url}}'),
   sms('order/cancelled', 'Order cancelled', 'transactional',
-    '{{store_name}}: #{{order_number}} cancelled. Refund ₹{{refund_amount}} in 5-7 days.'),
+    '{{store_name}}: Order #{{order_number}} is cancelled. Any refund reaches you in 5-7 days.'),
   sms('otp/verify', 'OTP', 'otp',
-    '{{code}} is your {{store_name}} verification code. Valid for {{ttl_minutes}} min. Do not share.'),
+    '{{store_name}}: {{code}} is your verification code. Valid for {{ttl_minutes}} min. Do not share.'),
   sms('otp/login', 'Login OTP', 'otp',
-    '{{code}} is your {{store_name}} login code. Valid {{ttl_minutes}} min.'),
+    '{{store_name}}: {{code}} is your login code. Valid for {{ttl_minutes}} min. Do not share.'),
   sms('cart/abandoned', 'Cart', 'automation',
-    '{{store_name}}: Items in your cart! Complete order: {{short_url}}'),
+    '{{store_name}}: You left items in your cart. Complete your order: {{short_url}}'),
   sms('promo/offer', 'Promo', 'marketing',
     '{{store_name}}: {{discount_percent}}% off storewide with {{coupon_code}}. Valid till {{expiry_date}}. {{short_url}}'),
   sms('winback', 'Winback', 'marketing',
@@ -597,7 +611,7 @@ export const CATALOG: TemplateSeed[] = [
   sms('delivery/eta', 'Delivery ETA', 'transactional',
     '{{store_name}}: #{{order_number}} arriving {{eta}}. Track: {{short_url}}'),
   sms('order/access-granted', 'Access granted', 'transactional',
-    '{{store_name}}: Access granted for order {{order_number}} — open your vault: {{vault_url}}'),
+    '{{store_name}}: Access granted for order {{order_number}}. Open your vault: {{vault_url}}'),
   sms('order/variant-change-requested', 'Variant change requested', 'transactional',
     '{{store_name}}: Order {{order_number}} needs your approval for a variant change. Review: {{order_url}}'),
   sms('order/payment-failed', 'Payment failed', 'transactional',
@@ -663,6 +677,48 @@ export const CATALOG: TemplateSeed[] = [
     "A refund of {{1}} for order {{2}} has been processed and will reflect in 5-7 business days. Thank you.\n— from {{brand_name}} team", 'UTILITY'),
   wa('feedback/request', 'Feedback request', 'automation',
     "How was your order {{1}}? We would love your feedback. Share it here: {{2}} Thank you for shopping with us!\n— from {{brand_name}} team", 'UTILITY'),
+
+  // Outreach (flagship only, to business owners after the AI call; controller lib/outreach/whatsapp.ts).
+  // {{1}} owner name, {{2}} business name, {{3}} as noted. `_hi` = the Hindi copy (locale hi).
+  waLink('outreach/preview_ready', 'Outreach: preview ready',
+    "Hi {{1}}, thanks for your time on the call. Here is the preview of the website we are making for {{2}}. It updates as you send us details, so just reply here with anything you want added.\n— from {{brand_name}} team",
+    'See your preview', { '1': 'Ravi', '2': 'Sharma Sweets' }),
+  waLink('outreach/preview_ready_hi', 'Outreach: preview ready (Hindi)',
+    "नमस्ते {{1}}, कॉल पर समय देने के लिए धन्यवाद। {{2}} के लिए हम जो वेबसाइट बना रहे हैं, उसका प्रीव्यू यहाँ है। आप जो जानकारी भेजेंगे, वह इसमें जुड़ती जाएगी, इसलिए जो भी जोड़ना हो, यहीं जवाब में भेज दीजिए।\n— from {{brand_name}} team",
+    'प्रीव्यू देखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स' }, 'hi'),
+  // {{3}} the details still missing, in plain words.
+  waLink('outreach/details_needed', 'Outreach: details needed',
+    "Hi {{1}}, the website for {{2}} is nearly ready. To finish it we still need: {{3}}. Please reply here with these details and we will add them for you.\n— from {{brand_name}} team",
+    'See your preview', { '1': 'Ravi', '2': 'Sharma Sweets', '3': 'your opening hours and shop address' }),
+  waLink('outreach/details_needed_hi', 'Outreach: details needed (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट लगभग तैयार है। इसे पूरा करने के लिए हमें यह जानकारी चाहिए: {{3}}। कृपया यहीं जवाब में भेज दीजिए, हम इसे जोड़ देंगे।\n— from {{brand_name}} team",
+    'प्रीव्यू देखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स', '3': 'दुकान खुलने का समय और पता' }, 'hi'),
+  waLink('outreach/site_live', 'Outreach: site live',
+    "Hi {{1}}, the website for {{2}} is now live. Tap the button to open it, and share the link with your customers.\n— from {{brand_name}} team",
+    'Open your website', { '1': 'Ravi', '2': 'Sharma Sweets' }),
+  waLink('outreach/site_live_hi', 'Outreach: site live (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट अब लाइव है। इसे खोलने के लिए नीचे का बटन दबाइए और लिंक अपने ग्राहकों के साथ शेयर कीजिए।\n— from {{brand_name}} team",
+    'वेबसाइट खोलें', { '1': 'रवि', '2': 'शर्मा स्वीट्स' }, 'hi'),
+  waLink('outreach/claim', 'Outreach: claim your site',
+    "Hi {{1}}, the website for {{2}} is ready to be yours. Tap the button to claim it with your email, so you can edit it and see who visits. This link works for 14 days.\n— from {{brand_name}} team",
+    'Claim your website', { '1': 'Ravi', '2': 'Sharma Sweets' }),
+  waLink('outreach/claim_hi', 'Outreach: claim your site (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट अब आपकी होने के लिए तैयार है। नीचे का बटन दबाकर अपने ईमेल से इसे अपने नाम कीजिए, ताकि आप इसे बदल सकें और देख सकें कि कितने लोग आए। यह लिंक 14 दिन तक चलेगा।\n— from {{brand_name}} team",
+    'अपनी वेबसाइट लें', { '1': 'रवि', '2': 'शर्मा स्वीट्स' }, 'hi'),
+  // {{3}} when we will call, e.g. "25 Nov, 11:00 am".
+  waLink('outreach/callback', 'Outreach: callback booked',
+    "Hi {{1}}, as you asked, we will call you back about the website for {{2}} on {{3}}. If another time is better, just reply here.\n— from {{brand_name}} team",
+    'View details', { '1': 'Ravi', '2': 'Sharma Sweets', '3': '25 Nov, 11:00 am' }),
+  waLink('outreach/callback_hi', 'Outreach: callback booked (Hindi)',
+    "नमस्ते {{1}}, जैसा आपने कहा, हम {{2}} की वेबसाइट के बारे में आपको {{3}} को वापस कॉल करेंगे। कोई और समय ठीक हो तो यहीं जवाब दीजिए।\n— from {{brand_name}} team",
+    'जानकारी देखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स', '3': '25 नव॰, 11:00 am' }, 'hi'),
+  // {{3}} the day the trial ends, e.g. "1 December".
+  waLink('outreach/trial_ending', 'Outreach: trial ending',
+    "Hi {{1}}, the free trial of the website for {{2}} ends on {{3}}. Tap the button to keep it online and see how many people visit it.\n— from {{brand_name}} team",
+    'Keep my website', { '1': 'Ravi', '2': 'Sharma Sweets', '3': '1 December' }),
+  waLink('outreach/trial_ending_hi', 'Outreach: trial ending (Hindi)',
+    "नमस्ते {{1}}, {{2}} की वेबसाइट का फ़्री ट्रायल {{3}} को खत्म हो रहा है। इसे चालू रखने और यह देखने के लिए कि कितने लोग आए, नीचे का बटन दबाइए।\n— from {{brand_name}} team",
+    'वेबसाइट चालू रखें', { '1': 'रवि', '2': 'शर्मा स्वीट्स', '3': '1 दिसंबर' }, 'hi'),
   // Imported from campaigns / mailer — regenerate with scripts/import-campaign-templates.ts --generate.
   ...(campaignCatalog as TemplateSeed[]),
 ]

@@ -12,7 +12,16 @@ export interface SmsProvider {
   /** The sender number used (for the audit log). */
   readonly from: string
   /** Send a plain SMS to an E.164 number. Returns the provider message id. Throws on failure. */
-  sendText(toE164: string, body: string): Promise<string>
+  sendText(toE164: string, body: string, opts?: SmsSendOpts): Promise<string>
+}
+
+/** India DLT content template id (AWS IN_TEMPLATE_ID) and the template slug, for the missing-id warning. */
+export interface SmsSendOpts {
+  dltTemplateId?: string | null
+  templateSlug?: string | null
+  /** The template's registered DLT header, sent as the sender id for India. */
+  dltHeader?: string | null
+  messageType?: 'TRANSACTIONAL' | 'PROMOTIONAL'
 }
 
 export interface WhatsAppProvider {

@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "5605299d1e794beac9c0900a53ab6fb0db1ed381719a809c21440a654b600b75",
+ "manifestHash": "cfa374e01765f76105ee6a65c8acd8ab32d2abd4fc19106b4413868d8f3b36a6",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -9519,6 +9519,49 @@
    "body": null,
    "summary": "Get search (customers)",
    "command": "customers search"
+  },
+  {
+   "id": "admin GET /api/admin/dashboard/activity",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/dashboard/activity",
+   "gatewayPath": "/v1/admin/dashboard/activity",
+   "file": "admin-service/src/app/api/(admin)/admin/dashboard/activity/route.ts",
+   "pathParams": [],
+   "query": [
+    "channel",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "channel",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "all",
+       "online",
+       "cod",
+       "business"
+      ]
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "dashboard:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "dashboard:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Fulfilment activity (shipped calendar, rhythm, time to ship) behind the dashboard's \"Orders shipped\" drawer.",
+   "command": "dashboard activity"
   },
   {
    "id": "admin GET /api/admin/dashboard/analytics",
@@ -26329,6 +26372,25 @@
      "provider_ref": {
       "type": "string"
      },
+     "dlt_template_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "SMS: India DLT content template id, stored in sms_dlt_template. Not given → keep; empty → remove."
+     },
+     "dlt_header": {
+      "type": "string"
+     },
+     "dlt_route": {
+      "type": "string",
+      "enum": [
+       "promotional",
+       "transactional",
+       "service",
+       "otp"
+      ]
+     },
      "note": {
       "type": "string"
      },
@@ -26614,6 +26676,25 @@
      },
      "provider_ref": {
       "type": "string"
+     },
+     "dlt_template_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "SMS: India DLT content template id, stored in sms_dlt_template. Not given → keep; empty → remove."
+     },
+     "dlt_header": {
+      "type": "string"
+     },
+     "dlt_route": {
+      "type": "string",
+      "enum": [
+       "promotional",
+       "transactional",
+       "service",
+       "otp"
+      ]
      },
      "note": {
       "type": "string"
@@ -39101,7 +39182,114 @@
        "config"
       ]
      },
-     {}
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "region": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "access_key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "secret_access_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+         },
+         "whatsapp_phone_number_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "waba_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "sms_origination": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "maxLength": 400
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "region",
+         "access_key_id",
+         "secret_access_key"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9]{3,11}$"
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "credentials": {
+          "const": "platform",
+          "type": "string"
+         },
+         "region": {
+          "const": "ap-south-1",
+          "type": "string"
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "pattern": "^\\d{15,25}$"
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "credentials"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
+     }
     ]
    },
    "bodySource": "zod",
@@ -39160,6 +39348,36 @@
    "command": "settings-messaging-numbers delete"
   },
   {
+   "id": "admin GET /api/admin/settings/messaging-numbers/check-sender-id",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/settings/messaging-numbers/check-sender-id",
+   "gatewayPath": "/v1/admin/settings/messaging-numbers/check-sender-id",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/messaging-numbers/check-sender-id/route.ts",
+   "pathParams": [],
+   "query": [
+    "header"
+   ],
+   "queryParams": [
+    {
+     "name": "header",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Read-only \"Check sender ID\": is ?header= registered on the platform's AWS account in ap-south-1. The flagship's administrator only; a store's numbers are the platform's to manage.",
+   "command": "settings-messaging-numbers check-sender-id"
+  },
+  {
    "id": "admin GET /api/admin/settings/providers",
    "host": "admin",
    "method": "GET",
@@ -39175,7 +39393,7 @@
     "settings:read"
    ],
    "guard": "auth",
-   "platform": "owner",
+   "platform": null,
    "body": null,
    "summary": "List providers (settings)",
    "command": "settings providers"
@@ -39196,7 +39414,7 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": "owner",
+   "platform": null,
    "body": {
     "type": "object",
     "properties": {
@@ -39259,11 +39477,144 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": "owner",
+   "platform": null,
    "body": null,
    "noBody": true,
    "summary": "Delete providers (settings)",
    "command": "settings providers-delete"
+  },
+  {
+   "id": "admin GET /api/admin/settings/providers/credentials",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/settings/providers/credentials",
+   "gatewayPath": "/v1/admin/settings/providers/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get credentials (settings providers)",
+   "command": "settings-providers credentials"
+  },
+  {
+   "id": "admin PUT /api/admin/settings/providers/credentials",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/settings/providers/credentials",
+   "gatewayPath": "/v1/admin/settings/providers/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "exotel",
+       "sarvam",
+       "twilio_voice",
+       "anthropic_voice"
+      ]
+     },
+     "values": {
+      "description": "any JSON value (type not inferred)"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Update credentials (settings providers)",
+   "command": "settings-providers credentials-update"
+  },
+  {
+   "id": "admin DELETE /api/admin/settings/providers/credentials",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/settings/providers/credentials",
+   "gatewayPath": "/v1/admin/settings/providers/credentials",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
+   "pathParams": [],
+   "query": [
+    "provider"
+   ],
+   "queryParams": [
+    {
+     "name": "provider",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "exotel",
+       "sarvam",
+       "twilio_voice",
+       "anthropic_voice"
+      ]
+     }
+    }
+   ],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete credentials (settings providers)",
+   "command": "settings-providers credentials-delete"
+  },
+  {
+   "id": "admin POST /api/admin/settings/providers/credentials/test",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/settings/providers/credentials/test",
+   "gatewayPath": "/v1/admin/settings/providers/credentials/test",
+   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/test/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "provider": {
+      "type": "string",
+      "enum": [
+       "exotel"
+      ]
+     }
+    },
+    "required": [
+     "provider"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Read-only check of saved Outreach credentials. Exotel only: a balance read, no call placed. Sarvam has no read-only endpoint, so it has no test. Platform owner on the flagship only.",
+   "command": "settings-providers-credentials test"
   },
   {
    "id": "admin GET /api/admin/setup-guide",
@@ -46073,6 +46424,49 @@
        "sender",
        "config"
       ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "provider": {
+        "const": "aws",
+        "type": "string"
+       },
+       "sender": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9]{3,11}$"
+       },
+       "config": {
+        "type": "object",
+        "properties": {
+         "credentials": {
+          "const": "platform",
+          "type": "string"
+         },
+         "region": {
+          "const": "ap-south-1",
+          "type": "string"
+         },
+         "dlt_entity_id": {
+          "type": "string",
+          "pattern": "^\\d{15,25}$"
+         },
+         "configuration_set": {
+          "type": "string",
+          "maxLength": 400
+         }
+        },
+        "required": [
+         "credentials"
+        ],
+        "additionalProperties": false
+       }
+      },
+      "required": [
+       "provider",
+       "sender",
+       "config"
+      ]
      }
     ]
    },
@@ -46133,6 +46527,40 @@
    "bodyContentType": "application/json",
    "summary": "Delete a messaging sender",
    "command": "platform messaging-senders delete"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/{tenantId}/messaging-senders/check-sender-id",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/{tenantId}/messaging-senders/check-sender-id",
+   "gatewayPath": "/v1/platform/ecom/{tenantId}/messaging-senders/check-sender-id",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/[tenantId]/messaging-senders/check-sender-id/route.ts",
+   "pathParams": [
+    {
+     "name": "tenantId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "header"
+   ],
+   "queryParams": [
+    {
+     "name": "header",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "admin",
+   "body": null,
+   "summary": "Read-only \"Check sender ID\": is ?header= registered on the platform's AWS account in ap-south-1. Platform admins only.",
+   "command": "platform messaging-senders check-sender-id"
   },
   {
    "id": "platform GET /api/admin/ecom/{tenantId}/numbers",
@@ -46990,6 +47418,25 @@
        "provider_ref": {
         "type": "string"
        },
+       "dlt_template_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "SMS: India DLT content template id, stored in sms_dlt_template. Not given → keep; empty → remove."
+       },
+       "dlt_header": {
+        "type": "string"
+       },
+       "dlt_route": {
+        "type": "string",
+        "enum": [
+         "promotional",
+         "transactional",
+         "service",
+         "otp"
+        ]
+       },
        "note": {
         "type": "string"
        },
@@ -47286,6 +47733,25 @@
        },
        "provider_ref": {
         "type": "string"
+       },
+       "dlt_template_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "SMS: India DLT content template id, stored in sms_dlt_template. Not given → keep; empty → remove."
+       },
+       "dlt_header": {
+        "type": "string"
+       },
+       "dlt_route": {
+        "type": "string",
+        "enum": [
+         "promotional",
+         "transactional",
+         "service",
+         "otp"
+        ]
        },
        "note": {
         "type": "string"
@@ -48211,6 +48677,553 @@
    "body": null,
    "summary": "Numbers the platform could buy for a store (Twilio, its own account): ?country=US&areaCode=872. Platform admins only.",
    "command": "platform numbers available"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/calls/{id}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/calls/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/calls/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/calls/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET → { call, recordingUrl, events }: the call row (transcript as { role: agent|caller, text, at }, consent), a 15-minute signed URL for the recording, and the call's audit events. Platform admin only.",
+   "command": "platform outreach-calls get"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/contacts",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/contacts",
+   "gatewayPath": "/v1/platform/ecom/outreach/contacts",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/contacts/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET ?program&status=a,b&list&q&page&pageSize → contacts, newest activity first.",
+   "command": "platform outreach-contacts list"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/contacts/{id}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/contacts/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/contacts/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/contacts/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get a contact (outreach)",
+   "command": "platform outreach-contacts get"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/outreach/contacts/{id}",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/contacts/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/contacts/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/contacts/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "suppress",
+       "requeue",
+       "not_interested"
+      ]
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500
+     }
+    },
+    "required": [
+     "action"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested.",
+   "command": "platform outreach-contacts update"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/events",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/events",
+   "gatewayPath": "/v1/platform/ecom/outreach/events",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/events/route.ts",
+   "pathParams": [],
+   "query": [
+    "contactId",
+    "limit"
+   ],
+   "queryParams": [
+    {
+     "name": "contactId",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "limit",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET ?limit&contactId → the audit trail, newest first.",
+   "command": "platform outreach events"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/lists",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/lists",
+   "gatewayPath": "/v1/platform/ecom/outreach/lists",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/lists/route.ts",
+   "pathParams": [],
+   "query": [
+    "program"
+   ],
+   "queryParams": [
+    {
+     "name": "program",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "List lists (outreach)",
+   "command": "platform outreach-lists list"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/lists",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/lists",
+   "gatewayPath": "/v1/platform/ecom/outreach/lists",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/lists/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "program": {
+      "type": "string",
+      "default": "showcase-offer"
+     },
+     "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "sheetUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "sheetTitle": {
+      "type": "string",
+      "maxLength": 120
+     }
+    },
+    "required": [
+     "name",
+     "sheetUrl"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "bodyAlternatives": [
+    {
+     "contentType": "multipart/form-data",
+     "schema": {
+      "type": "object",
+      "properties": {
+       "file": {
+        "type": "string",
+        "format": "binary"
+       },
+       "program": {
+        "type": "string",
+        "default": "showcase-offer"
+       },
+       "name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "file"
+      ]
+     }
+    }
+   ],
+   "summary": "POST multipart (file + name [+ program]) → import a CSV/XLSX; POST JSON { name, sheetUrl } → a Sheet-backed list, synced now.",
+   "command": "platform outreach-lists create"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/lists/{id}/sync",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/lists/{id}/sync",
+   "gatewayPath": "/v1/platform/ecom/outreach/lists/{id}/sync",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/lists/[id]/sync/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "noBody": true,
+   "summary": "POST → re-read the Sheet behind a list and upsert its rows (existing contacts keep their progress).",
+   "command": "platform outreach-lists sync"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/program",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/program",
+   "gatewayPath": "/v1/platform/ecom/outreach/program",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/program/route.ts",
+   "pathParams": [],
+   "query": [
+    "program"
+   ],
+   "queryParams": [
+    {
+     "name": "program",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET ?program → registry info plus the program's state and contact counts by status.",
+   "command": "platform outreach program"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/outreach/program",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/program",
+   "gatewayPath": "/v1/platform/ecom/outreach/program",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/program/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "program": {
+      "type": "string",
+      "default": "showcase-offer"
+     },
+     "enabled": {
+      "type": "boolean"
+     },
+     "daily_cap": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5000
+     },
+     "concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+     },
+     "window_start": {
+      "type": "string",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+     },
+     "window_end": {
+      "type": "string",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+     },
+     "test_numbers": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 20
+      },
+      "maxItems": 10
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers.",
+   "command": "platform outreach program-update"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/suppressions",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/suppressions",
+   "gatewayPath": "/v1/platform/ecom/outreach/suppressions",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/suppressions/route.ts",
+   "pathParams": [],
+   "query": [
+    "page",
+    "pageSize",
+    "q"
+   ],
+   "queryParams": [
+    {
+     "name": "page",
+     "schema": {
+      "type": "number"
+     }
+    },
+    {
+     "name": "pageSize",
+     "schema": {
+      "type": "number"
+     }
+    },
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "List suppressions (outreach)",
+   "command": "platform outreach suppressions"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/suppressions",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/suppressions",
+   "gatewayPath": "/v1/platform/ecom/outreach/suppressions",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/suppressions/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "phone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 200
+     }
+    },
+    "required": [
+     "phone"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { phone, reason } → suppress a number now; live contacts on it move to `suppressed`.",
+   "command": "platform outreach suppressions-create"
+  },
+  {
+   "id": "platform DELETE /api/admin/ecom/outreach/suppressions",
+   "host": "platform",
+   "method": "DELETE",
+   "path": "/api/admin/ecom/outreach/suppressions",
+   "gatewayPath": "/v1/platform/ecom/outreach/suppressions",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/suppressions/route.ts",
+   "pathParams": [],
+   "query": [
+    "phone"
+   ],
+   "queryParams": [
+    {
+     "name": "phone",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "phone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20
+     }
+    },
+    "required": [
+     "phone"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "DELETE ?phone= (or { phone }) → lift the suppression. Contacts already suppressed stay so until requeued.",
+   "command": "platform outreach suppressions-delete"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/test-call",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/test-call",
+   "gatewayPath": "/v1/platform/ecom/outreach/test-call",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/test-call/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "phone": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20
+     },
+     "language": {
+      "type": "string",
+      "enum": [
+       "en",
+       "hi",
+       "ta",
+       "te",
+       "kn",
+       "ml",
+       "mr",
+       "bn",
+       "gu"
+      ],
+      "default": "en"
+     },
+     "program": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "showcase-offer"
+     },
+     "businessName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "ownerName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     }
+    },
+    "required": [
+     "phone"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { phone, language } → { callId }: a real call to one of the program's test numbers (platform admin only).",
+   "command": "platform outreach test-call"
   },
   {
    "id": "platform GET /api/admin/ecom/store-status/overview",

@@ -15,6 +15,7 @@ import {
   type MatchType,
 } from '@/lib/google-ads/campaign-spec'
 import { cleanKeyword } from '@/lib/google-ads/limits'
+import type { EcomPreset } from '@/lib/google-ads/ecom-presets'
 import { toExtensions, type ExtDraft } from './ExtensionsEditor'
 
 // The wizard's form state (strings for inputs) and its conversion to the CampaignSpec the server takes.
@@ -147,6 +148,33 @@ export function newDraft(b: WizardBootstrap): Draft {
       channels: 'ALL_CHANNELS',
       audiences: [],
     },
+  }
+}
+
+/** A fresh Search draft filled from an ecom preset (the admin still reviews and edits every field). */
+export function draftFromPreset(p: EcomPreset, b: WizardBootstrap): Draft {
+  const base = newDraft(b)
+  const negatives = p.negatives.map(k => (k.matchType === 'EXACT' ? `[${k.text}]` : k.text)).join('\n')
+  return {
+    ...base,
+    type: 'SEARCH',
+    name: p.name,
+    dailyBudget: String(p.dailyBudget),
+    strategy: 'MAXIMIZE_CONVERSIONS',
+    locations: p.locations,
+    languages: p.languages,
+    adGroups: [
+      {
+        ...newAdGroup(p.finalUrl, p.adGroupName),
+        keywords: p.keywords,
+        negatives,
+        headlines: [...p.headlines],
+        descriptions: [...p.descriptions],
+        path1: p.path1,
+        path2: p.path2,
+        finalUrl: p.finalUrl,
+      },
+    ],
   }
 }
 

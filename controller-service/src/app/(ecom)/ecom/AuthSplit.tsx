@@ -10,15 +10,19 @@ import { CheckMark } from './Shapes'
 // Collapses to a single column on mobile with a compact brand header.
 // Server-guarded: an already-signed-in owner is bounced to the dashboard so the
 // auth form is never shown to an authenticated session. A plan picked on the pricing page
-// (?plan=&interval=) is carried through to /onboard.
+// (?plan=&interval=) is carried through to /onboard. ?next= returns to a claim link (/claim/<token>) and nowhere else.
+const RETURN_TO = /^\/claim\/[0-9a-z]{1,11}\.[A-Za-z0-9_-]{43}$/
+
 export default async function AuthSplit({
   mode,
   plan,
   interval,
+  next,
 }: {
   mode: 'signup' | 'signin'
   plan?: string
   interval?: string
+  next?: string
 }) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
@@ -30,7 +34,8 @@ export default async function AuthSplit({
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
   const plans = plan ? await listPlans().catch(() => []) : []
   const picked = plan && plans.some(p => p.slug === plan) ? `plan=${plan}&interval=${interval === 'yearly' ? 'yearly' : 'monthly'}` : null
-  if (owner) redirect(picked ? `/onboard?${picked}` : '/dashboard')
+  const returnTo = next && RETURN_TO.test(next) ? next : null
+  if (owner) redirect(returnTo ?? (picked ? `/onboard?${picked}` : '/dashboard'))
   const points = [
     'Your own branded storefront + admin',
     'Online & COD payments, settled for you',
@@ -76,7 +81,7 @@ export default async function AuthSplit({
           </span>
           Jeffi Commerce
         </Link>
-        <OwnerAuthForm mode={mode} planQuery={picked} />
+        <OwnerAuthForm mode={mode} planQuery={picked} returnTo={returnTo} />
         <div className="md:hidden mt-10 w-full max-w-sm mx-auto rounded-3xl org-sand p-5">
           <p className="font-display font-black text-lg leading-snug text-foreground">
             Everything you need to sell online — in one place.

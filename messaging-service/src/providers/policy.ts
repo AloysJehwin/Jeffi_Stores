@@ -15,6 +15,7 @@ const valid = (v: unknown): MessagingProvider | undefined => (v === 'twilio' || 
 
 export function invalidateProviderPolicy() {
   cache.clear()
+  dltCache.clear()
 }
 
 // Site Controls live in the store's own DB; a workspace without one has no choice to make.
@@ -60,5 +61,26 @@ export async function messagingProvider(tenantId: string, channel: 'sms' | 'what
     return (await resolve(tenantId))[channel]
   } catch {
     return 'twilio'
+  }
+}
+
+const dltCache = new Map<string, { at: number; id: string }>()
+
+/** India DLT entity id from the provider settings: the tenant's row, else the platform default (tenant_id NULL). '' = none. */
+export async function smsDltEntityId(tenantId?: string | null): Promise<string> {
+  const tid = tenantId && tenantId !== PLATFORM_TENANT_ID ? tenantId : null
+  const k = tid ?? 'platform'
+  const hit = dltCache.get(k)
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.id
+  try {
+    const r = await db.query<{ tenant_id: string | null; value: unknown }>(
+      `SELECT tenant_id, value FROM platform_provider_settings
+        WHERE key = 'sms_dlt_entity_id' AND (tenant_id IS NULL OR tenant_id = $1::uuid)`, [tid])
+    const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+    const id = str(r.rows.find(x => x.tenant_id)?.value) || str(r.rows.find(x => !x.tenant_id)?.value)
+    dltCache.set(k, { at: Date.now(), id })
+    return id
+  } catch {
+    return ''
   }
 }

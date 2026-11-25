@@ -461,8 +461,10 @@ app.post<{ Querystring: { force?: string } }>('/system-templates/install', async
     const existing = await tpl.findBySlug(pool, req.claims.tenantId, seed.channel, seed.slug, seed.locale ?? 'en')
     if (existing && req.query.force !== '1') { skipped++; continue }
     const providerRef = seed.channel === 'whatsapp' ? WA_APPROVED_SIDS[seed.slug] : undefined
+    const { dltTemplateId, ...rest } = seed
     const t = await tpl.upsertTemplate(pool, req.claims.tenantId, {
-      ...seed,
+      ...rest,
+      dlt_template_id: dltTemplateId,
       provider_ref: providerRef ?? seed.provider_ref,
       publish: true,
     })

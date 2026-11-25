@@ -73,6 +73,8 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
+  # One heap ceiling for every Node step (tests, type checks, builds); runners have 16 GB.
+  NODE_OPTIONS: --max-old-space-size=12288
   DRY_FLAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
 
 jobs:
@@ -90,6 +92,7 @@ jobs:
       browser: ${{ steps.affected.outputs.browser }}
       fastify: ${{ steps.affected.outputs.fastify }}
       ocr: ${{ steps.affected.outputs.ocr }}
+      voice: ${{ steps.affected.outputs.voice }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,7 +106,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -uo pipefail
-          full='{"apps":["controller","storefront","admin","business","showcase"],"services":["messaging","documents","public-api","mobile","ai-gateway","ocr","store-core"],"all":true}'
+          full='{"apps":["controller","storefront","admin","business","showcase"],"services":["messaging","documents","public-api","mobile","ai-gateway","ocr","voice","store-core"],"all":true}'
           out=$full
           if [ "$EVENT" = pull_request ]; then
             out=$(node scripts/affected.mjs "$BASE" HEAD) || { echo "::warning::scripts/affected.mjs failed; running everything"; out=$full; }
@@ -117,6 +120,7 @@ jobs:
             echo "browser=$(jq -c '.apps | map({app: ., port: ({storefront:3010,admin:3011,business:3012,controller:3013,showcase:3014}[.])})' <<<"$out")"
             echo "fastify=$(jq -c '.services | map(select(IN("messaging","documents","public-api","mobile")))' <<<"$out")"
             echo "ocr=$(jq -r '.services | index("ocr") != null' <<<"$out")"
+            echo "voice=$(jq -r '.services | index("voice") != null' <<<"$out")"
           } >> "$GITHUB_OUTPUT"
           { echo "### Affected"; echo '```json'; echo "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Every script a workflow runs is committed
@@ -218,15 +222,13 @@ jobs:
         with:
           node-version: ${{ matrix.node || 20 }}
           install: ${{ matrix.install }}
-      # The apps' checks load store-core's site themes and blocks; tsc outgrows Node's default heap.
       - run: ${{ matrix.run }}
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
 
   security:
     name: Security
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' }}
     permissions: { contents: read, pull-requests: write } # pull-requests: the dependency review's comment
     steps:
       - uses: actions/checkout@v4
@@ -245,6 +247,8 @@ jobs:
         run: node scripts/audit-gate.mjs
       - name: pip-audit (PaddleOCR)
         run: pipx run pip-audit==2.10.1 --requirement ai-platform/paddleocr/requirements.txt --no-deps --disable-pip --progress-spinner off
+      - name: pip-audit (voice-service)
+        run: pipx run pip-audit==2.10.1 --requirement voice-service/requirements.txt --no-deps --disable-pip --progress-spinner off
 
   test:
     name: Unit tests · ${{ matrix.app }}
@@ -311,7 +315,8 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites
+    if: ${{ !cancelled() && needs.test.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -320,16 +325,13 @@ jobs:
           pattern: vitest-*
           path: .vitest-reports
           merge-multiple: true
-      # Merging every part's coverage outgrew Node's default heap (OOM on #641's run).
       - run: npx vitest run --merge-reports --coverage
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
 
   integration:
     name: Integration tests · ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.rtl != '[]'
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.rtl != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -393,8 +395,8 @@ jobs:
   browser:
     name: Build + browser · ${{ matrix.app }}
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck] # a commit failing either never spends a build
-    if: needs.init.outputs.apps != '[]'
+    needs: [init, lint, typecheck, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites; a lint or typecheck failure never spends a build
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.init.outputs.apps != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -433,7 +435,6 @@ jobs:
       - name: Next.js build
         run: npm run build:${{ matrix.app }}
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
           NEXT_PUBLIC_ENABLE_RAZORPAY: ${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
@@ -471,7 +472,8 @@ jobs:
   ui-kit:
     name: UI kit
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -487,7 +489,7 @@ jobs:
   api-db-required:
     name: API tests (real DB)
     runs-on: ubuntu-latest
-    needs: [init, api-db-tests]
+    needs: [init, api-db-tests, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites
     if: always()
     steps:
       - name: Every API tests (real DB) card passed
@@ -515,8 +517,8 @@ jobs:
   service-api:
     name: Service API · ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.fastify != '[]'
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.fastify != '[]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -537,7 +539,8 @@ jobs:
   ratchets:
     name: Test ratchets
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/node-setup
@@ -550,8 +553,8 @@ jobs:
   ocr:
     name: OCR tests (advisory)
     runs-on: ubuntu-latest
-    needs: init
-    if: needs.init.outputs.ocr == 'true'
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.ocr == 'true' }}
     continue-on-error: true
     timeout-minutes: 20
     steps:
@@ -565,15 +568,32 @@ jobs:
       - run: pip install -r ai-platform/paddleocr/requirements.txt pytest
       - run: pytest ai-platform/paddleocr/tests
 
+  # voice-service (Python): pure-logic and contract tests, everything mocked (no calls, no network).
+  voice:
+    name: Voice service tests
+    runs-on: ubuntu-latest
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.voice == 'true' }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: voice-service/requirements*.txt
+      - run: pip install -r voice-service/requirements.txt -r voice-service/requirements-dev.txt
+      - run: python -m pytest voice-service
+
   responsive:
     name: Responsive sweep (advisory)
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     # Advisory: not in `checks`' needs and continue-on-error, so it never blocks a merge. Skipped on a release run (its
     # PR already ran it, and Post fails a release on any failed job). Promote it once it has proven reliable.
     # Renders every site pack's pages at seven widths (tests/responsive, docs/SITE_BUILDER_PLAN.md §5), and the visual
     # editor's page (free layers, converted blocks), with a CLS and LCP budget per page (docs/plans/SITE_EDITOR_PLAN.md).
-    if: needs.init.outputs.release != 'true'
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.release != 'true' }}
     continue-on-error: true
     timeout-minutes: 60
     services:
@@ -612,8 +632,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build storefront and business
         run: npm run build:storefront && npm run build:business
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
       - name: Start the apps behind the dev router
         run: |
           npx next start storefront-service -p 3010 > storefront.log 2>&1 &
@@ -643,12 +661,12 @@ jobs:
   site-editor-e2e:
     name: Site editor end-to-end (advisory)
     runs-on: ubuntu-latest
-    needs: init
+    needs: [init, lint, typecheck, api-db-tests, test] # stage 3: after stage 2, whatever its result
     # Advisory, like the responsive sweep: not in `checks`' needs and continue-on-error, skipped on a release run.
     # The visual editor in a real browser (docs/plans/SITE_EDITOR_PLAN.md phase 6): the canvas bridge on the storefront
     # and the editor in the admin Site Builder, behind the dev router so both share an origin as the editor's canvas
     # needs. tests/site-editor/seed.ts seeds jeffi_test (flag on, a draft, an admin session). Promote once reliable.
-    if: needs.init.outputs.release != 'true'
+    if: ${{ !cancelled() && needs.init.result == 'success' && needs.init.outputs.release != 'true' }}
     continue-on-error: true
     timeout-minutes: 45
     services:
@@ -689,8 +707,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build storefront and admin
         run: npm run build:storefront && npm run build:admin
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
       - name: Start the apps behind the dev router
         run: |
           npx next start storefront-service -p 3010 > storefront.log 2>&1 &
@@ -713,7 +729,8 @@ jobs:
   build:
     name: Build · ${{ matrix.app }}
     runs-on: ubuntu-24.04-arm
-    needs: [lint, typecheck] # a commit failing either never spends a build
+    needs: [lint, typecheck, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites; a lint or typecheck failure never spends a build
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -725,6 +742,7 @@ jobs:
           - { app: public-api, args: -f deploy/services.Dockerfile --target public-api . }
           - { app: mobile, args: -f deploy/services.Dockerfile --target mobile . }
           - { app: ai-gateway, args: -f ai-platform/gateway/Dockerfile ai-platform }
+          - { app: voice, args: -f voice-service/Dockerfile . }
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -735,15 +753,15 @@ jobs:
   images:
     name: Image · ${{ matrix.service }}
     runs-on: ubuntu-24.04-arm
-    needs: [init, lint, typecheck]
-    if: needs.init.outputs.release == 'true'
+    needs: [init, lint, typecheck, security, integration, service-api, ratchets, ui-kit, voice] # stage 4: after stage 3's required suites
+    if: ${{ !cancelled() && needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.init.outputs.release == 'true' }}
     permissions:
       id-token: write
       contents: read
     strategy:
       fail-fast: true
       matrix:
-        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase]
+        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase, voice]
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -768,10 +786,10 @@ jobs:
   checks:
     name: Checks passed
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck, security, test, coverage, integration, api-db-tests, browser, ui-kit, service-api, ratchets, build, images]
+    needs: [init, lint, typecheck, security, test, coverage, integration, api-db-tests, browser, ui-kit, service-api, ratchets, voice, build, images]
     # A PR (or a release whose checks all passed) runs this; a release with a failed check skips it, so nobody is
     # asked to approve a broken build. On a release it is also the approval: the `production` environment.
-    if: ${{ always() && (needs.init.outputs.release != 'true' || (needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test.result == 'success' && needs.coverage.result == 'success' && needs.integration.result == 'success' && needs.api-db-tests.result == 'success' && needs.browser.result == 'success' && needs.ui-kit.result == 'success' && needs.service-api.result == 'success' && needs.ratchets.result == 'success' && needs.build.result == 'success' && needs.images.result == 'success')) }}
+    if: ${{ always() && (needs.init.outputs.release != 'true' || (needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test.result == 'success' && needs.coverage.result == 'success' && needs.integration.result == 'success' && needs.api-db-tests.result == 'success' && needs.browser.result == 'success' && needs.ui-kit.result == 'success' && needs.service-api.result == 'success' && needs.ratchets.result == 'success' && needs.voice.result == 'success' && needs.build.result == 'success' && needs.images.result == 'success')) }}
     environment:
       name: ${{ needs.init.outputs.release == 'true' && 'production' || '' }}
       url: ${{ needs.init.outputs.release == 'true' && 'https://jeffistores.in' || '' }}

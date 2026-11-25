@@ -174,6 +174,20 @@ describe('upsertTemplate', () => {
     expect(verInsert[1]![6]).toEqual(expect.arrayContaining(['name', 'x']))
   })
 
+  it('stores an SMS DLT template id in sms_dlt_template (route from category), removes it when emptied, and exposes it through toApi', async () => {
+    const p = pool((sql, params) => sql.includes('FROM sms_dlt_template t') ? [{ dlt_template_id: 'T1', dlt_header: '', dlt_route: 'promotional', default_header: 'JEFFIS' }] : baseRoute()(sql))
+    const r = await upsertTemplate(p as any, 'ten1', { slug: 's', channel: 'sms', name: 'N', category: 'marketing', body: 'b', dlt_template_id: ' T1 ' })
+    const ins = p.client.query.mock.calls.find(c => String(c[0]).includes('INSERT INTO sms_dlt_template'))!
+    expect(ins[1]).toEqual(['v1', 'T1', null, 'promotional', false])
+    expect(toApi({ ...r, version: null })).toMatchObject({ dlt_template_id: 'T1', dlt_header: 'JEFFIS', dlt_route: 'promotional' })
+    const q = pool(baseRoute())
+    await upsertTemplate(q as any, 'ten1', { slug: 's', channel: 'sms', name: 'N', body: 'b', dlt_template_id: '' })
+    expect(q.client.query.mock.calls.some(c => String(c[0]).includes('DELETE FROM sms_dlt_template'))).toBe(true)
+    const keep = pool(baseRoute())
+    await upsertTemplate(keep as any, 'ten1', { slug: 's', channel: 'sms', name: 'N', body: 'b' })
+    expect(keep.client.query.mock.calls.some(c => String(c[0]).includes('sms_dlt_template') && !String(c[0]).includes('FROM sms_dlt_template t'))).toBe(false)
+  })
+
   it('skips the publish UPDATE when publish:false', async () => {
     const p = pool(baseRoute())
     await upsertTemplate(p as any, 'ten1', { slug: 's', channel: 'email', name: 'N', body: 'b', publish: false })

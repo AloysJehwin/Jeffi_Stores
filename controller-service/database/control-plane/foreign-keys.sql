@@ -97,3 +97,7 @@ ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_tenant_id
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.billing_charges ADD CONSTRAINT billing_charges_subscription_id_fkey
     FOREIGN KEY (subscription_id) REFERENCES public.billing_subscriptions(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.owner_attribution ADD CONSTRAINT owner_attribution_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.owner_conversion_uploads ADD CONSTRAINT owner_conversion_uploads_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;

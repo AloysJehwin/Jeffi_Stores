@@ -30,16 +30,16 @@ type Seed = { slug: string; channel: 'email' | 'sms'; name: string; category: st
 // Token versions of the hard-coded campaign SMS lines (controller-service/src/lib/campaigns/whatsapp-dispatch.ts campaignSmsBody).
 const SMS: Record<string, string> = {}
 const sms = (kinds: string[], body: string) => kinds.forEach(k => (SMS[k] = body))
-sms(['abandoned_cart', 'abandoned_checkout', 'high_value_cart'], "You left {items} in your cart. Complete your order before it's gone.")
-sms(['viewed_product', 'viewed_category', 'wishlist_reminder'], "Still thinking about {items}? Take another look before it's gone.")
-sms(['cart_price_drop'], 'Good news — {items} in your cart just dropped in price.')
-sms(['replenishment', 'subscription_renewal'], 'Running low on {items}? Reorder in a tap.')
-sms(['restock', 'back_in_stock_wishlist'], '{productName} is back in stock. Grab it before it sells out.')
-sms(['review_photo_followup'], 'Add a photo to your {productName} review and help other shoppers.')
+sms(['abandoned_cart', 'abandoned_checkout', 'high_value_cart'], "{store_name}: You left {items} in your cart. Complete your order before it's gone.")
+sms(['viewed_product', 'viewed_category', 'wishlist_reminder'], "{store_name}: Still thinking about {items}? Take another look before it's gone.")
+sms(['cart_price_drop'], '{store_name}: Good news: {items} in your cart just dropped in price.')
+sms(['replenishment', 'subscription_renewal'], '{store_name}: Running low on {items}? Reorder in a tap.')
+sms(['restock', 'back_in_stock_wishlist'], '{store_name}: {productName} is back in stock. Grab it before it sells out.')
+sms(['review_photo_followup'], '{store_name}: Add a photo to your {productName} review and help other shoppers.')
 sms(['winback_90', 'winback_180', 'price_drop', 'first_purchase_nudge', 'second_purchase_nudge', 'signup_anniversary',
   'loyalty_tier_upgrade', 'loyalty_points_reminder', 'referral_invite', 'birthday'],
-  '{headline}{#if couponCode} — use code {couponCode}{/if}.')
-sms(['review_request', 'review_reminder', 'post_purchase'], 'How was order {orderNumber}? Share a quick review: {ctaUrl}')
+  '{store_name}: {headline}{#if couponCode}, use code {couponCode}{/if}.')
+sms(['review_request', 'review_reminder', 'post_purchase'], '{store_name}: How was order {orderNumber}? Share a quick review: {ctaUrl}')
 
 // Mailer's hard-coded templates (controller-service/src/lib/shared/email-campaigns.ts) as library content; the layout is applied at send.
 const greet = '<p style="font-size:16px;color:#333;margin:0 0 12px;">Hi {firstName},</p>'

@@ -257,6 +257,8 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `import_jobs` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `linked_account_settlements` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `onboarding_drafts` | `control-plane/tables/control-plane.sql` | control-plane set |
+| `owner_attribution` | `control-plane/tables/owner-attribution.sql` | control-plane set |
+| `owner_conversion_uploads` | `control-plane/tables/owner-attribution.sql` | control-plane set |
 | `owner_tenants` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `owners` | `control-plane/tables/control-plane.sql` | control-plane set |
 | `plan_features` | `control-plane/tables/control-plane.sql` | control-plane set |

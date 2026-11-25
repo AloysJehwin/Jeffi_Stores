@@ -31,7 +31,7 @@ vi.mock('../src/templates-v2.js', () => ({ findBySlugWithDefaults: vi.fn().mockR
 vi.mock('@jeffi/wallet', () => ({ debit: vi.fn(), trueUp: vi.fn() }))
 vi.mock('../src/providers/email.js', () => ({ sendEmail: vi.fn() }))
 vi.mock('../src/providers/twilio.js', () => ({ sendSms: vi.fn(), sendWhatsApp: vi.fn(), normalizePhone: (s: string) => s }))
-vi.mock('../src/providers/policy.js', () => ({ messagingProvider: vi.fn() }))
+vi.mock('../src/providers/policy.js', () => ({ messagingProvider: vi.fn(), smsDltEntityId: vi.fn(async () => 'PE1') }))
 const { awsSend } = vi.hoisted(() => ({ awsSend: vi.fn() }))
 vi.mock('@aws-sdk/client-pinpoint-sms-voice-v2', () => ({
   PinpointSMSVoiceV2Client: class { send = awsSend },
@@ -167,6 +167,34 @@ describe('sendMessage', () => {
       expect(awsSend.mock.calls[0][0].input).toMatchObject({ DestinationPhoneNumber: '+919999999999', OriginationIdentity: 'sender-1', MessageBody: 'hello' })
       expect(sendSms).not.toHaveBeenCalled()
       expect(vi.mocked(messagingProvider).mock.calls[0]).toEqual(['t1', 'sms'])
+    })
+
+    it('carries the template DLT row (id, header, route) through to the AWS send, and a per-send id override', async () => {
+      Object.assign(process.env, env)
+      vi.mocked(messagingProvider).mockResolvedValue('aws')
+      awsSend.mockResolvedValue({ MessageId: 'aws-sms-2' })
+      const tpl = v2(null, 'Order {{order_number}} confirmed')
+      ;(tpl.variant as any).dlt = { dlt_template_id: 'TPL-1', dlt_header: 'JEFFIS', dlt_route: 'promotional' }
+      vi.mocked(findBySlugWithDefaults).mockResolvedValue(tpl as any)
+      await sendMessage(ctx, { channel: 'sms', to: '+919999999999', template: 'order/confirmed', variables: { order_number: '7' } } as any)
+      expect(awsSend.mock.calls[0][0].input).toMatchObject({ DestinationCountryParameters: { IN_ENTITY_ID: 'PE1', IN_TEMPLATE_ID: 'TPL-1' }, OriginationIdentity: 'JEFFIS', MessageType: 'PROMOTIONAL' })
+      await sendMessage(ctx, { channel: 'sms', to: '+919999999999', template: 'order/confirmed', variables: { order_number: '7' }, dlt_template_id: 'OVR' } as any)
+      expect(awsSend.mock.calls[1][0].input.DestinationCountryParameters).toEqual({ IN_ENTITY_ID: 'PE1', IN_TEMPLATE_ID: 'OVR' })
+    })
+
+    it('skips (and logs) a marketing-category SMS when no promotional DLT header is configured, sending nothing', async () => {
+      Object.assign(process.env, env)
+      vi.mocked(messagingProvider).mockResolvedValue('aws')
+      awsSend.mockResolvedValue({ MessageId: 'aws-sms-3' })
+      const tpl: any = v2(null, 'Sale on')
+      tpl.family.category = 'marketing'
+      vi.mocked(findBySlugWithDefaults).mockResolvedValue(tpl)
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      await sendMessage(ctx, { channel: 'sms', to: '+919999999999', template: 'promo/sale' } as any)
+      expect(awsSend).not.toHaveBeenCalled()
+      expect(warn.mock.calls.map(c => String(c[0])).join('')).toContain('sms_promotional_header_missing')
+      expect(warn.mock.calls.map(c => String(c[0])).join('')).not.toContain('9999999999')
+      warn.mockRestore()
     })
 
     it('sends an aws: template ref as a Cloud API template with the body variables in order', async () => {

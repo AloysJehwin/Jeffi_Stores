@@ -332,7 +332,7 @@ function inferBucket(points: { label: string }[]): TrendBucket {
   return 'month'
 }
 
-function formatBucket(iso: string, bucket: TrendBucket, full: boolean): string {
+export function formatBucket(iso: string, bucket: TrendBucket, full: boolean): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
   const day = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })

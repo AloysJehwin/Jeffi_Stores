@@ -135,3 +135,39 @@ WhatsApp shows a preview of the first link.
    - flagship: Settings → Numbers
    - each store: Ecom → store → Numbers
 4. WhatsApp templates belong to the WhatsApp Business account. A number on the same account (the flagship's three) shares its approved templates. A store's own account needs its templates approved there.
+
+## Providers for Outreach
+
+_Added 2026-11-24._ The Outreach program's providers are set on the flagship in **Settings → Providers → Outreach providers**, by the platform owner only. Non-secret values go to `platform_provider_settings` (`voice_provider`, `voice_config`, `sms_dlt_entity_id`, `sms_dlt_sender_ids`). Secrets go to `tenant_integration_credentials` under the platform id, encrypted with `SOCIAL_TOKEN_ENC_KEY`. They are write-only: the screen shows `Configured · ••••1234`, never the value. voice-service reads the merged config, secrets included, from `GET /api/internal/outreach/voice-config` on the controller with a service token whose `service` is `voice`.
+
+| Field | Where it comes from |
+| --- | --- |
+| Call provider | Exotel places real calls (AgentStream). Twilio test line calls only the test numbers. |
+| Exotel Account SID, API key, API token, region | Exotel dashboard → Settings → API settings (the host beside the keys: `api.in.exotel.com` for Mumbai) |
+| Exotel caller number | Exotel → ExoPhones: the 140-series number |
+| AgentStream app ID | Exotel App Bazaar: the flow with the AgentStream applet, the number in its URL |
+| Twilio from number, Account SID, Auth token | Twilio Console → Phone numbers, Account info. The credentials are optional: without them the messaging account (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`) is used |
+| Test numbers | Your own phones, E.164, at most 20 |
+| Sarvam API key | Sarvam dashboard → API keys. Models default to Saaras v3 (speech-to-text) and Bulbul v3 (text-to-speech) |
+| Voice per language | Sarvam's Bulbul v3 voice list (`en` ishita, `hi` priya, `ta` ishita, `te` neha, `kn` neha, `ml` pooja, `mr` priya, `bn` roopa, `gu` priya by default) |
+| Claude model ID, Anthropic API key | Default `claude-haiku-5-5`. The key is optional: without it `ANTHROPIC_API_KEY` is used. Console → API keys |
+| DLT entity ID, sender IDs | Airtel DLT portal: Entity → Profile, and Headers. Env fallbacks are `AWS_SMS_DLT_ENTITY_ID` and `AWS_SMS_DLT_SENDER_IDS` (comma-separated); a store override row wins over both. Each SMS template's DLT template ID is set on the template |
+
+On the Airtel DLT portal, add PE–TM chains for Karix and Sinch, the telemarketers AWS End User Messaging delivers through, and Exotel's TM ID `1002641844184516305` for calls. **Test Exotel** reads the account balance with the saved credentials; it places no call. Sarvam has no read-only endpoint, so it has no test.
+
+## India DLT on AWS
+
+Indian SMS must carry the Principal Entity ID and the content template ID. On AWS End User Messaging both go in `DestinationCountryParameters` (`IN_ENTITY_ID`, `IN_TEMPLATE_ID`), and only for +91 numbers. A send with an entity ID but no template ID still goes out (AWS may reject it) and logs one `sms_dlt_template_id_missing` warning naming the template slug, never the number.
+
+Where each id comes from:
+- Entity ID, first match wins: the store sender's `dlt_entity_id`, then the Providers setting `sms_dlt_entity_id` (the store's row, then the platform default), then env `AWS_SMS_DLT_ENTITY_ID`.
+- Template ID, first match wins: the per-send `dlt_template_id`, then the template's `sms_dlt_template` row (set by `dltTemplateId` on a seed catalog SMS entry, the "DLT template ID" field in the SMS template editor, or `dlt_template_id` on the template API).
+- Sender id: the row's `dlt_header`, else `sms_dlt.default_header`, replaces the origination identity for Indian sends.
+- Message type: the row's `dlt_route` (`promotional` sends as PROMOTIONAL; transactional, service and otp as TRANSACTIONAL); with no row, a marketing/promotional/campaign template category sends as PROMOTIONAL.
+
+**India SMS (DLT) via AWS sender.** An SMS sender of this type (Settings → Numbers for the flagship, Ecom → store → Numbers for a store) is an `aws` row with `credentials: 'platform'`: messaging-service sends with the platform's own AWS credentials from **ap-south-1**, so no keys are stored or shown. Pick a header from the platform's registered headers (`sms_dlt_sender_ids`; shared under Jeffi's entity) or enter the store's own header plus its own entity ID. "Check sender ID" calls `DescribeSenderIds` in ap-south-1 and shows Registered or Not registered; it requests nothing. Only the platform administrator can create, change or remove senders. The DLT sheet to approve before registering templates is `docs/DLT_SMS_TEMPLATES.csv` (`node scripts/dlt-template-sheet.mjs > docs/DLT_SMS_TEMPLATES.csv`). SMS bodies start with the brand, say "Rs." (a rupee sign forces UCS-2: 70 characters a segment) and stay GSM-7.
+
+One-time steps for the founder:
+1. On the Airtel DLT portal, add PE–TM chains for **Karix and Sinch**, AWS's Indian aggregators.
+2. Register transactional sender IDs in the AWS console in **ap-south-1**; promotional ones go through an AWS Support case.
+3. Set the entity ID (`sms_dlt_entity_id` in Providers, or `AWS_SMS_DLT_ENTITY_ID`) and fill each SMS template's DLT template ID.

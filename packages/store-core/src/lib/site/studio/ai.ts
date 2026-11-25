@@ -14,6 +14,15 @@ export const STUDIO_BUDGET_INR = () => Number(process.env.SITE_STUDIO_BUDGET_INR
 
 const spend = new AsyncLocalStorage<{ budgetInr: number; costInr: number }>()
 
+/** The gateway hints the site-writing ('deep') calls may run on instead. */
+export type StudioModel = 'deep' | 'agent' | 'fast'
+const model = new AsyncLocalStorage<StudioModel>()
+
+/** Runs fn with the studio's site-writing calls on another model (an outreach build runs on a faster one, mid-call). */
+export function runStudioWithModel<T>(m: StudioModel, fn: () => Promise<T>): Promise<T> {
+  return model.run(m, fn)
+}
+
 /** Runs fn as the owner's free generation: platform-funded, stopping AI calls once `budgetInr` is spent. */
 export function runStudioFunded<T>(fn: () => Promise<T>, budgetInr = STUDIO_BUDGET_INR(), label = 'site-studio'): Promise<T> {
   return spend.run({ budgetInr, costInr: 0 }, () => runPlatformFunded(label, budgetInr, fn))
@@ -66,7 +75,7 @@ export async function chat(messages: AiChatMessage[], o: ChatOpts): Promise<stri
   const r = await aiChat({
     feature: STUDIO_FEATURE,
     // Site generation runs on Opus (the gateway's deep hint); copy work stays on Haiku.
-    modelHint: o.modelHint ?? 'deep',
+    modelHint: o.modelHint ?? model.getStore() ?? 'deep',
     maxTokens: o.maxTokens,
     temperature: o.temperature ?? 0.7,
     jsonMode: o.json,

@@ -2,7 +2,7 @@
 // Which apps and services a change touches, for the CI matrix.
 //   node scripts/affected.mjs <base> <head>  ->  {"apps":[...],"services":[...],"all":bool}
 // apps: Next apps (controller storefront admin business showcase). services: messaging documents public-api
-// mobile ai-gateway ocr, plus store-core when its own tests are affected. A path this does not recognise means
+// mobile ai-gateway ocr voice, plus store-core when its own tests are affected. A path this does not recognise means
 // everything, so a new top-level file can never silently skip a job (the nightly full run is the second net).
 import fs from 'node:fs'
 import path from 'node:path'
@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 export const NEXT_APPS = ['controller', 'storefront', 'admin', 'business', 'showcase']
-export const SERVICES = ['messaging', 'documents', 'public-api', 'mobile', 'ai-gateway', 'ocr', 'store-core']
+export const SERVICES = ['messaging', 'documents', 'public-api', 'mobile', 'ai-gateway', 'ocr', 'voice', 'store-core']
 const FASTIFY = { 'messaging-service': 'messaging', 'document-service': 'documents', 'public-api-service': 'public-api', 'mobile-service': 'mobile' }
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -55,6 +55,7 @@ export function affected(files, ctx) {
       if (m[2].startsWith('database/')) everyApp()
     } else if (/^ai-platform\/paddleocr\//.test(f)) services.add('ocr')
     else if (/^ai-platform\//.test(f)) services.add('ai-gateway')
+    else if (/^voice-service\//.test(f)) services.add('voice')
     else if (/^scripts\//.test(f)) continue // the ratchet and check scripts run in the always-on cards
     else all = true
   }

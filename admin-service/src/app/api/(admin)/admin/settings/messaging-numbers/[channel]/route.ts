@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest, ctx: Params) {
   const parsed = parseBody(FlagshipSenderPutSchema, await request.json().catch(() => null))
   if (!parsed.ok) return parsed.response
   const { provider, sender, config } = parsed.data
-  if (provider === 'aws' && g.channel === 'whatsapp' && !config.whatsapp_phone_number_id)
+  if (provider === 'aws' && g.channel === 'whatsapp' && !(config as Record<string, string | undefined>).whatsapp_phone_number_id)
     return NextResponse.json({ error: 'AWS WhatsApp needs the phone number id.' }, { status: 400 })
   try {
     await saveTenantSender({ tenantId: PLATFORM_TENANT_ID, channel: g.channel, audience: g.audience, provider, sender, config, createdBy: g.admin.adminId })

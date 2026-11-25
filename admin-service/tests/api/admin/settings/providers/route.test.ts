@@ -82,6 +82,17 @@ describe('/api/admin/settings/providers', () => {
     expect(policy.setProviderSetting).not.toHaveBeenCalled()
   })
 
+  it('keeps the voice keys platform-wide and takes DLT ids per store', async () => {
+    const r = await PUT(put({ tenantId: T, key: 'voice_provider', value: 'exotel' }))
+    expect(r.status).toBe(400)
+    expect((await r.json()).error).toMatch(/platform only/)
+    expect((await PUT(put({ key: 'voice_config', value: { testNumbers: ['+919876543210'] } }))).status).toBe(200)
+    expect(policy.setProviderSetting).toHaveBeenLastCalledWith(null, 'voice_config', { testNumbers: ['+919876543210'] }, 'ops@x')
+    expect((await PUT(put({ key: 'voice_config', value: { exotel: { subdomain: 'evil.example.com' } } }))).status).toBe(400)
+    expect((await PUT(put({ tenantId: T, key: 'sms_dlt_sender_ids', value: ['jeffis'] }))).status).toBe(200)
+    expect(policy.setProviderSetting).toHaveBeenLastCalledWith(T, 'sms_dlt_sender_ids', ['JEFFIS'], 'ops@x')
+  })
+
   it('clears an override', async () => {
     const res = await DELETE(new NextRequest(`${url}?key=sms_provider&tenantId=${T}`, { method: 'DELETE' }))
     expect(res.status).toBe(200)

@@ -54,6 +54,21 @@ describe('/api/admin/ecom/[tenantId]/messaging-senders/[channel]', () => {
     expect(senders.listTenantSenders).not.toHaveBeenCalled()
   })
 
+  it('a non-platform admin gets 403 on every write, including the India DLT sender, and nothing is saved or deleted', async () => {
+    auth.authenticateAdmin.mockResolvedValue({ adminId: 'a-2', role: 'super_admin', scopes: ['settings:write'] })
+    expect((await put({ provider: 'aws', sender: 'JEFFIS', config: { credentials: 'platform' } })).status).toBe(403)
+    expect((await del()).status).toBe(403)
+    expect(senders.saveTenantSender).not.toHaveBeenCalled()
+    expect(senders.deleteTenantSender).not.toHaveBeenCalled()
+  })
+
+  it('GET returns masked meta only, never credentials', async () => {
+    senders.listTenantSenders.mockResolvedValue([{ channel: 'sms', audience: 'customer', provider: 'aws', sender: 'JEFFIS', meta: { credentials: 'platform', region: 'ap-south-1' } }])
+    const text = JSON.stringify(await (await get()).json())
+    expect(text).toContain('ap-south-1')
+    expect(text).not.toMatch(/secret_access_key|config_enc|auth_token"/)
+  })
+
   it('400s for an unknown channel or audience, 404s for an unknown tenant', async () => {
     expect((await get('fax')).status).toBe(400)
     expect((await get('sms', '?audience=bogus')).status).toBe(400)

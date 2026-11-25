@@ -8,6 +8,7 @@ import { businessIssues } from '@/lib/showcase/clean'
 import { SHOWCASE_PAGE_KEY } from '@/lib/showcase/types'
 import { goLiveShowcase } from '@controller/lib/showcase/billing'
 import { buildRunning, getStudioSession, type StudioSession } from '@controller/lib/site-studio/sessions'
+import { fireAndForget } from '@controller/lib/attribution/fire'
 import { ownedShowcase } from './site'
 
 // Publishing a Showcase: the studio's page (recompiled from source: stored ASTs are never trusted) and its look are
@@ -48,6 +49,14 @@ export async function copyStudioPage(site: Pick<ShowcaseSiteRow, 'id' | 'theme'>
   return true
 }
 
+/** The owner's first Showcase going live is an ad conversion when they came from a Google ad; never blocks the publish. */
+function queueShowcasePublished(ownerId: string): void {
+  fireAndForget('showcase_published', async () => {
+    const { enqueueOwnerConversion } = await import('@controller/lib/google-ads/ecom-conversions')
+    await enqueueOwnerConversion(ownerId, 'showcase_published')
+  })
+}
+
 export async function publishOwnerShowcase(ownerId: string, siteId: unknown): Promise<PublishResult> {
   const site = await ownedShowcase(ownerId, siteId)
   if (!site) return { ok: false, status: 404, error: 'That site could not be found. Save your business details first.' }
@@ -62,10 +71,16 @@ export async function publishOwnerShowcase(ownerId: string, siteId: unknown): Pr
 
   const first = site.status === 'draft'
   const r = await publishShowcase(site.id)
-  if (r.ok) return { ok: true, site: r.site, url: showcaseUrl(r.site.slug), first }
+  if (r.ok) {
+    if (first) queueShowcasePublished(ownerId)
+    return { ok: true, site: r.site, url: showcaseUrl(r.site.slug), first }
+  }
   if (r.code !== 'payment_due') return { ok: false, status: r.code === 'not_found' ? 404 : 409, error: r.error, code: r.code }
   const live = await goLiveShowcase(site.id)
-  if (live.ok) return { ok: true, site: live.site, url: showcaseUrl(live.site.slug), first }
+  if (live.ok) {
+    if (first) queueShowcasePublished(ownerId)
+    return { ok: true, site: live.site, url: showcaseUrl(live.site.slug), first }
+  }
   if (live.code === 'checkout') return { ok: false, status: 402, error: live.error, code: 'checkout', ...(live.checkoutUrl ? { checkoutUrl: live.checkoutUrl } : {}) }
   if (live.code === 'no_wallet') return { ok: false, status: 402, error: live.error, code: live.code }
   return { ok: false, status: live.code === 'not_found' ? 404 : 409, error: live.error, code: live.code }

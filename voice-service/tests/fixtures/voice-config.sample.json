@@ -1,0 +1,51 @@
+{
+  "provider": "exotel",
+  "exotel": {
+    "accountSid": "fakeacct",
+    "subdomain": "api.in.exotel.com",
+    "callerId": "+911401234567",
+    "appId": "12345",
+    "apiKey": "fake-exotel-key-0001",
+    "apiToken": "fake-exotel-token-0002",
+    "configured": true
+  },
+  "twilioTest": {
+    "from": "+14155550100",
+    "accountSid": "AC00000000000000000000000000000000",
+    "authToken": "fake-twilio-auth-0003",
+    "source": "stored",
+    "configured": true
+  },
+  "testNumbers": ["+919876543210", "+919876543211"],
+  "sarvam": {
+    "sttModel": "saaras:v3",
+    "ttsModel": "bulbul:v3",
+    "voices": {
+      "en": "ishita",
+      "hi": "priya",
+      "ta": "ishita",
+      "te": "neha",
+      "kn": "neha",
+      "ml": "pooja",
+      "mr": "priya",
+      "bn": "roopa",
+      "gu": "priya"
+    },
+    "apiKey": "fake-sarvam-key-0004",
+    "configured": true
+  },
+  "llmModel": "claude-haiku-5-5",
+  "anthropic": {
+    "apiKey": "sk-ant-fake-voice-key-0005",
+    "source": "stored",
+    "federation": true,
+    "configured": true
+  },
+  "anthropicIdentity": {
+    "organizationId": "00000000-0000-0000-0000-000000000001",
+    "workspaceId": "wrkspc_fake",
+    "serviceAccountId": "svac_fake",
+    "federationRuleId": "fdrl_fake"
+  },
+  "ready": true
+}
