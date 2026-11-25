@@ -10,15 +10,21 @@ import type { PinpointSMSVoiceV2Client, SendTextMessageRequest } from '@aws-sdk/
 import { cloudTemplate, cloudText, isAwsTemplateRef, parseAwsTemplateRef } from '@jeffi/api-contracts'
 import { normalizePhone } from './twilio.js'
 import type { SenderOverride } from './senders.js'
+import { smsDltEntityId } from './policy.js'
 
 // AWS End User Messaging, ported from the app's lib/shared/messaging/aws-provider.ts: WhatsApp through
 // Social Messaging (the Cloud API JSON is passed through to Meta), SMS through SMS-Voice v2. Same call
 // shapes as twilio.ts. Env is read per call; a missing id means not configured. A store's own AWS account
 // (tenant_messaging_senders) comes in as `ov` and replaces every env value, including the credentials.
 
+// An India DLT sender ("use the platform's AWS account"): sends with the platform env credentials from ap-south-1,
+// the only region with AWS's local DLT route. No keys are stored on its row.
+export const IN_DLT_REGION = 'ap-south-1'
+export const usesPlatformCredentials = (ov?: SenderOverride) => ov?.config.credentials === 'platform'
+
 const env = (ov?: SenderOverride) => ov
   ? {
-      region: ov.config.region || process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
+      region: usesPlatformCredentials(ov) ? IN_DLT_REGION : ov.config.region || process.env.AWS_MESSAGING_REGION || process.env.AWS_REGION || 'us-east-1',
       waPhoneId: ov.config.whatsapp_phone_number_id || '',
       wabaId: ov.config.waba_id || '',
       metaApiVersion: process.env.AWS_WHATSAPP_META_API_VERSION || 'v20.0',
@@ -33,16 +39,22 @@ const env = (ov?: SenderOverride) => ov
       metaApiVersion: process.env.AWS_WHATSAPP_META_API_VERSION || 'v20.0',
       smsOrigination: process.env.AWS_SMS_ORIGINATION || '',
       configurationSet: process.env.AWS_SMS_CONFIGURATION_SET || '',
-      dltEntityId: process.env.AWS_SMS_DLT_ENTITY_ID || '',
+      dltEntityId: '',
     }
+const platformCredentials = () =>
+  process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
+    : undefined
 const credentials = (ov?: SenderOverride) =>
-  ov
+  ov && usesPlatformCredentials(ov)
+    ? platformCredentials()
+    : ov
     ? { accessKeyId: ov.config.access_key_id, secretAccessKey: ov.config.secret_access_key }
     : process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
       ? { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY }
       : undefined
 // Per-store clients are kept by account + region so a tenant's sends reuse one connection pool.
-const ovKey = (ov: SenderOverride) => `${env(ov).region}:${ov.config.access_key_id}`
+const ovKey = (ov: SenderOverride) => `${env(ov).region}:${usesPlatformCredentials(ov) ? 'platform' : ov.config.access_key_id}`
 
 export const awsSmsConfigured = () => !!env().smsOrigination
 export const awsWhatsAppConfigured = () => !!env().waPhoneId
@@ -89,16 +101,44 @@ async function sendCloud(message: object, ov?: SenderOverride): Promise<string> 
   return r.messageId
 }
 
-export async function sendSms(o: { to: string; body: string; messageId: string }, ov?: SenderOverride): Promise<string> {
+/** PROMOTIONAL for promotional/marketing templates (DLT route, else template category); OTP and service stay TRANSACTIONAL. */
+export function smsMessageType(route?: string | null, category?: string | null): 'TRANSACTIONAL' | 'PROMOTIONAL' {
+  if (route) return route === 'promotional' ? 'PROMOTIONAL' : 'TRANSACTIONAL'
+  return ['marketing', 'promotional', 'campaign'].includes((category ?? '').toLowerCase()) ? 'PROMOTIONAL' : 'TRANSACTIONAL'
+}
+
+/** India DLT ids for an SMS: only Indian (+91) destinations carry them; a missing template id warns (no number logged). */
+export function indiaDltParams(to: string, entityId: string, templateId?: string | null, templateSlug?: string | null) {
+  if (!to.startsWith('+91')) return undefined
+  if (entityId && !templateId) console.warn(JSON.stringify({ level: 'warn', msg: 'sms_dlt_template_id_missing', template_slug: templateSlug ?? null }))
+  const p = { ...(entityId ? { IN_ENTITY_ID: entityId } : {}), ...(templateId ? { IN_TEMPLATE_ID: templateId } : {}) }
+  return Object.keys(p).length ? p : undefined
+}
+
+/** A promotional SMS to India with no promotional DLT header configured: the sender skips and logs it. */
+export class PromoHeaderMissingError extends Error {
+  constructor() { super('promotional_header_missing') }
+}
+
+export async function sendSms(o: { to: string; body: string; messageId: string; tenantId?: string; dltTemplateId?: string | null; dltHeader?: string | null; messageType?: 'TRANSACTIONAL' | 'PROMOTIONAL'; templateSlug?: string | null }, ov?: SenderOverride): Promise<string> {
   const { smsOrigination, configurationSet, dltEntityId } = env(ov)
   if (!smsOrigination) throw notConfigured('AWS_SMS_ORIGINATION')
+  const to = normalizePhone(o.to)
+  if (usesPlatformCredentials(ov) && !to.startsWith('+91')) throw new Error('This India DLT sender only sends to +91 numbers')
+  // A promotional SMS never goes out on a Service/Transactional header: it needs its own promotional DLT header.
+  const promoIndia = o.messageType === 'PROMOTIONAL' && to.startsWith('+91')
+  if (promoIndia && !o.dltHeader) throw new PromoHeaderMissingError()
+  // Entity id order: sender config, tenant/platform provider setting, then env.
+  const entity = dltEntityId || await smsDltEntityId(o.tenantId) || process.env.AWS_SMS_DLT_ENTITY_ID || ''
+  const dest = indiaDltParams(to, entity, o.dltTemplateId, o.templateSlug)
   const r = await sendText({
-    DestinationPhoneNumber: normalizePhone(o.to),
-    OriginationIdentity: smsOrigination,
+    DestinationPhoneNumber: to,
+    // An Indian send uses the template's registered DLT header as the sender id, when it has one.
+    OriginationIdentity: promoIndia ? o.dltHeader! : usesPlatformCredentials(ov) ? smsOrigination : dest && o.dltHeader ? o.dltHeader : smsOrigination,
     MessageBody: o.body,
-    MessageType: 'TRANSACTIONAL',
+    MessageType: o.messageType ?? 'TRANSACTIONAL',
     ...(configurationSet ? { ConfigurationSetName: configurationSet } : {}),
-    ...(dltEntityId ? { DestinationCountryParameters: { IN_ENTITY_ID: dltEntityId } } : {}),
+    ...(dest ? { DestinationCountryParameters: dest } : {}),
   }, ov)
   if (!r.MessageId) throw new Error('AWS SMS returned no message id')
   return r.MessageId

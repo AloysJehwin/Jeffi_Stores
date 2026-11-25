@@ -62,6 +62,8 @@ next-env.d.ts
 # Operator tools: set a key in every Secrets Manager secret; rebuild the Google taxonomy snapshot.
 !/scripts/set-secret.sh
 !/scripts/refresh-google-taxonomy.mjs
+# India DLT SMS template sheet: generator and its reviewed output.
+!/scripts/dlt-template-sheet.mjs
 # The ready-made site themes' generators (packages/store-core/src/lib/site/themes).
 !/scripts/site-themes/
 # The landing page's product films: record, narrate, render (outputs and .local/ stay ignored inside).
@@ -151,3 +153,6 @@ document-service/.documents/
 # Publishing helper (deploy/k8s/bootstrap/npm-token.sh stores its token)
 !packages/cli/publish.sh
 tests/ui-output/
+
+# India DLT SMS template sheet (the founder reviews it before registering on the DLT portal).
+!/docs/DLT_SMS_TEMPLATES.csv

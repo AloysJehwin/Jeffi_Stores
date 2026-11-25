@@ -1,0 +1,11 @@
+# Top-level deps of voice-service. requirements.txt pins the whole tree, resolved two weeks back
+# (--exclude-newer) so nothing just published reaches a call; regenerate with the command at its top.
+# pipecat bundles Silero VAD and the Smart Turn v3 ONNX models (onnxruntime), and the Exotel/Twilio serializers.
+pipecat-ai[anthropic,sarvam,websocket]==1.15.0
+fastapi
+uvicorn
+httpx
+boto3
+pydantic
+# MP3 encoding of the call recording (wheels bundle LAME; no ffmpeg in the image).
+lameenc

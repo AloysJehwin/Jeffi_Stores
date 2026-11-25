@@ -2,6 +2,7 @@ import { queryOne, queryMany, queryCount, type AnalyticsRange } from './shared'
 import { getDashboardInsights, rangeDays, type DashboardInsights } from '@/lib/shared/dashboard-insights'
 import { DashboardStats } from '@/types'
 import { fulfilledSql } from '@/lib/orders/fulfilled-status'
+import type { DashboardSeries } from '@/lib/dashboard/activity-types'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -213,7 +214,7 @@ const num = (v: unknown) => (v == null ? 0 : parseFloat(String(v)) || 0)
 const int = (v: unknown) => (v == null ? 0 : parseInt(String(v), 10) || 0)
 const pctDelta = (a: number, b: number): number | null => (b === 0 ? null : Math.round(((a - b) / b) * 100))
 
-export interface DashboardAnalytics {
+export interface DashboardAnalytics extends DashboardSeries {
   range: AnalyticsRange
   rangeLabel: string
   kpis: {
@@ -285,7 +286,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     `)
   const paidRevenue = kpiPromise.then(r => ({ revenue: num(r?.rev), revenuePrev: num(r?.rev_prev) }))
 
-  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow, insights] =
+  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow, insights, prevRows, convRows, flowRow] =
     await Promise.all([
       kpiPromise,
       // Trend series over the range. Two aggregations joined by bucket so the
@@ -408,6 +409,39 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       FROM orders WHERE created_at >= ${startExpr}
     `),
       getDashboardInsights({ startExpr, prevStartExpr, prevEndExpr, days: rangeDays(range) }, paidRevenue),
+      // Previous-period trend, shifted forward by one period so each row lands on the current bucket it compares to.
+      queryMany<Record<string, string>>(`
+      SELECT date_trunc('${bucket}', date_trunc('${bucket}', created_at) + ((${startExpr}) - (${prevStartExpr}))) AS bucket,
+             MIN(date_trunc('${bucket}', created_at)) AS prev_bucket,
+             COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) AS revenue,
+             COUNT(*) AS orders
+      FROM orders WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}
+      GROUP BY 1
+    `),
+      // Sessions and online paid orders per trend bucket, for the conversion sparkline (same formula as insights.conversion).
+      queryMany<Record<string, string>>(`
+      WITH s AS (
+        SELECT date_trunc('${bucket}', created_at) AS bucket, COUNT(DISTINCT session_id) AS sessions
+        FROM page_events WHERE created_at >= ${startExpr} GROUP BY 1
+      ), o AS (
+        SELECT date_trunc('${bucket}', created_at) AS bucket, COUNT(*) AS online_paid
+        FROM orders WHERE created_at >= ${startExpr} AND payment_status = 'paid' AND COALESCE(source, 'online') = 'online'
+        GROUP BY 1
+      )
+      SELECT COALESCE(s.bucket, o.bucket) AS bucket, COALESCE(s.sessions, 0) AS sessions, COALESCE(o.online_paid, 0) AS online_paid
+      FROM s FULL JOIN o ON o.bucket = s.bucket
+    `),
+      // How far orders placed in the range got (each stage counts every order that reached it).
+      queryOne<Record<string, string>>(`
+      SELECT
+        COUNT(*) AS placed,
+        COUNT(*) FILTER (WHERE payment_status = 'paid') AS paid,
+        COUNT(*) FILTER (WHERE shipped_at IS NOT NULL OR delivered_at IS NOT NULL OR ${fulfilledSql('')}) AS shipped,
+        COUNT(*) FILTER (WHERE ${fulfilledSql('')}) AS delivered,
+        COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
+        COUNT(*) FILTER (WHERE status = 'returned' OR shipment_status = 'rto_delivered') AS returned
+      FROM orders WHERE created_at >= ${startExpr}
+    `),
     ])
 
   const rev = num(kpiRow?.rev),
@@ -418,6 +452,37 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     custPrev = int(kpiRow?.cust_prev)
   const aov = ord > 0 ? rev / ord : 0
   const aovPrev = ordPrev > 0 ? revPrev / ordPrev : 0
+
+  const prevByBucket = new Map((prevRows ?? []).map(r => [String(r.bucket), r]))
+  const convByBucket = new Map((convRows ?? []).map(r => [String(r.bucket), r]))
+  const series: DashboardSeries = {
+    trendPrev: trendRows.map(r => {
+      const p = prevByBucket.get(String(r.bucket))
+      return { label: p ? String(p.prev_bucket) : '', revenue: num(p?.revenue), orders: int(p?.orders) }
+    }),
+    spark: {
+      orders: trendRows.map(r => int(r.orders)),
+      aov: trendRows.map(r => {
+        const paid = int(r.paid_orders)
+        return paid > 0 ? Math.round(num(r.revenue) / paid) : 0
+      }),
+      customers: trendRows.map(r => int(r.customers)),
+      // online paid orders per 100 sessions; 0 for buckets with no tracked sessions
+      conversion: trendRows.map(r => {
+        const c = convByBucket.get(String(r.bucket))
+        const sessions = int(c?.sessions)
+        return sessions > 0 ? Number(((int(c?.online_paid) / sessions) * 100).toFixed(2)) : 0
+      }),
+    },
+    flow: {
+      placed: int(flowRow?.placed),
+      paid: int(flowRow?.paid),
+      shipped: int(flowRow?.shipped),
+      delivered: int(flowRow?.delivered),
+      cancelled: int(flowRow?.cancelled),
+      returned: int(flowRow?.returned),
+    },
+  }
 
   return {
     range,
@@ -483,6 +548,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       rtoDelivered: int(retRow?.rto_delivered),
     },
     insights,
+    ...series,
   }
 }
 

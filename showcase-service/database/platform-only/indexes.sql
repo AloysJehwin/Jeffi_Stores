@@ -17,3 +17,6 @@ CREATE INDEX IF NOT EXISTS idx_showcase_sessions_seen ON public.showcase_session
 CREATE INDEX IF NOT EXISTS idx_showcase_sessions_visitor ON public.showcase_sessions (site_id, visitor_key, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_showcase_events_created ON public.showcase_events (site_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_showcase_events_session ON public.showcase_events (site_id, session_id);
+
+-- A site's live preview links (shortened at publish, revoked together).
+CREATE INDEX IF NOT EXISTS idx_showcase_preview_tokens_site ON public.showcase_preview_tokens (site_id, expires_at) WHERE revoked_at IS NULL;

@@ -104,6 +104,71 @@ describe('SenderCard', () => {
     expect(screen.getByRole('button', { name: /Cancel/ })).toBeInTheDocument()
   })
 
+  describe('India SMS (DLT) via AWS', () => {
+    const inDlt = {
+      provider: 'aws',
+      sender: 'JEFFIS',
+      updatedAt: '2026-03-05T00:00:00Z',
+      meta: { credentials: 'platform', region: 'ap-south-1' },
+    } as unknown as TenantSenderMeta
+
+    it('offers the type for SMS only, defaults to the platform header, takes no keys and shows the cost hint', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ sender: inDlt }) })
+      const { unmount } = render(<SenderCard url="/api/n" channel="whatsapp" audience="customer" initial={null} badge={badge} empty="" dltHeaders={['JEFFIS']} />)
+      fireEvent.click(screen.getByRole('button', { name: /Assign/ }))
+      expect(screen.queryByRole('option', { name: 'India SMS (DLT) via AWS' })).toBeNull()
+      unmount()
+
+      render(<SenderCard url="/api/n" channel="sms" audience="customer" initial={null} badge={badge} empty="" dltHeaders={['JEFFIS', 'JEFFSV']} />)
+      fireEvent.click(screen.getByRole('button', { name: /Assign/ }))
+      fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'in_dlt' } })
+      expect((screen.getAllByRole('combobox')[1] as HTMLSelectElement).value).toBe('JEFFIS')
+      expect(document.querySelector('input[type=password]')).toBeNull()
+      expect(screen.getByDisplayValue('ap-south-1')).toBeDisabled()
+      expect(screen.getByText(/About ₹0.44 per SMS/)).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /Save number/ }))
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ provider: 'aws', sender: 'JEFFIS', config: { credentials: 'platform' } })
+    })
+
+    it('validates an own header and entity id before saving', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ sender: inDlt }) })
+      render(<SenderCard url="/api/n" channel="sms" audience="customer" initial={null} badge={badge} empty="" dltHeaders={['JEFFIS']} />)
+      fireEvent.click(screen.getByRole('button', { name: /Assign/ }))
+      fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'in_dlt' } })
+      fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '__own__' } })
+      const save = screen.getByRole('button', { name: /Save number/ })
+      expect(save).toBeDisabled()
+      const inputs = screen.getAllByRole('textbox')
+      fireEvent.change(inputs[0], { target: { value: 'MYSHOP' } })
+      fireEvent.change(inputs[1], { target: { value: '123' } })
+      expect(save).toBeDisabled()
+      fireEvent.change(inputs[1], { target: { value: '1001000000000000001' } })
+      await waitFor(() => expect(save).toBeEnabled())
+      fireEvent.click(save)
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ provider: 'aws', sender: 'MYSHOP', config: { credentials: 'platform', dlt_entity_id: '1001000000000000001' } })
+    })
+
+    it('shows a saved sender and checks it on AWS, read-only', async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => ({ header: 'JEFFIS', registered: false }) })
+      render(<SenderCard url="/api/n" channel="sms" audience="customer" initial={inDlt} badge={badge} empty="" checkUrl="/api/check" />)
+      expect(screen.getByText('India SMS (DLT) via AWS')).toBeInTheDocument()
+      expect(screen.getByText(/Platform AWS account/)).toBeInTheDocument()
+      expect(screen.getByText('Jeffi Stores (shared)')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /Check sender ID/ }))
+      expect(await screen.findByText('Not registered on AWS')).toBeInTheDocument()
+      expect(fetchMock).toHaveBeenCalledWith('/api/check?header=JEFFIS')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('hides Assign, Replace and Remove when read-only', () => {
+      render(<SenderCard url="/api/n" channel="sms" audience="customer" initial={inDlt} badge={badge} empty="" readOnly />)
+      expect(screen.queryByRole('button', { name: /Replace|Assign|Remove/ })).toBeNull()
+      expect(screen.getByText('JEFFIS')).toBeInTheDocument()
+    })
+  })
+
   it('exports labels and a date formatter', () => {
     expect(CHANNEL_LABEL.whatsapp).toBe('WhatsApp')
     expect(AUDIENCE_LABEL.admin).toBe('Admin-facing')

@@ -7,7 +7,7 @@ import { X } from 'lucide-react'
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
 let locks = 0
-function useScrollLock(on: boolean) {
+export function useScrollLock(on: boolean) {
   useEffect(() => {
     if (!on || typeof document === 'undefined') return
     const prev = document.body.style.overflow
@@ -21,7 +21,7 @@ function useScrollLock(on: boolean) {
 }
 
 /** Keeps Tab inside the panel and focuses it on open unless a child already took focus (autoFocus). */
-function useFocusTrap(open: boolean, panel: React.RefObject<HTMLDivElement | null>) {
+export function useFocusTrap(open: boolean, panel: React.RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     if (!open) return
     const el = panel.current

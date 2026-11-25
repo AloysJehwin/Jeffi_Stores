@@ -1,0 +1,13 @@
+# Dependencies live in requirements.in / requirements.txt (pinned, like ai-platform/paddleocr); this file only
+# configures the tests: `python -m pytest voice-service` from the repo root.
+[project]
+name = "voice-service"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-q"

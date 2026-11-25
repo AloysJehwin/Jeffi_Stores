@@ -6,6 +6,7 @@ import { cancelSubscription, getSubscription, refundPayment } from '@controller/
 import { triggerProvisioning } from '@controller/lib/provisioning/trigger'
 import { startStoreIfReady } from '@controller/lib/provisioning/start-store'
 import { saveDesiredCompute } from '@controller/lib/compute/store'
+import { fireAndForget } from '@controller/lib/attribution/fire'
 import type { ComputeSpec } from '@/lib/compute/spec'
 import { chargedAt, cyclePaise, DAY_MS, listLines, monthlyTotal, patchLine, releaseUnstartedLines, toLine, type BillingLine } from './lines'
 import { getBillingSubscription, subscriptionByRazorpayId, type BillingSubscription } from './subscription'
@@ -243,6 +244,14 @@ async function periodEndOf(sub: BillingSubscription, entity: any): Promise<numbe
   return Date.now() + (sub.interval === 'yearly' ? 365 : 31) * DAY_MS
 }
 
+/** A first paid charge is an ad conversion for the owner who came from a Google ad (once per owner); never blocks billing. */
+function queuePaidConversion(tenantId: string, valueInr: number): void {
+  fireAndForget('subscription_paid', async () => {
+    const { enqueueTenantConversion } = await import('@controller/lib/google-ads/ecom-conversions')
+    await enqueueTenantConversion(tenantId, 'subscription_paid', { valueInr })
+  })
+}
+
 async function onCharged(sub: BillingSubscription, entity: any, payment: any): Promise<void> {
   const pool = controlPlanePool()
   // A replaced (or abandoned) subscription charged anyway: its replacement pays for this period, so all of it goes back.
@@ -278,6 +287,7 @@ async function onCharged(sub: BillingSubscription, entity: any, payment: any): P
   const periodEnd = sec(entity.current_end)
   const chargeId = await insertCharge(sub, payment, periodStart, periodEnd)
   if (!chargeId) return
+  queuePaidConversion(sub.tenantId, (Number(payment.amount) || 0) / 100)
 
   // Lines whose end or lower price has come, then everything this subscription charges for that hadn't started
   // (waiting lines, and chosen trials: the amount includes them from the first charge).

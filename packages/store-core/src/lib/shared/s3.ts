@@ -805,3 +805,17 @@ export async function presignProductMediaUpload(
   )
   return { uploadUrl, key, url: await getS3Url(key), expiresIn: ttlSeconds }
 }
+
+/** A short-lived GET URL for a platform-bucket object, by its full key as stored (prefix included), e.g. a call recording. */
+export async function presignPlatformObjectGet(fullKey: string, ttlSeconds = 15 * 60): Promise<string> {
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+  presignClient ??= new S3Client({
+    region: AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+  })
+  return getSignedUrl(presignClient, new GetObjectCommand({ Bucket: DEFAULT_BUCKET, Key: fullKey }), { expiresIn: ttlSeconds })
+}

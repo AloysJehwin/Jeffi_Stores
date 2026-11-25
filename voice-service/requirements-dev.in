@@ -1,0 +1,4 @@
+# Test-only deps, on top of requirements.txt.
+-c requirements.txt
+pytest
+pytest-asyncio

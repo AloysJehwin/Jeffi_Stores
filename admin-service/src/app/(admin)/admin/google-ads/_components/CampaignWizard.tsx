@@ -14,7 +14,8 @@ import { assertDraftResponse, lockHeaders } from '@/lib/client/draft-lock-client
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
 import { FEED_TYPES, IMAGE_AD_TYPES, specProblems } from '@/lib/google-ads/campaign-spec'
 import { postJson, errorText } from './ManageContext'
-import { newDraft, toSpec, type Draft } from './wizard/draft'
+import { draftFromPreset, newDraft, toSpec, type Draft } from './wizard/draft'
+import EcomPresets from './wizard/EcomPresets'
 import { Modal, btnGhost, btnPrimary } from './wizard/fields'
 import { StepCampaign, StepTargeting } from './wizard/StepBasics'
 import { AssetGroupEditor, MerchantLink, ProductGroups, SearchAds, type LinkState } from './wizard/StepAds'
@@ -371,7 +372,12 @@ export default function CampaignWizard({
             ))}
           </ol>
 
-          {step === 0 && <StepCampaign d={d} set={set} b={b} demandGenMinimum={options?.demandGenMinimum} />}
+          {step === 0 && (
+            <>
+              {!!b.ecomPresets?.length && !draftId && <EcomPresets presets={b.ecomPresets} onPick={p => setD(draftFromPreset(p, b))} />}
+              <StepCampaign d={d} set={set} b={b} demandGenMinimum={options?.demandGenMinimum} />
+            </>
+          )}
           {step === 1 && <StepTargeting d={d} set={set} b={b} />}
           {step === 2 && d.type === 'SEARCH' && <SearchAds d={d} set={set} b={b} canAi={canAi} />}
           {step === 2 && IMAGE_AD_TYPES.includes(d.type) && <ImageAdEditor d={d} set={set} b={b} canAi={canAi} options={options} />}

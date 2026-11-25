@@ -102,7 +102,7 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, preheader: live.preheader ?? null, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
+    return { subject: live.subject, preheader: live.preheader ?? null, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, dlt: t.variant.dlt ?? undefined, category: t.family.category ?? undefined, blocks: live.blocks as any, layout: live.layout, meta_category: t.variant.meta_category ?? undefined }
   }
   return null
 }
@@ -204,6 +204,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let subject = req.subject ?? null
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
+  let dlt: { templateId?: string; header?: string; messageType: 'TRANSACTIONAL' | 'PROMOTIONAL' } = { templateId: req.dlt_template_id, messageType: 'TRANSACTIONAL' }
   let layout: 'store' | 'none' = req.layout ?? 'store'
   let preheader: string | null = null
   let mediaHosted = false
@@ -218,6 +219,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     body = t.body
     preheader = t.preheader
     providerRef = providerRef ?? t.provider_ref ?? undefined
+    dlt = { templateId: dlt.templateId ?? t.dlt?.dlt_template_id, header: t.dlt?.dlt_header || undefined, messageType: aws.smsMessageType(t.dlt?.dlt_route, t.category) }
     layout = req.layout ?? ((t as any).layout === 'none' ? 'none' : 'store')
     if (req.channel === 'whatsapp') {
       // Slots follow the approved body: its own {{n}}, then {{brand_name}}, then header and button.
@@ -233,7 +235,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, preheader: preheader ? render(preheader, vars) : null, body: render(body, vars, html), providerRef, vars, waVars, waHeader, layout, mediaHosted }
+  return { subject: subject ? render(subject, vars) : null, preheader: preheader ? render(preheader, vars) : null, body: render(body, vars, html), providerRef, dlt, vars, waVars, waHeader, layout, mediaHosted }
 }
 
 // The store's Site Controls switches (feature_sms_enabled / feature_whatsapp_enabled) have the last word on
@@ -322,7 +324,7 @@ async function outboundSender(ctx: Ctx, channel: 'sms' | 'whatsapp', audience: S
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
   await assertChannelOn(ctx.tenantId, req.channel, ctx.space)
   await ensurePricing()
-  const { subject, preheader, body, providerRef, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
+  const { subject, preheader, body, providerRef, dlt, vars, waVars, waHeader, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
   // A sender row (number + credentials) when one applies; the platform env otherwise.
   const sender = req.channel === 'email'
@@ -370,7 +372,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
       // The store's own sender names its provider; else the tenant's provider policy decides, and a tenant on
       // AWS never falls back to Twilio.
       provider = sender?.provider ?? await messagingProvider(ctx.tenantId, 'sms')
-      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id }, sender ?? undefined) : await sendSms({ to: req.to, body, messageId: id }, sender ?? undefined)
+      ref = provider === 'aws' ? await aws.sendSms({ to: req.to, body, messageId: id, tenantId: ctx.tenantId, dltTemplateId: dlt.templateId, dltHeader: dlt.header, messageType: dlt.messageType, templateSlug: req.template }, sender ?? undefined) : await sendSms({ to: req.to, body, messageId: id }, sender ?? undefined)
     } else {
       // A raw content SID (no template) gets the caller's numbered variables as given.
       const variables = waVars ?? Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
@@ -388,13 +390,22 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     )
     await db.query(`INSERT INTO message_events (message_id, event) VALUES ($1,'sent')`, [id])
   } catch (e: any) {
-    // Provider failed: refund the price minus the non-refundable processing fee (P2); media is fully refunded.
-    const fee = processingFeeInr(req.channel, ctx.internal, priceProvider)
-    await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: fee, externalRef: `pub:${id}`, note: `refund: ${req.channel} failed` })
-    if (mediaHosted) await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a failed send' })
-    await db.query(`UPDATE messages SET status='failed', error=$2, charged_inr=$3, updated_at=now() WHERE id=$1`, [id, String(e?.message ?? e).slice(0, 500), debit.charged ? fee : 0])
-    await db.query(`INSERT INTO message_events (message_id, event, payload) VALUES ($1,'failed',$2)`, [id, { error: String(e?.message ?? e) }])
-    if (fee > 0 && debit.charged) console.log(`processing fee kept: ₹${fee.toFixed(2)} on ${id}`)
+    if (e instanceof aws.PromoHeaderMissingError) {
+      // Nothing was sent: full refund, skipped and logged (template slug only, no number).
+      await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `pub:${id}`, note: 'refund: promotional SMS has no promotional DLT header' })
+      if (mediaHosted) await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a skipped send' })
+      await db.query(`UPDATE messages SET status='skipped', error=$2, charged_inr=0, updated_at=now() WHERE id=$1`, [id, 'promotional_header_missing'])
+      await db.query(`INSERT INTO message_events (message_id, event, payload) VALUES ($1,'skipped',$2)`, [id, { reason: 'promotional_header_missing' }])
+      console.warn(JSON.stringify({ level: 'warn', msg: 'sms_promotional_header_missing', template_slug: req.template ?? null }))
+    } else {
+      // Provider failed: refund the price minus the non-refundable processing fee (P2); media is fully refunded.
+      const fee = processingFeeInr(req.channel, ctx.internal, priceProvider)
+      await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: fee, externalRef: `pub:${id}`, note: `refund: ${req.channel} failed` })
+      if (mediaHosted) await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a failed send' })
+      await db.query(`UPDATE messages SET status='failed', error=$2, charged_inr=$3, updated_at=now() WHERE id=$1`, [id, String(e?.message ?? e).slice(0, 500), debit.charged ? fee : 0])
+      await db.query(`INSERT INTO message_events (message_id, event, payload) VALUES ($1,'failed',$2)`, [id, { error: String(e?.message ?? e) }])
+      if (fee > 0 && debit.charged) console.log(`processing fee kept: ₹${fee.toFixed(2)} on ${id}`)
+    }
   }
   return (await one<MessageRow>(`SELECT * FROM messages WHERE id=$1`, [id]))!
 }

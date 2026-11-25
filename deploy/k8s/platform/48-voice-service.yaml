@@ -1,0 +1,135 @@
+# voice-service: Outreach's AI calls (voice-service/README.md). One Deployment for the platform, on the core.
+# replicas: 0 until the founder has configured the providers (admin Settings -> Providers) and the voice-service
+# Secret; then set replicas to 1 here and release (a `kubectl scale` is reset by the next release's apply).
+# Claude goes through Anthropic workload identity federation, not a key. This cluster's service-account tokens are not
+# trusted by the existing federation rules, so the `wif-minter` sidecar signs its own OIDC token (issuer
+# https://wif-voice.jeffistores.in, subject jeffi-voice-service) with the PEM in the voice-service Secret (key
+# wif-issuer.pem) and renews /wif/token every 30 minutes; the app reads it through ANTHROPIC_IDENTITY_TOKEN_FILE.
+# Setup steps: voice-service/README.md ("Claude through federation").
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: voice-wif-minter, namespace: jeffi }
+data:
+  minter.mjs: |
+    // Modelled on ai-platform/scripts/local-wif-token.mjs: signs a 1 h RS256 JWT and rewrites it every 30 min.
+    import { createPrivateKey, sign } from 'node:crypto'
+    import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+    const KEY = process.env.WIF_KEY_FILE || '/keys/wif-issuer.pem'
+    const OUT = process.env.WIF_TOKEN_FILE || '/wif/token'
+    const ISSUER = process.env.WIF_ISSUER || 'https://wif-voice.jeffistores.in'
+    const SUBJECT = process.env.WIF_SUBJECT || 'jeffi-voice-service'
+    const KID = process.env.WIF_KID || 'jeffi-local-1'
+    const b64 = v => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url')
+    function mint() {
+      const now = Math.floor(Date.now() / 1000)
+      const head = b64({ alg: 'RS256', typ: 'JWT', kid: KID })
+      const body = b64({ iss: ISSUER, sub: SUBJECT, aud: 'https://api.anthropic.com', iat: now, nbf: now - 30, exp: now + 3600 })
+      const sig = sign('RSA-SHA256', Buffer.from(`${head}.${body}`), createPrivateKey(readFileSync(KEY))).toString('base64url')
+      writeFileSync(OUT + '.tmp', `${head}.${body}.${sig}`, { mode: 0o600 })
+      renameSync(OUT + '.tmp', OUT)
+    }
+    function tick() {
+      let ok = false
+      try { mint(); ok = true; console.log('wif token renewed') } catch (e) { console.error('wif token not minted:', e.code || 'error') }
+      setTimeout(tick, ok ? 30 * 60 * 1000 : 60 * 1000)
+    }
+    tick()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-voice-service
+  namespace: jeffi
+  labels: { app: voice-service, jeffi.io/service: voice, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 0
+  revisionHistoryLimit: 5
+  # Calls are long-lived sockets: start the new pod before the old one drains.
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: voice-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: voice-service, jeffi.io/service: voice, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      # SIGTERM reports in-flight calls as `error` to the controller before exit.
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, runAsNonRoot: true }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-voice-service:latest
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - { name: TELEPHONY_PROVIDER, value: exotel }
+            - { name: PUBLIC_BASE_URL, value: 'https://voice.jeffistores.in' }
+            - { name: CONTROLLER_URL, value: 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000' }
+            - { name: MAX_CONCURRENT_CALLS, value: '4' }
+            - { name: S3_BUCKET, value: jeffi-stores-bucket }
+            - { name: VOICE_STATE_DIR, value: /state }
+            - { name: LOG_LEVEL, value: INFO }
+            - { name: ANTHROPIC_IDENTITY_TOKEN_FILE, value: /wif/token }
+            # The org UUID: also taken from the controller's voice-config; set here only as the env fallback.
+            - { name: ANTHROPIC_ORGANIZATION_ID, valueFrom: { secretKeyRef: { name: voice-service, key: ANTHROPIC_ORGANIZATION_ID, optional: true } } }
+          # SERVICE_AUTH_SECRET (required), VOICE_WS_KEY, and optional env fallbacks for the provider keys.
+          envFrom: [{ secretRef: { name: voice-service, optional: true } }]
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: 2, memory: 1536Mi }
+          # /readyz is 503 until the VAD and Smart Turn models are preloaded, so calls only reach a warm pod.
+          startupProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 2, failureThreshold: 45 }
+          readinessProbe: { httpGet: { path: /readyz, port: http }, periodSeconds: 10, timeoutSeconds: 3 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          securityContext: { allowPrivilegeEscalation: false }
+          volumeMounts:
+            - { name: state, mountPath: /state }
+            - { name: tmp, mountPath: /tmp }
+            - { name: wif, mountPath: /wif, readOnly: true }
+        - name: wif-minter
+          image: node:24-alpine
+          command: [node, /scripts/minter.mjs]
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 100m, memory: 96Mi }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true }
+          volumeMounts:
+            - { name: wif, mountPath: /wif }
+            - { name: wif-minter-script, mountPath: /scripts, readOnly: true }
+            - { name: wif-key, mountPath: /keys, readOnly: true }
+      volumes:
+        - name: wif
+          emptyDir: { medium: Memory, sizeLimit: 1Mi }
+        - name: wif-minter-script
+          configMap: { name: voice-wif-minter }
+        - name: wif-key
+          secret: { secretName: voice-service, optional: true, items: [{ key: wif-issuer.pem, path: wif-issuer.pem }], defaultMode: 0440 }
+        # In-flight call ids survive a container restart here, so the new process reports them as `error`.
+        - name: state
+          emptyDir: { sizeLimit: 16Mi }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-voice-service, namespace: jeffi }
+spec:
+  selector: { app: voice-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+# voice.jeffistores.in: Exotel/Twilio status callbacks and media WebSockets. Above the store catch-all
+# (49-routes.yaml); the wildcard certificate covers it.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-voice-service, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`voice.jeffistores.in`)
+      priority: 100
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-voice-service, port: 8080 }]
+  tls: {}

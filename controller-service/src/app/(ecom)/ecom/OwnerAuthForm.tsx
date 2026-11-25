@@ -9,8 +9,9 @@ import { useLeaveTo } from '@/components/auth/useLeaveTo'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'
 // doesn't. Both hit the same ecom auth endpoints (findOrCreateOwner upserts).
-// planQuery ("plan=growth&interval=yearly", validated server-side) sends the owner to that plan in /onboard.
-export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signup' | 'signin'; planQuery?: string | null }) {
+// planQuery ("plan=growth&interval=yearly", validated server-side) sends the owner to that plan in /onboard; returnTo
+// (a claim link, validated server-side) sends them back there.
+export default function OwnerAuthForm({ mode, planQuery = null, returnTo = null }: { mode: 'signup' | 'signin'; planQuery?: string | null; returnTo?: string | null }) {
   const router = useRouter()
   const { showToast } = useToast()
   const [step, setStep] = useState<'email' | 'otp'>('email')
@@ -72,7 +73,7 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
       }
       trackOwnerAuth(mode, 'email')
       // New owner (or one who picked a plan) → onboarding wizard; returning → dashboard.
-      go(afterAuth(mode, planQuery))
+      go(afterAuth(mode, planQuery, returnTo))
       router.refresh()
     } catch {
       showToast('Network error', 'error')
@@ -179,20 +180,20 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
           <span className="flex-1 h-px bg-border-default" /> or <span className="flex-1 h-px bg-border-default" />
         </div>
 
-        <GoogleButton mode={mode} planQuery={planQuery} onError={m => showToast(m, 'error')} />
+        <GoogleButton mode={mode} planQuery={planQuery} returnTo={returnTo} onError={m => showToast(m, 'error')} />
 
         <p className="mt-6 text-center text-sm text-foreground-muted">
           {mode === 'signup' ? (
             <>
               Already have an account?{' '}
-              <a href={planQuery ? `/signin?${planQuery}` : '/signin'} className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
+              <a href={authHref('/signin', planQuery, returnTo)} className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
                 Sign in
               </a>
             </>
           ) : (
             <>
               New to Jeffi Commerce?{' '}
-              <a href={planQuery ? `/signup?${planQuery}` : '/signup'} className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
+              <a href={authHref('/signup', planQuery, returnTo)} className="org-brown font-semibold hover:underline inline-block py-2 sm:inline sm:py-0">
                 Get started
               </a>
             </>
@@ -209,10 +210,12 @@ export default function OwnerAuthForm({ mode, planQuery = null }: { mode: 'signu
 function GoogleButton({
   mode,
   planQuery,
+  returnTo,
   onError,
 }: {
   mode: 'signup' | 'signin'
   planQuery: string | null
+  returnTo: string | null
   onError: (m: string) => void
 }) {
   const router = useRouter()
@@ -254,7 +257,7 @@ function GoogleButton({
         return
       }
       trackOwnerAuth(mode, 'google')
-      go(afterAuth(mode, planQuery))
+      go(afterAuth(mode, planQuery, returnTo))
       router.refresh()
     } catch {
       onError('Network error')
@@ -307,9 +310,15 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   )
 }
 
-function afterAuth(mode: 'signup' | 'signin', planQuery: string | null): string {
+function afterAuth(mode: 'signup' | 'signin', planQuery: string | null, returnTo: string | null): string {
+  if (returnTo) return returnTo
   if (planQuery) return `/onboard?${planQuery}`
   return mode === 'signup' ? '/onboard' : '/dashboard'
+}
+
+function authHref(path: string, planQuery: string | null, returnTo: string | null): string {
+  const q = [planQuery, returnTo ? `next=${encodeURIComponent(returnTo)}` : null].filter(Boolean).join('&')
+  return q ? `${path}?${q}` : path
 }
 
 function Spinner() {

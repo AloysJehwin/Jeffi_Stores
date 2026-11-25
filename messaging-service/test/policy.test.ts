@@ -5,7 +5,7 @@ vi.mock('../src/pools.js', () => ({ poolsForTenant: vi.fn() }))
 
 import { db } from '../src/db'
 import { poolsForTenant } from '../src/pools'
-import { messagingProvider } from '../src/providers/policy'
+import { messagingProvider, smsDltEntityId } from '../src/providers/policy'
 
 const store = (settings: Record<string, string>) => {
   const pool = { query: vi.fn(async () => ({ rows: Object.entries(settings).map(([key, value]) => ({ key, value })) })) }
@@ -31,5 +31,21 @@ describe('messagingProvider', () => {
     vi.mocked(poolsForTenant).mockRejectedValue(new Error('no tenant'))
     expect(await messagingProvider('b1', 'sms')).toBe('twilio')
     expect(await messagingProvider('b1', 'whatsapp')).toBe('twilio')
+  })
+})
+
+describe('smsDltEntityId', () => {
+  it('takes the tenant row over the platform default, and is empty when unset or the lookup fails', async () => {
+    const settings = [
+      { tenant_id: null, value: 'PLAT' },
+      { tenant_id: 'd1', value: ' TEN ' },
+    ]
+    vi.mocked(db.query).mockImplementation((async (_sql: string, [tid]: string[]) =>
+      ({ rows: settings.filter(r => !r.tenant_id || r.tenant_id === tid) })) as any)
+    expect(await smsDltEntityId('d1')).toBe('TEN')
+    expect(await smsDltEntityId('d2')).toBe('PLAT')
+    expect(await smsDltEntityId()).toBe('PLAT')
+    vi.mocked(db.query).mockRejectedValue(new Error('down'))
+    expect(await smsDltEntityId('d3')).toBe('')
   })
 })

@@ -872,6 +872,22 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Ecom Store',
     platformOnly: true,
   },
+  {
+    key: 'ecom_outreach:read',
+    label: 'Ecom Outreach (Read)',
+    description: 'View outreach programs, lists, contacts, calls and the audit trail',
+    routes: ['/admin/ecom/outreach'],
+    group: 'Ecom Store',
+    platformOnly: true,
+  },
+  {
+    key: 'ecom_outreach:write',
+    label: 'Ecom Outreach (Write)',
+    description: 'Run outreach programs: enable, set caps and windows, import lists, suppress and requeue contacts',
+    routes: ['/admin/ecom/outreach'],
+    group: 'Ecom Store',
+    platformOnly: true,
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -1005,6 +1021,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/ecom/compute-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/messaging-addon-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/domains')) return 'ecom_billing:read'
+  if (pathname.startsWith('/api/admin/ecom/outreach')) return 'ecom_outreach:read'
   if (/^\/api\/admin\/ecom\/[^/]+\/compute/.test(pathname)) return 'ecom_instances:read'
   if (/^\/api\/admin\/ecom\/[^/]+\/certs/.test(pathname)) return 'ecom_customers:read'
   if (pathname.startsWith('/api/admin/ecom/store-status')) return 'ecom_customers:read'

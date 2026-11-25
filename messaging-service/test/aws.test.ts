@@ -13,6 +13,9 @@ vi.mock('@aws-sdk/client-pinpoint-sms-voice-v2', () => ({
   SendTextMessageCommand: class { constructor(public input: any) {} },
 }))
 
+const { settingEntity } = vi.hoisted(() => ({ settingEntity: vi.fn(async (_t?: string | null) => '') }))
+vi.mock('../src/providers/policy', () => ({ smsDltEntityId: settingEntity }))
+
 import * as aws from '../src/providers/aws'
 
 const WA = 'AWS_WHATSAPP_PHONE_NUMBER_ID'
@@ -42,6 +45,68 @@ describe('aws sendSms', () => {
       DestinationPhoneNumber: '+919876543210', OriginationIdentity: 'sender-1',
       ConfigurationSetName: 'cfg', DestinationCountryParameters: { IN_ENTITY_ID: 'dlt1' },
     })
+  })
+
+  it('sends IN_ENTITY_ID and IN_TEMPLATE_ID for an Indian number', async () => {
+    process.env[SMS] = 'sender-1'; process.env.AWS_SMS_DLT_ENTITY_ID = 'PE1'
+    smsSend.mockResolvedValue({ MessageId: 'x' })
+    await aws.sendSms({ to: '9876543210', body: 'hi', messageId: 'm', dltTemplateId: 'T9' })
+    expect(smsSend.mock.calls[0][0].input.DestinationCountryParameters).toEqual({ IN_ENTITY_ID: 'PE1', IN_TEMPLATE_ID: 'T9' })
+  })
+
+  it('still sends without a template id, with one structured warning naming the slug and no number', async () => {
+    process.env[SMS] = 'sender-1'; process.env.AWS_SMS_DLT_ENTITY_ID = 'PE1'
+    smsSend.mockResolvedValue({ MessageId: 'x' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await aws.sendSms({ to: '9876543210', body: 'hi', messageId: 'm', templateSlug: 'order/shipped' })
+    expect(smsSend.mock.calls[0][0].input.DestinationCountryParameters).toEqual({ IN_ENTITY_ID: 'PE1' })
+    expect(warn).toHaveBeenCalledTimes(1)
+    const line = String(warn.mock.calls[0][0])
+    expect(JSON.parse(line)).toMatchObject({ msg: 'sms_dlt_template_id_missing', template_slug: 'order/shipped' })
+    expect(line).not.toContain('9876543210')
+    warn.mockRestore()
+  })
+
+  it('maps the message type and uses the DLT header as the sender id for India only', async () => {
+    process.env[SMS] = 'sender-1'; process.env.AWS_SMS_DLT_ENTITY_ID = 'PE1'
+    smsSend.mockResolvedValue({ MessageId: 'x' })
+    await aws.sendSms({ to: '9876543210', body: 'hi', messageId: 'm', dltTemplateId: 'T', dltHeader: 'JEFFIS', messageType: 'PROMOTIONAL' })
+    expect(smsSend.mock.calls[0][0].input).toMatchObject({ OriginationIdentity: 'JEFFIS', MessageType: 'PROMOTIONAL' })
+    await aws.sendSms({ to: '+14155550123', body: 'hi', messageId: 'm', dltHeader: 'JEFFIS' })
+    expect(smsSend.mock.calls[1][0].input).toMatchObject({ OriginationIdentity: 'sender-1', MessageType: 'TRANSACTIONAL' })
+  })
+
+  it('smsMessageType: route wins, else category; otp and service are transactional', () => {
+    expect(aws.smsMessageType('promotional', 'transactional')).toBe('PROMOTIONAL')
+    expect(aws.smsMessageType('otp', 'marketing')).toBe('TRANSACTIONAL')
+    expect(aws.smsMessageType('service')).toBe('TRANSACTIONAL')
+    expect(aws.smsMessageType(null, 'marketing')).toBe('PROMOTIONAL')
+    expect(aws.smsMessageType(undefined, 'otp')).toBe('TRANSACTIONAL')
+    expect(aws.smsMessageType()).toBe('TRANSACTIONAL')
+  })
+
+  it('sends no India params to a non-Indian number', async () => {
+    process.env[SMS] = 'sender-1'; process.env.AWS_SMS_DLT_ENTITY_ID = 'PE1'
+    smsSend.mockResolvedValue({ MessageId: 'x' })
+    await aws.sendSms({ to: '+14155550123', body: 'hi', messageId: 'm', dltTemplateId: 'T9' })
+    expect(smsSend.mock.calls[0][0].input).not.toHaveProperty('DestinationCountryParameters')
+  })
+
+  it('resolves the entity id: sender config, then provider setting, then env', async () => {
+    process.env[SMS] = 'sender-1'; process.env.AWS_SMS_DLT_ENTITY_ID = 'ENV'
+    smsSend.mockResolvedValue({ MessageId: 'x' })
+    const entity = async (o: any = {}, ov?: any) => {
+      smsSend.mockClear()
+      await aws.sendSms({ to: '9876543210', body: 'hi', messageId: 'm', dltTemplateId: 'T', ...o }, ov)
+      return smsSend.mock.calls[0][0].input.DestinationCountryParameters.IN_ENTITY_ID
+    }
+    settingEntity.mockResolvedValue('SETTING')
+    expect(await entity({ tenantId: 't1' })).toBe('SETTING')
+    expect(settingEntity).toHaveBeenCalledWith('t1')
+    const ov = { sender: 'S', config: { access_key_id: 'AK', secret_access_key: 'S', region: 'ap-south-1', sms_origination: 'OV', dlt_entity_id: 'SENDER' } }
+    expect(await entity({}, ov)).toBe('SENDER')
+    settingEntity.mockResolvedValue('')
+    expect(await entity()).toBe('ENV')
   })
 
   it('throws when SMS origination is not set, and when no id comes back', async () => {

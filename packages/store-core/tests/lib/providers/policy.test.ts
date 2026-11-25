@@ -14,7 +14,10 @@ import {
   normalizeProviderValue,
   setProviderSetting,
   clearProviderSetting,
+  PROVIDER_SETTING_KEYS,
+  PLATFORM_ONLY_PROVIDER_KEYS,
 } from '@/lib/providers/policy'
+import { DEFAULT_SARVAM_VOICES, mergeVoiceSettings } from '@/lib/providers/voice-settings'
 
 const T = '11111111-1111-1111-1111-111111111111'
 const rows = (r: { tenant_id: string | null; key: string; value: unknown }[]) => ({ rows: r, rowCount: r.length })
@@ -24,6 +27,19 @@ beforeEach(() => {
   invalidateProviderPolicy()
   resolveTenantId.mockResolvedValue(T)
   getFeatureFlags.mockResolvedValue({ smsProvider: 'twilio', whatsappProvider: 'twilio' })
+})
+
+describe('sms_dlt_entity_id setting', () => {
+  it('tenant row beats platform default; blank or oversized values are ignored', async () => {
+    query.mockResolvedValue(rows([{ tenant_id: null, key: 'sms_dlt_entity_id', value: '1100000000000000001' }, { tenant_id: T, key: 'sms_dlt_entity_id', value: ' 1100000000000000002 ' }]))
+    const p = await getProviderPolicy(T)
+    expect(p.smsDltEntityId).toBe('1100000000000000002')
+    expect(p.source.sms_dlt_entity_id).toBe('tenant')
+    expect(normalizeProviderValue('sms_dlt_entity_id', '  ')).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_entity_id', '1'.repeat(31))).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_entity_id', 'TEN')).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_entity_id', 5)).toBeNull()
+  })
 })
 
 describe('provider policy resolution', () => {
@@ -121,5 +137,54 @@ describe('normalizeProviderValue', () => {
     expect(normalizeProviderValue('ai_image_providers', ['openai'])).toBeNull()
     expect(normalizeProviderValue('ai_text_providers', 'razer')).toBeNull()
     expect(normalizeProviderValue('ai_image_default_quality', 'premium')).toBe('premium')
+  })
+})
+
+describe('Outreach keys', () => {
+  it('are provider setting keys, the voice ones platform-only', () => {
+    for (const k of ['voice_provider', 'voice_config', 'sms_dlt_entity_id', 'sms_dlt_sender_ids']) expect(PROVIDER_SETTING_KEYS).toContain(k)
+    expect([...PLATFORM_ONLY_PROVIDER_KEYS].sort()).toEqual(['voice_config', 'voice_provider'])
+  })
+
+  it('validates voice_provider and the DLT ids', () => {
+    expect(normalizeProviderValue('voice_provider', 'exotel')).toBe('exotel')
+    expect(normalizeProviderValue('voice_provider', 'twilio_test')).toBe('twilio_test')
+    expect(normalizeProviderValue('voice_provider', 'twilio')).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_entity_id', ' 1201159123456789012 ')).toBe('1201159123456789012')
+    expect(normalizeProviderValue('sms_dlt_entity_id', '12AB')).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_sender_ids', ['jeffis', 'JEFFIS', 'JFSHOP'])).toEqual(['JEFFIS', 'JFSHOP'])
+    expect(normalizeProviderValue('sms_dlt_sender_ids', ['JEFF'])).toBeNull()
+    expect(normalizeProviderValue('sms_dlt_sender_ids', 'JEFFIS')).toBeNull()
+  })
+
+  it('normalises voice_config and rejects anything invalid', () => {
+    expect(
+      normalizeProviderValue('voice_config', {
+        exotel: { accountSid: 'jeffi1', subdomain: 'api.in.exotel.com', callerId: '+91 140 123 4567', appId: '', extra: 'x' },
+        testNumbers: ['+91 98765 43210', '+919876543210'],
+        sarvam: { sttModel: 'saaras:v3', voices: { hi: 'Priya', xx: 'nope' } },
+        llmModel: 'claude-haiku-5-5',
+        apiKey: 'should-be-dropped',
+      })
+    ).toEqual({
+      exotel: { accountSid: 'jeffi1', subdomain: 'api.in.exotel.com', callerId: '+911401234567' },
+      testNumbers: ['+919876543210'],
+      sarvam: { sttModel: 'saaras:v3', voices: { hi: 'priya' } },
+      llmModel: 'claude-haiku-5-5',
+    })
+    expect(normalizeProviderValue('voice_config', { exotel: { subdomain: 'evil.example.com' } })).toBeNull()
+    expect(normalizeProviderValue('voice_config', { testNumbers: ['9876543210'] })).toBeNull()
+    const many = Array.from({ length: 21 }, (_, i) => `+9198765432${String(i).padStart(2, '0')}`)
+    expect(normalizeProviderValue('voice_config', { testNumbers: many })).toBeNull()
+    expect(normalizeProviderValue('voice_config', { twilioTest: { from: 'abc' } })).toBeNull()
+    expect(normalizeProviderValue('voice_config', 'x')).toBeNull()
+  })
+
+  it('merges stored voice settings over the defaults', () => {
+    const m = mergeVoiceSettings({ sarvam: { voices: { en: 'shubh' } }, testNumbers: ['+919876543210'] })
+    expect(m.sarvam).toEqual({ sttModel: 'saaras:v3', ttsModel: 'bulbul:v3', voices: { ...DEFAULT_SARVAM_VOICES, en: 'shubh' } })
+    expect(m.llmModel).toBe('claude-haiku-5-5')
+    expect(m.exotel.subdomain).toBe('api.in.exotel.com')
+    expect(mergeVoiceSettings({ exotel: { subdomain: 'bad' } })).toEqual(mergeVoiceSettings(null))
   })
 })
