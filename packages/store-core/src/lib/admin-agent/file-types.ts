@@ -3,7 +3,7 @@
 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
-export type Kind = 'pdf' | 'image' | 'docx' | 'pptx' | 'odf' | 'sheet' | 'text'
+export type Kind = 'pdf' | 'image' | 'docx' | 'pptx' | 'odf' | 'sheet' | 'text' | 'audio'
 
 export const KIND_BY_MIME: Record<string, Kind> = {
   'application/pdf': 'pdf',
@@ -26,6 +26,17 @@ export const KIND_BY_MIME: Record<string, Kind> = {
   'application/vnd.oasis.opendocument.spreadsheet': 'sheet',
   'text/csv': 'sheet',
   'text/tab-separated-values': 'sheet',
+  'audio/mpeg': 'audio',
+  'audio/mp3': 'audio',
+  'audio/mp4': 'audio',
+  'audio/x-m4a': 'audio',
+  'audio/m4a': 'audio',
+  'audio/wav': 'audio',
+  'audio/x-wav': 'audio',
+  'audio/ogg': 'audio',
+  'audio/webm': 'audio',
+  'audio/flac': 'audio',
+  'audio/aac': 'audio',
   'text/plain': 'text',
   'text/markdown': 'text',
   'text/html': 'text',
@@ -66,6 +77,12 @@ const MIME_BY_EXT: Record<string, string> = {
   xml: 'application/xml',
   json: 'application/json',
   rtf: 'application/rtf',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
 }
 
 /** The extensions the file picker offers. */
@@ -81,7 +98,7 @@ export function resolveMime(filename: string | null | undefined, reported: strin
 }
 
 export function unsupportedMessage(mime: string): string {
-  if (mime.startsWith('audio/') || mime.startsWith('video/')) return 'The assistant cannot listen to audio or watch video yet. Type out what it says, or attach a document or photo.'
+  if (mime.startsWith('video/')) return 'The assistant cannot watch video yet. Type out what it says, or attach a document, photo or audio recording.'
   if (mime === 'application/msword' || mime === 'application/vnd.ms-powerpoint') return 'Old Word/PowerPoint files (.doc, .ppt) cannot be read. Save it as .docx, .pptx or PDF.'
   return `The assistant cannot read this file type (${mime || 'unknown'}). Attach a PDF, image, Word, Excel, PowerPoint, CSV or text file.`
 }
