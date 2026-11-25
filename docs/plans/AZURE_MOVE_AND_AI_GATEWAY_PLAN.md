@@ -284,6 +284,27 @@ Secrets Manager (~$5.4/mo today) is gone. Key Vault costs a few cents a month, p
   - The store's DNS points at its node, so a store's traffic stays inside AWS.
   - Platform and flagship hosts keep pointing at Azure.
 
+**Store traffic: revised recommendation, an "AWS tenant edge"**
+
+Instead of an Elastic IP and Traefik on every store node, run one small always-on AWS node (t4g.small, or t4g.medium if it also hosts the store-facing shared services) as the store ingress.
+
+**DNS**
+- `*.jeffistores.in`, `*.business.jeffistores.in` and stores' custom domains point at the edge's Elastic IP. That is one wildcard record, as today.
+- Flagship and platform hosts get explicit records to Azure: `jeffistores.in`, `ecom.`, `admin.`, `business.`, `public.`, `mobile.`, `forms.`, `invoice.`, …
+
+**A shopper's request:** India → the edge in Virginia → the store's node in the same VPC → its pods and on-node Postgres → back. That's the same path and latency as today, and a store never depends on Azure to serve a page.
+
+**Shared services that read store databases (public-api, mobile)**
+- They also run a replica on the AWS side for store hosts.
+- Otherwise every store API query would go Azure → AWS → Azure.
+
+**What stays cross-cloud for stores**
+- Control-plane lookups against the flagship database (plans, settings, templates, wallet). These are mostly cached; they get measured in the Phase D rehearsal, with more caching where a page path hits them.
+- AI calls through the gateway (model latency dominates).
+- Kubernetes control (deploys, rescheduling). If Azure is down, store pods and the edge keep serving.
+
+**Cost:** about $16/mo (t4g.small + EIP), or about $28/mo with t4g.medium, on AWS. Spread across stores through plan pricing.
+
 **Control-plane database access**
 - Store pods read the flagship control plane over Tailscale.
 - The core VM advertises the VNet's Postgres subnet as a Tailscale subnet route, so the database stays private.
