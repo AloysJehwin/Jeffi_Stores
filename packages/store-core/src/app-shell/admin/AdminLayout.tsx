@@ -154,6 +154,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       group: 'Ecom Store',
       platformAdminOnly: true,
     },
+    {
+      href: '/admin/ecom/outreach',
+      label: 'Outreach',
+      scope: 'ecom_outreach:read',
+      group: 'Ecom Store',
+      platformAdminOnly: true,
+    },
     { href: '/admin/settings/site-builder', label: 'Site Builder', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
     {

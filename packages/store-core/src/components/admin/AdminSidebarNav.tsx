@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
+import { Globe, PhoneOutgoing, SlidersHorizontal } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useAdminHost } from '@/contexts/AdminHostContext'
 
@@ -511,6 +512,9 @@ export const NAV_ICONS: Record<string, JSX.Element> = {
       />
     </svg>
   ),
+  Domains: <Globe className="w-4 h-4" strokeWidth={1.8} />,
+  Configuration: <SlidersHorizontal className="w-4 h-4" strokeWidth={1.8} />,
+  Outreach: <PhoneOutgoing className="w-4 h-4" strokeWidth={1.8} />,
   'AI Pricing': (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path
