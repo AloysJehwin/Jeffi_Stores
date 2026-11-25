@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import { createPgPool, rdsSslOption, rdsIamPassword, sslFromConfig } from '@/lib/shared/pg-pool'
 import { getClient as getTenantClient, queryMany as tenantQueryMany } from '@/lib/shared/db'
 
 export interface RagResult {
@@ -44,9 +44,9 @@ function getPool(): Pool {
       config.ssl = rdsSslOption()
     } else {
       config.password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
-      // RDS requires SSL; set RAG_PG_SSL=1 when pointing at RDS with a password.
-      // Cert isn't verified (dev connects over the SSH tunnel). Razer replica needs no SSL.
-      config.ssl = process.env.RAG_PG_SSL === '1' ? { rejectUnauthorized: false } : undefined
+      // RAG_PG_SSL: 1/require (unverified, e.g. RDS over the SSH tunnel), verify (+ RAG_PG_SSL_CA), or unset
+      // for no TLS (the Razer replica).
+      config.ssl = sslFromConfig(process.env.RAG_PG_SSL, process.env.RAG_PG_SSL_CA)
     }
 
     pool = createPgPool(config)

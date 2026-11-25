@@ -116,6 +116,28 @@ describe('tenant-registry (database layer)', () => {
       expect(typeof capturedConfigs[0].password).toBe('function')
       delete process.env.CONTROL_PLANE_RDS_HOST
     })
+
+    it('DB_SSL decides TLS for a password URL, not the hostname (sslmode stripped)', async () => {
+      process.env.CONTROL_PLANE_DATABASE_URL = 'postgresql://app:pw@jeffi-prod.postgres.database.azure.com:5432/jeffi_stores?sslmode=require'
+      process.env.DB_SSL = 'verify'
+      try {
+        const { controlPlanePool } = await importRegistry()
+        controlPlanePool()
+        expect(capturedConfigs[0].ssl).toEqual({ rejectUnauthorized: true })
+        expect(capturedConfigs[0].connectionString).toBe('postgresql://app:pw@jeffi-prod.postgres.database.azure.com:5432/jeffi_stores')
+      } finally {
+        delete process.env.DB_SSL
+      }
+    })
+
+    it('without DB_SSL an RDS URL keeps the RDS-host default', async () => {
+      process.env.CONTROL_PLANE_DATABASE_URL = 'postgres://u:p@cp.abc.us-east-1.rds.amazonaws.com:5432/jeffi_stores'
+      const { controlPlanePool } = await importRegistry()
+      controlPlanePool()
+      // No bundle on disk in this suite: no ssl object, exactly as before.
+      expect(capturedConfigs[0].ssl).toBeUndefined()
+      expect(capturedConfigs[0].connectionString).toBe('postgres://u:p@cp.abc.us-east-1.rds.amazonaws.com:5432/jeffi_stores')
+    })
   })
 
   // -------------------------------------------------------------------------

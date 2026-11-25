@@ -1,7 +1,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import { createPgPool, rdsSslOption, rdsIamPassword, dbSslConfig, stripSslParams } from '@/lib/shared/pg-pool'
 import { fetchDbSecret } from '@/lib/shared/db-secret'
 import { getCurrentAuditActor, getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAuditActor } from '@/lib/auth/audit-context'
 import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from '@/lib/tenancy/tenant-context'
@@ -80,10 +80,15 @@ function buildDefaultPool(): Pool {
     config.port = port
     config.user = user
     config.database = dbName
-    config.ssl = rdsSslOption()
+    config.ssl = dbSslConfig() ?? rdsSslOption()
     config.password = rdsIamPassword(host, port, user, region)
   } else {
-    if (dbUrl.includes('rds.amazonaws.com')) {
+    // Password auth (the URL's): TLS from DB_SSL / DB_SSL_CA when set (Azure Flexible Server), else by RDS host.
+    const ssl = dbSslConfig()
+    if (ssl !== undefined) {
+      config.connectionString = stripSslParams(dbUrl)
+      config.ssl = ssl
+    } else if (dbUrl.includes('rds.amazonaws.com')) {
       // Strip sslmode/uselibpqcompat from the URL — pg v8 treats sslmode=require as
       // verify-full and overrides our ssl object, causing SELF_SIGNED_CERT_IN_CHAIN.
       // We control TLS entirely via the ssl: { ca } option below.
@@ -143,7 +148,7 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
     return createPgPool(config)
   }
   // Password auth: the store's own Postgres on its EC2 node, self-signed TLS (unverified). The
-  // password is the pod's env one, else the Secrets Manager secret at db_secret_ref (cached 5 min).
+  // password is the pod's env one, else the secret at db_secret_ref (cached 5 min).
   const envPw = podDbPassword(slug)
   if (!infra.dbSecretRef && !envPw) throw new Error('Tenant has neither IAM auth nor db_secret_ref set')
   const ref = infra.dbSecretRef!

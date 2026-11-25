@@ -31,6 +31,38 @@ export function rdsSslOption(): PoolConfig['ssl'] {
     : { rejectUnauthorized: false }
 }
 
+/**
+ * TLS from config, not the hostname: `disable`, `require` (encrypted, unverified) or `verify` (against
+ * `ca`: a CA bundle path, relative to the repo root, or inline PEM; the system roots without one).
+ * undefined when `mode` is unset, so callers keep their RDS-host default.
+ */
+export function sslFromConfig(mode: string | undefined, ca?: string): PoolConfig['ssl'] | undefined {
+  const m = (mode || '').trim().toLowerCase()
+  if (!m) return undefined
+  if (['disable', 'off', 'false', '0', 'no'].includes(m)) return false
+  if (['require', 'on', 'true', '1', 'yes', 'prefer'].includes(m)) return { rejectUnauthorized: false }
+  if (!['verify', 'verify-full', 'verify-ca'].includes(m)) throw new Error(`DB_SSL must be disable, require or verify (got "${mode}")`)
+  if (!ca) return { rejectUnauthorized: true }
+  if (ca.trimStart().startsWith('-----BEGIN')) return { rejectUnauthorized: true, ca }
+  const p = path.isAbsolute(ca) ? ca : repoPath(ca)
+  if (!fs.existsSync(p)) throw new Error(`DB_SSL_CA file not found: ${p}`)
+  return { rejectUnauthorized: true, ca: fs.readFileSync(p).toString() }
+}
+
+/** The platform database's TLS: DB_SSL + DB_SSL_CA (Azure Flexible Server: verify). */
+export const dbSslConfig = () => sslFromConfig(process.env.DB_SSL, process.env.DB_SSL_CA)
+
+/** A postgres URL without TLS params: pg lets the URL's sslmode override the ssl object. */
+export function stripSslParams(url: string): string {
+  try {
+    const u = new URL(url)
+    for (const k of ['sslmode', 'ssl', 'sslrootcert', 'sslcert', 'sslkey', 'uselibpqcompat']) u.searchParams.delete(k)
+    return u.toString()
+  } catch {
+    return url
+  }
+}
+
 // RDS IAM auth: pg calls this per connection to mint a short-lived auth token in
 // place of a stored password.
 export function rdsIamPassword(host: string, port: number, user: string, region: string): () => Promise<string> {
