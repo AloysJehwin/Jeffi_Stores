@@ -235,7 +235,7 @@ async function answer(store: Store, text: string, m: AdminWhatsAppMessage): Prom
     null,
     undefined
   )
-  if (out.status >= 400) return [String(out.body.error || 'The assistant is temporarily unavailable. Please try again in a moment.')]
+  if (out.status >= 400) return [String(out.body.error || 'The assistant is unavailable right now. Please try again in a few minutes.')]
   const body = toWhatsApp(String(out.body.message || ''))
   const proposals = await pendingProposals(conversationId, actor.adminId)
   const list = proposals.length ? await proposalList(proposals, conversationId) : ''

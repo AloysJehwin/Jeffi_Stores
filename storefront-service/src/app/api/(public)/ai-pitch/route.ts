@@ -5,6 +5,8 @@ import { storefrontAiGate, storefrontAiField } from '@/lib/shared/storefront-ai'
 
 export const dynamic = 'force-dynamic'
 
+// The product page's one-line pitch, written by the store's fast text model through the gateway.
+
 export async function POST(request: NextRequest) {
   const blocked = await storefrontAiGate()
   if (blocked) return blocked
@@ -24,5 +26,5 @@ export async function POST(request: NextRequest) {
   const context = [productName.trim(), brand, category].filter(Boolean).join(', ')
   const prompt = `Write exactly one sentence (max 20 words) describing what this product is and who it is best for. Be specific about the use case. No prices, no marketing fluff.\n\nProduct: ${context}\n\nReturn JSON: {"pitch":"<one sentence>"}`
 
-  return storefrontAiField(prompt, 'pitch')
+  return storefrontAiField(prompt, 'pitch', 'storefront_pitch')
 }

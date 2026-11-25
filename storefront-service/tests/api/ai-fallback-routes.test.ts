@@ -132,3 +132,16 @@ describe('POST /api/ai-affirmation', () => {
     expect(res.status).toBe(503)
   })
 })
+
+describe('store billing for the storefront AI lines', () => {
+  it.each([
+    ['recap', () => recapPOST(req('http://localhost/api/ai-recap', { cart: CART })), 'storefront_recap'],
+    ['cart insight', () => cartPOST(req('http://localhost/api/ai-cart-insight', { cart: CART })), 'storefront_cart_insight'],
+    ['affirmation', () => affirmPOST(req('http://localhost/api/ai-affirmation', { itemNames: ['M8 Bolt'] })), 'storefront_affirmation'],
+  ])('%s runs on the fast model through the gateway, charged under its own feature', async (_name, call, feature) => {
+    mockAiChat.mockResolvedValueOnce(aiOk('A line.'))
+    expect((await call()).status).toBe(200)
+    expect(mockAiChat.mock.calls[0][0]).toMatchObject({ feature, modelHint: 'fast', jsonMode: true })
+    expect(mockAiChat.mock.calls[0][0].billing).not.toBe(false)
+  })
+})

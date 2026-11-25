@@ -1,9 +1,6 @@
-// App-side AI client. Model host/selection now lives behind the ai-platform gateway
-// (see /ai-platform); this file is a thin, signature-preserving HTTP client to it, so the
-// 11 AI consumers are unchanged. Durability (queue/retry) and LLM caching are the gateway's job.
-// When the gateway is unreachable, times out or answers 5xx (never 4xx), calls go straight to
-// Ollama at OLLAMA_BASE_URL (ai-direct-ollama.ts) and come back with fallbackUsed: true.
-import { directChat, directEmbed, directVision, ollamaDirectUrl } from './ai-direct-ollama'
+// App-side AI client: the only way app code reaches a model. Every call goes to the ai-platform gateway, which
+// owns provider order, fallback (incl. the Razer circuit breaker), queueing and caching. There is no direct path:
+// when the gateway or every provider fails, the call throws (vision reports ok: false).
 import { meterAiCost } from '@/lib/ai/cost-meter'
 
 export interface AiChatMessage {
@@ -86,10 +83,8 @@ const GATEWAY_URL = (process.env.AI_GATEWAY_URL || 'http://100.82.208.8:8080').r
 const GATEWAY_TIMEOUT_MS = Number(process.env.AI_GATEWAY_TIMEOUT_MS) || 130_000
 // Short reachability check, so a dead gateway costs seconds, not the full generation timeout.
 const GATEWAY_CONNECT_TIMEOUT_MS = Number(process.env.AI_GATEWAY_CONNECT_TIMEOUT_MS) || 3_000
-const DIRECT_TIMEOUT_MS = Number(process.env.OLLAMA_DIRECT_TIMEOUT_MS) || 120_000
 const GATEWAY_DOWN_COOLDOWN_MS = 30_000
 const GATEWAY_FRESH_MS = 60_000
-const MIN_DIRECT_MS = 15_000
 
 let lastContactAt = 0
 let downUntil = 0
@@ -170,48 +165,14 @@ async function gatewayPost(path: string, body: unknown, label: string, withBody:
   }
 }
 
-type Direct<T> = (timeoutMs: number) => Promise<T>
-
-/** Direct Ollama only when Site Controls lists Razer for this store; no built-in fallback. */
-function directFor<T>(providers: string[] | undefined, direct: Direct<T>): Direct<T> | 'razer-off' | null {
-  return providers?.includes('razer') ? direct : providers?.length ? 'razer-off' : null
-}
-
-async function withFallback<T>(op: string, gateway: () => Promise<T>, direct: Direct<T> | 'razer-off' | null): Promise<T> {
-  const start = Date.now()
-  const fallback = ollamaDirectUrl() && typeof direct === 'function' ? direct : null
-  if (fallback && !(await gatewayReachable())) {
-    console.error(`[ai-client] gateway ${GATEWAY_URL} unreachable; ${op} via direct Ollama`)
-    return runDirect(op, fallback, DIRECT_TIMEOUT_MS)
-  }
-  try {
-    return await gateway()
-  } catch (err) {
-    if (direct === 'razer-off' && err instanceof GatewayFailure && err.retryable) {
-      throw new AiClientError(`AI unavailable (${err.message}); Razer is off in Settings → Providers, so nothing else can answer`, 'gateway', err)
-    }
-    if (!fallback || !(err instanceof GatewayFailure) || !err.retryable) throw err
-    console.error(`[ai-client] gateway ${op} failed (${err.message.slice(0, 300)}); falling back to direct Ollama`)
-    // One overall budget, so a slow gateway plus a fallback cannot double the caller's wait.
-    const remaining = GATEWAY_TIMEOUT_MS + 20_000 - (Date.now() - start)
-    return runDirect(op, fallback, Math.min(DIRECT_TIMEOUT_MS, Math.max(MIN_DIRECT_MS, remaining)), err)
-  }
-}
-
-async function runDirect<T>(op: string, direct: (timeoutMs: number) => Promise<T>, timeoutMs: number, gatewayErr?: Error): Promise<T> {
-  try {
-    return await direct(timeoutMs)
-  } catch (e) {
-    const msg = (e as Error)?.message || String(e)
-    console.error(`[ai-client] direct Ollama ${op} failed: ${msg}`)
-    const prefix = gatewayErr ? `AI gateway failed (${gatewayErr.message}); ` : 'AI gateway unreachable; '
-    throw new AiClientError(`${prefix}direct Ollama fallback failed: ${msg}`, 'ollama', e)
-  }
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 async function currentTenant(): Promise<string | null> {
+  try {
+    const { billedTenantId } = await import('@/lib/ai/billing')
+    const billed = billedTenantId()
+    if (billed) return billed
+  } catch {}
   try {
     const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
     return (await resolveTenantId()) ?? null
@@ -262,11 +223,7 @@ async function gatewayContext(cacheNamespace: string | undefined) {
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
   const ctx = await gatewayContext(req.cacheNamespace)
-  const res = await withFallback(
-    'chat',
-    () => gatewayPost('/v1/chat', { ...req, ...ctx }, '', true) as Promise<AiChatResponse>,
-    directFor(ctx.providers, ms => directChat(req, ms)),
-  )
+  const res = (await gatewayPost('/v1/chat', { ...req, ...ctx }, '', true)) as AiChatResponse
   meterAiCost(res.usage?.costInr)
   if (req.billing !== false) {
     void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
@@ -277,7 +234,7 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
 /**
  * Streaming variant of aiChat: text deltas and tool-call starts arrive through onEvent while the
  * model runs; resolves with the same final response. Usage is recorded once, at the end. When the
- * gateway stream fails before any output, falls back to aiChat (Ollama only when Site Controls lists Razer).
+ * gateway stream fails before any output, the same request is retried once as a plain aiChat.
  */
 export async function aiChatStream(
   req: AiChatRequest,
@@ -285,16 +242,15 @@ export async function aiChatStream(
 ): Promise<AiChatResponse> {
   let emitted = false
   let res: AiChatResponse | null = null
-  if (await gatewayReachable()) {
-    try {
-      res = await gatewayStream(req, e => {
-        emitted = true
-        opts.onEvent?.(e)
-      }, opts.signal)
-    } catch (err) {
-      if (emitted || opts.signal?.aborted) throw err
-      console.error(`[ai-client] gateway stream failed (${(err as Error).message.slice(0, 300)}); retrying without streaming`)
-    }
+  if (!(await gatewayReachable())) throw new AiClientError(`AI gateway ${GATEWAY_URL} unreachable`, 'gateway')
+  try {
+    res = await gatewayStream(req, e => {
+      emitted = true
+      opts.onEvent?.(e)
+    }, opts.signal)
+  } catch (err) {
+    if (emitted || opts.signal?.aborted) throw err
+    console.error(`[ai-client] gateway stream failed (${(err as Error).message.slice(0, 300)}); retrying without streaming`)
   }
   if (!res) {
     const r = await aiChat(req)
@@ -390,10 +346,7 @@ export async function activeTextProvider(cacheNamespace?: string): Promise<'anth
  *  logs the row with status 'unpaid'. Opt out with `billing: false`. */
 async function logChatUsage(req: AiChatRequest, res: AiChatResponse): Promise<void> {
   const { recordUsage } = await import('@/lib/ai/billing')
-  const pt = Number(res.usage?.promptTokens ?? 0)
-  const ct = Number(res.usage?.completionTokens ?? 0)
-  // Claude prompts bill cache-weighted (reads/writes scaled to the input price).
-  const billedIn = Number(res.usage?.billedPromptTokens ?? pt)
+  const { billedIn, ct } = chatBillableTokens(req, res)
   const units = [
     { type: 'token_1k_in' as const, qty: billedIn / 1000 },
     { type: 'token_1k_out' as const, qty: ct / 1000 },
@@ -418,8 +371,19 @@ async function logChatUsage(req: AiChatRequest, res: AiChatResponse): Promise<vo
   }
 }
 
-export function getAiProvider(): 'openai' | 'ollama' {
-  return (process.env.AI_PROVIDER || 'ollama').toLowerCase() as 'openai' | 'ollama'
+const estTokens = (text: string) => Math.ceil(text.length / 4)
+
+/** Tokens a chat is billed for. A gateway cache hit reports zero usage, so it is billed for the tokens the
+ *  answer would have cost (~4 characters a token), at the answering model's price: a store pays per answer
+ *  served, whether or not the platform's cache produced it (cost_inr stays the real cost, 0). */
+export function chatBillableTokens(req: Pick<AiChatRequest, 'messages'>, res: Pick<AiChatResponse, 'usage' | 'cache' | 'content'>): { billedIn: number; ct: number } {
+  const pt = Number(res.usage?.promptTokens ?? 0)
+  const ct = Number(res.usage?.completionTokens ?? 0)
+  if (res.cache && !pt && !ct) {
+    return { billedIn: estTokens(req.messages.map(m => m.content || '').join('\n')), ct: estTokens(res.content || '') }
+  }
+  // Claude prompts bill cache-weighted (reads/writes scaled to the input price).
+  return { billedIn: Number(res.usage?.billedPromptTokens ?? pt), ct }
 }
 
 export interface AiEmbedResult {
@@ -429,38 +393,24 @@ export interface AiEmbedResult {
   provider: string
 }
 
-/** Embeddings via the gateway, with the model and provider that produced them. The platform's
- *  embeddings provider (Settings → Providers) is sent along; direct Ollama is a fallback only
- *  while that provider is Razer, since vectors from two models cannot be mixed. */
+/** Embeddings via the gateway, with the model and provider that produced them. The store's
+ *  embeddings provider (Settings → Providers) and its model are sent along. */
 export async function aiEmbedWithModel(
   input: string | string[],
   model?: string,
   opts: { feature?: string; billing?: boolean } = {}
 ): Promise<AiEmbedResult> {
-  let usage: AiChatResponse['usage']
   let usedModel = model || ''
   let usedProvider = ''
   const started = Date.now()
   const routing = await routingFor(undefined)
   const provider = routing.embed
   const embedModel = provider ? routing.models?.embed?.[provider] : undefined
-  const out = await withFallback(
-    'embed',
-    async () => {
-      const r = await gatewayPost('/v1/embed', { input, model: embedModel ?? model, ...(provider ? { provider } : {}) }, 'embed ', false)
-      usage = r.usage
-      usedModel = r.model || usedModel
-      usedProvider = r.provider || provider || ''
-      return r.embeddings as number[][]
-    },
-    provider === 'azure'
-      ? null
-      : async ms => {
-          const v = await directEmbed(input, model, ms)
-          usedProvider = 'razer'
-          return v
-        },
-  )
+  const r = await gatewayPost('/v1/embed', { input, model: embedModel ?? model, ...(provider ? { provider } : {}) }, 'embed ', false)
+  const usage: AiChatResponse['usage'] = r.usage
+  const out = r.embeddings as number[][]
+  usedModel = r.model || usedModel
+  usedProvider = r.provider || provider || ''
   if (opts.billing !== false) {
     void (async () => {
       const { recordUsage, AiWalletError } = await import('@/lib/ai/billing')
@@ -618,7 +568,7 @@ export interface AiVisionResult {
   hint?: string
   provider?: string
   usage?: AiChatUsage
-  /** True when served by direct Ollama because the gateway was down. */
+  /** True when the gateway answered with a later provider in the order. */
   fallbackUsed?: boolean
 }
 
@@ -654,11 +604,7 @@ export async function aiVision(
   let r: AiVisionResult
   try {
     const ctx = await gatewayContext(opts.cacheNamespace)
-    r = await withFallback(
-      'vision',
-      () => gatewayPost('/v1/vision', { images, prompt, model, ...ctx }, 'vision ', false) as Promise<AiVisionResult>,
-      directFor(ctx.providers, ms => directVision(images, prompt, model, ms)),
-    )
+    r = (await gatewayPost('/v1/vision', { images, prompt, model, ...ctx }, 'vision ', false)) as AiVisionResult
   } catch (err) {
     return {
       ok: false,

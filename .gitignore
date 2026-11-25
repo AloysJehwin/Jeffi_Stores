@@ -80,6 +80,10 @@ next-env.d.ts
 !/scripts/component-owners.json
 !/scripts/check-service-routes.mjs
 !/scripts/service-routes-allowlist.json
+# Every AI call goes through the gateway (CI ratchet).
+!/scripts/check-ai-routing.mjs
+!/scripts/check-ai-routing.test.mjs
+!/scripts/ai-routing-allowlist.txt
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md
@@ -126,19 +130,6 @@ graphify-out/20*/
 
 # MCP server config — contains credentials, keep local only
 .mcp.json
-
-# On-device model training data (regenerated via scripts/gen-onboarding-dataset.mjs)
-data/onboarding/
-
-# On-device model weights (large; host on CDN/S3 in prod — regenerate via scripts/train+export)
-storefront-service/public/models/onboarding/onnx/*.onnx
-
-# On-device ORT runtime WASM (large; served from public/ or CDN in prod — copy from node_modules/onnxruntime-web/dist)
-storefront-service/public/ort/*.wasm
-storefront-service/public/ort/*.map
-storefront-service/public/models/onboarding/ort/*.wasm
-storefront-service/public/models/onboarding/ort/*.mjs
-
 
 # IDE state (holds local diff caches; never commit)
 .idea/

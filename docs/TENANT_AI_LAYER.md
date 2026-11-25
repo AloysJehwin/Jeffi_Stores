@@ -6,8 +6,7 @@ per-tenant. (#489)
 
 ## Principle
 
-- **Shared** across tenants: the base model weights (on-device Gemma, and the gateway's hosted
-  models). Identical bytes for everyone → no benefit to per-tenant copies.
+- **Shared** across tenants: the gateway's hosted models. Identical bytes for everyone → no benefit to per-tenant copies.
 - **Per-tenant** (never shared): the data the model reasons over (embeddings / RAG), any
   fine-tuned adapter (LoRA), and the response cache namespace.
 
@@ -33,26 +32,17 @@ Two stores exist; the tenant's OWN DB is the source of truth:
 - `embeddings.tenant_id` + `UNIQUE(tenant_id, source_table, source_id)` lets the same source id
   exist once per tenant and makes platform rows explicit (`NULL`).
 
-Backfill: `scripts/embed-everything.mjs --tenant <uuid>` (and `promote-enrichments.mjs`) stamp
-`tenant_id`. Loading an existing tenant's catalog into its own DB is an ops run of these scripts.
+Backfill: `scripts/embed-everything.mjs --tenant <uuid>` stamps `tenant_id` (vectors from the AI gateway). Loading an existing tenant's catalog into its own DB is an ops run of these scripts.
 
-### 3. On-device model (storefront, in-browser Gemma via WebGPU)
-- Base weights: shared cache (identical for all stores).
-- **LoRA adapter is per-tenant**: `controller-service/src/lib/on-device/keys.ts#onDeviceKeys(slug)` namespaces the
-  adapter's IndexedDB key by store slug, so on a shared browser one store's fine-tune never loads
-  into another's inference.
-- **Fine-tuning now applies**: `summary.worker.ts` loads the saved LoRA (same tenant-namespaced
-  key the fine-tune worker writes) after model init — previously the inference worker ignored the
-  adapter, so fine-tuning was a no-op.
-- The current store slug flows: `/api/store-config` (and SSR `app/layout.tsx`) → `StoreConfig.slug`
-  → `setOnDeviceStore(slug)` → the worker `init` message.
+### 3. Storefront AI lines
+- There is no in-browser model. The product pitch, cart insight, checkout recap and order note come from the
+  storefront's `/api/ai-*` routes: the store's fast text model through the gateway, charged to the store.
 
 ## Boundaries / ops
 
 - The gateway + the shared replica are external (the Razer box, `100.82.208.8`). This repo controls
   the per-tenant read/write routing and the namespacing; loading tenant data onto the replica (if
   ever used again) is an ops step. The go-forward store is the tenant's own DB.
-- Capability gate (WebGPU/device memory) is real; on-device runs only on CAPABLE devices.
 
 ## Future work
 

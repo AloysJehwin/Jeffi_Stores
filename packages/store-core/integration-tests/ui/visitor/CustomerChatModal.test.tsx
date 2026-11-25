@@ -146,6 +146,35 @@ describe('CustomerChatModal', () => {
     expect(screen.queryByText(/stack trace/)).not.toBeInTheDocument()
   })
 
+  it('no model: an explicit notice, search results labelled as such, no assistant bubble or feedback', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: any) =>
+      url === '/api/customer-agent/chat'
+        ? {
+            ok: false,
+            status: 503,
+            json: async () => ({
+              unavailable: true,
+              message: 'The assistant is unavailable right now. Please try again in a few minutes.',
+              searchResults: [{ name: 'Halo Speaker', slug: 'halo-speaker', price: '4999' }],
+            }),
+            init,
+          }
+        : { ok: true, status: 200, json: async () => ({}) }
+    )
+    setup()
+    ask('speaker')
+    expect(await screen.findByRole('status')).toHaveTextContent('The assistant is unavailable right now.')
+    expect(screen.getByText('Search results for “speaker”')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Halo Speaker/ })).toHaveAttribute('href', '/products/halo-speaker')
+    expect(screen.queryByRole('button', { name: 'Helpful' })).not.toBeInTheDocument()
+
+    fetchMock.mockClear()
+    ask('again')
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(sent.history).toEqual([{ role: 'user', content: 'speaker' }])
+  })
+
   it('a network failure shows a retry message', async () => {
     fetchMock.mockRejectedValue(new Error('offline'))
     setup()

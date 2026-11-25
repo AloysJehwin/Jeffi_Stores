@@ -6,10 +6,19 @@ import { Send, ThumbsUp, ThumbsDown, X, Bot, User } from 'lucide-react'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea'
 
+interface SearchHit {
+  slug: string
+  name: string
+  price?: string
+}
+
 interface ChatMessage {
-  role: 'user' | 'assistant'
+  /** 'notice': the store's own message when no model could answer (never shown as the assistant). */
+  role: 'user' | 'assistant' | 'notice'
   content: string
   id: string
+  query?: string
+  results?: SearchHit[]
 }
 
 interface Props {
@@ -176,6 +185,35 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
   )
 }
 
+function UnavailableNotice({ msg, onClose }: { msg: ChatMessage; onClose: () => void }) {
+  return (
+    <div role="status" className="rounded-xl border border-border-default bg-surface px-3.5 py-3 text-sm">
+      <p className="text-foreground-secondary">{msg.content}</p>
+      {!!msg.results?.length && (
+        <div className="mt-3">
+          <p className="text-[11px] uppercase tracking-widest font-semibold text-foreground-muted">
+            Search results for “{msg.query}”
+          </p>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {msg.results.map(p => (
+              <li key={p.slug}>
+                <Link
+                  href={`/products/${p.slug}`}
+                  onClick={onClose}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
+                >
+                  <span className="truncate text-foreground">{p.name}</span>
+                  {p.price && <span className="shrink-0 text-xs text-foreground-muted">₹{p.price}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 let idCounter = 0
 function uid() {
   return `msg-${++idCounter}-${Date.now()}`
@@ -243,7 +281,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
     setLoading(true)
 
     // Send last 10 messages as history (excluding the new user message we just added)
-    const history = next.slice(-11, -1).map(m => ({ role: m.role, content: m.content }))
+    const history = next
+      .slice(-11, -1)
+      .filter(m => m.role !== 'notice')
+      .map(m => ({ role: m.role, content: m.content }))
 
     try {
       const res = await fetch('/api/customer-agent/chat', {
@@ -260,6 +301,13 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         return
       }
       const data = await res.json()
+      if (data?.unavailable) {
+        setMessages(prev => [
+          ...prev,
+          { role: 'notice', content: data.message, id: uid(), query: q, results: Array.isArray(data.searchResults) ? data.searchResults : [] },
+        ])
+        return
+      }
       // Prefer the assistant message. Never render a raw server `error` string to
       // the customer — fall back to a fixed friendly line for any failure.
       const assistantMsg: ChatMessage = {
@@ -344,7 +392,9 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
               </div>
             )}
 
-            {messages.map(msg => (
+            {messages.map(msg => msg.role === 'notice' ? (
+              <UnavailableNotice key={msg.id} msg={msg} onClose={onClose} />
+            ) : (
               <div
                 key={msg.id}
                 className={`flex gap-2.5 min-w-0 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}

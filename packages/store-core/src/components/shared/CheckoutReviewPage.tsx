@@ -16,7 +16,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
 import { bp } from '@/lib/shared/business-path'
-import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
+import CheckoutRecapSummary from '@/components/storefront-ai/CheckoutRecapSummary'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 import { PaymentSections, UpiManualDialog, razorpayDisplayConfig, upiFlag, useUpiPayment, type PaymentChoice } from '@/components/payments'
 import { couponLookup, urlCoupon, urlCouponCode, withCoupon } from '@/components/visitor/coupons/terms'
@@ -378,7 +378,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
   const cartSubtotal = isBuyNow ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0) : getCartTotal()
 
-  // Line items for the on-device recap — works for both cart and buy-now flows.
+  // Line items for the AI recap — works for both cart and buy-now flows.
   const recapItems = isBuyNow
     ? buyNowItem
       ? [
@@ -1020,7 +1020,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           <div className="lg:col-span-2 space-y-6">
-            {/* On-device AI cart recap (silent unless the device is capable) */}
+            {/* AI cart recap (silent until the store AI answers) */}
             <CheckoutRecapSummary items={recapItems} total={cartSubtotal} />
             {/* Delivery Address */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">

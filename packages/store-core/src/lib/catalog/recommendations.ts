@@ -405,6 +405,7 @@ async function curate(
   try {
     const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
     const r = await aiChat({
+      feature: 'recommendations',
       modelHint: 'fast',
       jsonMode: true,
       temperature: 0.2,

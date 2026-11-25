@@ -1,0 +1,2 @@
+# Justified exceptions to scripts/check-ai-routing.mjs: `<path>  # reason`. Keep it tiny.
+scripts/demo-films/music/make-music.py  # demo-film background music (Lyria); the gateway has no music capability; run by hand for marketing films, never in a store's context

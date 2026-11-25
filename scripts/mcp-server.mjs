@@ -9,6 +9,7 @@ import pg from 'pg'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { gatewayEmbed } from './lib/ai-gateway.mjs'
 
 const LOG_DIR = path.join(os.homedir(), '.cache', 'jeffi-mcp')
 const LOG_FILE = path.join(LOG_DIR, 'calls.log')
@@ -26,8 +27,6 @@ function logCall(toolName, input, result, errorMsg) {
   fs.appendFile(LOG_FILE, JSON.stringify(entry) + '\n', () => {})
 }
 
-const RAG_OLLAMA_URL = (process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-const RAG_EMBED_MODEL = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
 const RAG_PG = {
   host: process.env.RAG_PG_HOST || '100.82.208.8',
   port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
@@ -84,24 +83,12 @@ const appPool = new pg.Pool(APP_PG)
 ragPool.on('error', () => {})
 appPool.on('error', () => {})
 
+// Query vectors come from the AI gateway; only rows embedded by the same model are compared.
 async function embed(text) {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), 5000)
-  try {
-    const res = await fetch(`${RAG_OLLAMA_URL}/api/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: RAG_EMBED_MODEL, prompt: text }),
-      signal: ctrl.signal,
-    })
-    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
-    const data = await res.json()
-    if (!Array.isArray(data.embedding)) throw new Error('No embedding')
-    return data.embedding
-  } finally {
-    clearTimeout(t)
-  }
+  const r = await gatewayEmbed(text, { timeoutMs: 5000 })
+  return { vector: r.vectors[0], model: r.model }
 }
+const SAME_MODEL = `COALESCE(embedding_model, 'nomic-embed-text')`
 
 function vec(arr) { return '[' + arr.join(',') + ']' }
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)) }
@@ -123,9 +110,9 @@ const TOOLS = [
       const v = await embed(query)
       const ids = await ragPool.query(
         `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
-         FROM embeddings WHERE source_table IN ('products','product_variants')
+         FROM embeddings WHERE source_table IN ('products','product_variants') AND ${SAME_MODEL} = $3
          ORDER BY embedding <=> $1::vector LIMIT $2`,
-        [vec(v), lim * 2]
+        [vec(v.vector), lim * 2, v.model]
       )
       const productIds = []
       for (const r of ids.rows) {
@@ -205,15 +192,15 @@ const TOOLS = [
     handler: async ({ productId, limit = 10 }) => {
       const lim = clamp(limit, 1, 50)
       const src = await ragPool.query(
-        `SELECT embedding FROM embeddings WHERE source_table = 'products' AND source_id = $1 LIMIT 1`,
+        `SELECT embedding, ${SAME_MODEL} AS model FROM embeddings WHERE source_table = 'products' AND source_id = $1 LIMIT 1`,
         [productId]
       )
       if (src.rows.length === 0) return { products: [], note: 'Product has no embedding yet.' }
       const r = await ragPool.query(
         `SELECT source_id, 1 - (embedding <=> $1::vector) AS sim
-         FROM embeddings WHERE source_table = 'products' AND source_id != $2
+         FROM embeddings WHERE source_table = 'products' AND source_id != $2 AND ${SAME_MODEL} = $4
          ORDER BY embedding <=> $1::vector LIMIT $3`,
-        [src.rows[0].embedding, productId, lim]
+        [src.rows[0].embedding, productId, lim, src.rows[0].model]
       )
       const ids = r.rows.map(x => x.source_id)
       if (ids.length === 0) return { products: [] }
@@ -241,9 +228,9 @@ const TOOLS = [
       const v = await embed(query)
       const r = await ragPool.query(
         `SELECT source_id, 1 - (embedding <=> $1::vector) AS sim
-         FROM embeddings WHERE source_table = 'users'
+         FROM embeddings WHERE source_table = 'users' AND ${SAME_MODEL} = $3
          ORDER BY embedding <=> $1::vector LIMIT $2`,
-        [vec(v), lim]
+        [vec(v.vector), lim, v.model]
       )
       const ids = r.rows.map(x => x.source_id)
       if (ids.length === 0) return { customers: [] }

@@ -54,7 +54,7 @@ vi.mock('@/components/visitor/cart/MobileCheckoutBar', () => ({ default: () => n
 vi.mock('@/components/visitor/cart/CouponNudge', () => ({ default: () => null }))
 vi.mock('@/components/visitor/cart/YourCoupons', () => ({ default: () => null }))
 vi.mock('@/components/visitor/cart/CartUpsellRow', () => ({ default: () => null }))
-vi.mock('@/components/on-device/CartInsightPanel', () => ({ default: () => null }))
+vi.mock('@/components/storefront-ai/CartInsightPanel', () => ({ default: () => null }))
 vi.mock('@/lib/client/analytics', () => ({ trackBeginCheckout: vi.fn() }))
 vi.mock('@/components/payments', () => ({
   PaymentSections: ({ value, onChange, cod }: any) => (

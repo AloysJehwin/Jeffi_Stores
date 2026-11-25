@@ -70,7 +70,8 @@ async function turn(sessionId: string): Promise<void> {
   try {
     if (await storefrontAiAllowed().catch(() => false)) {
       const ok = await aiTurn(s, listed.map(l => ({ m: l.message, t: l.translations })), brand)
-      if (ok) return
+      if (!ok) await assistantUnavailable(s, lastCustomer.message)
+      return
     }
     await botTurn(s, lastCustomer.message, listed.map(l => l.message), brand)
   } finally {
@@ -220,7 +221,15 @@ async function aiTurn(s: SessionRow, rows: Array<{ m: SupportMessage; t: Record<
   return true
 }
 
-/** Keyword bot when the store has no AI or the model is unreachable. */
+export const ASSISTANT_UNAVAILABLE_TEXT = 'Our assistant is unavailable right now, so your message has gone to our team. A person will reply here.'
+
+/** No model could answer: say so and pass the chat to a person, never a scripted stand-in for the assistant. */
+async function assistantUnavailable(s: SessionRow, last: SupportMessage): Promise<void> {
+  await postMessage({ session: s, sender: 'system', text: ASSISTANT_UNAVAILABLE_TEXT, lang: 'en' })
+  await handOffToHuman(s.id, 'Assistant unavailable', `The AI could not answer. Customer wrote: "${last.text.slice(0, 300)}"`)
+}
+
+/** Menu bot for a store whose plan has no AI (no model involved). */
 async function botTurn(s: SessionRow, last: SupportMessage, history: SupportMessage[], brand: string): Promise<void> {
   const orders = s.user_id ? await fetchUserOrders(s.user_id).catch(() => []) : []
   const p = getBotPayload(

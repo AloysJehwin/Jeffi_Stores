@@ -72,6 +72,22 @@ export function platformFunding(): { remainingInr: number; spentInr: number } | 
   return f ? { remainingInr: Math.max(0, f.budgetInr - f.spentInr), spentInr: round4(f.spentInr) } : null
 }
 
+// Store work run outside the store's own request scope (the ecom console on the controller): usage is priced
+// and charged to that store's wallet, and ai-client routes it with the store's provider order and cache partition.
+const billedTo = new AsyncLocalStorage<string>()
+
+export function runBilledTo<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
+  return billedTo.run(tenantId, fn)
+}
+
+/** Inside runBilledTo: the store being billed; else null. */
+export function billedTenantId(): string | null {
+  return billedTo.getStore() ?? null
+}
+
+const billingOwner = async () => billedTo.getStore() ?? (await credentialOwnerId())
+const billedRef = (ref: string | null | undefined) => ref ?? (billedTo.getStore() ? `tenant:${billedTo.getStore()}` : null)
+
 type PriceRow = { price_inr: number; cost_inr: number; model: string }
 
 // 5-min in-process price cache. Keyed by capability+unit_type (the lookup granularity below).
@@ -133,7 +149,7 @@ const round4 = (n: number) => Math.round(n * 10000) / 10000
 export async function preauthorize(
   input: Omit<UsageInput, 'costInr' | 'units'> & { estimateUnits: UsageUnits[] }
 ): Promise<{ usageId: string; priceInr: number }> {
-  const ownerId = await credentialOwnerId()
+  const ownerId = await billingOwner()
   const isFlagship = isPlatformOwner(ownerId)
   const f = funded.getStore()
   const estimated = isFlagship || f?.walletRef ? 0 : await priceUnits(input.capability, input.provider, input.model, input.estimateUnits)
@@ -142,7 +158,7 @@ export async function preauthorize(
     `INSERT INTO ai_usage (feature, capability, provider, model, units, cost_inr, price_inr, wallet_ref, status, ref, actor)
      VALUES ($1,$2,$3,$4,$5::jsonb, 0, $6, NULL, 'pending', $7, $8)
      RETURNING id`,
-    [input.feature, input.capability, input.provider, input.model, JSON.stringify(input.estimateUnits), estimated, input.ref ?? null, input.actor ?? null]
+    [input.feature, input.capability, input.provider, input.model, JSON.stringify(input.estimateUnits), estimated, billedRef(input.ref), input.actor ?? null]
   )
   const usageId = row!.id
   const walletRef = `ai:${usageId}`
@@ -202,7 +218,7 @@ export async function settle(
     f.spentInr += finalPrice
     return
   }
-  const ownerId = await credentialOwnerId()
+  const ownerId = await billingOwner()
   if (isPlatformOwner(ownerId)) return
   await trueUp({ tenantId: ownerId, amountInr: finalPrice, externalRef: walletRef, note: `AI: ${aiFeatureLabel(current.feature)}` }).catch(err => {
     console.warn('[ai-billing] trueUp failed', (err as Error).message)
@@ -214,7 +230,7 @@ export async function settle(
  *  marks the row 'unpaid' and throws AiWalletError (the caller already has the result and
  *  decides what to do). The flagship never debits (price 0). */
 export async function recordUsage(input: UsageInput): Promise<{ usageId: string; priceInr: number }> {
-  const ownerId = await credentialOwnerId()
+  const ownerId = await billingOwner()
   const isFlagship = isPlatformOwner(ownerId)
   const f = funded.getStore()
   const price = isFlagship || f?.walletRef ? 0 : await priceUnits(input.capability, input.provider, input.model, input.units)
@@ -230,7 +246,7 @@ export async function recordUsage(input: UsageInput): Promise<{ usageId: string;
       JSON.stringify(input.units),
       round4(input.costInr || 0),
       round4(price),
-      input.ref ?? null,
+      billedRef(input.ref),
       input.actor ?? null,
       input.latencyMs ?? null,
       input.cache ?? null,
@@ -273,7 +289,7 @@ export async function recordUsage(input: UsageInput): Promise<{ usageId: string;
 /** Convenience: callers that have no estimate yet can ask whether the wallet can likely cover a
  *  price. Used by lib/shared/ai-client.ts to log 'unpaid' when the balance can't pay. */
 export async function tenantCanPay(amountInr: number): Promise<{ ok: boolean; balance: number }> {
-  const ownerId = await credentialOwnerId()
+  const ownerId = await billingOwner()
   if (isPlatformOwner(ownerId)) return { ok: true, balance: 0 }
   const w = await getTenantWallet(ownerId).catch(() => null)
   const bal = w?.balance ?? 0

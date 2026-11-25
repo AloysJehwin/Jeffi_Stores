@@ -15,11 +15,11 @@ import { GET } from '@controller/app/api/(internal)/internal/ai/health/route'
 import { INCIDENT_KEY } from '@controller/lib/shared/ai-health'
 import { sendPlatformAlert } from '@controller/lib/provisioning/alerts'
 
-const OLLAMA = 'http://ollama.test:11434'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 let gatewayChat: () => any
-let ollamaUp = true
+let readyz: () => any
+let providers: () => any
 
 const res = (status: number, body: unknown) => ({
   ok: status < 400,
@@ -36,20 +36,19 @@ beforeEach(() => {
   store.clear()
   vi.mocked(sendPlatformAlert).mockClear()
   vi.stubEnv('CRON_SECRET', 'test-cron-secret')
-  vi.stubEnv('OLLAMA_BASE_URL', OLLAMA)
+  vi.stubEnv('OLLAMA_BASE_URL', 'http://ollama.test:11434')
   vi.stubEnv('NODE_ENV', 'production')
   vi.spyOn(console, 'error').mockImplementation(() => {})
   gatewayChat = () => res(200, { content: 'OK', fallbackUsed: false })
-  ollamaUp = true
+  readyz = () => res(200, { ok: true })
+  providers = () => res(200, { text: [{ name: 'anthropic', configured: true }, { name: 'razer', configured: false }] })
   mockFetch.mockReset()
   mockFetch.mockImplementation(async (url: string) => {
     const u = String(url)
-    if (u.startsWith(OLLAMA)) {
-      if (!ollamaUp) throw new TypeError('fetch failed')
-      return res(200, { models: [] })
-    }
+    if (u.includes('ollama.test')) throw new Error(`direct Ollama call: ${u}`)
     if (u.endsWith('/v1/chat')) return gatewayChat()
-    if (u.endsWith('/readyz')) return res(503, { ok: false, reason: 'no healthy Ollama' })
+    if (u.endsWith('/readyz')) return readyz()
+    if (u.endsWith('/v1/providers')) return providers()
     throw new Error(`unexpected ${u}`)
   })
 })
@@ -64,17 +63,19 @@ describe('GET /api/internal/ai/health', () => {
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
-  it('runs a tiny uncached gateway chat and stays quiet when healthy', async () => {
+  it('checks only the gateway: a tiny uncached chat, /readyz and /v1/providers', async () => {
     const r = await GET(req())
     expect(r.status).toBe(200)
-    expect(await r.json()).toMatchObject({ ok: true, incident: 'healthy' })
+    expect(await r.json()).toMatchObject({ ok: true, incident: 'healthy', ready: { ok: true }, providers: { ok: true, text: ['anthropic'] } })
     const chat = mockFetch.mock.calls.find(([u]) => String(u).endsWith('/v1/chat'))!
     expect(JSON.parse(chat[1].body)).toMatchObject({ noCache: true, cacheNamespace: 'ai-health', maxTokens: 5 })
+    expect(mockFetch.mock.calls.every(([u]) => !String(u).includes('ollama.test'))).toBe(true)
     expect(sendPlatformAlert).not.toHaveBeenCalled()
   })
 
   it('alerts once per incident, then once on recovery', async () => {
-    gatewayChat = () => res(500, { error: 'Ollama is not reachable' })
+    gatewayChat = () => res(500, { error: 'all text providers failed' })
+    readyz = () => res(503, { ok: false, reason: 'no healthy Ollama' })
 
     const first = await GET(req())
     expect(first.status).toBe(503)
@@ -87,25 +88,33 @@ describe('GET /api/internal/ai/health', () => {
     expect(store.has(INCIDENT_KEY)).toBe(true)
 
     expect((await (await GET(req())).json()).incident).toBe('ongoing')
-    expect((await (await GET(req())).json()).incident).toBe('ongoing')
     expect(sendPlatformAlert).toHaveBeenCalledTimes(1)
 
     gatewayChat = () => res(200, { content: 'OK' })
+    readyz = () => res(200, { ok: true })
     expect((await (await GET(req())).json()).incident).toBe('recovered')
     expect(sendPlatformAlert).toHaveBeenCalledTimes(2)
     expect(vi.mocked(sendPlatformAlert).mock.calls[1][0]).toContain('recovered')
     expect(store.has(INCIDENT_KEY)).toBe(false)
-
-    expect((await (await GET(req())).json()).incident).toBe('healthy')
-    expect(sendPlatformAlert).toHaveBeenCalledTimes(2)
   })
 
-  it('treats an unreachable direct Ollama as an incident (fallback broken)', async () => {
-    ollamaUp = false
+  it('treats a not-ready gateway or no configured text provider as an incident', async () => {
+    readyz = () => res(503, { ok: false, reason: 'redis queue unreachable' })
+    const notReady = await (await GET(req())).json()
+    expect(notReady.reasons).toEqual(['gateway /readyz HTTP 503: redis queue unreachable'])
+    store.clear()
+
+    readyz = () => res(200, { ok: true })
+    providers = () => res(200, { text: [{ name: 'anthropic', configured: false }] })
+    const none = await (await GET(req())).json()
+    expect(none.reasons).toEqual(['gateway /v1/providers: no text provider is configured'])
+  })
+
+  it('ignores a gateway that predates /readyz', async () => {
+    readyz = () => res(404, {})
     const r = await GET(req())
-    expect(r.status).toBe(503)
-    expect((await r.json()).reasons.join()).toContain('direct Ollama')
-    expect(sendPlatformAlert).toHaveBeenCalledTimes(1)
+    expect(r.status).toBe(200)
+    expect((await r.json()).ready).toEqual({ ok: null })
   })
 
   it('never sends mail outside production', async () => {
