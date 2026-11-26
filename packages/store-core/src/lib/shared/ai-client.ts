@@ -210,7 +210,7 @@ async function gatewayContext(cacheNamespace: string | undefined) {
       .then(() => policy.getAiRouting(store))
       .catch(() => ({}) as Routing),
     Promise.resolve()
-      .then(() => policy.getAnthropicIdentity(store))
+      .then(() => policy.getAnthropicIdentity())
       .catch(() => null),
   ])
   return {

@@ -254,31 +254,25 @@ export interface AnthropicIdentity {
   federationRuleId: string
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const identityCache = new Map<string, { at: number; value: AnthropicIdentity | null }>()
+let identityCache: { at: number; value: AnthropicIdentity | null } | null = null
 
-/** A store's Anthropic workload-identity ids (ai_provider_identities). A store without its own row
- *  (no per-store workspace yet) shares the platform's: the gateway's federation rule accepts any store's
- *  request, and spend is still logged and charged per store. null = not even the platform has one.
- *  `tenantId` undefined = the tenant in the current request scope; null/platform = the flagship row. */
-export async function getAnthropicIdentity(tenantId?: string | null): Promise<AnthropicIdentity | null> {
-  const id = tenantId === undefined ? await resolveTenantId().catch(() => null) : tenantId
-  const tid = id && UUID_RE.test(id) ? id : PLATFORM_TENANT_ID
-  const hit = identityCache.get(tid)
-  if (hit && Date.now() - hit.at < TTL_MS * 10) return hit.value
+/** The environment's one Anthropic workload identity (the platform row of ai_provider_identities): jeffi-production
+ *  in production, jeffi-local in local dev. Every store uses it; spend is still logged and charged per store by our
+ *  own metering. null = no identity, so text falls back to the next provider. */
+export async function getAnthropicIdentity(): Promise<AnthropicIdentity | null> {
+  if (identityCache && Date.now() - identityCache.at < TTL_MS * 10) return identityCache.value
   const r = await controlPlanePool()
     .query<{ workspace_id: string; service_account_id: string; federation_rule_id: string }>(
       `SELECT workspace_id, service_account_id, federation_rule_id FROM ai_provider_identities
-        WHERE tenant_id IN ($1::uuid, $2::uuid) AND provider = 'anthropic'
-        ORDER BY (tenant_id = $1::uuid) DESC LIMIT 1`,
-      [tid, PLATFORM_TENANT_ID]
+        WHERE tenant_id = $1::uuid AND provider = 'anthropic'`,
+      [PLATFORM_TENANT_ID]
     )
     .catch(() => null)
   const row = r?.rows[0]
   const value = row
     ? { workspaceId: row.workspace_id, serviceAccountId: row.service_account_id, federationRuleId: row.federation_rule_id }
     : null
-  identityCache.set(tid, { at: Date.now(), value })
+  identityCache = { at: Date.now(), value }
   return value
 }
 

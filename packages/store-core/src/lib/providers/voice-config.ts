@@ -75,7 +75,7 @@ async function readSettings(): Promise<{ provider: VoiceProviderName; settings: 
 
 /** The non-secret config plus per-part readiness computed from it and from which secrets are set. This is also what voice-service is sent. */
 export async function getVoiceConfigView(): Promise<VoiceConfigView> {
-  const [{ provider, settings }, identity] = await Promise.all([readSettings(), getAnthropicIdentity(null)])
+  const [{ provider, settings }, identity] = await Promise.all([readSettings(), getAnthropicIdentity()])
   const ex = settings.exotel
   const exotel = !!(ex.accountSid && ex.callerId && ex.appId && env('EXOTEL_API_KEY') && env('EXOTEL_API_TOKEN'))
   const twilio = !!(env('TWILIO_ACCOUNT_SID') && env('TWILIO_AUTH_TOKEN') && settings.twilioTest.from && settings.testNumbers.length)

@@ -56,8 +56,8 @@ data:
   AI_TTS_PROVIDERS: "sarvam,azure"
   SARVAM_STT_MODEL: "saaras:v3"
   SARVAM_TTS_MODEL: "bulbul:v3"
-  # Workload identity federation: org-wide id + the projected token (gateway.yaml). Per-store
-  # workspace/service-account/rule ids come with each request from ai_provider_identities.
+  # Workload identity federation: org-wide id + the projected token (gateway.yaml). The one production
+  # workspace/service-account/rule (jeffi-production) comes with each request from ai_provider_identities.
   ANTHROPIC_ORGANIZATION_ID: ""
   ANTHROPIC_IDENTITY_TOKEN_FILE: "/var/run/secrets/anthropic/token"
   # Must equal the projected token audience in gateway.yaml.

@@ -768,11 +768,11 @@ CREATE TABLE IF NOT EXISTS public.platform_provider_settings (
     updated_at  timestamp with time zone NOT NULL DEFAULT now()
 );
 
--- ai_provider_identities: per-store AI provider workload identity (non-secret ids). For Anthropic
--- one workspace + service account + federation rule per store; the gateway exchanges its pod token
--- for a workspace-scoped access token with them. tenant_id is the store (the platform id for
--- the flagship). Provisioned outside the app; read by lib/providers/policy.ts. No row = no Claude
--- for that store (text falls back to Razer).
+-- ai_provider_identities: the environment's AI provider workload identity (non-secret ids). One row, the
+-- platform's (tenant_id = the platform id): Anthropic workspace + service account + federation rule
+-- jeffi-production (or jeffi-local), used by every store; spend is charged per store by our own metering.
+-- The gateway exchanges its pod token for a workspace-scoped access token with them. Provisioned outside
+-- the app; read by lib/providers/policy.ts. No row = no Claude (text falls back to the next provider).
 CREATE TABLE IF NOT EXISTS public.ai_provider_identities (
     tenant_id           uuid NOT NULL,
     provider            text NOT NULL,
