@@ -351,7 +351,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     expect((await res.json()).success).toBe(true)
   })
 
-  it('asks the controller for a UPI QR when paymentMode is upi_qr', async () => {
+  it('dry-runs a upi_qr conversion for its QR (nothing kept, no QR request)', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue(FINAL_QUOTATION as any)
@@ -362,12 +362,11 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     const client = makeMockClient()
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
-    const res = await POST(makePost({ paymentMode: 'upi_qr' }), PARAMS)
+    const res = await POST(makePost({ paymentMode: 'upi_qr', dryRun: true }), PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.success).toBe(true)
-    expect(body.qrImageUrl).toBeNull()
-    expect(body.qrRequest).toMatchObject({ amountPaise: expect.any(Number), description: expect.stringContaining('Acme Store') })
+    expect(body).toMatchObject({ dryRun: true, totalAmount: expect.any(Number), savedAsDraft: false })
+    expect(body.qrRequest).toBeUndefined()
   })
 
   it('returns 500 when withTransaction throws', async () => {

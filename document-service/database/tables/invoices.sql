@@ -62,7 +62,8 @@ CREATE TABLE public.cash_sales (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     search_vector tsvector,
-    status character varying DEFAULT 'active'::character varying NOT NULL
+    status character varying DEFAULT 'active'::character varying NOT NULL,
+    razorpay_payment_id text
 );
 
 

@@ -218,6 +218,16 @@ describe('POST /api/admin/orders/create', () => {
     expect(res.status).toBe(422)
   })
 
+  it('refuses upi_qr: the QR comes first (qr-intents), the invoice once paid', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { ...parsedOrderData, paymentMode: 'upi_qr' } } as any)
+    const res = await POST(makePost({ ...validOrderBody, paymentMode: 'upi_qr' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/qr-intents/)
+    expect(mockWithTx).not.toHaveBeenCalled()
+  })
+
   it('returns 400 when an item is a digital product', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)

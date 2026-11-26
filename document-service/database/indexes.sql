@@ -37,6 +37,9 @@ CREATE INDEX idx_cash_sales_invoice_date ON public.cash_sales USING btree (invoi
 
 CREATE INDEX idx_cash_sales_invoice_number ON public.cash_sales USING btree (invoice_number);
 
+-- A UPI QR sale (payment_intents) records its Razorpay payment once.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cash_sales_razorpay_payment ON public.cash_sales USING btree (razorpay_payment_id) WHERE (razorpay_payment_id IS NOT NULL);
+
 
 
 --

@@ -463,11 +463,42 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     expect(res.status).toBe(200)
   })
 
-  it('accepts upi_qr payment mode', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeDefaultClient()))
-
+  it('refuses a direct upi_qr sale: the QR comes first', async () => {
     const res = await POST(postReq({ ...VALID_BODY, paymentMode: 'upi_qr' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/qr-intents/)
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('dry-runs a upi_qr sale for its QR: the total out, nothing kept', async () => {
+    const client = makeDefaultClient()
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(postReq({ ...VALID_BODY, paymentMode: 'upi_qr', dryRun: true }))
     expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ dryRun: true, totalAmount: 100 })
+    expect(client.query.mock.calls.some((c: any[]) => String(c[0]).includes('INSERT INTO cash_sales'))).toBe(true)
+  })
+
+  const QR = { razorpayPaymentId: 'pay_1', razorpayQrId: 'qr_1', amountPaise: 10000, intentId: 'i1' }
+  const finaliser = (body: Record<string, unknown>) => {
+    const req = postReq({ ...VALID_BODY, paymentMode: 'upi_qr', ...body })
+    req.claims = { service: 'platform', tenantId: 't', internal: true, adminId: 'admin-1', qrIntent: 'i1', exp: 0 } as any
+    return req
+  }
+
+  it('records the Razorpay payment on a sale the QR finaliser makes', async () => {
+    const client = makeDefaultClient()
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(finaliser({ qrPayment: QR }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ saleId: 'sale-uuid-1', saleNumber: expect.stringMatching(/^CS-/), totalAmount: 100 })
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('SET razorpay_payment_id = $2'), ['sale-uuid-1', 'pay_1'])
+  })
+
+  it('refuses a QR payment from anyone but its finaliser, and one for another total', async () => {
+    expect((await POST(postReq({ ...VALID_BODY, paymentMode: 'upi_qr', qrPayment: QR }))).status).toBe(403)
+    expect((await POST(finaliser({ qrPayment: { ...QR, amountPaise: 1 } }))).status).toBe(409)
+    expect(withTransaction).not.toHaveBeenCalled()
   })
 
   // --- null paymentMode defaults to cash ---

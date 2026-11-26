@@ -263,3 +263,33 @@ CREATE TABLE public.upi_bank_observations (
     matched_intent_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: payment_intents; Type: TABLE; Schema: public; Owner: -
+--
+-- QR-first admin sales (lib/payments/qr-intents.ts): a one-time Razorpay QR for an invoice, quotation conversion,
+-- draft finalise or cash sale. payload is the create call's validated body; the document is made from it only
+-- after Razorpay confirms the payment (webhook, poll or sweep). result_ref: the order or cash sale it made.
+
+CREATE TABLE public.payment_intents (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    kind character varying(32) NOT NULL,
+    payload jsonb NOT NULL,
+    amount_paise bigint NOT NULL,
+    razorpay_qr_id text,
+    qr_image_url text,
+    status character varying(16) DEFAULT 'pending'::character varying NOT NULL,
+    razorpay_payment_id text,
+    payment jsonb,
+    result_ref uuid,
+    error text,
+    actor jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_by uuid,
+    expires_at timestamp with time zone NOT NULL,
+    paid_at timestamp with time zone,
+    finalised_at timestamp with time zone,
+    checked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);

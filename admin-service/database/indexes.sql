@@ -1839,6 +1839,10 @@ CREATE INDEX IF NOT EXISTS idx_upi_payment_intents_order ON public.upi_payment_i
 -- UPG: one payer per UPI ID at a time; the queue behind it is read FIFO.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_upi_payment_intents_vpa_slot ON public.upi_payment_intents USING btree (receiving_vpa) WHERE ((status)::text = ANY (ARRAY['active'::text, 'processing'::text]));
 CREATE INDEX IF NOT EXISTS idx_upi_payment_intents_vpa_queue ON public.upi_payment_intents USING btree (receiving_vpa, status, created_at) WHERE (receiving_vpa IS NOT NULL);
+-- QR intents: the webhook finds one by its QR, the sweep reads the open ones; a payment finalises one intent.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_intents_qr ON public.payment_intents USING btree (razorpay_qr_id) WHERE (razorpay_qr_id IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_intents_payment ON public.payment_intents USING btree (razorpay_payment_id) WHERE (razorpay_payment_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_open ON public.payment_intents USING btree (status, expires_at) WHERE ((status)::text = ANY (ARRAY['pending'::text, 'paid'::text]));
 CREATE UNIQUE INDEX IF NOT EXISTS uq_upi_bank_observations_utr ON public.upi_bank_observations USING btree (utr) WHERE (utr IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_upi_bank_observations_vpa_observed ON public.upi_bank_observations USING btree (receiving_vpa, observed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payment_disputes_order ON public.payment_disputes USING btree (order_id);

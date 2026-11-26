@@ -18,7 +18,7 @@ import { sendBusinessInvoiceGeneratedEmail } from '../../lib/mail-business'
 import { lineItemExGst } from '../../lib/pricing'
 import { getFeatureFlags, getBusinessValues } from '../../lib/site-controls'
 import { findDigitalProductIds } from '../../lib/digital-guard'
-import { currentBrandNameAsync } from '../../lib/brand'
+import { amountMismatch, DryRun, isDryRun, qrPaymentOf, recordQrPayment, upiQrRefused } from '../../lib/qr-payment'
 import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom, lockNewDraft } from '../../lib/draft-locks'
 
 
@@ -73,6 +73,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const serialAssignments: { order_item_id: string; serial_number: string }[] = Array.isArray(body.serial_assignments)
       ? body.serial_assignments
       : []
+    // UPI QR: a dry run when the QR is made, then the real convert once Razorpay confirmed the payment.
+    const { qr, refused } = qrPaymentOf(request, body)
+    if (refused) return refused
+    const upiRefused = upiQrRefused(request, body, paymentMode)
+    if (upiRefused) return upiRefused
+    const dryRun = isDryRun(body)
 
     const isBuyerSame = quotation.buyer_same !== false
     const buyerState = isBuyerSame ? quotation.consignee_state : quotation.buyer_state || quotation.consignee_state
@@ -222,8 +228,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
     // Same formula as the quotation total (subtotal + unrounded tax, rounded once).
     const totalAmount = round2(subtotal + totalCgst + totalSgst + totalIgst)
-    // cash and bank_transfer are immediately paid; upi_qr and credit are unpaid until confirmed
-    const isPaid = paymentMode === 'cash' || paymentMode === 'bank_transfer'
+    if (qr) {
+      const mismatch = amountMismatch(totalAmount, qr)
+      if (mismatch) return mismatch
+    }
+    // cash and bank_transfer are immediately paid; credit is unpaid; upi_qr only converts once paid
+    const isPaid = paymentMode === 'cash' || paymentMode === 'bank_transfer' || !!qr
     const today = new Date().toISOString()
 
     const result = await withTransaction(async client => {
@@ -255,6 +265,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const insufficientItems = shortfalls.map(formatShortfall)
 
       const saveAsDraft = insufficientItems.length > 0
+      // A paid QR conversion can't become a draft.
+      if (saveAsDraft && qr) throw new InsufficientStockError(`Not enough stock: ${insufficientItems.join('; ')}`, 'Not enough stock')
       const orderStatus = saveAsDraft
         ? enableDelivery
           ? 'processing'
@@ -393,11 +405,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         newOrder.id,
         id,
       ])
+      if (qr) await recordQrPayment(client, newOrder.id, qr)
 
       // Converting ends the quotation's lock; a draft invoice it leaves behind is the converter's.
       const quoteLock = await assertHolder(client, admin, 'quotation', id, { epoch: epochFrom(request) })
       await closeLock(client, admin, 'quotation', id, 'converted')
 
+      if (dryRun) throw new DryRun({ totalAmount, savedAsDraft: saveAsDraft, insufficientItems, insufficientDetails: shortfalls })
       return {
         id: newOrder.id,
         order_number: newOrder.order_number,
@@ -451,18 +465,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    // The controller makes the UPI QR on the store's own Razorpay keys (this service holds none).
-    const qrRequest =
-      paymentMode === 'upi_qr'
-        ? {
-            orderId: result.id,
-            orderNumber: result.order_number,
-            amountPaise: Math.round(totalAmount * 100),
-            name: `Invoice ${result.invoice_number || result.order_number}`,
-            description: `${await currentBrandNameAsync()} Invoice ${result.invoice_number}`,
-          }
-        : null
-
     return NextResponse.json({
       success: true,
       orderId: result.id,
@@ -472,11 +474,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       savedAsDraft: result.saveAsDraft,
       insufficientItems: result.insufficientItems,
       insufficientDetails: result.shortfalls,
-      qrImageUrl: null,
-      qrRequest,
+      totalAmount,
       needsDelivery: enableDelivery && !result.saveAsDraft,
     })
   } catch (err: any) {
+    if (err instanceof DryRun) return NextResponse.json({ dryRun: true, ...err.result })
     const locked = draftLockResponse(err)
     if (locked) return locked
     if (err instanceof InsufficientStockError)

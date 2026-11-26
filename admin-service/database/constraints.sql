@@ -1723,6 +1723,11 @@ ALTER TABLE ONLY public.upi_bank_observations ADD CONSTRAINT upi_bank_observatio
 ALTER TABLE ONLY public.upi_bank_observations ADD CONSTRAINT upi_bank_observations_kind_check CHECK (kind IN ('credit','gmail_forwarding'));
 ALTER TABLE ONLY public.upi_payment_intents ADD CONSTRAINT upi_payment_intents_amount_check CHECK (amount_paise > 0);
 
+ALTER TABLE ONLY public.payment_intents ADD CONSTRAINT payment_intents_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.payment_intents ADD CONSTRAINT payment_intents_kind_check CHECK (kind IN ('invoice','quotation_convert','invoice_draft_finalise','cash_sale'));
+ALTER TABLE ONLY public.payment_intents ADD CONSTRAINT payment_intents_status_check CHECK (status IN ('pending','paid','finalised','expired','cancelled','failed'));
+ALTER TABLE ONLY public.payment_intents ADD CONSTRAINT payment_intents_amount_check CHECK (amount_paise > 0);
+
 ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_razorpay_dispute_id_key UNIQUE (razorpay_dispute_id);
 ALTER TABLE ONLY public.payment_disputes ADD CONSTRAINT payment_disputes_status_check CHECK (status IN ('open','under_review','won','lost','closed'));
