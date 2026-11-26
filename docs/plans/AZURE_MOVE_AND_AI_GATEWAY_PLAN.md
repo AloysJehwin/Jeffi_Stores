@@ -35,6 +35,16 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **Phase D/E tooling (2026-11-26):**
   - `deploy/azure/rehearsal/` covers restore, safe mode and the rehearsal vault (`jeffi-reh-kv`, allowlisted keys only), and runs the smoke and store round trip against production hostnames by IP.
   - `deploy/azure/cutover/` is the cutover driver plus rollback. Existing AWS store nodes re-join the Azure-led cluster in place: their Postgres stays on the node's EBS, and the nodes read the join secret from Secrets Manager themselves.
+- **AWS side, applied 2026-11-26:**
+  - OIDC issuer stack `jeffi-oidc-issuer` (us-east-1): bucket `jeffi-oidc-issuer-708835965056`, CloudFront `E1TL2LMMTV4YOW`. https://oidc.jeffistores.in serves the discovery document and JWKS (key `Z_CKyUqx…`).
+  - IRSA: the OIDC provider plus roles `jeffi-irsa-{app,controller,cert-manager,ecr-pull}`.
+  - Tenant edge `i-05ed28be747256c92` (t4g.small), Elastic IP 100.49.129.228 (= `CLUSTER_INGRESS_IP`), security groups `jeffi-k8s-node` + `jeffi-tenant-edge`.
+  - Tailnet policy:
+    - tag:ci reaches the core's 6443 and Postgres 5432;
+    - servers reach each other on all ports, and reach the Postgres subnet;
+    - the admin and owner reach 6443 and 5432 and can SSH as jeffi;
+    - routes are auto-approved.
+    - The pre-change policy is in ~/Documents/db-backups/tailscale-policy-before-2026-11-26.hujson.
 - **Overlay:** `azure.env` ids and `K8S_SERVER_URL` are filled. `CLUSTER_INGRESS_IP` waits for the AWS edge (step 10).
 - **Still to do:** the kubeconfig over `tailscale ssh` (the ACL gives nobody SSH to tag:server-prod yet), Postgres, IRSA (step 7) and the tenant edge.
 
