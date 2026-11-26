@@ -59,9 +59,11 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
       - `app.json` gained the documents bucket and WhatsApp template submission.
       - The controller gained domain purchase, and voice-service the cluster identity.
       - The runbook sets `AZURE_TARGET` only at cutover, and builds the `ai-gateway` Secret.
+    - **Applied 2026-11-27:**
+      - `aws-roles.sh --apply` pushed the new IRSA policies; the live inline policies equal the repo.
+      - `jeffi-tenant-provisioning` v4 (= the repo file) is the default. It adds `ec2:DeleteSnapshot` on `jeffi:role=db` snapshots, which the IAM user `Jeffi_Stores` gets too. v3 is kept for rollback.
+      - Policy simulation allows the documents bucket, WhatsApp template submission, domain purchase and tagged snapshot deletion.
     - **Open:**
-      - `jeffi-tenant-provisioning` v3 lacks `ec2:DeleteSnapshot` (the repo has it).
-      - `aws-roles.sh --apply` has to push the new IRSA policies.
       - Every service secret still holds the static `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` of IAM user `Jeffi_Stores`. The SDKs prefer them over IRSA, so Azure pods would act as that user until the keys are removed.
       - The CI lanes are not cutover-safe yet. With both clusters live, jobs and workers would run twice, `release-aws` would keep re-applying the AWS platform after cutover, and `release-azure` has no store steps or tenant fan-out.
 - **Still to do:** Postgres (then `pg-init.sh` and the rehearsal), the open audit items above, and the Anthropic clean-up after #646's production release.
