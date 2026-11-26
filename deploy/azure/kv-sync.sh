@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copy every jeffi/* Secrets Manager secret into Key Vault under its dash name (jeffi/production -> jeffi-production,
 # keyVaultName() in packages/store-core/src/lib/secrets/index.mjs; a test keeps kv_name equal to it). Dry run by default: lists each secret, its size and whether it
-# would be created, updated or left alone. --apply writes. jeffi/local* (developer secrets) is skipped unless
+# would be created, updated or left alone. --apply writes. jeffi/local* and jeffi/*/local (developer secrets) are skipped unless
 # --include-local. Values are never printed: each one goes from the AWS call into a 0600 file in a private temp
 # dir, is compared by sha256 and uploaded with `az keyvault secret set --file`, and the dir is removed on exit.
 # With asm-exec on PATH, values are resolved through it ({{resolve:secretsmanager:...}}) instead of the AWS CLI.
@@ -62,7 +62,7 @@ printf '%-44s %-44s %8s  %s\n' "Secrets Manager" "Key Vault ($KV)" bytes action
 n=0 bad=0
 while read -r id; do
   [ -n "$id" ] || continue
-  case $id in jeffi/local*) $LOCAL || { printf '%-44s %-44s %8s  %s\n' "$id" - - "skipped (local)"; continue; } ;; esac
+  case $id in jeffi/local*|jeffi/*/local) $LOCAL || { printf '%-44s %-44s %8s  %s\n' "$id" - - "skipped (local)"; continue; } ;; esac
   name=$(kv_name "$id")
   [ ${#name} -le 127 ] || { echo "$id: Key Vault name too long" >&2; bad=1; continue; }
   if ! sm_read "$id" "$tmp/src" 2>"$tmp/err"; then echo "$id: read failed: $(head -c 200 "$tmp/err")" >&2; bad=1; continue; fi
