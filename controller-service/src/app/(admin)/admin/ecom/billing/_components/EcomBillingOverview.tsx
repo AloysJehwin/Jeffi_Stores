@@ -6,6 +6,7 @@ import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, type Col } from
 import { TrendChart, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import type { EcomBillingOverview as Data } from '@controller/lib/overviews/ecom-billing'
 import { LINE_KIND_LABEL } from '@controller/components/admin/ecom/detail/BillingTables'
+import { ECOM_BILLING_INSIGHTS } from '../../_components/ecom-insights'
 import { OverviewShell, Grid2, dateIn, useEcomOverview } from '../../_components/overview-shell'
 import { BillingOverviewLoading } from '../../_components/skeletons'
 
@@ -85,7 +86,7 @@ const STORE_STATES = [
 export default function EcomBillingOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/billing/overview')
   return (
-    <OverviewShell {...o} skeleton={<BillingOverviewLoading />}>
+    <OverviewShell {...o} skeleton={<BillingOverviewLoading />} insights={ECOM_BILLING_INSIGHTS}>
       {d => {
         const w = d.current.wallet
         return (

@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Inbox } from 'lucide-react'
 import { Tabs, btnGhost } from '@/components/admin/channels/ui'
 import { ErrorState } from '@/components/admin/kit/states'
 import { PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { PageInsights } from '@/components/admin/insights'
 import { SHOWCASE_TABS, parseShowcaseTab, type ShowcaseTab, type ShowcaseTabData } from '@/lib/traffic/showcase-types'
 import type { ShowcaseStatus } from '@/lib/showcase/types'
 import PageHeader from '../../../_components/PageHeader'
@@ -18,6 +19,7 @@ import LeadsTab from './_components/LeadsTab'
 import AudienceTab from './_components/AudienceTab'
 import RealtimeTab from './_components/RealtimeTab'
 import AnalyticsTabLoading from './_components/AnalyticsLoading'
+import { showcaseInsights } from './_components/showcase-insights'
 
 const LABELS: Record<ShowcaseTab, string> = {
   overview: 'Overview',
@@ -40,6 +42,7 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
   const tab = parseShowcaseTab(sp.get('tab'))
   const [period, setPeriod] = usePeriod('30d')
   const live = tab === 'realtime'
+  const insights = useMemo(() => showcaseInsights(siteId, tenantSlug), [siteId, tenantSlug])
   const base = `/api/ecom/showcase/${siteId}/analytics?tenant=${encodeURIComponent(tenantSlug)}`
   const url = live ? `${base}&tab=realtime` : `${base}&tab=${tab}&from=${period.from}&to=${period.to}`
   const { data, error, loading, reload } = useOverviewData<{ tab: ShowcaseTab } & Record<string, any>>(url)
@@ -105,7 +108,7 @@ export default function AnalyticsClient({ siteId, name, host, status, tenantSlug
         {live ? (
           <p className="text-xs text-foreground-muted">Live: visits in the last 30 minutes and enquiries in the last day.</p>
         ) : (
-          <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+          <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={insights} />} />
         )}
 
         {error ? (

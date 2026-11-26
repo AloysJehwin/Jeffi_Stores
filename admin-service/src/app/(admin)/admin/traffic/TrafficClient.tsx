@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { TRAFFIC_INSIGHTS } from './traffic-insights'
 import { useCallback, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, btnGhost } from '@/components/admin/channels/ui'
@@ -77,7 +79,7 @@ export default function TrafficClient() {
       {live ? (
         <p className="text-xs text-foreground-muted">Live: the last 30 minutes of visits and the last hour of orders.</p>
       ) : (
-        <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+        <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={TRAFFIC_INSIGHTS} />} />
       )}
 
       {error ? (

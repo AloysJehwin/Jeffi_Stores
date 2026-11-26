@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { PeriodBar, usePeriod, useOverviewData } from '@/components/admin/overview/kit'
+import { PageInsights, type InsightsConfig } from '@/components/admin/insights'
 import type { Period } from '@/lib/overview/period'
 
 /** Period bar + loader shared by the platform overviews; renders children only with fresh data. */
@@ -20,6 +21,7 @@ export function OverviewShell<T>({
   loading,
   reload,
   skeleton,
+  insights,
   children,
 }: {
   period: Period
@@ -30,11 +32,13 @@ export function OverviewShell<T>({
   reload: () => void
   /** The overview's own body shape while its first data loads. */
   skeleton: ReactNode
+  /** The page's insights sheet, opened from the period bar. */
+  insights?: InsightsConfig
   children: (d: T) => ReactNode
 }) {
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={insights && <PageInsights config={insights} />} />
       {error ? (
         <p className="rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
           {error}
