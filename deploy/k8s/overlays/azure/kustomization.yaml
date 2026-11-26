@@ -26,7 +26,7 @@ patches:
   - path: patches/apps-identity.yaml
     target:
       kind: Deployment
-      name: jeffi-stores-(storefront|admin|business|messaging|document|public-api|mobile|showcase)-service(-edge)?
+      name: jeffi-stores-(storefront|admin|business|messaging|document|public-api|mobile|showcase|voice)-service(-edge)?
   - path: patches/controller-identity.yaml
   - path: patches/ecr-refresh-identity.yaml
   - path: patches/cert-manager-identity.yaml

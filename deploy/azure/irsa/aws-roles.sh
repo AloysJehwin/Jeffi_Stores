@@ -5,8 +5,9 @@
 #   jeffi-irsa-app          jeffi:jeffi-app (storefront, admin, business, messaging, documents, public-api, mobile,
 #                           showcase): S3, End User Messaging (policies/app.json)
 #   jeffi-irsa-controller   jeffi:jeffi-stores-controller-service: the same, the fleet config, WhatsApp templates
-#                           (policies/controller.json) and store provisioning on EC2/RDS, the managed policy
-#                           jeffi-tenant-provisioning (= deploy/aws/tenant-provisioner-iam-policy.json)
+#                           (policies/controller.json), domain purchase (deploy/aws/domain-purchase-iam-policy.json)
+#                           and store provisioning on EC2/RDS, the managed policy jeffi-tenant-provisioning
+#                           (= deploy/aws/tenant-provisioner-iam-policy.json)
 #   jeffi-irsa-cert-manager cert-manager:cert-manager: Route 53 DNS-01 in the jeffistores.in zone
 #   jeffi-irsa-ecr-pull     jeffi:ecr-refresh: the regcred pull secret
 # Run after publish-oidc.sh (the provider fetches the discovery document). Dry run by default (prints the trust
@@ -29,12 +30,16 @@ trust() { # <namespace> <service account>
  "Condition":{"StringEquals":{"$HOST:aud":"sts.amazonaws.com","$HOST:sub":"system:serviceaccount:$1:$2"}}}]}
 JSON
 }
-policy() { sed -e "s/__ACCOUNT__/$ACCOUNT/g" -e "s/__ZONE__/$ZONE/g" "$DIR/policies/$1.json"; }
+# policies/<name>.json, else the AWS-side file deploy/aws/<name>-iam-policy.json (one copy, shared with the IAM user).
+policy() {
+  local f=$DIR/policies/$1.json; [ -f "$f" ] || f=$DIR/../../aws/$1-iam-policy.json
+  sed -e "s/__ACCOUNT__/$ACCOUNT/g" -e "s/__ZONE__/$ZONE/g" "$f"
+}
 
 # name | namespace | service account | inline policies | managed policies
 ROLES=(
   "jeffi-irsa-app|jeffi|jeffi-app|app|"
-  "jeffi-irsa-controller|jeffi|jeffi-stores-controller-service|app controller|jeffi-tenant-provisioning"
+  "jeffi-irsa-controller|jeffi|jeffi-stores-controller-service|app controller domain-purchase|jeffi-tenant-provisioning"
   "jeffi-irsa-cert-manager|cert-manager|cert-manager|cert-manager|"
   "jeffi-irsa-ecr-pull|jeffi|ecr-refresh|ecr-pull|"
 )

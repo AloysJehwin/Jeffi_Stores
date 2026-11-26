@@ -62,10 +62,10 @@ Before the first store moves, put the Azure `DATABASE_URL` (and `CONTROL_PLANE_D
    - **Auto-approve routes:** add `autoApprovers.routes` for `10.60.2.0/24` and `168.63.129.16/32` by `tag:server-prod`, or approve them by hand after step 4 of the runbook.
    - **Split DNS:** `postgres.database.azure.com` → `168.63.129.16`.
    - **Auth key:** check that `TS_AUTHKEY` in `jeffi/production/k3s` is a reusable, tagged key that has not expired.
-5. **Anthropic federation.** Add a federation rule in the Anthropic console for issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`. It is the same kind of rule as `wif-voice`, and the gateway's token comes from this issuer once it runs on the Azure core.
+5. **Anthropic federation.** Done: rule `jeffi-production-azure` (`fdrl_01QsmDKrzxm6y34Ho52LNwk5`) trusts issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`. The cutover's identity step points the platform row at it.
 6. **GitHub settings.**
    - Secrets: `AZURE_CLIENT_ID` (the `githubClientId` output), `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` come from a Tailscale OAuth client (Settings → Trust credentials, Keys › Auth Keys write, tag `tag:ci`); set each with `gh secret set <name>`, which prompts for the value. Both were set on 2026-11-26.
-   - Variables: `AZURE_INGRESS_IP` (the `ingressIp` output, used until the DNS cutover). Set `AZURE_TARGET=true` last.
+   - Variables: `AZURE_INGRESS_IP` (the `ingressIp` output, used until the DNS cutover). `AZURE_TARGET=true` is set at cutover, not before ([`cutover/README.md`](cutover/README.md)): once it is set, every release applies the Azure platform, and its CronJobs and the messaging and documents workers would run beside AWS's against live providers.
 
 ## Apply runbook (in this order)
 
@@ -101,17 +101,13 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
    KUBECONFIG=~/.kube/jeffi-azure.yaml kubectl get nodes
    ```
    Then store the same file base64 as `KUBECONFIG_AZURE_B64`.
-   Or run `bash deploy/azure/fetch-kubeconfig.sh --apply [--github]`. It never prints the file, and it falls back to `az vm run-command` when Tailscale SSH isn't allowed yet. The tailnet's SSH rule is `check`, so a non-interactive `tailscale ssh` waits for a browser re-auth; the fallback is the normal path from a script. Then run `bash deploy/azure/github-settings.sh --apply` to set the GitHub Azure secrets and `AZURE_INGRESS_IP`; add `--enable-target` only after the rehearsal. The tailnet ACL, route and SSH additions are in [`deploy/tailscale/README.md`](../tailscale/README.md).
+   Or run `bash deploy/azure/fetch-kubeconfig.sh --apply [--github]`. It never prints the file, and it falls back to `az vm run-command` when Tailscale SSH isn't allowed yet. The tailnet's SSH rule is `check`, so a non-interactive `tailscale ssh` waits for a browser re-auth; the fallback is the normal path from a script. Then run `bash deploy/azure/github-settings.sh --apply` to set the GitHub Azure secrets and `AZURE_INGRESS_IP`; add `--enable-target` only at cutover. The tailnet ACL, route and SSH additions are in [`deploy/tailscale/README.md`](../tailscale/README.md).
 6. **Database.**
    ```bash
    bash deploy/azure/pg-init.sh             # dry run
    bash deploy/azure/pg-init.sh --apply
    ```
-   Then put the Azure connection details in `jeffi-production`, for example:
-   ```bash
-   bash deploy/azure/kv-sync.sh --patch jeffi-production DATABASE_URL --apply
-   ```
-   The value is typed and not echoed. Do the same for each Azure-specific key the app reads.
+   Its last step is `kv-sync.sh --azure-db --apply`. That points every service secret (`jeffi-production`, `jeffi-store`, messaging, documents, public-api, mobile) at this server as `app_user`, in `DATABASE_URL`, `CONTROL_PLANE_DATABASE_URL` and `MESSAGING_`/`DOCUMENTS_DATABASE_URL`, with the RDS IAM flags off. The Key Vault copies otherwise carry RDS IAM logins, and the store namespaces get copies of these secrets too. A later plain `kv-sync.sh --apply` keeps the overrides. The overlay also forces `DB_IAM_AUTH`, `RDS_IAM_AUTH` and `CONTROL_PLANE_IAM_AUTH` to false on the platform pods.
 7. **Self-hosted IRSA.**
    ```bash
    bash deploy/azure/irsa/publish-oidc.sh --apply
@@ -125,9 +121,11 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
 9. **Cluster secrets and the platform** (the rehearsal of Phase D). The full rehearsal, with safe mode, its own allowlisted Key Vault, a fresh restore and the smoke and store round trip, is `deploy/azure/rehearsal/` (see its README). The manual commands are:
    ```bash
    KUBECONFIG=~/.kube/jeffi-azure.yaml bash deploy/k8s/bootstrap/secrets.sh
+   JEFFI_CLOUD=azure bash deploy/k8s/bootstrap/ai-gateway-secret.sh
    JEFFI_CLOUD=azure bash deploy/k8s/bootstrap/apply-platform.sh "$(bash deploy/k8s/bootstrap/image-tag.sh)"
    ```
-   From here on, set `AZURE_TARGET=true` so each release also runs DB · Azure, Deploy · Azure · prepare and Release · Azure.
+   `ai-gateway-secret.sh` builds the gateway's `ai-gateway` Secret, which `secrets.sh` does not make. Without `ANTHROPIC_ORGANIZATION_ID` from it, the gateway skips Claude. Its `AI_CACHE_PG_URL` is the semantic cache's RDS URL; the cache is optional, so the gateway works without it, but point it at a database the core can reach to keep caching.
+   Leave `AZURE_TARGET` unset until the cutover (see the GitHub settings above).
 10. **Tenant edge.**
     ```bash
     K8S_SERVER_URL=https://<core TS IP>:6443 NODE_SG=<K8S_NODE_SECURITY_GROUP> bash deploy/aws/edge/launch-edge.sh

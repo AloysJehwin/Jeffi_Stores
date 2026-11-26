@@ -46,6 +46,6 @@ var AZURE_INGRESS_IP "$ingress" "$DEPLOYMENT output ingressIp or publicIpAddress
 if $TARGET; then
   var AZURE_TARGET true "--enable-target (the CI Azure jobs run from the next push)"
 else
-  echo "AZURE_TARGET not touched (--enable-target, only after the rehearsal)"
+  echo "AZURE_TARGET not touched (--enable-target, only at cutover: deploy/azure/cutover/README.md)"
 fi
 if ! $APPLY; then echo "Dry run: nothing set. Re-run with --apply."; fi
