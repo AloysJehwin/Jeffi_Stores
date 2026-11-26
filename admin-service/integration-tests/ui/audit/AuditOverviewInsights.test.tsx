@@ -4,10 +4,12 @@ import { ConfirmProvider } from '@/contexts/ConfirmContext'
 import { asAdmin } from '../_support'
 import { mockReducedMotion } from '../../../../packages/store-core/integration-tests/ui/admin-dashboard/fixtures'
 
+// One stable instance: ListFilters re-syncs whenever the params object changes, so a fresh one per call loops forever.
+const sp = new URLSearchParams()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => '/x',
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => sp,
 }))
 vi.mock('@/components/admin/overview/kit', async importOriginal => ({
   ...(await importOriginal<typeof import('@/components/admin/overview/kit')>()),

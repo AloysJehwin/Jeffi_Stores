@@ -3,7 +3,7 @@
 # the GitHub build role (github-oidc.sh) never reads jeffi/production. Prints key names, never values.
 # Re-run after changing a NEXT_PUBLIC_* key in jeffi/production (scripts/set-secret.sh does it for you).
 # Usage: bash deploy/k8s/bootstrap/build-secret.sh [--dry-run | --check]
-#   --check  read-only; warns when it differs from jeffi/production (Deploy · prepare runs it on every release)
+#   --check  read-only; warns when it differs from jeffi/production (Deploy · AWS · prepare runs it on every release)
 set -euo pipefail
 SRC=jeffi/production DST=jeffi/production/build REGION=us-east-1
 MODE=${1:-}

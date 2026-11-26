@@ -47,7 +47,7 @@ JSON
 DEPLOY_TRUST=$(trust "environment:production" "environment:production-release")
 # OwnSessions: SSM names a session <role session name>-<id>, and CI assumes this role as GitHubActions
 # (.github/actions/release-setup), so the role may close its own tunnels and no one else's.
-# ReadProductionSecret also covers jeffi/production/build (build-secret.sh --check in Deploy · prepare).
+# ReadProductionSecret also covers jeffi/production/build (build-secret.sh --check in Deploy · AWS · prepare).
 DEPLOY_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  {"Sid":"ReadProductionSecret","Effect":"Allow","Action":"secretsmanager:GetSecretValue","Resource":"$SECRETS:jeffi/production*"},
