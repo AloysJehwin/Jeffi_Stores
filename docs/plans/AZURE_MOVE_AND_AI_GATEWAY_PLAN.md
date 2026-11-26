@@ -46,7 +46,12 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
     - routes are auto-approved.
     - The pre-change policy is in ~/Documents/db-backups/tailscale-policy-before-2026-11-26.hujson.
 - **Overlay:** `azure.env` ids and `K8S_SERVER_URL` are filled. `CLUSTER_INGRESS_IP` waits for the AWS edge (step 10).
-- **Still to do:** the kubeconfig over `tailscale ssh` (the ACL gives nobody SSH to tag:server-prod yet), Postgres, IRSA (step 7) and the tenant edge.
+- **Later on 2026-11-26:**
+  - **Kubeconfig:** `~/.kube/jeffi-azure.yaml` was fetched with `fetch-kubeconfig.sh --apply --github`, through the `az vm run-command` fallback. Tailscale SSH is a `check` rule, so a script can't use it. From the Mac over the tailnet, `kubectl get nodes` shows `core` and `tenant-edge` Ready.
+  - **GitHub:** the secrets `KUBECONFIG_AZURE_B64`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` are set, and the variable `AZURE_INGRESS_IP` is 52.172.147.62. `AZURE_TARGET` is unset until the rehearsal passes.
+  - **Missing:** `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET`. The founder creates a Tailscale OAuth client for `tag:ci`; the Azure CI jobs can't join the tailnet without it.
+  - **Postgres:** request 2611260030001583 is still open. On 2026-11-26 the engineer said they are coordinating internally; the response deadline is 2026-11-27 04:55 UTC. Phase D's restore waits on it.
+- **Still to do:** Postgres (then `pg-init.sh` and the rehearsal), the Tailscale OAuth secrets, and the Anthropic clean-up after #646's production release.
 
 **Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
 - **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):
