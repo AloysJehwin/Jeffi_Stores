@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { PageInsights } from '@/components/admin/insights'
+import { RETURNS_INSIGHTS } from './returns-insights'
 import { Kpi, KpiGrid, Section, Banner, Table, Badge, count, money, pct, when } from '@/components/admin/channels/ui'
 import {
   AttentionList,
@@ -85,7 +87,7 @@ export default function ReturnsOverview() {
   )
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={RETURNS_INSIGHTS} />} />
       <ListFilters entity="returns" fields={RETURN_FIELDS} search={REQUEST_SEARCH} period noun="Returns" tab="overview" exportable />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <ReturnsOverviewSkeleton /> : data ? <Body d={data} /> : null}

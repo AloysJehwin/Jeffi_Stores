@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { PageInsights } from '@/components/admin/insights'
+import { SUBSCRIPTIONS_INSIGHTS } from './subscriptions-insights'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { SUBSCRIPTION_FIELDS, SUBSCRIPTION_SEARCH } from '@/lib/filters/fields/subscriptions'
 import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
@@ -27,7 +29,7 @@ export default function SubscriptionsOverview() {
 
   return (
     <div className="space-y-5">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={SUBSCRIPTIONS_INSIGHTS} />} />
       <ListFilters
         entity="subscriptions"
         fields={SUBSCRIPTION_FIELDS}

@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { PageInsights } from '@/components/admin/insights'
+import { INVOICES_INSIGHTS } from './invoices-insights'
 import { useSearchParams } from 'next/navigation'
 import { INVOICE_ALIASES, INVOICE_FIELDS, INVOICE_SEARCH } from '@jeffi/list-filters/fields'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
@@ -38,7 +40,7 @@ export default function InvoicesOverview() {
 
   return (
     <div className="space-y-5">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={INVOICES_INSIGHTS} />} />
       <ListFilters
         entity="invoices"
         fields={INVOICE_FIELDS}
