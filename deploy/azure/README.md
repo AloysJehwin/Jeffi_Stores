@@ -122,7 +122,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
    - Fill `deploy/k8s/overlays/azure/azure.env` with the tenant id and the two cluster client ids.
    - Fill `patches/provisioning.yaml`: `K8S_SERVER_URL` is `https://<core Tailscale IP>:6443`, and `CLUSTER_INGRESS_IP` comes from step 10.
    - Commit. `lib.sh` and `apply-platform.sh` refuse to render while a `REPLACE_ME` is left.
-9. **Cluster secrets and the platform** (the rehearsal of Phase D):
+9. **Cluster secrets and the platform** (the rehearsal of Phase D). The full rehearsal, with safe mode, its own allowlisted Key Vault, a fresh restore and the smoke and store round trip, is `deploy/azure/rehearsal/` (see its README). The manual commands are:
    ```bash
    KUBECONFIG=~/.kube/jeffi-azure.yaml bash deploy/k8s/bootstrap/secrets.sh
    JEFFI_CLOUD=azure bash deploy/k8s/bootstrap/apply-platform.sh "$(bash deploy/k8s/bootstrap/image-tag.sh)"
@@ -137,7 +137,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
     kubectl get node tenant-edge
     kubectl -n kube-system get ds traefik-edge
     ```
-11. **Cutover (Phase E window).**
+11. **Cutover (Phase E window).** `deploy/azure/cutover/cutover.sh` drives these steps: preflight, freeze, final dump and restore, identity, store re-join, DNS, CloudFront, smoke, unfreeze. `rollback.sh` reverses them; the checklist is in that folder's README. The manual equivalent:
     1. A day before:
        ```bash
        EDGE_IP=… AZURE_IP=… bash deploy/aws/edge/route53-plan.sh --lower-ttl --apply

@@ -32,6 +32,9 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **Node secret hygiene** (2026-11-26):
   - `launch-edge.sh` reads the k3s token and Tailscale key at launch, through `SECRETS_BACKEND` aws|keyvault, and writes them into the edge user-data. `--instance-secrets` keeps the old instance read.
   - The default store-node user-data turns tracing off (`set +x`) before the secrets are read, so they no longer reach the EC2 console log.
+- **Phase D/E tooling (2026-11-26):**
+  - `deploy/azure/rehearsal/` covers restore, safe mode and the rehearsal vault (`jeffi-reh-kv`, allowlisted keys only), and runs the smoke and store round trip against production hostnames by IP.
+  - `deploy/azure/cutover/` is the cutover driver plus rollback. Existing AWS store nodes re-join the Azure-led cluster in place: their Postgres stays on the node's EBS, and the nodes read the join secret from Secrets Manager themselves.
 - **Overlay:** `azure.env` ids and `K8S_SERVER_URL` are filled. `CLUSTER_INGRESS_IP` waits for the AWS edge (step 10).
 - **Still to do:** the kubeconfig over `tailscale ssh` (the ACL gives nobody SSH to tag:server-prod yet), Postgres, IRSA (step 7) and the tenant edge.
 
