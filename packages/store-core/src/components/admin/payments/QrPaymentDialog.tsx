@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Dialog, FormButton } from '@/components/admin/kit'
 
-export type QrIntentKind = 'invoice' | 'quotation_convert' | 'cash_sale'
+export type QrIntentKind = 'invoice' | 'quotation_convert' | 'invoice_draft_finalise' | 'cash_sale'
 
 export interface QrIntent {
   intentId: string

@@ -920,7 +920,8 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
 
   async function newQr() {
     setQrIntent(null)
-    await handleCreate({ preventDefault() {} } as React.FormEvent)
+    const ev = { preventDefault() {} } as React.FormEvent
+    await (editId ? handleFinalizeEdit(ev) : handleCreate(ev))
   }
 
   function qrDone(r: QrResult) {
@@ -1160,11 +1161,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
         return
       }
 
-      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
-        body: JSON.stringify({
+      const finalBody = {
           batch_assignments:
             Object.keys(batchAssignments).length > 0
               ? items
@@ -1192,7 +1189,16 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
                   return saved ? { ...sa, order_item_id: saved.order_item_id } : sa
                 })
               : [],
-        }),
+      }
+      if (paymentMode === 'upi_qr') {
+        setQrIntent(await createQrIntent('invoice_draft_finalise', { draftId: editId, ...finalBody }))
+        return
+      }
+      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
+        body: JSON.stringify(finalBody),
       })
       const finalData = await finalRes.json().catch(() => ({}))
       if (!finalRes.ok) {
