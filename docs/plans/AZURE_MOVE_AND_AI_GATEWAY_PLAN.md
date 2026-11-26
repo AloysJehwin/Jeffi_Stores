@@ -13,13 +13,21 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **Secrets:** `kv-sync.sh --apply` copied the 10 production secrets into Key Vault. The `*/local` developer secrets are skipped.
 - **Postgres: not created.** B2s returns `SkuNotAvailable` in every zone. Support request 2611260030001583 (Region access with zonal dependency) is pending. Until it's approved, `DEPLOY_PG=false` skips Postgres. Then run `PG_ZONE=<n> bash deploy/azure/apply.sh --apply` and `pg-init.sh`.
 - **Anthropic federation: one identity per environment** (founder, 2026-11-26). Every store uses it; spend is still charged per store by our own metering.
-  - **Production** is workspace `jeffi-production` (`wrkspc_015htan8z4DDLDEQiUYJC6ci`, formerly jeffi-flagship) and service account `svac_01Y2V3xrZqMpGFaCaNssTvFT`. Its label still reads jeffi-flagship because the console can't rename service accounts.
-    - Rule `jeffi-production` (`fdrl_016JTDCM9cspPwrmpERLUVHQ`) is on the live Razer issuer.
-    - Rule `jeffi-production-azure` (`fdrl_01QsmDKrzxm6y34Ho52LNwk5`) is on issuer `jeffi-azure-k3s` (`fdis_0167MVYogtxoLC6CGPJBJGne`; inline JWKS, JTI replay protection off, 1h), with subject `system:serviceaccount:jeffi:ai-gateway` and 1h tokens.
-    - A rule's issuer can't be changed. At cutover: archive the Razer rule, rename the Azure one to `jeffi-production`, and set the platform row's `federation_rule_id` to `fdrl_01QsmDKrzxm6y34Ho52LNwk5`.
-  - **Local** is workspace `jeffi-local`, service account `svac_01VrKZwGVrwZWEbkUuthoYQ5` (label jeffi-local-gateway), and rule `jeffi-local` (`fdrl_01J3WgQ2YoVatMdU2mzsnYp3`).
-  - Code: `getAnthropicIdentity()` reads only the platform row of `ai_provider_identities`. Migration `2026-11-26_single_anthropic_identity.sql` drops the per-store rows.
-  - After that release: archive the `jeffi-t-testco` rule, service account and workspace.
+  - **Production:** workspace `jeffi-production` (`wrkspc_015htan8z4DDLDEQiUYJC6ci`) and service account `jeffi-production` (`svac_01HXWF7V5MmqFNXzAaxbofaH`).
+    - Rule `jeffi-production-next` (`fdrl_015c1KmN69fVRfNYSuA5pZMF`) is on the Razer issuer.
+    - Rule `jeffi-production-azure` (`fdrl_01QsmDKrzxm6y34Ho52LNwk5`) is on issuer `jeffi-azure-k3s` (`fdis_0167MVYogtxoLC6CGPJBJGne`; inline JWKS, JTI replay protection off, 1h), with subject `system:serviceaccount:jeffi:ai-gateway`.
+    - The old rule `jeffi-production` (`fdrl_016JTDCM9cspPwrmpERLUVHQ`, old account jeffi-flagship) keeps serving until the release.
+  - **Local:** workspace `jeffi-local`, service account `jeffi-local` (`svac_01LfjoK5ho82QqgeNVrpLrtk`), and rule `jeffi-local` (`fdrl_01J3WgQ2YoVatMdU2mzsnYp3`). Already switched in the local DB.
+  - **Code:** `getAnthropicIdentity()` reads only the platform row. Migrations:
+    - `2026-11-26_single_anthropic_identity.sql` drops per-store rows.
+    - `2026-11-26_production_anthropic_service_account.sql` moves prod's row to the new account and rule.
+  - **After that release:**
+    - Archive the old `jeffi-production` rule, then rename `jeffi-production-next` to `jeffi-production`.
+    - Archive the jeffi-flagship, jeffi-local-gateway and jeffi-t-testco service accounts, the `jeffi-t-testco` rule, and the `jeffi-t-testco` workspace.
+  - **At the Azure cutover:**
+    - Archive the Razer rule and rename `jeffi-production-azure` to `jeffi-production`.
+    - Set the platform row's `federation_rule_id` to `fdrl_01QsmDKrzxm6y34Ho52LNwk5`, through a migration.
+  - A rule's issuer can't be changed, and service account names can't be edited.
   - Re-register the inline key whenever the k3s service-account key rotates.
 - **Overlay:** `azure.env` ids and `K8S_SERVER_URL` are filled. `CLUSTER_INGRESS_IP` waits for the AWS edge (step 10).
 - **Still to do:** the kubeconfig over `tailscale ssh` (the ACL gives nobody SSH to tag:server-prod yet), Postgres, IRSA (step 7) and the tenant edge.
