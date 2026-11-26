@@ -15,6 +15,7 @@ import { lineItemFromMrpIncl, lineItemExGst } from '../../lib/pricing'
 import { deductStockForLines, InsufficientStockError, type LineItem } from '../../lib/inventory-deduct'
 import { invoiceLineSchema } from '../../lib/invoice-line-items'
 import { announceLock, assertHolder, closeLock, draftLockResponse } from '../../lib/draft-locks'
+import { amountMismatch, DryRun, isDryRun, qrPaymentOf, upiQrRefused } from '../../lib/qr-payment'
 import { z } from 'zod'
 import { parseBody } from '../../lib/validate'
 
@@ -60,6 +61,12 @@ export async function POST(request: NextRequest) {
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })
     }
+    // UPI QR: a dry run when the QR is made, then the real sale once Razorpay confirmed the payment.
+    const { qr, refused } = qrPaymentOf(request, body)
+    if (refused) return refused
+    const upiRefused = upiQrRefused(request, body, paymentMode)
+    if (upiRefused) return upiRefused
+    const dryRun = isDryRun(body)
 
     const digitalIds = await findDigitalProductIds(items.map(i => i.product_id).filter((v): v is string => !!v))
     if (digitalIds.length)
@@ -182,6 +189,10 @@ export async function POST(request: NextRequest) {
 
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
     const totalAmount = round2(subtotal)
+    if (qr) {
+      const mismatch = amountMismatch(totalAmount, qr)
+      if (mismatch) return mismatch
+    }
 
     let lockRes: Awaited<ReturnType<typeof assertHolder>> = null
     const result = await withTransaction(async client => {
@@ -240,6 +251,7 @@ export async function POST(request: NextRequest) {
         ]
       )
       const saleId = saleResult.rows[0].id
+      if (qr) await client.query(`UPDATE cash_sales SET razorpay_payment_id = $2 WHERE id = $1`, [saleId, qr.razorpayPaymentId])
 
       if (invoiceNumber && fy && seq !== null) {
         await client.query(
@@ -308,6 +320,7 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      if (dryRun) throw new DryRun({ totalAmount })
       return { invoiceNumber, saleId, saleNumber }
     })
     if (draftId) await announceLock(admin, 'cash_sale', draftId, lockRes)
@@ -316,9 +329,12 @@ export async function POST(request: NextRequest) {
       success: true,
       invoiceNumber: result.invoiceNumber,
       saleId: result.saleId,
+      saleNumber: result.saleNumber,
+      totalAmount,
       invoiceUrl: `/api/admin/cash-sale/${result.saleId}/receipt`,
     })
   } catch (err: any) {
+    if (err instanceof DryRun) return NextResponse.json({ dryRun: true, ...err.result })
     if (err instanceof InsufficientStockError)
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
     if (err instanceof HeldBillGoneError) return NextResponse.json({ error: err.message }, { status: 409 })

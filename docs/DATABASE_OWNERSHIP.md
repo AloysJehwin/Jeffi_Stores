@@ -172,6 +172,7 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `orders` | `tables/orders.sql` | writes: admin 53, storefront 32, document 14, controller 3 |
 | `otp_verifications` | `tables/users.sql` | writes: admin 1 |
 | `payment_disputes` | `tables/payments.sql` | writes: admin 1 |
+| `payment_intents` | `tables/payments.sql` | QR-first admin sales (lib/payments/qr-intents.ts); the webhook writes it inside the store |
 | `payment_refunds` | `tables/payments.sql` | writes: admin 3 |
 | `payments` | `tables/payments.sql` | writes: admin 17, storefront 11 |
 | `price_inflation_log` | `tables/logs.sql` | writes: admin 3 |

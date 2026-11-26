@@ -65,7 +65,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // A draft never deducted stock — the finalize route does that in full.
     const wasDeducted = order.status !== 'draft'
 
-    const isPaid = paymentMode !== 'credit'
+    // A UPI QR draft is paid only once its QR is (the finalise records it).
+    const isPaid = paymentMode !== 'credit' && !(paymentMode === 'upi_qr' && order.status === 'draft')
     const effectiveDate = invoiceDate || new Date().toISOString().slice(0, 10)
 
     const result = await withTransaction(async client => {

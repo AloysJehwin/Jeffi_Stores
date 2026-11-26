@@ -7,6 +7,7 @@ import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { applyRefundEvent } from './refund-records'
 import { razorpayAccountFor, type RazorpayAccount } from './rzp-account'
 import { onPaymentCaptured } from './razorpay-events/payments'
+import { intentPaymentIds, sweepQrIntents } from './qr-intents'
 import type { EventContext } from './razorpay-events/context'
 
 /**
@@ -25,6 +26,8 @@ export async function sweepRazorpay(): Promise<RunResult> {
   const { instance } = await getRazorpayInstanceFor(account.tenantId ?? undefined)
   return withChannelLock('razorpay', 'razorpay_sweep', 'sweep', async ctx => {
     if (account.kind !== 'route') await ctx.step('recovered', () => sweepPayments(instance, account))
+    // QR-first admin sales are this store's own, on whichever account made the QR.
+    await ctx.step('qr_intents', () => sweepQrIntents())
     await ctx.step('refunds', () => pollPendingRefunds(instance, account))
   })
 }
@@ -43,6 +46,7 @@ async function sweepPayments(instance: any, account: RazorpayAccount): Promise<n
     const page = await instance.payments.all({ from: now - WINDOW_SEC, to: now - SETTLE_SEC, count: 100, skip })
     const items: any[] = Array.isArray(page?.items) ? page.items : []
     const elsewhere = account.kind === 'platform' ? await recordedForStores(items.map(p => p.id)) : new Set<string>()
+    for (const id of await intentPaymentIds(items.map(p => p.id))) elsewhere.add(id)
     for (const p of items) {
       if (p.status === 'authorized') {
         notifyUncaptured(p)
