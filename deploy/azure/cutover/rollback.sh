@@ -1,16 +1,19 @@
 #!/bin/bash
 # Reverses cutover.sh, from the files it saved in ~/Documents/db-backups/cutover-<date>/ (export CUTOVER_DATE=<that date>).
-# Steps, in order: azure-quiesce dns cloudfront identity unfreeze. Dry run by default; --apply acts; --step <name>, --from <name>, --list.
+# Steps, in order: azure-quiesce dns cloudfront stores-rejoin identity unfreeze. Dry run by default; --apply acts; --step <name>, --from <name>, --list.
 #   azure-quiesce  Azure pods to 0 so their CronJobs and workers stop writing to the Azure DB
 #   dns            the route53 batch saved before the switch (route53-rollback.json)
 #   cloudfront     each distribution's saved before-config (cloudfront-before-<id>.json)
+#   stores-rejoin  the store nodes back into the AWS cluster (server and Tailscale mode read from its provisioning ConfigMap,
+#                  nodes from stores-nodes.json); --only <slug|pool> for one first. Their pods return with unfreeze.
 #   identity       nothing to do: the RDS row was never changed (it still has fdrl_015c1KmN69fVRfNYSuA5pZMF);
 #                  only the manual console rename needs undoing (README)
 #   unfreeze       freeze.sh off on the AWS cluster
 # Anything written on Azure after the switch is NOT carried back; the RDS is as it was at the freeze.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
-STEPS=(azure-quiesce dns cloudfront identity unfreeze)
+source "$(dirname "${BASH_SOURCE[0]}")/stores.sh"
+STEPS=(azure-quiesce dns cloudfront stores-rejoin identity unfreeze)
 ZONE=${HOSTED_ZONE_ID:-Z08094881XKVZ9XSGBKG1}
 
 step_azure_quiesce() {
@@ -49,6 +52,24 @@ for o in c["Origins"]["Items"]: print("   restore origin %s -> %s" % (o["Id"], o
   done
   [ $n != 0 ] || die "no cloudfront-before-*.json in $RUN_DIR (the cloudfront step never applied, or CUTOVER_DATE is wrong)"
   $APPLY || echo "(dry run) --apply would restore the config(s) above"
+}
+
+step_stores_rejoin() {
+  need aws kubectl python3 npx
+  local server ts running
+  [ -s "$RUN_DIR/stores-nodes.json" ] || die "no $RUN_DIR/stores-nodes.json: the stores-rejoin step never ran in this window (CUTOVER_DATE=$DATE)"
+  aws_tunnel
+  # Where the AWS core is, and whether its nodes joined over Tailscale, from the cluster's own config.
+  server=${AWS_K3S_SERVER:-$(KUBECONFIG=$AWS_KUBECONFIG kubectl -n jeffi get cm provisioning -o jsonpath='{.data.K8S_SERVER_URL}')}
+  ts=$(KUBECONFIG=$AWS_KUBECONFIG kubectl -n jeffi get cm provisioning -o jsonpath='{.data.K8S_NODES_OVER_TAILSCALE}' 2>/dev/null || true)
+  [ -n "$server" ] || die "no K8S_SERVER_URL in the AWS provisioning ConfigMap (or set AWS_K3S_SERVER)"
+  [ "$ts" = true ] || ts=false
+  echo "   target: $server (tailscale=$ts)"
+  if $APPLY; then
+    running=$(KUBECONFIG=$AZ_KUBECONFIG kubectl get pods -A -l jeffi.io/tenant --no-headers 2>/dev/null | awk '$4 == "Running" {print $1}' | sort -u | tr '\n' ' ' || true)
+    [ -z "$running" ] || die "store pods still run in the Azure cluster ($running): run azure-quiesce first, so each Postgres stops cleanly before its node leaves"
+  fi
+  rejoin_all aws "$server" "$ts" "${STORES_SECRETS_BACKEND:-aws}"
 }
 
 step_identity() {

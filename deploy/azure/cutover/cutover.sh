@@ -1,17 +1,20 @@
 #!/bin/bash
 # Phase E cutover driver (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md): platform core from AWS to Azure, stores stay on AWS.
-# Steps, in order: preflight freeze final-dump-restore identity dns cloudfront smoke unfreeze.
+# Steps, in order: preflight freeze final-dump-restore identity stores-rejoin dns cloudfront smoke unfreeze.
 # Dry run by default (reads only); --apply acts, with a typed confirmation before each irreversible step.
 #   EDGE_IP=<AWS tenant edge EIP> AZURE_IP=52.172.147.62 bash deploy/azure/cutover/cutover.sh [--apply]
 #   ... --step <name>    one step        ... --from <name>   that step and everything after it       --list
+#   ... --step stores-rejoin --only <slug|pool>   one store's nodes first, as the canary
 # Inputs (env): EDGE_IP, AZURE_IP (required); CUTOVER_DATE (export once at T-0); CUTOVER_SHA (image sha deployed on
 #   Azure, default: this checkout's); RESTORE_CLEAN=1 (restore over a non-empty Azure DB); RESTORE_ALLOW_ERRORS=1
 #   (carry on after pg_restore reports errors); SMOKE_TENANTS=1 (also smoke the stores in the Azure cluster);
-#   UNFREEZE_AWS=1 (bring the AWS cluster back too, see README); BACKUPS_DIR, AWS_KUBECONFIG, AZ_KUBECONFIG.
+#   UNFREEZE_AWS=1 (bring the AWS cluster back too, see README); AZURE_K3S_SERVER (default: K8S_SERVER_URL of the Azure overlay);
+#   STORES_SECRETS_BACKEND (keyvault|aws, where the k3s token and Tailscale key are read, default keyvault); STORES_REDISCOVER=1; BACKUPS_DIR, AWS_KUBECONFIG, AZ_KUBECONFIG.
 # Artifacts and the rollback inputs: ~/Documents/db-backups/cutover-<date>/ ; timestamps: cutover-<date>.log
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
-STEPS=(preflight freeze final-dump-restore identity dns cloudfront smoke unfreeze)
+source "$(dirname "${BASH_SOURCE[0]}")/stores.sh"
+STEPS=(preflight freeze final-dump-restore identity stores-rejoin dns cloudfront smoke unfreeze)
 AZURE_IP=${AZURE_IP:-}; EDGE_IP=${EDGE_IP:-}
 export RUN_DIR ANTH_TENANT ANTH_SA ANTH_RULE_AZURE RESTORE_CLEAN=${RESTORE_CLEAN:-} RESTORE_ALLOW_ERRORS=${RESTORE_ALLOW_ERRORS:-}
 need_ips() { [ -n "$EDGE_IP" ] && [ -n "$AZURE_IP" ] || die "set EDGE_IP and AZURE_IP"; }
@@ -116,6 +119,31 @@ SQL
   grep -qx "after  $ANTH_RULE_AZURE" <<<"$out" || die "the platform row is not on $ANTH_RULE_AZURE (no row, or a different service account than $ANTH_SA)"
   say "Bring the Azure platform up on the restored data (freeze.sh off, Azure)"
   if [ -s "$AZ_FREEZE_STATE" ]; then freeze_azure off; else echo "   not quiesced: nothing to resume"; fi
+}
+
+# Existing stores join the Azure core's cluster in place (plan 6a); their Postgres stays on the node's EBS disk.
+step_stores_rejoin() {
+  need_ips; need aws kubectl python3 curl npx
+  local server=${AZURE_K3S_SERVER:-$(grep -E '^ +K8S_SERVER_URL:' "$AZ_PROVISIONING" | awk '{print $2}')} slug out bad_stores=()
+  [ -n "$server" ] || die "no Azure K8S_SERVER_URL (AZURE_K3S_SERVER, or $AZ_PROVISIONING)"
+  say "Store nodes, as the AWS cluster has them"
+  discover_nodes
+  if $APPLY; then [ -s "$AWS_FREEZE_STATE" ] || die "the AWS cluster is not frozen ($AWS_FREEZE_STATE missing): freeze first"; fi
+  KUBECONFIG=$AZ_KUBECONFIG kubectl get nodes >/dev/null || die "the Azure cluster does not answer"
+  say "Re-join the nodes to $server (one typed confirmation per batch)"
+  rejoin_all azure "$server" true "${STORES_SECRETS_BACKEND:-keyvault}"
+  say "Re-apply every store into the Azure cluster (the controller's reconcile-k8s, pods pinned to the same node and disk)"
+  slugs_to_apply | tr '\n' ' '; echo
+  if ! $APPLY; then echo "(dry run) would POST reconcile-k8s?slug=<slug> for each store, then check its Postgres pod and storefront through $EDGE_IP"; return 0; fi
+  confirm_typed reapply "apply the Kubernetes objects of $(slugs_to_apply | wc -l | tr -d ' ') store(s) into the Azure cluster: their pods start"
+  for slug in $(slugs_to_apply); do
+    export SLUG=$slug
+    out=$(KUBECONFIG=$AZ_KUBECONFIG lib_run azure 'in_cluster reconcile_k8s "/api/internal/provisioning/reconcile-k8s?slug=$SLUG"' 2>&1) || true
+    # The route answers 200 even when a store failed, so read its body, then verify the store itself.
+    if grep -q '"ok": *false' <<<"$out"; then echo "   $slug: reconcile reported a failure:" >&2; tail -5 <<<"$out" >&2; bad_stores+=("$slug"); continue; fi
+    verify_store "$slug" || bad_stores+=("$slug")
+  done
+  [ ${#bad_stores[@]} = 0 ] || die "not healthy on Azure: ${bad_stores[*]} (re-run this step; --only <slug> for one)"
 }
 
 step_dns() {

@@ -89,13 +89,14 @@ PY
 # holds inside it (errexit is ignored in anything called from an if or ||).
 usage() { sed -n '2,/^set -euo/p' "$SELF" | sed '$d; s/^# \{0,1\}//'; }
 main() {
-  APPLY=${CUTOVER_APPLY:-false}
+  APPLY=${CUTOVER_APPLY:-false}; STORES_ONLY=${STORES_ONLY:-}
   if [ "${1:-}" = __step ]; then "step_${2//-/_}"; exit 0; fi
   local only='' from='' s run=() on=false
   while [ $# -gt 0 ]; do case $1 in
     --apply) APPLY=true ;;
     --step) only=${2:?--step <name>}; shift ;;
     --from) from=${2:?--from <name>}; shift ;;
+    --only) STORES_ONLY=${2:?--only <store slug | pool>}; shift ;;
     --list) printf '%s\n' "${STEPS[@]}"; exit 0 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument $1 (--help)" ;;
@@ -111,7 +112,7 @@ main() {
     else run+=("$s"); fi
   done
   mkdir -p "$RUN_DIR"
-  export CUTOVER_APPLY=$APPLY CUTOVER_DATE=$DATE
+  export CUTOVER_APPLY=$APPLY CUTOVER_DATE=$DATE STORES_ONLY=${STORES_ONLY:-}
   echo "$(basename "$SELF"): $(mode) run, steps: ${run[*]}. Log: $LOG"
   if ! $APPLY; then echo "Dry run: reads only. Nothing changes without --apply."; fi
   local t0 rc
