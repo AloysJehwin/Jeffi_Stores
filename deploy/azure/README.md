@@ -101,6 +101,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
    KUBECONFIG=~/.kube/jeffi-azure.yaml kubectl get nodes
    ```
    Then store the same file base64 as `KUBECONFIG_AZURE_B64`.
+   Or run `bash deploy/azure/fetch-kubeconfig.sh --apply [--github]`. It never prints the file, and it falls back to `az vm run-command` when Tailscale SSH isn't allowed yet. Then run `bash deploy/azure/github-settings.sh --apply` to set the GitHub Azure secrets and `AZURE_INGRESS_IP`; add `--enable-target` only after the rehearsal. The tailnet ACL, route and SSH additions are in [`deploy/tailscale/README.md`](../tailscale/README.md).
 6. **Database.**
    ```bash
    bash deploy/azure/pg-init.sh             # dry run
@@ -148,7 +149,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
        Point CloudFront's origin at `origin.jeffistores.in`, run the smoke tests, unset `AZURE_INGRESS_IP`, then unfreeze.
     3. Rollback: the batch the plan saved, under `~/Documents/db-backups/route53-rollback-*.json`.
 
-**How CI reaches Azure.** `db-azure`, `deploy-prep-azure` and `release-azure` in `.github/workflows/ci.yml` use `.github/actions/azure-release-setup`. That action:
+**How CI reaches Azure** (needs the `tag:ci` rule from `deploy/tailscale/azure-acl-snippet.hujson`). `db-azure`, `deploy-prep-azure` and `release-azure` in `.github/workflows/ci.yml` use `.github/actions/azure-release-setup`. That action:
 - logs in to Azure (federated);
 - joins the tailnet as `tag:ci` with `--accept-routes`;
 - installs psql;
