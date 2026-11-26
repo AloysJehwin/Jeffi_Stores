@@ -130,7 +130,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/deploy/next-cluster-server.js ./$
 
 # Copy secrets bootstrap script (fetches from AWS Secrets Manager, or Key Vault with SECRETS_BACKEND=keyvault, at container start)
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/load-secrets.mjs
-COPY --from=builder --chown=nextjs:nodejs /app/deploy/secrets-backend.mjs ./deploy/secrets-backend.mjs
+# The secrets library it imports (../packages/store-core/src/lib/secrets/index.mjs), at the same path as in the repo
+COPY --from=builder --chown=nextjs:nodejs /app/packages/store-core/src/lib/secrets/index.mjs ./packages/store-core/src/lib/secrets/index.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/k8s-cron.mjs ./deploy/k8s-cron.mjs
 
 # Schema and migration files: database/ and <service>/database/ (the controller's tenant fan-out reads them)

@@ -1,0 +1,28 @@
+# The core's Traefik skips routes labelled jeffi.io/edge-only=true: those send store hosts to the AWS tenant edge's own
+# copies (deploy/k8s/edge/shared-services.yaml), which only the edge's Traefik serves. The values are the base's
+# (platform/10-traefik.yaml) plus the selector; keep the two in step.
+- op: replace
+  path: /spec/valuesContent
+  value: |-
+    nodeSelector: { jeffi.io/role: core }
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    providers:
+      kubernetesCRD:
+        allowCrossNamespace: true
+        labelSelector: jeffi.io/edge-only!=true
+      kubernetesIngress:
+        publishedService: { enabled: true }
+    ports:
+      web:
+        # CloudFront reaches the apex over HTTP and sends X-Forwarded-*; keep them on :80 only.
+        forwardedHeaders: { insecure: true }
+      websecure:
+        transport:
+          respondingTimeouts: { readTimeout: 300s, writeTimeout: 0s, idleTimeout: 180s }
+    logs:
+      access: { enabled: true }
+    resources:
+      requests: { cpu: 50m, memory: 96Mi }
+      limits: { memory: 256Mi }

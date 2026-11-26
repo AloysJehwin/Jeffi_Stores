@@ -1,7 +1,7 @@
 export type SecretsBackend = 'aws' | 'keyvault'
 
 /** NotFound: no such secret. Deleted: scheduled for deletion / soft-deleted (restore() brings it back). */
-export type SecretErrorCode = 'NotFound' | 'Deleted' | 'Exists' | 'Denied' | 'Invalid' | 'Backend'
+export type SecretErrorCode = 'NotFound' | 'Deleted' | 'Exists' | 'Denied' | 'Empty' | 'Invalid' | 'Backend'
 
 export declare class SecretError extends Error {
   readonly code: SecretErrorCode
@@ -60,5 +60,10 @@ export interface LoadedSecretEnv {
   backend: SecretsBackend
   /** The blob's string values. */
   values: Record<string, string>
+  /** Keys in the blob, string or not. */
+  size: number
 }
-export declare function loadSecretEnv(id: string, opts?: SecretsOptions & { fallbackId?: string }): Promise<LoadedSecretEnv>
+export declare function loadSecretEnv(
+  id: string,
+  opts?: SecretsOptions & { fallbackId?: string; onFallback?: (err: unknown) => void }
+): Promise<LoadedSecretEnv>

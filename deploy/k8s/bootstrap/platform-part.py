@@ -24,8 +24,10 @@ def part_of(o):
     md = o["metadata"]
     if (md.get("labels") or {}).get("jeffi.io/routes") == "platform":
         return "routes"
-    if md["name"] in NAMES:
-        return NAMES[md["name"]]
+    # A service's copy on the AWS tenant edge (deploy/k8s/edge) rolls with it.
+    name = md["name"].removesuffix("-edge")
+    if name in NAMES:
+        return NAMES[name]
     if o["kind"] == "CronJob" and md["name"].startswith("cron-"):
         return "controller"
     return "shared"

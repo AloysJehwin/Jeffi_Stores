@@ -21,7 +21,7 @@ The existing `jeffi-ai-cin` resource group (Speech and OpenAI) is separate, and 
 | `irsa/aws-roles.sh` | Creates the IAM OIDC provider for `oidc.jeffistores.in`, plus one role per service account (next table). |
 | `../aws/oidc-issuer.yaml` | CloudFormation for the issuer site: a private S3 bucket, CloudFront with origin access control, an ACM certificate and the Route 53 alias `oidc.jeffistores.in`. |
 | `../aws/edge/` | The AWS tenant edge: <ul><li>`launch-edge.sh`: a t4g.small with an Elastic IP (`eip` subcommand) and a security group open on 80/443;</li><li>`edge-node-user-data.sh`: joins the core over Tailscale;</li><li>`route53-plan.sh`: store hosts to the edge, platform hosts to Azure, with a saved rollback batch.</li></ul> |
-| `../k8s/overlays/azure/` | The platform on Azure, which `JEFFI_CLOUD=azure` selects. It adds: <ul><li>projected tokens for STS and Entra;</li><li>`SECRETS_BACKEND=keyvault` and `DB_IAM_AUTH=false`;</li><li>cert-manager and ecr-refresh through IRSA;</li><li>CoreDNS forwarding for the Postgres private zone;</li><li>the provisioning ConfigMap for store nodes;</li><li>the edge Traefik (`../k8s/edge/`).</li></ul> |
+| `../k8s/overlays/azure/` | The platform on Azure, which `JEFFI_CLOUD=azure` selects. It adds: <ul><li>projected tokens for STS and Entra;</li><li>`SECRETS_BACKEND=keyvault`, `DB_IAM_AUTH=false` and `DB_SSL=require`;</li><li>cert-manager and ecr-refresh through IRSA;</li><li>CoreDNS forwarding for the Postgres private zone;</li><li>the provisioning ConfigMap for store nodes and pods (next section);</li><li>the edge (`../k8s/edge/`): its Traefik, and a `public-{slug}` copy of public-api with its own Redis, which the core's Traefik skips (`patches/traefik-core.yaml`).</li></ul> |
 
 ### Identities
 
@@ -36,6 +36,19 @@ The existing `jeffi-ai-cin` resource group (Speech and OpenAI) is separate, and 
 | `jeffi-irsa-ecr-pull` (IAM) | `jeffi:ecr-refresh` | ECR login and pull of `jeffi-stores-*`. |
 
 On the core, pods can also use the VM identity through IMDS, as they use the EC2 instance role today. The federated path works on every node, including AWS ones.
+
+### Stores on AWS, platform on Azure
+
+Store pods and servers get no Entra identity. The controller runs with `SECRETS_BACKEND=keyvault`, and the provisioning ConfigMap (`patches/provisioning.yaml`) carries the rest:
+
+| Setting | Effect |
+|---|---|
+| `SECRETS_BACKEND=keyvault` on the controller | Copies each secret a store's pods use into its namespace (`env-jeffi-store`, …) on every apply. Pods read it through `envFrom` with `SECRETS_BACKEND=env`. Writes each new node's k3s token and Tailscale key from `jeffi-production-k3s` into its user-data. |
+| `K8S_NODES_OVER_TAILSCALE=true` | Store nodes run `tailscale up --accept-routes` and join with flannel on `tailscale0` at their Tailscale address. |
+| `TENANT_PLATFORM_DB_IAM_AUTH=false`, `TENANT_PLATFORM_DB_SSL=require` | Store pods log in to the flagship Postgres with the password in their secret, over TLS. Their own database is unchanged. |
+| `TENANT_NODE_CIDRS=100.64.0.0/10` | Each store's NetworkPolicy admits the Tailscale node addresses. |
+
+Before the first store moves, put the Azure `DATABASE_URL` (and `CONTROL_PLANE_DATABASE_URL`, if set) into `jeffi-store`, `jeffi-messaging-production` and `jeffi-documents-production` too, with `kv-sync.sh --patch`.
 
 ## Founder steps before applying
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -185,19 +184,20 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     )
 
 
-def load_secret_env(secret_id: str, region: str | None = None) -> dict[str, str]:
-    """Optional: read a Secrets Manager JSON secret (SM_SECRET_ID), like the Node services do."""
-    import boto3
+def load_secret_env(secret_id: str, region: str | None = None, fallback_id: str | None = None) -> dict[str, str]:
+    """Optional: read a JSON secret (SM_SECRET_ID) from Secrets Manager or Key Vault (SECRETS_BACKEND), as the Node
+    services do."""
+    from .secret_store import load_secret_env as load
 
-    client = boto3.client("secretsmanager", region_name=region)
-    raw = client.get_secret_value(SecretId=secret_id)["SecretString"]
-    return {k: v for k, v in json.loads(raw).items() if isinstance(v, str)}
+    return load(secret_id, region, env=os.environ, fallback_id=fallback_id)
 
 
 def bootstrap_env() -> None:
-    """Fill missing env keys from SM_SECRET_ID when it is set; explicit env always wins."""
+    """Fill missing env keys from SM_SECRET_ID when it is set; explicit env always wins. SECRETS_BACKEND=env: the
+    environment already holds them."""
     secret_id = os.environ.get("SM_SECRET_ID")
-    if not secret_id:
+    if not secret_id or os.environ.get("SECRETS_BACKEND") == "env":
         return
-    for k, v in load_secret_env(secret_id, os.environ.get("AWS_REGION") or None).items():
+    values = load_secret_env(secret_id, os.environ.get("AWS_REGION") or None, os.environ.get("SM_SECRET_FALLBACK_ID") or None)
+    for k, v in values.items():
         os.environ.setdefault(k, v)
