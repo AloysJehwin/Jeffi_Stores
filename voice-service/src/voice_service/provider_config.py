@@ -1,8 +1,10 @@
-"""Provider config: admin Settings -> Providers (the controller's voice-config endpoint) first, env as the fallback.
+"""Provider config: non-secret settings from admin Settings -> Providers (the controller's voice-config endpoint), env as the fallback.
 
 GET {CONTROLLER_URL}/api/internal/outreach/voice-config is fetched when a call starts and cached for 60 s in memory
-only (never written to disk, never logged). Each field falls back to its env var when the endpoint is unreachable or
-leaves it empty. With neither, `missing()` names what is absent and calls are refused.
+only. It carries no secrets: every credential (Exotel, Twilio, Sarvam, Azure Speech, Anthropic key) comes from this
+service's own env only, and a credential field in the response is ignored. Each non-secret field falls back to its
+env var when the endpoint is unreachable or leaves it empty. With neither, `missing()` names what is absent and calls
+are refused.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from typing import Any
 import httpx
 
 from .auth import outbound_token
-from .config import Settings, normalize_number
+from .config import Settings, normalize_number, speech_engine
 from .llm_client import token_file_ok
 from .log import get_logger
 
@@ -61,6 +63,11 @@ class VoiceConfig:
     stt_model: str = ""
     tts_model: str = ""
     voices: dict[str, str] = field(default_factory=dict)
+    azure_api_key: str = ""
+    azure_region: str = ""
+    azure_voices: dict[str, str] = field(default_factory=dict)
+    stt_provider: str = "sarvam"  # sarvam | azure: the engine tried first; the other is the fallback
+    tts_provider: str = "sarvam"
     anthropic_api_key: str = ""
     anthropic_identity: AnthropicIdentity = field(default_factory=AnthropicIdentity)
     anthropic_identity_token_file: str = ""
@@ -74,6 +81,18 @@ class VoiceConfig:
     def voice_for(self, language: str) -> str:
         base = (language or "").split("-")[0].lower()
         return self.voices.get(language) or self.voices.get(base) or ""
+
+    def azure_voice_for(self, language: str) -> str:
+        from .speech import DEFAULT_AZURE_VOICES
+
+        base = (language or "").split("-")[0].lower()
+        return self.azure_voices.get(language) or self.azure_voices.get(base) or DEFAULT_AZURE_VOICES.get(base, DEFAULT_AZURE_VOICES["en"])
+
+    def sarvam_ready(self) -> bool:
+        return bool(self.sarvam_api_key)
+
+    def azure_ready(self) -> bool:
+        return bool(self.azure_api_key and self.azure_region)
 
     def identity_ready(self) -> bool:
         """Federation is usable: every id set and the token file present."""
@@ -94,7 +113,12 @@ class VoiceConfig:
         return gaps
 
     def missing(self) -> list[str]:
-        need: dict[str, str] = {"sarvam.apiKey": self.sarvam_api_key}
+        need: dict[str, str] = {}
+        if not (self.sarvam_ready() or self.azure_ready()):
+            # One usable speech engine is enough (the other is only the fallback).
+            need["sarvam.apiKey"] = ""
+            if "azure" in (self.stt_provider, self.tts_provider):
+                need["azureSpeech.apiKey"] = ""
         if self.provider == "exotel":
             need |= {
                 "exotel.accountSid": self.exotel_sid,
@@ -127,10 +151,15 @@ def _s(v: Any) -> str:
 
 
 def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
-    """Reads the controller's getVoiceConfig() shape (packages/store-core/src/lib/providers/voice-config.ts), field by
-    field: the controller's value when non-empty, else the env var. `sources` records which one each field used."""
+    """Reads the controller's getVoiceConfigView() shape (packages/store-core/src/lib/providers/voice-config.ts), field by
+    field: the controller's value when non-empty, else the env var. Credentials are env only. `sources` records which one each field used."""
     r = remote or {}
     sources: dict[str, str] = {}
+
+    def secret(name: str, env_value: str) -> str:
+        if env_value:
+            sources[name] = "env"
+        return env_value
 
     def pick(name: str, remote_value: Any, env_value: str) -> str:
         rv = _s(remote_value)
@@ -155,6 +184,21 @@ def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
     voices = {k: v.strip() for k, v in voices_raw.items() if isinstance(k, str) and _s(v)} if isinstance(voices_raw, dict) else {}
     if voices:
         sources["sarvam.voices"] = "controller"
+    speech_raw = r.get("speech") if isinstance(r.get("speech"), dict) else {}
+    stt_provider = speech_engine(speech_raw.get("sttProvider"), "")
+    tts_provider = speech_engine(speech_raw.get("ttsProvider"), "")
+    if stt_provider or tts_provider:
+        sources["speech"] = "controller"
+    elif env.stt_provider != "sarvam" or env.tts_provider != "sarvam":
+        sources["speech"] = "env"
+    azure_voices_raw = _get(r, "azureSpeech", "voices")
+    azure_voices = (
+        {k: v.strip() for k, v in azure_voices_raw.items() if isinstance(k, str) and _s(v)}
+        if isinstance(azure_voices_raw, dict)
+        else {}
+    )
+    if azure_voices:
+        sources["azureSpeech.voices"] = "controller"
     ident_raw = r.get("anthropicIdentity") if isinstance(r.get("anthropicIdentity"), dict) else {}
 
     def ident(key: str, env_value: str) -> str:
@@ -179,17 +223,22 @@ def merge(remote: dict[str, Any] | None, env: Settings) -> VoiceConfig:
         exotel_subdomain=pick("exotel.subdomain", _get(r, "exotel", "subdomain"), env.exotel_subdomain),
         exotel_caller_id=normalize_number(pick("exotel.callerId", _get(r, "exotel", "callerId"), env.exotel_caller_id)),
         exotel_app_id=pick("exotel.appId", _get(r, "exotel", "appId"), env.exotel_app_id),
-        exotel_api_key=pick("exotel.apiKey", _get(r, "exotel", "apiKey"), env.exotel_api_key),
-        exotel_api_token=pick("exotel.apiToken", _get(r, "exotel", "apiToken"), env.exotel_api_token),
-        twilio_account_sid=pick("twilioTest.accountSid", _get(r, "twilioTest", "accountSid"), env.twilio_account_sid),
-        twilio_auth_token=pick("twilioTest.authToken", _get(r, "twilioTest", "authToken"), env.twilio_auth_token),
+        exotel_api_key=secret("exotel.apiKey", env.exotel_api_key),
+        exotel_api_token=secret("exotel.apiToken", env.exotel_api_token),
+        twilio_account_sid=secret("twilioTest.accountSid", env.twilio_account_sid),
+        twilio_auth_token=secret("twilioTest.authToken", env.twilio_auth_token),
         twilio_from=normalize_number(pick("twilioTest.from", _get(r, "twilioTest", "from"), env.twilio_voice_from)),
         test_numbers=frozenset(numbers),
-        sarvam_api_key=pick("sarvam.apiKey", _get(r, "sarvam", "apiKey"), env.sarvam_api_key),
+        sarvam_api_key=secret("sarvam.apiKey", env.sarvam_api_key),
         stt_model=pick("sarvam.sttModel", _get(r, "sarvam", "sttModel"), env.stt_model),
         tts_model=pick("sarvam.ttsModel", _get(r, "sarvam", "ttsModel"), env.tts_model),
         voices=voices,
-        anthropic_api_key=pick("anthropic.apiKey", _get(r, "anthropic", "apiKey"), env.anthropic_api_key),
+        azure_api_key=secret("azureSpeech.apiKey", env.azure_speech_key),
+        azure_region=pick("azureSpeech.region", _get(r, "azureSpeech", "region"), env.azure_speech_region).lower(),
+        azure_voices=azure_voices,
+        stt_provider=stt_provider or env.stt_provider,
+        tts_provider=tts_provider or env.tts_provider,
+        anthropic_api_key=secret("anthropic.apiKey", env.anthropic_api_key),
         anthropic_identity=identity,
         anthropic_identity_token_file=env.anthropic_identity_token_file,
         llm_model=pick("llmModel", r.get("llmModel"), env.llm_model),

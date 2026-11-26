@@ -92,19 +92,8 @@ export function genDbPassword(): string {
 }
 /** @deprecated Overwrites the stored password; use getOrCreateTenantDbPassword (tenant-db-secret.ts). */
 export async function ensureTenantDbSecret(slug: string, password: string): Promise<void> {
-  const { SecretsManagerClient, CreateSecretCommand, PutSecretValueCommand } = await import(
-    '@aws-sdk/client-secrets-manager'
-  )
-  const client = new SecretsManagerClient({ region: AWS_REGION })
-  const SecretId = tenantDbSecretRef(slug)
-  const SecretString = JSON.stringify({ username: NODE_DB_USER, password, database: TENANT_DB })
-  try {
-    await client.send(new CreateSecretCommand({ Name: SecretId, SecretString }))
-  } catch (e: any) {
-    if (e?.name === 'ResourceExistsException') {
-      await client.send(new PutSecretValueCommand({ SecretId, SecretString }))
-    } else throw e
-  }
+  const { secrets } = await import('@/lib/secrets/index.mjs')
+  await secrets(AWS_REGION).put(tenantDbSecretRef(slug), JSON.stringify({ username: NODE_DB_USER, password, database: TENANT_DB }))
 }
 
 /** The store's on-node Postgres password (stored once, read back after), for a node-mode spec. */

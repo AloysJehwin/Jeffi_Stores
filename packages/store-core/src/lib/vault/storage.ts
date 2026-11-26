@@ -10,6 +10,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 import { controlPlanePool } from '@/lib/tenant-registry/shared'
+import { staticAwsCredentials } from '@/lib/shared/aws-credentials'
 
 /** Thrown when a tenant's S3 writes would push them past spec.storage.s3Gb. Mirrors @jeffi/tenancy's. */
 export class StorageCapExceededError extends Error {
@@ -91,10 +92,7 @@ export function vaultStagingKey(tenantId: string | null, productId: string, file
 
 const s3 = new S3Client({
   region: AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
+  credentials: staticAwsCredentials(),
 })
 
 class S3StorageDriver implements StorageDriver {

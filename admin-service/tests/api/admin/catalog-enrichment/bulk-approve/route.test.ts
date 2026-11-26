@@ -7,7 +7,10 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
 // reEmbed imports these dynamically — mock them
-vi.mock('@/lib/shared/rag', () => ({ embed: vi.fn() }))
+vi.mock('@/lib/shared/rag', () => {
+  const embed = vi.fn()
+  return { embed, embedWithModel: vi.fn(async (t: string) => ({ vector: await embed(t), model: 'nomic-embed-text' })) }
+})
 const mockPoolInstance = vi.hoisted(() => ({
   query: vi.fn().mockResolvedValue({}),
   end: vi.fn().mockResolvedValue(undefined),

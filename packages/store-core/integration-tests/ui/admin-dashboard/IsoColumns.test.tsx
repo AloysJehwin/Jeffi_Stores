@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { IsoColumns } from '@/components/admin/dashboard/IsoColumns'
-import { makeDays, mockReducedMotion } from './fixtures'
+import { makeIsoDays, mockReducedMotion } from './fixtures'
 
-const days = makeDays(4) // 28 days; index 10 is the busiest (30 shipped)
+const days = makeIsoDays(4) // 28 days; index 10 is the busiest (30 shipped)
 
 const prism = (c: HTMLElement, i: number) => c.querySelector(`[data-prism="${i}"]`)!
 const topPoints = (c: HTMLElement, i: number) => prism(c, i).querySelector('polygon:last-child')!.getAttribute('points')
@@ -135,6 +135,21 @@ describe('IsoColumns', () => {
   it('renders an empty state without days', () => {
     render(<IsoColumns days={[]} mode="3d" />)
     expect(screen.getByText('No shipments in this range.')).toBeInTheDocument()
+  })
+
+  it('takes its subject, unit and empty text from props for other pages', () => {
+    const plain = days.map(d => ({ date: d.date, value: d.value }))
+    const { container, unmount } = render(<IsoColumns days={plain} mode="grid" subject="Return requests" unit="requested" />)
+    expect(screen.getByRole('group', { name: /^Return requests per day over 4 weeks/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Thu, 15 Jan: 30 requested' })).toBeInTheDocument()
+    fireEvent.focus(container.querySelector('[data-cell="10"]')!)
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText(/^requested · /)).toBeInTheDocument()
+    expect(within(tip).queryByText('Others')).not.toBeInTheDocument()
+    expect(within(tip).queryByText(/customer/)).not.toBeInTheDocument()
+    unmount()
+    render(<IsoColumns days={[]} mode="3d" emptyText="No returns yet." />)
+    expect(screen.getByText('No returns yet.')).toBeInTheDocument()
   })
 
   it('rises from flat when motion is allowed, and starts fully grown when reduced', async () => {

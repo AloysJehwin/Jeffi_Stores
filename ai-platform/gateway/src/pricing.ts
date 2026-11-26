@@ -7,6 +7,7 @@
 import type { TokenUsage } from '../../sdk/types'
 
 export type PriceUnit = 'image' | 'video_second' | 'token_1k_in' | 'token_1k_out' | 'token_1k_cache_read' | 'token_1k_cache_write'
+  | 'audio_minute' | 'tts_1k_chars'
 export type PriceCells = Partial<Record<PriceUnit, number>>
 export type PriceTable = Record<string, Record<string, PriceCells>>
 
@@ -23,6 +24,18 @@ const claude = (inp: number, out: number, read: number, write = inp * 1.25): Pri
   token_1k_in: usd(inp / 1000), token_1k_out: usd(out / 1000),
   token_1k_cache_read: usd(read / 1000), token_1k_cache_write: usd(write / 1000),
 })
+
+// Azure OpenAI Global Standard retail per MTok: input / output / cached input (Azure OpenAI pricing page, Nov 2026;
+// same list prices as OpenAI's for these models).
+const gpt = (inp: number, out: number, read: number): PriceCells => ({
+  token_1k_in: usd(inp / 1000), token_1k_out: usd(out / 1000), token_1k_cache_read: usd(read / 1000),
+})
+// gpt-image per 1024x1024 image by quality (low / medium / high); the provider prices 1536-wide sizes at 1.5x.
+const gptImage = (low: number, medium: number, high: number): Record<string, PriceCells> => ({
+  low: { image: usd(low) }, medium: { image: usd(medium) }, high: { image: usd(high) },
+})
+const imageRows = (model: string, cells: Record<string, PriceCells>) =>
+  Object.fromEntries(Object.entries(cells).map(([q, c]) => [`${model}:${q}`, c]))
 
 const buildDefaults = (): PriceTable => ({
   anthropic: {
@@ -71,6 +84,45 @@ const buildDefaults = (): PriceTable => ({
     'wan-video/wan-2.2-i2v-fast': { video_second: usd(0.05) },
     '*': { image: usd(0.03), video_second: usd(0.10) },
   },
+  azure: {
+    'gpt-5': gpt(1.25, 10, 0.125),
+    'gpt-5-mini': gpt(0.25, 2, 0.025),
+    'gpt-5-nano': gpt(0.05, 0.4, 0.005),
+    'gpt-4.1': gpt(2, 8, 0.5),
+    'gpt-4.1-mini': gpt(0.4, 1.6, 0.1),
+    'gpt-4.1-nano': gpt(0.1, 0.4, 0.025),
+    'gpt-4o': gpt(2.5, 10, 1.25),
+    'gpt-4o-mini': gpt(0.15, 0.6, 0.075),
+    // $0.02 / $0.13 per MTok of input.
+    'text-embedding-3-small': { token_1k_in: usd(0.00002), token_1k_out: 0 },
+    'text-embedding-3-large': { token_1k_in: usd(0.00013), token_1k_out: 0 },
+    ...imageRows('gpt-image-1', gptImage(0.011, 0.042, 0.167)),
+    ...imageRows('gpt-image-1-mini', gptImage(0.005, 0.011, 0.036)),
+    // Sora 2, 720p: $0.10 per output second.
+    'sora': { video_second: usd(0.10) },
+    // Whisper $0.36/hour; gpt-4o(-mini)-transcribe about $0.006 / $0.003 per minute of audio.
+    'whisper': { audio_minute: usd(0.006) },
+    'gpt-4o-transcribe': { audio_minute: usd(0.006) },
+    'gpt-4o-mini-transcribe': { audio_minute: usd(0.003) },
+    // tts-1 $15, tts-1-hd $30 per 1M characters; gpt-4o-mini-tts about $0.015 per minute (~1k characters).
+    'tts-1': { tts_1k_chars: usd(0.015) },
+    'tts-1-hd': { tts_1k_chars: usd(0.03) },
+    'gpt-4o-mini-tts': { tts_1k_chars: usd(0.015) },
+    // Azure AI Speech, Standard: real-time speech to text $1 per audio hour; neural text to speech $15 per 1M characters.
+    'azure-speech-stt': { audio_minute: usd(1 / 60) },
+    'azure-speech-tts': { tts_1k_chars: usd(0.015) },
+    '*': { ...gpt(0.4, 1.6, 0.1), image: usd(0.042), video_second: usd(0.10), audio_minute: usd(0.006), tts_1k_chars: usd(0.015) },
+  },
+  // Sarvam pay-as-you-go list prices, INR excluding GST (docs.sarvam.ai/api/getting-started/pricing, read 2026-11-26):
+  // speech to text ₹0.49 per minute (billed per second, every Saaras model); Bulbul v3 ₹3.00 and v4 Flash ₹2.00 per
+  // 1,000 characters.
+  sarvam: {
+    'saaras:v3': { audio_minute: 0.49 },
+    'saaras:v4': { audio_minute: 0.49 },
+    'bulbul:v3': { tts_1k_chars: 3 },
+    'bulbul:v4-flash': { tts_1k_chars: 2 },
+    '*': { audio_minute: 0.49, tts_1k_chars: 3 },
+  },
 })
 export let DEFAULT_PRICES: PriceTable = buildDefaults()
 
@@ -113,6 +165,11 @@ function cellsFor(provider: string, model: string): PriceCells {
   return { ...(models['*'] || {}), ...(prefix ? models[prefix] : {}) }
 }
 
+/** The provider's priced models for a unit, in table order (no wildcard). */
+export function pricedModels(provider: string, unit: PriceUnit): string[] {
+  return Object.entries(DEFAULT_PRICES[provider] ?? {}).filter(([m, c]) => m !== '*' && c[unit] != null).map(([m]) => m)
+}
+
 /** Unit price in INR for one unit of `unit` (0 when unknown). */
 export function unitPrice(provider: string, model: string, unit: PriceUnit): number {
   return cellsFor(provider, model)[unit] ?? 0
@@ -145,6 +202,24 @@ export function anthropicUsage(model: string, u: { input_tokens?: number | null;
       token_1k_cache_read: read / 1000, token_1k_cache_write: write / 1000,
     }),
   }
+}
+
+/** OpenAI-shaped usage (Azure): cached prompt tokens bill at the cache-read price, weighted into billedPromptTokens. */
+export function openAiUsage(provider: string, model: string, u: { prompt_tokens?: number | null; completion_tokens?: number | null; prompt_tokens_details?: { cached_tokens?: number | null } | null } | null | undefined): TokenUsage {
+  const n = (x: number | null | undefined) => Math.max(0, Math.floor(x || 0))
+  const prompt = n(u?.prompt_tokens), out = n(u?.completion_tokens), read = Math.min(prompt, n(u?.prompt_tokens_details?.cached_tokens))
+  const inPrice = unitPrice(provider, model, 'token_1k_in')
+  const readPrice = unitPrice(provider, model, 'token_1k_cache_read') || inPrice
+  const usage: TokenUsage = {
+    promptTokens: prompt,
+    completionTokens: out,
+    costInr: costFor(provider, model, { token_1k_in: (prompt - read) / 1000, token_1k_out: out / 1000, token_1k_cache_read: read / 1000 }),
+  }
+  if (read) {
+    usage.cacheReadTokens = read
+    usage.billedPromptTokens = Math.round(prompt - read + (inPrice ? read * readPrice / inPrice : read))
+  }
+  return usage
 }
 
 /** Token usage block for chat/embed responses from Ollama's counters. */

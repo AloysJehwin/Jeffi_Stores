@@ -1,6 +1,7 @@
 // Admin UI kit. Import from '@/components/admin/kit' (or a module directly).
 export * from './core'
 export * from './period'
+export * from './segmented'
 export * from './tones'
 export * from './layout'
 export * from './actions'

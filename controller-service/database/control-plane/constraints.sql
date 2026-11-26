@@ -111,13 +111,13 @@ ALTER TABLE ONLY public.api_key_usage_daily ADD CONSTRAINT api_key_usage_daily_p
 ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_key UNIQUE (capability, provider, model, unit_type);
 ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_capability_check
-    CHECK (capability IN ('text','embed','vision','image','video'));
+    CHECK (capability IN ('text','embed','vision','image','video','audio'));
 ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_unit_type_check
-    CHECK (unit_type IN ('token_1k_in','token_1k_out','image','video_second','call'));
+    CHECK (unit_type IN ('token_1k_in','token_1k_out','image','video_second','call','audio_minute','tts_1k_chars'));
 ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_key_check
     CHECK (key IN ('sms_provider','whatsapp_provider','ai_text_providers','ai_image_providers','ai_video_providers','ai_image_default_quality',
-                   'voice_provider','voice_config','sms_dlt_entity_id','sms_dlt_sender_ids'));
+                   'ai_stt_providers','ai_tts_providers','ai_models','ai_embed_provider','voice_provider','voice_config','sms_dlt_entity_id','sms_dlt_sender_ids'));
 ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_pkey PRIMARY KEY (tenant_id, provider);
 ALTER TABLE ONLY public.ai_provider_identities ADD CONSTRAINT ai_provider_identities_provider_check
     CHECK (provider IN ('anthropic'));

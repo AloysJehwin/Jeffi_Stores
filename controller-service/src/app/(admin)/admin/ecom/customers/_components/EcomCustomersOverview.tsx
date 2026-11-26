@@ -5,6 +5,7 @@ import { AttentionList } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, type Col } from '@/components/admin/channels/ui'
 import { TrendChart, DonutSplit, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import type { EcomCustomersOverview as Data } from '@controller/lib/overviews/ecom-customers'
+import { ECOM_CUSTOMERS_INSIGHTS } from '../../_components/ecom-insights'
 import { OverviewShell, Grid2, label, useEcomOverview } from '../../_components/overview-shell'
 import { CustomersOverviewLoading } from '../../_components/skeletons'
 
@@ -48,7 +49,7 @@ const TOP_COLS: Col<Top>[] = [
 export default function EcomCustomersOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/customers/overview')
   return (
-    <OverviewShell {...o} skeleton={<CustomersOverviewLoading />}>
+    <OverviewShell {...o} skeleton={<CustomersOverviewLoading />} insights={ECOM_CUSTOMERS_INSIGHTS}>
       {d => (
         <>
           <KpiGrid>

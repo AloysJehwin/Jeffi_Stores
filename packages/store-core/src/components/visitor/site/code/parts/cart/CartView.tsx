@@ -1,7 +1,7 @@
 'use client'
 
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
-import CartInsightPanel from '@/components/on-device/CartInsightPanel'
+import CartInsightPanel from '@/components/storefront-ai/CartInsightPanel'
 import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'
 import CartUpsellRow from '@/components/visitor/cart/CartUpsellRow'
 import { CartSkeleton } from '@/components/visitor/skeletons/commerce'

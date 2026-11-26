@@ -9,12 +9,19 @@
 #                (local-<image sha of HEAD>; CI's Images stage or release.sh --build-only pushes it first).
 # Neither target: both, the flagship first. Neither --schema nor --migrations: both, schema first.
 # --dry-run shows the SQL (flagship) or validates the Job (tenants) and applies nothing; --yes skips the prompts (CI).
-# Usage: bash deploy/k8s/db/release-db.sh [--flagship] [--tenants] [--schema] [--migrations] [--dry-run] [--yes]
+# Usage: bash deploy/k8s/db/release-db.sh [--flagship] [--tenants] [--schema] [--migrations] [--dry-run] [--yes] [--cloud=aws|azure]
+# --cloud=aws (default) or --cloud=azure: the flagship database's target (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md).
+# Azure: Postgres Flexible Server over the core's Tailscale subnet route, app_user's password from Key Vault
+# (lib.sh); the stores' databases stay on AWS, so --tenants there is refused.
 source "$(dirname "$0")/lib.sh"
 FLAGSHIP=false; TENANTS=false; SCHEMA=false; MIGRATIONS=false
 for a in "$@"; do case $a in
   --flagship) FLAGSHIP=true ;; --tenants) TENANTS=true ;; --schema) SCHEMA=true ;; --migrations) MIGRATIONS=true ;;
 esac; done
+if [ "$CLOUD" = azure ]; then
+  $TENANTS && { echo "release-db: the stores' databases stay on AWS; run --tenants without --cloud=azure" >&2; exit 2; }
+  FLAGSHIP=true
+fi
 $FLAGSHIP || $TENANTS || { FLAGSHIP=true; TENANTS=true; }
 $SCHEMA || $MIGRATIONS || { SCHEMA=true; MIGRATIONS=true; }
 mkdir -p "$OUT_DIR"
@@ -34,8 +41,13 @@ if $FLAGSHIP; then
   if $MIGRATIONS; then
     say "File migrations on jeffi_stores (every <service>/database/migrations and platform-only/migrations)"
     flag=(); $DRY_RUN && flag=(--dry-run)
-    RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=jeffi_stores \
-      bash "$REPO/deploy/run-migrations.sh" ${flag[@]+"${flag[@]}"}
+    if [ "$CLOUD" = azure ]; then # password from PGPASSFILE
+      RDS_HOST='' PGSSLMODE=require DATABASE_URL="postgresql://app_user@$PG_ADDR:5432/jeffi_stores" \
+        bash "$REPO/deploy/run-migrations.sh" ${flag[@]+"${flag[@]}"}
+    else
+      RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=jeffi_stores \
+        bash "$REPO/deploy/run-migrations.sh" ${flag[@]+"${flag[@]}"}
+    fi
   fi
 fi
 

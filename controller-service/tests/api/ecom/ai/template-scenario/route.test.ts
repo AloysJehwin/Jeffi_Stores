@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
-const { mockOwnerApi, mockApprovals, mockFill, mockRate } = vi.hoisted(() => ({
+const { mockOwnerApi, mockApprovals, mockFill, mockRate, billed } = vi.hoisted(() => ({
   mockOwnerApi: vi.fn(),
   mockApprovals: vi.fn(),
   mockFill: vi.fn(),
   mockRate: vi.fn(),
+  billed: { tenant: null as string | null, during: null as string | null },
 }))
 
 vi.mock('@controller/lib/ecom/owner-api', () => ({ ownerApi: mockOwnerApi }))
@@ -21,6 +22,14 @@ vi.mock('@/lib/ai/template-scenario', () => ({
 }))
 vi.mock('@/lib/ai/billing', () => ({
   AiWalletError: class extends Error { status = 402; balanceInr = 1; neededInr = 5 },
+  runBilledTo: async (tenantId: string, fn: () => Promise<unknown>) => {
+    billed.tenant = tenantId
+    try {
+      return await fn()
+    } finally {
+      billed.tenant = null
+    }
+  },
 }))
 vi.mock('@/lib/ai/media', () => ({ AiMediaError: class extends Error { status = 415 } }))
 
@@ -59,8 +68,12 @@ describe('POST /api/ecom/ai/template-scenario', () => {
   })
 
   it('fills the scenario on the tenant wallet, never as a platform library', async () => {
-    mockFill.mockResolvedValue({ name: 'shipped', body: 'Hi' })
+    mockFill.mockImplementation(async () => {
+      billed.during = billed.tenant
+      return { name: 'shipped', body: 'Hi' }
+    })
     const res = await POST(req({ ...BODY, isPlatformLibrary: true }))
+    expect(billed.during).toBe('t-1')
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ name: 'shipped', body: 'Hi' })
     expect(mockFill).toHaveBeenCalledWith(expect.objectContaining({ scenarioText: 'order shipped' }), 't-1', false, 'o@acme.test')

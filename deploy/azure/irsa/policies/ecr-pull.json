@@ -1,0 +1,7 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "EcrLogin", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    { "Sid": "EcrPull", "Effect": "Allow", "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"], "Resource": "arn:aws:ecr:us-east-1:__ACCOUNT__:repository/jeffi-stores-*" }
+  ]
+}

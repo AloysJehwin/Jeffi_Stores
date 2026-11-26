@@ -49,6 +49,63 @@ export interface TenantWorkloadInput {
   routeTo?: StoreLayout // while switching layouts: traffic stays on this one, which runs a single copy
   storeSecret?: string // Secrets Manager id for the store's app pods (default: the platform's)
   dbPassword?: string // node-mode Postgres password (tenant-db-secret.ts); without it the Secret is rendered with none
+  platform?: PlatformLink // how the pods reach the platform; default: today's (AWS)
+}
+
+/**
+ * How a store's pods reach the platform. The default is the platform on AWS: each pod's boot loader reads its
+ * secret from Secrets Manager through its server's role, and messaging and documents log in to the flagship
+ * database with an RDS IAM token. With the platform on Azure (tenant-compute.ts tenantPlatformLink), servers
+ * stay on AWS and can't read Key Vault, so the controller copies each secret into the store's namespace
+ * (`kubernetes`), and the flagship database takes a password over TLS. The store's own database is untouched:
+ * on-node Postgres keeps its password, a dedicated RDS its IAM token (tenant_infra.iam_auth).
+ */
+export interface PlatformLink {
+  secrets: 'secretsmanager' | 'kubernetes'
+  dbIamAuth: boolean
+  dbSsl?: string // DB_SSL for the flagship database (disable | require | verify)
+  nodeCidrs?: string[] // node addresses beyond the VPC that probe pods (Tailscale, when nodes join over it)
+}
+export const DEFAULT_PLATFORM_LINK: PlatformLink = { secrets: 'secretsmanager', dbIamAuth: true }
+
+/** The namespace's copy of a secret (`kubernetes` secrets), which the pods take as env. */
+export const tenantEnvSecretName = (id: string) => `env-${id.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`
+export const ENV_SECRET_LABEL = { 'jeffi.io/env-secret': 'true' }
+
+// The pod's secret: SM_SECRET_ID for its boot loader, or, copied into the namespace, its env (SECRETS_BACKEND=env
+// tells the loader there is nothing to fetch; env set on the container still wins over the Secret's).
+function secretEnv(link: PlatformLink, id: string, fallbackId?: string): { env: EnvVar[]; envFrom?: unknown[] } {
+  const env: EnvVar[] = [{ name: 'SM_SECRET_ID', value: id }, ...(fallbackId ? [{ name: 'SM_SECRET_FALLBACK_ID', value: fallbackId }] : [])]
+  if (link.secrets !== 'kubernetes') return { env }
+  return { env: [...env, { name: 'SECRETS_BACKEND', value: 'env' }], envFrom: [{ secretRef: { name: tenantEnvSecretName(id) } }] }
+}
+
+/** The secrets a render's pods take from their namespace: the Secret name, the id it copies and its fallback. */
+export function tenantEnvSecrets(objs: K8sObject[]): { name: string; id: string; fallbackId?: string }[] {
+  const out = new Map<string, { name: string; id: string; fallbackId?: string }>()
+  for (const o of objs) {
+    if (o.kind !== 'Deployment') continue
+    for (const c of (o as any).spec?.template?.spec?.containers ?? []) {
+      const val = (n: string) => c.env?.find((e: EnvVar) => e.name === n)?.value as string | undefined
+      for (const f of c.envFrom ?? []) {
+        const name = f.secretRef?.name as string | undefined
+        const id = val('SM_SECRET_ID')
+        if (!name?.startsWith('env-') || !id || name !== tenantEnvSecretName(id)) continue
+        const fallbackId = val('SM_SECRET_FALLBACK_ID')
+        out.set(name, { name, id, ...(fallbackId && { fallbackId }) })
+      }
+    }
+  }
+  return [...out.values()]
+}
+
+// The flagship database. Messaging and documents always say how they log in; the store apps follow their secret
+// until the platform takes a password, which then overrides whatever IAM flags the secret carries.
+function platformDbEnv(link: PlatformLink, service: boolean): EnvVar[] {
+  const ssl = link.dbSsl ? [{ name: 'DB_SSL', value: link.dbSsl }] : []
+  if (service) return [{ name: 'DB_IAM_AUTH', value: link.dbIamAuth ? 'true' : 'false' }, ...ssl]
+  if (link.dbIamAuth) return ssl
+  return [...['DB_IAM_AUTH', 'RDS_IAM_AUTH', 'CONTROL_PLANE_IAM_AUTH'].map(name => ({ name, value: 'false' })), ...ssl]
 }
 
 const SERVICES = {
@@ -136,16 +193,17 @@ const volumes = [
   { name: 'tmp', emptyDir: { sizeLimit: '256Mi' } },
 ]
 
-function serviceDeployment(slug: string, ns: string, service: BackingService, spec: ServiceSpec, image: string, place: ReturnType<typeof placement>, nodes: number, poolEnv: { name: string; value: string }[], dbEnv: EnvVar[]): K8sObject {
+function serviceDeployment(slug: string, ns: string, service: BackingService, spec: ServiceSpec, image: string, place: ReturnType<typeof placement>, nodes: number, poolEnv: { name: string; value: string }[], dbEnv: EnvVar[], link: PlatformLink): K8sObject {
   const s = SERVICES[service]
   const res = POD_RESOURCES[service][spec.size]
   const lbl = labels(slug, s.app, service)
+  const sec = secretEnv(link, s.secret)
   const env = [
-    { name: 'SM_SECRET_ID', value: s.secret },
+    ...sec.env,
     ...poolEnv,
     ...dbEnv,
     { name: 'SERVICE_TENANT_SLUG', value: slug },
-    { name: 'DB_IAM_AUTH', value: 'true' },
+    ...platformDbEnv(link, true),
     { name: 'PUBLIC_BASE_URL', value: PUBLIC_BASE_URL },
     { name: 'NODE_OPTIONS', value: `--max-old-space-size=${Math.floor(mem(res.limits.memory) * 0.7)}` },
     ...(service === 'documents'
@@ -173,6 +231,7 @@ function serviceDeployment(slug: string, ns: string, service: BackingService, sp
               image,
               ports: [{ name: 'http', containerPort: s.port }],
               env,
+              ...(sec.envFrom && { envFrom: sec.envFrom }),
               resources: res,
               startupProbe: { ...probe, periodSeconds: 5, failureThreshold: 24 },
               readinessProbe: { ...probe, periodSeconds: 10, timeoutSeconds: 5 },
@@ -238,8 +297,10 @@ function appDeployment(a: {
   poolEnv: { name: string; value: string }[]
   dbEnv: EnvVar[]
   secret: string
+  link: PlatformLink
 }): K8sObject {
   const res = POD_RESOURCES[a.sizeOf][a.svc.size]
+  const sec = secretEnv(a.link, a.secret, a.secret !== 'jeffi/production' ? 'jeffi/production' : undefined)
   const app = appLabel(a.role)
   const lbl = labels(a.slug, app, a.role ?? 'controller')
   // Probes use localhost: the app 404s a tenant host until the tenant is active, which happens only
@@ -265,14 +326,14 @@ function appDeployment(a: {
               image: a.image,
               ports: [{ name: 'http', containerPort: 3000 }],
               env: [
-                { name: 'SM_SECRET_ID', value: a.secret },
-                ...(a.secret !== 'jeffi/production' ? [{ name: 'SM_SECRET_FALLBACK_ID', value: 'jeffi/production' }] : []),
+                ...sec.env,
                 // The image is the role; this pins the pod to its store.
                 ...(a.role ? [{ name: 'SERVICE_TENANT_SLUG', value: a.slug }] : []),
                 ...(a.role === 'admin' ? [{ name: 'STOREFRONT_URL', value: `http://${tenantRoleName(a.slug, 'storefront')}:3000` }] : []),
                 { name: 'WEB_CONCURRENCY', value: '1' },
                 ...a.poolEnv,
                 ...a.dbEnv,
+                ...platformDbEnv(a.link, false),
                 { name: 'IN_PROCESS_CRON', value: 'false' },
                 { name: 'CLIENT_CERT_PROXY', value: 'traefik' },
                 { name: 'MESSAGING_URL', value: `http://${tenantServiceName(a.slug, 'messaging')}:${SERVICES.messaging.port}` },
@@ -283,6 +344,7 @@ function appDeployment(a: {
                 { name: 'REDIS_PASSWORD', valueFrom: { secretKeyRef: { name: 'redis', key: 'password' } } },
                 { name: 'REDIS_URL', value: 'redis://:$(REDIS_PASSWORD)@redis:6379' },
               ],
+              ...(sec.envFrom && { envFrom: sec.envFrom }),
               resources: res,
               startupProbe: { ...probe('/api/health'), periodSeconds: 5, failureThreshold: 36 },
               readinessProbe: { ...probe('/api/ready'), periodSeconds: 10, timeoutSeconds: 5 },
@@ -321,6 +383,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const nodeDb = spec.db.mode === 'node'
   const dbEnv = nodeDb ? nodeDbEnv(slug) : []
   const image = (s: TenantService) => input.images?.[s] || DEFAULT_IMAGES[s]
+  const link = input.platform ?? DEFAULT_PLATFORM_LINK
   // The store apps' narrower secret; the old all-in-one app keeps the platform's.
   const secret = input.storeSecret || 'jeffi/store'
   const roles = activeServices(input.plan).filter((k): k is ServiceRole => (STORE_ROLES as readonly string[]).includes(k))
@@ -430,13 +493,13 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   ]
 
   for (const a of apps) {
-    objs.push(appDeployment({ slug, ns, ...a, place, nodes, poolEnv, dbEnv, secret: a.role ? secret : 'jeffi/production' }), appService(ns, slug, a.name, a.role))
+    objs.push(appDeployment({ slug, ns, ...a, place, nodes, poolEnv, dbEnv, secret: a.role ? secret : 'jeffi/production', link }), appService(ns, slug, a.name, a.role))
     objs.push(...scaling(ns, a.name, selector(slug, appLabel(a.role)), a.svc))
   }
 
   for (const { k: service, svc: s } of backing) {
     const b = SERVICES[service]
-    objs.push(serviceDeployment(slug, ns, service, s, image(service), place, nodes, poolEnv, dbEnv), {
+    objs.push(serviceDeployment(slug, ns, service, s, image(service), place, nodes, poolEnv, dbEnv, link), {
       apiVersion: 'v1',
       kind: 'Service',
       metadata: { name: tenantServiceName(slug, service), namespace: ns },
@@ -464,6 +527,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
             // The platform's cron fan-out calls the store's admin service.
             { namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'jeffi' } } },
             { ipBlock: { cidr: '172.31.0.0/16' } },
+            ...(link.nodeCidrs ?? []).map(cidr => ({ ipBlock: { cidr } })),
           ],
         },
       ],

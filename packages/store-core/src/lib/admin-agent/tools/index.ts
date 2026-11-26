@@ -1,6 +1,6 @@
 import { query, queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
-import { embed, findSimilarCustomers } from '@/lib/shared/rag'
+import { embedWithModel, findSimilarCustomers, LEGACY_EMBED_MODEL } from '@/lib/shared/rag'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { SALES_TOOLS } from './sales'
 import { MARKETING_TOOLS } from './marketing'
@@ -80,17 +80,34 @@ export const TOOLS: ToolDef[] = [
     mutating: false,
     handler: async ({ query: q, limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 10, 1, 50)
-      const v = await embed(String(q))
+      const { vector: v, model } = await embedWithModel(String(q))
+      // Only vectors of the query's model are comparable; a store mid-switch falls back to name matching.
       const ids = await queryMany<{ source_table: string; source_id: string; sim: number }>(
         `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
          FROM embeddings WHERE source_table IN ('products', 'product_variants')
+           AND COALESCE(embedding_model, '${LEGACY_EMBED_MODEL}') = $3
          ORDER BY embedding <=> $1::vector LIMIT $2`,
-        [vec(v), lim * 2]
+        [vec(v), lim * 2, model]
       ).catch(() => [])
 
       const productIds: string[] = []
       for (const r of ids) {
         if (r.source_table === 'products' && !productIds.includes(r.source_id)) productIds.push(r.source_id)
+      }
+      if (ids.length === 0) {
+        const words = String(q)
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .split(/\s+/)
+          .filter(w => w.length >= 3)
+          .slice(0, 3)
+        for (const word of words) {
+          const hits = await queryMany<{ id: string }>(
+            `SELECT id::text FROM products WHERE is_active = TRUE AND (name ILIKE $1 OR sku ILIKE $1) LIMIT $2`,
+            [`%${word}%`, lim]
+          ).catch(() => [] as { id: string }[])
+          for (const h of hits) if (!productIds.includes(h.id)) productIds.push(h.id)
+        }
       }
       const variantSrcIds = ids.filter(r => r.source_table === 'product_variants').map(r => r.source_id)
       if (variantSrcIds.length) {
@@ -187,16 +204,17 @@ export const TOOLS: ToolDef[] = [
     mutating: false,
     handler: async ({ productId, limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 10, 1, 50)
-      const src = await queryOne<{ embedding: string }>(
-        `SELECT embedding::text FROM embeddings WHERE source_table = 'products' AND source_id = $1 LIMIT 1`,
+      const src = await queryOne<{ embedding: string; embedding_model: string | null }>(
+        `SELECT embedding::text, embedding_model FROM embeddings WHERE source_table = 'products' AND source_id = $1 LIMIT 1`,
         [String(productId)]
       ).catch(() => null)
       if (!src) return { products: [], note: 'Product has no embedding yet.' }
       const rows = await queryMany<{ source_id: string; sim: number }>(
         `SELECT source_id, 1 - (embedding <=> $1::vector) AS sim
          FROM embeddings WHERE source_table = 'products' AND source_id != $2
+           AND COALESCE(embedding_model, '${LEGACY_EMBED_MODEL}') = $4
          ORDER BY embedding <=> $1::vector LIMIT $3`,
-        [src.embedding, productId, lim]
+        [src.embedding, productId, lim, src.embedding_model || LEGACY_EMBED_MODEL]
       )
       const ids = rows.map(x => x.source_id)
       if (ids.length === 0) return { products: [] }

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { AUDIT_INSIGHTS } from './audit-insights'
 import {
   usePeriod,
   PeriodBar,
@@ -36,7 +38,7 @@ export default function AuditOverview() {
   const href = (h: string) => ap(h.startsWith('/admin/audit?') ? `${h}&from=${period.from}&to=${period.to}` : h)
   return (
     <div className="space-y-3">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={AUDIT_INSIGHTS} />} />
       <ListFilters
         entity="audit"
         fields={AUDIT_FIELDS}

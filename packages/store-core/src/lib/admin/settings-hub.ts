@@ -18,8 +18,8 @@ export const SETTINGS_HUB_TABS: {
   { id: 'team', label: 'Team', href: '/admin/team', scope: 'settings:read', ownerOnly: true },
   // The store's SMS / WhatsApp numbers: the flagship's administrator edits them, a store sees the ones Jeffi assigned.
   { id: 'numbers', label: 'Numbers', href: '/admin/settings?tab=numbers', scope: 'settings:read' },
-  // Which provider sends SMS / WhatsApp and serves AI, platform-wide; per-store overrides are in Ecom → Configuration.
-  { id: 'providers', label: 'Providers', href: '/admin/settings?tab=providers', scope: 'settings:read', platformAdminOnly: true },
+  // Flagship: messaging, calling and AI routing platform-wide. A store: its own AI routing and models (messaging read-only).
+  { id: 'providers', label: 'Providers', href: '/admin/settings?tab=providers', scope: 'settings:read' },
   { id: 'service-accounts', label: 'Service accounts', href: '/admin/service-accounts', scope: 'service_accounts:read' },
   // No standalone route: `jeffi login` and extension tokens, one's own (owners: everyone's).
   { id: 'cli', label: 'CLI & tokens', href: '/admin/settings?tab=cli', scope: 'settings:read' },

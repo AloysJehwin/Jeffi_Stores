@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { CONFIG, CLAUDE_VISION_MODEL, claudeModelForHint } from '../config'
+import { CONFIG, CLAUDE_VISION_MODEL, claudeModelFor, claudeModelForHint } from '../config'
+import { options, type Capability, type ModelList } from '../models'
 import { anthropicUsage } from '../pricing'
 import {
   AiClientError, type AiChatMessage, type AiChatRequest, type AiChatStreamEvent, type AiToolCall,
@@ -36,6 +37,13 @@ function wifReady(): boolean {
 /** Gateway-wide: some Claude auth path exists (per-store WIF or the dev key). */
 export function anthropicConfigured(): boolean {
   return wifReady() || !!CONFIG.anthropicApiKey
+}
+
+/** AI_ANTHROPIC_MODELS, plus today's default (the copy hint's model), flagged. */
+export function anthropicModels(cap: Capability): ModelList | null {
+  if (cap !== 'text') return null
+  const def = claudeModelForHint(undefined).model
+  return { models: options([...CONFIG.anthropicModels, def], def) }
 }
 
 /**
@@ -181,7 +189,7 @@ function toTool(t: AiToolDef): Tool {
 }
 
 function buildParams(req: AiChatRequest): Params {
-  const { model, effort } = claudeModelForHint(req.modelHint)
+  const { model, effort } = claudeModelFor(req)
   const { system, messages, tools } = toAnthropic(req)
   // Cache the stable prefix: last tool (covers all tools) and the system prompt, plus the
   // automatic breakpoint on the conversation so a tool loop reuses the previous turns.
@@ -260,7 +268,7 @@ export async function anthropicVision(req: VisionRequest): Promise<VisionRespons
   let msg: Message
   try {
     msg = await requireClient(req).beta.messages.stream({
-      model: CLAUDE_VISION_MODEL,
+      model: req.models?.anthropic || CLAUDE_VISION_MODEL,
       max_tokens: Math.max(16000, CONFIG.anthropicMinMaxTokens),
       output_config: { effort: 'low' },
       messages: [{ role: 'user', content }],

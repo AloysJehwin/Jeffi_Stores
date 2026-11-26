@@ -4,46 +4,39 @@ import { resolve } from 'node:path'
 
 vi.mock('server-only', () => ({}))
 const query = vi.hoisted(() => vi.fn())
-const store = vi.hoisted(() => new Map<string, { config_enc: string }>())
-vi.mock('@/lib/tenant-registry', () => ({
-  controlPlanePool: () => ({ query }),
-  getIntegrationCredential: vi.fn(async (t: string, p: string) => store.get(`${t}:${p}`) ?? null),
-  saveIntegrationCredential: vi.fn(async (c: { tenantId: string; provider: string; configEnc: string }) => {
-    store.set(`${c.tenantId}:${c.provider}`, { config_enc: c.configEnc })
-  }),
-  deleteIntegrationCredential: vi.fn(async (t: string, p: string) => {
-    store.delete(`${t}:${p}`)
-  }),
-}))
+vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }) }))
 const identity = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/providers/policy', () => ({ getAnthropicIdentity: identity }))
-vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: vi.fn(async () => null) }))
 
 import {
-  getVoiceConfig,
-  getVoiceConfigPublic,
-  saveVoiceCredential,
-  clearVoiceCredential,
+  getVoiceConfigView,
+  voiceSecretsStatus,
   testExotelCredentials,
-  VoiceCredentialError,
+  testTwilioCredentials,
+  testAzureSpeechCredentials,
+  testSarvamCredentials,
 } from '@/lib/providers/voice-config'
-import { saveIntegrationCredential } from '@/lib/tenant-registry'
 
-const P = '00000000-0000-0000-0000-000000000000'
 const KEY = 'exotel-key-AAAA1111'
 const TOKEN = 'exotel-token-BBBB2222'
 const SARVAM = 'sarvam-secret-CCCC3333'
+const AZURE = 'azure-speech-key-DDDD4444'
 const settings = (rows: { key: string; value: unknown }[]) => query.mockResolvedValue({ rows })
 const exotelSettings = { exotel: { accountSid: 'jeffi1', callerId: '+911401234567', appId: '12345' } }
+const SECRET_ENV = [
+  'EXOTEL_API_KEY',
+  'EXOTEL_API_TOKEN',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'SARVAM_API_KEY',
+  'AZURE_SPEECH_KEY',
+  'ANTHROPIC_API_KEY',
+  'ANTHROPIC_ORGANIZATION_ID',
+]
 
 beforeEach(() => {
   vi.clearAllMocks()
-  store.clear()
-  vi.stubEnv('SOCIAL_TOKEN_ENC_KEY', 'a'.repeat(64))
-  vi.stubEnv('TWILIO_ACCOUNT_SID', '')
-  vi.stubEnv('TWILIO_AUTH_TOKEN', '')
-  vi.stubEnv('ANTHROPIC_API_KEY', '')
-  vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', '')
+  for (const k of SECRET_ENV) vi.stubEnv(k, '')
   identity.mockResolvedValue(null)
   settings([])
 })
@@ -52,77 +45,131 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('voice credentials', () => {
-  it('stores encrypted, merges a partial replace, and clears', async () => {
-    const st = await saveVoiceCredential('exotel', { apiKey: KEY, apiToken: TOKEN })
-    expect(st).toEqual({ apiKey: { configured: true, last4: '1111' }, apiToken: { configured: true, last4: '2222' } })
-    const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
-    expect(saved.tenantId).toBe(P)
-    expect(saved.configEnc).toMatch(/^v1:/)
-    expect(saved.configEnc).not.toContain(KEY)
-    expect(JSON.stringify(saved.meta)).not.toContain('1111')
-
-    await saveVoiceCredential('exotel', { apiToken: 'exotel-token-NEW-9999' })
-    const c = await getVoiceConfig()
-    expect(c.exotel.apiKey).toBe(KEY)
-    expect(c.exotel.apiToken).toBe('exotel-token-NEW-9999')
-
-    await clearVoiceCredential('exotel')
-    expect((await getVoiceConfig()).exotel.apiKey).toBeNull()
-  })
-
-  it('refuses an incomplete set, unknown fields and bad formats', async () => {
-    await expect(saveVoiceCredential('exotel', { apiKey: KEY })).rejects.toThrow(/apiToken/)
-    await expect(saveVoiceCredential('sarvam', { apiKey: SARVAM, extra: 'x' })).rejects.toBeInstanceOf(VoiceCredentialError)
-    await expect(saveVoiceCredential('twilio_voice', { accountSid: 'nope', authToken: 'a'.repeat(32) })).rejects.toThrow(/AC/)
-    await expect(saveVoiceCredential('anthropic_voice', { apiKey: 'x'.repeat(30) })).rejects.toThrow(/sk-ant-/)
-    await expect(saveVoiceCredential('sarvam', {})).rejects.toThrow(/Nothing/)
-    expect(saveIntegrationCredential).not.toHaveBeenCalled()
+describe('voiceSecretsStatus', () => {
+  it('lists every voice secret by name and presence, never a value', () => {
+    expect(voiceSecretsStatus()).toEqual([
+      { name: 'EXOTEL_API_KEY', group: 'calling', present: false },
+      { name: 'EXOTEL_API_TOKEN', group: 'calling', present: false },
+      { name: 'TWILIO_ACCOUNT_SID', group: 'calling', present: false },
+      { name: 'TWILIO_AUTH_TOKEN', group: 'calling', present: false },
+      { name: 'SARVAM_API_KEY', group: 'voice', present: false },
+      { name: 'AZURE_SPEECH_KEY', group: 'voice', present: false },
+      { name: 'ANTHROPIC_API_KEY', group: 'voice', present: false },
+    ])
+    vi.stubEnv('EXOTEL_API_KEY', KEY)
+    vi.stubEnv('SARVAM_API_KEY', '   ')
+    const s = voiceSecretsStatus()
+    expect(s.find(x => x.name === 'EXOTEL_API_KEY')?.present).toBe(true)
+    expect(s.find(x => x.name === 'SARVAM_API_KEY')?.present).toBe(false)
+    expect(JSON.stringify(s)).not.toContain(KEY)
   })
 })
 
-describe('getVoiceConfig', () => {
-  it('merges settings and secrets, and is ready when the chosen provider, Sarvam and Claude are set', async () => {
+describe('getVoiceConfigView', () => {
+  it('defaults to Exotel with nothing ready and no secret in the result', async () => {
+    const v = await getVoiceConfigView()
+    expect(v.provider).toBe('exotel')
+    expect(v.ready).toBe(false)
+    expect(v.parts).toEqual({ exotel: false, twilio: false, calling: false, sarvam: false, azure: false, speech: false, claude: false })
+    expect(v.speech).toEqual({ sttProvider: 'sarvam', ttsProvider: 'sarvam' })
+    expect(v.azureSpeech).toMatchObject({ region: 'centralindia' })
+    expect(Object.keys(v.azureSpeech.voices).sort()).toEqual(['bn', 'en', 'gu', 'hi', 'kn', 'ml', 'mr', 'ta', 'te'])
+  })
+
+  it('is ready when the chosen provider, a speech engine and Claude are set, from env presence', async () => {
     settings([
       { key: 'voice_provider', value: 'exotel' },
       { key: 'voice_config', value: exotelSettings },
     ])
-    await saveVoiceCredential('exotel', { apiKey: KEY, apiToken: TOKEN })
-    await saveVoiceCredential('sarvam', { apiKey: SARVAM })
-    let c = await getVoiceConfig()
-    expect(c.exotel).toMatchObject({ accountSid: 'jeffi1', subdomain: 'api.in.exotel.com', apiKey: KEY, configured: true })
-    expect(c.sarvam).toMatchObject({ sttModel: 'saaras:v3', ttsModel: 'bulbul:v3', apiKey: SARVAM, configured: true })
-    expect(c.llmModel).toBe('claude-haiku-5-5')
-    expect(c.anthropic.configured).toBe(false)
-    expect(c.ready).toBe(false)
+    vi.stubEnv('EXOTEL_API_KEY', KEY)
+    vi.stubEnv('EXOTEL_API_TOKEN', TOKEN)
+    vi.stubEnv('SARVAM_API_KEY', SARVAM)
+    let v = await getVoiceConfigView()
+    expect(v.exotel).toMatchObject({ accountSid: 'jeffi1', subdomain: 'api.in.exotel.com' })
+    expect(v.parts).toMatchObject({ exotel: true, calling: true, sarvam: true, speech: true, claude: false })
+    expect(v.ready).toBe(false)
 
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-env-key-0000')
-    c = await getVoiceConfig()
-    expect(c.anthropic).toEqual({ apiKey: 'sk-ant-env-key-0000', source: 'env', federation: false, configured: true })
-    expect(c.ready).toBe(true)
+    v = await getVoiceConfigView()
+    expect(v.parts.claude).toBe(true)
+    expect(v.ready).toBe(true)
+    expect(JSON.stringify(v)).not.toMatch(new RegExp([KEY, TOKEN, SARVAM, 'sk-ant-env-key-0000'].join('|')))
   })
 
-  it('falls back to the messaging Twilio account for the test line', async () => {
+  it('needs the Exotel account details as well as its secrets', async () => {
+    vi.stubEnv('EXOTEL_API_KEY', KEY)
+    vi.stubEnv('EXOTEL_API_TOKEN', TOKEN)
+    expect((await getVoiceConfigView()).parts.exotel).toBe(false)
+  })
+
+  it('readies the Twilio test line from the env account, a from-number and a test number', async () => {
     settings([
       { key: 'voice_provider', value: 'twilio_test' },
       { key: 'voice_config', value: { twilioTest: { from: '+14155550100' }, testNumbers: ['+919876543210'] } },
     ])
     vi.stubEnv('TWILIO_ACCOUNT_SID', 'AC' + '1'.repeat(32))
     vi.stubEnv('TWILIO_AUTH_TOKEN', 'env-auth-token-5555')
-    const c = await getVoiceConfig()
-    expect(c.provider).toBe('twilio_test')
-    expect(c.twilioTest).toMatchObject({ source: 'messaging', authToken: 'env-auth-token-5555', configured: true })
+    const v = await getVoiceConfigView()
+    expect(v.provider).toBe('twilio_test')
+    expect(v.twilioTest.from).toBe('+14155550100')
+    expect(v.parts).toMatchObject({ twilio: true, calling: true, exotel: false })
+  })
 
-    await saveVoiceCredential('twilio_voice', { accountSid: 'AC' + 'a'.repeat(32), authToken: 'stored-auth-token-6666' })
-    expect((await getVoiceConfig()).twilioTest).toMatchObject({ source: 'stored', authToken: 'stored-auth-token-6666' })
+  it('is ready with Azure alone, and not with neither speech engine', async () => {
+    settings([{ key: 'voice_config', value: exotelSettings }])
+    vi.stubEnv('EXOTEL_API_KEY', KEY)
+    vi.stubEnv('EXOTEL_API_TOKEN', TOKEN)
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-env-key-0000')
+    expect((await getVoiceConfigView()).ready).toBe(false)
+    vi.stubEnv('AZURE_SPEECH_KEY', AZURE)
+    const v = await getVoiceConfigView()
+    expect(v.parts).toMatchObject({ azure: true, sarvam: false, speech: true })
+    expect(v.ready).toBe(true)
+  })
+
+  it('takes the stored engines, region and voices over the defaults', async () => {
+    settings([
+      {
+        key: 'voice_config',
+        value: { speech: { ttsProvider: 'azure' }, azureSpeech: { region: 'SouthIndia', voices: { hi: 'hi-IN-MadhurNeural' } } },
+      },
+    ])
+    const v = await getVoiceConfigView()
+    expect(v.speech).toEqual({ sttProvider: 'sarvam', ttsProvider: 'azure' })
+    expect(v.azureSpeech.region).toBe('southindia')
+    expect(v.azureSpeech.voices).toMatchObject({ hi: 'hi-IN-MadhurNeural', ta: 'ta-IN-PallaviNeural' })
+  })
+
+  describe('anthropic federation', () => {
+    const ids = { workspaceId: 'wrkspc_1', serviceAccountId: 'svac_1', federationRuleId: 'fdrl_1' }
+    const org = '11111111-2222-3333-4444-555555555555'
+
+    it('reports the platform identity plus the org id, and counts as Claude without a key', async () => {
+      identity.mockResolvedValue(ids)
+      vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
+      const v = await getVoiceConfigView()
+      expect(identity).toHaveBeenCalledWith()
+      expect(v.anthropicIdentity).toEqual({ organizationId: org, ...ids })
+      expect(v.parts.claude).toBe(true)
+    })
+
+    it('is null without the org id or without an identity row', async () => {
+      identity.mockResolvedValue(ids)
+      expect((await getVoiceConfigView()).anthropicIdentity).toBeNull()
+      vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
+      identity.mockResolvedValue(null)
+      const v = await getVoiceConfigView()
+      expect(v.anthropicIdentity).toBeNull()
+      expect(v.parts.claude).toBe(false)
+    })
   })
 })
 
 // The wire contract with voice-service: voice-service/tests/fixtures/voice-config.sample.json is what
-// voice-service's provider_config.merge is tested against. If getVoiceConfig's shape changes, this fails until
+// voice-service's provider_config.merge is tested against. If getVoiceConfigView's shape changes, this fails until
 // the fixture (and merge) follow.
 describe('voice-service contract fixture', () => {
-  it('equals a fully configured getVoiceConfig() result', async () => {
+  it('equals a fully configured getVoiceConfigView() result', async () => {
     const fixture = JSON.parse(readFileSync(resolve(process.cwd(), 'voice-service/tests/fixtures/voice-config.sample.json'), 'utf8'))
     settings([
       { key: 'voice_provider', value: 'exotel' },
@@ -132,83 +179,107 @@ describe('voice-service contract fixture', () => {
           exotel: { accountSid: 'fakeacct', callerId: '+911401234567', appId: '12345' },
           twilioTest: { from: '+14155550100' },
           testNumbers: ['+919876543210', '+919876543211'],
+          speech: { sttProvider: 'azure' },
         },
       },
     ])
-    await saveVoiceCredential('exotel', { apiKey: 'fake-exotel-key-0001', apiToken: 'fake-exotel-token-0002' })
-    await saveVoiceCredential('sarvam', { apiKey: 'fake-sarvam-key-0004' })
-    await saveVoiceCredential('twilio_voice', { accountSid: 'AC' + '0'.repeat(32), authToken: 'fake-twilio-auth-0003' })
-    await saveVoiceCredential('anthropic_voice', { apiKey: 'sk-ant-fake-voice-key-0005' })
+    for (const [k, v] of Object.entries({
+      EXOTEL_API_KEY: 'fake',
+      EXOTEL_API_TOKEN: 'fake',
+      TWILIO_ACCOUNT_SID: 'fake',
+      TWILIO_AUTH_TOKEN: 'fake',
+      SARVAM_API_KEY: 'fake',
+      AZURE_SPEECH_KEY: 'fake',
+      ANTHROPIC_ORGANIZATION_ID: '00000000-0000-0000-0000-000000000001',
+    }))
+      vi.stubEnv(k, v)
     identity.mockResolvedValue({ workspaceId: 'wrkspc_fake', serviceAccountId: 'svac_fake', federationRuleId: 'fdrl_fake' })
-    vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', '00000000-0000-0000-0000-000000000001')
-    const c = await getVoiceConfig()
-    expect(JSON.parse(JSON.stringify(c))).toEqual(fixture)
+    expect(JSON.parse(JSON.stringify(await getVoiceConfigView()))).toEqual(fixture)
   })
 })
 
-describe('anthropic federation', () => {
-  const ids = { workspaceId: 'wrkspc_1', serviceAccountId: 'svac_1', federationRuleId: 'fdrl_1' }
-  const org = '11111111-2222-3333-4444-555555555555'
+describe('credential tests read the env secrets, read-only', () => {
+  const fetchMock = () => {
+    const m = vi.fn(async () => ({ ok: true, status: 200 }))
+    vi.stubGlobal('fetch', m)
+    return m
+  }
+  const call = (m: ReturnType<typeof fetchMock>) => m.mock.calls[0] as unknown as [string, RequestInit]
 
-  it('reports the platform identity plus the org id, and counts as configured without a key', async () => {
-    identity.mockResolvedValue(ids)
-    vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
-    const c = await getVoiceConfig()
-    expect(identity).toHaveBeenCalledWith(null)
-    expect(c.anthropicIdentity).toEqual({ organizationId: org, ...ids })
-    expect(c.anthropic).toEqual({ apiKey: null, source: null, federation: true, configured: true })
-    const p = await getVoiceConfigPublic()
-    expect(p.anthropic.federation).toBe(true)
-    expect(JSON.stringify(p)).not.toContain('wrkspc_1')
-  })
-
-  it('is null without the org id or without an identity row; a stored key stays as the fallback', async () => {
-    identity.mockResolvedValue(ids)
-    expect((await getVoiceConfig()).anthropicIdentity).toBeNull()
-    vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
-    identity.mockResolvedValue(null)
-    await saveVoiceCredential('anthropic_voice', { apiKey: 'sk-ant-' + 'x'.repeat(30) })
-    const c = await getVoiceConfig()
-    expect(c.anthropicIdentity).toBeNull()
-    expect(c.anthropic).toMatchObject({ source: 'stored', federation: false, configured: true })
-  })
-})
-
-describe('getVoiceConfigPublic', () => {
-  it('masks every secret to configured + last 4 and shows no digits of env values', async () => {
+  it('Exotel: names the missing secrets, then reads the balance on the fixed host', async () => {
+    expect(await testExotelCredentials()).toEqual({ ok: false, message: expect.stringMatching(/EXOTEL_API_KEY and EXOTEL_API_TOKEN/) })
+    vi.stubEnv('EXOTEL_API_KEY', KEY)
+    vi.stubEnv('EXOTEL_API_TOKEN', TOKEN)
+    expect((await testExotelCredentials()).message).toMatch(/account SID/)
     settings([{ key: 'voice_config', value: exotelSettings }])
-    await saveVoiceCredential('exotel', { apiKey: KEY, apiToken: TOKEN })
-    await saveVoiceCredential('sarvam', { apiKey: SARVAM })
-    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-env-key-0000')
-    vi.stubEnv('TWILIO_ACCOUNT_SID', 'AC' + '1'.repeat(32))
-    vi.stubEnv('TWILIO_AUTH_TOKEN', 'env-auth-token-5555')
-    const p = await getVoiceConfigPublic()
-    const json = JSON.stringify(p)
-    for (const s of [KEY, TOKEN, SARVAM, 'sk-ant-env-key-0000', 'env-auth-token-5555', '1'.repeat(32)]) expect(json).not.toContain(s)
-    expect(p.exotel.apiKey).toEqual({ configured: true, last4: '1111' })
-    expect(p.sarvam.apiKey).toEqual({ configured: true, last4: '3333' })
-    expect(p.anthropic.apiKey).toEqual({ configured: true, last4: null })
-    expect(p.twilioTest.authToken).toEqual({ configured: true, last4: null })
-    expect(p.exotel.accountSid).toBe('jeffi1')
-  })
-})
-
-describe('testExotelCredentials', () => {
-  it('needs saved credentials and calls only the fixed Exotel host, read-only', async () => {
-    expect((await testExotelCredentials()).ok).toBe(false)
-    settings([{ key: 'voice_config', value: exotelSettings }])
-    await saveVoiceCredential('exotel', { apiKey: KEY, apiToken: TOKEN })
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }))
-    vi.stubGlobal('fetch', fetchMock)
+    const m = fetchMock()
     const r = await testExotelCredentials()
     expect(r.ok).toBe(true)
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const [url, init] = call(m)
     expect(url).toBe('https://api.in.exotel.com/v1/Accounts/jeffi1/Balance.json')
     expect(init.method ?? 'GET').toBe('GET')
     expect((init.headers as Record<string, string>).authorization).toBe(`Basic ${Buffer.from(`${KEY}:${TOKEN}`).toString('base64')}`)
     expect(r.message).not.toContain(KEY)
-
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 401 })
+    m.mockResolvedValueOnce({ ok: false, status: 401 })
     expect(await testExotelCredentials()).toEqual({ ok: false, message: 'Exotel rejected the API key or token.' })
+    m.mockResolvedValueOnce({ ok: false, status: 404 })
+    expect((await testExotelCredentials()).message).toMatch(/No account jeffi1/)
+    m.mockRejectedValueOnce(new Error('network'))
+    expect(await testExotelCredentials()).toEqual({ ok: false, message: 'Exotel did not answer.' })
+  })
+
+  it('Twilio: reads the account with the env credentials', async () => {
+    expect((await testTwilioCredentials()).ok).toBe(false)
+    const sid = 'AC' + '1'.repeat(32)
+    vi.stubEnv('TWILIO_ACCOUNT_SID', sid)
+    vi.stubEnv('TWILIO_AUTH_TOKEN', 'env-auth-token-5555')
+    const m = fetchMock()
+    expect((await testTwilioCredentials()).ok).toBe(true)
+    const [url, init] = call(m)
+    expect(url).toBe(`https://api.twilio.com/2010-04-01/Accounts/${sid}.json`)
+    expect(init.method ?? 'GET').toBe('GET')
+    m.mockResolvedValueOnce({ ok: false, status: 401 })
+    expect((await testTwilioCredentials()).message).toMatch(/rejected/)
+    m.mockResolvedValueOnce({ ok: false, status: 500 })
+    expect(await testTwilioCredentials()).toEqual({ ok: false, message: 'Twilio answered 500.' })
+    m.mockRejectedValueOnce(new Error('network'))
+    expect((await testTwilioCredentials()).message).toBe('Twilio did not answer.')
+  })
+
+  it('Azure Speech: asks the configured region for a token', async () => {
+    expect((await testAzureSpeechCredentials()).message).toMatch(/AZURE_SPEECH_KEY is not set/)
+    vi.stubEnv('AZURE_SPEECH_KEY', AZURE)
+    settings([{ key: 'voice_config', value: { azureSpeech: { region: 'southindia' } } }])
+    const m = fetchMock()
+    const r = await testAzureSpeechCredentials()
+    expect(r).toEqual({ ok: true, message: 'Azure Speech accepted the key (southindia).' })
+    const [url, init] = call(m)
+    expect(url).toBe('https://southindia.api.cognitive.microsoft.com/sts/v1.0/issueToken')
+    expect((init.headers as Record<string, string>)['Ocp-Apim-Subscription-Key']).toBe(AZURE)
+    expect(r.message).not.toContain(AZURE)
+    m.mockResolvedValueOnce({ ok: false, status: 401 })
+    expect((await testAzureSpeechCredentials()).message).toMatch(/rejected the key for southindia/)
+    m.mockResolvedValueOnce({ ok: false, status: 500 })
+    expect(await testAzureSpeechCredentials()).toEqual({ ok: false, message: 'Azure Speech answered 500.' })
+    m.mockRejectedValueOnce(new Error('network'))
+    expect(await testAzureSpeechCredentials()).toEqual({ ok: false, message: 'Azure Speech did not answer.' })
+  })
+
+  it('Sarvam: a refused key fails, a validation error means the key was accepted', async () => {
+    expect((await testSarvamCredentials()).message).toMatch(/SARVAM_API_KEY is not set/)
+    vi.stubEnv('SARVAM_API_KEY', SARVAM)
+    const m = fetchMock()
+    m.mockResolvedValueOnce({ ok: false, status: 422 })
+    expect(await testSarvamCredentials()).toEqual({ ok: true, message: 'Sarvam accepted the API key.' })
+    const [url, init] = call(m)
+    expect(url).toBe('https://api.sarvam.ai/text-to-speech')
+    expect((init.headers as Record<string, string>)['api-subscription-key']).toBe(SARVAM)
+    expect(init.body).toBe('{}')
+    m.mockResolvedValueOnce({ ok: false, status: 403 })
+    expect(await testSarvamCredentials()).toEqual({ ok: false, message: 'Sarvam rejected the API key.' })
+    m.mockResolvedValueOnce({ ok: false, status: 500 })
+    expect((await testSarvamCredentials()).message).toBe('Sarvam answered 500.')
+    m.mockRejectedValueOnce(new Error('network'))
+    expect((await testSarvamCredentials()).message).toBe('Sarvam did not answer.')
   })
 })

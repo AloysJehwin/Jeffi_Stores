@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { aiChat, type AiToolDef, type AiChatMessage } from '@/lib/shared/ai-client'
 import { storefrontAiGate } from '@/lib/shared/storefront-ai'
+import { ASSISTANT_UNAVAILABLE } from '@/lib/shared/ai-unavailable'
 import { CUSTOMER_TOOLS, getCustomerTool, type CustomerToolContext } from '@/lib/customer-agent/tools'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
@@ -22,18 +23,6 @@ const postSchema = z.object({
 })
 
 const MAX_ITERATIONS = 10
-
-// Resolve intent → { tool, input } from the raw user message, or null if unclear
-function resolveIntent(msg: string): { tool: string; input: Record<string, unknown> } | null {
-  const m = msg.toLowerCase()
-  if (/recommend|based on (my|what i|purchases|history|bought)|what should i buy/.test(m))
-    return { tool: 'get_my_recommendations', input: {} }
-  if (/my orders?|recent orders?|order (status|history|list)|what.*ordered/.test(m))
-    return { tool: 'get_my_orders', input: {} }
-  if (/what'?s new|new (products?|arrivals?|items?)/.test(m)) return { tool: 'get_recent_products', input: {} }
-  if (/popular|featured|best seller|trending/.test(m)) return { tool: 'get_featured_products', input: {} }
-  return null
-}
 
 interface ToolCallRecord {
   tool: string
@@ -144,6 +133,16 @@ const SELF_FORMATTING_TOOLS = new Set([
   'get_my_orders',
 ])
 
+// No model could answer: say so plainly. Matching products may follow, labelled as plain search results.
+async function unavailable(query: string, ctx: CustomerToolContext): Promise<NextResponse> {
+  let searchResults: ProductRow[] = []
+  try {
+    const out = (await getCustomerTool('search_products')?.handler({ query, limit: 5 }, ctx)) as { products?: ProductRow[] } | undefined
+    searchResults = (out?.products ?? []).map(p => ({ name: p.name, slug: p.slug, price: p.price }))
+  } catch {}
+  return NextResponse.json({ unavailable: true, message: ASSISTANT_UNAVAILABLE, searchResults }, { status: 503 })
+}
+
 export async function POST(req: NextRequest) {
   const user = await authenticateUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -177,52 +176,8 @@ export async function POST(req: NextRequest) {
   let provider = ''
   let model = ''
 
-  // For well-known intents, call the tool directly and format the response server-side.
-  // This avoids the model hallucinating products from its own knowledge instead of using tool data.
-  const resolved = resolveIntent(userMessage)
-  if (resolved) {
-    const tool = getCustomerTool(resolved.tool)
-    if (tool) {
-      try {
-        let out = (await tool.handler(resolved.input, ctx)) as Record<string, unknown>
-        toolCallRecords.push({ tool: resolved.tool, input: resolved.input, output: out })
-
-        // If recommendations returned empty, fall back to featured products
-        if (resolved.tool === 'get_my_recommendations' && Array.isArray(out.products) && out.products.length === 0) {
-          const featuredTool = getCustomerTool('get_featured_products')
-          if (featuredTool) {
-            const featuredOut = (await featuredTool.handler({}, ctx)) as Record<string, unknown>
-            toolCallRecords.push({ tool: 'get_featured_products', input: {}, output: featuredOut })
-            out = {
-              products: (featuredOut as any).products,
-              note: "You don't have any purchases yet — showing popular products instead.",
-            }
-          }
-        }
-
-        finalText = formatToolResult(resolved.tool, out)
-        return NextResponse.json({
-          message: finalText,
-          toolCalls: toolCallRecords,
-          provider: 'local',
-          model: 'direct',
-        })
-      } catch (err: any) {
-        const msg = String(err?.message || err)
-        toolCallRecords.push({ tool: resolved.tool, input: resolved.input, output: msg, isError: true })
-        finalText = "I couldn't fetch that right now. Please try again in a moment."
-        return NextResponse.json({
-          message: finalText,
-          toolCalls: toolCallRecords,
-          provider: 'local',
-          model: 'direct',
-        })
-      }
-    }
-  }
-
-  // For queries resolveIntent couldn't match, fall through to the LLM loop
-  // Uses Ollama's native tools API — no XML parsing, works with gemma4 and any tool-capable model.
+  // Every answer comes from the model through the gateway; product and order tools are formatted server-side
+  // once the model has chosen them, so it cannot invent products.
   const toolsDef = buildToolsDef()
   try {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -285,13 +240,7 @@ export async function POST(req: NextRequest) {
       break
     }
   } catch {
-    return NextResponse.json({
-      message:
-        "I'm having trouble responding right now. Please try again in a moment, or reach out to our support team.",
-      toolCalls: toolCallRecords,
-      provider,
-      model,
-    })
+    return unavailable(userMessage, ctx)
   }
 
   if (!finalText) {

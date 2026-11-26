@@ -1,0 +1,35 @@
+// Additions to the tailnet policy file for the Azure core. NOT a complete policy: merge each block into the section of the
+// same name in https://login.tailscale.com/admin/acls/file (README.md next to this file has the steps).
+// Assumes tag:ci (GitHub Actions) and tag:server-prod (the core, store nodes, the AWS edge) already exist under
+// "tagOwners"; if not, add them (owners: autogroup:admin).
+{
+	// "acls": add these rules next to the existing ones.
+	"acls": [
+		// CI reaches the core's Kubernetes API and the Azure Postgres subnet behind it (advertised by the core).
+		{
+			"action": "accept",
+			"src":    ["tag:ci"],
+			"dst":    ["tag:server-prod:6443", "10.60.2.0/24:5432"],
+		},
+	],
+
+	// "autoApprovers": the core's advertised routes are accepted without a trip to the admin console.
+	// 10.60.2.0/24 is the Postgres subnet; 168.63.129.16/32 is Azure's DNS, which resolves the private Postgres zone.
+	"autoApprovers": {
+		"routes": {
+			"10.60.2.0/24":     ["tag:server-prod"],
+			"168.63.129.16/32": ["tag:server-prod"],
+		},
+	},
+
+	// "ssh": the admin user may `tailscale ssh jeffi@jeffi-k8s-core-az` (deploy/azure/fetch-kubeconfig.sh).
+	// "check" re-authenticates the user in the browser; use "accept" to skip that.
+	"ssh": [
+		{
+			"action": "check",
+			"src":    ["autogroup:admin"],
+			"dst":    ["tag:server-prod"],
+			"users":  ["jeffi"],
+		},
+	],
+}

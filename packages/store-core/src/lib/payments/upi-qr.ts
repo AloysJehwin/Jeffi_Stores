@@ -12,7 +12,7 @@ const RZP_QR_LEFT_RATIO = 136 / 674
 const RZP_QR_TOP_RATIO = 648 / 1644
 const RZP_QR_SIZE_RATIO = 399 / 674
 
-async function cropRazorpayQr(imageUrl: string): Promise<string> {
+export async function cropRazorpayQr(imageUrl: string): Promise<string> {
   const imgRes = await fetch(imageUrl)
   const buf = Buffer.from(await imgRes.arrayBuffer())
   const meta = await sharp(buf).metadata()

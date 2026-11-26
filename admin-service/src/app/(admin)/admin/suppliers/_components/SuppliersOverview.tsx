@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { SUPPLIERS_INSIGHTS } from './suppliers-insights'
 import Link from 'next/link'
 import {
   usePeriod,
@@ -56,7 +58,7 @@ export default function SuppliersOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={SUPPLIERS_INSIGHTS} />} />
       <ListFilters entity="suppliers" fields={SUPPLIER_FIELDS} search={SUPPLIER_SEARCH} noun="Suppliers" tab="overview" period />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (

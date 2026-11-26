@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "PlatformBucketObjects", "Effect": "Allow", "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"], "Resource": "arn:aws:s3:::jeffi-stores-bucket/*" },
+    { "Sid": "PlatformBucketList", "Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::jeffi-stores-bucket" },
+    { "Sid": "VaultBucket", "Effect": "Allow", "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket"], "Resource": ["arn:aws:s3:::jeffi-stores-vault", "arn:aws:s3:::jeffi-stores-vault/*"] },
+    { "Sid": "MailInboundRead", "Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::jeffi-mail-inbound-__ACCOUNT__/inbound/*" },
+    { "Sid": "SmsSend", "Effect": "Allow", "Action": ["sms-voice:SendTextMessage", "sms-voice:SendMediaMessage", "sms-voice:Describe*", "sms-voice:List*"], "Resource": "*" },
+    { "Sid": "WhatsAppSend", "Effect": "Allow", "Action": ["social-messaging:SendWhatsAppMessage", "social-messaging:PostWhatsAppMessageMedia", "social-messaging:GetWhatsAppMessageMedia", "social-messaging:DeleteWhatsAppMessageMedia", "social-messaging:Get*", "social-messaging:List*"], "Resource": "*" }
+  ]
+}

@@ -485,7 +485,7 @@ describe('POST /api/admin/agent/chat', () => {
     expect(data.message).toMatch(/iteration limit/i)
   })
 
-  it('returns 502 when AI client throws AiClientError', async () => {
+  it('returns an explicit 503 when the AI client throws AiClientError', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
@@ -493,9 +493,9 @@ describe('POST /api/admin/agent/chat', () => {
     mockAiChat.mockRejectedValue(new AiClientError('AI service unavailable', 'anthropic'))
 
     const res = await POST(makePost({ message: 'hello' }))
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(503)
     const data = await res.json()
-    expect(data.error).toMatch(/AI service unavailable/i)
+    expect(data.error).toMatch(/assistant is unavailable right now/i)
   })
 
   it('returns 502 on generic AI error', async () => {
@@ -1174,19 +1174,19 @@ describe('POST /api/admin/agent/chat', () => {
     expect(systemMsg!.content).not.toMatch(/Flagship Customer/)
   })
 
-  // ── Sanitised 502 for provider/billing internals ─────────────────────────────
+  // ── No model: an explicit "unavailable", never provider internals ───────────
 
-  it('maps provider/billing errors to a generic 502 message', async () => {
+  it('maps any gateway/provider failure to an explicit 503 unavailable', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    mockAiChat.mockRejectedValue(new AiClientError('OpenAI: no credits remaining', 'openai'))
+    mockAiChat.mockRejectedValue(new AiClientError('AI gateway HTTP 503: all text providers failed (anthropic: no credits)', 'gateway'))
 
     const res = await POST(makePost({ message: 'hello' }))
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(503)
     const data = await res.json()
-    expect(data.error).toMatch(/temporarily unavailable/i)
+    expect(data).toMatchObject({ unavailable: true, error: 'The assistant is unavailable right now. Please try again in a few minutes.' })
     expect(data.error).not.toMatch(/credits/i)
   })
 })

@@ -2,8 +2,8 @@
 /**
  * Catalog enrichment pipeline.
  *
- * For products with empty/short description (or stale ai_enriched_at), call the
- * copy LLM (Ollama qwen3:14b) to produce 8 ai_ fields:
+ * For products with empty/short description (or stale ai_enriched_at), ask the
+ * store's text model through the AI gateway (/v1/chat, modelHint 'enrich') for 8 ai_ fields:
  *   ai_description, ai_use_cases, ai_keywords, ai_who_uses_it,
  *   ai_application, ai_product_type, ai_features, ai_search_tags
  *
@@ -17,12 +17,13 @@
  *
  * Env:
  *   DATABASE_URL        postgres://... (live RDS via tunnel by default)
- *   OLLAMA_BASE_URL     default http://100.82.208.8:11434 (Razer)
- *   OLLAMA_COPY_MODEL   default qwen3:14b
+ *   AI_GATEWAY_URL      the AI gateway (required), with AI_GATEWAY_TOKEN
+ *   TENANT_ID           the store whose provider order the gateway uses (default: the platform)
  *   ENRICH_RESTAGE_DAYS default 90
  */
 
 import pg from 'pg'
+import { gatewayChat, gatewayUrl } from './lib/ai-gateway.mjs'
 
 const args = Object.fromEntries(
   process.argv.slice(2).map(a => {
@@ -36,8 +37,7 @@ if (!DATABASE_URL) {
   console.error('DATABASE_URL env var is required')
   process.exit(1)
 }
-const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+const CACHE_NAMESPACE = process.env.TENANT_ID || 'platform'
 const RESTAGE_DAYS = parseInt(process.env.ENRICH_RESTAGE_DAYS || '90', 10)
 const LIMIT = parseInt(args.limit || '25', 10)
 const DRY_RUN = args['dry-run'] === 'true'
@@ -52,11 +52,11 @@ const pool = new pg.Pool({
 
 const RATE_LIMIT_MS = 12_000
 let lastCallAt = 0
-async function rateLimitedCallOllama(userPrompt) {
+async function rateLimitedCall(userPrompt) {
   const wait = RATE_LIMIT_MS - (Date.now() - lastCallAt)
   if (wait > 0) await new Promise(r => setTimeout(r, wait))
   lastCallAt = Date.now()
-  return callOllama(userPrompt)
+  return callModel(userPrompt)
 }
 
 const SYSTEM_PROMPT = `You write product intelligence data for an Indian B2B/B2C hardware and tools store (jeffistores.com).
@@ -84,24 +84,18 @@ function buildUserPrompt(p) {
   ].filter(Boolean).join('\n')
 }
 
-async function callOllama(userPrompt) {
-  const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      format: 'json',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      options: { temperature: 0.3 },
-    }),
+async function callModel(userPrompt) {
+  const r = await gatewayChat({
+    modelHint: 'enrich',
+    jsonMode: true,
+    temperature: 0.3,
+    cacheNamespace: CACHE_NAMESPACE,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
   })
-  if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`)
-  const data = await res.json()
-  return data.message?.content || ''
+  return { content: r.content || '', model: r.model || '' }
 }
 
 function cleanArr(val, maxLen = 40, maxItems = 15) {
@@ -167,7 +161,7 @@ async function fetchCandidates() {
   return rows
 }
 
-async function stage(p, e) {
+async function stage(p, e, model) {
   if (DRY_RUN) {
     console.log(`  [dry-run] ${p.name}`)
     console.log(`    type: ${e.ai_product_type}`)
@@ -186,21 +180,21 @@ async function stage(p, e) {
     [p.id, p.name, p.description || null,
      e.ai_description, e.ai_use_cases, e.ai_keywords, e.ai_who_uses_it,
      e.ai_application, e.ai_product_type, e.ai_features, e.ai_search_tags,
-     OLLAMA_MODEL]
+     model]
   )
 }
 
 async function main() {
-  console.log(`enrich-products: model=${OLLAMA_MODEL} limit=${LIMIT} dryRun=${DRY_RUN}`)
+  console.log(`enrich-products: gateway=${gatewayUrl()} store=${CACHE_NAMESPACE} limit=${LIMIT} dryRun=${DRY_RUN}`)
   const candidates = await fetchCandidates()
   console.log(`candidates: ${candidates.length}`)
 
   let ok = 0, errors = 0
   for (const p of candidates) {
     try {
-      const raw = await rateLimitedCallOllama(buildUserPrompt(p))
-      const enrichment = parseEnrichment(raw)
-      await stage(p, enrichment)
+      const { content, model } = await rateLimitedCall(buildUserPrompt(p))
+      const enrichment = parseEnrichment(content)
+      await stage(p, enrichment, model)
       console.log(`  + ${p.name.slice(0, 60)}  [${enrichment.ai_product_type}] (${enrichment.ai_use_cases.length} tags)`)
       ok++
     } catch (err) {

@@ -77,7 +77,8 @@ export async function dispatchRazorpayEvent(event: any, ctx: EventContext): Prom
     case 'payment_link.expired':
       return onPaymentLinkExpired(p.payment_link?.entity, ctx)
     case 'qr_code.credited':
-      return onQrCodeCredited(p.qr_code?.entity, p.payment?.entity, ctx)
+      await onQrCodeCredited(p.qr_code?.entity, p.payment?.entity, ctx)
+      return
     case 'refund.created':
     case 'refund.processed':
     case 'refund.failed':

@@ -16,6 +16,7 @@ vi.mock('@/lib/tenant-registry', () => ({
 vi.mock('@/lib/ai/enrich-field', () => ({ enrichField: mockEnrich, parseEnrichBody: (b: object) => b }))
 
 import { POST } from '@controller/app/api/(ecom)/ecom/ai/enrich-field/route'
+import { billedTenantId } from '@/lib/ai/billing'
 
 const TENANT = { id: 't-1', display_name: 'Acme', service_types: ['messaging'] }
 const req = (body: unknown) =>
@@ -45,8 +46,14 @@ describe('POST /api/ecom/ai/enrich-field', () => {
   })
 
   it('enriches the field for the store and returns the result', async () => {
-    mockEnrich.mockResolvedValue('better text')
+    let billedDuring: string | null = null
+    mockEnrich.mockImplementation(async () => {
+      billedDuring = billedTenantId()
+      return 'better text'
+    })
     const res = await POST(req({ field: 'desc', text: 'hi' }))
+    expect(billedDuring).toBe('t-1')
+    expect(billedTenantId()).toBeNull()
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ result: 'better text' })
     expect(mockEnrich).toHaveBeenCalledWith(expect.objectContaining({ store: expect.stringContaining('Acme'), field: 'desc', text: 'hi' }))

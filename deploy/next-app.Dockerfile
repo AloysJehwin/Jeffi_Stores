@@ -48,7 +48,6 @@ ARG NEXT_PUBLIC_ENABLE_GST
 ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 ARG NEXT_PUBLIC_BASE_URL
 ARG NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY
-ARG NEXT_PUBLIC_ONDEVICE_MODEL_BASE
 ARG NEXT_PUBLIC_APP_VERSION
 ARG NEXT_PUBLIC_GIT_SHA
 ENV DATABASE_URL=$DATABASE_URL
@@ -62,7 +61,6 @@ ENV NEXT_PUBLIC_ENABLE_GST=$NEXT_PUBLIC_ENABLE_GST
 ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 ENV NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=$NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY
-ENV NEXT_PUBLIC_ONDEVICE_MODEL_BASE=$NEXT_PUBLIC_ONDEVICE_MODEL_BASE
 ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 ENV NEXT_PUBLIC_GIT_SHA=$NEXT_PUBLIC_GIT_SHA
 
@@ -130,8 +128,10 @@ COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
 # Copy cluster server wrapper
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/next-cluster-server.js ./${APP}/cluster-server.js
 
-# Copy secrets bootstrap script (fetches from AWS Secrets Manager at container start)
+# Copy secrets bootstrap script (fetches from AWS Secrets Manager, or Key Vault with SECRETS_BACKEND=keyvault, at container start)
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/load-secrets.mjs
+# The secrets library it imports (../packages/store-core/src/lib/secrets/index.mjs), at the same path as in the repo
+COPY --from=builder --chown=nextjs:nodejs /app/packages/store-core/src/lib/secrets/index.mjs ./packages/store-core/src/lib/secrets/index.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/k8s-cron.mjs ./deploy/k8s-cron.mjs
 
 # Schema and migration files: database/ and <service>/database/ (the controller's tenant fan-out reads them)

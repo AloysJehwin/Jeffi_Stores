@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { PageInsights } from '@/components/admin/insights'
+import { ORDERS_INSIGHTS } from './orders-insights'
 import { useSearchParams } from 'next/navigation'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { ORDER_ALIASES, ORDER_FIELDS, ORDER_SEARCH } from '@/lib/filters/fields/orders'
@@ -72,7 +74,7 @@ export default function OrdersOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={ORDERS_INSIGHTS} />} />
       <ListFilters
         entity="orders"
         fields={ORDER_FIELDS}

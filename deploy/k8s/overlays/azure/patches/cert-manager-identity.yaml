@@ -1,0 +1,24 @@
+# cert-manager's Route 53 DNS-01 (letsencrypt-dns) with role jeffi-irsa-cert-manager: ambient credentials now come from
+# a web-identity token, not the core's instance profile. The values are the base's (platform/20-cert-manager.yaml) plus
+# the token; keep the two in step.
+- op: replace
+  path: /spec/valuesContent
+  value: |-
+    crds: { enabled: true }
+    extraArgs: [--cluster-issuer-ambient-credentials]
+    nodeSelector: { jeffi.io/role: core }
+    resources: { requests: { cpu: 20m, memory: 64Mi } }
+    webhook: { nodeSelector: { jeffi.io/role: core } }
+    cainjector: { nodeSelector: { jeffi.io/role: core } }
+    extraEnv:
+      - { name: AWS_REGION, value: us-east-1 }
+      - { name: AWS_ROLE_ARN, value: 'arn:aws:iam::708835965056:role/jeffi-irsa-cert-manager' }
+      - { name: AWS_WEB_IDENTITY_TOKEN_FILE, value: /var/run/secrets/aws/token }
+      - { name: AWS_STS_REGIONAL_ENDPOINTS, value: regional }
+    volumes:
+      - name: aws-iam-token
+        projected:
+          sources:
+            - serviceAccountToken: { audience: sts.amazonaws.com, expirationSeconds: 86400, path: token }
+    volumeMounts:
+      - { name: aws-iam-token, mountPath: /var/run/secrets/aws, readOnly: true }

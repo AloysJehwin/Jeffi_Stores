@@ -1,0 +1,23 @@
+# ECR stays: the pull-secret refresh logs in with role jeffi-irsa-ecr-pull instead of an EC2 instance profile.
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: ecr-refresh, namespace: jeffi }
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          volumes:
+            - name: aws-iam-token
+              projected:
+                sources:
+                  - serviceAccountToken: { audience: sts.amazonaws.com, expirationSeconds: 3600, path: token }
+          containers:
+            - name: refresh
+              env:
+                - { name: AWS_REGION, value: us-east-1 }
+                - { name: AWS_ROLE_ARN, value: 'arn:aws:iam::708835965056:role/jeffi-irsa-ecr-pull' }
+                - { name: AWS_WEB_IDENTITY_TOKEN_FILE, value: /var/run/secrets/aws/token }
+                - { name: AWS_STS_REGIONAL_ENDPOINTS, value: regional }
+              volumeMounts:
+                - { name: aws-iam-token, mountPath: /var/run/secrets/aws, readOnly: true }

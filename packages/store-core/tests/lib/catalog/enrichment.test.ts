@@ -4,7 +4,7 @@ vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
   queryOne: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@/lib/shared/rag', () => ({ embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]) }))
+vi.mock('@/lib/shared/rag', () => ({ embedWithModel: vi.fn().mockResolvedValue({ vector: [0.1, 0.2, 0.3], model: 'nomic-embed-text' }) }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: vi.fn().mockResolvedValue('tenant-x') }))
 
 import {
@@ -19,7 +19,7 @@ import {
   type Enrichment,
 } from '@/lib/catalog/enrichment'
 import { query, queryOne } from '@/lib/shared/db'
-import { embed } from '@/lib/shared/rag'
+import { embedWithModel as embed } from '@/lib/shared/rag'
 
 function source(over: Partial<EnrichSource> = {}): EnrichSource {
   return {
@@ -214,7 +214,7 @@ describe('reEmbedProduct', () => {
   beforeEach(() => {
     vi.mocked(query).mockReset().mockResolvedValue({ rows: [] } as any)
     vi.mocked(queryOne).mockReset()
-    vi.mocked(embed).mockReset().mockResolvedValue([0.1, 0.2])
+    vi.mocked(embed).mockReset().mockResolvedValue({ vector: [0.1, 0.2], model: 'nomic-embed-text' })
   })
 
   it('returns not-found when the product is missing', async () => {
@@ -247,6 +247,8 @@ describe('reEmbedProduct', () => {
     const insert = vi.mocked(query).mock.calls.find(c => String(c[0]).includes('INSERT INTO embeddings'))!
     expect(insert[1]![4]).toBe('tenant-x') // tenant id bound at $5
     expect(insert[1]![0]).toBe('p1')
+    expect(insert[1]![5]).toBe('nomic-embed-text') // embedding_model stored at $6
+    expect(String(insert[0])).toContain('embedding_model')
   })
 
   it('returns the error message when embedding throws', async () => {

@@ -14,6 +14,7 @@ export interface ServiceClaims {
   scopes?: string[]
   space?: 'store' | 'api' // which template copies the caller reads/edits (default by service)
   senderTenant?: string // internal sends as the platform only: go out from this store's numbers (its staff's codes)
+  qrIntent?: string // a QR-first sale (store-core qr-intents): 'validate' for its dry run, else the intent it finalises
   exp: number
 }
 

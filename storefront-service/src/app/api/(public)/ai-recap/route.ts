@@ -13,11 +13,7 @@ interface CartLine {
   qty?: number
 }
 
-// Server-side (Ollama on the Razer box) fallback for the on-device checkout recap.
-// Used when the in-browser model is disabled/unsupported on the device (e.g. mobile).
-// Mirrors the intent of buildRecapPrompt() in src/lib/on-device/prompt.ts but builds
-// its own inline prompt (the on-device prompt format is a fine-tune contract; the
-// server model is a general gemma3:4b, so we prompt it plainly).
+// The checkout's 2-3 sentence order recap, written by the store's fast text model through the gateway.
 export async function POST(request: NextRequest) {
   const blocked = await storefrontAiGate()
   if (blocked) return blocked
@@ -52,5 +48,5 @@ export async function POST(request: NextRequest) {
     `### Cart\n${cartLines}${summary ? `\nSummary: ${summary}` : ''}\n\n` +
     'Return JSON: {"text":"<recap>"}'
 
-  return storefrontAiField(prompt, 'text')
+  return storefrontAiField(prompt, 'text', 'storefront_recap')
 }

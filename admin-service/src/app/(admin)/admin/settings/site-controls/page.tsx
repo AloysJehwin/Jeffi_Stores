@@ -917,60 +917,17 @@ export default async function SiteControlsPage() {
                   </div>
                   <div>
                     <SectionCard
-                      title="On-device AI"
-                      description="Experimental browser-based AI features. Per-platform switches control where the in-browser model runs; when it's off (or unsupported) on a platform, that device falls back to server-generated AI instead."
+                      title="AI shopping summaries"
+                      description="Short AI lines on the product page, cart, checkout and order confirmation. Written on the server by the store's text model (Settings → Providers) and charged to the store's AI wallet like any other AI use."
                       columns
                     >
                       <FullSpan>
                         <ToggleControl
                           settingKey="feature_ondevice_summary_enabled"
-                          label="On-device summaries"
-                          hint="AI cart/product/order summaries computed in the customer's browser. Master switch — turn on, then choose the platforms below."
+                          label="AI shopping summaries"
+                          hint="Shows the AI pitch, cart insight, checkout recap and order note. Needs Storefront AI on the store's plan."
                           initial={c.flags.ondeviceSummaryEnabled}
                         />
-                      </FullSpan>
-                      <FullSpan>
-                        <div className="pl-4 border-l-2 border-border-default ml-1 space-y-3">
-                          <ToggleControl
-                            settingKey="feature_ondevice_summary_desktop_enabled"
-                            label="↳ Summaries on Desktop / System"
-                            hint="Run the in-browser model on desktop computers."
-                            initial={c.flags.ondeviceSummaryDesktopEnabled}
-                          />
-                          <ToggleControl
-                            settingKey="feature_ondevice_summary_mobile_enabled"
-                            label="↳ Summaries on Mobile"
-                            hint="Run the in-browser model on phones. Off by default — the ~400MB model is heavy on mobile, so phones use the server instead."
-                            initial={c.flags.ondeviceSummaryMobileEnabled}
-                          />
-                        </div>
-                      </FullSpan>
-                      <FullSpan>
-                        <div className="pt-2 border-t border-border-default" />
-                      </FullSpan>
-                      <FullSpan>
-                        <ToggleControl
-                          settingKey="feature_ondevice_finetune_enabled"
-                          label="On-device fine-tuning"
-                          hint="Experimental on-device model fine-tuning worker. Master switch."
-                          initial={c.flags.ondeviceFinetuneEnabled}
-                        />
-                      </FullSpan>
-                      <FullSpan>
-                        <div className="pl-4 border-l-2 border-border-default ml-1 space-y-3">
-                          <ToggleControl
-                            settingKey="feature_ondevice_finetune_desktop_enabled"
-                            label="↳ Fine-tuning on Desktop / System"
-                            hint="Run the fine-tuning worker on desktop computers."
-                            initial={c.flags.ondeviceFinetuneDesktopEnabled}
-                          />
-                          <ToggleControl
-                            settingKey="feature_ondevice_finetune_mobile_enabled"
-                            label="↳ Fine-tuning on Mobile"
-                            hint="Run the fine-tuning worker on phones. Off by default (too heavy for mobile)."
-                            initial={c.flags.ondeviceFinetuneMobileEnabled}
-                          />
-                        </div>
                       </FullSpan>
                     </SectionCard>
                   </div>

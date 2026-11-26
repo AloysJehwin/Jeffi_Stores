@@ -6,7 +6,7 @@ import { api } from '../../api/client'
 import { useStoreConfig } from '../../hooks/useStoreConfig'
 import { useTokens } from '../../theme'
 
-// The web's on-device AI panels as they run on a phone: the server (Ollama) fallback, rendered only once text arrives.
+// The web's AI shopping lines on a phone: the store's AI routes (gateway, charged to the store), rendered only once text arrives.
 type Kind = 'cart' | 'recap' | 'affirmation'
 
 const ROUTES: Record<Kind, string> = {
@@ -52,7 +52,7 @@ export default function AiInsight({ kind, body, className }: { kind: Kind; body:
         <Icon size={16} color={t.accent500} strokeWidth={2} />
       </View>
       <Text className="flex-1 text-sm leading-relaxed text-foreground">{text}</Text>
-      <Text className="mt-0.5 text-[11px] text-foreground-muted">ollama</Text>
+      <Text className="mt-0.5 text-[11px] text-foreground-muted">AI</Text>
     </Card>
   )
 }

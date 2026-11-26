@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { B2B_CUSTOMERS_INSIGHTS } from './b2b-customers-insights'
 import Link from 'next/link'
 import {
   usePeriod,
@@ -48,7 +50,7 @@ export default function B2bCustomersOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={B2B_CUSTOMERS_INSIGHTS} />} />
       <ListFilters
         entity="business_customers"
         fields={B2B_FIELDS}

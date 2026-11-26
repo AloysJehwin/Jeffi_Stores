@@ -59,6 +59,20 @@ describe('Admin AiPricingClient', () => {
     expect(screen.getByText('No prices for this capability.')).toBeInTheDocument()
   })
 
+  it('has an Audio tab with the per-minute and per-1k-characters units', async () => {
+    mockFetch([
+      ...rows(),
+      row({ id: 'r4', capability: 'audio', provider: 'azure', model: '*', unit_type: 'audio_minute', cost_inr: 1, price_inr: 2 }),
+      row({ id: 'r5', capability: 'audio', provider: 'azure', model: 'tts', unit_type: 'tts_1k_chars', cost_inr: 1, price_inr: 2 }),
+    ])
+    renderIt()
+    await screen.findByText('razer')
+    fireEvent.click(screen.getByRole('tab', { name: 'Audio' }))
+    expect(screen.getByText('per audio minute')).toBeInTheDocument()
+    expect(screen.getByText('per 1k spoken characters')).toBeInTheDocument()
+    expect(screen.queryByText('razer')).toBeNull()
+  })
+
   it('reports a load failure', async () => {
     mockFetch({ error: 'Not allowed to read prices' })
     renderIt()

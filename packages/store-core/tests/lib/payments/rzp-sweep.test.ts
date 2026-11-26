@@ -8,6 +8,7 @@ vi.mock('@/lib/payments/refund-records', () => ({ applyRefundEvent: vi.fn(async 
 vi.mock('@/lib/payments/rzp-account', () => ({ razorpayAccountFor: vi.fn() }))
 vi.mock('@/lib/payments/razorpay-events/payments', () => ({ onPaymentCaptured: vi.fn() }))
 vi.mock('@/lib/payments/capture', () => ({ applyCapturedPayment: vi.fn(), applyLinkPayment: vi.fn(), applyQrPayment: vi.fn() }))
+vi.mock('@/lib/payments/qr-intents', () => ({ intentPaymentIds: vi.fn(async () => new Set()), sweepQrIntents: vi.fn(async () => 0) }))
 vi.mock('@/lib/channels/sync-run', () => ({
   withChannelLock: vi.fn(async (_c: string, _l: string, _k: string, fn: any) => {
     const counts: Record<string, number> = {}
@@ -26,6 +27,7 @@ import { applyRefundEvent } from '@/lib/payments/refund-records'
 import { razorpayAccountFor } from '@/lib/payments/rzp-account'
 import { onPaymentCaptured } from '@/lib/payments/razorpay-events/payments'
 import { applyCapturedPayment, applyLinkPayment, applyQrPayment } from '@/lib/payments/capture'
+import { intentPaymentIds, sweepQrIntents } from '@/lib/payments/qr-intents'
 
 const now = () => Math.floor(Date.now() / 1000)
 const inst = {
@@ -55,8 +57,11 @@ describe('sweepRazorpay', () => {
         { id: 'pay_auth', status: 'authorized', amount: 900, created_at: now() - 3600 },
         { id: 'pay_fresh', status: 'authorized', created_at: now() - 60 },
         { id: 'pay_fail', status: 'failed' },
+        { id: 'pay_qr_intent', status: 'captured', amount: 300 },
       ],
     })
+    vi.mocked(intentPaymentIds).mockResolvedValueOnce(new Set(['pay_qr_intent']))
+    vi.mocked(sweepQrIntents).mockResolvedValueOnce(2)
     vi.mocked(queryOne).mockImplementation(async (_s: string, p?: any[]) => (p?.[0] === 'pay_done' ? ({ '?column?': 1 } as any) : null))
     vi.mocked(onPaymentCaptured).mockImplementation(async (p: any) => (p.id === 'pay_new' ? 'paid' : 'unmatched'))
     inst.refunds.fetch.mockResolvedValue({ status: 'processed' })
@@ -65,7 +70,7 @@ describe('sweepRazorpay', () => {
     const r = await sweepRazorpay()
 
     expect(vi.mocked(onPaymentCaptured).mock.calls.map(c => (c[0] as any).id)).toEqual(['pay_new', 'pay_lost'])
-    expect(r.counts).toEqual({ recovered: 1, refunds: 1 })
+    expect(r.counts).toEqual({ recovered: 1, qr_intents: 2, refunds: 1 })
     const types = vi.mocked(createAdminNotification).mock.calls.map(c => [c[0].type, c[0].entityId])
     expect(types).toEqual([
       ['razorpay_unmatched_payment', 'pay_lost'],
@@ -80,7 +85,9 @@ describe('sweepRazorpay', () => {
     vi.mocked(queryMany).mockResolvedValue([{ razorpay_refund_id: 'rfnd_1' }] as any)
     const r = await sweepRazorpay()
     expect(inst.payments.all).not.toHaveBeenCalled()
-    expect(r.counts).toEqual({ refunds: 0 })
+    // A Route store's QR intents are its own, so its sweep still reads them.
+    expect(sweepQrIntents).toHaveBeenCalled()
+    expect(r.counts).toEqual({ qr_intents: 0, refunds: 0 })
   })
 
   it('applies an own-key store’s payments in that store', async () => {

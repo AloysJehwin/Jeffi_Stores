@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "cfa374e01765f76105ee6a65c8acd8ab32d2abd4fc19106b4413868d8f3b36a6",
+ "manifestHash": "17c493a3f26c970f1846bf7c83f645121616a46ee0079d0a7728e5b0d6e508c3",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -433,6 +433,43 @@
    "body": null,
    "summary": "List messages for a conversation",
    "command": "agent-conversations messages"
+  },
+  {
+   "id": "admin GET /api/admin/agent/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/agent/insights",
+   "gatewayPath": "/v1/admin/agent/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/agent/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "agent:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "agent:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily agent conversations (distinct ones that got a question) against the tool calls the agent made, behind the agent Overview's insights sheet. Same gate as the agent overview API.",
+   "command": "agent insights"
   },
   {
    "id": "admin GET /api/admin/agent/overview",
@@ -3147,6 +3184,43 @@
    "command": "audit create"
   },
   {
+   "id": "admin GET /api/admin/audit/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/audit/insights",
+   "gatewayPath": "/v1/admin/audit/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/audit/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "audit:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "audit:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily audit events by who acted (a team member, or the system when no admin is attached), optionally for one kind of action (risky = delete, import, export), behind the audit Overview's insights sheet. Same gate as the audit overview API.",
+   "command": "audit insights"
+  },
+  {
    "id": "admin GET /api/admin/audit/mail-log",
    "host": "admin",
    "method": "GET",
@@ -3963,6 +4037,43 @@
    "command": "business-customers approve"
   },
   {
+   "id": "admin GET /api/admin/business/customers/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/business/customers/insights",
+   "gatewayPath": "/v1/admin/business/customers/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/business/customers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "business_customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "business_customers:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Business applications per day by outcome, behind the Overview's insights pop-over.",
+   "command": "business-customers insights"
+  },
+  {
    "id": "admin GET /api/admin/business/customers/overview",
    "host": "admin",
    "method": "GET",
@@ -4398,6 +4509,43 @@
    "noBody": true,
    "summary": "Delete reply draft for an RFQ",
    "command": "business-rfqs reply-draft-delete"
+  },
+  {
+   "id": "admin GET /api/admin/business/rfqs/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/business/rfqs/insights",
+   "gatewayPath": "/v1/admin/business/rfqs/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/business/rfqs/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "business_rfqs:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "business_rfqs:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "RFQs received per day by stage, behind the Overview's insights pop-over.",
+   "command": "business-rfqs insights"
   },
   {
    "id": "admin GET /api/admin/business/rfqs/overview",
@@ -4933,6 +5081,43 @@
    "bodyContentType": "application/json",
    "summary": "Generate (campaigns)",
    "command": "campaigns generate"
+  },
+  {
+   "id": "admin GET /api/admin/campaigns/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/campaigns/insights",
+   "gatewayPath": "/v1/admin/campaigns/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/campaigns/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "mailer:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily automated-campaign sends, split into the ones that led to an order and the rest (so the days stack to the sends), behind the Overview's insights sheet. Same gate as the campaigns overview API.",
+   "command": "campaigns insights"
   },
   {
    "id": "admin GET /api/admin/campaigns/overview",
@@ -5577,6 +5762,43 @@
    "body": null,
    "summary": "Get receipt for a cash sale",
    "command": "cash-sale receipt"
+  },
+  {
+   "id": "admin GET /api/admin/cash-sale/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/cash-sale/insights",
+   "gatewayPath": "/v1/admin/cash-sale/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/cash-sale/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "invoices:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "invoices:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the cash sales insights pop-over on the cash-sale overview.",
+   "command": "cash-sale insights"
   },
   {
    "id": "admin GET /api/admin/cash-sale/overview",
@@ -7897,6 +8119,43 @@
    "command": "coupons publish"
   },
   {
+   "id": "admin GET /api/admin/coupons/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/coupons/insights",
+   "gatewayPath": "/v1/admin/coupons/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/coupons/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "coupons:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "coupons:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the coupon redemptions insights pop-over on the coupons overview.",
+   "command": "coupons insights"
+  },
+  {
    "id": "admin GET /api/admin/coupons/overview",
    "host": "admin",
    "method": "GET",
@@ -8214,6 +8473,43 @@
    "bodyContentType": "application/json",
    "summary": "Manually run ONE cron job for the CURRENT store, IN-PROCESS under that store's tenant context.",
    "command": "cron trigger"
+  },
+  {
+   "id": "admin GET /api/admin/customer-programs/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/customer-programs/insights",
+   "gatewayPath": "/v1/admin/customer-programs/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/customer-programs/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "campaigns:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "campaigns:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Loyalty points activity and referral sign-ups per day, behind the Overview's insights pop-over.",
+   "command": "customer-programs insights"
   },
   {
    "id": "admin GET /api/admin/customer-programs/overview",
@@ -9433,6 +9729,43 @@
    "command": "customers whatsapp-create"
   },
   {
+   "id": "admin GET /api/admin/customers/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/customers/insights",
+   "gatewayPath": "/v1/admin/customers/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/customers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "customers:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "New accounts and guests per day, behind the Overview's insights pop-over.",
+   "command": "customers insights"
+  },
+  {
    "id": "admin GET /api/admin/customers/mail-templates",
    "host": "admin",
    "method": "GET",
@@ -10034,6 +10367,43 @@
    "body": null,
    "summary": "Streams the product bulk-import template: the multi-sheet .xlsx (default) or the flat one-sheet layout as ?format=csv. products:read gated. Downloading is an export of the schema shape, not data.",
    "command": "data-source template"
+  },
+  {
+   "id": "admin GET /api/admin/delhivery/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/delhivery/insights",
+   "gatewayPath": "/v1/admin/delhivery/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/delhivery/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "delhivery:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "delhivery:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Shipments handed to Delhivery per day by state, behind the Overview's insights pop-over.",
+   "command": "delhivery insights"
   },
   {
    "id": "admin GET /api/admin/delhivery/overview",
@@ -11868,6 +12238,43 @@
    "command": "financial ai-costs"
   },
   {
+   "id": "admin GET /api/admin/financial/ai-costs/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/ai-costs/insights",
+   "gatewayPath": "/v1/admin/financial/ai-costs/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/ai-costs/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily AI spend (rupees) by capability, behind the AI costs tab's insights sheet. Mirrors the tab's amount: the platform's cost on the flagship, what the store was charged elsewhere. Same gate as the ai-costs API.",
+   "command": "financial-ai-costs insights"
+  },
+  {
    "id": "admin GET /api/admin/financial/cashflow",
    "host": "admin",
    "method": "GET",
@@ -12042,6 +12449,43 @@
    "noBody": true,
    "summary": "POST — pull this store's disputes from Razorpay (ones the webhook missed or that predate it).",
    "command": "financial-disputes sync"
+  },
+  {
+   "id": "admin GET /api/admin/financial/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/insights",
+   "gatewayPath": "/v1/admin/financial/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the revenue and refunds insights pop-over on the financial overview.",
+   "command": "financial insights"
   },
   {
    "id": "admin GET /api/admin/financial/marketplace-settlements",
@@ -23910,6 +24354,44 @@
         "serial_number"
        ]
       }
+     },
+     "qrPayment": {
+      "type": "object",
+      "properties": {
+       "razorpayPaymentId": {
+        "type": "string",
+        "minLength": 1
+       },
+       "razorpayQrId": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "amountPaise": {
+        "type": "integer",
+        "exclusiveMinimum": 0
+       },
+       "intentId": {
+        "type": "string",
+        "minLength": 1
+       }
+      },
+      "required": [
+       "razorpayPaymentId",
+       "amountPaise",
+       "intentId"
+      ]
+     },
+     "dryRun": {
+      "type": "boolean",
+      "examples": [
+       true
+      ]
      }
     }
    },
@@ -23945,6 +24427,43 @@
    "noBody": true,
    "summary": "Publish a draft",
    "command": "invoices-drafts publish"
+  },
+  {
+   "id": "admin GET /api/admin/invoices/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/invoices/insights",
+   "gatewayPath": "/v1/admin/invoices/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/invoices/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "invoices:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "invoices:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the invoices issued insights pop-over on the invoices overview.",
+   "command": "invoices insights"
   },
   {
    "id": "admin GET /api/admin/invoices/overview",
@@ -25138,6 +25657,43 @@
    "bodyContentType": "application/json",
    "summary": "POST — the composer's email exactly as a customer gets it (layout, coupon, attachments), sent to the admin.",
    "command": "mailer test"
+  },
+  {
+   "id": "admin GET /api/admin/marketing/messaging/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/marketing/messaging/insights",
+   "gatewayPath": "/v1/admin/marketing/messaging/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/marketing/messaging/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "mailer:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily outbound messages by outcome for one channel, behind the messaging Overview's insights sheet. WhatsApp and SMS read message_logs (provider delivery receipts); email reads the broadcast log, which has no receipts.",
+   "command": "marketing-messaging insights"
   },
   {
    "id": "admin GET /api/admin/marketing/messaging/overview",
@@ -30763,6 +31319,43 @@
    "command": "orders create"
   },
   {
+   "id": "admin GET /api/admin/orders/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/orders/insights",
+   "gatewayPath": "/v1/admin/orders/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/orders/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "orders:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "orders:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the orders placed insights pop-over on the orders overview.",
+   "command": "orders insights"
+  },
+  {
    "id": "admin GET /api/admin/orders/overview",
    "host": "admin",
    "method": "GET",
@@ -31111,6 +31704,95 @@
    "body": null,
    "summary": "Get overview (packing slips)",
    "command": "packing-slips overview"
+  },
+  {
+   "id": "admin POST /api/admin/payments/qr-intents",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/payments/qr-intents",
+   "gatewayPath": "/v1/admin/payments/qr-intents",
+   "file": "admin-service/src/app/api/(admin)/admin/payments/qr-intents/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "invoice",
+       "quotation_convert",
+       "invoice_draft_finalise",
+       "cash_sale"
+      ]
+     },
+     "payload": {
+      "type": "object",
+      "description": "any JSON value"
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "UPI QR first: { kind, payload } where payload is the body the create call takes. Validated by a dry run of that call (stock included, per its flag); nothing is created until Razorpay confirms the payment.",
+   "command": "payments-qr-intents create"
+  },
+  {
+   "id": "admin GET /api/admin/payments/qr-intents/{id}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/payments/qr-intents/{id}",
+   "gatewayPath": "/v1/admin/payments/qr-intents/{id}",
+   "file": "admin-service/src/app/api/(admin)/admin/payments/qr-intents/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "The QR dialog's poll: { status, resultRef?, resultUrl?, invoiceUrl?, invoiceNumber?, error?, amount, expiresAt }.",
+   "command": "payments-qr-intents get"
+  },
+  {
+   "id": "admin POST /api/admin/payments/qr-intents/{id}/cancel",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/payments/qr-intents/{id}/cancel",
+   "gatewayPath": "/v1/admin/payments/qr-intents/{id}/cancel",
+   "file": "admin-service/src/app/api/(admin)/admin/payments/qr-intents/[id]/cancel/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Closes the QR and cancels the intent. 409 (with the status) when it was paid first: keep polling it.",
+   "command": "payments-qr-intents cancel"
   },
   {
    "id": "admin GET /api/admin/payments/upi",
@@ -36274,6 +36956,43 @@
    "command": "products draft"
   },
   {
+   "id": "admin GET /api/admin/products/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/products/insights",
+   "gatewayPath": "/v1/admin/products/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/products/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "products:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "products:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Products added per day by state, behind the Overview's insights pop-over.",
+   "command": "products insights"
+  },
+  {
    "id": "admin GET /api/admin/products/overview",
    "host": "admin",
    "method": "GET",
@@ -36309,6 +37028,43 @@
    "body": null,
    "summary": "Get overview (products)",
    "command": "products overview"
+  },
+  {
+   "id": "admin GET /api/admin/purchase-orders/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/purchase-orders/insights",
+   "gatewayPath": "/v1/admin/purchase-orders/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/purchase-orders/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "inventory:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "inventory:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the purchase orders raised insights pop-over on the purchase-orders overview.",
+   "command": "purchase-orders insights"
   },
   {
    "id": "admin GET /api/admin/purchase-orders/overview",
@@ -37200,12 +37956,50 @@
         "serial_number"
        ]
       }
+     },
+     "qrPayment": {
+      "type": "object",
+      "properties": {
+       "razorpayPaymentId": {
+        "type": "string",
+        "minLength": 1
+       },
+       "razorpayQrId": {
+        "anyOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       },
+       "amountPaise": {
+        "type": "integer",
+        "exclusiveMinimum": 0
+       },
+       "intentId": {
+        "type": "string",
+        "minLength": 1
+       }
+      },
+      "required": [
+       "razorpayPaymentId",
+       "amountPaise",
+       "intentId"
+      ]
+     },
+     "dryRun": {
+      "type": "boolean",
+      "examples": [
+       true
+      ]
      }
     }
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
-   "summary": "Convert to invoice for a quotation",
+   "summary": "UPI QR conversions go through POST /api/admin/payments/qr-intents (the QR first, the invoice once paid).",
    "command": "quotations convert-to-invoice"
   },
   {
@@ -37262,6 +38056,43 @@
    "noBody": true,
    "summary": "Resend email for a quotation",
    "command": "quotations resend-email"
+  },
+  {
+   "id": "admin GET /api/admin/quotations/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/quotations/insights",
+   "gatewayPath": "/v1/admin/quotations/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/quotations/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "quotations:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "quotations:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the quotations sent insights pop-over on the quotations overview.",
+   "command": "quotations insights"
   },
   {
    "id": "admin GET /api/admin/quotations/overview",
@@ -37544,6 +38375,43 @@
    "command": "replacements get"
   },
   {
+   "id": "admin GET /api/admin/replacements/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/replacements/insights",
+   "gatewayPath": "/v1/admin/replacements/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/replacements/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "replacements:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "replacements:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the replacement requests insights pop-over on the replacements overview.",
+   "command": "replacements insights"
+  },
+  {
    "id": "admin GET /api/admin/replacements/overview",
    "host": "admin",
    "method": "GET",
@@ -37814,6 +38682,43 @@
    "bodyContentType": "application/json",
    "summary": "Submit valuate for a return",
    "command": "returns valuate"
+  },
+  {
+   "id": "admin GET /api/admin/returns/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/returns/insights",
+   "gatewayPath": "/v1/admin/returns/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/returns/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "returns:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "returns:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the return requests insights pop-over on the returns overview.",
+   "command": "returns insights"
   },
   {
    "id": "admin GET /api/admin/returns/overview",
@@ -38365,6 +39270,43 @@
    "command": "review-forms submissions-update"
   },
   {
+   "id": "admin GET /api/admin/review-forms/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/review-forms/insights",
+   "gatewayPath": "/v1/admin/review-forms/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/review-forms/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "review_forms:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "review_forms:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Review form responses per day by status, behind the Overview's insights pop-over.",
+   "command": "review-forms insights"
+  },
+  {
    "id": "admin GET /api/admin/review-forms/overview",
    "host": "admin",
    "method": "GET",
@@ -38489,6 +39431,43 @@
    "bodyContentType": "application/json",
    "summary": "Update reviews",
    "command": "reviews update"
+  },
+  {
+   "id": "admin GET /api/admin/reviews/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/reviews/insights",
+   "gatewayPath": "/v1/admin/reviews/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/reviews/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "reviews:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "reviews:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Reviews received per day by rating band, behind the Overview's insights pop-over.",
+   "command": "reviews insights"
   },
   {
    "id": "admin GET /api/admin/reviews/overview",
@@ -39385,15 +40364,30 @@
    "gatewayPath": "/v1/admin/settings/providers",
    "file": "admin-service/src/app/api/(admin)/admin/settings/providers/route.ts",
    "pathParams": [],
-   "query": [],
-   "queryParams": [],
+   "query": [
+    "tenant"
+   ],
+   "queryParams": [
+    {
+     "name": "tenant",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "format": "uuid",
+      "examples": [
+       ""
+      ]
+     }
+    }
+   ],
    "scope": "settings:read",
    "scopeSource": "literal",
    "scopes": [
-    "settings:read"
+    "settings:read",
+    "settings:write"
    ],
    "guard": "auth",
-   "platform": null,
+   "platform": "owner",
    "body": null,
    "summary": "List providers (settings)",
    "command": "settings providers"
@@ -39414,7 +40408,7 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": null,
+   "platform": "owner",
    "body": {
     "type": "object",
     "properties": {
@@ -39477,7 +40471,7 @@
     "settings:write"
    ],
    "guard": "auth",
-   "platform": null,
+   "platform": "owner",
    "body": null,
    "noBody": true,
    "summary": "Delete providers (settings)",
@@ -39505,82 +40499,6 @@
    "command": "settings-providers credentials"
   },
   {
-   "id": "admin PUT /api/admin/settings/providers/credentials",
-   "host": "admin",
-   "method": "PUT",
-   "path": "/api/admin/settings/providers/credentials",
-   "gatewayPath": "/v1/admin/settings/providers/credentials",
-   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
-   "pathParams": [],
-   "query": [],
-   "queryParams": [],
-   "scope": "settings:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "settings:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": {
-    "type": "object",
-    "properties": {
-     "provider": {
-      "type": "string",
-      "enum": [
-       "exotel",
-       "sarvam",
-       "twilio_voice",
-       "anthropic_voice"
-      ]
-     },
-     "values": {
-      "description": "any JSON value (type not inferred)"
-     }
-    }
-   },
-   "bodySource": "inferred",
-   "bodyContentType": "application/json",
-   "summary": "Update credentials (settings providers)",
-   "command": "settings-providers credentials-update"
-  },
-  {
-   "id": "admin DELETE /api/admin/settings/providers/credentials",
-   "host": "admin",
-   "method": "DELETE",
-   "path": "/api/admin/settings/providers/credentials",
-   "gatewayPath": "/v1/admin/settings/providers/credentials",
-   "file": "admin-service/src/app/api/(admin)/admin/settings/providers/credentials/route.ts",
-   "pathParams": [],
-   "query": [
-    "provider"
-   ],
-   "queryParams": [
-    {
-     "name": "provider",
-     "schema": {
-      "type": "string",
-      "enum": [
-       "exotel",
-       "sarvam",
-       "twilio_voice",
-       "anthropic_voice"
-      ]
-     }
-    }
-   ],
-   "scope": "settings:write",
-   "scopeSource": "literal",
-   "scopes": [
-    "settings:write"
-   ],
-   "guard": "auth",
-   "platform": null,
-   "body": null,
-   "noBody": true,
-   "summary": "Delete credentials (settings providers)",
-   "command": "settings-providers credentials-delete"
-  },
-  {
    "id": "admin POST /api/admin/settings/providers/credentials/test",
    "host": "admin",
    "method": "POST",
@@ -39603,17 +40521,17 @@
      "provider": {
       "type": "string",
       "enum": [
-       "exotel"
+       "exotel",
+       "twilio_voice",
+       "azure_speech",
+       "sarvam"
       ]
      }
-    },
-    "required": [
-     "provider"
-    ]
+    }
    },
    "bodySource": "inferred",
    "bodyContentType": "application/json",
-   "summary": "Read-only check of saved Outreach credentials. Exotel only: a balance read, no call placed. Sarvam has no read-only endpoint, so it has no test. Platform owner on the flagship only.",
+   "summary": "Test (settings providers credentials)",
    "command": "settings-providers-credentials test"
   },
   {
@@ -39804,6 +40722,43 @@
    "bodyContentType": "application/json",
    "summary": "Update platform (setup guide)",
    "command": "setup-guide platform-update"
+  },
+  {
+   "id": "admin GET /api/admin/shelving/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/shelving/insights",
+   "gatewayPath": "/v1/admin/shelving/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/shelving/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "inventory:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "inventory:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Shelf movements per day, added and removed, behind the Overview's insights pop-over.",
+   "command": "shelving insights"
   },
   {
    "id": "admin POST /api/admin/shelving/labels",
@@ -44250,6 +45205,43 @@
    "command": "subscriptions post"
   },
   {
+   "id": "admin GET /api/admin/subscriptions/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/subscriptions/insights",
+   "gatewayPath": "/v1/admin/subscriptions/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/subscriptions/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "subscriptions:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "subscriptions:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily series behind the subscriptions started insights pop-over on the subscriptions overview.",
+   "command": "subscriptions insights"
+  },
+  {
    "id": "admin GET /api/admin/subscriptions/overview",
    "host": "admin",
    "method": "GET",
@@ -44577,6 +45569,43 @@
    "bodyContentType": "application/json",
    "summary": "POST ?draft=<id> { resolutions? } — merge the draft into live; 409 lists overlapping edits.",
    "command": "suppliers publish"
+  },
+  {
+   "id": "admin GET /api/admin/suppliers/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/suppliers/insights",
+   "gatewayPath": "/v1/admin/suppliers/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/suppliers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "inventory:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "inventory:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Purchase orders and goods receipts per day, behind the Overview's insights pop-over.",
+   "command": "suppliers insights"
   },
   {
    "id": "admin GET /api/admin/suppliers/list",
@@ -45283,6 +46312,43 @@
    "command": "tasks get"
   },
   {
+   "id": "admin GET /api/admin/tasks/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/tasks/insights",
+   "gatewayPath": "/v1/admin/tasks/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/tasks/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "customers:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Tasks created per day against tasks completed per day (two date columns, so two queries merged), optionally for one priority, behind the tasks Overview's insights sheet. Same gate as the tasks overview API.",
+   "command": "tasks insights"
+  },
+  {
    "id": "admin GET /api/admin/tasks/overview",
    "host": "admin",
    "method": "GET",
@@ -45318,6 +46384,41 @@
    "body": null,
    "summary": "Get overview (tasks)",
    "command": "tasks overview"
+  },
+  {
+   "id": "admin GET /api/admin/team/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/team/insights",
+   "gatewayPath": "/v1/admin/team/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/team/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "owner",
+   "body": null,
+   "summary": "Team members who signed in per day against the actions the team took (the audit log's admin rows), behind the team Overview's insights sheet. Owner-only, like the team overview API.",
+   "command": "team insights"
   },
   {
    "id": "admin GET /api/admin/team/overview",
@@ -45601,6 +46702,43 @@
    "body": null,
    "summary": "GET ?tab=overview|acquisition|behaviour|funnel|products|search|audience|realtime&from&to (IST days).",
    "command": "traffic get"
+  },
+  {
+   "id": "admin GET /api/admin/traffic/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/traffic/insights",
+   "gatewayPath": "/v1/admin/traffic/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/traffic/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "traffic:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "traffic:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily page views against the sessions that made them, optionally for one kind of page (the page_events `page` column), behind the Traffic page's insights sheet. Same gate as the traffic API.",
+   "command": "traffic insights"
   },
   {
    "id": "admin POST /api/admin/uploads/image",
@@ -47081,6 +48219,43 @@
    "command": "platform ai-pricing update"
   },
   {
+   "id": "platform GET /api/admin/ecom/billing/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/billing/insights",
+   "gatewayPath": "/v1/platform/ecom/billing/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/billing/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_billing:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Subscription charges per day, split into the ones kept in full and the ones with money refunded (part or all), so the days stack to the charges. Same scope as the billing overview API.",
+   "command": "platform billing insights"
+  },
+  {
    "id": "platform GET /api/admin/ecom/billing/overview",
    "host": "platform",
    "method": "GET",
@@ -48008,6 +49183,43 @@
    "command": "platform customers services"
   },
   {
+   "id": "platform GET /api/admin/ecom/customers/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/customers/insights",
+   "gatewayPath": "/v1/platform/ecom/customers/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/customers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_customers:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Daily workspace signups, split into the ones that went live (active, or since suspended or terminated) and the rest, optionally for one product. Same scope as the customers overview API.",
+   "command": "platform customers insights"
+  },
+  {
    "id": "platform GET /api/admin/ecom/customers/overview",
    "host": "platform",
    "method": "GET",
@@ -48166,6 +49378,43 @@
    "noBody": true,
    "summary": "Platform admins: unlink a client from the manager account (stores using it through the manager are disconnected).",
    "command": "platform google-ads delete"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/instances/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/instances/insights",
+   "gatewayPath": "/v1/platform/ecom/instances/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/instances/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_instances:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_instances:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Provisioning jobs that finished each day (by their last update): done against failed. Same scope as the instances overview API.",
+   "command": "platform instances insights"
   },
   {
    "id": "platform GET /api/admin/ecom/instances/overview",
@@ -49224,6 +50473,43 @@
    "bodyContentType": "application/json",
    "summary": "POST { phone, language } → { callId }: a real call to one of the program's test numbers (platform admin only).",
    "command": "platform outreach test-call"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/store-status/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/store-status/insights",
+   "gatewayPath": "/v1/platform/ecom/store-status/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/store-status/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_customers:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Store health events per day: schema release runs (succeeded against failed) or provisioning steps (ok against errors). Same scope as the store-status overview API.",
+   "command": "platform store-status insights"
   },
   {
    "id": "platform GET /api/admin/ecom/store-status/overview",

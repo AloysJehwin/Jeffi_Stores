@@ -25,7 +25,7 @@ vi.mock('@/components/shared/ProductWarningBadges', () => ({ default: () => null
 vi.mock('@/components/ui/CopySku', () => ({ default: ({ sku }: any) => <span>{sku}</span> }))
 vi.mock('@/components/visitor/CouponHintBanner', () => ({ default: () => null }))
 vi.mock('@/components/ui/ImgWithSkeleton', () => ({ default: ({ alt }: any) => <img alt={alt} /> }))
-vi.mock('@/components/on-device/CheckoutRecapSummary', () => ({ default: () => null }))
+vi.mock('@/components/storefront-ai/CheckoutRecapSummary', () => ({ default: () => null }))
 vi.mock('@/components/payments', () => ({
   PaymentSections: ({ cod, razorpay }: any) => <div data-testid="payments">{`cod:${cod} razorpay:${razorpay}`}</div>,
   UpiManualDialog: () => null,

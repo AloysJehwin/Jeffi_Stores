@@ -590,3 +590,51 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     expect((await res.json()).invoiceNumber).toBe('JS/2024-25/0001')
   })
 })
+
+describe('POST /api/admin/invoices/drafts/[id]/finalize: UPI QR first', () => {
+  const ITEMS = [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '1', product_name: 'Item A' }]
+  const QR = { razorpayPaymentId: 'pay_1', razorpayQrId: 'qr_1', amountPaise: 120000, intentId: 'i1' }
+  const req = (body: Record<string, unknown>, claims?: Record<string, unknown>) => {
+    const r = new NextRequest('http://localhost/api/admin/invoices/drafts/order-123/finalize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (claims) r.claims = { service: 'platform', tenantId: 't', internal: true, exp: 0, ...claims } as any
+    return r
+  }
+  const call = (r: NextRequest) => POST(r, { params: Promise.resolve({ id: 'order-123' }) })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce(draftOrder)
+  })
+
+  it('dry run: finalises in a rolled-back transaction and answers the total, sending nothing', async () => {
+    const client = makeTxClient({ itemsRows: ITEMS })
+    setupTx(client)
+    const res = await call(req({ dryRun: true }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ dryRun: true, totalAmount: 1200 })
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+
+  it('finalises paid from the QR finaliser, with the payment in the same transaction', async () => {
+    const client = makeTxClient({ itemsRows: ITEMS })
+    setupTx(client)
+    const res = await call(req({ qrPayment: QR }, { adminId: 'admin-1', qrIntent: 'i1' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ orderId: 'order-123', orderNumber: 'ORD-001', totalAmount: 1200, invoiceNumber: 'JS/2024-25/0001' })
+    const sqls = client.query.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(s => s.includes("payment_mode = 'upi_qr'"))).toBe(true)
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO payments'), ['order-123', 'pay_1', 1200, expect.any(String)])
+  })
+
+  it('refuses a forged QR payment and one for another total', async () => {
+    expect((await call(req({ qrPayment: QR }))).status).toBe(403)
+    expect((await call(req({ qrPayment: { ...QR, amountPaise: 5 } }, { adminId: 'admin-1', qrIntent: 'i1' }))).status).toBe(409)
+    expect(mockWithTransaction).not.toHaveBeenCalled()
+  })
+})

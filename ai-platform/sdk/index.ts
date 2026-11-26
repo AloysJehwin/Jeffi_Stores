@@ -8,7 +8,7 @@ import type {
   OcrRequest, OcrResponse,
   ImageGenerateRequest, ImageGenerateResponse,
   VideoGenerateRequest, VideoStartResponse, VideoJobResponse,
-  ProvidersResponse,
+  ProvidersResponse, TranscribeRequest, TranscribeResponse, SpeakRequest, SpeakResponse,
 } from './types'
 
 export * from './types'
@@ -49,9 +49,19 @@ export async function aiChatStream(
   throw new AiClientError('AI gateway stream ended without a result', 'gateway')
 }
 
-/** Text embeddings (RAG, semantic cache). */
+/** Text embeddings (RAG, semantic cache). `provider` picks razer or azure; store `model` with the vectors. */
 export async function embed(req: EmbedRequest): Promise<EmbedResponse> {
   return post<EmbedResponse>(cfg(), '/v1/embed', req)
+}
+
+/** Speech-to-text in the stt order (sarvam, azure). `language` is BCP-47 (hi-IN); omit to detect. */
+export async function transcribe(req: TranscribeRequest): Promise<TranscribeResponse> {
+  return post<TranscribeResponse>(cfg(), '/v1/audio/transcribe', req)
+}
+
+/** Text-to-speech in the tts order (sarvam, azure), a voice for `language`; audio comes back as base64. */
+export async function speak(req: SpeakRequest): Promise<SpeakResponse> {
+  return post<SpeakResponse>(cfg(), '/v1/audio/speak', req)
 }
 
 /** Vision / OCR over one or more base64 images. */
@@ -81,7 +91,7 @@ export async function videoJob(jobId: string): Promise<VideoJobResponse> {
   return r.result ? { ...r, result: { ...r.result, videoUrl: absolute(r.result.videoUrl) } } : r
 }
 
-/** Which providers the gateway can route to, and its default order per capability. */
+/** Which providers the gateway can route to, the models each offers, and its default order per capability. */
 export async function providers(): Promise<ProvidersResponse> {
   return get<ProvidersResponse>(cfg(), '/v1/providers')
 }

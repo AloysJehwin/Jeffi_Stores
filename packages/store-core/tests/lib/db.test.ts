@@ -8,7 +8,7 @@
  * Key constraint: `new Pool(config)` is called in src, so the Pool mock
  * must be a proper constructor function (not an arrow function).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Helper: build a pg mock whose Pool is a real constructor function
@@ -213,6 +213,48 @@ describe('getPool – TLS configuration', () => {
     await mod.query('SELECT 1')
     const config = pg.capturedConfigs[0]
     expect(config.ssl).toBeUndefined()
+  })
+
+  describe('DB_SSL / DB_SSL_CA (config, not hostname)', () => {
+    const clear = () => {
+      delete process.env.DB_SSL
+      delete process.env.DB_SSL_CA
+    }
+    beforeEach(clear)
+    afterAll(clear)
+
+    it('verify + CA on a password URL (Azure Flexible Server): verified TLS, sslmode stripped', async () => {
+      process.env.DB_SSL = 'verify'
+      process.env.DB_SSL_CA = '/etc/ssl/azure-pg/ca.pem'
+      const { mod, pg } = await importDb({ dbUrl: 'postgresql://app:pw@jeffi-prod.postgres.database.azure.com:5432/jeffi_stores?sslmode=require' })
+      await mod.query('SELECT 1')
+      const config = pg.capturedConfigs[0]
+      expect(config.ssl).toEqual({ rejectUnauthorized: true, ca: 'CERT_CONTENT' })
+      expect(config.connectionString).toBe('postgresql://app:pw@jeffi-prod.postgres.database.azure.com:5432/jeffi_stores')
+    })
+
+    it('disable wins over an RDS host, with no bundle needed', async () => {
+      process.env.DB_SSL = 'disable'
+      const { mod, pg } = await importDb({ dbUrl: 'postgres://user:pw@myhost.rds.amazonaws.com:5432/db', certExists: false })
+      await mod.query('SELECT 1')
+      expect(pg.capturedConfigs[0].ssl).toBe(false)
+    })
+
+    it('require encrypts any host without verifying', async () => {
+      process.env.DB_SSL = 'require'
+      const { mod, pg } = await importDb({ dbUrl: 'postgres://user:pw@10.1.2.3:5432/db' })
+      await mod.query('SELECT 1')
+      expect(pg.capturedConfigs[0].ssl).toEqual({ rejectUnauthorized: false })
+    })
+
+    it('applies to the RDS IAM pool too', async () => {
+      process.env.DB_SSL = 'require'
+      const { mod, pg } = await importDb({ rdsIamAuth: 'true', certExists: true })
+      await mod.query('SELECT 1')
+      const config = pg.capturedConfigs[0]
+      expect(config.ssl).toEqual({ rejectUnauthorized: false })
+      expect(typeof config.password).toBe('function')
+    })
   })
 })
 

@@ -9,6 +9,8 @@ import { AttentionList } from '@/components/admin/overview/kit'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, count, money, pct, when } from '@/components/admin/channels/ui'
 import { delta, ratio } from '@/lib/overview/period'
 import { Bars, OverviewFrame, withAp } from './catalog-overview'
+import { PageInsights } from '@/components/admin/insights'
+import { PRODUCTS_INSIGHTS } from './products-insights'
 import ProductsOverviewLoading from './ProductsOverviewLoading'
 import type { AttentionItem } from '@/components/admin/overview/kit'
 
@@ -100,6 +102,7 @@ export default function ProductsOverview({ fields }: { fields: FilterField[] }) 
     <OverviewFrame<ProductsOverviewData>
       endpoint="/api/admin/products/overview"
       query={query}
+      actions={<PageInsights config={PRODUCTS_INSIGHTS} />}
       skeleton={<ProductsOverviewLoading />}
       filters={
         <ListFilters entity="products" fields={fields} search={PRODUCT_SEARCH} period noun="Products" tab="overview" />

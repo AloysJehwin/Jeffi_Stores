@@ -14,7 +14,7 @@ The published files are on the CDN at `https://dm9rri2wgl1e.cloudfront.net/marke
 ## How a film is made
 
 1. **Shots** (`shots/*.mjs`). Playwright walks the real local app with an animated cursor. `compose/record.mjs` saves each walk to `clips/<shot>/` as 30 fps JPEG frames.
-2. **Narration** (`narration/<film>.json`). Each line gets its own Gemini TTS take, in Indian English with the voice Sulafat. `compose/narrate.mjs` measures each take and places it on the film's clock.
+2. **Narration** (`narration/<film>.json`). Each line gets its own take from the AI gateway's text to speech (Sarvam, then Azure; `language` defaults to en-IN, `ttsVoice` picks a voice), so set `AI_GATEWAY_URL` and `AI_GATEWAY_TOKEN`. The v1/v2 takes were Gemini TTS (voice Sulafat); a re-shoot sounds different. `compose/narrate.mjs` measures each take and places it on the film's clock.
 3. **Plan** (`plans/<film>.json`). There is one scene per narration line. A scene is one of:
    - a title card
    - a recording inside a browser frame

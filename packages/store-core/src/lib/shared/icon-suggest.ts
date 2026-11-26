@@ -68,6 +68,7 @@ export const ICON_OPTIONS = [
 export async function suggestIcon(categoryName: string): Promise<string> {
   try {
     const response = await aiChat({
+      feature: 'icon_suggest',
       modelHint: 'fast',
       jsonMode: true,
       temperature: 0,

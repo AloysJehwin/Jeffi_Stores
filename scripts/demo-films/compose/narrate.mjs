@@ -1,45 +1,31 @@
-// Narration: one Gemini TTS take per line (Indian English), silence trimmed, durations measured, then placed on the
-// film clock at each line's start. Writes <out>/lines.json, <out>/narration.wav and <out>/captions.vtt.
-// Usage: node narrate.mjs <script.json> <outDir>   script = { voice, style, lines: [{ id, text, at? }] }
+// Narration: one take per line from the AI gateway's text-to-speech (its order: Sarvam, then Azure), silence trimmed,
+// durations measured, then placed on the film clock at each line's start. Writes <out>/lines.json, <out>/narration.wav
+// and <out>/captions.vtt. Needs AI_GATEWAY_URL (+ AI_GATEWAY_TOKEN); takes never come from a provider directly.
+// Usage: node narrate.mjs <script.json> <outDir>   script = { language?, ttsVoice?, lines: [{ id, text, at? }] }
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
+import { gatewaySpeak } from '../../lib/ai-gateway.mjs'
 
 const [, , scriptPath, outDir] = process.argv
 const script = JSON.parse(fs.readFileSync(scriptPath, 'utf8'))
-const key = process.env.GOOGLE_AI_API_KEY || fs.readFileSync(path.join(os.homedir(), '.jeffi/google-ai-key'), 'utf8').trim()
 fs.mkdirSync(outDir, { recursive: true })
-const MODEL = script.model || 'gemini-3.8-flash-tts'
-// gemini-3.8-flash-tts reads any instruction aloud, so it gets the line alone; a style prefix is only for 2.5 models.
-const style = script.style || ''
 
 async function tts(text, file) {
   if (fs.existsSync(file)) return
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: style ? `${style} ${text}` : text }] }],
-        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { languageCode: script.language || 'en-IN', voiceConfig: { prebuiltVoiceConfig: { voiceName: script.voice || 'Sulafat' } } } },
-      }),
-    })
-    const d = await r.json()
-    const part = d.candidates?.[0]?.content?.parts?.find(p => p.inlineData)
-    if (part) {
-      const raw = Buffer.from(part.inlineData.data, 'base64')
+    try {
+      const r = await gatewaySpeak({ text, language: script.language || 'en-IN', format: 'wav', ...(script.ttsVoice ? { voice: script.ttsVoice } : {}) })
       const tmp = `${file}.raw`
-      fs.writeFileSync(tmp, raw)
-      const isWav = raw.subarray(0, 4).toString() === 'RIFF'
-      const input = isWav ? ['-i', tmp] : ['-f', 's16le', '-ar', '24000', '-ac', '1', '-i', tmp]
+      fs.writeFileSync(tmp, r.audio)
       // Trim leading/trailing silence, keep 80 ms of air.
-      execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...input, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse', '-ar', '48000', '-ac', '1', file])
+      execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse', '-ar', '48000', '-ac', '1', file])
       fs.rmSync(tmp)
       return
+    } catch (err) {
+      console.error(`tts attempt ${attempt} failed`, String(err?.message || err).slice(0, 200))
+      await new Promise(r => setTimeout(r, 3000 * attempt))
     }
-    console.error(`tts attempt ${attempt} failed`, JSON.stringify(d).slice(0, 200))
-    await new Promise(r => setTimeout(r, 3000 * attempt))
   }
   throw new Error(`tts failed: ${text}`)
 }

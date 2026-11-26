@@ -161,11 +161,13 @@ curl http://100.110.153.68:11434/api/tags
 
 Path: `scripts/embed-everything.mjs`
 
+Vectors come from the AI gateway (`/v1/embed`, like every app call), never from Ollama directly: set `AI_GATEWAY_URL` and `AI_GATEWAY_TOKEN`. Each row stores the gateway's `embedding_model`, and a row from another model is re-embedded.
+
 ### Run it locally (Mac)
 
 ```bash
 cd /Users/I578432/Documents/GitHub-Personal/Jeffi_Storess_Site
-RDS_MASTER_PASSWORD='...' node scripts/embed-everything.mjs
+AI_GATEWAY_URL=... AI_GATEWAY_TOKEN=... RDS_MASTER_PASSWORD='...' node scripts/embed-everything.mjs
 ```
 
 Either env var works:

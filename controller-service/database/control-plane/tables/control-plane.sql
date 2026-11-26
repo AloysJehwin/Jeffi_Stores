@@ -741,10 +741,10 @@ CREATE TABLE IF NOT EXISTS public.api_key_usage_daily (
 -- is still charged). Edited at /admin/ecom/ai-pricing; seeded in seed-plans.sql.
 CREATE TABLE IF NOT EXISTS public.ai_price_list (
     id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video
-    provider    character varying(32) NOT NULL,   -- ollama | razer | anthropic | google | replicate | openai
+    capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video | audio
+    provider    character varying(32) NOT NULL,   -- ollama | razer | anthropic | google | replicate | openai | azure
     model       character varying(128) NOT NULL,  -- '*' = default for the provider
-    unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call
+    unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call | audio_minute | tts_1k_chars
     cost_inr    numeric(10,4) NOT NULL DEFAULT 0,
     price_inr   numeric(10,4) NOT NULL DEFAULT 0,
     active      boolean NOT NULL DEFAULT true,
@@ -768,11 +768,11 @@ CREATE TABLE IF NOT EXISTS public.platform_provider_settings (
     updated_at  timestamp with time zone NOT NULL DEFAULT now()
 );
 
--- ai_provider_identities: per-store AI provider workload identity (non-secret ids). For Anthropic
--- one workspace + service account + federation rule per store; the gateway exchanges its pod token
--- for a workspace-scoped access token with them. tenant_id is the store (the platform id for
--- the flagship). Provisioned outside the app; read by lib/providers/policy.ts. No row = no Claude
--- for that store (text falls back to Razer).
+-- ai_provider_identities: the environment's AI provider workload identity (non-secret ids). One row, the
+-- platform's (tenant_id = the platform id): Anthropic workspace + service account + federation rule
+-- jeffi-production (or jeffi-local), used by every store; spend is charged per store by our own metering.
+-- The gateway exchanges its pod token for a workspace-scoped access token with them. Provisioned outside
+-- the app; read by lib/providers/policy.ts. No row = no Claude (text falls back to the next provider).
 CREATE TABLE IF NOT EXISTS public.ai_provider_identities (
     tenant_id           uuid NOT NULL,
     provider            text NOT NULL,

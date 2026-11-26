@@ -31,6 +31,7 @@ import SerialEntryModal, {
 } from '@/components/admin/SerialEntryModal'
 import DatePicker from '@/components/ui/DatePicker'
 import Toggle from '@/components/ui/Toggle'
+import QrPaymentDialog, { createQrIntent, type QrIntent, type QrResult } from '@/components/admin/payments/QrPaymentDialog'
 import InvoicesMobileList from './_components/InvoicesMobileList'
 import { LoadingForm, LoadingTable } from '@/components/admin/kit/skeleton'
 import { Pager, usePagedRows } from '@/components/admin/kit/pager'
@@ -209,6 +210,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
   const [postalCode, setPostalCode] = useState('')
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
+  const [qrIntent, setQrIntent] = useState<QrIntent | null>(null)
 
   // Buyer (Bill to) — separate from consignee
   const [buyerSame, setBuyerSame] = useState(true)
@@ -864,28 +866,33 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
     setFormError('')
     setSubmitting(true)
     try {
+      const body = {
+        customerName,
+        customerPhone,
+        customerEmail,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        postalCode,
+        buyerGstin,
+        paymentMode,
+        notes,
+        items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
+        batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
+          batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
+        ),
+        serial_assignments: serialAssignments,
+      }
+      if (paymentMode === 'upi_qr') {
+        setQrIntent(await createQrIntent('invoice', body))
+        return
+      }
       const res = await fetch('/api/admin/orders/create', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          customerEmail,
-          addressLine1,
-          addressLine2,
-          city,
-          state,
-          postalCode,
-          buyerGstin,
-          paymentMode,
-          notes,
-          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
-          batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
-            batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
-          ),
-          serial_assignments: serialAssignments,
-        }),
+        body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -909,6 +916,22 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function newQr() {
+    setQrIntent(null)
+    const ev = { preventDefault() {} } as React.FormEvent
+    await (editId ? handleFinalizeEdit(ev) : handleCreate(ev))
+  }
+
+  function qrDone(r: QrResult) {
+    setQrIntent(null)
+    showToast('Invoice created', 'success')
+    resetForm()
+    navigateView('list')
+    fetchInvoices()
+    fetchDrafts()
+    if (r.resultUrl) window.open(r.resultUrl, '_blank')
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -1138,11 +1161,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
         return
       }
 
-      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
-        body: JSON.stringify({
+      const finalBody = {
           batch_assignments:
             Object.keys(batchAssignments).length > 0
               ? items
@@ -1170,7 +1189,16 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
                   return saved ? { ...sa, order_item_id: saved.order_item_id } : sa
                 })
               : [],
-        }),
+      }
+      if (paymentMode === 'upi_qr') {
+        setQrIntent(await createQrIntent('invoice_draft_finalise', { draftId: editId, ...finalBody }))
+        return
+      }
+      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...lockHeaders('invoice', editId) },
+        body: JSON.stringify(finalBody),
       })
       const finalData = await finalRes.json().catch(() => ({}))
       if (!finalRes.ok) {
@@ -1198,6 +1226,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
   function renderForm(isEdit: boolean) {
     return (
       <>
+        <QrPaymentDialog intent={qrIntent} onClose={() => setQrIntent(null)} onDone={qrDone} onNewQr={newQr} />
         {batchPickerItem && (
           <BatchPickerModal
             items={[batchPickerItem]}
@@ -1711,7 +1740,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
                     </FormButton>
                   ) : (
                     <FormButton disabled={submitting} className={`w-full md:w-auto ${isEdit ? 'col-span-2 md:col-span-1' : ''}`}>
-                      {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
+                      {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : paymentMode === 'upi_qr' ? 'Show payment QR' : 'Create Invoice'}
                     </FormButton>
                   )}
                 </div>

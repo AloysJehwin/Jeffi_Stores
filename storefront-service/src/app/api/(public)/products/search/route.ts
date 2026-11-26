@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/shared/db'
-import { embed, runWithHnswTuning } from '@/lib/shared/rag'
+import { embedWithModel, runWithHnswTuning, LEGACY_EMBED_MODEL } from '@/lib/shared/rag'
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 
 export const dynamic = 'force-dynamic'
@@ -11,13 +11,14 @@ function vec(arr: number[]) {
 
 async function semanticSearch(q: string, limit: number, excludeId: string): Promise<any[]> {
   try {
-    const v = await embed(q)
+    const { vector: v, model } = await embedWithModel(q)
     const hnswResult = await runWithHnswTuning(
       `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
        FROM embeddings
        WHERE source_table IN ('products', 'product_variants')
+         AND COALESCE(embedding_model, '${LEGACY_EMBED_MODEL}') = $3
        ORDER BY embedding <=> $1::vector LIMIT $2`,
-      [vec(v), limit * 3]
+      [vec(v), limit * 3, model]
     )
     const productIds: string[] = []
     const variantIds: string[] = []

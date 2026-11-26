@@ -22,27 +22,18 @@ describe('vision', () => {
     delete process.env.PADDLE_OCR_URL
     delete process.env.OLLAMA_BASE_URL
     delete process.env.AI_PROVIDER
+    delete process.env.AI_GATEWAY_URL
     mockAiVision.mockResolvedValue({ ok: false, text: '', model: '', error: 'vision not configured' })
   })
 
   describe('isVisionConfigured', () => {
-    it('returns true when PADDLE_OCR_URL is set', () => {
+    it('is true only with the AI gateway: vision never goes to PaddleOCR or Ollama directly', () => {
       process.env.PADDLE_OCR_URL = 'http://paddle:8866'
-      expect(isVisionConfigured()).toBe(true)
-    })
-
-    it('returns true when OLLAMA_BASE_URL is set', () => {
       process.env.OLLAMA_BASE_URL = 'http://ollama:11434'
-      expect(isVisionConfigured()).toBe(true)
-    })
-
-    it('returns true when AI_PROVIDER is ollama', () => {
       process.env.AI_PROVIDER = 'ollama'
-      expect(isVisionConfigured()).toBe(true)
-    })
-
-    it('returns false when no vision env vars set', () => {
       expect(isVisionConfigured()).toBe(false)
+      process.env.AI_GATEWAY_URL = 'http://gateway:8080'
+      expect(isVisionConfigured()).toBe(true)
     })
   })
 

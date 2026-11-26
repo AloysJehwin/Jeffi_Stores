@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time: let the pipeline release the AI gateway on the Razer box (razer-release.sh). Run from a machine with
+# One-time: let the pipeline release the Razer box's LLM service (PaddleOCR and the overlay) (razer-release.sh). Run from a machine with
 # AWS credentials and the razer-gpu SSH alias.
 #   1. The EC2 core gets a deploy key at /etc/jeffi/razer-deploy (root only), over SSM.
 #   2. The Razer box installs /usr/local/sbin/ai-gateway-release and authorizes that key for it alone
@@ -37,4 +37,4 @@ ssh "$RAZER_SSH" "sudo -n install -m 0755 /tmp/ai-gateway-release /usr/local/sbi
 
 say "Status over the pipeline's path"
 ssm "ssh -i /etc/jeffi/razer-deploy -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 ${RAZER_HOST:-aloysjehwin@100.82.208.8} status"
-echo "Done. The pipeline's Deploy · AI gateway stage can now release the gateway."
+echo "Done. The pipeline's Release · razer stage can now release the LLM service."

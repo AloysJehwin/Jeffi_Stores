@@ -1,0 +1,39 @@
+# The controller: role jeffi-irsa-controller (store provisioning on EC2/RDS, S3, messaging) and the
+# jeffi-prod-cluster-controller identity (Key Vault Secrets Officer: it creates and deletes tenant-db-* secrets).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
+spec:
+  template:
+    spec:
+      volumes:
+        - name: aws-iam-token
+          projected:
+            sources:
+              - serviceAccountToken: { audience: sts.amazonaws.com, expirationSeconds: 86400, path: token }
+        - name: azure-identity-token
+          projected:
+            sources:
+              - serviceAccountToken: { audience: api://AzureADTokenExchange, expirationSeconds: 3600, path: azure-identity-token }
+      containers:
+        - name: app
+          env:
+            - { name: AWS_REGION, value: us-east-1 }
+            - { name: AWS_ROLE_ARN, value: 'arn:aws:iam::708835965056:role/jeffi-irsa-controller' }
+            - { name: AWS_WEB_IDENTITY_TOKEN_FILE, value: /var/run/secrets/aws/token }
+            - { name: AWS_STS_REGIONAL_ENDPOINTS, value: regional }
+            - name: AWS_ROLE_SESSION_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - { name: SECRETS_BACKEND, value: keyvault }
+            - name: AZURE_KEY_VAULT_NAME
+              valueFrom: { configMapKeyRef: { name: azure-identity, key: KEY_VAULT_NAME } }
+            - name: AZURE_TENANT_ID
+              valueFrom: { configMapKeyRef: { name: azure-identity, key: TENANT_ID } }
+            - name: AZURE_CLIENT_ID
+              valueFrom: { configMapKeyRef: { name: azure-identity, key: CONTROLLER_CLIENT_ID } }
+            - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
+            - { name: DB_IAM_AUTH, value: 'false' }
+            - { name: DB_SSL, value: require }
+          volumeMounts:
+            - { name: aws-iam-token, mountPath: /var/run/secrets/aws, readOnly: true }
+            - { name: azure-identity-token, mountPath: /var/run/secrets/azure/tokens, readOnly: true }

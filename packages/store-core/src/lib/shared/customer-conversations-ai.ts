@@ -1,5 +1,5 @@
 import { query, queryMany, queryOne } from '@/lib/shared/db'
-import { aiChat, getAiProvider } from '@/lib/shared/ai-client'
+import { aiChat } from '@/lib/shared/ai-client'
 import { listConversations } from '@/lib/shared/customer-conversations'
 import type { ConversationItem } from '@/lib/shared/customer-conversations-shared'
 
@@ -24,8 +24,9 @@ export interface ProfileFacts {
 const MAX_WORDS = 120
 const SNIPPET = 320
 
+/** AI always runs through the gateway, which knows its providers; nothing to configure here. */
 export function aiProfileConfigured(): boolean {
-  return getAiProvider() === 'openai' ? !!process.env.OPENAI_API_KEY : true
+  return true
 }
 
 export async function getAiSummary(userId: string): Promise<AiCustomerSummary> {
@@ -204,6 +205,7 @@ export async function refreshAiSummary(userId: string): Promise<{ summary: strin
   const facts = await collectProfileFacts(userId)
   const prompt = buildProfilePrompt(facts)
   const res = await aiChat({
+    feature: 'customer_summary',
     modelHint: 'fast',
     temperature: 0.3,
     maxTokens: 400,

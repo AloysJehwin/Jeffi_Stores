@@ -5,23 +5,26 @@ import { acc, dec1, usePrefersReducedMotion, useMounted, WEEKDAYS, WEEKDAYS_LONG
 export interface WeekdayRhythmProps {
   /** 0 = Mon … 6 = Sun. */
   weekday: { day: number; avg: number }[]
+  /** Word in each bar's label: "Monday: 4 shipped per day on average". */
+  unit?: string
+  emptyText?: string
   className?: string
 }
 
 /** Average shipped per weekday, value above each bar, peak day in accent. */
-export function WeekdayRhythm({ weekday, className = '' }: WeekdayRhythmProps) {
+export function WeekdayRhythm({ weekday, unit = 'shipped', emptyText = 'No shipments yet.', className = '' }: WeekdayRhythmProps) {
   const reduced = usePrefersReducedMotion()
   const mounted = useMounted(reduced)
   const byDay = Array.from({ length: 7 }, (_, d) => weekday.find(w => w.day === d)?.avg ?? 0)
   const max = Math.max(...byDay)
-  if (max <= 0) return <p className={`py-6 text-center text-xs text-foreground-muted ${className}`}>No shipments yet.</p>
+  if (max <= 0) return <p className={`py-6 text-center text-xs text-foreground-muted ${className}`}>{emptyText}</p>
   const peak = byDay.indexOf(max)
   const weekend = (byDay[5] + byDay[6]) / 2
   return (
     <div className={className}>
       <div className="flex h-24 items-end gap-1.5">
         {byDay.map((v, d) => (
-          <div key={d} className="flex h-full flex-1 flex-col items-center justify-end gap-1" role="img" aria-label={`${WEEKDAYS_LONG[d]}: ${dec1(v)} shipped per day on average`}>
+          <div key={d} className="flex h-full flex-1 flex-col items-center justify-end gap-1" role="img" aria-label={`${WEEKDAYS_LONG[d]}: ${dec1(v)} ${unit} per day on average`}>
             <span className="text-[10px] tabular-nums text-foreground-secondary">{dec1(v)}</span>
             <div
               data-bar={d === peak ? 'peak' : 'day'}

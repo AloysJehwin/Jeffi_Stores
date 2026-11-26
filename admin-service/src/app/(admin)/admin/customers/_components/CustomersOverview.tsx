@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { CUSTOMERS_INSIGHTS } from './customers-insights'
 import Link from 'next/link'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
 import { CUSTOMER_FIELDS, CUSTOMER_SEARCH } from '@/lib/filters/fields/customers'
@@ -37,7 +39,7 @@ export default function CustomersOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={CUSTOMERS_INSIGHTS} />} />
       <ListFilters
         entity="customers"
         fields={CUSTOMER_FIELDS}

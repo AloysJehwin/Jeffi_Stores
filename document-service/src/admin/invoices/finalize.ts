@@ -11,6 +11,7 @@ import { invoiceReply } from '../../lib/reply-context'
 import { generateOrderInvoice, assignInvoiceNumber } from '../../lib/invoice'
 import { announceLock, assertHolder, closeLock, draftLockResponse, epochFrom } from '../../lib/draft-locks'
 import { assertCompleteLines, IncompleteLinesError } from '../../lib/invoice-line-items'
+import { amountMismatch, DryRun, isDryRun, qrPaymentOf, recordQrPayment, type QrPayment } from '../../lib/qr-payment'
 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,10 +24,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = []
     let serialAssignments: { order_item_id: string; serial_number: string }[] = []
+    // UPI QR: a dry run when the QR is made, then the real finalise once Razorpay confirmed the payment.
+    let qr: QrPayment | null = null
+    let dryRun = false
     try {
       const body = await request.json()
       if (Array.isArray(body?.batch_assignments)) batchAssignments = body.batch_assignments
       if (Array.isArray(body?.serial_assignments)) serialAssignments = body.serial_assignments
+      const q = qrPaymentOf(request, body)
+      if (q.refused) return q.refused
+      qr = q.qr
+      dryRun = isDryRun(body)
     } catch (_) {}
 
     const order = await queryOne<any>(
@@ -39,6 +47,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const allowedStatuses = ['draft', 'confirmed', 'delivered', 'granted', 'processing']
     if (!allowedStatuses.includes(order.status)) {
       return NextResponse.json({ error: 'Invoice is already finalized' }, { status: 400 })
+    }
+
+    if (qr) {
+      const mismatch = amountMismatch(Number(order.total_amount), qr)
+      if (mismatch) return mismatch
     }
 
     const isOnlineOrder = order.source === 'online' || order.source === 'business'
@@ -95,6 +108,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         lock = await assertHolder(client, admin, 'invoice', id, { epoch: epochFrom(request) })
         await closeLock(client, admin, 'invoice', id, 'finalized')
       }
+      if (qr) await recordQrPayment(client, id, qr)
+      if (dryRun) throw new DryRun({ totalAmount: Number(order.total_amount) })
       return { invoiceNumber, orderId: id, lock }
     })
     await announceLock(admin, 'invoice', id, result.lock)
@@ -119,8 +134,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       success: true,
       invoiceNumber: result.invoiceNumber,
       invoiceUrl: result.invoiceNumber ? `/api/orders/${result.orderId}/invoice` : null,
+      orderId: result.orderId,
+      orderNumber: order.order_number,
+      totalAmount: Number(order.total_amount),
     })
   } catch (err: any) {
+    if (err instanceof DryRun) return NextResponse.json({ dryRun: true, ...err.result })
     const locked = draftLockResponse(err)
     if (locked) return locked
     if (err instanceof IncompleteLinesError) return NextResponse.json({ error: err.message }, { status: 400 })

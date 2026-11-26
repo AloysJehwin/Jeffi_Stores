@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-// The on-device pitch line fires fetch / loads an LLM; stub it to a marker so this stays a pure render test.
-vi.mock('@/components/on-device/ProductPitchLine', () => ({
+// The AI pitch line fetches from the server; stub it to a marker so this stays a pure render test.
+vi.mock('@/components/storefront-ai/ProductPitchLine', () => ({
   default: (p: { productName: string }) => <div data-testid="pitch">pitch:{p.productName}</div>,
 }))
 

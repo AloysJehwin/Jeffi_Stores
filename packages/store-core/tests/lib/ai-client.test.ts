@@ -4,12 +4,19 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 vi.mock('@/lib/providers/policy', () => ({ getAiRouting: vi.fn(async () => ({})) }))
+const recordUsage = vi.hoisted(() => vi.fn(async (_input: any) => ({ usageId: 'u1', priceInr: 0 })))
+const billedTenantId = vi.hoisted(() => vi.fn((): string | null => null))
+vi.mock('@/lib/ai/billing', () => ({
+  recordUsage,
+  billedTenantId,
+  AiWalletError: class AiWalletError extends Error {},
+}))
 vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
 
-import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider, __resetAiClientState } from '@/lib/shared/ai-client'
+import { aiChat, aiChatStream, aiEmbed, aiEmbedWithModel, aiSpeak, aiTranscribe, aiVision, AiClientError, chatBillableTokens, __resetAiClientState } from '@/lib/shared/ai-client'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getAiRouting } from '@/lib/providers/policy'
 
@@ -32,6 +39,8 @@ function sentBody(callIndex = 0) {
 
 beforeEach(() => {
   mockFetch.mockReset()
+  recordUsage.mockClear()
+  vi.mocked(getAiRouting).mockResolvedValue({})
   __resetAiClientState()
   vi.mocked(resolveTenantId).mockResolvedValue(null)
 })
@@ -49,12 +58,6 @@ describe('AiClientError', () => {
   })
 })
 
-describe('getAiProvider', () => {
-  it('returns a known provider', () => {
-    expect(['openai', 'ollama']).toContain(getAiProvider())
-  })
-})
-
 describe('aiChat (gateway client)', () => {
   it('posts the request to the gateway chat endpoint and returns its reply', async () => {
     mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
@@ -64,6 +67,18 @@ describe('aiChat (gateway client)', () => {
     expect(url).toMatch(/\/v1\/chat$/)
     expect(init.method).toBe('POST')
     expect(init.signal).toBeDefined()
+  })
+
+  it('sends the store text models for the providers it orders, and none when unset', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic', 'razer'], models: { text: { anthropic: 'claude-sonnet-5-5', razer: 'llama3.1:8b' } } })
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody()).toMatchObject({ providers: ['anthropic', 'razer'], models: { anthropic: 'claude-sonnet-5-5', razer: 'llama3.1:8b' } })
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic'] })
+    mockFetch.mockClear()
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody()).not.toHaveProperty('models')
   })
 
   it('forwards model hint, JSON mode, sampling, tools and noCache', async () => {
@@ -162,6 +177,91 @@ describe('aiEmbed (gateway client)', () => {
   })
 })
 
+describe('aiEmbedWithModel and the embeddings provider', () => {
+  it('returns the vectors with the model and provider the gateway reports', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[1, 2]], model: 'nomic-embed-text', provider: 'razer', usage: { promptTokens: 2000 } }))
+    const r = await aiEmbedWithModel(['a'], undefined, { feature: 'embed_sync' })
+    expect(r).toEqual({ vectors: [[1, 2]], model: 'nomic-embed-text', provider: 'razer' })
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ feature: 'embed_sync', capability: 'embed', provider: 'ollama', units: [{ type: 'token_1k_in', qty: 2 }] })
+  })
+
+  it('sends the policy embed provider and meters Azure under azure', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ embed: 'azure' })
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[3]], model: 'text-embedding-3-small@768', provider: 'azure' }))
+    const r = await aiEmbedWithModel('x')
+    expect(sentBody()).toMatchObject({ input: 'x', provider: 'azure' })
+    expect(r).toMatchObject({ model: 'text-embedding-3-small@768', provider: 'azure' })
+    expect(await aiEmbed('y').catch(() => null)).toBeNull()
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ provider: 'azure' })
+  })
+
+  it('sends the embed model chosen for the provider', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ embed: 'azure', models: { embed: { azure: 'text-embedding-3-large' } } })
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[3]], model: 'text-embedding-3-large@768', provider: 'azure' }))
+    await aiEmbedWithModel('x')
+    expect(sentBody()).toMatchObject({ provider: 'azure', model: 'text-embedding-3-large' })
+  })
+
+  it('throws on a gateway failure and never calls anything but the gateway', async () => {
+    vi.stubEnv('OLLAMA_BASE_URL', 'http://ollama.test')
+    vi.mocked(getAiRouting).mockResolvedValue({ embed: 'razer' })
+    mockFetch.mockResolvedValue({ ok: false, status: 502, json: async () => ({}), text: async () => '' })
+    await expect(aiEmbedWithModel('x')).rejects.toThrow('AI gateway embed HTTP 502')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(String(mockFetch.mock.calls[0][0])).toMatch(/\/v1\/embed$/)
+    vi.unstubAllEnvs()
+  })
+})
+
+describe('aiTranscribe', () => {
+  it('posts base64 audio with the audio order and meters minutes', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ stt: ['azure'], tts: ['sarvam'], models: { stt: { azure: 'gpt-4o-transcribe' }, tts: { sarvam: 'bulbul:v3' } } })
+    mockFetch.mockResolvedValueOnce(okJson({ text: 'namaste', language: 'hi-IN', durationSeconds: 90, provider: 'azure', model: 'gpt-4o-transcribe' }))
+    const r = await aiTranscribe({ audio: Buffer.from('abc'), mimeType: 'audio/ogg', language: 'hi-IN', feature: 'staff_voice_memo' })
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/audio\/transcribe$/)
+    expect(sentBody()).toEqual({ audioBase64: Buffer.from('abc').toString('base64'), mimeType: 'audio/ogg', language: 'hi-IN', providers: ['azure'], models: { azure: 'gpt-4o-transcribe' } })
+    expect(r).toEqual({ text: 'namaste', language: 'hi-IN', durationSeconds: 90, provider: 'azure', model: 'gpt-4o-transcribe' })
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ feature: 'staff_voice_memo', capability: 'audio', provider: 'azure', model: 'gpt-4o-transcribe', units: [{ type: 'audio_minute', qty: 1.5 }] })
+  })
+
+  it('omits language and providers when unset, skips billing when asked, and throws on a gateway error', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ text: 't', durationSeconds: 6, provider: 'azure', model: 'm' }))
+    const r = await aiTranscribe({ audio: Buffer.from('a'), mimeType: 'audio/mpeg', feature: 'f', billing: false })
+    expect(sentBody()).toEqual({ audioBase64: 'YQ==', mimeType: 'audio/mpeg' })
+    expect(r.language).toBe('')
+    expect(recordUsage).not.toHaveBeenCalled()
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}), text: async () => 'all providers failed' })
+    await expect(aiTranscribe({ audio: Buffer.from('a'), mimeType: 'audio/mpeg', feature: 'f' })).rejects.toThrow('AI gateway transcribe HTTP 502: all providers failed')
+  })
+})
+
+describe('aiSpeak', () => {
+  it('returns the decoded audio and meters 1k characters', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ stt: ['azure'], tts: ['sarvam'], models: { stt: { azure: 'gpt-4o-transcribe' }, tts: { sarvam: 'bulbul:v3' } } })
+    mockFetch.mockResolvedValueOnce(okJson({ audioBase64: Buffer.from('mp3bytes').toString('base64'), mimeType: 'audio/mpeg', characters: 500, provider: 'azure', model: 'hi-IN-SwaraNeural' }))
+    const r = await aiSpeak({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', feature: 'voice_reply' })
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/audio\/speak$/)
+    expect(sentBody()).toEqual({ text: 'namaste', language: 'hi-IN', voice: 'hi-IN-SwaraNeural', format: 'mp3', providers: ['sarvam'], models: { sarvam: 'bulbul:v3' } })
+    expect(r.audio.toString()).toBe('mp3bytes')
+    expect(r).toMatchObject({ mimeType: 'audio/mpeg', provider: 'azure', model: 'hi-IN-SwaraNeural' })
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0]).toMatchObject({ capability: 'audio', units: [{ type: 'tts_1k_chars', qty: 0.5 }] })
+  })
+
+  it('falls back to the text length for metering and rejects a reply without audio', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ audioBase64: 'YQ==', provider: 'azure', model: 'm' }))
+    const r = await aiSpeak({ text: 'x'.repeat(2000), language: 'en-IN', feature: 'f' })
+    expect(r.mimeType).toBe('audio/mpeg')
+    await vi.waitFor(() => expect(recordUsage).toHaveBeenCalled())
+    expect(recordUsage.mock.calls[0][0].units).toEqual([{ type: 'tts_1k_chars', qty: 2 }])
+    mockFetch.mockResolvedValueOnce(okJson({ provider: 'azure' }))
+    await expect(aiSpeak({ text: 'hi', language: 'en-IN', feature: 'f' })).rejects.toThrow('returned no audio')
+  })
+})
+
 describe('aiVision (gateway client)', () => {
   it('returns the gateway OCR result', async () => {
     mockFetch.mockResolvedValueOnce(okJson({ ok: true, text: 'line 1', model: 'PP-OCRv5' }))
@@ -169,6 +269,13 @@ describe('aiVision (gateway client)', () => {
     expect(result).toEqual({ ok: true, text: 'line 1', model: 'PP-OCRv5' })
     expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/vision$/)
     expect(sentBody()).toMatchObject({ images: ['aGVsbG8='], prompt: 'extract' })
+  })
+
+  it('sends the text models with the vision call', async () => {
+    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic'], models: { text: { anthropic: 'claude-haiku-5-5' } } })
+    mockFetch.mockResolvedValueOnce(okJson({ ok: true, text: 't', model: 'm' }))
+    await aiVision(['x'], 'extract')
+    expect(sentBody()).toMatchObject({ providers: ['anthropic'], models: { anthropic: 'claude-haiku-5-5' } })
   })
 
   it('reports a non-ok reply without throwing', async () => {
@@ -185,125 +292,96 @@ describe('aiVision (gateway client)', () => {
   })
 })
 
-describe('direct Ollama fallback (OLLAMA_BASE_URL set, Razer in Site Controls)', () => {
-  const OLLAMA = 'http://ollama.test:11434'
-  type Handler = (url: string, init?: any) => any
-  let gateway: Handler
-  let ollama: Handler
+describe('gateway only: no direct provider path', () => {
+  const status = (code: number, body = '') => ({ ok: code < 400, status: code, text: async () => body, json: async () => ({}) })
   let errSpy: ReturnType<typeof vi.spyOn>
 
-  const status = (code: number, body = '') => ({ ok: code < 400, status: code, text: async () => body, json: async () => ({}) })
-  const calls = (needle: string) => mockFetch.mock.calls.filter(([u]) => String(u).includes(needle))
-
   beforeEach(() => {
-    vi.stubEnv('OLLAMA_BASE_URL', OLLAMA)
+    // A leftover OLLAMA_BASE_URL and Razer in the order must change nothing: the gateway owns fallback.
+    vi.stubEnv('OLLAMA_BASE_URL', 'http://ollama.test:11434')
     vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic', 'razer'] })
-    vi.stubEnv('OLLAMA_FAST_MODEL', 'fast-model')
-    vi.stubEnv('OLLAMA_SQL_MODEL', 'sql-model')
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    gateway = () => okJson(GATEWAY_REPLY)
-    ollama = () => okJson({ message: { content: '<think>x</think>direct answer' } })
-    mockFetch.mockImplementation(async (url: string, init?: any) => {
-      if (String(url).startsWith(OLLAMA)) return ollama(url, init)
-      if (String(url).endsWith('/healthz')) return okJson({ ok: true })
-      return gateway(url, init)
-    })
   })
   afterEach(() => {
     vi.unstubAllEnvs()
-    vi.mocked(getAiRouting).mockResolvedValue({})
     errSpy.mockRestore()
   })
 
-  it('uses the gateway when it answers', async () => {
-    expect(await aiChat({ messages: [{ role: 'user', content: 'hi' }] })).toEqual(GATEWAY_REPLY)
-    expect(calls(OLLAMA)).toHaveLength(0)
+  const onlyGateway = () => expect(mockFetch.mock.calls.every(([u]) => !String(u).includes('ollama.test'))).toBe(true)
+
+  it('surfaces a gateway 5xx as AiClientError without retrying elsewhere', async () => {
+    mockFetch.mockResolvedValue(status(503, '{"error":"all text providers failed"}'))
+    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toBe('AI gateway HTTP 503: {"error":"all text providers failed"}')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    onlyGateway()
+    expect(recordUsage).not.toHaveBeenCalled()
   })
 
-  it('falls back on a gateway 5xx with the same shape and fallbackUsed', async () => {
-    gateway = () => status(500, '{"error":"Ollama is not reachable"}')
-    const r = await aiChat({ messages: [{ role: 'user', content: 'hi' }], modelHint: 'sql' })
-    expect(r).toMatchObject({ content: 'direct answer', provider: 'ollama', model: 'sql-model', fallbackUsed: true, cache: null })
-    expect(typeof r.latencyMs).toBe('number')
-    const [url, init] = calls(OLLAMA)[0]
-    expect(url).toBe(`${OLLAMA}/api/chat`)
-    expect(JSON.parse(init.body)).toMatchObject({ model: 'sql-model', stream: false, think: false })
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to direct Ollama'))
+  it('surfaces a network failure as AiClientError', async () => {
+    mockFetch.mockRejectedValue(new TypeError('fetch failed'))
+    await expect(aiChat({ messages: [{ role: 'user', content: 'hi' }] })).rejects.toBeInstanceOf(AiClientError)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    onlyGateway()
   })
 
-  it('falls back on a network error and passes tools/jsonMode through', async () => {
-    gateway = () => { throw new TypeError('fetch failed') }
-    ollama = () => okJson({ message: { content: '', tool_calls: [{ function: { name: 'search', arguments: '{"q":"x"}' } }] } })
-    const tools = [{ type: 'function' as const, function: { name: 'search', description: 'd', parameters: {} } }]
-    const r = await aiChat({ messages: [{ role: 'user', content: 'hi' }], tools, jsonMode: true, modelHint: 'fast' })
-    expect(r.toolCalls).toEqual([{ name: 'search', arguments: { q: 'x' } }])
-    expect(r.fallbackUsed).toBe(true)
-    expect(JSON.parse(calls(OLLAMA)[0][1].body)).toMatchObject({ tools, format: 'json', model: 'fast-model' })
+  it('reports a vision failure as ok: false, gateway only', async () => {
+    mockFetch.mockResolvedValue(status(503))
+    expect(await aiVision(['aGk='], 'read')).toMatchObject({ ok: false, error: 'AI gateway vision HTTP 503' })
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    onlyGateway()
   })
 
-  it('goes direct without waiting once the gateway health check fails', async () => {
-    mockFetch.mockImplementation(async (url: string, init?: any) => {
-      if (String(url).startsWith(OLLAMA)) return ollama(url, init)
-      throw new TypeError('fetch failed')
+  it('streams fail fast with AiClientError while the gateway is unreachable', async () => {
+    mockFetch.mockRejectedValue(new TypeError('fetch failed'))
+    const err = await aiChatStream({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toMatch(/unreachable/)
+    expect(mockFetch.mock.calls.map(([u]) => String(u))).toEqual([expect.stringMatching(/\/healthz$/)])
+  })
+
+  it('retries a failed stream once as a plain gateway chat', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (String(url).endsWith('/healthz')) return okJson({ ok: true })
+      if (String(url).endsWith('/v1/chat/stream')) return status(502, 'boom')
+      return okJson(GATEWAY_REPLY)
     })
-    const r = await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
-    expect(r.fallbackUsed).toBe(true)
-    expect(calls('/v1/chat')).toHaveLength(0)
-    await aiChat({ messages: [{ role: 'user', content: 'again' }] })
-    expect(calls('/healthz')).toHaveLength(1)
+    const events: unknown[] = []
+    const r = await aiChatStream({ messages: [{ role: 'user', content: 'hi' }] }, { onEvent: e => events.push(e) })
+    expect(r.content).toBe('Hello world')
+    expect(events).toEqual([{ type: 'text', text: 'Hello world' }])
+    onlyGateway()
+  })
+})
+
+describe('store billing context', () => {
+  it('routes with the billed store when one is set (ecom console)', async () => {
+    billedTenantId.mockReturnValue('11111111-1111-4111-8111-111111111111')
+    vi.mocked(resolveTenantId).mockClear()
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody().cacheNamespace).toBe('11111111-1111-4111-8111-111111111111')
+    expect(getAiRouting).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111')
+    expect(resolveTenantId).not.toHaveBeenCalled()
+    billedTenantId.mockReturnValue(null)
+  })
+})
+
+describe('chatBillableTokens', () => {
+  const req = { messages: [{ role: 'system' as const, content: 'x'.repeat(400) }, { role: 'user' as const, content: 'y'.repeat(400) }] }
+
+  it('bills the reported usage, cache-weighted input first', () => {
+    expect(chatBillableTokens(req, { content: 'a', cache: null, usage: { promptTokens: 900, completionTokens: 50, billedPromptTokens: 300 } })).toEqual({ billedIn: 300, ct: 50 })
+    expect(chatBillableTokens(req, { content: 'a', cache: null, usage: { promptTokens: 900, completionTokens: 50 } })).toEqual({ billedIn: 900, ct: 50 })
   })
 
-  it('never goes to Ollama when Site Controls leaves Razer out', async () => {
-    vi.mocked(getAiRouting).mockResolvedValue({ text: ['anthropic'] })
-    gateway = () => status(503, '{"error":"no text provider in the requested order is available"}')
-    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
-    expect(err).toBeInstanceOf(AiClientError)
-    expect(err.message).toMatch(/Razer is off in Settings → Providers/)
-    expect((await aiVision(['x'], 'read')).ok).toBe(false)
-    expect(calls(OLLAMA)).toHaveLength(0)
+  it('bills a cache hit (zero reported usage) for the tokens the answer would have cost', () => {
+    expect(chatBillableTokens(req, { content: 'z'.repeat(81), cache: 'kv', usage: { promptTokens: 0, completionTokens: 0, costInr: 0 } })).toEqual({ billedIn: 201, ct: 21 })
+    expect(chatBillableTokens(req, { content: 'z', cache: 'semantic' })).toEqual({ billedIn: 201, ct: 1 })
   })
 
-  it('does NOT fall back on a 4xx', async () => {
-    gateway = () => status(400, 'bad request')
-    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
-    expect(err).toBeInstanceOf(AiClientError)
-    expect(err.message).toBe('AI gateway HTTP 400: bad request')
-    expect(calls(OLLAMA)).toHaveLength(0)
-  })
-
-  it('throws AiClientError when both the gateway and direct Ollama fail', async () => {
-    gateway = () => status(503)
-    ollama = () => { throw new TypeError('fetch failed') }
-    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
-    expect(err).toBeInstanceOf(AiClientError)
-    expect(err.message).toMatch(/AI gateway failed .*direct Ollama fallback failed/)
-  })
-
-  it('falls back for embeddings', async () => {
-    gateway = () => status(502)
-    ollama = () => okJson({ embedding: [0.5, 0.6] })
-    expect(await aiEmbed(['a', 'b'])).toEqual([[0.5, 0.6], [0.5, 0.6]])
-    expect(JSON.parse(calls(OLLAMA)[0][1].body)).toEqual({ model: 'nomic-embed-text', prompt: 'a' })
-  })
-
-  it('does not fall back for embeddings on a 4xx', async () => {
-    gateway = () => status(422)
-    await expect(aiEmbed('a')).rejects.toThrow('AI gateway embed HTTP 422')
-    expect(calls(OLLAMA)).toHaveLength(0)
-  })
-
-  it('falls back for vision and marks fallbackUsed', async () => {
-    gateway = () => status(503)
-    ollama = () => okJson({ message: { content: 'invoice text' } })
-    vi.stubEnv('OLLAMA_VISION_MODEL', 'vision-model')
-    expect(await aiVision(['aGk='], 'read')).toEqual({ ok: true, text: 'invoice text', model: 'vision-model', fallbackUsed: true })
-    expect(JSON.parse(calls(OLLAMA)[0][1].body).messages[0].images).toEqual(['aGk='])
-  })
-
-  it('reports a vision 4xx without falling back', async () => {
-    gateway = () => status(413)
-    const r = await aiVision(['x'], 'read')
-    expect(r).toMatchObject({ ok: false, error: 'AI gateway vision HTTP 413' })
-    expect(calls(OLLAMA)).toHaveLength(0)
+  it('leaves a non-cached call with no usage at zero', () => {
+    expect(chatBillableTokens(req, { content: 'z', cache: null })).toEqual({ billedIn: 0, ct: 0 })
   })
 })

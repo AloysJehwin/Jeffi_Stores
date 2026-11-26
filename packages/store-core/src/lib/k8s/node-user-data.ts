@@ -1,5 +1,6 @@
 // cloud-init for k3s agent nodes (stock AL2023 arm64). Joins the cluster with the token in
-// Secrets Manager (jeffi/production/k3s), then registers with its labels + taints.
+// Secrets Manager (jeffi/production/k3s), then registers with its labels + taints. Traced until the secrets are
+// read (`set +x`): under -x the token and Tailscale key would reach the EC2 console log.
 export interface AgentNodeSpec {
   nodeName: string // pool-basic-N | t-{slug}
   labels: Record<string, string>
@@ -7,6 +8,12 @@ export interface AgentNodeSpec {
   server: string // https://<core private ip>:6443
   // A store's own server: runs the database-disk agent, so the store's Postgres can live here.
   dbAgent?: boolean
+  // The cluster spans clouds (the core on Azure): flannel over tailscale0, the node registered at its Tailscale
+  // address, and the core's subnet routes (the Postgres subnet, Azure DNS) accepted.
+  overTailscale?: boolean
+  // The k3s token and Tailscale key, written in by the controller when the platform's secrets are in Key Vault
+  // (the node can't read them). Nothing traces the script then, so neither reaches the console log.
+  join?: { k3sToken: string; tsAuthKey: string }
 }
 
 const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
@@ -86,13 +93,16 @@ export function agentNodeUserData(spec: AgentNodeSpec): string {
     spec.nodeName,
     ...Object.entries(spec.labels).flatMap(([k, v]) => ['--node-label', `${k}=${v}`]),
     ...(spec.taints ?? []).flatMap(t => ['--node-taint', t]),
+    ...(spec.overTailscale ? ['--flannel-iface', 'tailscale0'] : []),
   ]
     .map(shq)
     .join(' ')
+  if (spec.overTailscale || spec.join) return crossCloudUserData(spec, args)
   return `#!/bin/bash
 set -euxo pipefail
 REGION=us-east-1
 ${spec.dbAgent ? dbAgentInstall(spec.nodeName) : ''}dnf install -y jq
+set +x
 sec() { aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production/k3s --query SecretString --output text | jq -r ".$1"; }
 if ! command -v tailscale >/dev/null; then curl -fsSL https://tailscale.com/install.sh | sh; fi
 systemctl enable --now tailscaled
@@ -101,5 +111,40 @@ TSKEY=$(sec TS_AUTHKEY)
 if ! command -v k3s >/dev/null; then
   curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable K3S_URL=${shq(spec.server)} K3S_TOKEN="$(sec K3S_TOKEN)" sh -s - ${args}
 fi
+`
+}
+
+// The same join, over Tailscale and/or with the secrets written in. No `set -x`: with the secrets in the script,
+// tracing would print them to the console log.
+function crossCloudUserData(spec: AgentNodeSpec, args: string): string {
+  const { join } = spec
+  const sec = join
+    ? `TSKEY=${shq(join.tsAuthKey)}
+K3S_TOKEN=${shq(join.k3sToken)}
+`
+    : `dnf install -y jq
+sec() { aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production/k3s --query SecretString --output text | jq -r ".$1"; }
+TSKEY=$(sec TS_AUTHKEY)
+K3S_TOKEN=$(sec K3S_TOKEN)
+`
+  const ts = spec.overTailscale
+  return `#!/bin/bash
+set -euo pipefail
+REGION=us-east-1
+${spec.dbAgent ? dbAgentInstall(spec.nodeName) : ''}${sec}if ! command -v tailscale >/dev/null; then curl -fsSL https://tailscale.com/install.sh | sh; fi
+systemctl enable --now tailscaled
+${ts ? '[ -n "$TSKEY" ] || { echo "no Tailscale auth key" >&2; exit 1; }\n' : ''}[ -z "$TSKEY" ] || tailscale status >/dev/null 2>&1 || tailscale up --authkey "$TSKEY" --hostname ${shq(`jeffi-${spec.nodeName}`)} --advertise-tags tag:server-prod${ts ? ' --accept-routes' : ''}
+unset TSKEY
+${
+    ts
+      ? `TS_IP=
+for _ in $(seq 1 30); do TS_IP=$(tailscale ip -4 2>/dev/null | head -1 || true); [ -n "$TS_IP" ] && break; sleep 2; done
+[ -n "$TS_IP" ] || { echo "no Tailscale address" >&2; exit 1; }
+`
+      : ''
+  }if ! command -v k3s >/dev/null; then
+  curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable K3S_URL=${shq(spec.server)} K3S_TOKEN="$K3S_TOKEN" sh -s - ${args}${ts ? ' --node-ip "$TS_IP"' : ''}
+fi
+unset K3S_TOKEN
 `
 }

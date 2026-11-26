@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build one service image (arm64) and push it to ECR; skipped when the tag is already there.
-# Usage: build-push-ecr.sh <controller|storefront|admin|business|showcase|messaging|documents|public-api|mobile|voice> <tag> [context-dir]
+# Usage: build-push-ecr.sh <controller|storefront|admin|business|showcase|messaging|documents|public-api|mobile|voice|ai-gateway> <tag> [context-dir]
 #   context-dir defaults to the repo root (release.sh passes a `git archive` copy).
 # The NEXT_PUBLIC_* build args come from jeffi/production/build (build-secret.sh), never from jeffi/production.
 set -euo pipefail
@@ -10,6 +10,7 @@ REGION=us-east-1
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGISTRY=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com
 NEXT=
+BCTX=.
 case $SERVICE in
   controller|storefront|admin|business|showcase)
               REPO=jeffi-stores-$SERVICE-service; BUILD=(-f deploy/next-app.Dockerfile --build-arg "APP=$SERVICE-service"); NEXT=1 ;;
@@ -18,6 +19,8 @@ case $SERVICE in
   public-api) REPO=jeffi-stores-public-api-service; BUILD=(-f deploy/services.Dockerfile --target public-api) ;;
   mobile)     REPO=jeffi-stores-mobile-service;     BUILD=(-f deploy/services.Dockerfile --target mobile) ;;
   voice)      REPO=jeffi-stores-voice-service;      BUILD=(-f voice-service/Dockerfile) ;;
+  # Its Dockerfile copies sdk/ and gateway/, so the build context is the ai-platform folder.
+  ai-gateway) REPO=jeffi-stores-ai-gateway-service; BUILD=(-f ai-platform/gateway/Dockerfile); BCTX=ai-platform ;;
   *) echo "unknown service $SERVICE" >&2; exit 1 ;;
 esac
 IMAGE=$REGISTRY/$REPO:$TAG
@@ -37,8 +40,8 @@ for k,v in json.load(sys.stdin).items():
     if k.startswith("NEXT_PUBLIC_") and isinstance(v,str): print(f"{k}={v}")') ||
     { echo "cannot read jeffi/production/build: run bash deploy/k8s/bootstrap/build-secret.sh" >&2; exit 1; }
   while IFS= read -r line; do ARGS+=(--build-arg "$line"); done <<<"$PUBLIC"
-  # The on-device summary pair may live in the environment (CI repo vars) rather than the secret.
-  for k in NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY NEXT_PUBLIC_ONDEVICE_MODEL_BASE; do
+  # The AI summaries default may live in the environment (CI repo vars) rather than the secret.
+  for k in NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY; do
     grep -q "^$k=" <<<"$PUBLIC" || [ -z "${!k:-}" ] || ARGS+=(--build-arg "$k=${!k}")
   done
   ARGS+=(--build-arg "NEXT_PUBLIC_APP_VERSION=$(node -p "require('$CTX/package.json').version")" --build-arg "NEXT_PUBLIC_GIT_SHA=${TAG#local-}")
@@ -48,5 +51,5 @@ fi
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin "$REGISTRY" >/dev/null
 # BUILDX_CACHE_ARGS: e.g. "--cache-from type=gha,scope=$SERVICE --cache-to type=gha,mode=max,scope=$SERVICE" in CI.
 # shellcheck disable=SC2086
-(cd "$CTX" && docker buildx build --platform linux/arm64 "${BUILD[@]}" "${ARGS[@]}" ${BUILDX_CACHE_ARGS:-} -t "$IMAGE" --push .)
+(cd "$CTX" && docker buildx build --platform linux/arm64 "${BUILD[@]}" "${ARGS[@]}" ${BUILDX_CACHE_ARGS:-} -t "$IMAGE" --push "$BCTX")
 echo "$IMAGE"

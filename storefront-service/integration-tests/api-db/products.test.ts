@@ -11,10 +11,13 @@ import { makeCustomerSession, makeAdminSession, apiRequest, endPool } from '../.
 // The /products/search route awaits embed() (AI gateway) for a semantic pass before responding; there is no
 // gateway in the test env, so stub rag.embed to throw fast — semanticSearch() swallows it and returns [],
 // and the route falls back to its real Postgres ILIKE query (what these tests assert). DB stays real.
-// embed() throws before runWithHnswTuning is reached, so only embed needs stubbing; the real one is re-exported.
+// embed()/embedWithModel() throw before runWithHnswTuning is reached; the real module is re-exported.
 vi.mock('@/lib/shared/rag', async (orig) => ({
   ...(await orig<typeof import('@/lib/shared/rag')>()),
   embed: vi.fn(async () => {
+    throw new Error('embed disabled in api-db tests')
+  }),
+  embedWithModel: vi.fn(async () => {
     throw new Error('embed disabled in api-db tests')
   }),
 }))

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { TASKS_INSIGHTS } from './tasks-insights'
 import {
   usePeriod,
   PeriodBar,
@@ -39,7 +41,7 @@ export default function TasksOverview() {
   )
   return (
     <div className="space-y-3">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={TASKS_INSIGHTS} />} />
       <ListFilters entity="tasks" fields={OVERVIEW_FIELDS} search={TASK_SEARCH} noun="Tasks" tab="overview" period />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading && <TasksOverviewSkeleton />}

@@ -130,19 +130,12 @@ export default function AnalyticsDashboardClient({
   const [range, setRange] = useState<AnalyticsRange>(initial.range)
   const [loading, setLoading] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [drawerActivity, setDrawerActivity] = useState<DashboardActivity | null>(initialActivity)
-  const [drawerLoading, setDrawerLoading] = useState(false)
   const [weekChannel, setWeekChannel] = useState<ActivityChannel>('all')
   const [weekData, setWeekData] = useState<DashboardActivity | null>(initialActivity)
   const shippedCard = useRef<HTMLDivElement>(null)
   const today = useMemo(localDay, [])
 
-  const refetchDrawer = useCallback(async ({ weeks, channel }: { weeks: number; channel: ActivityChannel }) => {
-    setDrawerLoading(true)
-    const next = await fetchActivity(weeks, channel)
-    if (next) setDrawerActivity(next)
-    setDrawerLoading(false)
-  }, [])
+  const loadDrawer = useCallback(({ weeks, channel }: { weeks: number; channel: ActivityChannel }) => fetchActivity(weeks, channel), [])
 
   const changeWeekChannel = useCallback(async (c: ActivityChannel) => {
     setWeekChannel(c)
@@ -275,7 +268,7 @@ export default function AnalyticsDashboardClient({
               <DashCard
                 title="Orders shipped"
                 hint={cal ? 'last 26 weeks' : undefined}
-                onClick={drawerActivity ? () => setDrawerOpen(true) : undefined}
+                onClick={initialActivity ? () => setDrawerOpen(true) : undefined}
                 ariaLabel="Orders shipped, open details"
                 className="h-full"
               >
@@ -447,9 +440,7 @@ export default function AnalyticsDashboardClient({
 
       {footer}
 
-      {drawerActivity && (
-        <ActivityDrawer activity={drawerActivity} open={drawerOpen} onClose={closeDrawer} loading={drawerLoading} storeName={storeName} today={today} onRefetch={refetchDrawer} />
-      )}
+      {initialActivity && <ActivityDrawer activity={initialActivity} open={drawerOpen} onClose={closeDrawer} storeName={storeName} today={today} load={loadDrawer} />}
     </div>
   )
 }

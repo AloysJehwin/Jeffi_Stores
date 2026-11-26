@@ -6,8 +6,7 @@ import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 
-// Server (Ollama) fallback for the on-device post-purchase affirmation. Mirrors
-// buildAffirmationPrompt() intent for devices where on-device is off/unsupported.
+// The order confirmation's one-line affirmation, written by the store's fast text model through the gateway.
 export async function POST(request: NextRequest) {
   const blocked = await storefrontAiGate()
   if (blocked) return blocked
@@ -33,5 +32,5 @@ export async function POST(request: NextRequest) {
     `### Purchased\n${items.map(n => `- ${n}`).join('\n')}\n\n` +
     'Return JSON: {"text":"<one sentence>"}'
 
-  return storefrontAiField(prompt, 'text')
+  return storefrontAiField(prompt, 'text', 'storefront_affirmation')
 }

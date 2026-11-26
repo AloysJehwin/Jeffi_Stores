@@ -219,7 +219,7 @@ Tests use only the throwaway values already in `ci.yml` (`test-jwt-secret...`, `
 
 ## 6. Post-deploy browser smoke per service
 
-New step inside each `Release · <service>` job, after the existing `smoke.sh`: `LIVE_URL=<public host> npx playwright test tests/post-deploy/<service>.spec.ts`.
+New step inside each `Release · AWS · <service>` job, after the existing `smoke.sh`: `LIVE_URL=<public host> npx playwright test tests/post-deploy/<service>.spec.ts`.
 
 | Service | Live URL | Checks |
 |---|---|---|

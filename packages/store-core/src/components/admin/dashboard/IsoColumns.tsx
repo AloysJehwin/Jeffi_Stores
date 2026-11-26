@@ -1,19 +1,33 @@
 'use client'
 
-// Isometric shipped-orders chart: SVG prisms (weeks x weekdays), orbitable by yaw, morphing into a flat dot grid.
+// Isometric daily-count chart: SVG prisms (weeks x weekdays), orbitable by yaw, morphing into a flat dot grid.
 // Projection: grid coords (x = week, y = weekday, centred) are rotated by `yaw`, then squashed vertically (iso tilt);
 // prism height lifts the top face straight up. Painting order is by rotated depth, recomputed for every yaw.
 
 import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import type { ActivityDay } from '../../../lib/dashboard/activity-types'
 import { acc, dec1, dotFill, easeOut, fmtLong, GRID_LINE, NEUTRAL_FILL, nf, TIP_CLASS, usePrefersReducedMotion, useTween } from './viz'
 import { ActivityLegend } from './DotCalendar'
 
+export interface IsoDay {
+  date: string
+  value: number
+  /** Tooltip breakdown, largest first; three are listed and the rest folds into "Others". */
+  parts?: { name: string; count: number }[]
+  /** Last tooltip line, e.g. "12 customers". */
+  note?: string
+}
+
 export interface IsoColumnsProps {
-  days: ActivityDay[]
+  /** Monday-aligned days, weeks * 7. */
+  days: IsoDay[]
   mode: '3d' | 'grid'
   /** YYYY-MM-DD; days after it are left out of the daily average. */
   today?: string
+  /** What is counted, for the summary: "Orders shipped per day over 26 weeks". */
+  subject?: string
+  /** Word after a count: "12 shipped". */
+  unit?: string
+  emptyText?: string
   className?: string
 }
 
@@ -77,7 +91,7 @@ const Prism = memo(function Prism({ i, cell, count, H, rise, m, hot, onHover }: 
 })
 
 /** Isometric weeks x weekdays chart; `mode` morphs the columns into the DotCalendar's dots and back. */
-export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProps) {
+export function IsoColumns({ days, mode, today, subject = 'Orders shipped', unit = 'shipped', emptyText = 'No shipments in this range.', className = '' }: IsoColumnsProps) {
   const reduced = usePrefersReducedMotion()
   const W = Math.max(1, Math.ceil(days.length / 7))
   const [yaw, setYaw] = useState(DEFAULT_YAW)
@@ -89,12 +103,12 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
   const riseT = useTween(1, 650, reduced, 0)
   const m = easeOut(useTween(mode === 'grid' ? 1 : 0, 420, reduced))
 
-  const max = useMemo(() => Math.max(0, ...days.map(d => d.shipped)), [days])
-  const busiest = useMemo(() => (max > 0 ? days.findIndex(d => d.shipped === max) : -1), [days, max])
-  const total = useMemo(() => days.reduce((s, d) => s + d.shipped, 0), [days])
+  const max = useMemo(() => Math.max(0, ...days.map(d => d.value)), [days])
+  const busiest = useMemo(() => (max > 0 ? days.findIndex(d => d.value === max) : -1), [days, max])
+  const total = useMemo(() => days.reduce((s, d) => s + d.value, 0), [days])
   const dailyAvg = useMemo(() => {
     const live = today ? days.filter(d => d.date <= today) : days
-    return live.length ? live.reduce((s, d) => s + d.shipped, 0) / live.length : 0
+    return live.length ? live.reduce((s, d) => s + d.value, 0) / live.length : 0
   }, [days, today])
 
   const gridCell = Math.min(560 / W, 40)
@@ -128,7 +142,7 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
   // Back to front: farther (smaller depth) first, recomputed whenever the yaw changes.
   const order = useMemo(() => cells.map((_, i) => i).sort((a, b) => cells[a].depth - cells[b].depth || a - b), [cells])
 
-  const heights = useMemo(() => days.map(d => (d.shipped <= 0 || max <= 0 ? 0 : Math.max(2, (d.shipped / max) * MAXH))), [days, max])
+  const heights = useMemo(() => days.map(d => (d.value <= 0 || max <= 0 ? 0 : Math.max(2, (d.value / max) * MAXH))), [days, max])
   const riseOf = useCallback(
     (i: number) => {
       const key = (Math.floor(i / 7) + (i % 7)) / (W - 1 + 6 || 1)
@@ -187,12 +201,14 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
 
   const showPrisms = m < 1
   const showDots = m > 0
-  const summary = `Orders shipped per day over ${W} weeks: ${nf(total)} in total${busiest >= 0 ? `, busiest ${fmtLong(days[busiest].date)} with ${days[busiest].shipped}` : ''}.`
+  const summary = `${subject} per day over ${W} weeks: ${nf(total)} in total${busiest >= 0 ? `, busiest ${fmtLong(days[busiest].date)} with ${days[busiest].value}` : ''}.`
   const empty = days.length === 0
-  const others = hotDay ? hotDay.shipped - hotDay.top.reduce((s, t) => s + t.count, 0) : 0
+  const shownParts = hotDay?.parts?.slice(0, 3) ?? []
+  const others = hotDay ? Math.round((hotDay.value - shownParts.reduce((s, t) => s + t.count, 0)) * 100) / 100 : 0
+  const hasNotes = days.some(d => d.note)
   const tipLeft = tip ? (tip.x > 62 ? '-105%' : tip.x < 20 ? '5%' : '-50%') : '0'
 
-  if (empty) return <p className="py-10 text-center text-xs text-foreground-muted">No shipments in this range.</p>
+  if (empty) return <p className="py-10 text-center text-xs text-foreground-muted">{emptyText}</p>
 
   return (
     <div className={className}>
@@ -216,7 +232,7 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
         <svg viewBox={`0 0 ${VW} ${VH}`} className={`absolute inset-0 h-full w-full ${mode === '3d' ? 'cursor-grab active:cursor-grabbing' : ''}`} data-yaw={yaw} aria-hidden={mode === '3d' ? 'true' : undefined}>
           {showPrisms &&
             order.map(i => (
-              <Prism key={i} i={i} cell={cells[i]} count={days[i].shipped} H={heights[i]} rise={riseOf(i)} m={m} hot={hot === i} onHover={onHover} />
+              <Prism key={i} i={i} cell={cells[i]} count={days[i].value} H={heights[i]} rise={riseOf(i)} m={m} hot={hot === i} onHover={onHover} />
             ))}
           {showDots &&
             days.map((d, i) => {
@@ -229,7 +245,7 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
                   data-cell={mode === 'grid' ? i : undefined}
                   role={mode === 'grid' ? 'button' : undefined}
                   tabIndex={mode === 'grid' ? (cellFocus === i ? 0 : -1) : undefined}
-                  aria-label={mode === 'grid' ? `${fmtLong(d.date)}: ${d.shipped} shipped` : undefined}
+                  aria-label={mode === 'grid' ? `${fmtLong(d.date)}: ${nf(d.value)} ${unit}` : undefined}
                   opacity={clamp01((m - 0.45) / 0.55)}
                   onPointerEnter={() => setHot(i)}
                   onPointerLeave={() => setHot(null)}
@@ -241,7 +257,7 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
                   onKeyDown={e => onCellKey(e, i)}
                   className="outline-none focus-visible:[&>circle]:stroke-[2px]"
                 >
-                  <circle cx={c.gridC[0]} cy={c.gridC[1]} r={gridCell * (focused ? 0.42 : 0.34)} fill={dotFill(d.shipped, max)} stroke={d.shipped > 0 ? (focused ? acc(900) : undefined) : GRID_LINE} strokeWidth={d.shipped > 0 ? (focused ? 1.5 : 0) : 0.6} style={{ transition: 'r 150ms' }} />
+                  <circle cx={c.gridC[0]} cy={c.gridC[1]} r={gridCell * (focused ? 0.42 : 0.34)} fill={dotFill(d.value, max)} stroke={d.value > 0 ? (focused ? acc(900) : undefined) : GRID_LINE} strokeWidth={d.value > 0 ? (focused ? 1.5 : 0) : 0.6} style={{ transition: 'r 150ms' }} />
                 </g>
               )
             })}
@@ -252,19 +268,19 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
               <span className="font-medium opacity-80">{fmtLong(hotDay.date)}</span>
               {hot === busiest && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white" style={{ background: acc(600) }}>Busiest</span>}
             </div>
-            <div className="mt-1 text-lg font-semibold tabular-nums leading-none">{hotDay.shipped}</div>
+            <div className="mt-1 text-lg font-semibold tabular-nums leading-none">{nf(hotDay.value)}</div>
             <div className="mb-1.5 mt-0.5 opacity-70">
-              shipped{dailyAvg > 0 ? ` · ${dec1(hotDay.shipped / dailyAvg)}× daily avg` : ''}
+              {unit}{dailyAvg > 0 ? ` · ${dec1(hotDay.value / dailyAvg)}× daily avg` : ''}
             </div>
-            {hotDay.top.length > 0 && (
+            {shownParts.length > 0 && (
               <ul className="space-y-0.5">
-                {hotDay.top.slice(0, 3).map((t, k) => (
+                {shownParts.map((t, k) => (
                   <li key={t.name} className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: acc(TIP_SHADES[k]) }} />
                       <span className="truncate">{t.name}</span>
                     </span>
-                    <span className="tabular-nums">{t.count}</span>
+                    <span className="tabular-nums">{nf(t.count)}</span>
                   </li>
                 ))}
                 {others > 0 && (
@@ -273,14 +289,12 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
                       <span className="h-2 w-2 shrink-0 rounded-full bg-surface opacity-50" />
                       Others
                     </span>
-                    <span className="tabular-nums">{others}</span>
+                    <span className="tabular-nums">{nf(others)}</span>
                   </li>
                 )}
               </ul>
             )}
-            <div className="mt-1.5 opacity-70">
-              {hotDay.customers} {hotDay.customers === 1 ? 'customer' : 'customers'}
-            </div>
+            {hotDay.note && <div className="mt-1.5 opacity-70">{hotDay.note}</div>}
           </div>
         )}
       </div>
@@ -293,16 +307,16 @@ export function IsoColumns({ days, mode, today, className = '' }: IsoColumnsProp
         <thead>
           <tr>
             <th>Date</th>
-            <th>Shipped</th>
-            <th>Customers</th>
+            <th>{unit.charAt(0).toUpperCase() + unit.slice(1)}</th>
+            {hasNotes && <th>Details</th>}
           </tr>
         </thead>
         <tbody>
           {days.map(d => (
             <tr key={d.date}>
               <td>{d.date}</td>
-              <td>{d.shipped}</td>
-              <td>{d.customers}</td>
+              <td>{d.value}</td>
+              {hasNotes && <td>{d.note ?? ''}</td>}
             </tr>
           ))}
         </tbody>

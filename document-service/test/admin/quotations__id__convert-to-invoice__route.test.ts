@@ -330,20 +330,69 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
   // --- Payment modes ---
 
-  it('on upi_qr returns a QR request for the controller, which makes it on the store\'s own keys', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
+  it('refuses a direct upi_qr conversion: the QR comes first', async () => {
     const res = await POST(postReq({ paymentMode: 'upi_qr' }), { params: Promise.resolve({ id: QUOT_ID }) })
-    const json = await res.json()
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/qr-intents/)
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('dry run: every check and write in a rolled-back transaction, the total out, nothing sent', async () => {
+    const client = makeTransactionClient()
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(postReq({ paymentMode: 'upi_qr', dryRun: true }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
-    expect(json.qrImageUrl).toBeNull()
-    expect(json.qrRequest).toMatchObject({ amountPaise: expect.any(Number), description: expect.stringContaining('Acme Store') })
+    expect(await res.json()).toEqual({ dryRun: true, totalAmount: 200, savedAsDraft: false, insufficientItems: [], insufficientDetails: [] })
+    expect(sqlsOf(client).some(q => q.includes('INSERT INTO orders'))).toBe(true)
+    expect(sqlsOf(client).some(q => q.includes('INSERT INTO payments'))).toBe(false)
+    expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
+  })
+
+  const finaliser = (body: Record<string, unknown>) => {
+    const req = postReq({ paymentMode: 'upi_qr', ...body })
+    req.claims = { service: 'platform', tenantId: 't', internal: true, adminId: 'admin-1', qrIntent: 'i1', exp: 0 } as any
+    return req
+  }
+  const QR = { razorpayPaymentId: 'pay_1', razorpayQrId: 'qr_1', amountPaise: 20000, intentId: 'i1' }
+
+  it('converts paid from the QR finaliser, recording the payment in the same transaction', async () => {
+    const client = makeTransactionClient()
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(finaliser({ qrPayment: QR }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toMatchObject({ orderId: 'order-uuid-1', orderNumber: 'OFF-123', totalAmount: 200, savedAsDraft: false })
+    expect(json.qrRequest).toBeUndefined()
+    const order = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO orders'))!
+    expect(order[1].slice(2, 4)).toEqual(['paid', 'upi_qr'])
+    const pay = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO payments'))!
+    expect(pay[1].slice(0, 3)).toEqual(['order-uuid-1', 'pay_1', 200])
+    expect(sendInvoiceFinalizedEmail).toHaveBeenCalled()
+  })
+
+  it('refuses a QR payment from anyone but its finaliser, and a payment for another total', async () => {
+    const forged = await POST(postReq({ paymentMode: 'upi_qr', qrPayment: QR }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(forged.status).toBe(403)
+    vi.mocked(queryOne).mockReset().mockResolvedValueOnce(FINAL_QUOTATION as any)
+    const short = await POST(finaliser({ qrPayment: { ...QR, amountPaise: 100 } }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(short.status).toBe(409)
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('a paid QR conversion short of stock fails instead of saving a draft', async () => {
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(0)))
+    const res = await POST(finaliser({ qrPayment: QR }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/Not enough stock/)
   })
 
   it('marks order as paid for bank_transfer paymentMode', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
+    const client = makeTransactionClient()
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
     const res = await POST(postReq({ paymentMode: 'bank_transfer' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
-    expect((await res.json()).qrRequest).toBeNull()
+    const order = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO orders'))!
+    expect(order[1][2]).toBe('paid')
   })
 
   // --- Buyer ≠ consignee path ---

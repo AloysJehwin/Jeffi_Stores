@@ -10,7 +10,7 @@ vi.mock('@/lib/integrations/owner', () => ({
 vi.mock('@jeffi/wallet', () => ({ debit: vi.fn(), trueUp: vi.fn() }))
 vi.mock('@/lib/payments/wallet', () => ({ getTenantWallet: vi.fn() }))
 
-import { preauthorize, settle, recordUsage, AiWalletError, __resetAiBillingCache } from '@/lib/ai/billing'
+import { preauthorize, settle, recordUsage, runBilledTo, billedTenantId, AiWalletError, __resetAiBillingCache } from '@/lib/ai/billing'
 import { query, queryOne } from '@/lib/shared/db'
 import { credentialOwnerId } from '@/lib/integrations/owner'
 import { debit, trueUp } from '@jeffi/wallet'
@@ -151,5 +151,30 @@ describe('recordUsage', () => {
     const r = await recordUsage(text)
     expect(r.priceInr).toBe(0)
     expect(debit).not.toHaveBeenCalled()
+  })
+})
+
+describe('runBilledTo (store work outside its own request scope)', () => {
+  const text = { feature: 'enrichment', capability: 'text' as const, provider: 'ollama', model: 'm', units: [{ type: 'token_1k_in' as const, qty: 1 }], costInr: 0 }
+  const OTHER = '33333333-3333-4333-8333-333333333333'
+
+  it('charges the named store even when the request resolves to the flagship', async () => {
+    vi.mocked(credentialOwnerId).mockResolvedValue(FLAGSHIP)
+    const r = await runBilledTo(OTHER, () => recordUsage(text))
+    expect(r.priceInr).toBeCloseTo(0.06, 4)
+    expect(debit).toHaveBeenCalledWith(expect.objectContaining({ tenantId: OTHER, amountInr: 0.06 }))
+    const insert = vi.mocked(queryOne).mock.calls.find(c => /INSERT INTO ai_usage/.test(c[0]))!
+    expect(insert[1]).toContain(`tenant:${OTHER}`)
+    expect(credentialOwnerId).not.toHaveBeenCalled()
+  })
+
+  it('preauthorizes media against the named store, and the scope ends with the call', async () => {
+    vi.mocked(credentialOwnerId).mockResolvedValue(FLAGSHIP)
+    await runBilledTo(OTHER, async () => {
+      expect(billedTenantId()).toBe(OTHER)
+      await preauthorize({ ...imageInput, estimateUnits: [{ type: 'image', qty: 1 }] })
+    })
+    expect(debit).toHaveBeenCalledWith(expect.objectContaining({ tenantId: OTHER, amountInr: 6 }))
+    expect(billedTenantId()).toBeNull()
   })
 })

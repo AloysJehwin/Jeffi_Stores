@@ -3,7 +3,8 @@ import { GoogleProvider } from '../src/providers/google'
 import { ReplicateProvider } from '../src/providers/replicate'
 import { SdWebuiProvider } from '../src/providers/sd-webui'
 import { imageDims, nearestAspect } from '../src/providers/types'
-import { ollamaChat, ollamaEmbed } from '../src/providers/ollama'
+import { ollamaChat, ollamaEmbed, ollamaInstalledModels } from '../src/providers/ollama'
+import { ocrProbe, ocrStatus, runOcr } from '../src/providers/paddleocr'
 
 const PNG_B64 = Buffer.from('89504e470d0a1a0a0000000d49484452000002000000030008060000', 'hex').toString('base64')
 
@@ -88,6 +89,22 @@ describe('google', () => {
     expect((calls[2].init?.headers as Record<string, string>)['x-goog-api-key']).toBe('k')
   })
 
+  it('runs a chosen model alone: gemini or imagen by its id, veo without the fallback', async () => {
+    const calls = mockFetch(url => {
+      if (url.includes(':predictLongRunning')) return new Response('nope', { status: 404 })
+      if (url.includes(':predict')) return { predictions: [{ bytesBase64Encoded: PNG_B64 }] }
+      return { candidates: [{ content: { parts: [{ inlineData: { data: PNG_B64 } }] } }] }
+    })
+    const g = new GoogleProvider('k', 'm', 'p', 'imagen-4.0-generate-001', 'veo-a', 'veo-b')
+    expect((await g.generateImage!({ ...req, n: 1, quality: 'premium', model: 'gemini-2.5-flash-image' })).model).toBe('gemini-2.5-flash-image')
+    expect(calls[0].url).toContain('/models/gemini-2.5-flash-image:generateContent')
+    expect((await g.generateImage!({ ...req, n: 1, model: 'imagen-4.0-ultra' })).model).toBe('imagen-4.0-ultra')
+    expect(calls[1].url).toContain('/models/imagen-4.0-ultra:predict')
+    expect(g.videoModel!({ prompt: 'x', durationSec: 4, aspect: '16:9', model: 'veo-c' })).toBe('veo-c')
+    await expect(g.startVideo!({ prompt: 'x', durationSec: 4, aspect: '16:9', model: 'veo-c' })).rejects.toThrow(/HTTP 404/)
+    expect(calls.slice(2).map(c => c.url)).toEqual([expect.stringContaining('/models/veo-c:predictLongRunning')])
+  })
+
   it('reports pending and operation errors', async () => {
     mockFetch(() => ({ done: false }))
     const g = new GoogleProvider('k')
@@ -115,6 +132,15 @@ describe('replicate', () => {
     expect(calls[0].url).toBe('https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions')
     expect(body(calls[0]).input).toMatchObject({ prompt: 'red shoe', aspect_ratio: '16:9', num_outputs: 2 })
     expect(gets).toBe(1)
+  })
+
+  it('a chosen image model replaces the quality model', async () => {
+    const calls = mockFetch(url => (url.endsWith('/predictions')
+      ? { id: 'p2', status: 'succeeded', output: 'https://r/1.png' }
+      : new Response(Buffer.from(PNG_B64, 'base64'), { headers: { 'content-type': 'image/png' } })))
+    const out = await new ReplicateProvider('tok').generateImage!({ ...req, n: 1, quality: 'draft', model: 'black-forest-labs/flux-1.1-pro' })
+    expect(out.model).toBe('black-forest-labs/flux-1.1-pro')
+    expect(calls[0].url).toBe('https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions')
   })
 
   it('video uses wan t2v, i2v with an image, and maps statuses', async () => {
@@ -165,6 +191,20 @@ describe('ollama usage mapping', () => {
     expect(r).toMatchObject({ promptTokens: 0, completionTokens: 0, toolCalls: [{ name: 'f', arguments: { a: 1 } }] })
   })
 
+  it('chat runs the requested razer model', async () => {
+    const calls = mockFetch(() => ({ message: { content: 'hi' } }))
+    const r = await ollamaChat({ messages: [{ role: 'user', content: 'x' }], modelHint: 'fast', models: { razer: 'qwen3:30b' } })
+    expect(r.model).toBe('qwen3:30b')
+    expect(body(calls[calls.length - 1]).model).toBe('qwen3:30b')
+  })
+
+  it('lists installed models from /api/tags', async () => {
+    mockFetch(url => (url.endsWith('/api/tags') ? { models: [{ name: 'gemma4:12b' }, { model: 'nomic-embed-text:latest' }, {}] } : {}))
+    expect(await ollamaInstalledModels()).toEqual(['gemma4:12b', 'nomic-embed-text:latest'])
+    mockFetch(() => new Response('', { status: 500 }))
+    await expect(ollamaInstalledModels()).rejects.toThrow('Ollama tags HTTP 500')
+  })
+
   it('embed sums counts and estimates when the endpoint omits them', async () => {
     mockFetch((_u, init) => {
       const prompt = JSON.parse(String(init?.body)).prompt
@@ -172,5 +212,30 @@ describe('ollama usage mapping', () => {
     })
     const r = await ollamaEmbed(['abcdefgh', 'other'])
     expect(r).toEqual({ embeddings: [[1, 2], [3]], promptTokens: 2 + 7 })
+  })
+})
+
+describe('paddleocr breaker', () => {
+  it('fails fast while open, re-probes after a failed call and recovers', async () => {
+    const down = mockFetch(url => url.includes('/health') ? new Response('{"error":"loading the model"}', { status: 503 }) : { ok: true, text: 'x' })
+    await ocrProbe.probe()
+    await ocrProbe.probe()
+    expect(ocrProbe.isOpen()).toBe(true)
+    expect(ocrStatus()).toMatchObject({ ok: false, reason: 'loading the model' })
+    const before = down.length
+    await expect(runOcr('AAAA', 'image/png')).rejects.toMatchObject({ status: 503, message: expect.stringContaining('PaddleOCR is down') })
+    expect(down.length).toBe(before)
+
+    mockFetch(url => url.includes('/health') ? new Response('{}') : { ok: true, text: 'hi', pages: 1, lines: [{ text: 'hi', score: 0.9 }], mean_score: 0.9 })
+    await ocrProbe.probe()
+    expect(ocrProbe.isOpen()).toBe(false)
+    expect(await runOcr('AAAA', 'image/png')).toMatchObject({ ok: true, text: 'hi', provider: 'paddleocr' })
+
+    const flaky = mockFetch(url => {
+      if (url.includes('/health')) return new Response('{}')
+      throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } })
+    })
+    await expect(runOcr('AAAA', 'image/png')).rejects.toMatchObject({ status: 503, message: expect.stringContaining('ECONNREFUSED') })
+    expect(flaky.some(c => c.url.includes('/health'))).toBe(true)
   })
 })

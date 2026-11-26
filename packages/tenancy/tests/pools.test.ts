@@ -95,6 +95,59 @@ describe('rdsSslOption', () => {
   })
 })
 
+describe('sslFromConfig / dbSslConfig (DB_SSL, DB_SSL_CA)', () => {
+  it('is undefined when unset, so the RDS-host default applies', async () => {
+    const m = await load()
+    expect(m.sslFromConfig(undefined)).toBeUndefined()
+    expect(m.sslFromConfig('  ')).toBeUndefined()
+  })
+
+  it.each(['disable', 'off', 'false', '0', 'no'])('%s turns TLS off', async (v) => {
+    const m = await load()
+    expect(m.sslFromConfig(v)).toBe(false)
+  })
+
+  it.each(['require', 'REQUIRE', 'on', 'true', '1', 'prefer'])('%s encrypts without verifying', async (v) => {
+    const m = await load()
+    expect(m.sslFromConfig(v)).toEqual({ rejectUnauthorized: false })
+  })
+
+  it('verify uses the system roots without a CA', async () => {
+    const m = await load()
+    expect(m.sslFromConfig('verify')).toEqual({ rejectUnauthorized: true })
+    expect(m.sslFromConfig('verify-full')).toEqual({ rejectUnauthorized: true })
+  })
+
+  it('verify reads the DB_SSL_CA bundle, or takes inline PEM', async () => {
+    existsSync.mockReturnValue(true)
+    readFileSync.mockReturnValue(Buffer.from('AZURE-CA'))
+    const m = await load()
+    expect(m.sslFromConfig('verify-ca', '/etc/ssl/azure/ca.pem')).toEqual({ rejectUnauthorized: true, ca: 'AZURE-CA' })
+    expect(readFileSync).toHaveBeenCalledWith('/etc/ssl/azure/ca.pem')
+    const pem = '-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----'
+    expect(m.sslFromConfig('verify', pem)).toEqual({ rejectUnauthorized: true, ca: pem })
+  })
+
+  it('verify with a missing CA file throws', async () => {
+    existsSync.mockReturnValue(false)
+    const m = await load()
+    expect(() => m.sslFromConfig('verify', '/nope/ca.pem')).toThrow('DB_SSL_CA file not found')
+  })
+
+  it('rejects an unknown mode', async () => {
+    const m = await load()
+    expect(() => m.sslFromConfig('maybe')).toThrow('DB_SSL must be disable, require or verify')
+  })
+
+  it('dbSslConfig reads DB_SSL and DB_SSL_CA', async () => {
+    process.env.DB_SSL = 'require'
+    const m = await load()
+    expect(m.dbSslConfig()).toEqual({ rejectUnauthorized: false })
+    delete process.env.DB_SSL
+    expect(m.dbSslConfig()).toBeUndefined()
+  })
+})
+
 describe('rdsIamPassword', () => {
   it('builds a Signer and returns a token-producing fn', async () => {
     const m = await load()
@@ -128,6 +181,31 @@ describe('mainPool', () => {
     m.mainPool('postgres://app_user@db.x.rds.amazonaws.com:5432/jeffi_stores')
     expect(typeof pgCtorCalls.at(-1).password).toBe('function')
     expect(SignerCtor).toHaveBeenCalledWith(expect.objectContaining({ region: 'ap-south-1', username: 'app_user' }))
+  })
+
+  it('DB_SSL=verify with a CA: Azure Flexible Server, password from the URL, no IAM', async () => {
+    delete process.env.DB_IAM_AUTH
+    process.env.DB_SSL = 'verify'
+    process.env.DB_SSL_CA = '/etc/ssl/azure/ca.pem'
+    existsSync.mockReturnValue(true)
+    readFileSync.mockReturnValue(Buffer.from('AZURE-CA'))
+    const m = await load()
+    m.mainPool('postgres://jeffi_app:s3cr%40t@jeffi-prod.postgres.database.azure.com:5432/jeffi_stores?sslmode=require')
+    const cfg = pgCtorCalls.at(-1)
+    expect(cfg).toMatchObject({ host: 'jeffi-prod.postgres.database.azure.com', user: 'jeffi_app', password: 's3cr@t', database: 'jeffi_stores' })
+    expect(cfg.ssl).toEqual({ rejectUnauthorized: true, ca: 'AZURE-CA' })
+    expect(SignerCtor).not.toHaveBeenCalled()
+  })
+
+  it('DB_SSL overrides the RDS-host default, both ways', async () => {
+    delete process.env.DB_IAM_AUTH
+    process.env.DB_SSL = 'disable'
+    const m = await load()
+    m.mainPool('postgres://u:p@db.abc.us-east-1.rds.amazonaws.com:5432/jeffi_stores')
+    expect(pgCtorCalls.at(-1).ssl).toBe(false)
+    process.env.DB_SSL = 'require'
+    m.mainPool('postgres://u:p@10.0.0.5:5432/jeffi_stores')
+    expect(pgCtorCalls.at(-1).ssl).toEqual({ rejectUnauthorized: false })
   })
 
   it('defaults the port to 5432 when the URL omits it', async () => {
@@ -197,6 +275,16 @@ describe('controlPlanePool', () => {
     const cfg = pgCtorCalls.at(-1)
     expect(cfg).toMatchObject({ host: 'cp.rds.amazonaws.com', port: 5433, user: 'cp_user', database: 'jeffi_stores' })
     expect(typeof cfg.password).toBe('function')
+    expect(cfg.ssl).toEqual({ rejectUnauthorized: false })
+  })
+
+  it('an IAM pool takes DB_SSL when set', async () => {
+    process.env.CONTROL_PLANE_IAM_AUTH = 'true'
+    process.env.CONTROL_PLANE_RDS_HOST = 'cp.rds.amazonaws.com'
+    process.env.DB_SSL = 'verify'
+    const m = await load()
+    m.controlPlanePool()
+    expect(pgCtorCalls.at(-1).ssl).toEqual({ rejectUnauthorized: true })
   })
 })
 

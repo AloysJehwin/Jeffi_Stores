@@ -1,0 +1,8 @@
+# Kubelet probes and node-originated traffic come from the Azure VNet and from Tailscale addresses (node IPs are
+# Tailscale IPs; flannel runs over tailscale0), not only the AWS VPC.
+- op: add
+  path: /spec/ingress/0/from/-
+  value: { ipBlock: { cidr: 10.60.0.0/16 } }
+- op: add
+  path: /spec/ingress/0/from/-
+  value: { ipBlock: { cidr: 100.64.0.0/10 } }

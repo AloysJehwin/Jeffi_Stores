@@ -1,0 +1,8 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "PublishFleetConfig", "Effect": "Allow", "Action": ["s3:PutObject", "s3:GetObject"], "Resource": "arn:aws:s3:::jeffi-stores-mtls-truststore/fleet/*" },
+    { "Sid": "ListFleetConfigPrefix", "Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::jeffi-stores-mtls-truststore" },
+    { "Sid": "WhatsAppTemplates", "Effect": "Allow", "Action": ["social-messaging:CreateWhatsAppMessageTemplate", "social-messaging:UpdateWhatsAppMessageTemplate", "social-messaging:DeleteWhatsAppMessageTemplate"], "Resource": "*" }
+  ]
+}

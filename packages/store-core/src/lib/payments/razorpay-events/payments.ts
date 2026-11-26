@@ -3,6 +3,7 @@ import { queryOne } from '@/lib/shared/db'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { applyCapturedPayment, applyLinkPayment, applyQrPayment, recordPaymentDetails } from '@/lib/payments/capture'
 import { runInTenant } from '@/lib/payments/webhook-tenant'
+import { applyQrIntentPayment } from '@/lib/payments/qr-intents'
 import { inPaymentStore, storeFor, type EventContext } from './context'
 
 /** Returns what happened to the payment (a CaptureOutcome, or 'wallet' for a top-up). */
@@ -13,6 +14,14 @@ export async function onPaymentCaptured(payment: any, ctx: EventContext): Promis
   if (payment.notes?.purpose === 'wallet_topup') {
     if (ctx.source === 'platform') await creditWalletTopup(payment)
     return 'wallet'
+  }
+  // A UPI QR payment names no order or QR: Razorpay says which QR took it (the qr_code.credited fallback).
+  if (!payment.order_id && !payment.invoice_id && payment.method === 'upi') {
+    const qr = await qrForPayment(payment.id, ctx)
+    if (qr) {
+      const out = await onQrCodeCredited(qr, payment, ctx)
+      if (out !== 'unmatched') return out
+    }
   }
   return inPaymentStore(ctx, payment, async store => {
     const out = await applyCapturedPayment(payment, store)
@@ -102,11 +111,28 @@ export async function onPaymentLinkExpired(link: any, ctx: EventContext) {
   )
 }
 
-export async function onQrCodeCredited(qr: any, payment: any, ctx: EventContext) {
-  if (!qr?.id) return
+/** A QR intent (QR-first admin sale) first, then an invoice QR on an order. */
+export async function onQrCodeCredited(qr: any, payment: any, ctx: EventContext): Promise<string> {
+  if (!qr?.id) return 'unmatched'
   const store = await storeFor(ctx, qr)
-  if (!store) return
-  await runInTenant(store, async () => {
-    if ((await applyQrPayment(qr, payment, store)) !== 'unmatched' && payment?.id) await details(payment, ctx)
+  if (!store) return 'unmatched'
+  return runInTenant(store, async () => {
+    const intent = await applyQrIntentPayment(qr, payment, store)
+    if (intent !== 'unmatched') return intent
+    const out = await applyQrPayment(qr, payment, store)
+    if (out !== 'unmatched' && payment?.id) await details(payment, ctx)
+    return out
   })
+}
+
+/** The QR a payment was made on, read from the account that took it (null when none or unreadable). */
+async function qrForPayment(paymentId: string, ctx: EventContext): Promise<any | null> {
+  try {
+    const { getRazorpayInstance, getRazorpayInstanceFor } = await import('@/lib/payments/razorpay')
+    const rzp: any = ctx.source === 'own' && ctx.store ? (await getRazorpayInstanceFor(ctx.store.tenantId)).instance : getRazorpayInstance()
+    const list = await rzp.qrCode.all({ payment_id: paymentId })
+    return (Array.isArray(list?.items) ? list.items : [])[0] ?? null
+  } catch {
+    return null
+  }
 }

@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import { createPgPool, rdsSslOption, rdsIamPassword, dbSslConfig, stripSslParams, isRdsUrl } from '@/lib/shared/pg-pool'
 import type { TenantContext } from '@/lib/tenancy/tenant-context'
 import { repoPath } from '@/lib/shared/paths'
 
@@ -73,11 +73,13 @@ export function controlPlanePool(): Pool {
     config.port = port
     config.user = user
     config.database = process.env.CONTROL_PLANE_RDS_DB || 'jeffi_stores'
-    config.ssl = rdsSslOption()
+    config.ssl = dbSslConfig() ?? rdsSslOption()
     config.password = rdsIamPassword(host, port, user, region)
   } else {
-    config.connectionString = url
-    if (url.includes('rds.amazonaws.com')) {
+    const ssl = dbSslConfig()
+    config.connectionString = ssl === undefined ? url : stripSslParams(url)
+    if (ssl !== undefined) config.ssl = ssl
+    else if (isRdsUrl(url)) {
       const certPath = repoPath('certs', 'global-bundle.pem')
       if (fs.existsSync(certPath)) config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
     }

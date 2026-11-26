@@ -8,7 +8,7 @@
 #                        environments: read jeffi/production (the RDS
 #                        master password for 05-table-owner.sh), SSM tunnels to the core and through it to RDS,
 #                        log in to RDS as app_user (schema diff, migrations), invalidate CloudFront, and run one
-#                        SSM command on the core to release the AI gateway on the Razer box (razer-release.sh).
+#                        SSM command on the core to release the Razer LLM service (razer-release.sh).
 # Idempotent; --dry-run prints the policies and what build-secret.sh would write. Then set the secrets it prints.
 # Usage: bash deploy/k8s/bootstrap/github-oidc.sh [--dry-run]
 source "$(dirname "$0")/../db/lib.sh"
@@ -47,7 +47,7 @@ JSON
 DEPLOY_TRUST=$(trust "environment:production" "environment:production-release")
 # OwnSessions: SSM names a session <role session name>-<id>, and CI assumes this role as GitHubActions
 # (.github/actions/release-setup), so the role may close its own tunnels and no one else's.
-# ReadProductionSecret also covers jeffi/production/build (build-secret.sh --check in Deploy · prepare).
+# ReadProductionSecret also covers jeffi/production/build (build-secret.sh --check in Deploy · AWS · prepare).
 DEPLOY_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  {"Sid":"ReadProductionSecret","Effect":"Allow","Action":"secretsmanager:GetSecretValue","Resource":"$SECRETS:jeffi/production*"},

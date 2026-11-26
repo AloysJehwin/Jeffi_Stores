@@ -1,8 +1,8 @@
-// End-to-end AI monitor behind the ai_health cron: a tiny real chat through the gateway (no
-// fallback, no cache) plus a direct-Ollama reachability check. Alerts the platform admin once
-// per incident and once on recovery; incident state lives in Redis.
+// End-to-end AI monitor behind the ai_health cron, all through the gateway (the app never reaches a provider):
+// a tiny real chat (no cache), the gateway's own dependency verdict (/readyz) and its provider report
+// (/v1/providers: at least one text provider configured). Alerts the platform admin once per incident and once
+// on recovery; incident state lives in Redis.
 import { aiGatewayUrl, aiGatewayHeaders } from '@/lib/shared/ai-client'
-import { directReachable, ollamaDirectUrl } from '@/lib/shared/ai-direct-ollama'
 import { getRedisClient } from '@/lib/shared/redis'
 
 export const INCIDENT_KEY = 'ai:health:incident'
@@ -12,7 +12,10 @@ const CHAT_TIMEOUT_MS = Number(process.env.AI_HEALTH_CHAT_TIMEOUT_MS) || 60_000
 export interface AiHealthResult {
   ok: boolean
   gateway: { ok: boolean; latencyMs: number; error?: string; readyz?: string }
-  ollama: { ok: boolean | null; error?: string }
+  /** The gateway's /readyz verdict; null when the gateway predates it. */
+  ready: { ok: boolean | null; error?: string }
+  /** Text providers the gateway reports configured. */
+  providers: { ok: boolean | null; text: string[]; error?: string }
   reasons: string[]
 }
 
@@ -77,15 +80,38 @@ async function readyz(base: string): Promise<string | undefined> {
   }
 }
 
+async function checkReady(base: string): Promise<AiHealthResult['ready']> {
+  try {
+    const res = await timedFetch(`${base}/readyz`, {}, 5_000)
+    if (res.status === 404) return { ok: null }
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => null)
+    return { ok: false, error: `HTTP ${res.status}${data?.reason ? `: ${data.reason}` : ''}` }
+  } catch (e) {
+    return { ok: false, error: `unreachable: ${errText(e, 5_000)}` }
+  }
+}
+
+async function checkProviders(base: string): Promise<AiHealthResult['providers']> {
+  try {
+    const res = await timedFetch(`${base}/v1/providers`, { headers: aiGatewayHeaders() }, 5_000)
+    if (!res.ok) return { ok: false, text: [], error: `HTTP ${res.status}` }
+    const data = (await res.json().catch(() => null)) as { text?: { name: string; configured: boolean }[] } | null
+    const text = (data?.text ?? []).filter(p => p.configured).map(p => p.name)
+    return text.length ? { ok: true, text } : { ok: false, text, error: 'no text provider is configured' }
+  } catch (e) {
+    return { ok: false, text: [], error: `unreachable: ${errText(e, 5_000)}` }
+  }
+}
+
 export async function runAiHealthCheck(): Promise<AiHealthResult> {
-  const [gateway, ollama] = await Promise.all([
-    checkGateway(),
-    ollamaDirectUrl() ? directReachable() : Promise.resolve({ ok: null as boolean | null, error: 'OLLAMA_BASE_URL not set' }),
-  ])
+  const base = aiGatewayUrl()
+  const [gateway, ready, providers] = await Promise.all([checkGateway(), checkReady(base), checkProviders(base)])
   const reasons: string[] = []
   if (!gateway.ok) reasons.push(`${gateway.error}${gateway.readyz ? ` (gateway /readyz ${gateway.readyz})` : ''}`)
-  if (ollama.ok === false) reasons.push(`direct Ollama ${ollamaDirectUrl()} unreachable (${ollama.error}); app fallback unavailable`)
-  return { ok: reasons.length === 0, gateway, ollama, reasons }
+  else if (ready.ok === false) reasons.push(`gateway /readyz ${ready.error}`)
+  if (providers.ok === false) reasons.push(`gateway /v1/providers: ${providers.error}`)
+  return { ok: reasons.length === 0, gateway, ready, providers, reasons }
 }
 
 export type IncidentTransition = 'healthy' | 'opened' | 'ongoing' | 'recovered'
@@ -115,7 +141,7 @@ export async function recordAiHealth(result: AiHealthResult, send: AlertSender =
   } catch (e) {
     console.error('[ai-health] incident state read failed:', (e as Error)?.message || e)
   }
-  const details = `Gateway: ${aiGatewayUrl()}\nDirect Ollama: ${ollamaDirectUrl() || '(not configured)'}`
+  const details = `Gateway: ${aiGatewayUrl()}`
 
   if (!result.ok) {
     if (open) return 'ongoing'

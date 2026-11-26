@@ -1,0 +1,38 @@
+# The platform on the Azure core (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md, deploy/azure/README.md). Only rendered
+# when JEFFI_CLOUD=azure (deploy/k8s/db/lib.sh platform_manifests); the AWS deployment keeps using ../../platform.
+# On top of the base:
+#   - the cluster identity: projected service-account tokens for AWS STS (self-hosted IRSA, deploy/azure/irsa) and
+#     for Entra (Key Vault, SECRETS_BACKEND=keyvault), on the platform services, the controller, ecr-refresh and
+#     cert-manager; DB_IAM_AUTH off and DB_SSL=require (the Flexible Server takes a password over TLS)
+#   - the AWS tenant edge (../../edge): its Traefik, and store-facing copies of public-api (and mobile, parked) that
+#     only it routes to (the core's Traefik skips jeffi.io/edge-only routes, patches/traefik-core.yaml)
+#   - Azure DNS for the Postgres private zone, the provisioning config pointing store nodes at the core's Tailscale
+#     address and store hosts at the edge, with stores reaching the platform as tenantPlatformLink() describes
+# Fill every REPLACE_ME (azure.env, patches/provisioning.yaml) from apply.sh's outputs first: lib.sh refuses to
+# render the overlay while one is left.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../platform
+  - ../../edge
+  - identity.yaml
+  - coredns-custom.yaml
+configMapGenerator:
+  - name: azure-identity
+    namespace: jeffi
+    envs: [azure.env]
+    options: { disableNameSuffixHash: true }
+patches:
+  - path: patches/apps-identity.yaml
+    target:
+      kind: Deployment
+      name: jeffi-stores-(storefront|admin|business|messaging|document|public-api|mobile|showcase)-service(-edge)?
+  - path: patches/controller-identity.yaml
+  - path: patches/ecr-refresh-identity.yaml
+  - path: patches/cert-manager-identity.yaml
+    target: { kind: HelmChart, name: cert-manager, namespace: kube-system }
+  - path: patches/traefik-core.yaml
+    target: { kind: HelmChartConfig, name: traefik, namespace: kube-system }
+  - path: patches/provisioning.yaml
+  - path: patches/netpol.yaml
+    target: { kind: NetworkPolicy, name: ingress-from-edge, namespace: jeffi }

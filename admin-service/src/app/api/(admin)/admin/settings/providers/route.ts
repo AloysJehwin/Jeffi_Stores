@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { isPlatformOwner } from '@/lib/auth/scopes'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { platformOwnerOnly as platformOnly } from '@/lib/providers/admin-gate'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { invalidateSmsDltConfig } from '@/lib/providers/sms-dlt'
 import {
   PLATFORM_ONLY_PROVIDER_KEYS,
   PROVIDER_SETTING_KEYS,
+  STORE_EDITABLE_PROVIDER_KEYS,
   type ProviderSettingKey,
   clearProviderSetting,
   listProviderSettings,
@@ -14,15 +16,32 @@ import {
 } from '@/lib/providers/policy'
 import { messagingProviderReadiness } from '@/lib/shared/messaging'
 import { aiGatewayHeaders } from '@/lib/shared/ai-client'
+import { getVoiceConfigView, voiceSecretsStatus, type VoiceConfigView } from '@/lib/providers/voice-config'
 
 export const dynamic = 'force-dynamic'
 
-// Platform provider policy (control plane platform_provider_settings), edited from the flagship's
-// Settings → Providers. Platform owner on the flagship only: a store admin (tenant resolved) never reaches it.
-// Outreach secrets are not set here: they go to ./credentials, encrypted.
+// Settings → Providers. The flagship administrator edits the platform default or one store's overrides;
+// a store admin (tenant resolved) sees and edits only its own store's AI routing and models. No credential
+// is accepted or returned: secrets are shown by name and presence only.
 
 const UUID = /^[0-9a-f-]{36}$/i
 const keyOf = (v: unknown) => PROVIDER_SETTING_KEYS.find(k => k === v) as ProviderSettingKey | undefined
+const MESSAGING_KEYS: ProviderSettingKey[] = ['sms_provider', 'whatsapp_provider']
+
+type Actor = { admin: { adminId?: string; email?: string; role: string; scopes: string[] }; flagship: boolean; tenantId: string | null }
+
+/** Flagship platform owner (tenantId null) or a store admin (its own tenant id); else a refusal. */
+async function actor(scope: 'settings:read' | 'settings:write', req: NextRequest): Promise<Actor | NextResponse> {
+  const admin = await requireAdminScope(req, scope)
+  if (admin instanceof NextResponse) return admin
+  const tenant = await resolveTenantId().catch(() => 'unknown' as const)
+  if (!tenant) {
+    if (!isPlatformOwner(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    return { admin, flagship: true, tenantId: null }
+  }
+  if (tenant === 'unknown') return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  return { admin, flagship: false, tenantId: tenant }
+}
 
 /** tenantId: null/absent = platform default; else a store uuid. undefined = invalid. */
 function scopeOf(v: unknown): string | null | undefined {
@@ -30,41 +49,137 @@ function scopeOf(v: unknown): string | null | undefined {
   return typeof v === 'string' && UUID.test(v) ? v : undefined
 }
 
-async function gatewayProviders(): Promise<unknown | null> {
+type Gateway = { gateway: any | null; gatewayError?: string }
+
+async function gatewayProviders(): Promise<Gateway> {
   const base = (process.env.AI_GATEWAY_URL || '').replace(/\/$/, '')
-  if (!base) return null
+  if (!base) return { gateway: null, gatewayError: 'AI_GATEWAY_URL is not set' }
   try {
     const r = await fetch(`${base}/v1/providers`, { headers: aiGatewayHeaders(), signal: AbortSignal.timeout(2500), cache: 'no-store' })
-    return r.ok ? await r.json() : null
-  } catch {
-    return null
+    if (!r.ok) return { gateway: null, gatewayError: `AI gateway answered HTTP ${r.status}` }
+    return { gateway: await r.json() }
+  } catch (err: any) {
+    return { gateway: null, gatewayError: `AI gateway unreachable: ${err?.message || 'request failed'}` }
   }
 }
 
+const configured = (list: unknown, name: string): boolean =>
+  Array.isArray(list) && list.some((p: any) => p?.name === name && p?.configured)
+
+type Secret = { name: string; group: 'ai' | 'messaging' | 'calling' | 'voice'; present: boolean }
+
+function aiSecrets(gw: any | null): Secret[] {
+  const any = (name: string, ...caps: string[]) => caps.some(c => configured(gw?.[c], name))
+  const mk = (name: string, present: boolean): Secret => ({ name, group: 'ai', present })
+  return [
+    mk('AZURE_OPENAI_API_KEY', any('azure', 'text', 'embed', 'image', 'video')),
+    mk('GOOGLE_AI_API_KEY', any('google', 'image', 'video')),
+    mk('REPLICATE_API_TOKEN', any('replicate', 'image', 'video')),
+    mk('SARVAM_API_KEY', any('sarvam', 'stt', 'tts')),
+    mk('Anthropic federation', any('anthropic', 'text')),
+  ]
+}
+
+function messagingSecrets(): Secret[] {
+  const has = (n: string) => !!(process.env[n] || '').trim()
+  return [
+    { name: 'TWILIO_ACCOUNT_SID', group: 'messaging', present: has('TWILIO_ACCOUNT_SID') },
+    { name: 'TWILIO_AUTH_TOKEN', group: 'messaging', present: has('TWILIO_AUTH_TOKEN') },
+    { name: 'AWS (platform role)', group: 'messaging', present: true },
+  ]
+}
+
+/** The voice view in the shape the Providers page reads: V2's per-part readiness folded into each part. */
+function pageVoice(v: VoiceConfigView) {
+  return {
+    provider: v.provider,
+    exotel: { ...v.exotel, configured: v.parts.exotel },
+    twilioTest: { ...v.twilioTest, configured: v.parts.twilio },
+    testNumbers: v.testNumbers,
+    sarvam: { ...v.sarvam, configured: v.parts.sarvam },
+    speech: v.speech,
+    azureSpeech: { ...v.azureSpeech, configured: v.parts.azure },
+    llmModel: v.llmModel,
+    anthropic: { federation: !!v.anthropicIdentity, configured: v.parts.claude },
+    ready: v.ready,
+  }
+}
+
+async function voiceParts(): Promise<{ secrets: Secret[]; voice: ReturnType<typeof pageVoice> | null }> {
+  const voice = await getVoiceConfigView().then(pageVoice).catch(() => null)
+  return { secrets: voiceSecretsStatus(), voice }
+}
+
+const asMap = (rows: { key: string; value: unknown }[]) => Object.fromEntries(rows.map(r => [r.key, r.value]))
+
 export async function GET(req: NextRequest) {
-  const admin = await platformOnly(await requireAdminScope(req, 'settings:read'))
-  if (admin instanceof NextResponse) return admin
+  const a = await actor('settings:read', req)
+  if (a instanceof NextResponse) return a
+  const asked = scopeOf(req.nextUrl.searchParams.get('tenant'))
+  if (asked === undefined) return NextResponse.json({ error: 'Invalid tenant' }, { status: 400 })
+  const tenantId = a.flagship ? asked : a.tenantId
+  const canWrite = !(await requireAdminScope(req, 'settings:write').then(r => r instanceof NextResponse))
   try {
-    const [settings, tenants, gateway] = await Promise.all([
+    const cp = controlPlanePool()
+    const [rows, gw, prices, tenants, name] = await Promise.all([
       listProviderSettings(),
-      controlPlanePool().query(
-        `SELECT id, slug, display_name FROM tenants WHERE status NOT IN ('terminated','rejected') ORDER BY display_name`
-      ),
       gatewayProviders(),
+      cp.query(
+        `SELECT capability, provider, model, unit_type, price_inr FROM ai_price_list WHERE active ORDER BY capability, provider, model, unit_type`
+      ),
+      a.flagship ? cp.query(`SELECT id, slug, display_name FROM tenants WHERE status NOT IN ('terminated','rejected') ORDER BY display_name`) : null,
+      tenantId ? cp.query(`SELECT display_name FROM tenants WHERE id = $1::uuid`, [tenantId]) : null,
     ])
-    return NextResponse.json({ settings, tenants: tenants.rows, messaging: messagingProviderReadiness(), gateway })
+    const platform = asMap(rows.filter(r => !r.tenant_id))
+    const own = tenantId ? asMap(rows.filter(r => r.tenant_id === tenantId)) : {}
+    // A store never sees the flagship-only keys (voice, DLT ids).
+    const visible = (m: Record<string, unknown>) =>
+      a.flagship
+        ? m
+        : Object.fromEntries(
+            Object.entries(m).filter(([k]) => STORE_EDITABLE_PROVIDER_KEYS.includes(k as ProviderSettingKey) || MESSAGING_KEYS.includes(k as ProviderSettingKey))
+          )
+    const body: Record<string, unknown> = {
+      scope: tenantId
+        ? { kind: 'store', tenantId, tenantName: (name?.rows[0] as any)?.display_name ?? undefined }
+        : { kind: 'platform' },
+      canEdit: {
+        messaging: a.flagship && canWrite,
+        calling: a.flagship && canWrite && !tenantId,
+        ai: canWrite,
+        integrations: false,
+      },
+      settings: visible(tenantId ? { ...platform, ...own } : platform),
+      inherited: tenantId ? visible(platform) : {},
+      overridden: Object.keys(visible(own)),
+      gateway: gw.gateway,
+      ...(gw.gatewayError ? { gatewayError: gw.gatewayError } : {}),
+      prices: prices.rows,
+      messaging: messagingProviderReadiness(),
+    }
+    if (a.flagship) {
+      const v = await voiceParts()
+      const seen = new Set<string>()
+      body.secrets = [...aiSecrets(gw.gateway), ...messagingSecrets(), ...v.secrets].filter(s => !seen.has(s.name) && seen.add(s.name))
+      body.voice = v.voice
+      body.tenants = tenants?.rows ?? []
+    }
+    return NextResponse.json(body)
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function PUT(req: NextRequest) {
-  const admin = await platformOnly(await requireAdminScope(req, 'settings:write'))
-  if (admin instanceof NextResponse) return admin
+  const a = await actor('settings:write', req)
+  if (a instanceof NextResponse) return a
   const b = await req.json().catch(() => ({}))
   const key = keyOf(b.key)
-  const tenantId = scopeOf(b.tenantId)
+  const tenantId = a.flagship ? scopeOf(b.tenantId) : a.tenantId
   if (!key || tenantId === undefined) return NextResponse.json({ error: 'A valid key and tenantId (or null) are required' }, { status: 400 })
+  if (!a.flagship && (!STORE_EDITABLE_PROVIDER_KEYS.includes(key) || (b.tenantId && b.tenantId !== a.tenantId))) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
   if (tenantId && PLATFORM_ONLY_PROVIDER_KEYS.includes(key)) return NextResponse.json({ error: `${key} is set for the platform only` }, { status: 400 })
   const value = normalizeProviderValue(key, b.value)
   if (value === null) return NextResponse.json({ error: `Invalid value for ${key}` }, { status: 400 })
@@ -73,7 +188,7 @@ export async function PUT(req: NextRequest) {
     if (!ready) return NextResponse.json({ error: 'AWS is unavailable until onboarding completes' }, { status: 400 })
   }
   try {
-    await setProviderSetting(tenantId, key, value, admin.email || admin.adminId || null)
+    await setProviderSetting(tenantId, key, value, a.admin.email || a.admin.adminId || null)
     invalidateSmsDltConfig()
     return NextResponse.json({ ok: true, tenantId, key, value })
   } catch (err: any) {
@@ -83,12 +198,15 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const admin = await platformOnly(await requireAdminScope(req, 'settings:write'))
-  if (admin instanceof NextResponse) return admin
+  const a = await actor('settings:write', req)
+  if (a instanceof NextResponse) return a
   const sp = req.nextUrl.searchParams
   const key = keyOf(sp.get('key'))
-  const tenantId = scopeOf(sp.get('tenantId'))
+  const tenantId = a.flagship ? scopeOf(sp.get('tenantId')) : a.tenantId
   if (!key || tenantId === undefined) return NextResponse.json({ error: 'A valid key and tenantId (or none) are required' }, { status: 400 })
+  if (!a.flagship && (!STORE_EDITABLE_PROVIDER_KEYS.includes(key) || (sp.get('tenantId') && sp.get('tenantId') !== a.tenantId))) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
   try {
     const removed = await clearProviderSetting(tenantId, key)
     invalidateSmsDltConfig()

@@ -5,6 +5,7 @@ import { AttentionList } from '@/components/admin/overview/kit'
 import { Kpi, KpiGrid, Section, Table, Badge, count, pct, when, type Col } from '@/components/admin/channels/ui'
 import { RankedBars } from '@/components/admin/dashboard/Charts'
 import type { EcomInstancesOverview as Data } from '@controller/lib/overviews/ecom-instances'
+import { ECOM_INSTANCES_INSIGHTS } from '../../_components/ecom-insights'
 import { OverviewShell, Grid2, bytes, label, useEcomOverview } from '../../_components/overview-shell'
 import { InstancesOverviewLoading } from '../../_components/skeletons'
 
@@ -64,7 +65,7 @@ const STORAGE_COLS: Col<Use>[] = [
 export default function EcomInstancesOverview() {
   const o = useEcomOverview<Data>('/api/admin/ecom/instances/overview')
   return (
-    <OverviewShell {...o} skeleton={<InstancesOverviewLoading />}>
+    <OverviewShell {...o} skeleton={<InstancesOverviewLoading />} insights={ECOM_INSTANCES_INSIGHTS}>
       {d => (
         <>
           <KpiGrid>

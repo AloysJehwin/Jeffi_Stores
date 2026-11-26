@@ -10,11 +10,15 @@ import {
   TENANT_ROUTE_NAMES,
   STORE_PARTS,
   legacyAppNames,
+  tenantEnvSecrets,
+  ENV_SECRET_LABEL,
+  type PlatformLink,
   type StorePart,
   type TenantService,
   type TenantWorkloadInput,
 } from './tenant-workload'
-import { agentNodeUserData, DB_READY_LABEL } from './node-user-data'
+import { agentNodeUserData, DB_READY_LABEL, type AgentNodeSpec } from './node-user-data'
+import { getSecretJson, loadSecretEnv, secretsBackend } from '@/lib/secrets/index.mjs'
 import {
   dedicatedNodeName,
   isTenantNodeName,
@@ -41,6 +45,23 @@ export function clusterIngressIp(): string {
   return ip
 }
 
+/**
+ * How store pods reach the platform, from the controller's config (the provisioning ConfigMap): the platform's
+ * secrets in Key Vault (SECRETS_BACKEND=keyvault) are copied into each store namespace; TENANT_PLATFORM_DB_IAM_AUTH
+ * =false and TENANT_PLATFORM_DB_SSL give the flagship database's login; TENANT_NODE_CIDRS (comma list) the node
+ * addresses outside the VPC. Unset, it is today's AWS link.
+ */
+export function tenantPlatformLink(env: NodeJS.ProcessEnv = process.env): PlatformLink {
+  const ssl = (env.TENANT_PLATFORM_DB_SSL || '').trim()
+  const cidrs = (env.TENANT_NODE_CIDRS || '').split(',').map(c => c.trim()).filter(Boolean)
+  return {
+    secrets: secretsBackend(env) === 'keyvault' ? 'kubernetes' : 'secretsmanager',
+    dbIamAuth: (env.TENANT_PLATFORM_DB_IAM_AUTH || '').trim().toLowerCase() !== 'false',
+    ...(ssl && { dbSsl: ssl }),
+    ...(cidrs.length ? { nodeCidrs: cidrs } : {}),
+  }
+}
+
 function nodeLaunchConfig() {
   const server = process.env.K8S_SERVER_URL
   const imageId = process.env.K8S_NODE_AMI_ID
@@ -55,7 +76,23 @@ function nodeLaunchConfig() {
     // Store and pool servers get the tenant-node profile (no access to other stores' database secrets);
     // the core's profile only until K8S_TENANT_NODE_IAM_PROFILE is set (service-secrets-iam.sh).
     iamProfile: process.env.K8S_TENANT_NODE_IAM_PROFILE || process.env.K8S_NODE_IAM_PROFILE || 'jeffi-stores-ec2-profile',
+    // The cluster spans clouds: nodes join the core over Tailscale (flannel on tailscale0, its subnet routes).
+    overTailscale: process.env.K8S_NODES_OVER_TAILSCALE === 'true',
   }
+}
+
+/**
+ * The k3s token and Tailscale key for a node's user-data, when the platform's secrets live in Key Vault, which an
+ * AWS server can't read. Read through the secrets library at each launch; never logged. Otherwise undefined: the
+ * node reads jeffi/production/k3s from Secrets Manager itself, as today.
+ */
+async function nodeJoinSecrets(): Promise<AgentNodeSpec['join']> {
+  if (secretsBackend() !== 'keyvault') return undefined
+  const id = process.env.K8S_JOIN_SECRET_ID || 'jeffi/production/k3s'
+  const s = await getSecretJson<{ K3S_TOKEN?: unknown; TS_AUTHKEY?: unknown }>(id)
+  if (typeof s.K3S_TOKEN !== 'string' || !s.K3S_TOKEN || typeof s.TS_AUTHKEY !== 'string' || !s.TS_AUTHKEY)
+    throw new Error(`${id} has no K3S_TOKEN or TS_AUTHKEY`)
+  return { k3sToken: s.K3S_TOKEN, tsAuthKey: s.TS_AUTHKEY }
 }
 
 export const POOL_LABEL = { 'jeffi.io/pool': 'basic' }
@@ -89,6 +126,7 @@ async function launchNode(
 ) {
   const { runInstance } = await import('@/lib/shared/ec2-client')
   const cfg = nodeLaunchConfig()
+  const join = await nodeJoinSecrets()
   return runInstance({
     name: `jeffi-k8s-${nodeName}`,
     instanceType,
@@ -98,7 +136,15 @@ async function launchNode(
     appTag: 'jeffi-k8s',
     metadataHopLimit: 2,
     tags,
-    userData: agentNodeUserData({ nodeName, labels, taints, server: cfg.server, dbAgent: opts.dbAgent }),
+    userData: agentNodeUserData({
+      nodeName,
+      labels,
+      taints,
+      server: cfg.server,
+      dbAgent: opts.dbAgent,
+      ...(cfg.overTailscale && { overTailscale: true }),
+      ...(join && { join }),
+    }),
     ...(opts.availabilityZone ? { availabilityZone: opts.availabilityZone } : {}),
   })
 }
@@ -414,6 +460,37 @@ async function seedNamespace(ns: string) {
   }
 }
 
+const ENV_SECRET_SELECTOR = Object.entries(ENV_SECRET_LABEL).map(([k, v]) => `${k}=${v}`).join(',')
+const SECRET_KEY_RE = /^[-._a-zA-Z0-9]+$/
+
+// `kubernetes` secrets: each secret the pods take as env, copied from the platform's store (Key Vault) with the
+// fallback their loader would use. Applied whole, so a key dropped from the source leaves the copy too.
+async function seedEnvSecrets(ns: string, objs: K8sObject[]): Promise<void> {
+  for (const s of tenantEnvSecrets(objs)) {
+    const { id, values } = await loadSecretEnv(s.id, s.fallbackId ? { fallbackId: s.fallbackId } : {})
+    const data = Object.fromEntries(
+      Object.entries(values)
+        .filter(([k]) => SECRET_KEY_RE.test(k))
+        .map(([k, v]) => [k, Buffer.from(v, 'utf8').toString('base64')])
+    )
+    await apply({
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { name: s.name, namespace: ns, labels: ENV_SECRET_LABEL, annotations: { 'jeffi.io/secret-id': id } },
+      type: 'Opaque',
+      data,
+    } as K8sObject)
+  }
+}
+
+/** Drop the namespace's env Secrets no pod of the render takes any more. */
+async function pruneEnvSecrets(ns: string, objs: K8sObject[]): Promise<void> {
+  const keep = new Set(tenantEnvSecrets(objs).map(s => s.name))
+  for (const o of (await list<any>('Secret', ns, ENV_SECRET_SELECTOR).catch(() => [])) ?? []) {
+    if (!keep.has(o.metadata.name)) await remove('Secret', o.metadata.name, ns)
+  }
+}
+
 /** The images tenants run, per service: platform/release ConfigMap (set by rollout.sh). */
 export async function releaseImages(): Promise<Partial<Record<TenantService, string>>> {
   const cm = await get<any>('ConfigMap', 'release', PLATFORM_NS).catch(() => null)
@@ -446,10 +523,12 @@ export async function applyTenantWorkload(
   // The release's controller is control plane only: the old all-in-one app keeps the image it runs until
   // its store switches to its own services, and can't be started anew.
   const running = (await get<any>('Deployment', app, ns))?.spec?.template?.spec?.containers?.[0]?.image as string | undefined
+  const platform = input.platform ?? tenantPlatformLink()
   const objs = renderTenantWorkload({
     ...input,
     images: { ...(await releaseImages()), ...(running && { controller: running }), ...input.images },
     storeSecret: input.storeSecret ?? process.env.STORE_SECRET_ID,
+    platform,
   })
   if (!running && !input.images?.controller && objs.some(o => o.kind === 'Deployment' && o.metadata.name === app))
     throw new Error(`${input.slug} runs no all-in-one app to keep; it can only run its own services`)
@@ -461,6 +540,7 @@ export async function applyTenantWorkload(
     await apply(nsObj)
     await seedNamespace(ns)
   }
+  if (platform.secrets === 'kubernetes') await seedEnvSecrets(ns, mine)
   for (const o of mine) await apply(o)
   // Drop what this render no longer has: HPA/PDBs a smaller size doesn't need, and the app pods and
   // routes of the layout the store has just left (only once traffic is on the new one, see reconcileLayout).
@@ -475,6 +555,8 @@ export async function applyTenantWorkload(
     for (const name of TENANT_ROUTE_NAMES) if (!rendered.has(`IngressRoute/${name}`)) await remove('IngressRoute', name, ns)
     await pruneCustomDomains(ns, rendered)
     await retireLegacyApp(input.slug)
+    // The pods a layout switch keeps draining still take theirs.
+    if (platform.secrets === 'kubernetes' && !opts.keepApps) await pruneEnvSecrets(ns, rest)
   }
   return mine.some(o => o.kind === 'Deployment')
 }

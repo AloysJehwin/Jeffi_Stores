@@ -3,21 +3,27 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { VOICE_PROVIDERS, normalizeDltEntityId, normalizeSenderIds, normalizeVoiceConfig, type VoiceProviderName } from './voice-settings'
 
-// Which provider serves SMS, WhatsApp and AI for a store. Set only by the platform admin
-// (flagship Site Controls, Providers card) in control-plane platform_provider_settings: a tenant row overrides the
+// Which provider serves SMS, WhatsApp and AI for a store. Messaging is set only by the platform admin; a store
+// edits its own AI routing and models (Settings → Providers) in control-plane platform_provider_settings: a tenant row overrides the
 // platform default (tenant_id NULL); with neither, behaviour is unchanged (the store's old Site
 // Controls messaging choice, the gateway's own AI order).
 
 export const MESSAGING_PROVIDERS = ['twilio', 'aws'] as const
-export const AI_TEXT_PROVIDERS = ['anthropic', 'razer'] as const
-export const AI_IMAGE_PROVIDERS = ['razer', 'google', 'replicate'] as const
-export const AI_VIDEO_PROVIDERS = ['google', 'replicate'] as const
+export const AI_TEXT_PROVIDERS = ['anthropic', 'razer', 'azure'] as const
+export const AI_IMAGE_PROVIDERS = ['razer', 'google', 'replicate', 'azure'] as const
+export const AI_VIDEO_PROVIDERS = ['google', 'replicate', 'azure'] as const
+export const AI_STT_PROVIDERS = ['sarvam', 'azure'] as const
+export const AI_TTS_PROVIDERS = ['sarvam', 'azure'] as const
+export const AI_EMBED_PROVIDERS = ['razer', 'azure'] as const
 export const AI_IMAGE_QUALITIES = ['draft', 'standard', 'premium'] as const
 
 export type MessagingProviderName = (typeof MESSAGING_PROVIDERS)[number]
 export type AiTextProvider = (typeof AI_TEXT_PROVIDERS)[number]
 export type AiImageProvider = (typeof AI_IMAGE_PROVIDERS)[number]
 export type AiVideoProvider = (typeof AI_VIDEO_PROVIDERS)[number]
+export type AiSttProvider = (typeof AI_STT_PROVIDERS)[number]
+export type AiTtsProvider = (typeof AI_TTS_PROVIDERS)[number]
+export type AiEmbedProvider = (typeof AI_EMBED_PROVIDERS)[number]
 export type AiImageQuality = (typeof AI_IMAGE_QUALITIES)[number]
 
 export const PROVIDER_SETTING_KEYS = [
@@ -26,6 +32,10 @@ export const PROVIDER_SETTING_KEYS = [
   'ai_text_providers',
   'ai_image_providers',
   'ai_video_providers',
+  'ai_stt_providers',
+  'ai_tts_providers',
+  'ai_models',
+  'ai_embed_provider',
   'ai_image_default_quality',
   // Outreach calls (platform scope only) and India SMS DLT ids; read by voice-config.ts and sms-dlt.ts.
   'voice_provider',
@@ -35,6 +45,23 @@ export const PROVIDER_SETTING_KEYS = [
 ] as const
 /** Keys set only as the platform default, never per store. */
 export const PLATFORM_ONLY_PROVIDER_KEYS: readonly ProviderSettingKey[] = ['voice_provider', 'voice_config']
+/** Keys a store admin may write for its own store (AI routing only). */
+export const STORE_EDITABLE_PROVIDER_KEYS: readonly ProviderSettingKey[] = [
+  'ai_text_providers', 'ai_image_providers', 'ai_video_providers', 'ai_stt_providers', 'ai_tts_providers', 'ai_embed_provider', 'ai_models',
+]
+
+export const AI_MODEL_CAPABILITIES = ['text', 'image', 'video', 'stt', 'tts', 'embed'] as const
+export type AiModelCapability = (typeof AI_MODEL_CAPABILITIES)[number]
+export type AiModels = Partial<Record<AiModelCapability, Record<string, string>>>
+const MODEL_PROVIDERS: Record<AiModelCapability, readonly string[]> = {
+  text: AI_TEXT_PROVIDERS,
+  image: AI_IMAGE_PROVIDERS,
+  video: AI_VIDEO_PROVIDERS,
+  stt: AI_STT_PROVIDERS,
+  tts: AI_TTS_PROVIDERS,
+  embed: AI_EMBED_PROVIDERS,
+}
+const MODEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:@\/-]{0,99}$/
 export type ProviderSettingKey = (typeof PROVIDER_SETTING_KEYS)[number]
 export type PolicySource = 'tenant' | 'platform' | 'fallback'
 
@@ -45,6 +72,12 @@ export interface ProviderPolicy {
   aiTextProviders: AiTextProvider[]
   aiImageProviders: AiImageProvider[]
   aiVideoProviders: AiVideoProvider[]
+  aiSttProviders: AiSttProvider[]
+  aiTtsProviders: AiTtsProvider[]
+  /** Chosen model per capability and provider; the gateway uses its default for a provider with none. */
+  aiModels: AiModels
+  /** Single embeddings provider; razer (nomic) unless the store or platform says azure. */
+  aiEmbedProvider: AiEmbedProvider
   aiImageDefaultQuality?: AiImageQuality
   /** India DLT Principal Entity id for AWS SMS (tenant row, else platform default). */
   smsDltEntityId?: string
@@ -55,6 +88,10 @@ export interface AiRouting {
   text?: string[]
   image?: string[]
   video?: string[]
+  stt?: string[]
+  tts?: string[]
+  embed?: AiEmbedProvider
+  models?: AiModels
 }
 
 const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
@@ -79,6 +116,24 @@ function orderOf<T extends string>(v: unknown, allow: readonly T[]): T[] | null 
   return out
 }
 
+/** capability -> provider -> model id; unknown capabilities, providers or unsafe ids make it invalid (null). */
+function modelsOf(v: unknown): AiModels | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: AiModels = {}
+  for (const [cap, byProvider] of Object.entries(v as Record<string, unknown>)) {
+    if (!(AI_MODEL_CAPABILITIES as readonly string[]).includes(cap)) return null
+    if (!byProvider || typeof byProvider !== 'object' || Array.isArray(byProvider)) return null
+    const clean: Record<string, string> = {}
+    for (const [prov, id] of Object.entries(byProvider as Record<string, unknown>)) {
+      if (!MODEL_PROVIDERS[cap as AiModelCapability].includes(prov)) return null
+      if (typeof id !== 'string' || !MODEL_ID_RE.test(id)) return null
+      clean[prov] = id
+    }
+    if (Object.keys(clean).length) out[cap as AiModelCapability] = clean
+  }
+  return out
+}
+
 /** Validates a value for a key; null when invalid. Arrays are de-duplicated, order kept. */
 export function normalizeProviderValue(key: ProviderSettingKey, v: unknown): unknown | null {
   switch (key) {
@@ -91,6 +146,14 @@ export function normalizeProviderValue(key: ProviderSettingKey, v: unknown): unk
       return orderOf(v, AI_IMAGE_PROVIDERS)
     case 'ai_video_providers':
       return orderOf(v, AI_VIDEO_PROVIDERS)
+    case 'ai_stt_providers':
+      return orderOf(v, AI_STT_PROVIDERS)
+    case 'ai_tts_providers':
+      return orderOf(v, AI_TTS_PROVIDERS)
+    case 'ai_models':
+      return modelsOf(v)
+    case 'ai_embed_provider':
+      return AI_EMBED_PROVIDERS.includes(v as AiEmbedProvider) ? v : null
     case 'ai_image_default_quality':
       return AI_IMAGE_QUALITIES.includes(v as AiImageQuality) ? v : null
     case 'voice_provider':
@@ -161,6 +224,10 @@ export async function getProviderPolicy(tenantId?: string | null): Promise<Provi
     aiTextProviders: pick<AiTextProvider[]>('ai_text_providers') ?? ['anthropic', 'razer'],
     aiImageProviders: pick<AiImageProvider[]>('ai_image_providers') ?? [],
     aiVideoProviders: pick<AiVideoProvider[]>('ai_video_providers') ?? [],
+    aiSttProviders: pick<AiSttProvider[]>('ai_stt_providers') ?? [],
+    aiTtsProviders: pick<AiTtsProvider[]>('ai_tts_providers') ?? [],
+    aiModels: pick<AiModels>('ai_models') ?? {},
+    aiEmbedProvider: pick<AiEmbedProvider>('ai_embed_provider') ?? 'razer',
     aiImageDefaultQuality: pick<AiImageQuality>('ai_image_default_quality'),
     smsDltEntityId: pick<string>('sms_dlt_entity_id'),
     source,
@@ -174,6 +241,10 @@ export async function getAiRouting(tenantId?: string | null): Promise<AiRouting>
   if (p.aiTextProviders.length) out.text = p.aiTextProviders
   if (p.aiImageProviders.length) out.image = p.aiImageProviders
   if (p.aiVideoProviders.length) out.video = p.aiVideoProviders
+  if (p.aiSttProviders.length) out.stt = p.aiSttProviders
+  if (p.aiTtsProviders.length) out.tts = p.aiTtsProviders
+  if (Object.keys(p.aiModels).length) out.models = p.aiModels
+  out.embed = p.aiEmbedProvider
   return out
 }
 
@@ -183,31 +254,25 @@ export interface AnthropicIdentity {
   federationRuleId: string
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const identityCache = new Map<string, { at: number; value: AnthropicIdentity | null }>()
+let identityCache: { at: number; value: AnthropicIdentity | null } | null = null
 
-/** A store's Anthropic workload-identity ids (ai_provider_identities). A store without its own row
- *  (no per-store workspace yet) shares the platform's: the gateway's federation rule accepts any store's
- *  request, and spend is still logged and charged per store. null = not even the platform has one.
- *  `tenantId` undefined = the tenant in the current request scope; null/platform = the flagship row. */
-export async function getAnthropicIdentity(tenantId?: string | null): Promise<AnthropicIdentity | null> {
-  const id = tenantId === undefined ? await resolveTenantId().catch(() => null) : tenantId
-  const tid = id && UUID_RE.test(id) ? id : PLATFORM_TENANT_ID
-  const hit = identityCache.get(tid)
-  if (hit && Date.now() - hit.at < TTL_MS * 10) return hit.value
+/** The environment's one Anthropic workload identity (the platform row of ai_provider_identities): jeffi-production
+ *  in production, jeffi-local in local dev. Every store uses it; spend is still logged and charged per store by our
+ *  own metering. null = no identity, so text falls back to the next provider. */
+export async function getAnthropicIdentity(): Promise<AnthropicIdentity | null> {
+  if (identityCache && Date.now() - identityCache.at < TTL_MS * 10) return identityCache.value
   const r = await controlPlanePool()
     .query<{ workspace_id: string; service_account_id: string; federation_rule_id: string }>(
       `SELECT workspace_id, service_account_id, federation_rule_id FROM ai_provider_identities
-        WHERE tenant_id IN ($1::uuid, $2::uuid) AND provider = 'anthropic'
-        ORDER BY (tenant_id = $1::uuid) DESC LIMIT 1`,
-      [tid, PLATFORM_TENANT_ID]
+        WHERE tenant_id = $1::uuid AND provider = 'anthropic'`,
+      [PLATFORM_TENANT_ID]
     )
     .catch(() => null)
   const row = r?.rows[0]
   const value = row
     ? { workspaceId: row.workspace_id, serviceAccountId: row.service_account_id, federationRuleId: row.federation_rule_id }
     : null
-  identityCache.set(tid, { at: Date.now(), value })
+  identityCache = { at: Date.now(), value }
   return value
 }
 

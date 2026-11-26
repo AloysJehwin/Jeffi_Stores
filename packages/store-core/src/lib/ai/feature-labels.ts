@@ -28,6 +28,15 @@ const LABELS: Record<string, string> = {
   template_video: 'Template header video',
   admin_agent: 'Admin agent',
   storefront_assistant: 'Storefront assistant',
+  storefront_pitch: 'Product page pitch',
+  storefront_cart_insight: 'Cart insight',
+  storefront_recap: 'Checkout recap',
+  storefront_affirmation: 'Order confirmation note',
+  review_draft: 'Review draft',
+  recommendations: 'Recommendations',
+  customer_summary: 'Customer summary',
+  daily_briefing: 'Daily briefing',
+  icon_suggest: 'Category icon',
   support_agent: 'Support assistant',
   support_translate: 'Support translation',
   reply_reader: 'Customer reply reading',
@@ -51,6 +60,7 @@ export const AI_CAPABILITY_LABEL: Record<string, string> = {
   vision: 'Vision',
   image: 'Images',
   video: 'Video',
+  audio: 'Audio',
 }
 
 /** Readable wallet note for an 'ai' ledger entry; billing writes 'AI: <label>', older rows 'AI <key>'. */

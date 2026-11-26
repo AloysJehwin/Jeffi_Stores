@@ -1,0 +1,7 @@
+# The AWS tenant edge: its Traefik, and the shared services' store-facing copies. Included by overlays/azure only;
+# inert until a node carries jeffi.io/edge=true.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - traefik-edge.yaml
+  - shared-services.yaml

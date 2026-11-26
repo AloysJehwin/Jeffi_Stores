@@ -13,7 +13,8 @@ vi.mock('@/lib/payments/razorpay-events/context', () => ({
   inPaymentStore: vi.fn(),
   storeFor: vi.fn(),
 }))
-vi.mock('@/lib/payments/razorpay', () => ({ getRazorpayInstance: vi.fn() }))
+vi.mock('@/lib/payments/razorpay', () => ({ getRazorpayInstance: vi.fn(), getRazorpayInstanceFor: vi.fn() }))
+vi.mock('@/lib/payments/qr-intents', () => ({ applyQrIntentPayment: vi.fn(async () => 'unmatched') }))
 vi.mock('@/lib/billing/topup', () => ({ creditTopup: vi.fn(() => Promise.resolve()) }))
 
 import {
@@ -27,7 +28,8 @@ import { queryOne } from '@/lib/shared/db'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { applyCapturedPayment, applyLinkPayment, applyQrPayment, recordPaymentDetails } from '@/lib/payments/capture'
 import { inPaymentStore, storeFor } from '@/lib/payments/razorpay-events/context'
-import { getRazorpayInstance } from '@/lib/payments/razorpay'
+import { getRazorpayInstance, getRazorpayInstanceFor } from '@/lib/payments/razorpay'
+import { applyQrIntentPayment } from '@/lib/payments/qr-intents'
 import { creditTopup } from '@/lib/billing/topup'
 
 const store = { tenantId: 't1', slug: 'acme', ctx: null }
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(inPaymentStore).mockImplementation(async (_c: any, _p: any, fn: any) => fn(store))
   vi.mocked(storeFor).mockResolvedValue(store as any)
+  vi.mocked(applyQrIntentPayment).mockResolvedValue('unmatched')
 })
 
 describe('onPaymentCaptured', () => {
@@ -175,7 +178,56 @@ describe('onPaymentLinkExpired', () => {
   })
 })
 
+describe('onPaymentCaptured: UPI QR payments', () => {
+  it('finds the QR of an orderless UPI payment and finalises its QR intent (qr_code.credited fallback)', async () => {
+    const all = vi.fn(async () => ({ items: [{ id: 'qr_1', notes: { payment_intent_id: 'i1' } }] }))
+    vi.mocked(getRazorpayInstance).mockReturnValue({ qrCode: { all } } as any)
+    vi.mocked(applyQrIntentPayment).mockResolvedValue('paid')
+    const pay = { id: 'pay_q', amount: 500, method: 'upi', order_id: null }
+    const r = await onPaymentCaptured(pay, ctx())
+    expect(all).toHaveBeenCalledWith({ payment_id: 'pay_q' })
+    expect(applyQrIntentPayment).toHaveBeenCalledWith({ id: 'qr_1', notes: { payment_intent_id: 'i1' } }, pay, store)
+    expect(r).toBe('paid')
+    expect(inPaymentStore).not.toHaveBeenCalled()
+  })
+
+  it("reads the QR on a store's own account for an own-key event", async () => {
+    const all = vi.fn(async () => ({ items: [{ id: 'qr_1' }] }))
+    vi.mocked(getRazorpayInstanceFor).mockResolvedValue({ instance: { qrCode: { all } } } as any)
+    vi.mocked(applyQrIntentPayment).mockResolvedValue('already_paid')
+    const r = await onPaymentCaptured({ id: 'pay_q', method: 'upi' }, ctx({ source: 'own', store }))
+    expect(getRazorpayInstanceFor).toHaveBeenCalledWith('t1')
+    expect(r).toBe('already_paid')
+  })
+
+  it('falls through to the order path when no QR took the payment or Razorpay fails', async () => {
+    vi.mocked(getRazorpayInstance).mockReturnValue({ qrCode: { all: vi.fn(async () => ({ items: [] })) } } as any)
+    vi.mocked(applyCapturedPayment).mockResolvedValue('unmatched' as any)
+    expect(await onPaymentCaptured({ id: 'p1', method: 'upi' }, ctx())).toBe('unmatched')
+    vi.mocked(getRazorpayInstance).mockImplementation(() => {
+      throw new Error('no keys')
+    })
+    expect(await onPaymentCaptured({ id: 'p2', method: 'upi' }, ctx())).toBe('unmatched')
+    expect(inPaymentStore).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls through when the QR is neither an intent nor an invoice QR', async () => {
+    vi.mocked(getRazorpayInstance).mockReturnValue({ qrCode: { all: vi.fn(async () => ({ items: [{ id: 'qr_x' }] })) } } as any)
+    vi.mocked(applyQrPayment).mockResolvedValue('unmatched' as any)
+    vi.mocked(applyCapturedPayment).mockResolvedValue('unmatched' as any)
+    expect(await onPaymentCaptured({ id: 'p3', method: 'upi' }, ctx())).toBe('unmatched')
+    expect(inPaymentStore).toHaveBeenCalled()
+  })
+})
+
 describe('onQrCodeCredited', () => {
+  it('finalises a QR intent first and leaves the invoice QR alone', async () => {
+    vi.mocked(applyQrIntentPayment).mockResolvedValue('paid')
+    expect(await onQrCodeCredited({ id: 'qr' }, { id: 'pay' }, ctx())).toBe('paid')
+    expect(applyQrIntentPayment).toHaveBeenCalledWith({ id: 'qr' }, { id: 'pay' }, store)
+    expect(applyQrPayment).not.toHaveBeenCalled()
+  })
+
   it('returns when qr has no id', async () => {
     await onQrCodeCredited({}, { id: 'pay' }, ctx())
     expect(storeFor).not.toHaveBeenCalled()

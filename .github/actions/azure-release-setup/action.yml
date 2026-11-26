@@ -1,0 +1,53 @@
+name: Azure release setup
+description: Azure login (federated), the tailnet (the core's API and its Postgres subnet route), psql and the Azure core's kubeconfig for a release job on Azure.
+inputs:
+  client-id:
+    description: The jeffi-prod-github-deploy identity's client id (deploy/azure, apply.sh output githubClientId)
+    required: true
+  tenant-id:
+    description: Entra tenant id
+    required: true
+  subscription-id:
+    description: Azure subscription id
+    required: true
+  ts-oauth-client-id:
+    description: Tailscale OAuth client (tag:ci)
+    required: true
+  ts-oauth-secret:
+    description: Tailscale OAuth secret
+    required: true
+  kubeconfig-b64:
+    description: The Azure core's admin kubeconfig, base64 (server https://<core Tailscale IP>:6443)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+    # --accept-routes: the core advertises the Postgres subnet and Azure DNS (deploy/azure/cloud-init/core.sh).
+    - uses: tailscale/github-action@v3
+      with:
+        oauth-client-id: ${{ inputs.ts-oauth-client-id }}
+        oauth-secret: ${{ inputs.ts-oauth-secret }}
+        tags: tag:ci
+        args: --accept-routes
+    # scripts/db-files.mjs (the schema/migration manifest) runs in the DB stages; builtins only, no npm ci.
+    - uses: actions/setup-node@v4
+      with: { node-version: 20 }
+    - name: Tools and kubeconfig
+      shell: bash
+      env:
+        KUBECONFIG_B64: ${{ inputs.kubeconfig-b64 }}
+      run: |
+        set -euo pipefail
+        { echo "OUT_DIR=$RUNNER_TEMP/db"; echo "JEFFI_CLOUD=azure"; echo "KUBECONFIG=$HOME/.kube/jeffi-azure.yaml"; } >> "$GITHUB_ENV"
+        sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client python3-venv >/dev/null
+        mkdir -p ~/.kube
+        echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/jeffi-azure.yaml
+        chmod 600 ~/.kube/jeffi-azure.yaml
+    - name: Release tag
+      shell: bash
+      run: echo "TAG=$(bash deploy/k8s/bootstrap/image-tag.sh)" >> "$GITHUB_ENV" # needs the full history (fetch-depth 0)
