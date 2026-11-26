@@ -95,6 +95,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
   'packages/store-core/src/components/admin/BatchPickerModal.tsx',
+  // UPI QR dialog: opened only by an already-gated create (invoice, quotation convert, cash sale); its cancel and
+  // new-QR calls act on that intent and the routes re-check the kind's :write scope (QR_INTENT_SCOPE).
+  'packages/store-core/src/components/admin/payments/QrPaymentDialog.tsx',
   // Shared "Fill from scenario" dialog — the opener is only rendered when the caller
   // passes canUseScenarioFill (useCanWrite('templates') / server-derived canEdit), and
   // the applyFill callback lives in the parent editor. Same pattern as BatchPickerModal.

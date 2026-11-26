@@ -69,3 +69,12 @@ export function rdsIamPassword(host: string, port: number, user: string, region:
   const signer = new Signer({ hostname: host, port, region, username: user })
   return () => signer.getAuthToken()
 }
+
+/** True when the connection URL's host is an RDS endpoint (host suffix, not a substring anywhere in the URL). */
+export function isRdsUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase().endsWith('.rds.amazonaws.com')
+  } catch {
+    return false
+  }
+}

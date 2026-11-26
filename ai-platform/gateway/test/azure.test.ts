@@ -251,7 +251,7 @@ describe('speech to text', () => {
   })
 
   it('falls back to Speech short audio after an outage, or uses it when it is the only path', async () => {
-    const calls = mockFetch(url => url.includes('openai.azure.com')
+    const calls = mockFetch(url => new URL(url).hostname.endsWith('.openai.azure.com')
       ? new Response('down', { status: 503 })
       : { RecognitionStatus: 'Success', DisplayText: 'hello there' })
     const r = await az().transcribe({ audio: wav, mimeType: 'audio/wav' })

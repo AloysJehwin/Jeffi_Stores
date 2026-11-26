@@ -26,12 +26,20 @@ function done(text: string, source: string, extra: { pages?: number; model?: str
   return t.length > MAX_TEXT ? { ok: true, text: t.slice(0, MAX_TEXT), source, truncated: true, ...extra } : { ok: true, text: t, source, ...extra }
 }
 
+/** Applies `re` until nothing changes, so a nested fragment (`<scr<script>ipt>`) can't reassemble into a tag. */
+function stripAll(s: string, re: RegExp): string {
+  for (let prev = ''; prev !== s; ) {
+    prev = s
+    s = s.replace(re, '')
+  }
+  return s
+}
+
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
 function xmlText(xml: string, breaks: RegExp, tabs?: RegExp): string {
   let s = xml.replace(breaks, '\n')
   if (tabs) s = s.replace(tabs, '\t')
-  return s
-    .replace(/<[^>]+>/g, '')
+  return stripAll(s, /<[^>]+>/g)
     .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e: string) =>
       e[0] === '#' ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : (ENTITIES[e] ?? m)
     )
@@ -77,7 +85,7 @@ function readSheet(buf: Buffer, mime: string): string {
 
 function readText(buf: Buffer, mime: string): string {
   const s = buf.toString('utf8')
-  if (mime === 'text/html') return xmlText(s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ''), /<\/(p|div|tr|li|h\d)>|<br\s*\/?>/gi, /<\/t[dh]>/gi)
+  if (mime === 'text/html') return xmlText(stripAll(s, /<(script|style)[\s\S]*?<\/\1>/gi), /<\/(p|div|tr|li|h\d)>|<br\s*\/?>/gi, /<\/t[dh]>/gi)
   if (mime.includes('rtf')) return s.replace(/\\par[d]?/g, '\n').replace(/\{\\\*[^{}]*\}|\\[a-z]+-?\d* ?|[{}]/g, '')
   return s
 }

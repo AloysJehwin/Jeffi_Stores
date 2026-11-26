@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { createPgPool, rdsSslOption, rdsIamPassword, dbSslConfig, stripSslParams } from '@/lib/shared/pg-pool'
+import { createPgPool, rdsSslOption, rdsIamPassword, dbSslConfig, stripSslParams, isRdsUrl } from '@/lib/shared/pg-pool'
 import type { TenantContext } from '@/lib/tenancy/tenant-context'
 import { repoPath } from '@/lib/shared/paths'
 
@@ -79,7 +79,7 @@ export function controlPlanePool(): Pool {
     const ssl = dbSslConfig()
     config.connectionString = ssl === undefined ? url : stripSslParams(url)
     if (ssl !== undefined) config.ssl = ssl
-    else if (url.includes('rds.amazonaws.com')) {
+    else if (isRdsUrl(url)) {
       const certPath = repoPath('certs', 'global-bundle.pem')
       if (fs.existsSync(certPath)) config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
     }

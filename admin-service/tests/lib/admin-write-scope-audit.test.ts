@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import glob from 'fast-glob'
 import { AI_ACTION_SCOPES } from '@/lib/auth/ai-scope'
+import { QR_INTENT_SCOPE } from '@/lib/payments/qr-intents/types'
 
 /**
  * Every mutating admin endpoint must gate on a :write scope, so an action is never reachable
@@ -116,6 +117,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Approving a customer's reply: decideAsAdmin checks the scenario's record :write scope
   // (orders, quotations, invoices, business_rfqs, subscriptions) before acting.
   'replies/actions/[id]',
+  // UPI QR intents: hasScope(..., QR_INTENT_SCOPE[kind]), a map whose values are all :write (pinned below).
+  'payments/qr-intents',
+  'payments/qr-intents/[id]/cancel',
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {
@@ -194,6 +198,10 @@ describe('an admin action is never reachable with read-only access', () => {
 
   it('gates admin-only write handlers outside /api/admin on a :write scope', () => {
     expect(adminOnlyRoutesWithoutWriteScope()).toEqual([])
+  })
+
+  it('gates every UPI QR intent kind on a :write scope', () => {
+    expect(Object.values(QR_INTENT_SCOPE).filter(s => !s.endsWith(':write'))).toEqual([])
   })
 
   it('only allows :write scopes for client-chosen AI field scopes', () => {

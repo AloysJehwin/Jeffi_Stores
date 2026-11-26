@@ -76,7 +76,7 @@ export function mainPool(url: string, max = 10): pg.Pool {
   if (u.password) config.password = decodeURIComponent(u.password)
   const ssl = dbSslConfig()
   if (ssl !== undefined) config.ssl = ssl
-  else if (u.hostname.includes('rds.amazonaws.com')) config.ssl = rdsSslOption()
+  else if (u.hostname.toLowerCase().endsWith('.rds.amazonaws.com')) config.ssl = rdsSslOption()
   if (process.env.DB_IAM_AUTH === 'true') config.password = rdsIamPassword(u.hostname, port, user, process.env.AWS_REGION || 'us-east-1')
   return createPgPool(config)
 }

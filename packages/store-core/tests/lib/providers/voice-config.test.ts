@@ -148,7 +148,7 @@ describe('getVoiceConfigView', () => {
       identity.mockResolvedValue(ids)
       vi.stubEnv('ANTHROPIC_ORGANIZATION_ID', org)
       const v = await getVoiceConfigView()
-      expect(identity).toHaveBeenCalledWith(null)
+      expect(identity).toHaveBeenCalledWith()
       expect(v.anthropicIdentity).toEqual({ organizationId: org, ...ids })
       expect(v.parts.claude).toBe(true)
     })

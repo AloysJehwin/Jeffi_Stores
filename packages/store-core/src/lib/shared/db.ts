@@ -1,7 +1,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { createPgPool, rdsSslOption, rdsIamPassword, dbSslConfig, stripSslParams } from '@/lib/shared/pg-pool'
+import { createPgPool, rdsSslOption, rdsIamPassword, dbSslConfig, stripSslParams, isRdsUrl } from '@/lib/shared/pg-pool'
 import { fetchDbSecret } from '@/lib/shared/db-secret'
 import { getCurrentAuditActor, getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext, runWithAuditActor } from '@/lib/auth/audit-context'
 import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from '@/lib/tenancy/tenant-context'
@@ -88,7 +88,7 @@ function buildDefaultPool(): Pool {
     if (ssl !== undefined) {
       config.connectionString = stripSslParams(dbUrl)
       config.ssl = ssl
-    } else if (dbUrl.includes('rds.amazonaws.com')) {
+    } else if (isRdsUrl(dbUrl)) {
       // Strip sslmode/uselibpqcompat from the URL — pg v8 treats sslmode=require as
       // verify-full and overrides our ssl object, causing SELF_SIGNED_CERT_IN_CHAIN.
       // We control TLS entirely via the ssl: { ca } option below.
