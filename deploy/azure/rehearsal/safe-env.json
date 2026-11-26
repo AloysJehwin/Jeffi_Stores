@@ -1,0 +1,13 @@
+[
+  {"name": "SMS_DISABLED", "value": "true"},
+  {"name": "WHATSAPP_DISABLED", "value": "true"},
+  {"name": "MAIL_DISABLED", "value": "true"},
+  {"name": "AMAZON_PUSH_DISABLED", "value": "true"},
+  {"name": "GMC_PUSH_DISABLED", "value": "true"},
+  {"name": "ADSENSE_DISABLED", "value": "true"},
+  {"name": "ENABLE_RAZORPAY", "value": "false"},
+  {"name": "ENABLE_UPI", "value": "false"},
+  {"name": "IN_PROCESS_CRON", "value": "false"},
+  {"name": "POOL_AUTOSCALE_ENABLED", "value": "false"},
+  {"name": "REHEARSAL_SAFE_MODE", "value": "true"}
+]

@@ -6,22 +6,24 @@
 #   restore  pg_restore as app_user (--no-owner --no-acl: every object becomes app_user's, as pg-init.sh set it up).
 #            Refuses a target that already has tables unless --reset.
 #   ensure   as the admin (extension ownership, like pg-init.sh): the four extensions and the schema grant.
+#   scrub    safe mode (safe-mode.sql), always, right after the restore and before any pod starts: the copy's outbound
+#            channels, campaigns, outreach and integration credentials are switched off. --scrub-only does just this.
 # Passwords never reach argv, the environment or the output: the RDS IAM token and the Key Vault passwords go into
 # 0600 PGPASSFILEs in private temp dirs, removed on exit. Dry run unless --apply.
 # Usage: bash deploy/azure/rehearsal/restore-dump.sh [--apply] [--yes] [--target-db jeffi_stores] [--dump FILE]
-#          [--dump-only] [--reset] [--jobs 4]
+#          [--dump-only] [--reset] [--jobs 4] [--scrub-only]
 # Needs: Postgres created and pg-init.sh applied, az and aws logins, Tailscale up (accepting routes), docker (or a
 # local pg_restore of a new enough major), the core's SSH key or session-manager-plugin (lib.sh tunnel).
 export JEFFI_CLOUD=azure
 source "$(dirname "$0")/common.sh"
-TARGET_DB=jeffi_stores; DUMP=; DUMP_ONLY=false; RESET=false; JOBS=4
+TARGET_DB=jeffi_stores; DUMP=; DUMP_ONLY=false; RESET=false; JOBS=4; SCRUB_ONLY=false
 args=("$@"); i=0
 while [ $i -lt ${#args[@]} ]; do
   case ${args[$i]} in
     --target-db) TARGET_DB=${args[$((i+1))]:?--target-db needs a name}; i=$((i+1)) ;;
     --dump) DUMP=${args[$((i+1))]:?--dump needs a file}; i=$((i+1)) ;;
     --jobs) JOBS=${args[$((i+1))]:?--jobs needs a number}; i=$((i+1)) ;;
-    --dump-only) DUMP_ONLY=true ;; --reset) RESET=true ;;
+    --dump-only) DUMP_ONLY=true ;; --reset) RESET=true ;; --scrub-only) SCRUB_ONLY=true ;;
   esac
   i=$((i+1))
 done
@@ -103,6 +105,7 @@ say "Plan"
 echo "source:  RDS $RDS_HOST / jeffi_stores$([ -n "$DUMP" ] && echo "  (reusing $DUMP: no fresh dump)")"
 echo "target:  $AZ_PG_HOST / $TARGET_DB (restore as app_user; extensions and schema grant as $AZ_PG_ADMIN)"
 echo "output:  $BK"
+echo "then:    safe-mode scrub of the copy (safe-mode.sql; the Azure database only)"
 if ! $APPLY; then
   if ! $DUMP_ONLY; then
     say "Read-only check of the target"
@@ -113,6 +116,9 @@ if ! $APPLY; then
   echo; echo "Dry run: nothing dumped or restored (--apply)."; exit 0
 fi
 
+if $SCRUB_ONLY; then
+  tunnel; timed safe-mode-db db_scrub "$TARGET_DB"; print_times; exit 0
+fi
 if [ -z "$DUMP" ]; then
   confirm "Dump prod jeffi_stores (read-only on RDS) into $BK?"
   timed dump do_dump
@@ -146,5 +152,6 @@ timed ensure-extensions do_ensure
 timed restore do_restore
 timed ensure-extensions-after do_ensure
 timed verify verify
+timed safe-mode-db db_scrub "$TARGET_DB"
 print_times
 say "Done. Next: bash deploy/k8s/db/release-db.sh --cloud=azure --dry-run, then bash deploy/azure/rehearsal/rehearse.sh"

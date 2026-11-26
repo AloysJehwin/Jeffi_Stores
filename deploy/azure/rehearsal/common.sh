@@ -26,3 +26,15 @@ print_times() {
 }
 need() { local c; for c in "$@"; do command -v "$c" >/dev/null || { echo "missing tool: $c" >&2; exit 1; }; done; }
 major_of() { sed -E 's/^[^0-9]*([0-9]+).*/\1/'; }
+
+# Safe mode, database half (safe-mode.sql): only ever the Azure copy. Needs `tunnel` first (PG_ADDR, PGPASSFILE).
+REH_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+db_guard() {
+  [ "$CLOUD" = azure ] && [ -n "${PG_ADDR:-}" ] && ! $REHEARSAL || { echo "safe mode refuses: not connected to the Azure Postgres" >&2; return 1; }
+  case "$AZ_PG_HOST $PG_ADDR" in *amazonaws*) echo "safe mode refuses: $AZ_PG_HOST looks like RDS" >&2; return 1 ;; esac
+}
+db_scrub() { # <database>
+  db_guard
+  psql_app "$1" -q -f "$REH_DIR/safe-mode.sql" 2>&1 | sed -E 's/^psql:[^ ]+ NOTICE:  //'
+}
+db_violations() { psql_app "${1:-jeffi_stores}" -q -At -f "$REH_DIR/safe-mode-check.sql"; }

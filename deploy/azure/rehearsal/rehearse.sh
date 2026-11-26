@@ -1,28 +1,30 @@
 #!/bin/bash
-# Phase D: bring the whole platform up on the Azure core under a test hostname, prove it, and time it.
-#   1  (--restore) restore-dump.sh --apply, then release-db.sh --cloud=azure on the restored database
-#   2  secrets.sh, apply-platform.sh and rollout.sh platform with JEFFI_CLOUD=azure. A kubectl shim (first on PATH,
-#      this script only) rewrites every *jeffistores.in host in what `kubectl kustomize` and `kubectl apply -f
-#      <file>` see, so the routes, the wildcard certificate and the PUBLIC_*_URL settings use <domain> and
-#      <app>.<domain>. Production hostnames in DNS are never touched; oidc., wif-voice., origin. and
-#      @jeffistores.in addresses are left alone.
-#   3  smoke.sh against the rehearsal hosts: a copy of it with the hosts rewritten, connecting straight to the
-#      Azure IP (no DNS needed)
-#   4  (--with-dns) A records for <domain> and *.<domain>, with a saved rollback batch
-#   5  a throwaway store: tenant rows like createTenant()'s, the provisioning worker builds it, smoke, then the
-#      admin deprovision route tears it down (needs --admin-cookie-file)
-# Dry run unless --apply: the checks and the host rewrite preview are read-only. Every step that creates billable
-# resources or touches DNS asks first (--yes skips). Output also goes to ~/Documents/db-backups/rehearsal-<date>.log.
-# Usage: bash deploy/azure/rehearsal/rehearse.sh [--apply] [--yes] [--domain az-rehearsal.jeffistores.in]
-#          [--tag local-xxxxxxxx] [--azure-ip IP] [--ingress-ip IP] [--restore] [--with-dns] [--skip-platform]
-#          [--skip-store] [--admin-cookie-file FILE] [--plan basic] [--slug NAME] [--keep-store]
-#          [--store-timeout-min 45]
-# Needs: README.md in this folder (Postgres created and restored, kubeconfig at ~/.kube/jeffi-azure.yaml, az and aws
-# logins, Tailscale up, overlay values filled, certs/ for secrets.sh).
+# Phase D: bring the whole platform up on the Azure core, prove it, and time it, on a restored COPY of production.
+# REHEARSAL SAFE MODE is always on (see README): the copy must not reach real customers, owners, payment providers
+# or marketplaces. It has three parts, each checked before the run goes on:
+#   database   safe-mode.sql on the Azure copy (flags off, campaigns and outreach paused, credentials blanked)
+#   manifests  a kubectl shim, first on PATH for the platform scripts only, renders the overlay through safe-mode.jq:
+#              kill-switch env on every container, every CronJob suspended, messaging/document/voice at 0 replicas
+#   verify     the run fails if a running pod lacks a switch or a CronJob is not suspended
+# Hostnames: the PRODUCTION ones. Nothing is tested through DNS; smoke.sh and curl connect straight to the Azure
+# ingress IP (SMOKE_CONNECT_TO / --connect-to). --rewrite-hosts (opt-in) renders <app>.<domain> instead; see README.
+#   1  (--restore) restore-dump.sh --apply (restore + scrub), then release-db.sh --cloud=azure
+#   2  scrub + check the database, secrets.sh, apply-platform.sh and rollout.sh platform with JEFFI_CLOUD=azure,
+#      the wildcard certificate (DNS-01: a temporary _acme-challenge TXT record), then the pod/CronJob verification
+#   3  smoke.sh per service against the Azure IP
+#   4  a throwaway store: tenant rows like createTenant()'s, advanced by the controller's advance route (the
+#      CronJobs stay suspended), smoke, then the admin deprovision route (needs --admin-cookie-file)
+# Dry run unless --apply: the checks and the render preview are read-only. Anything billable or touching DNS asks
+# first (--yes skips, except --no-safe-mode). Output also goes to ~/Documents/db-backups/rehearsal-<date>.log.
+# Usage: bash deploy/azure/rehearsal/rehearse.sh [--apply] [--yes] [--tag local-xxxxxxxx] [--azure-ip IP]
+#          [--ingress-ip IP] [--restore] [--skip-platform] [--skip-store] [--admin-cookie-file FILE] [--plan basic]
+#          [--slug NAME] [--keep-store] [--store-timeout-min 45]
+#          [--rewrite-hosts [--domain az-rehearsal.jeffistores.in] [--with-dns]] [--no-safe-mode]
 export JEFFI_CLOUD=azure
 source "$(dirname "$0")/common.sh"
 DOMAIN=az-rehearsal.jeffistores.in; TAG=; AZURE_IP=${AZURE_INGRESS_IP:-}; INGRESS_IP=; RESTORE=false; WITH_DNS=false
 SKIP_PLATFORM=false; SKIP_STORE=false; COOKIE=; PLAN=basic; SLUG=; KEEP_STORE=false; STORE_TIMEOUT=45
+REWRITE=false; SAFE=true
 args=("$@"); i=0
 while [ $i -lt ${#args[@]} ]; do
   case ${args[$i]} in
@@ -35,18 +37,23 @@ while [ $i -lt ${#args[@]} ]; do
     --slug) SLUG=${args[$((i+1))]:?}; i=$((i+1)) ;;
     --store-timeout-min) STORE_TIMEOUT=${args[$((i+1))]:?}; i=$((i+1)) ;;
     --restore) RESTORE=true ;; --with-dns) WITH_DNS=true ;; --skip-platform) SKIP_PLATFORM=true ;;
-    --skip-store) SKIP_STORE=true ;; --keep-store) KEEP_STORE=true ;;
+    --skip-store) SKIP_STORE=true ;; --keep-store) KEEP_STORE=true ;; --rewrite-hosts) REWRITE=true ;;
+    --no-safe-mode) SAFE=false ;;
   esac
   i=$((i+1))
 done
-[[ $DOMAIN =~ ^([a-z0-9-]+\.)+[a-z]+$ ]] || { echo "bad --domain: $DOMAIN" >&2; exit 2; }
-case ${DOMAIN%%.*} in
-  www|ecom|admin|business|public|mobile|voice|k8s|forms|vault|certificate|oidc|origin|invoice|quotation|purchaseorder|jeffistores)
-    echo "--domain $DOMAIN is a production host" >&2; exit 2 ;;
-esac
-[ "$DOMAIN" != jeffistores.in ] || { echo "--domain is the production apex" >&2; exit 2; }
+$REWRITE || ! $WITH_DNS || { echo "--with-dns only goes with --rewrite-hosts (production hostnames are never pointed at Azure here)" >&2; exit 2; }
+if $REWRITE; then
+  [[ $DOMAIN =~ ^([a-z0-9-]+\.)+[a-z]+$ ]] || { echo "bad --domain: $DOMAIN" >&2; exit 2; }
+  case ${DOMAIN%%.*} in
+    www|ecom|admin|business|public|mobile|voice|k8s|forms|vault|certificate|oidc|origin|invoice|quotation|purchaseorder|jeffistores)
+      echo "--domain $DOMAIN is a production host" >&2; exit 2 ;;
+  esac
+  [ "$DOMAIN" != jeffistores.in ] || { echo "--domain is the production apex" >&2; exit 2; }
+  HOSTBASE=$DOMAIN
+else HOSTBASE=jeffistores.in; fi
 [[ $STORE_TIMEOUT =~ ^[0-9]+$ ]] || { echo "bad --store-timeout-min" >&2; exit 2; }
-need kubectl az aws psql curl python3 sed
+need kubectl az aws psql curl python3 sed jq
 cd "$REPO"
 SHA=$(image_sha); [ -n "$TAG" ] || TAG=local-$SHA; SHA=${TAG#local-}
 LOG=$BK_ROOT/rehearsal-$(date +%Y-%m-%d).log
@@ -55,7 +62,13 @@ FAILED=()
 run() { timed "$@" || FAILED+=("$1"); }
 must() { timed "$@" || { FAILED+=("$1"); print_times; echo "Stopped: $1 failed." >&2; exit 1; }; }
 
-# ---- the host rewrite: a kubectl shim, first on PATH for the platform scripts only
+if ! $SAFE; then
+  echo "SAFE MODE OFF: the restored production copy could message customers, call payment providers and push to marketplaces." >&2
+  read -r -p "Type exactly 'contact real customers' to continue (--yes does not apply): " a
+  [ "$a" = 'contact real customers' ] || { echo "Stopped."; exit 1; }
+fi
+
+# ---- the render shim, first on PATH for the platform scripts only
 REAL_KUBECTL=$(command -v kubectl)
 cat > "$SHIM_DIR/kubectl" <<EOF
 #!/bin/bash
@@ -64,28 +77,60 @@ REAL='$REAL_KUBECTL'
 rw() {
   local extra=()
   [ -z "\${REH_INGRESS_IP:-}" ] || extra=(-e "s#REPLACE_ME_edge_elastic_ip#\$REH_INGRESS_IP#g")
-  sed -E -e 's#(wif-voice|oidc|origin)\.jeffistores\.in#\1.KEEPJEFFI#g' -e 's#@jeffistores\.in#@KEEPJEFFI#g' \\
-    -e "s#jeffistores\.in#\$REH_DOMAIN#g" -e 's#KEEPJEFFI#jeffistores.in#g' \${extra[@]+"\${extra[@]}"}
+  if [ "\${REH_REWRITE:-}" = 1 ]; then
+    sed -E -e 's#(wif-voice|oidc|origin)\.jeffistores\.in#\1.KEEPJEFFI#g' -e 's#@jeffistores\.in#@KEEPJEFFI#g' \\
+      -e "s#jeffistores\.in#\$REH_DOMAIN#g" -e 's#KEEPJEFFI#jeffistores.in#g' \${extra[@]+"\${extra[@]}"}
+  else sed -E -e 's#^\$##' \${extra[@]+"\${extra[@]}"}; fi
 }
+safe() { if [ "\${REH_SAFE:-}" = 1 ]; then "\$REAL" create --dry-run=client -f - -o json | jq --argjson safe "\$(cat '$REH_DIR/safe-env.json')" -f '$REH_DIR/safe-mode.jq'; else cat; fi; }
 case "\${1:-}" in
-  kustomize) "\$REAL" "\$@" | rw ;;
+  kustomize) "\$REAL" "\$@" | rw | safe ;;
   apply) if [ \$# -eq 3 ] && [ "\$2" = -f ] && [ -f "\$3" ]; then rw < "\$3" | "\$REAL" apply -f -; else exec "\$REAL" "\$@"; fi ;;
   *) exec "\$REAL" "\$@" ;;
 esac
 EOF
 chmod 700 "$SHIM_DIR/kubectl"
-export REH_DOMAIN=$DOMAIN REH_INGRESS_IP=$INGRESS_IP
-# smoke.sh with its hosts rewritten the same way (it sources lib.sh by a relative path, so that path is pinned).
-sed -E -e "s#jeffistores\.in#$DOMAIN#g" -e "s#^source .*#source '$REPO/deploy/k8s/db/lib.sh'#" \
-  deploy/k8s/bootstrap/smoke.sh > "$SHIM_DIR/smoke.sh"
+export REH_DOMAIN=$DOMAIN REH_INGRESS_IP=$INGRESS_IP REH_REWRITE=$($REWRITE && echo 1 || echo 0) REH_SAFE=$($SAFE && echo 1 || echo 0)
+# smoke.sh: as is for production hostnames; with --rewrite-hosts a copy with its hosts rewritten.
+SMOKE=$REPO/deploy/k8s/bootstrap/smoke.sh
+if $REWRITE; then
+  sed -E -e "s#jeffistores\.in#$DOMAIN#g" -e "s#^source .*#source '$REPO/deploy/k8s/db/lib.sh'#" "$SMOKE" > "$SHIM_DIR/smoke.sh"
+  SMOKE=$SHIM_DIR/smoke.sh
+fi
+# Services whose pods exist in safe mode (messaging, documents and voice are parked at 0 replicas).
+SMOKE_SERVICES="controller storefront admin business public-api mobile showcase ai-gateway"
 
 hosts_of() { grep -oE '[A-Za-z0-9*._-]*jeffistores\.in' | sort -u; }
 
+# ---- checks that fail the run (also run in the dry run where the cluster has the objects)
+verify_pods() { # every running pod in jeffi / jeffi-edge carries every switch
+  local out
+  out=$(kubectl get pods -A -o json | jq -r --argjson want "$(cat "$REH_DIR/safe-env.json")" '
+    .items[] | select(.metadata.namespace as $n | ["jeffi", "jeffi-edge"] | index($n))
+    | select(.metadata.deletionTimestamp == null and .status.phase != "Succeeded" and .status.phase != "Failed")
+    | .metadata.name as $p | .spec.containers[] | . as $c | $want[]
+    | select(. as $w | ([$c.env[]? | select(.name == $w.name and .value == $w.value)] | length) == 0)
+    | "\($p)/\($c.name) lacks \(.name)=\(.value)"')
+  [ -z "$out" ] || { echo "$out" | head -20 >&2; echo "safe mode: a running pod is missing a switch" >&2; return 1; }
+  echo "all $(kubectl get pods -A -o json | jq '[.items[] | select(.metadata.namespace as $n | ["jeffi","jeffi-edge"] | index($n)) | select(.status.phase=="Running")] | length') running pods carry the switches"
+}
+verify_cronjobs() {
+  local out
+  out=$(kubectl get cronjob -A -o json | jq -r '.items[] | select(.spec.suspend != true) | "\(.metadata.namespace)/\(.metadata.name)"')
+  [ -z "$out" ] || { echo "$out" >&2; echo "safe mode: CronJobs not suspended" >&2; return 1; }
+  echo "all $(kubectl get cronjob -A --no-headers | wc -l | tr -d ' ') CronJobs suspended"
+}
+verify_db() {
+  local n; n=$(db_violations jeffi_stores)
+  [ "$n" = 0 ] || { echo "safe mode: $n violation(s) in the Azure copy (bash deploy/azure/rehearsal/restore-dump.sh --apply --scrub-only)" >&2; return 1; }
+  echo "database copy: 0 violations"
+}
+
 # ---- preflight (read-only)
 say "Preflight"
-echo "domain $DOMAIN (apps at <app>.$DOMAIN), image tag $TAG, cloud azure"
+echo "hostnames: $($REWRITE && echo "REWRITTEN to <app>.$DOMAIN (--rewrite-hosts)" || echo "production, tested through the Azure IP only"); image tag $TAG; safe mode $($SAFE && echo ON || echo OFF)"
 [ -f "$KUBECONFIG" ] || { echo "no kubeconfig at $KUBECONFIG (README step 5)" >&2; exit 1; }
-az account show --query '{subscription:name}' -o tsv >/dev/null || { echo "az is not logged in" >&2; exit 1; }
+az account show --query name -o tsv >/dev/null || { echo "az is not logged in" >&2; exit 1; }
 aws sts get-caller-identity --query Account --output text >/dev/null || { echo "aws is not logged in" >&2; exit 1; }
 k8s_tunnel
 kubectl get nodes --no-headers | sed 's/^/   node /'
@@ -97,11 +142,14 @@ if ! out=$(PATH=$SHIM_DIR:$PATH platform_manifests "$TAG" 2>&1); then
   echo "The overlay does not render. Fill REPLACE_ME values (README step 8), or pass --ingress-ip to point store hosts somewhere for this rehearsal." >&2
   exit 1
 fi
-say "Host rewrite preview (overlay as rendered)"
-before=$("$REAL_KUBECTL" kustomize "$REPO/deploy/k8s/overlays/azure" | sed -E "s#REPLACE_ME_edge_elastic_ip#x#g" | hosts_of)
-after=$(PATH=$SHIM_DIR:$PATH kubectl kustomize "$REPO/deploy/k8s/overlays/azure" | hosts_of)
-echo "production hosts in the manifests: $(echo "$before" | wc -l | tr -d ' '); rewritten set:"
-echo "$after" | sed 's/^/   /'
+say "Render preview (what the platform scripts will apply)"
+rendered=$(PATH=$SHIM_DIR:$PATH kubectl kustomize "$REPO/deploy/k8s/overlays/azure")
+if $SAFE; then
+  echo "CronJobs rendered suspended: $(jq -s '[.[] | .items[]? | select(.kind=="CronJob" and .spec.suspend==true)] | length' <<<"$rendered")"
+  echo "parked at 0 replicas: $(jq -r -s '[.[] | .items[]? | select(.kind=="Deployment" and .spec.replicas==0) | .metadata.name] | join(", ")' <<<"$rendered")"
+  echo "switches on every container: $(jq -r '[.[].name] | join(" ")' "$REH_DIR/safe-env.json")"
+fi
+echo "hostnames in the manifests:"; hosts_of <<<"$rendered" | sed 's/^/   /'
 [ -z "$COOKIE" ] || [ -s "$COOKIE" ] || { echo "no such cookie file: $COOKIE" >&2; exit 1; }
 if ! $SKIP_STORE && [ -z "$COOKIE" ]; then
   echo "The store round trip needs --admin-cookie-file (an administrator's 'Cookie: ...' header line) so the test store can be deleted; or pass --skip-store." >&2
@@ -109,26 +157,32 @@ if ! $SKIP_STORE && [ -z "$COOKIE" ]; then
 fi
 
 say "Plan"
-$RESTORE && echo "  1  restore the prod dump into Azure Postgres (restore-dump.sh), then release-db.sh --cloud=azure"
-$SKIP_PLATFORM || echo "  2  secrets.sh, apply-platform.sh $TAG, rollout.sh $TAG platform, wait for the wildcard certificate"
-echo "  3  smoke.sh $SHA against $DOMAIN hosts via $AZURE_IP"
-$WITH_DNS && echo "  4  Route 53: A $DOMAIN and *.$DOMAIN -> $AZURE_IP (rollback batch saved)"
-$SKIP_STORE || echo "  5  throwaway store ${SLUG:-rehearsal-<mmddhhmm>} on plan $PLAN: provision, smoke, deprovision$($KEEP_STORE && echo ' (kept: --keep-store)')"
+$RESTORE && echo "  1  restore the prod dump into Azure Postgres (restore-dump.sh, scrubbed), then release-db.sh --cloud=azure"
+echo "  2  database scrub + check$($SKIP_PLATFORM || echo ", secrets.sh, apply-platform.sh $TAG, rollout.sh $TAG platform, wildcard certificate, pod and CronJob verification")"
+echo "  3  smoke.sh $SHA per service ($SMOKE_SERVICES) via $AZURE_IP"
+$WITH_DNS && echo "  -  Route 53: A $DOMAIN and *.$DOMAIN -> $AZURE_IP (rollback batch saved)"
+$SKIP_STORE || echo "  4  throwaway store ${SLUG:-rehearsal-<mmddhhmm>} on plan $PLAN: provision, smoke, deprovision$($KEEP_STORE && echo ' (kept: --keep-store)')"
 if ! $APPLY; then echo; echo "Dry run: nothing changed (--apply)."; exit 0; fi
 
 mkdir -p "$BK_ROOT"
 exec > >(tee -a "$LOG") 2>&1
-echo "=== rehearsal $(date '+%Y-%m-%d %H:%M:%S') tag $TAG domain $DOMAIN azure-ip $AZURE_IP (log $LOG)"
+echo "=== rehearsal $(date '+%Y-%m-%d %H:%M:%S') tag $TAG hostnames $HOSTBASE azure-ip $AZURE_IP safe-mode $($SAFE && echo on || echo OFF) (log $LOG)"
 T0=$SECONDS
 
-# ---- 1 database
+# ---- 1 restore
 if $RESTORE; then
-  say "1. Database"
+  say "1. Database restore"
   must restore-dump bash "$REPO/deploy/azure/rehearsal/restore-dump.sh" --apply $($YES && echo --yes) --target-db jeffi_stores
   must release-db bash "$REPO/deploy/k8s/db/release-db.sh" --cloud=azure $($YES && echo --yes)
 fi
 
-# ---- 2 platform
+# ---- 2 safe mode on the database, then the platform
+tunnel
+if $SAFE; then
+  say "2. Safe mode: database"
+  must safe-mode-db db_scrub jeffi_stores # again: release-db's migrations may have added rows
+  must safe-mode-db-check verify_db
+fi
 ecr_kick() { # the first pull secret: the 6-hourly ecr-refresh has not run yet on a fresh cluster
   local end=$((SECONDS + 600)) job
   while [ $SECONDS -lt $end ]; do
@@ -143,7 +197,7 @@ ecr_kick() { # the first pull secret: the 6-hourly ecr-refresh has not run yet o
 }
 if ! $SKIP_PLATFORM; then
   say "2. Platform"
-  confirm "Apply the platform to the Azure core ($KUBECONFIG) as <app>.$DOMAIN? It also requests a Let's Encrypt wildcard certificate (a temporary _acme-challenge TXT record in Route 53)."
+  confirm "Apply the platform to the Azure core ($KUBECONFIG)? It requests a Let's Encrypt wildcard certificate for the platform names (a temporary _acme-challenge TXT record in the Route 53 jeffistores.in zone; no A or CNAME record changes)."
   [ -f certs/ca-cert.pem ] || { echo "certs/ca-cert.pem is missing (secrets.sh needs the platform CA, README step 9)" >&2; exit 1; }
   must secrets bash deploy/k8s/bootstrap/secrets.sh
   ecr_kick & ECR_PID=$!
@@ -152,8 +206,13 @@ if ! $SKIP_PLATFORM; then
   must rollout-platform env PATH="$SHIM_DIR:$PATH" bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform
   run wildcard-certificate kubectl -n jeffi-edge wait --for=condition=Ready certificate/wildcard-jeffistores --timeout=600s
 fi
+if $SAFE; then
+  say "2. Safe mode: verification"
+  must verify-cronjobs verify_cronjobs
+  must verify-pods verify_pods
+fi
 
-# ---- 4 dns (before smoke: the browser checks are easier with it, smoke itself connects by IP)
+# ---- optional DNS (rewrite mode only: new names under the rehearsal domain)
 dns_records() {
   local zone b="$BK_ROOT/route53-rehearsal-rollback-$RSTAMP.json" up="$SHIM_DIR/up.json" n
   [[ $DOMAIN == *.jeffistores.in ]] || { echo "--with-dns only supports a name under jeffistores.in" >&2; return 1; }
@@ -170,16 +229,23 @@ dns_records() {
   echo "Rollback: aws route53 change-resource-record-sets --hosted-zone-id $zone --change-batch file://$b"
 }
 if $WITH_DNS; then
-  say "4. DNS"
+  say "DNS"
   confirm "Create A records $DOMAIN and *.$DOMAIN -> $AZURE_IP in the jeffistores.in zone (new names only)?"
   run dns dns_records
 fi
 
-# ---- 3 smoke
-say "3. Smoke"
-run smoke env SMOKE_CONNECT_TO="::$AZURE_IP:" bash "$SHIM_DIR/smoke.sh" "$SHA"
+# ---- 3 smoke, one service at a time (the parked services have no pods)
+smoke_all() {
+  local s bad=0
+  for s in $SMOKE_SERVICES; do
+    SMOKE_CONNECT_TO="::$AZURE_IP:" bash "$SMOKE" "$SHA" "$s" flagship || bad=1
+  done
+  return $bad
+}
+say "3. Smoke (connecting to $AZURE_IP; DNS is not used)"
+run smoke smoke_all
 
-# ---- 5 store round trip
+# ---- 4 store round trip
 ADMIN_CURL() { curl -sS --connect-to "::$AZURE_IP:" -H @"$COOKIE" "$@"; }
 store_create() {
   tid=$(psql_app jeffi_stores -q -At -v slug="$SLUG" -v name="Rehearsal $SLUG" -v plan="$PLAN" <<'SQL'
@@ -198,12 +264,10 @@ SQL
   [[ $tid =~ ^[0-9a-f-]{36}$ ]] || { echo "no tenant created: is plan '$PLAN' active? $(psql_app jeffi_stores -At -c "select string_agg(slug, ', ') from plans where is_active")" >&2; return 1; }
   STORE_LEFT=1; echo "tenant $tid ($SLUG)"
 }
-store_build() {
-  local end=$((SECONDS + STORE_TIMEOUT * 60)) last= row st kick=0
+store_build() { # the CronJobs (and so the provisioning worker) stay suspended: this loop advances only this tenant's job
+  local end=$((SECONDS + STORE_TIMEOUT * 60)) last= row st
   while [ $SECONDS -lt $end ]; do
-    if [ $((SECONDS - kick)) -ge 60 ]; then
-      in_cluster provisioning_advance /api/internal/provisioning/advance "{\"tenantId\":\"$tid\"}" >/dev/null 2>&1 || true; kick=$SECONDS
-    fi
+    in_cluster provisioning_advance /api/internal/provisioning/advance "{\"tenantId\":\"$tid\"}" >/dev/null 2>&1 || true
     row=$(psql_app jeffi_stores -At -F '|' -c "select status, step, coalesce(left(last_error, 300), '') from provisioning_jobs where tenant_id='$tid' order by created_at desc limit 1")
     st=${row%%|*}
     [ "${row%|*}" = "$last" ] || { last=${row%|*}; printf '   %4ss  %s\n' "$((SECONDS - BUILD_T0))" "$last"; }
@@ -219,7 +283,7 @@ store_delete() {
   local code
   code=$(ADMIN_CURL -o "$SHIM_DIR/dep.json" -w '%{http_code}' --max-time 900 -H 'Content-Type: application/json' -X POST \
     -d '{"confirm":true,"keep":{"database":false,"media":false,"config":false}}' \
-    "https://ecom.$DOMAIN/api/admin/ecom/customers/$tid/deprovision" || true)
+    "https://ecom.$HOSTBASE/api/admin/ecom/customers/$tid/deprovision" || true)
   echo "deprovision: HTTP $code $(head -c 300 "$SHIM_DIR/dep.json" 2>/dev/null)"
   [ "$code" = 200 ] || return 1
   echo "tenant status now: $(psql_app jeffi_stores -At -c "select status from tenants where id='$tid'")"
@@ -227,11 +291,11 @@ store_delete() {
   echo "namespace tenant-$SLUG is gone"
 }
 if ! $SKIP_STORE; then
-  say "5. Store round trip"
+  say "4. Store round trip"
   [ -n "$SLUG" ] || SLUG=rehearsal-$(date +%m%d%H%M)
   [[ $SLUG =~ ^[a-z0-9][a-z0-9-]{2,40}$ ]] || { echo "bad --slug" >&2; exit 2; }
-  code=$(ADMIN_CURL -o /dev/null -w '%{http_code}' "https://ecom.$DOMAIN/api/admin/ecom/customers/overview" || true)
-  case $code in 2??) echo "admin session accepted" ;; *) echo "The admin cookie is not accepted on https://ecom.$DOMAIN (HTTP $code); no store created." >&2; FAILED+=(admin-auth); SKIP_STORE=true ;; esac
+  code=$(ADMIN_CURL -o /dev/null -w '%{http_code}' "https://ecom.$HOSTBASE/api/admin/ecom/customers/overview" || true)
+  case $code in 2??) echo "admin session accepted" ;; *) echo "The admin cookie is not accepted on https://ecom.$HOSTBASE via $AZURE_IP (HTTP $code); no store created." >&2; FAILED+=(admin-auth); SKIP_STORE=true ;; esac
 fi
 if ! $SKIP_STORE; then
   confirm "Create store $SLUG? This launches an AWS EC2 node and EBS volume and Route 53 records for $SLUG.jeffistores.in (billable, removed by the deprovision step)."
@@ -239,7 +303,7 @@ if ! $SKIP_STORE; then
   must store-create store_create
   BUILD_T0=$SECONDS
   run store-provision store_build
-  run store-smoke env SMOKE_CONNECT_TO="::$AZURE_IP:" bash "$SHIM_DIR/smoke.sh" "$SHA" storefront tenants
+  run store-smoke env SMOKE_CONNECT_TO="::$AZURE_IP:" bash "$SMOKE" "$SHA" storefront tenants
   if $KEEP_STORE; then echo "Kept: tenant $tid ($SLUG)"
   else must store-delete store_delete; STORE_LEFT=0
     echo "Check for leftovers: aws ec2 describe-instances --filters 'Name=tag:Name,Values=*$SLUG*' --query 'Reservations[].Instances[].[InstanceId,State.Name]' --output text"
