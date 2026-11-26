@@ -1,5 +1,6 @@
 'use client'
 
+import QrPaymentDialog, { createQrIntent, type QrIntent, type QrResult } from '@/components/admin/payments/QrPaymentDialog'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { productLabel, variantLabel } from '@/lib/catalog/product-label'
 import { round2 } from '@/lib/catalog/gst'
@@ -153,6 +154,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [submitting, setSubmitting] = useState(false)
+  const [qrIntent, setQrIntent] = useState<QrIntent | null>(null)
   const actionToast = useActionToast()
   // Validation and submit failures are toasts; '' clears nothing.
   const setFormError = (m: string) => m && actionToast.error(m)
@@ -567,37 +569,42 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
     setFormError('')
     setSubmitting(true)
     const draftId = heldIdRef.current
-    completingRef.current = true
     try {
+      const body = {
+        paymentMode,
+        notes,
+        items: items.map(it => ({
+          product_id: it.product_id,
+          product_name: it.product_name,
+          product_sku: it.product_sku,
+          variant_id: it.variant_id,
+          sub_variant_id: it.sub_variant_id,
+          variant_name: it.variant_name,
+          hsn_code: it.hsn_code,
+          gst_rate: it.gst_rate,
+          quantity: it.quantity,
+          buy_unit: it.buy_unit || null,
+          unit: it.unit,
+          unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
+          discount_pct: Number(it.discount_pct) || 0,
+          temp_id: it.id,
+        })),
+        batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
+          batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
+        ),
+        serial_assignments: serialAssignments,
+        ...(draftId ? { draft_id: draftId } : {}),
+      }
+      if (paymentMode === 'upi_qr') {
+        setQrIntent(await createQrIntent('cash_sale', body))
+        return
+      }
+      completingRef.current = true
       const res = await fetch('/api/admin/invoices/cash-sale', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentMode,
-          notes,
-          items: items.map(it => ({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_sku: it.product_sku,
-            variant_id: it.variant_id,
-            sub_variant_id: it.sub_variant_id,
-            variant_name: it.variant_name,
-            hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate,
-            quantity: it.quantity,
-            buy_unit: it.buy_unit || null,
-            unit: it.unit,
-            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
-            discount_pct: Number(it.discount_pct) || 0,
-            temp_id: it.id,
-          })),
-          batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
-            batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
-          ),
-          serial_assignments: serialAssignments,
-          ...(draftId ? { draft_id: draftId } : {}),
-        }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -633,6 +640,24 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function qrDone(r: QrResult) {
+    setQrIntent(null)
+    completingRef.current = true
+    showToast('Cash sale recorded', 'success')
+    resetForm()
+    if (heldIdRef.current) {
+      setHeldId(null)
+      setBillLabel('')
+    }
+    fetchSales()
+    router.push(r.resultUrl || ap(r.resultRef ? `/admin/cash-sale/${r.resultRef}/view` : '/admin/cash-sale'))
+  }
+
+  async function newQr() {
+    setQrIntent(null)
+    await handleSubmit({ preventDefault() {} } as React.FormEvent)
   }
 
   if (view === 'receipt' && receipt) {
@@ -865,6 +890,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
         {heldId && <DraftLockBanner lock={lock} scope="invoices:write" />}
 
 
+        <QrPaymentDialog intent={qrIntent} onClose={() => setQrIntent(null)} onDone={qrDone} onNewQr={newQr} />
         <form onSubmit={handleSubmit}>
           <LockedFieldset readOnly={lock.readOnly}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -984,7 +1010,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
                         disabled={submitting || holding}
                         className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                       >
-                        {submitting ? 'Processing…' : 'Complete Sale'}
+                        {submitting ? 'Processing…' : paymentMode === 'upi_qr' ? 'Show payment QR' : 'Complete Sale'}
                       </button>
                       <button
                         type="button"

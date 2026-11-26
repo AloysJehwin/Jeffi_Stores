@@ -186,6 +186,29 @@ describe('CashSaleClient', () => {
     expect(await screen.findByRole('link', { name: 'RC-1' })).toBeInTheDocument()
   })
 
+  it('UPI QR shows the payment QR first and creates no sale until paid', async () => {
+    const intent = { intentId: 'pi_1', qrImageUrl: 'https://cdn.test/qr.png', amount: 2360, expiresAt: new Date(Date.now() + 600_000).toISOString() }
+    fetchMock.mockImplementation(async (url: string, init?: any) => {
+      const m = init?.method || 'GET'
+      if (url.startsWith('/api/admin/cash-sale?')) return json(true, { sales, total: 2 })
+      if (url === '/api/admin/payments/qr-intents' && m === 'POST') return json(true, intent)
+      if (url === '/api/admin/payments/qr-intents/pi_1') return json(true, { status: 'pending' })
+      return json(true, {})
+    })
+    draw()
+    await openNew()
+    fireEvent.click(screen.getByText('fill-line'))
+    fireEvent.click(screen.getByRole('radio', { name: 'UPI (QR Scan)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show payment QR' }))
+    expect(await screen.findByAltText('UPI QR code')).toHaveAttribute('src', 'https://cdn.test/qr.png')
+    const post = fetchMock.mock.calls.find(c => c[0] === '/api/admin/payments/qr-intents')!
+    const body = JSON.parse(post[1].body)
+    expect(body.kind).toBe('cash_sale')
+    expect(body.payload).toMatchObject({ paymentMode: 'upi_qr', batch_assignments: [], serial_assignments: [] })
+    expect(body.payload.items[0]).toMatchObject({ product_name: 'Drill', quantity: 2, unit_price: 1180 })
+    expect(fetchMock.mock.calls.some(c => c[0] === '/api/admin/invoices/cash-sale')).toBe(false)
+  })
+
   it('blocks a sale that exceeds available stock', async () => {
     draw()
     await openNew()

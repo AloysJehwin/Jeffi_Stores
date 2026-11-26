@@ -292,6 +292,7 @@
   "packages/store-core/src/components/admin/mobile/MobileDetailSheet.tsx": ["admin"],
   "packages/store-core/src/components/admin/mobile/MobileListCard.tsx": ["admin"],
   "packages/store-core/src/components/admin/overview/kit.tsx": ["controller","admin"],
+  "packages/store-core/src/components/admin/payments/QrPaymentDialog.tsx": ["admin"],
   "packages/store-core/src/components/admin/product-form/MediaManager.tsx": ["admin"],
   "packages/store-core/src/components/admin/product-form/ProductExtraSections.tsx": ["admin"],
   "packages/store-core/src/components/admin/providers/AiRouting.tsx": ["controller","admin"],
