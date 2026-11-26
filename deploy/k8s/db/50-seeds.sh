@@ -6,6 +6,10 @@
 # --dry-run runs the same scripts read-only and prints what they would change.
 # Usage: bash deploy/k8s/db/50-seeds.sh [--dry-run]
 source "$(dirname "$0")/lib.sh"
+refuse_if_aws_retired
+if [ "$CLOUD" = azure ] && [ "$FLAGSHIP_CLOUD" != azure ]; then
+  echo "50-seeds: skipped, messaging is on standby on Azure until the cutover (FLAGSHIP_CLOUD=azure)"; exit 0
+fi
 k8s_tunnel
 run() { # <script> [args]
   kubectl -n jeffi exec deploy/jeffi-stores-messaging-service -- env SPAWN_APP=1 \

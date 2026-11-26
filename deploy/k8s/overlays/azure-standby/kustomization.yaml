@@ -1,0 +1,24 @@
+# The Azure platform before the cutover (FLAGSHIP_CLOUD=aws; deploy/k8s/db/lib.sh platform_manifests and apply-platform.sh
+# pick it). The azure overlay with the work that may run in one cluster only switched off, so a release or apply to
+# Azure while AWS is still the flagship never runs it twice:
+#   - every app CronJob (app.kubernetes.io/part-of=jeffi-cron) suspended; ecr-refresh keeps the pull secret fresh
+#   - messaging, documents and voice at 0 replicas
+# Both carry jeffi.io/standby=true (smoke.sh skips a standby Deployment). The cutover's azure-live step applies ../azure's
+# CronJobs and those Deployments in their place (deploy/azure/cutover/README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../azure
+patches:
+  - target: { kind: CronJob, labelSelector: app.kubernetes.io/part-of=jeffi-cron }
+    patch: |-
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata: { name: standby, annotations: { jeffi.io/standby: 'true' } }
+      spec: { suspend: true }
+  - target: { kind: Deployment, name: jeffi-stores-(messaging|document|voice)-service }
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: standby, annotations: { jeffi.io/standby: 'true' } }
+      spec: { replicas: 0 }

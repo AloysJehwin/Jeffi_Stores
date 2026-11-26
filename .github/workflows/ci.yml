@@ -30,7 +30,15 @@ name: Jeffi Stores Pipeline
 #                                                                      Release · AWS · ai-gateway   │
 #                                                                      Release · AWS · razer ───────┘   (the LLM box's host services)
 #   Mobile · Android (when the merge touched mobile-service/client) beside the DB card, after the approval.
-#   With AZURE_TARGET=true the Azure lane runs beside it: DB · Azure · flagship ─→ Deploy · Azure · prepare ─→ Release · Azure · <service>.
+#
+# Two lanes, by two repository variables (deploy/azure/cutover/README.md flips both in its azure-live step):
+#   FLAGSHIP_CLOUD unset or aws (before the cutover): the AWS lane above. With AZURE_TARGET=true the Azure lane also
+#     runs, on standby: DB · Azure · flagship ─→ Deploy · Azure · prepare ─→ Release · Azure · <service>, rendered from
+#     deploy/k8s/overlays/azure-standby (app CronJobs suspended, messaging, documents and voice at 0), no stores.
+#   FLAGSHIP_CLOUD=azure (after it; needs AZURE_TARGET=true): the Azure lane is the release, stores included:
+#     DB · Azure · flagship + tenants ─→ Deploy · Azure · prepare ─→ Release · Azure · <service> ─→ CloudFront ─→ Post.
+#     Every AWS job is skipped: that cluster stays frozen and its RDS is the pre-cutover copy. So is razer: its path
+#     is the AWS core (razer-release.sh), which stops at the cutover.
 #
 # One DB stage: the flagship (jeffi_stores, the platform set: schema diff, manual.sql, control-plane diff, plan
 # seed, then migrations) and every store tenant's own database (the tenant set: the schema fan-out, then the tenant
@@ -78,6 +86,8 @@ env:
   # One heap ceiling for every Node step (tests, type checks, builds); runners have 16 GB.
   NODE_OPTIONS: --max-old-space-size=12288
   DRY_FLAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
+  # The deploy scripts read it (deploy/k8s/db/lib.sh): aws renders Azure on standby and keeps AWS; azure the reverse.
+  FLAGSHIP_CLOUD: ${{ vars.FLAGSHIP_CLOUD || 'aws' }}
 
 jobs:
   # ── Init ─────────────────────────────────────────────────────────────────────────────────────
@@ -166,6 +176,21 @@ jobs:
             if [ -n "$migrations" ]; then echo "**Migrations:** new \`<service>/database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the DB stage still runs any not yet recorded."; fi
             echo; echo "Approve the \`production\` environment to proceed."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Release lanes (FLAGSHIP_CLOUD, AZURE_TARGET)
+        if: steps.mode.outputs.release == 'true'
+        env:
+          FLAGSHIP: ${{ vars.FLAGSHIP_CLOUD }}
+          AZURE: ${{ vars.AZURE_TARGET }}
+        run: |
+          set -euo pipefail
+          case "${FLAGSHIP:-aws}" in
+            aws) lanes="AWS (flagship, stores, tenant databases, CloudFront)"
+                 [ "$AZURE" != true ] || lanes="$lanes; Azure on standby (flagship database and platform; app CronJobs suspended, messaging, documents and voice at 0; no stores)" ;;
+            azure) [ "$AZURE" = true ] || { echo "::error::FLAGSHIP_CLOUD=azure without AZURE_TARGET=true: no lane would release"; exit 1; }
+                   lanes="Azure (flagship, stores, tenant databases, CloudFront); every AWS job skipped, razer included" ;;
+            *) echo "::error::FLAGSHIP_CLOUD is '$FLAGSHIP': aws or azure"; exit 1 ;;
+          esac
+          { echo "**Release lanes:** $lanes"; echo; } | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ── Checks ───────────────────────────────────────────────────────────────────────────────────
 
@@ -819,10 +844,12 @@ jobs:
 
   # ── Release: one approval, the databases, then each service ─────────────────────────────────
 
+  # Off once FLAGSHIP_CLOUD=azure: the stores' databases are then reached from the Azure cluster (db-azure · tenants).
   db-aws:
     name: DB · AWS · ${{ matrix.db }}
     runs-on: ubuntu-latest
     needs: checks
+    if: vars.FLAGSHIP_CLOUD != 'azure'
     environment: production-release
     concurrency: { group: "deploy-production-db-${{ matrix.db }}", cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -843,9 +870,10 @@ jobs:
         uses: ./.github/actions/db-report
         with: { name: "db-aws-${{ matrix.db }}" }
 
-  # The flagship database on Azure (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md). The db-aws job targets AWS; the stores'
-  # databases stay there. Off until the Azure landing zone exists: repository variable AZURE_TARGET=true. Postgres is
+  # The databases on Azure (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md). Off until AZURE_TARGET=true. Postgres is
   # reached over the tailnet (the core's subnet route), app_user's password read from Key Vault (deploy/k8s/db/lib.sh).
+  # Before the cutover only the flagship; with FLAGSHIP_CLOUD=azure also tenants, the fan-out Job in the Azure cluster
+  # (the stores rejoined it at the cutover).
   db-azure:
     name: DB · Azure · ${{ matrix.db }}
     runs-on: ubuntu-latest
@@ -857,7 +885,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        db: [flagship]
+        db: ${{ fromJSON(vars.FLAGSHIP_CLOUD == 'azure' && '["flagship","tenants"]' || '["flagship"]') }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -869,9 +897,9 @@ jobs:
           ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           kubeconfig-b64: ${{ secrets.KUBECONFIG_AZURE_B64 }}
-      - name: Schema · jeffi_stores on Azure Postgres (platform set diff, manual.sql, control-plane diff, plan seed)
+      - name: Schema · ${{ matrix.db == 'flagship' && 'jeffi_stores on Azure Postgres (platform set diff, manual.sql, control-plane diff, plan seed)' || 'every store database (tenant set, the release controller image in the Azure cluster)' }}
         run: bash deploy/k8s/db/release-db.sh --${{ matrix.db }} --schema --yes --cloud=azure ${{ env.DRY_FLAG }}
-      - name: Migrations · pending files on jeffi_stores (Azure)
+      - name: Migrations · ${{ matrix.db == 'flagship' && 'pending files on jeffi_stores (Azure)' || 'pending tenant-set files on every store database (Azure)' }}
         run: bash deploy/k8s/db/release-db.sh --${{ matrix.db }} --migrations --yes --cloud=azure ${{ env.DRY_FLAG }}
       - if: always()
         uses: ./.github/actions/db-report
@@ -881,6 +909,7 @@ jobs:
     name: Deploy · AWS · prepare
     runs-on: ubuntu-latest
     needs: db-aws
+    if: vars.FLAGSHIP_CLOUD != 'azure'
     environment: production-release
     concurrency: { group: deploy-production-deploy-prep, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -896,10 +925,12 @@ jobs:
       - name: Room on the core, the ECR pull secret, and what the services share (namespaces, edge, Redis, RBAC, config, release images)
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform prep ${{ env.DRY_FLAG }}
 
+  # Off once FLAGSHIP_CLOUD=azure (the whole matrix, razer too: razer-release.sh goes through the AWS core).
   release-aws:
     name: Release · AWS · ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: deploy-prep-aws
+    if: vars.FLAGSHIP_CLOUD != 'azure'
     environment: production-release
     concurrency: { group: "deploy-production-release-${{ matrix.service }}", cancel-in-progress: false }
     permissions: { id-token: write, contents: read, actions: read }
@@ -939,7 +970,7 @@ jobs:
       # The stores are re-applied by the release's controller, so a store service's stores wait for that job.
       - if: matrix.kind == 'store'
         uses: ./.github/actions/wait-for-job
-        with: { job: "Release · controller", timeout-minutes: "90" }
+        with: { job: "Release · AWS · controller", timeout-minutes: "90" }
       - if: matrix.kind == 'store'
         name: Every store's ${{ matrix.service }} at the release tag (a store without one is skipped)
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" stores ${{ matrix.service }} ${{ env.DRY_FLAG }}
@@ -996,9 +1027,9 @@ jobs:
         name: Smoke · Razer LLM service (Ollama, the image server and PaddleOCR from the core, the way the gateway reaches them)
         run: bash deploy/k8s/bootstrap/razer-release.sh smoke
 
-  # The platform on the Azure core, rendered from deploy/k8s/overlays/azure (JEFFI_CLOUD=azure): what the services
-  # share first (namespaces, edge, Redis, RBAC, config, the tenant edge's Traefik), then each service. The cluster is
-  # reached over the tailnet. Off until AZURE_TARGET=true.
+  # The platform on the Azure core (JEFFI_CLOUD=azure): what the services share first (namespaces, edge, Redis, RBAC,
+  # config, the tenant edge's Traefik), then each service. Rendered from deploy/k8s/overlays/azure-standby until
+  # FLAGSHIP_CLOUD=azure, from overlays/azure after it. The cluster is reached over the tailnet. Off until AZURE_TARGET=true.
   deploy-prep-azure:
     name: Deploy · Azure · prepare
     runs-on: ubuntu-latest
@@ -1018,12 +1049,26 @@ jobs:
           ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           kubeconfig-b64: ${{ secrets.KUBECONFIG_AZURE_B64 }}
+      # The Azure controller copies jeffi-store into each store's namespace; the deploy identity reads the vault only.
+      - if: vars.FLAGSHIP_CLOUD == 'azure'
+        name: jeffi-store matches jeffi-production without the control-plane keys, in Key Vault (warns only; prints no values)
+        run: bash deploy/k8s/bootstrap/store-secret.sh --check
+      - if: vars.FLAGSHIP_CLOUD == 'azure'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - if: vars.FLAGSHIP_CLOUD == 'azure'
+        name: jeffi/production/build matches jeffi/production's NEXT_PUBLIC_* keys (warns only; prints no values)
+        run: bash deploy/k8s/bootstrap/build-secret.sh --check
       - name: Room on the Azure core, the ECR pull secret, and what the services share
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform prep ${{ env.DRY_FLAG }}
 
-  # The platform's services on the Azure core (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md). The release-aws job targets
-  # AWS, where the stores stay; at cutover the flagship and platform steps move here. Before the DNS cutover set the
-  # repository variable AZURE_INGRESS_IP (the core's public IP) so the smoke tests reach the Azure ingress, not AWS.
+  # The platform's services on the Azure core (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md), as release-aws does on AWS.
+  # Before the cutover only the flagship's deployments, on standby (no stores: they are in the AWS cluster). With
+  # FLAGSHIP_CLOUD=azure the stores too (controller: stores shared; each store service: stores <service> after
+  # it), the template seed and the post-deploy smoke. Until the DNS cutover, AZURE_INGRESS_IP (the core's public IP) has
+  # the smoke tests reach the Azure ingress, not AWS; the cutover's azure-live step deletes it.
   release-azure:
     name: Release · Azure · ${{ matrix.service }}
     runs-on: ubuntu-latest
@@ -1031,13 +1076,23 @@ jobs:
     if: vars.AZURE_TARGET == 'true'
     environment: production-release
     concurrency: { group: "deploy-production-release-azure-${{ matrix.service }}", cancel-in-progress: false }
-    permissions: { id-token: write, contents: read }
+    permissions: { id-token: write, contents: read, actions: read }
     env:
       SMOKE_CONNECT_TO: ${{ vars.AZURE_INGRESS_IP && format('::{0}:', vars.AZURE_INGRESS_IP) || '' }}
     strategy:
       fail-fast: false
       matrix:
-        service: [controller, storefront, admin, business, messaging, documents, public-api, mobile, showcase, ai-gateway]
+        include:
+          - { service: controller, kind: platform }
+          - { service: storefront, kind: store }
+          - { service: admin, kind: store }
+          - { service: business, kind: store }
+          - { service: messaging, kind: store }
+          - { service: documents, kind: store }
+          - { service: public-api, kind: platform }
+          - { service: mobile, kind: platform }
+          - { service: showcase, kind: platform }
+          - { service: ai-gateway, kind: platform }
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 } # the release tag is computed from history
@@ -1049,24 +1104,73 @@ jobs:
           ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           kubeconfig-b64: ${{ secrets.KUBECONFIG_AZURE_B64 }}
-      - name: Flagship ${{ matrix.service }} at the release tag (Azure)
+      - name: Flagship ${{ matrix.service }} at the release tag (Azure)${{ matrix.service == 'controller' && ', with the platform routes and CronJobs' || '' }}
         run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ matrix.service }} ${{ env.DRY_FLAG }}
       - name: Smoke · flagship ${{ matrix.service }} (Azure)
         run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" ${{ matrix.service }} flagship ${{ env.DRY_FLAG }}
+      - if: matrix.service == 'controller' && vars.FLAGSHIP_CLOUD == 'azure'
+        name: Every store's namespace, routes and config; a store still on the old all-in-one app moves onto its own services (Azure)
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" stores shared ${{ env.DRY_FLAG }}
+      - if: matrix.kind == 'store' && vars.FLAGSHIP_CLOUD == 'azure'
+        uses: ./.github/actions/wait-for-job
+        with: { job: "Release · Azure · controller", timeout-minutes: "90" }
+      - if: matrix.kind == 'store' && vars.FLAGSHIP_CLOUD == 'azure'
+        name: Every store's ${{ matrix.service }} at the release tag (a store without one is skipped; Azure)
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" stores ${{ matrix.service }} ${{ env.DRY_FLAG }}
+      - if: matrix.kind == 'store' && vars.FLAGSHIP_CLOUD == 'azure'
+        name: Smoke · stores' ${{ matrix.service }} (Azure)
+        run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" ${{ matrix.service }} tenants ${{ env.DRY_FLAG }}
+      - if: matrix.service == 'messaging' && vars.FLAGSHIP_CLOUD == 'azure'
+        name: Templates · catalog (new catalog templates, email content for unedited copies, WhatsApp {{brand_name}} bodies; in the new messaging pod)
+        run: bash deploy/k8s/db/50-seeds.sh ${{ env.DRY_FLAG }}
+      # Post-deploy browser smoke against the live hosts, as in release-aws (advisory); only once DNS points at Azure.
+      - id: postdeploy
+        if: vars.FLAGSHIP_CLOUD == 'azure' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        name: Post-deploy smoke · ${{ matrix.service }} (which host)
+        run: |
+          case "${{ matrix.service }}" in
+            controller) url=https://ecom.jeffistores.in/ ;;
+            storefront) url=https://jeffistores.in/ ;;
+            business) url=https://business.jeffistores.in/ ;;
+            showcase) url="${{ vars.POST_DEPLOY_SHOWCASE_URL || 'https://site-smoke-check.jeffistores.in/' }}" ;;
+            public-api) url=https://public.jeffistores.in/ ;;
+            mobile) url=https://mobile.jeffistores.in/ ;;
+            *) url= ;;
+          esac
+          spec=${{ matrix.service }}; case $spec in public-api|mobile) spec=services ;; esac
+          [ -f "tests/post-deploy/$spec.spec.ts" ] || url=
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
+      - if: steps.postdeploy.outputs.url != ''
+        continue-on-error: true
+        uses: ./.github/actions/node-setup
+      - if: steps.postdeploy.outputs.url != ''
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+      - if: steps.postdeploy.outputs.url != ''
+        continue-on-error: true
+        name: Post-deploy browser smoke · ${{ matrix.service }}
+        env:
+          LIVE_URL: ${{ steps.postdeploy.outputs.url }}
+          PUBLIC_API_URL: ${{ matrix.service == 'public-api' && steps.postdeploy.outputs.url || '' }}
+          MOBILE_URL: ${{ matrix.service == 'mobile' && steps.postdeploy.outputs.url || '' }}
+        run: npx playwright test -c playwright.post-deploy.config.ts tests/post-deploy/${{ steps.postdeploy.outputs.spec }}.spec.ts
 
+  # After the flagship's lane (AWS, or Azure once FLAGSHIP_CLOUD=azure); a service that failed does not hold it back.
+  # CloudFront stays on AWS either way: the deploy role, no cluster.
   cdn:
     name: CloudFront
     runs-on: ubuntu-latest
-    needs: release-aws # after every service; one that failed does not hold the invalidation back
-    if: ${{ !cancelled() && needs.release-aws.result != 'skipped' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+    needs: [release-aws, release-azure]
+    if: ${{ !cancelled() && (vars.FLAGSHIP_CLOUD == 'azure' && needs.release-azure.result || needs.release-aws.result) != 'skipped' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
     environment: production-release
     concurrency: { group: deploy-production-cdn, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 } # the release tag is computed from history
-      - uses: ./.github/actions/release-setup
-        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
       - name: Invalidate CloudFront
         env:
           DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}

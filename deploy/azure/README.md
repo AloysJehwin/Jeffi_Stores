@@ -21,7 +21,8 @@ The existing `jeffi-ai-cin` resource group (Speech and OpenAI) is separate, and 
 | `irsa/aws-roles.sh` | Creates the IAM OIDC provider for `oidc.jeffistores.in`, plus one role per service account (next table). |
 | `../aws/oidc-issuer.yaml` | CloudFormation for the issuer site: a private S3 bucket, CloudFront with origin access control, an ACM certificate and the Route 53 alias `oidc.jeffistores.in`. |
 | `../aws/edge/` | The AWS tenant edge: <ul><li>`launch-edge.sh`: a t4g.small with an Elastic IP (`eip` subcommand) and a security group open on 80/443;</li><li>`edge-node-user-data.sh`: joins the core over Tailscale;</li><li>`route53-plan.sh`: store hosts to the edge, platform hosts to Azure, with a saved rollback batch.</li></ul> |
-| `../k8s/overlays/azure/` | The platform on Azure, which `JEFFI_CLOUD=azure` selects. It adds: <ul><li>projected tokens for STS and Entra;</li><li>`SECRETS_BACKEND=keyvault`, `DB_IAM_AUTH=false` and `DB_SSL=require`;</li><li>cert-manager and ecr-refresh through IRSA;</li><li>CoreDNS forwarding for the Postgres private zone;</li><li>the provisioning ConfigMap for store nodes and pods (next section);</li><li>the edge (`../k8s/edge/`): its Traefik, and a `public-{slug}` copy of public-api with its own Redis, which the core's Traefik skips (`patches/traefik-core.yaml`).</li></ul> |
+| `../k8s/overlays/azure/` | The platform on Azure, which `JEFFI_CLOUD=azure` selects. It adds: <ul><li>projected tokens for STS and Entra;</li><li>`SECRETS_BACKEND=keyvault`, `DB_IAM_AUTH=false` and `DB_SSL=require`;</li><li>cert-manager and ecr-refresh through IRSA;</li><li>CoreDNS forwarding for the Postgres private zone;</li><li>the provisioning ConfigMap for store nodes and pods (next section);</li><li>the edge (`../k8s/edge/`): its Traefik, and a `public-{slug}` copy of public-api with its own Redis, which the core's Traefik skips (`patches/traefik-core.yaml`).</li></ul> After the cutover only (`FLAGSHIP_CLOUD=azure`). |
+| `../k8s/overlays/azure-standby/` | The same overlay before the cutover (`FLAGSHIP_CLOUD=aws`): the 61 app CronJobs suspended (`ecr-refresh` keeps running), messaging, documents and voice at 0, both annotated `jeffi.io/standby`. `lib.sh` and `apply-platform.sh` render it, and refuse to render Azure at all while `FLAGSHIP_CLOUD` is unset. The cutover's `azure-live` step applies the live CronJobs and Deployments in their place. |
 
 ### Identities
 
@@ -65,7 +66,7 @@ Before the first store moves, put the Azure `DATABASE_URL` (and `CONTROL_PLANE_D
 5. **Anthropic federation.** Done: rule `jeffi-production-azure` (`fdrl_01QsmDKrzxm6y34Ho52LNwk5`) trusts issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`. The cutover's identity step points the platform row at it.
 6. **GitHub settings.**
    - Secrets: `AZURE_CLIENT_ID` (the `githubClientId` output), `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` come from a Tailscale OAuth client (Settings → Trust credentials, Keys › Auth Keys write, tag `tag:ci`); set each with `gh secret set <name>`, which prompts for the value. Both were set on 2026-11-26.
-   - Variables: `AZURE_INGRESS_IP` (the `ingressIp` output, used until the DNS cutover). `AZURE_TARGET=true` is set at cutover, not before ([`cutover/README.md`](cutover/README.md)): once it is set, every release applies the Azure platform, and its CronJobs and the messaging and documents workers would run beside AWS's against live providers.
+   - Variables: `AZURE_INGRESS_IP` (the `ingressIp` output, used until the DNS cutover). `AZURE_TARGET=true` and `FLAGSHIP_CLOUD=azure` are set at cutover, not before, by the cutover's `azure-live` step ([`cutover/README.md`](cutover/README.md)). Should `AZURE_TARGET` be set early, releases render Azure on standby (`overlays/azure-standby`): no app CronJob, no messaging, documents or voice worker, no stores, so nothing runs beside AWS. It still applies the platform to Azure on every release, so leave it unset.
 
 ## Apply runbook (in this order)
 
@@ -122,10 +123,10 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
    ```bash
    KUBECONFIG=~/.kube/jeffi-azure.yaml bash deploy/k8s/bootstrap/secrets.sh
    JEFFI_CLOUD=azure bash deploy/k8s/bootstrap/ai-gateway-secret.sh
-   JEFFI_CLOUD=azure bash deploy/k8s/bootstrap/apply-platform.sh "$(bash deploy/k8s/bootstrap/image-tag.sh)"
+   JEFFI_CLOUD=azure FLAGSHIP_CLOUD=aws bash deploy/k8s/bootstrap/apply-platform.sh "$(bash deploy/k8s/bootstrap/image-tag.sh)"
    ```
    `ai-gateway-secret.sh` builds the gateway's `ai-gateway` Secret, which `secrets.sh` does not make. Without `ANTHROPIC_ORGANIZATION_ID` from it, the gateway skips Claude. Its `AI_CACHE_PG_URL` is the semantic cache's RDS URL; the cache is optional, so the gateway works without it, but point it at a database the core can reach to keep caching.
-   Leave `AZURE_TARGET` unset until the cutover (see the GitHub settings above).
+   `FLAGSHIP_CLOUD=aws` renders the standby overlay; without it the Azure render is refused. Leave `AZURE_TARGET` unset until the cutover (see the GitHub settings above).
 10. **Tenant edge.**
     ```bash
     K8S_SERVER_URL=https://<core TS IP>:6443 NODE_SG=<K8S_NODE_SECURITY_GROUP> bash deploy/aws/edge/launch-edge.sh
@@ -135,7 +136,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
     kubectl get node tenant-edge
     kubectl -n kube-system get ds traefik-edge
     ```
-11. **Cutover (Phase E window).** `deploy/azure/cutover/cutover.sh` drives these steps: preflight, freeze, final dump and restore, identity, store re-join, DNS, CloudFront, smoke, unfreeze. `rollback.sh` reverses them; the checklist is in that folder's README. The manual equivalent:
+11. **Cutover (Phase E window).** `deploy/azure/cutover/cutover.sh` drives these steps: preflight, freeze, final dump and restore, identity, store re-join, DNS, CloudFront, smoke, azure-live (the app CronJobs and workers off standby, then the GitHub variables `FLAGSHIP_CLOUD=azure` and `AZURE_TARGET=true`, `AZURE_INGRESS_IP` deleted), unfreeze. `rollback.sh` reverses them; the checklist is in that folder's README. The manual equivalent:
     1. A day before:
        ```bash
        EDGE_IP=… AZURE_IP=… bash deploy/aws/edge/route53-plan.sh --lower-ttl --apply
@@ -144,7 +145,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
        ```bash
        EDGE_IP=… AZURE_IP=… bash deploy/aws/edge/route53-plan.sh --apply
        ```
-       Point CloudFront's origin at `origin.jeffistores.in`, run the smoke tests, unset `AZURE_INGRESS_IP`, then unfreeze.
+       Point CloudFront's origin at `origin.jeffistores.in`, run the smoke tests, apply `overlays/azure`'s app CronJobs and messaging, documents and voice Deployments, set `FLAGSHIP_CLOUD=azure` and `AZURE_TARGET=true`, delete `AZURE_INGRESS_IP`, then unfreeze.
     3. Rollback: the batch the plan saved, under `~/Documents/db-backups/route53-rollback-*.json`.
 
 **How CI reaches Azure** (needs the `tag:ci` rule from `deploy/tailscale/azure-acl-snippet.hujson`). `db-azure`, `deploy-prep-azure` and `release-azure` in `.github/workflows/ci.yml` use `.github/actions/azure-release-setup`. That action:
@@ -157,7 +158,19 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
 From there:
 - `release-db.sh --cloud=azure` reaches Postgres directly over the subnet route. It takes `app_user`'s password from Key Vault through a temporary `PGPASSFILE`, so no password is in argv or the environment.
 - `rollout.sh` and `smoke.sh` render the overlay and talk to the core's Tailscale address.
-- The AWS jobs are unchanged.
+
+**Which lane releases** is set by two repository variables. The workflow passes `FLAGSHIP_CLOUD` on to the scripts, and Init's summary names the lanes.
+
+| `FLAGSHIP_CLOUD` | `AZURE_TARGET` | Release |
+|---|---|---|
+| unset or `aws` (before the cutover) | unset | The AWS lane only, as before. |
+| unset or `aws` | `true` (not planned) | The AWS lane, plus the Azure lane on standby: the flagship database and the platform from `overlays/azure-standby`. No stores, tenant fan-out, seed or CloudFront. |
+| `azure` (set by the cutover's `azure-live` step) | `true` | The Azure lane is the release: DB · Azure · flagship and tenants (the fan-out Job in the Azure cluster, where the stores now are); Deploy · Azure · prepare (`store-secret.sh --check` on Key Vault, `build-secret.sh --check`, `platform prep`); and Release · Azure · \<service>, with the stores (`stores shared` in the controller's job, `stores <service>` after it), the template seed in messaging's job and the post-deploy browser smoke. CloudFront follows it. Every AWS job is skipped, Release · AWS · razer included (see below). |
+| `azure` | unset | Refused by Init: no lane would release. |
+
+After the cutover the scripts refuse the AWS side: `release-db.sh`, `rollout.sh`, `40-tenant-fanout.sh` and `50-seeds.sh` with `JEFFI_CLOUD=aws` and `FLAGSHIP_CLOUD=azure` stop before touching anything. Export `FLAGSHIP_CLOUD=azure` for Mac releases from then on (`JEFFI_CLOUD=azure`). The Azure deploy identity can read Key Vault but not write it, so Deploy · Azure · prepare only warns when `jeffi-store` lags `jeffi-production`. Write it from the Mac with `JEFFI_CLOUD=azure bash deploy/k8s/bootstrap/store-secret.sh` (Key Vault Secrets Officer).
+
+**Razer after the cutover.** `razer-release.sh` reaches the Razer box over SSM through the AWS core, which stops at the cutover, so Release · AWS · razer is skipped from then on. PaddleOCR changes need a path through the Azure core first (open item in the plan).
 
 ## Monthly cost (from the plan, Azure retail Central India and AWS actuals, 2026-11-25)
 

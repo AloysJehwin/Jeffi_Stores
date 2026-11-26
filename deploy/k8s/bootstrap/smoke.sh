@@ -1,7 +1,8 @@
 #!/bin/bash
 # After a rollout, prove it is serving, per service (ci.yml runs one per service job). Scope (default both):
 #   flagship  the platform's deployment of the service: its pod answers its own health check (Host: localhost,
-#             as the probes do), the Next apps' /api/health reporting <sha>, and its public host answers
+#             as the probes do), the Next apps' /api/health reporting <sha>, and its public host answers; a
+#             deployment on standby (Azure before the cutover, at 0) is skipped
 #   tenants   (store services) the same in every store that runs it; the storefront also through each store's
 #             own host, reporting <sha>. Suspended stores (scaled to 0) are skipped.
 # No service: every one. A host that does not answer (000) or answers 5xx fails it. --dry-run reports what is
@@ -52,6 +53,10 @@ in_pod() { # in_pod <namespace> <deployment> <service>
 
 flagship() { # flagship <service>
   local d; [ "$1" = documents ] && d=jeffi-stores-document-service || d=jeffi-stores-$1-service
+  # Azure before the cutover (overlays/azure-standby): parked at 0, with no pod to ask.
+  if [ "$(kubectl -n jeffi get deploy "$d" -o jsonpath='{.metadata.annotations.jeffi\.io/standby}/{.spec.replicas}' 2>/dev/null)" = true/0 ]; then
+    echo "   skip $d (standby until the cutover)"; return 0
+  fi
   in_pod jeffi "$d" "$1"
   case $1 in
     controller) check https://ecom.jeffistores.in/ ;;

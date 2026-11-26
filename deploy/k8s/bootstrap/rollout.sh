@@ -14,8 +14,11 @@
 #   tenant-db  the tenant schema set fanned out to every store's database (40-tenant-fanout.sh); the release
 #              runs it in the database stage (release-db.sh --tenants), before this script
 # --dry-run changes nothing: platform shows `kubectl diff`, stores what it would apply and wait on.
+# JEFFI_CLOUD=azure: before the cutover (FLAGSHIP_CLOUD=aws) only the platform, on standby; the stores and their
+# databases are the AWS cluster's until then. After it (FLAGSHIP_CLOUD=azure) the AWS cluster is refused.
 # Usage: rollout.sh <tag> [platform [prep|<service>]|stores [shared|<service>]|tenant-db] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
 source "$(dirname "$0")/../db/lib.sh"
+refuse_if_aws_retired
 TAG=${1:?tag}
 PHASE=all PART=
 for a in "${@:2}"; do case $a in
@@ -23,6 +26,10 @@ for a in "${@:2}"; do case $a in
   prep|shared|controller|storefront|admin|business|messaging|documents|public-api|mobile|showcase|ai-gateway) PART=$a ;;
 esac; done
 STORE_PARTS="storefront admin business messaging documents"
+STANDBY=false; [ "$CLOUD" = azure ] && [ "$FLAGSHIP_CLOUD" != azure ] && STANDBY=true
+if $STANDBY; then case $PHASE in stores|tenant-db|tenant-schema|tenant-migrations)
+  echo "rollout: the stores are in the AWS cluster until the cutover (FLAGSHIP_CLOUD=azure); nothing to do on Azure" >&2; exit 2 ;;
+esac; fi
 k8s_tunnel
 manifests() { platform_manifests "$TAG"; }
 tenants() { kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'; }
@@ -168,5 +175,5 @@ case $PHASE in
   tenant-schema) tenant_db --schema ;;
   tenant-migrations) tenant_db --migrations ;;
   stores) stores ;;
-  all) platform; stores ;;
+  all) platform; if $STANDBY; then echo "Stores skipped: they are in the AWS cluster until the cutover"; else stores; fi ;;
 esac

@@ -1,6 +1,8 @@
 #!/bin/bash
 # Reverses cutover.sh, from the files it saved in ~/Documents/db-backups/cutover-<date>/ (export CUTOVER_DATE=<that date>).
-# Steps, in order: azure-quiesce dns cloudfront stores-rejoin identity unfreeze. Dry run by default; --apply acts; --step <name>, --from <name>, --list.
+# Steps, in order: release-lanes azure-quiesce dns cloudfront stores-rejoin identity unfreeze. Dry run by default; --apply acts; --step <name>, --from <name>, --list.
+#   release-lanes  the GitHub variables azure-live changed (FLAGSHIP_CLOUD, AZURE_TARGET, AZURE_INGRESS_IP) back to the
+#                  values it saved, so the next release is the AWS lane again and none re-applies Azure
 #   azure-quiesce  Azure pods to 0 so their CronJobs and workers stop writing to the Azure DB
 #   dns            the route53 batch saved before the switch (route53-rollback.json)
 #   cloudfront     each distribution's saved before-config (cloudfront-before-<id>.json)
@@ -13,8 +15,18 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/stores.sh"
-STEPS=(azure-quiesce dns cloudfront stores-rejoin identity unfreeze)
+STEPS=(release-lanes azure-quiesce dns cloudfront stores-rejoin identity unfreeze)
 ZONE=${HOSTED_ZONE_ID:-Z08094881XKVZ9XSGBKG1}
+
+step_release_lanes() {
+  need gh
+  local name val
+  [ -s "$GH_VARS_BEFORE" ] || { echo "   nothing to restore: azure-live never ran in this window ($GH_VARS_BEFORE missing)"; return 0; }
+  while IFS='=' read -r name val; do echo "   $name: now '$(gh_var "$name")', back to '${val:-(unset)}'"; done < "$GH_VARS_BEFORE"
+  $APPLY || { echo "(dry run) --apply would restore them"; return 0; }
+  confirm_typed release-lanes "restore the GitHub variables above (releases take the AWS lane again)"
+  while IFS='=' read -r name val; do gh_var_set "$name" "$val"; done < "$GH_VARS_BEFORE"
+}
 
 step_azure_quiesce() {
   if ! $APPLY; then echo "(dry run) would run freeze.sh on against $AZ_KUBECONFIG (state $RUN_DIR/azure-rollback-freeze.txt)"; return 0; fi

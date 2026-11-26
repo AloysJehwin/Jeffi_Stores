@@ -9,6 +9,7 @@
 # API server validate it and runs nothing.
 # Usage: bash deploy/k8s/db/40-tenant-fanout.sh <sha|live> [--schema|--migrations|--report] [--slug=<slug>] [--dry-run]
 source "$(dirname "$0")/lib.sh"
+refuse_if_aws_retired
 SHA=${1:?image sha of the release (its controller image local-<sha> must be in ECR), or live}
 SCHEMA=true; FILES=true; REPORT=false; SLUG=
 for a in "${@:2}"; do case $a in --schema) FILES=false ;; --migrations) SCHEMA=false ;; --report) REPORT=true ;; --slug=*) SLUG=${a#--slug=} ;; esac; done

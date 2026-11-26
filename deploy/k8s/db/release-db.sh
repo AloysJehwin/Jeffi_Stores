@@ -10,16 +10,18 @@
 # Neither target: both, the flagship first. Neither --schema nor --migrations: both, schema first.
 # --dry-run shows the SQL (flagship) or validates the Job (tenants) and applies nothing; --yes skips the prompts (CI).
 # Usage: bash deploy/k8s/db/release-db.sh [--flagship] [--tenants] [--schema] [--migrations] [--dry-run] [--yes] [--cloud=aws|azure]
-# --cloud=aws (default) or --cloud=azure: the flagship database's target (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md).
+# --cloud=aws (default) or --cloud=azure: the cluster and flagship database (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md).
 # Azure: Postgres Flexible Server over the core's Tailscale subnet route, app_user's password from Key Vault
-# (lib.sh); the stores' databases stay on AWS, so --tenants there is refused.
+# (lib.sh). --tenants there needs FLAGSHIP_CLOUD=azure: until the cutover the stores and the controller that reaches
+# their databases are in the AWS cluster. After it (FLAGSHIP_CLOUD=azure) the AWS side is refused.
 source "$(dirname "$0")/lib.sh"
+refuse_if_aws_retired
 FLAGSHIP=false; TENANTS=false; SCHEMA=false; MIGRATIONS=false
 for a in "$@"; do case $a in
   --flagship) FLAGSHIP=true ;; --tenants) TENANTS=true ;; --schema) SCHEMA=true ;; --migrations) MIGRATIONS=true ;;
 esac; done
-if [ "$CLOUD" = azure ]; then
-  $TENANTS && { echo "release-db: the stores' databases stay on AWS; run --tenants without --cloud=azure" >&2; exit 2; }
+if [ "$CLOUD" = azure ] && [ "$FLAGSHIP_CLOUD" != azure ]; then
+  $TENANTS && { echo "release-db: the stores are in the AWS cluster until the cutover (FLAGSHIP_CLOUD=azure); run --tenants without --cloud=azure" >&2; exit 2; }
   FLAGSHIP=true
 fi
 $FLAGSHIP || $TENANTS || { FLAGSHIP=true; TENANTS=true; }
