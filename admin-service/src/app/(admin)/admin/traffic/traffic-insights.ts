@@ -1,5 +1,5 @@
 import { insightsLoader, weekdaySection, weeklySection, type InsightsConfig } from '@/components/admin/insights'
-import { pageStats } from '@/lib/page-insights/stats'
+import { pageStats } from '@/components/admin/insights-pages/stats'
 
 export const TRAFFIC_INSIGHTS: InsightsConfig = {
   title: 'Store traffic',

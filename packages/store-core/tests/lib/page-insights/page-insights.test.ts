@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mondayGrid, summarize, type InsightsSeries } from '@/lib/insights/series'
 import { mergeInsightsSeries } from '@/lib/page-insights/merge'
-import { pageStats, partStats, percentOf, seriesSums } from '@/lib/page-insights/stats'
+import { pageStats, partStats, percentOf, seriesSums } from '@/components/admin/insights-pages/stats'
 
 const today = '2026-11-26'
 const grid = mondayGrid(today, 2)

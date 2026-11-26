@@ -137,7 +137,7 @@ export default function QrPaymentDialog({
         )}
         {finalising && <p className="text-sm font-medium text-foreground" role="status">Paid — creating the invoice…</p>}
         {status === 'failed' && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">Paid. Couldn't create the invoice: {error}</p>
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">Paid. Couldn&apos;t create the invoice: {error}</p>
         )}
         {status === 'expired' && <p className="text-sm text-foreground-secondary" role="status">This QR has expired.</p>}
         {status === 'cancelled' && <p className="text-sm text-foreground-secondary" role="status">Payment cancelled.</p>}

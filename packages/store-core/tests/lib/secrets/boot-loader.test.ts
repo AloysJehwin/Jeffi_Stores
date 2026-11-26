@@ -75,7 +75,7 @@ function run(env: Record<string, string>): Promise<{ code: number; out: string; 
     ...env,
   }
   return new Promise((resolve) => {
-    execFile(process.execPath, [LOADER], { env: full, cwd: ROOT, timeout: 30_000 }, (e, out, err) => resolve({ code: e ? ((e as any).code ?? 1) : 0, out, err }))
+    execFile(process.execPath, [LOADER], { env: full as NodeJS.ProcessEnv, cwd: ROOT, timeout: 30_000 }, (e: Error | null, out: string, err: string) => resolve({ code: e ? ((e as any).code ?? 1) : 0, out, err }))
   })
 }
 

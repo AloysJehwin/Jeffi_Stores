@@ -216,9 +216,9 @@ describe('platform on Azure, stores on AWS', () => {
 
   it('reads its link from config; unset is today', async () => {
     const { tenantPlatformLink } = await import('@/lib/k8s/tenant-compute')
-    expect(tenantPlatformLink({})).toEqual({ secrets: 'secretsmanager', dbIamAuth: true })
+    expect(tenantPlatformLink({} as NodeJS.ProcessEnv)).toEqual({ secrets: 'secretsmanager', dbIamAuth: true })
     expect(
-      tenantPlatformLink({ SECRETS_BACKEND: 'keyvault', TENANT_PLATFORM_DB_IAM_AUTH: 'false', TENANT_PLATFORM_DB_SSL: 'require', TENANT_NODE_CIDRS: '100.64.0.0/10, 10.60.0.0/16' })
+      tenantPlatformLink({ SECRETS_BACKEND: 'keyvault', TENANT_PLATFORM_DB_IAM_AUTH: 'false', TENANT_PLATFORM_DB_SSL: 'require', TENANT_NODE_CIDRS: '100.64.0.0/10, 10.60.0.0/16' } as unknown as NodeJS.ProcessEnv)
     ).toEqual({ secrets: 'kubernetes', dbIamAuth: false, dbSsl: 'require', nodeCidrs: ['100.64.0.0/10', '10.60.0.0/16'] })
   })
 

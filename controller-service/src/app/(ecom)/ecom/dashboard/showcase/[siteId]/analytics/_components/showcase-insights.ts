@@ -1,5 +1,5 @@
 import { insightsLoader, weekdaySection, weeklySection, type InsightsConfig } from '@/components/admin/insights'
-import { pageStats } from '@/lib/page-insights/stats'
+import { pageStats } from '@/components/admin/insights-pages/stats'
 
 /** The insights sheet for one Showcase: page views against the enquiries it received. */
 export function showcaseInsights(siteId: string, tenantSlug: string): InsightsConfig {

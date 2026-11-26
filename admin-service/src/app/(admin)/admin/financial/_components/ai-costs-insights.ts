@@ -1,5 +1,5 @@
 import { insightsLoader, weekdaySection, weeklySection, type InsightsConfig } from '@/components/admin/insights'
-import { seriesSums } from '@/lib/page-insights/stats'
+import { seriesSums } from '@/components/admin/insights-pages/stats'
 import { fmtLong, nf } from '@/components/admin/dashboard/viz'
 
 const rupees = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`

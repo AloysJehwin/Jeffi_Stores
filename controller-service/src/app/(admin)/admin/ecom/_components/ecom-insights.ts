@@ -1,6 +1,6 @@
 import { insightsLoader, weekdaySection, type InsightsConfig } from '@/components/admin/insights'
 import { totalVsPartSection } from '@/components/admin/insights-pages/sections'
-import { partStats } from '@/lib/page-insights/stats'
+import { partStats } from '@/components/admin/insights-pages/stats'
 
 const BASE = '/api/admin/ecom'
 
