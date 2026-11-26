@@ -277,7 +277,7 @@ resource githubId 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
   tags: tags
 }
 
-// Federated credentials on one identity must be written one at a time.
+// Federated credentials are written one at a time across the tenant, so the three loops are chained too.
 @batchSize(1)
 resource githubFic 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = [
   for env in githubEnvironments: {
@@ -304,6 +304,7 @@ resource appsFic 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIden
   for (sub, i) in clusterAppSubjects: {
     parent: appsId
     name: 'k3s-apps-${i}'
+    dependsOn: [githubFic]
     properties: {
       issuer: oidcIssuerUrl
       subject: sub
@@ -325,6 +326,7 @@ resource controllerFic 'Microsoft.ManagedIdentity/userAssignedIdentities/federat
   for (sub, i) in clusterControllerSubjects: {
     parent: controllerId
     name: 'k3s-controller-${i}'
+    dependsOn: [appsFic]
     properties: {
       issuer: oidcIssuerUrl
       subject: sub
