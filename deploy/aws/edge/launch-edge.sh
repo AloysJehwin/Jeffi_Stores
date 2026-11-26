@@ -7,7 +7,11 @@
 #   eip <instance-id> [--apply]   allocate (or reuse the jeffi-tenant-edge one) and associate the Elastic IP only
 # Needs K8S_SERVER_URL (https://<core Tailscale IP>:6443), and SUBNET_ID / NODE_SG (the store nodes' subnet and
 # security group, from the provisioning ConfigMap's K8S_NODE_SECURITY_GROUP) unless the defaults below fit.
-# Usage: K8S_SERVER_URL=https://100.x.y.z:6443 bash deploy/aws/edge/launch-edge.sh [--apply]
+# The k3s token and Tailscale key are read here at launch (SECRETS_BACKEND=aws|keyvault, like the controller) and written
+# into the user-data, which unsets them after use and never traces; the instance profile needs no secrets access. They
+# stay readable to the instance (IMDS user-data) and to ec2:DescribeInstanceAttribute, as on controller-launched store
+# nodes. --instance-secrets keeps the old behaviour: the node reads jeffi/production/k3s from Secrets Manager itself.
+# Usage: K8S_SERVER_URL=https://100.x.y.z:6443 bash deploy/aws/edge/launch-edge.sh [--apply] [--instance-secrets]
 #        bash deploy/aws/edge/launch-edge.sh eip i-0123456789abcdef0 [--apply]
 set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)
@@ -15,7 +19,29 @@ export AWS_REGION=${AWS_REGION:-us-east-1}
 TYPE=${EDGE_INSTANCE_TYPE:-t4g.small}
 PROFILE=${EDGE_IAM_PROFILE:-jeffi-tenant-node-profile}
 NAME=jeffi-tenant-edge
-APPLY=false; for a in "$@"; do [ "$a" = --apply ] && APPLY=true; done
+APPLY=false INSTANCE_SECRETS=false
+for a in "$@"; do case $a in --apply) APPLY=true ;; --instance-secrets) INSTANCE_SECRETS=true ;; esac; done
+
+# The k3s token and Tailscale key (one JSON secret: K3S_TOKEN, TS_AUTHKEY), from the store SECRETS_BACKEND picks, as in
+# packages/store-core/src/lib/secrets: `aws` (default, Secrets Manager) or `keyvault` (name jeffi/production/k3s is
+# jeffi-production-k3s there; vault AZURE_KEY_VAULT_NAME, default jeffi-prod-kv, or AZURE_KEY_VAULT_URL).
+JOIN_SECRET_ID=${K8S_JOIN_SECRET_ID:-jeffi/production/k3s}
+secrets_backend() {
+  case $(printf %s "${SECRETS_BACKEND:-aws}" | tr A-Z a-z) in
+    aws|secretsmanager) echo aws ;; keyvault|key-vault|azure) echo keyvault ;;
+    *) echo "SECRETS_BACKEND must be aws or keyvault (got \"${SECRETS_BACKEND:-}\")" >&2; return 1 ;;
+  esac
+}
+join_secret() { # prints the secret's JSON; callers keep it in a variable only
+  local backend name; backend=$(secrets_backend)
+  if [ "$backend" = aws ]; then
+    aws secretsmanager get-secret-value --region "${SECRETS_REGION:-us-east-1}" --secret-id "$JOIN_SECRET_ID" --query SecretString --output text
+  else
+    name=${JOIN_SECRET_ID//[^0-9A-Za-z-]/-}
+    if [ -n "${AZURE_KEY_VAULT_URL:-}" ]; then az keyvault secret show --id "${AZURE_KEY_VAULT_URL%/}/secrets/$name" --query value -o tsv
+    else az keyvault secret show --vault-name "${AZURE_KEY_VAULT_NAME:-jeffi-prod-kv}" --name "$name" --query value -o tsv; fi
+  fi
+}
 
 eip() { # <instance-id>
   local alloc ip
@@ -50,8 +76,23 @@ if [ "$EDGE_SG" = None ]; then
     echo "would create security group $NAME (tcp 80, 443 and udp 41641 from anywhere)"; EDGE_SG=$NODE_SG
   fi
 fi
-ud=$(mktemp); trap 'rm -f "$ud"' EXIT
-sed "s#__K8S_SERVER__#$SERVER#" "$DIR/edge-node-user-data.sh" > "$ud"
+ud=$(mktemp); trap 'rm -f "$ud"' EXIT # mktemp is 0600; the secrets reach it and EC2 only, never argv or the terminal
+if $INSTANCE_SECRETS; then
+  echo "secrets: the node reads jeffi/production/k3s itself (--instance-secrets)"
+else
+  join=$(join_secret)
+  echo "secrets: k3s token and Tailscale key read at launch from $(secrets_backend)"
+fi
+SERVER="$SERVER" JOIN="${join:-}" python3 -I -c '
+import json, os, shlex, sys
+s = open(sys.argv[1]).read().replace("__K8S_SERVER__", os.environ["SERVER"])
+j = json.loads(os.environ["JOIN"]) if os.environ["JOIN"] else {}
+for ph, k in (("__TS_AUTHKEY__", "TS_AUTHKEY"), ("__K3S_TOKEN__", "K3S_TOKEN")):
+    v = j.get(k, "")
+    if j and (not isinstance(v, str) or not v): sys.exit(k + " missing from the join secret")
+    s = s.replace(ph, shlex.quote(v) if v else "\"\"")
+open(sys.argv[2], "w").write(s)' "$DIR/edge-node-user-data.sh" "$ud"
+unset join
 run=(aws ec2 run-instances --image-id "$AMI" --instance-type "$TYPE" --subnet-id "$SUBNET"
   --security-group-ids "$NODE_SG" "$EDGE_SG" --iam-instance-profile "Name=$PROFILE" --user-data "file://$ud"
   --metadata-options 'HttpTokens=required,HttpEndpoint=enabled'

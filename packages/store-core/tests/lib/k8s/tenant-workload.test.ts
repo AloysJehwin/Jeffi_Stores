@@ -325,6 +325,15 @@ describe('agent user-data across clouds', () => {
     expect(ud).not.toContain('--accept-routes')
   })
 
+  it('today: tracing is off before the token or Tailscale key is read', () => {
+    const ud = agentNodeUserData({ ...base, dbAgent: true })
+    const off = ud.indexOf('set +x\n')
+    expect(off).toBeGreaterThan(-1)
+    expect(off).toBeLessThan(ud.indexOf('$(sec TS_AUTHKEY)'))
+    expect(off).toBeLessThan(ud.indexOf('$(sec K3S_TOKEN)'))
+    expect(ud.slice(off)).not.toMatch(/set -\w*x|set -o xtrace/)
+  })
+
   it('over Tailscale: flannel on tailscale0, the Tailscale address, routes accepted', () => {
     const ud = agentNodeUserData({ ...base, overTailscale: true })
     expect(ud).toContain('--advertise-tags tag:server-prod --accept-routes')

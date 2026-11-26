@@ -1,5 +1,6 @@
 // cloud-init for k3s agent nodes (stock AL2023 arm64). Joins the cluster with the token in
-// Secrets Manager (jeffi/production/k3s), then registers with its labels + taints.
+// Secrets Manager (jeffi/production/k3s), then registers with its labels + taints. Traced until the secrets are
+// read (`set +x`): under -x the token and Tailscale key would reach the EC2 console log.
 export interface AgentNodeSpec {
   nodeName: string // pool-basic-N | t-{slug}
   labels: Record<string, string>
@@ -101,6 +102,7 @@ export function agentNodeUserData(spec: AgentNodeSpec): string {
 set -euxo pipefail
 REGION=us-east-1
 ${spec.dbAgent ? dbAgentInstall(spec.nodeName) : ''}dnf install -y jq
+set +x
 sec() { aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production/k3s --query SecretString --output text | jq -r ".$1"; }
 if ! command -v tailscale >/dev/null; then curl -fsSL https://tailscale.com/install.sh | sh; fi
 systemctl enable --now tailscaled
