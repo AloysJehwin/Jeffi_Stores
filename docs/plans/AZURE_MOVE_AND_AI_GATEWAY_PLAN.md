@@ -4,6 +4,22 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 
 ## Phase B/C status (2026-11-26)
 
+**Applied 2026-11-26 (Phase B, Azure side):**
+- **Foundation and core VM:** resource group `jeffi-prod-cin`, VNet and NSG, Key Vault `jeffi-prod-kv`, the identities, and static IP 52.172.147.62. The VM `jeffi-prod-core` is an E4ps_v6 (no zone pinned, since the sponsorship subscription blocks zones in Central India).
+  - Tailscale name `jeffi-k8s-core-az` at 100.126.223.51. The routes 10.60.2.0/24 and 168.63.129.16/32 are approved.
+  - k3s v1.37.2 is up with issuer `https://oidc.jeffistores.in`.
+  - First boot gave k3s an empty `--node-external-ip`, because IMDS has no public IP for a Standard-SKU address. It was fixed on the VM, and `core.sh` now gets the IP from Bicep.
+  - VM customData can't be changed in place, so `apply.sh --core` after a `core.sh` edit needs a rebuilt VM. Ordinary runs leave `--core` off.
+- **Secrets:** `kv-sync.sh --apply` copied the 10 production secrets into Key Vault. The `*/local` developer secrets are skipped.
+- **Postgres: not created.** B2s returns `SkuNotAvailable` in every zone. Support request 2611260030001583 (Region access with zonal dependency) is pending. Until it's approved, `DEPLOY_PG=false` skips Postgres. Then run `PG_ZONE=<n> bash deploy/azure/apply.sh --apply` and `pg-init.sh`.
+- **Anthropic federation:**
+  - Issuer `jeffi-azure-k3s` (`fdis_0167MVYogtxoLC6CGPJBJGne`): inline JWKS, JTI replay protection off, 1h max, like `jeffi-razer-k3s`.
+  - Rules for subject `system:serviceaccount:jeffi:ai-gateway`, audience `https://api.anthropic.com`, 1h tokens: `jeffi-azure-flagship` (`fdrl_01QsmDKrzxm6y34Ho52LNwk5`, service account and workspace jeffi-flagship) and `jeffi-azure-t-testco` (`fdrl_01DG9agoD1BsVXgfy5TTF6N4`, jeffi-t-testco).
+  - At cutover, point `ai_provider_identities.federation_rule_id` at these.
+  - The inline key must be re-registered whenever the k3s service-account key rotates.
+- **Overlay:** `azure.env` ids and `K8S_SERVER_URL` are filled. `CLUSTER_INGRESS_IP` waits for the AWS edge (step 10).
+- **Still to do:** the kubeconfig over `tailscale ssh` (the ACL gives nobody SSH to tag:server-prod yet), Postgres, IRSA (step 7) and the tenant edge.
+
 **Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
 - **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):
   - resource group `jeffi-prod-cin`, VNet and NSG (80/443 public; the k3s API, SSH and Postgres only over Tailscale), static IP;

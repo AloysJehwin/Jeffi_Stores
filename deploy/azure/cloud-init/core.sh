@@ -8,6 +8,8 @@ set -euo pipefail
 KV=__KEY_VAULT__
 ISSUER=__OIDC_ISSUER__
 ROUTES=__ADVERTISE_ROUTES__
+# IMDS leaves publicIpAddress empty for Standard-SKU public IPs, so Bicep passes the static IP in.
+PUBLIC_IP=__PUBLIC_IP__
 export DEBIAN_FRONTEND=noninteractive
 command -v jq >/dev/null || { apt-get update -q && apt-get install -y -q jq curl; }
 
@@ -42,7 +44,8 @@ fi
 TS_IP=
 for _ in $(seq 1 30); do TS_IP=$(tailscale ip -4 2>/dev/null | head -1 || true); [ -n "$TS_IP" ] && break; sleep 2; done
 [ -n "$TS_IP" ] || { echo "no Tailscale address" >&2; exit 1; }
-PUBLIC_IP=$(imds 'instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text')
+EXTERNAL_IP_ARGS=()
+[ -n "$PUBLIC_IP" ] && EXTERNAL_IP_ARGS=(--node-external-ip "$PUBLIC_IP")
 
 if ! command -v k3s >/dev/null; then
   K3S_TOKEN=$(kv_get jeffi-production-k3s K3S_TOKEN)
@@ -54,7 +57,7 @@ if ! command -v k3s >/dev/null; then
     --node-label jeffi.io/role=core \
     --node-label jeffi.io/cloud=azure \
     --node-label svccontroller.k3s.cattle.io/enablelb=true \
-    --node-ip "$TS_IP" --advertise-address "$TS_IP" --node-external-ip "$PUBLIC_IP" \
+    --node-ip "$TS_IP" --advertise-address "$TS_IP" "${EXTERNAL_IP_ARGS[@]}" \
     --flannel-iface tailscale0 \
     --tls-san "$TS_IP" --tls-san jeffi-k8s-core-az \
     --kube-apiserver-arg "service-account-issuer=$ISSUER" \

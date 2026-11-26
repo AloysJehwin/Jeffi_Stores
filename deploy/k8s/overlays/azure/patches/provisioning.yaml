@@ -7,7 +7,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata: { name: provisioning, namespace: jeffi }
 data:
-  K8S_SERVER_URL: https://REPLACE_ME_core_tailscale_ip:6443
+  K8S_SERVER_URL: https://100.126.223.51:6443
   CLUSTER_INGRESS_IP: REPLACE_ME_edge_elastic_ip
   # Flannel over tailscale0, node IP = Tailscale IP, the core's subnet routes accepted.
   K8S_NODES_OVER_TAILSCALE: 'true'

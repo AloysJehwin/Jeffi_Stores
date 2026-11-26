@@ -8,6 +8,8 @@ param adminUsername string = 'jeffi'
 param sshPublicKey string
 param subnetId string
 param publicIpId string
+@description('The static public IP itself: cloud-init cannot read a Standard-SKU IP from IMDS.')
+param publicIpAddress string
 param keyVaultName string
 param oidcIssuerUrl string
 param pgSubnetCidr string
@@ -16,7 +18,7 @@ param tags object
 
 var kvSecretsOfficer = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 // 168.63.129.16 is Azure DNS: advertised so the tailnet can resolve the Postgres private zone through the core.
-var cloudInit = replace(replace(replace(loadTextContent('../cloud-init/core.sh'), '__KEY_VAULT__', keyVaultName), '__OIDC_ISSUER__', oidcIssuerUrl), '__ADVERTISE_ROUTES__', '${pgSubnetCidr},168.63.129.16/32')
+var cloudInit = replace(replace(replace(replace(loadTextContent('../cloud-init/core.sh'), '__KEY_VAULT__', keyVaultName), '__OIDC_ISSUER__', oidcIssuerUrl), '__ADVERTISE_ROUTES__', '${pgSubnetCidr},168.63.129.16/32'), '__PUBLIC_IP__', publicIpAddress)
 
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName

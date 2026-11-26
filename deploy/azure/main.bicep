@@ -67,6 +67,7 @@ module core 'modules/core-vm.bicep' = if (deployCore) {
     sshPublicKey: sshPublicKey
     subnetId: foundation.outputs.nodesSubnetId
     publicIpId: foundation.outputs.publicIpId
+    publicIpAddress: foundation.outputs.publicIpAddress
     keyVaultName: keyVaultName
     oidcIssuerUrl: oidcIssuerUrl
     pgSubnetCidr: foundation.outputs.pgSubnetCidr
