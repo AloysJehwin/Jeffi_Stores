@@ -3,7 +3,7 @@
 # restrictions) and `what-if` only, nothing created. --core adds the k3s core VM (second pass, after kv-sync.sh).
 # The Postgres admin password is generated on the first pass and read back from Key Vault afterwards; it goes
 # through a 0600 parameters file, never argv or the terminal.
-# Usage: bash deploy/azure/apply.sh [--core] [--apply]
+# Usage: [PG_SKU=Standard_B2s] [PG_ZONE=1|2|3] bash deploy/azure/apply.sh [--core] [--apply]
 set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)
 SUBSCRIPTION=${AZ_SUBSCRIPTION:-Azure subscription 1}
@@ -47,6 +47,7 @@ operator=$(az ad signed-in-user show --query id -o tsv 2>/dev/null || true)
 PW="$pw" SSH_KEY="$ssh_key" OPERATOR="$operator" CORE=$CORE python3 -I -c '
 import json, os
 p = {"pgAdminPassword": os.environ["PW"], "deployCore": os.environ["CORE"] == "true",
+     "pgSku": os.environ.get("PG_SKU") or "Standard_B2s", "pgZone": os.environ.get("PG_ZONE", ""),
      "sshPublicKey": os.environ["SSH_KEY"], "operatorPrincipalId": os.environ["OPERATOR"]}
 print(json.dumps({"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0", "parameters": {k: {"value": v} for k, v in p.items()}}))' > "$tmp/params.json"

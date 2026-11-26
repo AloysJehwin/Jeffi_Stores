@@ -17,6 +17,8 @@ param vnetCidr string = '10.60.0.0/16'
 param nodesSubnetCidr string = '10.60.1.0/24'
 param pgSubnetCidr string = '10.60.2.0/24'
 param pgSku string = 'Standard_B2s'
+@description('Postgres availability zone; empty lets Azure choose.')
+param pgZone string = ''
 param pgStorageGb int = 32
 param githubEnvironments array = [
   'production'
@@ -178,6 +180,7 @@ resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   }
   properties: {
     version: '16'
+    availabilityZone: empty(pgZone) ? null : pgZone
     administratorLogin: pgAdminLogin
     administratorLoginPassword: pgAdminPassword
     storage: {

@@ -23,6 +23,7 @@ param githubRepo string = 'AloysJehwin/Jeffi_Stores'
 param sshPublicKey string = ''
 param vmSize string = 'Standard_E4ps_v6'
 param pgSku string = 'Standard_B2s'
+param pgZone string = ''
 // apply.sh passes the signed-in user, who then may write the vault's secrets (kv-sync.sh, pg-init.sh).
 param operatorPrincipalId string = ''
 param tags object = {
@@ -48,6 +49,7 @@ module foundation 'modules/foundation.bicep' = {
     oidcIssuerUrl: oidcIssuerUrl
     githubRepo: githubRepo
     pgSku: pgSku
+    pgZone: pgZone
     operatorPrincipalId: operatorPrincipalId
     tags: tags
   }
