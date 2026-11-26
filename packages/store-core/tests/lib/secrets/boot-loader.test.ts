@@ -62,6 +62,8 @@ function run(env: Record<string, string>): Promise<{ code: number; out: string; 
   const full = {
     ...clean,
     NODE_ENV: 'production',
+    // CI runs Node 20, where the AWS SDK prints a NodeVersionSupportWarning ahead of the loader's own stderr.
+    NODE_NO_WARNINGS: '1',
     SPAWN_APP: '1',
     APP_ENTRY: app,
     AWS_REGION: 'us-east-1',
