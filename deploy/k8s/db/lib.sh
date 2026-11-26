@@ -8,6 +8,17 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 CLOUD=${JEFFI_CLOUD:-aws}
 for a in "$@"; do case $a in --cloud=*) CLOUD=${a#--cloud=} ;; esac; done
 case $CLOUD in aws|azure) export JEFFI_CLOUD=$CLOUD ;; *) echo "unknown cloud: $CLOUD" >&2; exit 2 ;; esac
+# Which cluster is the flagship: aws until the cutover, azure after it (CI passes the repository variable
+# FLAGSHIP_CLOUD; deploy/azure/cutover/README.md). Until then Azure renders on standby (overlays/azure-standby); after
+# it nothing re-applies or migrates the AWS platform, whose RDS is the pre-cutover copy. Unset: AWS as always, and
+# no Azure render (say which).
+FLAGSHIP_CLOUD=${FLAGSHIP_CLOUD:-}
+case $FLAGSHIP_CLOUD in ''|aws|azure) ;; *) echo "unknown FLAGSHIP_CLOUD: $FLAGSHIP_CLOUD (aws or azure)" >&2; exit 2 ;; esac
+refuse_if_aws_retired() {
+  [ "$CLOUD" = aws ] && [ "$FLAGSHIP_CLOUD" = azure ] || return 0
+  echo "$(basename "$0"): FLAGSHIP_CLOUD=azure, so the AWS platform is retired (its cluster frozen, its RDS the pre-cutover copy). Run it with JEFFI_CLOUD=azure." >&2
+  exit 2
+}
 AZ_RG=${AZ_RG:-jeffi-prod-cin}
 AZ_KEY_VAULT=${AZ_KEY_VAULT:-jeffi-prod-kv}
 AZ_PG_HOST=${AZ_PG_HOST:-jeffi-prod-pg.postgres.database.azure.com}
@@ -208,10 +219,17 @@ schema_diff() {
 
 # The platform manifests with every jeffi-stores-* image at <tag> (rollout.sh, and 40-tenant-fanout.sh's Job).
 # On Azure, the overlay (cluster identity for AWS and Key Vault, the AWS tenant edge); it refuses to render while a
-# placeholder is left in it (deploy/k8s/overlays/azure/kustomization.yaml).
+# placeholder is left in it (deploy/k8s/overlays/azure/kustomization.yaml). Before the cutover (FLAGSHIP_CLOUD=aws),
+# azure-standby: the app CronJobs suspended, messaging, documents and voice at 0.
 platform_manifests() {
   local dir=$REPO/deploy/k8s/platform out
-  [ "$CLOUD" = azure ] && dir=$REPO/deploy/k8s/overlays/azure
+  if [ "$CLOUD" = azure ]; then
+    case $FLAGSHIP_CLOUD in
+      azure) dir=$REPO/deploy/k8s/overlays/azure ;;
+      aws) dir=$REPO/deploy/k8s/overlays/azure-standby ;;
+      *) echo "Set FLAGSHIP_CLOUD to render the Azure platform: aws before the cutover (standby: CronJobs suspended, messaging, documents and voice at 0), azure after it" >&2; return 1 ;;
+    esac
+  fi
   out=$(kubectl kustomize "$dir")
   if grep -q 'REPLACE_ME' <<<"$out"; then echo "$dir still has REPLACE_ME placeholders" >&2; return 1; fi
   sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:$1#g" <<<"$out"

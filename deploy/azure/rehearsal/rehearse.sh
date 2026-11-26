@@ -25,6 +25,9 @@
 #          [--slug NAME] [--keep-store] [--store-timeout-min 45]
 #          [--rewrite-hosts [--domain az-rehearsal.jeffistores.in] [--with-dns]] [--no-safe-mode]
 export JEFFI_CLOUD=azure
+# A rehearsal is before the cutover by definition: the platform renders on standby (overlays/azure-standby), under safe mode.
+[ "${FLAGSHIP_CLOUD:-aws}" = aws ] || { echo "FLAGSHIP_CLOUD=${FLAGSHIP_CLOUD}: Azure is the live flagship, a rehearsal would park it" >&2; exit 2; }
+export FLAGSHIP_CLOUD=aws
 source "$(dirname "$0")/common.sh"
 DOMAIN=az-rehearsal.jeffistores.in; TAG=; AZURE_IP=${AZURE_INGRESS_IP:-}; INGRESS_IP=; RESTORE=false; WITH_DNS=false
 SKIP_PLATFORM=false; SKIP_STORE=false; COOKIE=; PLAN=basic; SLUG=; KEEP_STORE=false; STORE_TIMEOUT=45
@@ -153,7 +156,7 @@ if ! out=$(PATH=$SHIM_DIR:$PATH platform_manifests "$TAG" 2>&1); then
   exit 1
 fi
 say "Render preview (what the platform scripts will apply)"
-rendered=$(PATH=$SHIM_DIR:$PATH kubectl kustomize "$REPO/deploy/k8s/overlays/azure")
+rendered=$(PATH=$SHIM_DIR:$PATH kubectl kustomize "$REPO/deploy/k8s/overlays/azure-standby")
 if $SAFE; then
   echo "CronJobs rendered suspended: $(jq -s '[.[] | .items[]? | select(.kind=="CronJob" and .spec.suspend==true)] | length' <<<"$rendered")"
   echo "parked at 0 replicas: $(jq -r -s '[.[] | .items[]? | select(.kind=="Deployment" and .spec.replicas==0) | .metadata.name] | join(", ")' <<<"$rendered")"

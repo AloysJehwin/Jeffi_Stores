@@ -4,7 +4,8 @@
 # AZURE_INGRESS_IP (the core's public IP; the foundation output is publicIpAddress, the subscription-level one ingressIp).
 # Values go to `gh` on stdin, never argv. The repo is gh's: run inside the checkout or set GH_REPO=owner/name.
 # AZURE_TARGET is the switch that turns the db-azure / deploy-prep-azure / release-azure jobs on: --enable-target sets it
-# to true. Do that ONLY after the rehearsal (deploy/azure/README.md) has passed; until then CI stays on AWS.
+# to true. The cutover's azure-live step sets it (with FLAGSHIP_CLOUD=azure) through gh itself, so this flag is a manual
+# fallback, for the cutover only (deploy/azure/cutover/README.md). Set before it, releases render Azure on standby.
 # Dry run by default: prints the names and where each value comes from, no values. --apply sets them.
 # Usage: bash deploy/azure/github-settings.sh [--apply] [--enable-target]
 set -euo pipefail
@@ -46,6 +47,6 @@ var AZURE_INGRESS_IP "$ingress" "$DEPLOYMENT output ingressIp or publicIpAddress
 if $TARGET; then
   var AZURE_TARGET true "--enable-target (the CI Azure jobs run from the next push)"
 else
-  echo "AZURE_TARGET not touched (--enable-target, only at cutover: deploy/azure/cutover/README.md)"
+  echo "AZURE_TARGET not touched (the cutover's azure-live step sets it with FLAGSHIP_CLOUD=azure: deploy/azure/cutover/README.md)"
 fi
 if ! $APPLY; then echo "Dry run: nothing set. Re-run with --apply."; fi

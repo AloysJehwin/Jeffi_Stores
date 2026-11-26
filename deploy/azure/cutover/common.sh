@@ -52,6 +52,17 @@ freeze_aws() { KUBECONFIG=$AWS_KUBECONFIG FREEZE_STATE=$AWS_FREEZE_STATE bash "$
 freeze_azure() { KUBECONFIG=$AZ_KUBECONFIG FREEZE_STATE=$AZ_FREEZE_STATE bash "$BOOT/freeze.sh" "$1"; }
 aws_tunnel() { KUBECONFIG=$AWS_KUBECONFIG lib_run aws 'k8s_tunnel'; }
 
+# The repository variables the release lanes read (.github/workflows/ci.yml), through gh (this checkout's repo, or
+# GH_REPO). None is secret. azure-live saves them once per window in GH_VARS_BEFORE; rollback's release-lanes restores them.
+GH_VARS=(FLAGSHIP_CLOUD AZURE_TARGET AZURE_INGRESS_IP)
+GH_VARS_BEFORE=$RUN_DIR/github-vars-before.txt
+gh_var() { gh variable list --json name,value --jq ".[] | select(.name == \"$1\") | .value"; }
+gh_var_set() { # <name> <value>; an empty value deletes the variable
+  if [ -n "$2" ]; then printf %s "$2" | gh variable set "$1" >/dev/null
+  else gh variable delete "$1" >/dev/null 2>&1 || true; fi
+  echo "   $1=${2:-(unset)}"
+}
+
 cf_id_for_alias() {
   aws cloudfront list-distributions --output json | python3 -I -c 'import json,sys; h=sys.argv[1]
 d=json.load(sys.stdin)["DistributionList"].get("Items") or []
