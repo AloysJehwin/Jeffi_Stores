@@ -9,7 +9,7 @@
 #   Azure, default: this checkout's); RESTORE_CLEAN=1 (restore over a non-empty Azure DB); RESTORE_ALLOW_ERRORS=1
 #   (carry on after pg_restore reports errors); SMOKE_TENANTS=1 (also smoke the stores in the Azure cluster);
 #   UNFREEZE_AWS=1 (bring the AWS cluster back too, see README); AZURE_K3S_SERVER (default: K8S_SERVER_URL of the Azure overlay);
-#   STORES_SECRETS_BACKEND (keyvault|aws, where the k3s token and Tailscale key are read, default keyvault); STORES_REDISCOVER=1; BACKUPS_DIR, AWS_KUBECONFIG, AZ_KUBECONFIG.
+#   STORES_REDISCOVER=1 (read the AWS cluster's nodes again); BACKUPS_DIR, AWS_KUBECONFIG, AZ_KUBECONFIG.
 # Artifacts and the rollback inputs: ~/Documents/db-backups/cutover-<date>/ ; timestamps: cutover-<date>.log
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
@@ -131,7 +131,7 @@ step_stores_rejoin() {
   if $APPLY; then [ -s "$AWS_FREEZE_STATE" ] || die "the AWS cluster is not frozen ($AWS_FREEZE_STATE missing): freeze first"; fi
   KUBECONFIG=$AZ_KUBECONFIG kubectl get nodes >/dev/null || die "the Azure cluster does not answer"
   say "Re-join the nodes to $server (one typed confirmation per batch)"
-  rejoin_all azure "$server" true "${STORES_SECRETS_BACKEND:-keyvault}"
+  rejoin_all azure "$server" true
   say "Re-apply every store into the Azure cluster (the controller's reconcile-k8s, pods pinned to the same node and disk)"
   slugs_to_apply | tr '\n' ' '; echo
   if ! $APPLY; then echo "(dry run) would POST reconcile-k8s?slug=<slug> for each store, then check its Postgres pod and storefront through $EDGE_IP"; return 0; fi

@@ -69,7 +69,7 @@ step_stores_rejoin() {
     running=$(KUBECONFIG=$AZ_KUBECONFIG kubectl get pods -A -l jeffi.io/tenant --no-headers 2>/dev/null | awk '$4 == "Running" {print $1}' | sort -u | tr '\n' ' ' || true)
     [ -z "$running" ] || die "store pods still run in the Azure cluster ($running): run azure-quiesce first, so each Postgres stops cleanly before its node leaves"
   fi
-  rejoin_all aws "$server" "$ts" "${STORES_SECRETS_BACKEND:-aws}"
+  rejoin_all aws "$server" "$ts"
 }
 
 step_identity() {

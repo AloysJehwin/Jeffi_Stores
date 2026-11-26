@@ -89,28 +89,19 @@ print("missing: " + ", ".join(miss) if miss else "ok"); sys.exit(1 if miss else 
   echo "   $2 never became Ready with its labels: ${out##*$'\n'}" >&2; return 1
 }
 
-# The k3s token and Tailscale key, from the backend that holds them, into a 0600 file in the 0700 scratch dir. Never echoed.
-fetch_join_secret() { # <keyvault|aws> <outfile>
-  case $1 in
-    keyvault) az keyvault secret show --vault-name "${AZ_KEY_VAULT:-jeffi-prod-kv}" --name jeffi-production-k3s --query value -o tsv > "$2" ;;
-    aws) aws secretsmanager get-secret-value --secret-id jeffi/production/k3s --query SecretString --output text > "$2" ;;
-    *) die "unknown secrets backend $1 (keyvault|aws)" ;;
-  esac
-  [ -s "$2" ] || die "jeffi-production-k3s (backend $1) came back empty"
-}
-
-# SSM parameters for one node: uninstall the agent, accept the core's routes, then node-user-data.ts's cross-cloud join
-# (secrets inside, no tracing), then restart the disk agent so it labels db-ready again. File 0600, deleted after the send.
-build_params() { # <node> <server> <overTailscale true|false> <backend> -> $SCRATCH/params.json
-  local n=$1 server=$2 ts=$3 backend=$4
+# SSM parameters for one node: uninstall the agent, accept the core's routes, then node-user-data.ts's join (the
+# cross-cloud one over Tailscale, else the default one), then restart the disk agent so it labels db-ready again. The
+# document holds only non-secret values (server, node name, labels, taints): on the node the script reads the k3s token
+# and Tailscale key itself from Secrets Manager (jeffi/production/k3s) with the instance profile, keeps them in shell
+# variables without tracing and unsets them. Nothing secret is generated, sent or stored here.
+build_params() { # <node> <server> <overTailscale true|false> -> $SCRATCH/params.json
+  local n=$1 server=$2 ts=$3
   ( umask 077
-    fetch_join_secret "$backend" "$SCRATCH/sec.json"
-    python3 -I - "$(nodes_json)" "$n" "$server" "$ts" "$SCRATCH/sec.json" > "$SCRATCH/spec.json" <<'PY'
+    python3 -I - "$(nodes_json)" "$n" "$server" "$ts" > "$SCRATCH/spec.json" <<'PY'
 import json, sys
-m, name, server, ts, sec = sys.argv[1:]
-e = next(x for x in json.load(open(m))["nodes"] if x["name"] == name); s = json.load(open(sec))
-spec = {"nodeName": name, "labels": e["labels"], "taints": e["taints"], "server": server,
-        "join": {"k3sToken": s["K3S_TOKEN"], "tsAuthKey": s["TS_AUTHKEY"]}}
+m, name, server, ts = sys.argv[1:]
+e = next(x for x in json.load(open(m))["nodes"] if x["name"] == name)
+spec = {"nodeName": name, "labels": e["labels"], "taints": e["taints"], "server": server}
 if ts == "true": spec["overTailscale"] = True
 json.dump(spec, sys.stdout)
 PY
@@ -126,14 +117,14 @@ lines += [x for x in body if not x.startswith("#!")]
 if db: lines.append("systemctl restart jeffi-db-volume.service 2>/dev/null || true")
 json.dump({"commands": lines, "executionTimeout": ["900"]}, sys.stdout)
 PY
-    rm -f "$SCRATCH/sec.json" "$SCRATCH/spec.json" "$SCRATCH/join.sh" )
+    rm -f "$SCRATCH/spec.json" "$SCRATCH/join.sh" )
 }
 
 # Move one node into <target> (aws|azure): checks (a dry run stops after them), delete its stale Node object and
 # node-password secret there (k3s refuses a re-installed agent with a new password under the old name), uninstall + join over
 # SSM, wait for Ready with its labels.
-rejoin_node() { # <node> <target> <server> <overTailscale> <backend>
-  local n=$1 target=$2 server=$3 ts=$4 backend=$5 kc id ping cmd st i
+rejoin_node() { # <node> <target> <server> <overTailscale>
+  local n=$1 target=$2 server=$3 ts=$4 kc id ping cmd st i
   kc=$(kc_of "$target")
   if node_ready "$kc" "$n"; then echo "   $n is already Ready in the $target cluster"; return 0; fi
   id=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=jeffi-k8s-$n" Name=instance-state-name,Values=running \
@@ -141,11 +132,11 @@ rejoin_node() { # <node> <target> <server> <overTailscale> <backend>
   [[ $id =~ ^i-[0-9a-f]+$ ]] || die "no single running instance named jeffi-k8s-$n (got: ${id:-none})"
   ping=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$id" --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || true)
   [ "$ping" = Online ] || die "$n ($id) is not Online in SSM (${ping:-no answer}): the instance profile needs AmazonSSMManagedInstanceCore"
-  echo "   $n = $id, SSM Online; would join $server (tailscale=$ts, secrets from $backend)"
+  echo "   $n = $id, SSM Online; would join $server (tailscale=$ts; the node reads the join secret itself)"
   $APPLY || return 0
   KUBECONFIG=$kc kubectl delete node "$n" --ignore-not-found --wait=false >/dev/null
   KUBECONFIG=$kc kubectl -n kube-system delete secret "$n.node-password.k3s" --ignore-not-found >/dev/null
-  build_params "$n" "$server" "$ts" "$backend"
+  build_params "$n" "$server" "$ts"
   cmd=$(aws ssm send-command --instance-ids "$id" --document-name AWS-RunShellScript --parameters "file://$SCRATCH/params.json" \
     --comment "jeffi cutover: rejoin $n" --query Command.CommandId --output text)
   rm -f "$SCRATCH/params.json"
@@ -166,15 +157,15 @@ rejoin_node() { # <node> <target> <server> <overTailscale> <backend>
 
 # Rejoin every node of every selected batch into <target>; one typed confirmation per batch, in order (the canary first
 # unless --only picks one).
-rejoin_all() { # <target> <server> <overTailscale> <backend>
-  local target=$1 server=$2 ts=$3 backend=$4 b key nodes n
+rejoin_all() { # <target> <server> <overTailscale>
+  local target=$1 server=$2 ts=$3 b key nodes n
   b=$(batches); [ -n "$b" ] || die "no store nodes to move (manifest $(nodes_json))"
   echo "   batches: $(cut -d' ' -f1 <<<"$b" | tr '\n' ' ')"
   # Batches arrive on fd 3 so the typed confirmation reads the terminal, not the list.
   while read -r key nodes <&3; do
     say "Batch $key"
     if $APPLY; then confirm_typed "$key" "move the node(s) of $key into the $target cluster; the store is down until it is re-applied"; fi
-    for n in $nodes; do rejoin_node "$n" "$target" "$server" "$ts" "$backend"; done
+    for n in $nodes; do rejoin_node "$n" "$target" "$server" "$ts"; done
   done 3<<<"$b"
 }
 
