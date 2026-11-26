@@ -19,6 +19,8 @@ param pgSubnetCidr string = '10.60.2.0/24'
 param pgSku string = 'Standard_B2s'
 @description('Postgres availability zone; empty lets Azure choose.')
 param pgZone string = ''
+@description('False skips the Postgres server, e.g. while region access is pending.')
+param deployPostgres bool = true
 param pgStorageGb int = 32
 param githubEnvironments array = [
   'production'
@@ -170,7 +172,7 @@ resource dnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-
   }
 }
 
-resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = if (deployPostgres) {
   name: '${prefix}-pg'
   location: location
   tags: tags
@@ -210,7 +212,7 @@ resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
 }
 
 // Configuration writes on one server must not overlap: each waits for the previous.
-resource pgExtensions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+resource pgExtensions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = if (deployPostgres) {
   parent: pg
   name: 'azure.extensions'
   properties: {
@@ -219,7 +221,7 @@ resource pgExtensions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@
   }
 }
 
-resource pgTls 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
+resource pgTls 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = if (deployPostgres) {
   parent: pg
   name: 'require_secure_transport'
   properties: {
@@ -231,7 +233,7 @@ resource pgTls 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08
   ]
 }
 
-resource pgDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
+resource pgDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = if (deployPostgres) {
   parent: pg
   name: 'jeffi_stores'
   properties: {
@@ -395,7 +397,7 @@ output nodesSubnetId string = '${vnet.id}/subnets/nodes'
 output pgSubnetCidr string = pgSubnetCidr
 output publicIpId string = ip.id
 output publicIpAddress string = ip.properties.ipAddress
-output postgresFqdn string = pg.properties.fullyQualifiedDomainName
+output postgresFqdn string = deployPostgres ? pg!.properties.fullyQualifiedDomainName : ''
 output postgresDnsZone string = dnsZone.name
 output keyVaultUri string = kv.properties.vaultUri
 output githubClientId string = githubId.properties.clientId
