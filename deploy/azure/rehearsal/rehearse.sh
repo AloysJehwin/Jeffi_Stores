@@ -5,7 +5,11 @@
 #   database   safe-mode.sql on the Azure copy (flags off, campaigns and outreach paused, credentials blanked)
 #   manifests  a kubectl shim, first on PATH for the platform scripts only, renders the overlay through safe-mode.jq:
 #              kill-switch env on every container, every CronJob suspended, messaging/document/voice at 0 replicas
-#   verify     the run fails if a running pod lacks a switch or a CronJob is not suspended
+#   credentials the pods read secrets from Key Vault, so the rehearsal gets its own vault (--vault, default
+#              jeffi-reh-kv) holding the allowlisted keys only (secret-keys-keep.txt, -deny.txt, secret-sources.txt),
+#              every container points at it, and google-sa is deleted: no live provider credential reaches a pod
+#   verify     the run fails if a running pod lacks a switch or the vault pointer, a CronJob is not suspended, or a
+#              denied key exists in the rehearsal vault or any platform or store Secret
 # Hostnames: the PRODUCTION ones. Nothing is tested through DNS; smoke.sh and curl connect straight to the Azure
 # ingress IP (SMOKE_CONNECT_TO / --connect-to). --rewrite-hosts (opt-in) renders <app>.<domain> instead; see README.
 #   1  (--restore) restore-dump.sh --apply (restore + scrub), then release-db.sh --cloud=azure
@@ -39,6 +43,7 @@ while [ $i -lt ${#args[@]} ]; do
     --restore) RESTORE=true ;; --with-dns) WITH_DNS=true ;; --skip-platform) SKIP_PLATFORM=true ;;
     --skip-store) SKIP_STORE=true ;; --keep-store) KEEP_STORE=true ;; --rewrite-hosts) REWRITE=true ;;
     --no-safe-mode) SAFE=false ;;
+    --vault) REH_VAULT=${args[$((i+1))]:?}; i=$((i+1)) ;;
   esac
   i=$((i+1))
 done
@@ -58,6 +63,11 @@ cd "$REPO"
 SHA=$(image_sha); [ -n "$TAG" ] || TAG=local-$SHA; SHA=${TAG#local-}
 LOG=$BK_ROOT/rehearsal-$(date +%Y-%m-%d).log
 SHIM_DIR=$(mktemp -d); chmod 700 "$SHIM_DIR"; on_exit "rm -rf '$SHIM_DIR'"
+source "$REH_DIR/safe-secrets.sh"
+# The kill-switch env plus the rehearsal vault: every container is pointed at it instead of jeffi-prod-kv.
+SAFE_ENV=$SHIM_DIR/safe-env.json
+jq --arg v "$REH_VAULT" '. + [{name: "AZURE_KEY_VAULT_NAME", value: $v}, {name: "AZURE_KEY_VAULT_URL", value: ("https://" + $v + ".vault.azure.net")}]' \
+  "$REH_DIR/safe-env.json" > "$SAFE_ENV"
 FAILED=()
 run() { timed "$@" || FAILED+=("$1"); }
 must() { timed "$@" || { FAILED+=("$1"); print_times; echo "Stopped: $1 failed." >&2; exit 1; }; }
@@ -82,7 +92,7 @@ rw() {
       -e "s#jeffistores\.in#\$REH_DOMAIN#g" -e 's#KEEPJEFFI#jeffistores.in#g' \${extra[@]+"\${extra[@]}"}
   else sed -E -e 's#^\$##' \${extra[@]+"\${extra[@]}"}; fi
 }
-safe() { if [ "\${REH_SAFE:-}" = 1 ]; then "\$REAL" create --dry-run=client -f - -o json | jq --argjson safe "\$(cat '$REH_DIR/safe-env.json')" -f '$REH_DIR/safe-mode.jq'; else cat; fi; }
+safe() { if [ "\${REH_SAFE:-}" = 1 ]; then "\$REAL" create --dry-run=client -f - -o json | jq --argjson safe "\$(cat '$SAFE_ENV')" -f '$REH_DIR/safe-mode.jq'; else cat; fi; }
 case "\${1:-}" in
   kustomize) "\$REAL" "\$@" | rw | safe ;;
   apply) if [ \$# -eq 3 ] && [ "\$2" = -f ] && [ -f "\$3" ]; then rw < "\$3" | "\$REAL" apply -f -; else exec "\$REAL" "\$@"; fi ;;
@@ -105,7 +115,7 @@ hosts_of() { grep -oE '[A-Za-z0-9*._-]*jeffistores\.in' | sort -u; }
 # ---- checks that fail the run (also run in the dry run where the cluster has the objects)
 verify_pods() { # every running pod in jeffi / jeffi-edge carries every switch
   local out
-  out=$(kubectl get pods -A -o json | jq -r --argjson want "$(cat "$REH_DIR/safe-env.json")" '
+  out=$(kubectl get pods -A -o json | jq -r --argjson want "$(cat "$SAFE_ENV")" '
     .items[] | select(.metadata.namespace as $n | ["jeffi", "jeffi-edge"] | index($n))
     | select(.metadata.deletionTimestamp == null and .status.phase != "Succeeded" and .status.phase != "Failed")
     | .metadata.name as $p | .spec.containers[] | . as $c | $want[]
@@ -147,7 +157,7 @@ rendered=$(PATH=$SHIM_DIR:$PATH kubectl kustomize "$REPO/deploy/k8s/overlays/azu
 if $SAFE; then
   echo "CronJobs rendered suspended: $(jq -s '[.[] | .items[]? | select(.kind=="CronJob" and .spec.suspend==true)] | length' <<<"$rendered")"
   echo "parked at 0 replicas: $(jq -r -s '[.[] | .items[]? | select(.kind=="Deployment" and .spec.replicas==0) | .metadata.name] | join(", ")' <<<"$rendered")"
-  echo "switches on every container: $(jq -r '[.[].name] | join(" ")' "$REH_DIR/safe-env.json")"
+  echo "switches on every container: $(jq -r '[.[].name] | join(" ")' "$SAFE_ENV")"
 fi
 echo "hostnames in the manifests:"; hosts_of <<<"$rendered" | sed 's/^/   /'
 [ -z "$COOKIE" ] || [ -s "$COOKIE" ] || { echo "no such cookie file: $COOKIE" >&2; exit 1; }
@@ -158,6 +168,7 @@ fi
 
 say "Plan"
 $RESTORE && echo "  1  restore the prod dump into Azure Postgres (restore-dump.sh, scrubbed), then release-db.sh --cloud=azure"
+$SAFE && echo "  -  rehearsal Key Vault $REH_VAULT: created if missing, filled with the allowlisted keys of $(grep -vcE '^[[:space:]]*(#|$)' "$SOURCES_FILE") secrets (secret-sources.txt)"
 echo "  2  database scrub + check$($SKIP_PLATFORM || echo ", secrets.sh, apply-platform.sh $TAG, rollout.sh $TAG platform, wildcard certificate, pod and CronJob verification")"
 echo "  3  smoke.sh $SHA per service ($SMOKE_SERVICES) via $AZURE_IP"
 $WITH_DNS && echo "  -  Route 53: A $DOMAIN and *.$DOMAIN -> $AZURE_IP (rollback batch saved)"
@@ -183,6 +194,12 @@ if $SAFE; then
   must safe-mode-db db_scrub jeffi_stores # again: release-db's migrations may have added rows
   must safe-mode-db-check verify_db
 fi
+if $SAFE; then
+  say "2. Safe mode: credentials (rehearsal vault $REH_VAULT)"
+  confirm "Create Key Vault $REH_VAULT in $AZ_RG (standard tier, RBAC; about no cost) with role assignments for you and the cluster identities, and copy the allowlisted keys of the production secrets into it? Values are never printed."
+  must reh-vault-create reh_vault_create
+  must reh-vault-copy reh_vault_fill
+fi
 ecr_kick() { # the first pull secret: the 6-hourly ecr-refresh has not run yet on a fresh cluster
   local end=$((SECONDS + 600)) job
   while [ $SECONDS -lt $end ]; do
@@ -200,6 +217,8 @@ if ! $SKIP_PLATFORM; then
   confirm "Apply the platform to the Azure core ($KUBECONFIG)? It requests a Let's Encrypt wildcard certificate for the platform names (a temporary _acme-challenge TXT record in the Route 53 jeffistores.in zone; no A or CNAME record changes)."
   [ -f certs/ca-cert.pem ] || { echo "certs/ca-cert.pem is missing (secrets.sh needs the platform CA, README step 9)" >&2; exit 1; }
   must secrets bash deploy/k8s/bootstrap/secrets.sh
+  # secrets.sh seeds the Google service account JSON (a live Google credential) when the file is in the repo root: no pod has started yet.
+  $SAFE && must drop-google-sa kubectl -n jeffi delete secret google-sa --ignore-not-found
   ecr_kick & ECR_PID=$!
   must apply-platform env PATH="$SHIM_DIR:$PATH" bash deploy/k8s/bootstrap/apply-platform.sh "$TAG"
   wait $ECR_PID 2>/dev/null || true
@@ -210,6 +229,7 @@ if $SAFE; then
   say "2. Safe mode: verification"
   must verify-cronjobs verify_cronjobs
   must verify-pods verify_pods
+  must verify-secrets verify_secrets
 fi
 
 # ---- optional DNS (rewrite mode only: new names under the rehearsal domain)
@@ -310,6 +330,7 @@ if ! $SKIP_STORE; then
   fi
 fi
 
+$SAFE && run verify-secrets-final verify_secrets # the store's own namespace copies, if it was kept
 say "Result"
 print_times
 echo "Total $((SECONDS - T0))s"
