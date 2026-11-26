@@ -25,11 +25,13 @@
  * because Next.js loads the file and process.env is already set by the time
  * the app reads it (so SM values written to .env.local act as defaults).
  *
- * SECRETS_BACKEND=keyvault reads the same secret from Azure Key Vault under its
- * dash name (jeffi/production -> jeffi-production); see secrets-backend.mjs.
+ * Reads through the one secrets library (packages/store-core/src/lib/secrets/index.mjs, which both
+ * Dockerfiles copy to the same path): SECRETS_BACKEND=keyvault reads the same secret from Azure Key Vault
+ * under its dash name (jeffi/production -> jeffi-production). SECRETS_BACKEND=env fetches nothing: the
+ * pod's environment already holds the secret (a store pod's Kubernetes Secret, copied by the controller).
  */
 
-import { readSecret, secretsBackend, keyVaultName } from './secrets-backend.mjs'
+import { loadSecretEnv, secretsBackend, keyVaultName, isSecretError } from '../packages/store-core/src/lib/secrets/index.mjs'
 import { writeFileSync, existsSync, readFileSync, lstatSync, symlinkSync, unlinkSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -46,21 +48,39 @@ let SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
 const SECRET_FALLBACK_ID = process.env.SM_SECRET_FALLBACK_ID
 const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
 const FALLBACK = process.env.ALLOW_ENV_FALLBACK === 'true'
-const BACKEND = secretsBackend()
+const FROM_ENV = process.env.SECRETS_BACKEND === 'env'
+const BACKEND = FROM_ENV ? 'env' : secretsBackend()
 const STORE = BACKEND === 'keyvault' ? 'Key Vault' : 'Secrets Manager'
-const shown = id => (BACKEND === 'keyvault' ? `${id}" (Key Vault "${keyVaultName(id)}` : id)
+const shown = id => (BACKEND === 'keyvault' ? `"${id}" (Key Vault "${keyVaultName(id)}")` : `"${id}"`)
+// Secrets Manager's own error under the library's SecretError: its name and message, as this loader always printed.
+const why = err => err?.cause ?? err
 
 async function loadSecrets() {
-  let secretString
+  let blob
   try {
-    secretString = await readSecret(SECRET_ID, { region: REGION }).catch(err => {
-      if (!SECRET_FALLBACK_ID || !/ResourceNotFound|AccessDenied/.test(`${err.name} ${err.message}`)) throw err
-      process.stderr.write(`[load-secrets] "${shown(SECRET_ID)}" unavailable (${err.name}); using "${shown(SECRET_FALLBACK_ID)}"\n`)
-      SECRET_ID = SECRET_FALLBACK_ID
-      return readSecret(SECRET_ID, { region: REGION })
+    blob = await loadSecretEnv(SECRET_ID, {
+      region: REGION,
+      fallbackId: SECRET_FALLBACK_ID,
+      onFallback: err => {
+        process.stderr.write(`[load-secrets] ${shown(SECRET_ID)} unavailable (${err?.cause?.name ?? err?.code ?? err?.name}); using ${shown(SECRET_FALLBACK_ID)}\n`)
+        SECRET_ID = SECRET_FALLBACK_ID
+      },
     })
   } catch (err) {
-    const msg = `[load-secrets] Failed to fetch "${shown(SECRET_ID)}" from ${STORE}: ${err.message}`
+    if (isSecretError(err, 'Empty')) {
+      const msg = `[load-secrets] Secret "${SECRET_ID}" exists but SecretString is empty`
+      if (FALLBACK) {
+        process.stderr.write(`${msg} — continuing\n`)
+        return
+      }
+      process.stderr.write(`${msg}\n`)
+      process.exit(1)
+    }
+    if (isSecretError(err, 'Invalid')) {
+      process.stderr.write(`[load-secrets] SecretString for "${SECRET_ID}" is not valid JSON\n`)
+      process.exit(1)
+    }
+    const msg = `[load-secrets] Failed to fetch ${shown(SECRET_ID)} from ${STORE}: ${why(err)?.message}`
     if (FALLBACK) {
       process.stderr.write(`${msg} — continuing (ALLOW_ENV_FALLBACK=true)\n`)
       return
@@ -68,24 +88,7 @@ async function loadSecrets() {
     process.stderr.write(`${msg}\nSet ALLOW_ENV_FALLBACK=true to skip SM.\n`)
     process.exit(1)
   }
-
-  if (!secretString) {
-    const msg = `[load-secrets] Secret "${SECRET_ID}" exists but SecretString is empty`
-    if (FALLBACK) {
-      process.stderr.write(`${msg} — continuing\n`)
-      return
-    }
-    process.stderr.write(`${msg}\n`)
-    process.exit(1)
-  }
-
-  let secrets
-  try {
-    secrets = JSON.parse(secretString)
-  } catch {
-    process.stderr.write(`[load-secrets] SecretString for "${SECRET_ID}" is not valid JSON\n`)
-    process.exit(1)
-  }
+  const secrets = blob.values
 
   if (!isProduction) {
     // DEV: write to .env.local so Next.js picks it up natively.
@@ -120,7 +123,7 @@ async function loadSecrets() {
       }
     }
     process.stdout.write(
-      `[load-secrets] Wrote ${Object.keys(secrets).length} secrets from "${SECRET_ID}"` +
+      `[load-secrets] Wrote ${blob.size} secrets from "${SECRET_ID}"` +
         `${overrideCount ? ` + ${overrideCount} local override(s)` : ''} → .env.local\n`
     )
     return
@@ -130,7 +133,6 @@ async function loadSecrets() {
   let loaded = 0,
     skipped = 0
   for (const [key, value] of Object.entries(secrets)) {
-    if (typeof value !== 'string') continue
     if (process.env[key] !== undefined) {
       skipped++
       continue
@@ -143,7 +145,8 @@ async function loadSecrets() {
   )
 }
 
-await loadSecrets()
+if (FROM_ENV) process.stdout.write(`[load-secrets] "${SECRET_ID}" is in the environment already (SECRETS_BACKEND=env)\n`)
+else await loadSecrets()
 
 // In prod, chain into the app WITHIN the same environment. The old Docker CMD
 // (`node load-secrets.mjs && node cluster-server.js`) ran the server as a SEPARATE

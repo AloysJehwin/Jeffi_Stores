@@ -1,0 +1,182 @@
+# The shared services' store-facing copies on the AWS tenant edge (plan §6a): a store's API host public-{slug} is
+# served next to the store's own nodes, not from Azure, so its /v1/admin calls into the store's namespace and its
+# database queries stay inside AWS. Only the edge's Traefik routes to them: their IngressRoute is labelled
+# jeffi.io/edge-only, which the core's Traefik skips (overlays/azure/patches/traefik-core.yaml), so public.jeffistores.in
+# and every platform host keep the core's copies. Selectors differ from the core's, so no core Service picks these pods.
+# They take the platform services' identity and Key Vault env from overlays/azure (patches/apps-identity.yaml), and roll
+# with their service (bootstrap/platform-part.py maps *-edge to it). Rate limits and idempotency keys live in the edge's
+# own Redis, so a key used on both hosts gets each host's limit.
+# mobile serves only mobile.jeffistores.in, a platform host on Azure, and no store host yet: its copy stays at 0.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis-edge, namespace: jeffi, labels: { app: redis-edge } }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: redis-edge } }
+  template:
+    metadata: { labels: { app: redis-edge } }
+    spec:
+      nodeSelector: { jeffi.io/edge: 'true' }
+      tolerations: [{ key: jeffi.io/edge, operator: Exists, effect: NoSchedule }]
+      automountServiceAccountToken: false
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          # Counters and idempotency keys only: no disk.
+          args: [--requirepass, $(REDIS_PASSWORD), --save, '', --maxmemory, 48mb, --maxmemory-policy, volatile-lru]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+          ports: [{ containerPort: 6379 }]
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-edge, namespace: jeffi }
+spec:
+  selector: { app: redis-edge }
+  ports: [{ port: 6379 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-public-api-service-edge
+  namespace: jeffi
+  labels: { app: public-api-edge, jeffi.io/service: public-api, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: public-api-edge, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: public-api-edge, jeffi.io/service: public-api, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/edge: 'true' }
+      tolerations: [{ key: jeffi.io/edge, operator: Exists, effect: NoSchedule }]
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-public-api-service:latest
+          ports: [{ name: http, containerPort: 3100 }]
+          # As platform/47-public-api-service.yaml, with the edge's Redis.
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/public-api/production }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=192 }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            - { name: DB_IAM_AUTH, value: 'true' }
+            - { name: PUBLIC_API_URL, value: 'https://public.jeffistores.in' }
+            - { name: PLATFORM_ADMIN_URL, value: 'http://jeffi-stores-admin-service.jeffi.svc.cluster.local:3000' }
+            - { name: PLATFORM_CONTROLLER_URL, value: 'http://jeffi-stores-controller-service.jeffi.svc.cluster.local:3000' }
+            - { name: TENANT_ADMIN_URL_TEMPLATE, value: 'http://{slug}-admin-service.tenant-{slug}.svc.cluster.local:3000' }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis-edge:6379' }
+          resources:
+            requests: { cpu: 25m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-public-api-service-edge, namespace: jeffi }
+spec:
+  selector: { app: public-api-edge, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3100, targetPort: http }]
+---
+# Above the core's public-{slug} route (priority 100, platform/47-public-api-service.yaml), on the edge's Traefik only.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: jeffi-stores-public-api-service-edge
+  namespace: jeffi
+  labels: { jeffi.io/edge-only: 'true' }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: HostRegexp(`^public-[a-z0-9-]+\.jeffistores\.in$`)
+      priority: 101
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-public-api-service-edge, port: 3100 }]
+  tls: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-mobile-service-edge
+  namespace: jeffi
+  labels: { app: mobile-edge, jeffi.io/service: mobile, jeffi.io/tenant: jeffi-stores }
+spec:
+  # Parked: no store host routes here yet (see the top of this file). Give it a route and replicas together.
+  replicas: 0
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: mobile-edge, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: mobile-edge, jeffi.io/service: mobile, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/edge: 'true' }
+      tolerations: [{ key: jeffi.io/edge, operator: Exists, effect: NoSchedule }]
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-mobile-service:latest
+          ports: [{ name: http, containerPort: 3103 }]
+          # As platform/48-mobile-service.yaml, with the edge's Redis.
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/mobile/production }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=192 }
+            - { name: STOREFRONT_URL, value: 'http://jeffi-stores-storefront-service.jeffi.svc.cluster.local:3000' }
+            - { name: PUBLIC_SITE_URL, value: 'https://jeffistores.in' }
+            - { name: MIN_APP_VERSION, value: '1.0.0' }
+            - { name: DB_IAM_AUTH, value: 'true' }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis-edge:6379' }
+          resources:
+            requests: { cpu: 25m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-mobile-service-edge, namespace: jeffi }
+spec:
+  selector: { app: mobile-edge, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3103, targetPort: http }]

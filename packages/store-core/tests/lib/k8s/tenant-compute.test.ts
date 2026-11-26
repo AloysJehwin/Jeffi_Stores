@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('server-only', () => ({}))
 const k8s = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), apply: vi.fn(), remove: vi.fn() }))
@@ -10,6 +10,8 @@ const ec2 = vi.hoisted(() => ({
   attachVolume: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/shared/ec2-client', () => ec2)
+const sec = vi.hoisted(() => ({ loadSecretEnv: vi.fn(), getSecretJson: vi.fn() }))
+vi.mock('@/lib/secrets/index.mjs', async orig => ({ ...(await orig<typeof import('@/lib/secrets/index.mjs')>()), ...sec }))
 
 import { ensureTenantNodes, poolCapacity, terminateTenantInstance } from '@/lib/k8s/tenant-compute'
 
@@ -197,5 +199,93 @@ describe('applyTenantWorkload – the old all-in-one app', () => {
     k8s.remove.mockClear()
     await applyTenantWorkload(input)
     expect(removed()).toContain('Deployment/acme-controller-service')
+  })
+})
+
+describe('platform on Azure, stores on AWS', () => {
+  const KEYS = ['SECRETS_BACKEND', 'TENANT_PLATFORM_DB_IAM_AUTH', 'TENANT_PLATFORM_DB_SSL', 'TENANT_NODE_CIDRS', 'K8S_NODES_OVER_TAILSCALE', 'K8S_JOIN_SECRET_ID']
+  const applied = () => k8s.apply.mock.calls.map(c => c[0])
+  beforeEach(() => {
+    vi.clearAllMocks()
+    for (const k of KEYS) delete process.env[k]
+    k8s.get.mockImplementation(async (kind: string, name: string) => (kind === 'Secret' && name === 'redis' ? {} : null))
+  })
+  afterEach(() => {
+    for (const k of KEYS) delete process.env[k]
+  })
+
+  it('reads its link from config; unset is today', async () => {
+    const { tenantPlatformLink } = await import('@/lib/k8s/tenant-compute')
+    expect(tenantPlatformLink({})).toEqual({ secrets: 'secretsmanager', dbIamAuth: true })
+    expect(
+      tenantPlatformLink({ SECRETS_BACKEND: 'keyvault', TENANT_PLATFORM_DB_IAM_AUTH: 'false', TENANT_PLATFORM_DB_SSL: 'require', TENANT_NODE_CIDRS: '100.64.0.0/10, 10.60.0.0/16' })
+    ).toEqual({ secrets: 'kubernetes', dbIamAuth: false, dbSsl: 'require', nodeCidrs: ['100.64.0.0/10', '10.60.0.0/16'] })
+  })
+
+  it('on AWS it copies nothing and lists no secrets', async () => {
+    const { applyTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    await applyTenantWorkload({ slug: 'acme', plan: 'basic', hosts: ['acme.jeffistores.in'], layout: 'services' })
+    expect(sec.loadSecretEnv).not.toHaveBeenCalled()
+    expect(applied().some((o: any) => o.metadata.name.startsWith('env-'))).toBe(false)
+    expect(k8s.list).not.toHaveBeenCalledWith('Secret', expect.anything(), expect.anything())
+  })
+
+  it('copies each secret the pods take into the namespace before them, and drops the ones no pod takes', async () => {
+    process.env.SECRETS_BACKEND = 'keyvault'
+    sec.loadSecretEnv.mockImplementation(async (id: string) => ({ id: id === 'jeffi/store' ? 'jeffi/production' : id, backend: 'keyvault', values: { JWT_SECRET: `j-${id}`, 'bad key': 'x' }, size: 2 }))
+    k8s.list.mockImplementation(async (kind: string) => (kind === 'Secret' ? [{ metadata: { name: 'env-jeffi-production' } }, { metadata: { name: 'env-jeffi-store' } }] : []))
+    const { applyTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    await applyTenantWorkload({ slug: 'acme', plan: 'basic', hosts: ['acme.jeffistores.in'], layout: 'services' })
+    expect(sec.loadSecretEnv.mock.calls).toEqual([
+      ['jeffi/store', { fallbackId: 'jeffi/production' }],
+      ['jeffi/messaging/production', {}],
+      ['jeffi/documents/production', {}],
+    ])
+    const store = applied().find((o: any) => o.kind === 'Secret' && o.metadata.name === 'env-jeffi-store')
+    expect(store).toMatchObject({
+      metadata: { namespace: 'tenant-acme', labels: { 'jeffi.io/env-secret': 'true' }, annotations: { 'jeffi.io/secret-id': 'jeffi/production' } },
+      data: { JWT_SECRET: Buffer.from('j-jeffi/store').toString('base64') },
+    })
+    expect(store.data).not.toHaveProperty('bad key')
+    const names = applied().map((o: any) => `${o.kind}/${o.metadata.name}`)
+    expect(names.indexOf('Secret/env-jeffi-store')).toBeLessThan(names.indexOf('Deployment/acme-storefront-service'))
+    expect(k8s.list).toHaveBeenCalledWith('Secret', 'tenant-acme', 'jeffi.io/env-secret=true')
+    expect(k8s.remove.mock.calls.filter(c => c[0] === 'Secret').map(c => c[1])).toEqual(['env-jeffi-production'])
+  })
+
+  it('a slice copies only its own secret, and keeps the rest', async () => {
+    process.env.SECRETS_BACKEND = 'keyvault'
+    sec.loadSecretEnv.mockResolvedValue({ id: 'jeffi/messaging/production', backend: 'keyvault', values: { A: 'a' }, size: 1 })
+    const { applyTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    await applyTenantWorkload({ slug: 'acme', plan: 'basic', hosts: ['acme.jeffistores.in'], layout: 'services' }, { part: 'messaging' })
+    expect(sec.loadSecretEnv.mock.calls.map(c => c[0])).toEqual(['jeffi/messaging/production'])
+    expect(k8s.remove.mock.calls.some(c => c[0] === 'Secret')).toBe(false)
+  })
+
+  it('launches a node over Tailscale with the join secrets written in from Key Vault', async () => {
+    process.env.SECRETS_BACKEND = 'keyvault'
+    process.env.K8S_NODES_OVER_TAILSCALE = 'true'
+    process.env.K8S_SERVER_URL = 'https://100.70.1.2:6443'
+    process.env.K8S_NODE_AMI_ID = 'ami-1'
+    process.env.K8S_NODE_SECURITY_GROUP = 'sg-1'
+    sec.getSecretJson.mockResolvedValue({ K3S_TOKEN: 'k3s-tok', TS_AUTHKEY: 'ts-key' })
+    ec2.runInstance.mockResolvedValue({ instanceId: 'i-new' })
+    await ensureTenantNodes('acme', { placement: 'dedicated', type: 't4g.small', count: 1 }, 0, {}, vi.fn())
+    expect(sec.getSecretJson).toHaveBeenCalledWith('jeffi/production/k3s')
+    const ud = ec2.runInstance.mock.calls[0][0].userData as string
+    expect(ud).toContain("K3S_TOKEN='k3s-tok'")
+    expect(ud).toContain('--accept-routes')
+    expect(ud).toContain('tailscale0')
+    expect(ud).not.toContain('secretsmanager')
+  })
+
+  it('refuses a join secret without both values, naming neither', async () => {
+    process.env.SECRETS_BACKEND = 'keyvault'
+    process.env.K8S_SERVER_URL = 'https://100.70.1.2:6443'
+    process.env.K8S_NODE_AMI_ID = 'ami-1'
+    process.env.K8S_NODE_SECURITY_GROUP = 'sg-1'
+    sec.getSecretJson.mockResolvedValue({ K3S_TOKEN: 'k3s-tok' })
+    await expect(ensureTenantNodes('acme', { placement: 'dedicated', type: 't4g.small', count: 1 }, 0, {}, vi.fn())).rejects.toThrow(/^jeffi\/production\/k3s has no K3S_TOKEN or TS_AUTHKEY$/)
+    expect(ec2.runInstance).not.toHaveBeenCalled()
   })
 })

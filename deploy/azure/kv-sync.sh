@@ -1,6 +1,6 @@
 #!/bin/bash
 # Copy every jeffi/* Secrets Manager secret into Key Vault under its dash name (jeffi/production -> jeffi-production,
-# the mapping deploy/secrets-backend.mjs reads with). Dry run by default: lists each secret, its size and whether it
+# keyVaultName() in packages/store-core/src/lib/secrets/index.mjs; a test keeps kv_name equal to it). Dry run by default: lists each secret, its size and whether it
 # would be created, updated or left alone. --apply writes. jeffi/local* (developer secrets) is skipped unless
 # --include-local. Values are never printed: each one goes from the AWS call into a 0600 file in a private temp
 # dir, is compared by sha256 and uploaded with `az keyvault secret set --file`, and the dir is removed on exit.

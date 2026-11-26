@@ -262,3 +262,95 @@ describe('tracing env', () => {
     })
   })
 })
+
+describe('platform link (platform on Azure, stores on AWS)', () => {
+  const AZURE = { secrets: 'kubernetes' as const, dbIamAuth: false, dbSsl: 'require', nodeCidrs: ['100.64.0.0/10'] }
+  const render = (platform?: any) => renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), layout: 'services', platform }) as any[]
+  const c0 = (objs: any[], name: string) => byKind(objs, 'Deployment', name)[0].spec.template.spec.containers[0]
+  const envOfC = (c: any) => Object.fromEntries(c.env.map((e: any) => [e.name, e.value]))
+
+  it('renders exactly as before without a link, or with the default one', () => {
+    expect(JSON.stringify(render())).toBe(JSON.stringify(render({ secrets: 'secretsmanager', dbIamAuth: true })))
+    expect(JSON.stringify(render())).not.toContain('envFrom')
+  })
+
+  it('pods take their secret from the namespace copy; set env still wins', () => {
+    const objs = render(AZURE)
+    const sf = c0(objs, 'acme-storefront-service')
+    expect(sf.envFrom).toEqual([{ secretRef: { name: 'env-jeffi-store' } }])
+    expect(envOfC(sf)).toMatchObject({ SM_SECRET_ID: 'jeffi/store', SM_SECRET_FALLBACK_ID: 'jeffi/production', SECRETS_BACKEND: 'env' })
+    expect(c0(objs, 'acme-messaging-service').envFrom).toEqual([{ secretRef: { name: 'env-jeffi-messaging-production' } }])
+    expect(c0(objs, 'acme-postgres').envFrom).toBeUndefined()
+    for (const d of byKind(objs, 'Deployment').filter((d: any) => d.metadata.name !== 'redis'))
+      expect((d as any).spec.template.spec.automountServiceAccountToken).toBe(false)
+  })
+
+  it('lists the copies the namespace needs', async () => {
+    const { tenantEnvSecrets } = await import('@/lib/k8s/tenant-workload')
+    expect(tenantEnvSecrets(render(AZURE))).toEqual([
+      { name: 'env-jeffi-store', id: 'jeffi/store', fallbackId: 'jeffi/production' },
+      { name: 'env-jeffi-messaging-production', id: 'jeffi/messaging/production' },
+      { name: 'env-jeffi-documents-production', id: 'jeffi/documents/production' },
+    ])
+    expect(tenantEnvSecrets(render())).toEqual([])
+    const old = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme'), platform: AZURE }) as any[]
+    expect(tenantEnvSecrets(old).map(s => s.name)).toContain('env-jeffi-production')
+  })
+
+  it('the flagship database by password over TLS; the store database untouched', () => {
+    const objs = render(AZURE)
+    const env = (n: string) => envOfC(c0(objs, n))
+    for (const n of ['acme-messaging-service', 'acme-document-service']) expect(env(n)).toMatchObject({ DB_IAM_AUTH: 'false', DB_SSL: 'require' })
+    expect(env('acme-storefront-service')).toMatchObject({ DB_IAM_AUTH: 'false', RDS_IAM_AUTH: 'false', CONTROL_PLANE_IAM_AUTH: 'false', DB_SSL: 'require', TENANT_DB_SLUG: 'acme' })
+    // On-node Postgres keeps its own password Secret.
+    expect(c0(objs, 'acme-storefront-service').env.find((e: any) => e.name === 'TENANT_DB_PASSWORD').valueFrom.secretKeyRef.name).toBe('acme-postgres')
+    expect(env('acme-messaging-service')).not.toHaveProperty('RDS_IAM_AUTH')
+  })
+
+  it('admits node addresses beyond the VPC', () => {
+    const from = (byKind(render(AZURE), 'NetworkPolicy')[0] as any).spec.ingress[0].from
+    expect(from.slice(-2)).toEqual([{ ipBlock: { cidr: '172.31.0.0/16' } }, { ipBlock: { cidr: '100.64.0.0/10' } }])
+  })
+})
+
+describe('agent user-data across clouds', () => {
+  const base = { nodeName: 't-acme', labels: { 'jeffi.io/tenant': 'acme' }, server: 'https://100.70.1.2:6443' }
+  const SM_READ = 'aws secretsmanager get-secret-value'
+
+  it('today: reads the token from Secrets Manager, traced', () => {
+    const ud = agentNodeUserData(base)
+    expect(ud).toContain('set -euxo pipefail')
+    expect(ud).toContain(SM_READ)
+    expect(ud).not.toContain('tailscale0')
+    expect(ud).not.toContain('--accept-routes')
+  })
+
+  it('over Tailscale: flannel on tailscale0, the Tailscale address, routes accepted', () => {
+    const ud = agentNodeUserData({ ...base, overTailscale: true })
+    expect(ud).toContain('--advertise-tags tag:server-prod --accept-routes')
+    expect(ud).toContain(`'--flannel-iface' 'tailscale0' --node-ip "$TS_IP"`)
+    expect(ud).toContain('tailscale ip -4')
+    expect(ud).toContain(SM_READ)
+    expect(ud).toContain('set -euo pipefail')
+    expect(ud).not.toContain('set -eux')
+  })
+
+  it('with the secrets written in: no Secrets Manager, no tracing, quoted, unset after use', () => {
+    const ud = agentNodeUserData({ ...base, overTailscale: true, dbAgent: true, join: { k3sToken: "K10ab::server:x'y", tsAuthKey: 'tskey-auth-1' } })
+    expect(ud).not.toContain('secretsmanager')
+    expect(ud).not.toMatch(/set -\w*x/)
+    expect(ud).toContain(`K3S_TOKEN='K10ab::server:x'\\''y'`)
+    expect(ud).toContain("TSKEY='tskey-auth-1'")
+    expect(ud).toContain('K3S_TOKEN="$K3S_TOKEN" sh -s -')
+    expect(ud).toContain('unset TSKEY')
+    expect(ud).toContain('unset K3S_TOKEN')
+    expect(ud.indexOf('jeffi-db-volume')).toBeGreaterThan(-1)
+    expect(ud.indexOf('jeffi-db-volume')).toBeLessThan(ud.indexOf('TSKEY='))
+  })
+
+  it('the rendered scripts are valid bash', async () => {
+    const { execFileSync } = await import('node:child_process')
+    for (const spec of [base, { ...base, overTailscale: true }, { ...base, overTailscale: true, dbAgent: true, join: { k3sToken: 't', tsAuthKey: 'k' } }])
+      execFileSync('bash', ['-n'], { input: agentNodeUserData(spec) })
+  })
+})

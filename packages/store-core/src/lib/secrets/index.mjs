@@ -2,8 +2,8 @@
 // `aws` (default, Secrets Manager) or `keyvault` (Azure Key Vault, AZURE_KEY_VAULT_URL or _NAME).
 // Callers always use Secrets Manager names (`jeffi/tenant-db/acme`); Key Vault keeps them as
 // keyVaultName() (`jeffi-tenant-db-acme`). Values are strings, JSON blobs stay JSON.
-// Plain ESM with no dependencies (Key Vault over fetch, the AWS SDK loaded on demand) so the boot
-// loader can import it on Node 20 without a TypeScript loader. Types: index.d.mts.
+// Plain ESM with no dependencies (Key Vault over fetch, the AWS SDK loaded on demand): deploy/load-secrets.mjs
+// imports this file directly, and both Dockerfiles copy it next to the loader. Types: index.d.mts.
 
 const KV_API = '7.4'
 const KV_RESOURCE = 'https://vault.azure.net'
@@ -44,6 +44,19 @@ export function keyVaultUrl(env = process.env) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// A request that failed before any response (connection refused, reset, timeout) is tried up to 3 times:
+// IMDS, Entra and Key Vault have brief hiccups, and the boot loader must not fail a pod on one.
+async function fetchRetry(fetchImpl, url, init) {
+  for (let i = 0; ; i++) {
+    try {
+      return await fetchImpl(url, init())
+    } catch (e) {
+      if (i >= 2) throw e
+      await sleep(500 * (i + 1))
+    }
+  }
+}
 
 // ---- AWS Secrets Manager ------------------------------------------------------------------------
 
@@ -121,7 +134,7 @@ const tokens = new Map()
 /**
  * A Key Vault access token: workload identity (AZURE_FEDERATED_TOKEN_FILE + AZURE_CLIENT_ID +
  * AZURE_TENANT_ID, the cluster's OIDC issuer federated in Entra) when configured, else the VM's
- * managed identity from IMDS (AZURE_CLIENT_ID picks a user-assigned one).
+ * managed identity from IMDS (AZURE_MI_CLIENT_ID, else AZURE_CLIENT_ID, picks a user-assigned one).
  */
 async function azureToken(env, fetchImpl, refresh = false) {
   const federated = env.AZURE_FEDERATED_TOKEN_FILE && env.AZURE_CLIENT_ID && env.AZURE_TENANT_ID
@@ -133,24 +146,26 @@ async function azureToken(env, fetchImpl, refresh = false) {
     const { readFile } = await import('node:fs/promises')
     const assertion = (await readFile(env.AZURE_FEDERATED_TOKEN_FILE, 'utf8')).trim()
     const authority = (env.AZURE_AUTHORITY_HOST || 'https://login.microsoftonline.com/').replace(/\/?$/, '/')
-    res = await fetchImpl(`${authority}${env.AZURE_TENANT_ID}/oauth2/v2.0/token`, {
+    const body = new URLSearchParams({
+      client_id: env.AZURE_CLIENT_ID,
+      scope: `${KV_RESOURCE}/.default`,
+      grant_type: 'client_credentials',
+      client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+      client_assertion: assertion,
+    }).toString()
+    res = await fetchRetry(fetchImpl, `${authority}${env.AZURE_TENANT_ID}/oauth2/v2.0/token`, () => ({
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: env.AZURE_CLIENT_ID,
-        scope: `${KV_RESOURCE}/.default`,
-        grant_type: 'client_credentials',
-        client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-        client_assertion: assertion,
-      }).toString(),
+      body,
       signal: AbortSignal.timeout(10_000),
-    })
+    }))
   } else {
     const q = new URLSearchParams({ 'api-version': '2018-02-01', resource: KV_RESOURCE })
-    if (env.AZURE_CLIENT_ID) q.set('client_id', env.AZURE_CLIENT_ID)
+    const mi = env.AZURE_MI_CLIENT_ID || env.AZURE_CLIENT_ID
+    if (mi) q.set('client_id', mi)
     const url = `${env.AZURE_IMDS_ENDPOINT || 'http://169.254.169.254'}/metadata/identity/oauth2/token?${q}`
     for (let i = 0; ; i++) {
-      res = await fetchImpl(url, { headers: { Metadata: 'true' }, signal: AbortSignal.timeout(5_000) })
+      res = await fetchRetry(fetchImpl, url, () => ({ headers: { Metadata: 'true' }, signal: AbortSignal.timeout(5_000) }))
       if (i >= 2 || !(res.status === 429 || res.status >= 500)) break
       await sleep(500 * (i + 1))
     }
@@ -171,12 +186,12 @@ function keyVaultClient({ env, fetch: fetchImpl = globalThis.fetch, settleMs = 1
   async function call(method, path, body) {
     let token = await azureToken(env, fetchImpl)
     for (let i = 0; ; i++) {
-      const res = await fetchImpl(`${base}${path}${path.includes('?') ? '&' : '?'}api-version=${KV_API}`, {
+      const res = await fetchRetry(fetchImpl, `${base}${path}${path.includes('?') ? '&' : '?'}api-version=${KV_API}`, () => ({
         method,
         headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
         signal: AbortSignal.timeout(15_000),
-      })
+      }))
       if (res.status === 401 && i === 0) {
         token = await azureToken(env, fetchImpl, true)
         continue
@@ -315,23 +330,30 @@ export function forgetDbSecret(ref) {
   for (const k of [...dbSecrets.keys()]) if (k.endsWith(`|${ref}`)) dbSecrets.delete(k)
 }
 
+// The fallback reads for errors the boot loader always fell back on: missing or denied, also when only the
+// Secrets Manager SDK's own error says so.
+const FALLBACK_RE = /ResourceNotFound|AccessDenied/
+const fallsBack = (e) => isSecretError(e, 'NotFound') || isSecretError(e, 'Denied') || FALLBACK_RE.test(`${e?.cause?.name} ${e?.cause?.message}`)
+
 /**
  * For the boot loader: read the JSON blob `id` (e.g. `jeffi/production`) and return its string values.
- * `fallbackId` is read instead when `id` is missing or not readable yet. Throws SecretError.
+ * `fallbackId` is read instead when `id` is missing or not readable yet (`onFallback` hears why first).
+ * Throws SecretError: Empty for an empty secret, Invalid when it is not a JSON object.
  */
 export async function loadSecretEnv(id, opts = {}) {
-  const { fallbackId, ...rest } = opts
+  const { fallbackId, onFallback, ...rest } = opts
   const client = createSecretsClient(rest)
   let used = id
   let raw
   try {
     raw = await client.get(id)
   } catch (e) {
-    if (!fallbackId || !(isSecretError(e, 'NotFound') || isSecretError(e, 'Denied'))) throw e
+    if (!fallbackId || !fallsBack(e)) throw e
+    onFallback?.(e)
     used = fallbackId
     raw = await client.get(fallbackId)
   }
-  if (!raw) throw new SecretError('Invalid', used, `Secret "${used}" is empty`)
+  if (!raw) throw new SecretError('Empty', used, `Secret "${used}" is empty`)
   let parsed
   try {
     parsed = JSON.parse(raw)
@@ -341,5 +363,5 @@ export async function loadSecretEnv(id, opts = {}) {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new SecretError('Invalid', used, `Secret "${used}" is not a JSON object`)
   const values = {}
   for (const [k, v] of Object.entries(parsed)) if (typeof v === 'string') values[k] = v
-  return { id: used, backend: client.backend, values }
+  return { id: used, backend: client.backend, values, size: Object.keys(parsed).length }
 }

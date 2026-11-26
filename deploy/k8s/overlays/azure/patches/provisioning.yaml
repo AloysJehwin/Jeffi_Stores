@@ -1,8 +1,19 @@
 # Store nodes (AWS) join the core at its Tailscale address; store hosts point at the AWS tenant edge's Elastic IP
 # (deploy/aws/edge/launch-edge.sh prints it). The core no longer has an EC2 instance profile to hand out.
+# The controller (SECRETS_BACKEND=keyvault, patches/controller-identity.yaml) writes each node's k3s token and
+# Tailscale key into its user-data, and copies each store's secrets into its namespace as a Secret
+# (packages/store-core/src/lib/k8s/tenant-compute.ts).
 apiVersion: v1
 kind: ConfigMap
 metadata: { name: provisioning, namespace: jeffi }
 data:
   K8S_SERVER_URL: https://REPLACE_ME_core_tailscale_ip:6443
   CLUSTER_INGRESS_IP: REPLACE_ME_edge_elastic_ip
+  # Flannel over tailscale0, node IP = Tailscale IP, the core's subnet routes accepted.
+  K8S_NODES_OVER_TAILSCALE: 'true'
+  # Store pods log in to the flagship database on Azure with the password in their secret, over TLS. Their own
+  # database is unchanged (on-node Postgres: password; dedicated RDS: IAM).
+  TENANT_PLATFORM_DB_IAM_AUTH: 'false'
+  TENANT_PLATFORM_DB_SSL: require
+  # Node addresses are Tailscale ones: kubelet probes and node traffic come from them.
+  TENANT_NODE_CIDRS: 100.64.0.0/10

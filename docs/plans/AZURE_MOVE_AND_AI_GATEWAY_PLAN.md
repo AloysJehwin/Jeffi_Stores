@@ -16,7 +16,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
   - the pod side in `deploy/k8s/overlays/azure`, used only when `JEFFI_CLOUD=azure`. The AWS manifests render byte-identical.
 - **Secrets:**
   - `kv-sync.sh` copies `jeffi/*` to Key Vault under dash names, dry run by default, values never printed;
-  - `deploy/load-secrets.mjs` reads Key Vault when `SECRETS_BACKEND=keyvault`, through `deploy/secrets-backend.mjs`. That file is a dependency-free shim standing in for the Phase C secrets library, so keep the two in step.
+  - `deploy/load-secrets.mjs` reads Key Vault when `SECRETS_BACKEND=keyvault`, through the one secrets library (`packages/store-core/src/lib/secrets/index.mjs`, `loadSecretEnv`), which both Dockerfiles copy to its repo path. The old `deploy/secrets-backend.mjs` shim is gone. On AWS the loader prints and loads exactly as before (an end-to-end test against a local Secrets Manager pins its lines), and a test keeps `kv-sync.sh`'s names equal to the library's.
 - **AWS tenant edge** (`deploy/aws/edge`, `deploy/k8s/edge`): a Traefik DaemonSet on `jeffi.io/edge=true`, the launch and Elastic IP script, and a Route 53 plan with a saved rollback.
 - **CI:**
   - `db-azure`, `deploy-prep-azure` and `release-azure` reach Azure over Tailscale;
@@ -38,13 +38,20 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
    - on the day, store hosts move to the edge and platform hosts to Azure;
    - CloudFront's origin moves to `origin.jeffistores.in`.
 
-**Left for the app code (Phase C).**
-- **Database TLS for Flexible Server.** The overlay only sets `DB_IAM_AUTH=false`.
-- **Store node cloud-init** (`node-user-data.ts`):
-  - `--flannel-iface tailscale0 --node-ip <Tailscale IP>`;
-  - `tailscale up --accept-routes`, so the node can reach the Postgres subnet and Azure DNS through the core.
-- **Store pods on AWS can't each get a Key Vault identity.** Entra federated credentials need an exact subject, at most 20 per identity. The suggested fix: the controller copies `jeffi-store` into each store namespace as a Secret.
-- **public-api and mobile replicas on the edge** for store hosts.
+**Phase C follow-ups, done (2026-11-26).** All gated by configuration: the AWS deployment renders and behaves as before.
+- **Database TLS for Flexible Server.** The overlay sets `DB_SSL=require` next to `DB_IAM_AUTH=false` on the platform services and the controller.
+- **Store pods** (`tenant-workload.ts`, `tenant-compute.ts` `tenantPlatformLink()`). Store pods can't each get a Key Vault identity (Entra federated credentials need an exact subject, at most 20 per identity), so with the controller on `SECRETS_BACKEND=keyvault`:
+  - the controller copies each secret the store's pods use (`jeffi/store` with its `jeffi/production` fallback, messaging, documents) from Key Vault into the namespace as `env-<name>` Secrets on every apply, and drops the ones no pod uses;
+  - pods take them through `envFrom`, with `SECRETS_BACKEND=env`, so the boot loader fetches nothing; env set on the container still wins;
+  - `TENANT_PLATFORM_DB_IAM_AUTH=false` and `TENANT_PLATFORM_DB_SSL=require` (provisioning ConfigMap) give the flagship database a password over TLS; the store's own database keeps its login (on-node Postgres: password; dedicated RDS: IAM);
+  - `TENANT_NODE_CIDRS=100.64.0.0/10` lets Tailscale node addresses through each store's NetworkPolicy.
+- **Store node cloud-init** (`node-user-data.ts`): with `K8S_NODES_OVER_TAILSCALE=true`, `tailscale up --accept-routes` and k3s `--flannel-iface tailscale0 --node-ip <Tailscale IP>`. With the controller on Key Vault, it reads `jeffi/production/k3s` (`jeffi-production-k3s`) through the secrets library at each launch and writes the k3s token and Tailscale key into the user-data, untraced; the node no longer calls Secrets Manager.
+- **voice-service** reads `SM_SECRET_ID` from Secrets Manager or Key Vault (REST, workload identity or IMDS) by `SECRETS_BACKEND`, env first (`voice_service/secret_store.py`).
+- **public-api on the edge** (`deploy/k8s/edge/shared-services.yaml`): a copy for `public-{slug}` hosts on `jeffi.io/edge=true`, with the edge's own Redis, routed by an IngressRoute labelled `jeffi.io/edge-only` that the core's Traefik skips. mobile has no store host today (only `mobile.jeffistores.in`, a platform host), so its edge copy is parked at 0 replicas.
+
+**Still open.**
+- **Edge node join** (`deploy/aws/edge/edge-node-user-data.sh`) still reads `jeffi/production/k3s` from Secrets Manager through its instance profile. Fine while Secrets Manager stays (until the cutover settles); before deleting it, have `launch-edge.sh` write the token in as the controller does.
+- **Join secrets in user-data** are readable by anything on the node that reaches IMDS (pods too, at hop limit 2), the same reach the node's instance profile gives today. A short-lived k3s bootstrap token per launch would narrow it.
 - **Bicep compile.** The templates were not compiled here, because the Bicep CLI isn't installed and `az bicep install` downloads it. Run that and `az bicep build --file deploy/azure/main.bicep` before the first `apply.sh`.
 
 ## 0. Decisions so far (founder, 2026-11-25)

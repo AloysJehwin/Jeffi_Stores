@@ -297,6 +297,26 @@ describe('Azure Key Vault backend', () => {
     expect(kv.calls[0].url.searchParams.get('client_id')).toBe('uami-1')
   })
 
+  it('AZURE_MI_CLIENT_ID names the VM identity over AZURE_CLIENT_ID', async () => {
+    const m = await load()
+    const kv = fakeVault()
+    kv.live.set('n', ['v'])
+    await m.createSecretsClient(kv.opts({ AZURE_CLIENT_ID: 'app-1', AZURE_MI_CLIENT_ID: 'uami-2' })).get('n')
+    expect(kv.calls[0].url.searchParams.get('client_id')).toBe('uami-2')
+  })
+
+  it('retries a request that failed before any response', async () => {
+    const m = await load()
+    const kv = fakeVault()
+    kv.live.set('n', ['v'])
+    const flaky = vi.fn(async (url: string, init: any) => {
+      if (flaky.mock.calls.length <= 2) throw new TypeError('fetch failed')
+      return kv.fetch(url, init)
+    })
+    await expect(m.createSecretsClient({ ...kv.opts(), fetch: flaky as any }).get('n')).resolves.toBe('v')
+    expect(flaky).toHaveBeenCalledTimes(4)
+  }, 10_000)
+
   it('uses workload identity (federated token file) when configured', async () => {
     const m = await load()
     const kv = fakeVault()
@@ -497,6 +517,7 @@ describe('loadSecretEnv (boot loader entry)', () => {
       id: 'jeffi/production',
       backend: 'aws',
       values: { JWT_SECRET: 'j', DB: 'postgres://x' },
+      size: 4,
     })
   })
 
@@ -513,6 +534,17 @@ describe('loadSecretEnv (boot loader entry)', () => {
     expect(r2.values).toEqual({ A: 'fb2' })
   })
 
+  it('tells onFallback why, and falls back on any error the SDK names missing or denied', async () => {
+    const m = await load()
+    sm.send.mockRejectedValueOnce(awsErr('KMSAccessDeniedException', 'no key')).mockResolvedValueOnce({ SecretString: '{"A":"fb"}' })
+    const onFallback = vi.fn()
+    const r = await m.loadSecretEnv('a', { backend: 'aws', fallbackId: 'b', onFallback })
+    expect(r).toMatchObject({ id: 'b', values: { A: 'fb' } })
+    expect(onFallback).toHaveBeenCalledOnce()
+    expect(onFallback.mock.calls[0][0]).toMatchObject({ code: 'Backend', cause: { name: 'KMSAccessDeniedException' } })
+    expect(sent().map((c) => c.SecretId)).toEqual(['a', 'b'])
+  })
+
   it('does not fall back on other errors, or without a fallback', async () => {
     const m = await load()
     sm.send.mockRejectedValueOnce(awsErr('ThrottlingException')).mockRejectedValueOnce(awsErr('ResourceNotFoundException'))
@@ -522,20 +554,30 @@ describe('loadSecretEnv (boot loader entry)', () => {
   })
 
   it.each([
-    ['', 'is empty'],
-    ['not json', 'is not valid JSON'],
-    ['[1,2]', 'is not a JSON object'],
-    ['null', 'is not a JSON object'],
-  ])('rejects %j', async (raw, msg) => {
+    ['', 'Empty', 'is empty'],
+    ['not json', 'Invalid', 'is not valid JSON'],
+    ['[1,2]', 'Invalid', 'is not a JSON object'],
+    ['null', 'Invalid', 'is not a JSON object'],
+  ])('rejects %j', async (raw, code, msg) => {
     const m = await load()
     sm.send.mockResolvedValue({ SecretString: raw })
-    await expect(m.loadSecretEnv('jeffi/production', { backend: 'aws' })).rejects.toMatchObject({ code: 'Invalid', message: expect.stringContaining(msg) })
+    await expect(m.loadSecretEnv('jeffi/production', { backend: 'aws' })).rejects.toMatchObject({ code, message: expect.stringContaining(msg) })
   })
 
   it('reads the dash-named copy from Key Vault', async () => {
     const m = await load()
     const kv = fakeVault()
     kv.live.set('jeffi-production', [JSON.stringify({ JWT_SECRET: 'kv' })])
-    await expect(m.loadSecretEnv('jeffi/production', kv.opts())).resolves.toEqual({ id: 'jeffi/production', backend: 'keyvault', values: { JWT_SECRET: 'kv' } })
+    await expect(m.loadSecretEnv('jeffi/production', kv.opts())).resolves.toEqual({ id: 'jeffi/production', backend: 'keyvault', values: { JWT_SECRET: 'kv' }, size: 1 })
+  })
+
+  it('kv-sync.sh names Key Vault copies the same way', async () => {
+    const { execFileSync } = await import('node:child_process')
+    const m = await load()
+    const script = path.resolve(__dirname, '../../../../../deploy/azure/kv-sync.sh')
+    const fn = fs.readFileSync(script, 'utf8').split('\n').find((l) => l.startsWith('kv_name()'))!
+    for (const id of ['jeffi/production', 'jeffi/production/k3s', 'jeffi/tenant-db/acme-shop', 'jeffi/store', 'jeffi/a_b.c']) {
+      expect(execFileSync('bash', ['-c', `${fn}\nkv_name "$1"`, '_', id], { encoding: 'utf8' })).toBe(m.keyVaultName(id))
+    }
   })
 })

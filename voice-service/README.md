@@ -133,7 +133,8 @@ what is missing.
 | `S3_BUCKET` (or `S3_BUCKET_NAME`), `S3_KEY_PREFIX`, `AWS_REGION` | | recordings; unset bucket = no recording |
 | `VOICE_WS_KEY` | | if set, `/ws/exotel` requires `?k=<key>` |
 | `VOICE_STATE_DIR` | `/tmp/voice-service` | in-flight call ids, for restart reporting |
-| `SM_SECRET_ID` | | optional: fill unset env keys from a Secrets Manager JSON secret, like the Node services |
+| `SM_SECRET_ID` | | optional: fill unset env keys from a JSON secret, like the Node services (`SM_SECRET_FALLBACK_ID` when it is missing) |
+| `SECRETS_BACKEND` | `aws` | where `SM_SECRET_ID` lives: `aws` (Secrets Manager) or `keyvault` (Azure Key Vault, `AZURE_KEY_VAULT_NAME`, dash name `jeffi-voice-production`; workload identity or the VM identity) |
 | `VOICE_LLM_FIRST_TOKEN_S` | `8` | no first token from the LLM by then: apologise and end (`llm_timeout`) |
 | `VOICE_STT_MISS_SPEECH_S` | `1.5` | a turn with this much speech and no transcript means STT isn't answering (`stt_timeout`) |
 | `LOG_LEVEL` | `INFO` | `DEBUG` logs transcripts |

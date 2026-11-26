@@ -34,6 +34,7 @@ spec:
               valueFrom: { configMapKeyRef: { name: azure-identity, key: APPS_CLIENT_ID } }
             - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
             - { name: DB_IAM_AUTH, value: 'false' }
+            - { name: DB_SSL, value: require }
           volumeMounts:
             - { name: aws-iam-token, mountPath: /var/run/secrets/aws, readOnly: true }
             - { name: azure-identity-token, mountPath: /var/run/secrets/azure/tokens, readOnly: true }
