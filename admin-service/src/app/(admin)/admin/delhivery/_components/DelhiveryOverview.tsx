@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { DELHIVERY_INSIGHTS } from './delhivery-insights'
 import {
   Kpi,
   KpiGrid,
@@ -98,7 +100,7 @@ export default function DelhiveryOverview() {
   )
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={DELHIVERY_INSIGHTS} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <DelhiveryOverviewSkeleton /> : data ? <Body d={data} /> : null}
     </div>

@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { RFQS_INSIGHTS } from './rfqs-insights'
 import Link from 'next/link'
 import {
   usePeriod,
@@ -73,7 +75,7 @@ export default function RfqsOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={RFQS_INSIGHTS} />} />
       <ListFilters entity="business_rfqs" fields={RFQ_FIELDS} search={RFQ_SEARCH} period noun="RFQs" tab="overview" exportable />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (

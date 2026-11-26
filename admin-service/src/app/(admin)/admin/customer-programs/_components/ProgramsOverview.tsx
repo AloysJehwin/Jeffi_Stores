@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { PROGRAMS_INSIGHTS } from './programs-insights'
 import Link from 'next/link'
 import {
   AttentionList,
@@ -71,7 +73,7 @@ export default function ProgramsOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={PROGRAMS_INSIGHTS} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data ? !error && <ProgramsOverviewLoading /> : <Body data={data} />}
     </div>

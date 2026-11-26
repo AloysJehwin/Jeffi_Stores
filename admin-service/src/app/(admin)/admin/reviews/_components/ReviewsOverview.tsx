@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { REVIEWS_INSIGHTS } from './reviews-insights'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -286,7 +288,7 @@ export default function ReviewsOverview() {
 
   const header = (
     <>
-      <PeriodBar value={period} onChange={setPeriod} />
+      <PeriodBar value={period} onChange={setPeriod} actions={<PageInsights config={REVIEWS_INSIGHTS} />} />
       <ListFilters
         entity="reviews"
         fields={OVERVIEW_FIELDS}
