@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "eaa68c87fb4fe48f38e7859854dfe49b3b58de163016acec728ddc4cf591fd13",
+ "manifestHash": "17c493a3f26c970f1846bf7c83f645121616a46ee0079d0a7728e5b0d6e508c3",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -433,6 +433,43 @@
    "body": null,
    "summary": "List messages for a conversation",
    "command": "agent-conversations messages"
+  },
+  {
+   "id": "admin GET /api/admin/agent/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/agent/insights",
+   "gatewayPath": "/v1/admin/agent/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/agent/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "agent:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "agent:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily agent conversations (distinct ones that got a question) against the tool calls the agent made, behind the agent Overview's insights sheet. Same gate as the agent overview API.",
+   "command": "agent insights"
   },
   {
    "id": "admin GET /api/admin/agent/overview",
@@ -3147,6 +3184,43 @@
    "command": "audit create"
   },
   {
+   "id": "admin GET /api/admin/audit/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/audit/insights",
+   "gatewayPath": "/v1/admin/audit/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/audit/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "audit:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "audit:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily audit events by who acted (a team member, or the system when no admin is attached), optionally for one kind of action (risky = delete, import, export), behind the audit Overview's insights sheet. Same gate as the audit overview API.",
+   "command": "audit insights"
+  },
+  {
    "id": "admin GET /api/admin/audit/mail-log",
    "host": "admin",
    "method": "GET",
@@ -5007,6 +5081,43 @@
    "bodyContentType": "application/json",
    "summary": "Generate (campaigns)",
    "command": "campaigns generate"
+  },
+  {
+   "id": "admin GET /api/admin/campaigns/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/campaigns/insights",
+   "gatewayPath": "/v1/admin/campaigns/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/campaigns/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "mailer:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily automated-campaign sends, split into the ones that led to an order and the rest (so the days stack to the sends), behind the Overview's insights sheet. Same gate as the campaigns overview API.",
+   "command": "campaigns insights"
   },
   {
    "id": "admin GET /api/admin/campaigns/overview",
@@ -12125,6 +12236,43 @@
    "body": null,
    "summary": "Finance → AI costs. No x-tenant-id header (middleware sets it on every tenant host) means the flagship.",
    "command": "financial ai-costs"
+  },
+  {
+   "id": "admin GET /api/admin/financial/ai-costs/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/financial/ai-costs/insights",
+   "gatewayPath": "/v1/admin/financial/ai-costs/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/financial/ai-costs/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "financial:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "financial:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily AI spend (rupees) by capability, behind the AI costs tab's insights sheet. Mirrors the tab's amount: the platform's cost on the flagship, what the store was charged elsewhere. Same gate as the ai-costs API.",
+   "command": "financial-ai-costs insights"
   },
   {
    "id": "admin GET /api/admin/financial/cashflow",
@@ -25509,6 +25657,43 @@
    "bodyContentType": "application/json",
    "summary": "POST — the composer's email exactly as a customer gets it (layout, coupon, attachments), sent to the admin.",
    "command": "mailer test"
+  },
+  {
+   "id": "admin GET /api/admin/marketing/messaging/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/marketing/messaging/insights",
+   "gatewayPath": "/v1/admin/marketing/messaging/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/marketing/messaging/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "mailer:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "mailer:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily outbound messages by outcome for one channel, behind the messaging Overview's insights sheet. WhatsApp and SMS read message_logs (provider delivery receipts); email reads the broadcast log, which has no receipts.",
+   "command": "marketing-messaging insights"
   },
   {
    "id": "admin GET /api/admin/marketing/messaging/overview",
@@ -46127,6 +46312,43 @@
    "command": "tasks get"
   },
   {
+   "id": "admin GET /api/admin/tasks/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/tasks/insights",
+   "gatewayPath": "/v1/admin/tasks/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/tasks/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "customers:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Tasks created per day against tasks completed per day (two date columns, so two queries merged), optionally for one priority, behind the tasks Overview's insights sheet. Same gate as the tasks overview API.",
+   "command": "tasks insights"
+  },
+  {
    "id": "admin GET /api/admin/tasks/overview",
    "host": "admin",
    "method": "GET",
@@ -46162,6 +46384,41 @@
    "body": null,
    "summary": "Get overview (tasks)",
    "command": "tasks overview"
+  },
+  {
+   "id": "admin GET /api/admin/team/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/team/insights",
+   "gatewayPath": "/v1/admin/team/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/team/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": "owner",
+   "body": null,
+   "summary": "Team members who signed in per day against the actions the team took (the audit log's admin rows), behind the team Overview's insights sheet. Owner-only, like the team overview API.",
+   "command": "team insights"
   },
   {
    "id": "admin GET /api/admin/team/overview",
@@ -46445,6 +46702,43 @@
    "body": null,
    "summary": "GET ?tab=overview|acquisition|behaviour|funnel|products|search|audience|realtime&from&to (IST days).",
    "command": "traffic get"
+  },
+  {
+   "id": "admin GET /api/admin/traffic/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/traffic/insights",
+   "gatewayPath": "/v1/admin/traffic/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/traffic/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "traffic:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "traffic:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Daily page views against the sessions that made them, optionally for one kind of page (the page_events `page` column), behind the Traffic page's insights sheet. Same gate as the traffic API.",
+   "command": "traffic insights"
   },
   {
    "id": "admin POST /api/admin/uploads/image",
@@ -47925,6 +48219,43 @@
    "command": "platform ai-pricing update"
   },
   {
+   "id": "platform GET /api/admin/ecom/billing/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/billing/insights",
+   "gatewayPath": "/v1/platform/ecom/billing/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/billing/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_billing:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_billing:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Subscription charges per day, split into the ones kept in full and the ones with money refunded (part or all), so the days stack to the charges. Same scope as the billing overview API.",
+   "command": "platform billing insights"
+  },
+  {
    "id": "platform GET /api/admin/ecom/billing/overview",
    "host": "platform",
    "method": "GET",
@@ -48852,6 +49183,43 @@
    "command": "platform customers services"
   },
   {
+   "id": "platform GET /api/admin/ecom/customers/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/customers/insights",
+   "gatewayPath": "/v1/platform/ecom/customers/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/customers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_customers:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Daily workspace signups, split into the ones that went live (active, or since suspended or terminated) and the rest, optionally for one product. Same scope as the customers overview API.",
+   "command": "platform customers insights"
+  },
+  {
    "id": "platform GET /api/admin/ecom/customers/overview",
    "host": "platform",
    "method": "GET",
@@ -49010,6 +49378,43 @@
    "noBody": true,
    "summary": "Platform admins: unlink a client from the manager account (stores using it through the manager are disconnected).",
    "command": "platform google-ads delete"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/instances/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/instances/insights",
+   "gatewayPath": "/v1/platform/ecom/instances/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/instances/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_instances:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_instances:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Provisioning jobs that finished each day (by their last update): done against failed. Same scope as the instances overview API.",
+   "command": "platform instances insights"
   },
   {
    "id": "platform GET /api/admin/ecom/instances/overview",
@@ -50068,6 +50473,43 @@
    "bodyContentType": "application/json",
    "summary": "POST { phone, language } → { callId }: a real call to one of the program's test numbers (platform admin only).",
    "command": "platform outreach test-call"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/store-status/insights",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/store-status/insights",
+   "gatewayPath": "/v1/platform/ecom/store-status/insights",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/store-status/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "ecom_customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "ecom_customers:read"
+   ],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Store health events per day: schema release runs (succeeded against failed) or provisioning steps (ok against errors). Same scope as the store-status overview API.",
+   "command": "platform store-status insights"
   },
   {
    "id": "platform GET /api/admin/ecom/store-status/overview",
