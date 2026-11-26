@@ -1,6 +1,8 @@
 'use client'
 
 import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
+import { PageInsights } from '@/components/admin/insights'
+import { CASH_SALE_INSIGHTS } from './cash-sale-insights'
 import { Kpi, KpiGrid, Section, Table, count, money, pct } from '@/components/admin/channels/ui'
 import { DonutSplit, TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { delta } from '@/lib/overview/period'
@@ -26,7 +28,7 @@ export default function CashSaleOverview() {
 
   return (
     <div className="space-y-5">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={CASH_SALE_INSIGHTS} />} />
       <ListFilters
         entity="cash_sale"
         fields={CASH_SALE_FIELDS}

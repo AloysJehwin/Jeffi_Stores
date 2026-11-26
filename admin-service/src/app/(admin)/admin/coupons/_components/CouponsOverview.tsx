@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { PageInsights } from '@/components/admin/insights'
+import { COUPONS_INSIGHTS } from './coupons-insights'
 import { ListFilters, useFilterQuery, SplitRow } from '@/components/admin/kit'
 import { COUPON_ALIASES, COUPON_FIELDS, COUPON_SEARCH } from '@/lib/filters/fields/coupons'
 import {
@@ -58,7 +60,7 @@ export default function CouponsOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={COUPONS_INSIGHTS} />} />
       <ListFilters
         entity="coupons"
         fields={COUPON_FIELDS}

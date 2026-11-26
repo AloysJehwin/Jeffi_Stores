@@ -1,6 +1,8 @@
 'use client'
 
 import { Kpi, Banner, Section, count, pct } from '@/components/admin/channels/ui'
+import { PageInsights } from '@/components/admin/insights'
+import { REPLACEMENTS_INSIGHTS } from './replacements-insights'
 import { AttentionList, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { delta } from '@/lib/overview/period'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
@@ -20,7 +22,7 @@ export default function ReplacementsOverview() {
   const p = data?.kpis.previous
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={REPLACEMENTS_INSIGHTS} />} />
       <ListFilters
         entity="replacements"
         fields={REPLACEMENT_FIELDS}

@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { PageInsights } from '@/components/admin/insights'
+import { QUOTATIONS_INSIGHTS } from './quotations-insights'
 import { useSearchParams } from 'next/navigation'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit'
@@ -33,7 +35,7 @@ export default function QuotationsOverview() {
 
   return (
     <div className="space-y-5">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={QUOTATIONS_INSIGHTS} />} />
       <ListFilters
         entity="quotations"
         fields={QUOTATION_FIELDS}

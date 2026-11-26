@@ -3,6 +3,8 @@
 // Finance Overview: KPIs with vs-previous deltas, cash flow trend, aging donuts and the
 // needs-attention list. Shares `?from&to` with every other finance tab via useFinancePeriod.
 
+import { PageInsights } from '@/components/admin/insights'
+import { FINANCE_INSIGHTS } from './financial-insights'
 import Link from 'next/link'
 import { Badge, Banner, Kpi, KpiGrid, Section, count, money, pct, type Tone } from '@/components/admin/channels/ui'
 import { MixDonutCard } from '@/components/admin/kit/charts'
@@ -104,7 +106,7 @@ export function OverviewTab() {
 
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<PageInsights config={FINANCE_INSIGHTS} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <OverviewTabSkeleton /> : data && <Body d={data} />}
     </div>
