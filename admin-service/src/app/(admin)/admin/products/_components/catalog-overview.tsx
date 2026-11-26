@@ -31,12 +31,15 @@ export function OverviewFrame<T extends { attention?: AttentionItem[] }>({
   skeleton,
   query,
   filters,
+  actions,
 }: {
   endpoint: string
   children: (data: T, period: Period) => React.ReactNode
   skeleton?: React.ReactNode
   query?: string
   filters?: React.ReactNode
+  /** Right of the period bar, before Refresh (e.g. the page's insights button). */
+  actions?: React.ReactNode
 }) {
   const [period, setPeriod] = usePeriod()
   const { data, error, loading, reload } = useOverviewData<T>(
@@ -44,7 +47,7 @@ export function OverviewFrame<T extends { attention?: AttentionItem[] }>({
   )
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={actions} />
       {filters}
       {error ? (
         <Banner ok={false}>{error}</Banner>

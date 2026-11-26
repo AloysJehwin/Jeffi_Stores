@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "708b2642e37078b6fd57c9fc5a5ef9ac099db44571b719aaafc9f383f25a283b",
+ "manifestHash": "eaa68c87fb4fe48f38e7859854dfe49b3b58de163016acec728ddc4cf591fd13",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -3963,6 +3963,43 @@
    "command": "business-customers approve"
   },
   {
+   "id": "admin GET /api/admin/business/customers/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/business/customers/insights",
+   "gatewayPath": "/v1/admin/business/customers/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/business/customers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "business_customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "business_customers:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Business applications per day by outcome, behind the Overview's insights pop-over.",
+   "command": "business-customers insights"
+  },
+  {
    "id": "admin GET /api/admin/business/customers/overview",
    "host": "admin",
    "method": "GET",
@@ -4398,6 +4435,43 @@
    "noBody": true,
    "summary": "Delete reply draft for an RFQ",
    "command": "business-rfqs reply-draft-delete"
+  },
+  {
+   "id": "admin GET /api/admin/business/rfqs/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/business/rfqs/insights",
+   "gatewayPath": "/v1/admin/business/rfqs/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/business/rfqs/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "business_rfqs:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "business_rfqs:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "RFQs received per day by stage, behind the Overview's insights pop-over.",
+   "command": "business-rfqs insights"
   },
   {
    "id": "admin GET /api/admin/business/rfqs/overview",
@@ -8290,6 +8364,43 @@
    "command": "cron trigger"
   },
   {
+   "id": "admin GET /api/admin/customer-programs/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/customer-programs/insights",
+   "gatewayPath": "/v1/admin/customer-programs/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/customer-programs/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "campaigns:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "campaigns:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Loyalty points activity and referral sign-ups per day, behind the Overview's insights pop-over.",
+   "command": "customer-programs insights"
+  },
+  {
    "id": "admin GET /api/admin/customer-programs/overview",
    "host": "admin",
    "method": "GET",
@@ -9507,6 +9618,43 @@
    "command": "customers whatsapp-create"
   },
   {
+   "id": "admin GET /api/admin/customers/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/customers/insights",
+   "gatewayPath": "/v1/admin/customers/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/customers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "customers:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "customers:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "New accounts and guests per day, behind the Overview's insights pop-over.",
+   "command": "customers insights"
+  },
+  {
    "id": "admin GET /api/admin/customers/mail-templates",
    "host": "admin",
    "method": "GET",
@@ -10108,6 +10256,43 @@
    "body": null,
    "summary": "Streams the product bulk-import template: the multi-sheet .xlsx (default) or the flat one-sheet layout as ?format=csv. products:read gated. Downloading is an export of the schema shape, not data.",
    "command": "data-source template"
+  },
+  {
+   "id": "admin GET /api/admin/delhivery/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/delhivery/insights",
+   "gatewayPath": "/v1/admin/delhivery/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/delhivery/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "delhivery:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "delhivery:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Shipments handed to Delhivery per day by state, behind the Overview's insights pop-over.",
+   "command": "delhivery insights"
   },
   {
    "id": "admin GET /api/admin/delhivery/overview",
@@ -36586,6 +36771,43 @@
    "command": "products draft"
   },
   {
+   "id": "admin GET /api/admin/products/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/products/insights",
+   "gatewayPath": "/v1/admin/products/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/products/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "products:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "products:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Products added per day by state, behind the Overview's insights pop-over.",
+   "command": "products insights"
+  },
+  {
    "id": "admin GET /api/admin/products/overview",
    "host": "admin",
    "method": "GET",
@@ -38863,6 +39085,43 @@
    "command": "review-forms submissions-update"
   },
   {
+   "id": "admin GET /api/admin/review-forms/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/review-forms/insights",
+   "gatewayPath": "/v1/admin/review-forms/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/review-forms/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "review_forms:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "review_forms:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Review form responses per day by status, behind the Overview's insights pop-over.",
+   "command": "review-forms insights"
+  },
+  {
    "id": "admin GET /api/admin/review-forms/overview",
    "host": "admin",
    "method": "GET",
@@ -38987,6 +39246,43 @@
    "bodyContentType": "application/json",
    "summary": "Update reviews",
    "command": "reviews update"
+  },
+  {
+   "id": "admin GET /api/admin/reviews/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/reviews/insights",
+   "gatewayPath": "/v1/admin/reviews/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/reviews/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "reviews:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "reviews:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Reviews received per day by rating band, behind the Overview's insights pop-over.",
+   "command": "reviews insights"
   },
   {
    "id": "admin GET /api/admin/reviews/overview",
@@ -40241,6 +40537,43 @@
    "bodyContentType": "application/json",
    "summary": "Update platform (setup guide)",
    "command": "setup-guide platform-update"
+  },
+  {
+   "id": "admin GET /api/admin/shelving/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/shelving/insights",
+   "gatewayPath": "/v1/admin/shelving/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/shelving/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "inventory:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "inventory:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Shelf movements per day, added and removed, behind the Overview's insights pop-over.",
+   "command": "shelving insights"
   },
   {
    "id": "admin POST /api/admin/shelving/labels",
@@ -45051,6 +45384,43 @@
    "bodyContentType": "application/json",
    "summary": "POST ?draft=<id> { resolutions? } — merge the draft into live; 409 lists overlapping edits.",
    "command": "suppliers publish"
+  },
+  {
+   "id": "admin GET /api/admin/suppliers/insights",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/suppliers/insights",
+   "gatewayPath": "/v1/admin/suppliers/insights",
+   "file": "admin-service/src/app/api/(admin)/admin/suppliers/insights/route.ts",
+   "pathParams": [],
+   "query": [
+    "filter",
+    "weeks"
+   ],
+   "queryParams": [
+    {
+     "name": "filter",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "weeks",
+     "schema": {
+      "type": "number"
+     }
+    }
+   ],
+   "scope": "inventory:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "inventory:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Purchase orders and goods receipts per day, behind the Overview's insights pop-over.",
+   "command": "suppliers insights"
   },
   {
    "id": "admin GET /api/admin/suppliers/list",

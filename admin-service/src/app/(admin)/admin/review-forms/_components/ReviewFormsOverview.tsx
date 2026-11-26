@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { REVIEW_FORMS_INSIGHTS } from './review-forms-insights'
 import Link from 'next/link'
 import {
   AttentionList,
@@ -46,7 +48,7 @@ export default function ReviewFormsOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={REVIEW_FORMS_INSIGHTS} />} />
       <ListFilters
         entity="review_forms"
         fields={REVIEW_FORM_FIELDS}
