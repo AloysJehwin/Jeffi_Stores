@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { MESSAGING_INSIGHTS } from './messaging-insights'
 import Link from 'next/link'
 import {
   AttentionList,
@@ -62,7 +64,7 @@ export default function MessagingOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={MESSAGING_INSIGHTS} />} />
       <ListFilters entity="messaging" fields={MESSAGING_FIELDS} search={MESSAGING_SEARCH} period noun="Messages" tab="overview" exportable />
       {filters && <p className="text-xs text-foreground-muted">Filtered: only the matching broadcasts count; automated WhatsApp and SMS are left out.</p>}
       {error && <Banner ok={false}>{error}</Banner>}

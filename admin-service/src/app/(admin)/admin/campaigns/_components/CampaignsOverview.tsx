@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { CAMPAIGNS_INSIGHTS } from './campaigns-insights'
 import Link from 'next/link'
 import {
   AttentionList,
@@ -48,7 +50,7 @@ export default function CampaignsOverview() {
 
   return (
     <div className="space-y-4">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={CAMPAIGNS_INSIGHTS} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading || !data || !c || !p ? (
         !error && <CampaignsOverviewLoading />

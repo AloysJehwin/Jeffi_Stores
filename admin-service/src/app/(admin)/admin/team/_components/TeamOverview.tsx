@@ -1,5 +1,7 @@
 'use client'
 
+import { PageInsights } from '@/components/admin/insights'
+import { TEAM_INSIGHTS } from './team-insights'
 import {
   usePeriod,
   PeriodBar,
@@ -20,7 +22,7 @@ export default function TeamOverview() {
   )
   return (
     <div className="space-y-3">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={TEAM_INSIGHTS} />} />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading && <TeamOverviewSkeleton />}
       {data && (
