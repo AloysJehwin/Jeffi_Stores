@@ -64,7 +64,7 @@ Before the first store moves, put the Azure `DATABASE_URL` (and `CONTROL_PLANE_D
    - **Auth key:** check that `TS_AUTHKEY` in `jeffi/production/k3s` is a reusable, tagged key that has not expired.
 5. **Anthropic federation.** Add a federation rule in the Anthropic console for issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`. It is the same kind of rule as `wif-voice`, and the gateway's token comes from this issuer once it runs on the Azure core.
 6. **GitHub settings.**
-   - Secrets: `AZURE_CLIENT_ID` (the `githubClientId` output), `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` are **not set** (checked 2026-11-26): create a Tailscale OAuth client (Settings → OAuth clients, Keys › Auth Keys write, tag `tag:ci`), then `gh secret set TS_OAUTH_CLIENT_ID` and `gh secret set TS_OAUTH_SECRET`, each of which prompts for the value.
+   - Secrets: `AZURE_CLIENT_ID` (the `githubClientId` output), `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` come from a Tailscale OAuth client (Settings → Trust credentials, Keys › Auth Keys write, tag `tag:ci`); set each with `gh secret set <name>`, which prompts for the value. Both were set on 2026-11-26.
    - Variables: `AZURE_INGRESS_IP` (the `ingressIp` output, used until the DNS cutover). Set `AZURE_TARGET=true` last.
 
 ## Apply runbook (in this order)
