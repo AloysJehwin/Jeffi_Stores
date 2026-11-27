@@ -45,6 +45,7 @@ var roles = {
   kvSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
   reader: 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
   storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+  storageBlobDataReader: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
 }
 
 resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
@@ -504,6 +505,17 @@ resource pgBackupBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' =
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataContributor)
     principalId: pgBackupId.properties.principalId
     principalType: 'ServicePrincipal'
+  }
+}
+
+// The operator reads the backups to restore one (deploy/azure/README.md, Backups and restore).
+resource operatorBackupRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(operatorPrincipalId)) {
+  scope: pgBackupContainer
+  name: guid(pgBackupContainer.id, operatorPrincipalId, roles.storageBlobDataReader)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataReader)
+    principalId: operatorPrincipalId
+    principalType: operatorPrincipalType
   }
 }
 

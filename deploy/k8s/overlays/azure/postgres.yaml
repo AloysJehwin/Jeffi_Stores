@@ -52,8 +52,12 @@ spec:
                 openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=postgres" -keyout "$D/server.key" -out "$D/server.crt"
               fi
               chmod 600 "$D/server.key" "$D/server.crt"
+              # kubectl port-forward connects on the pod's own loopback, already inside the API server's TLS tunnel.
+              # Plain TCP there: a TLS close races into a reset, and kubectl drops the whole forward on a reset.
               printf '%s\n' \
                 'local all all trust' \
+                'host all all 127.0.0.1/32 scram-sha-256' \
+                'host all all ::1/128 scram-sha-256' \
                 'hostssl all all 0.0.0.0/0 scram-sha-256' \
                 'hostssl all all ::/0 scram-sha-256' \
                 'hostnossl all all 0.0.0.0/0 reject' \
@@ -131,6 +135,9 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
+        # This namespace too (the platform services, the backup job): the policy must stand on its own when Postgres
+        # is applied before the rest of the platform.
+        - podSelector: {}
         - namespaceSelector: { matchLabels: { jeffi.io/tier: tenant } }
       ports: [{ port: 5432 }]
 ---
@@ -161,6 +168,8 @@ spec:
                 - -c
                 - |
                   set -e
+                  # k3s's policy controller admits a new pod's address only after a few seconds.
+                  for i in $(seq 1 30); do pg_isready -q -t 3 && break; sleep 2; done
                   STAMP=$(date -u +%Y%m%d-%H%M)
                   echo "$STAMP" > /backup/stamp
                   pg_dump -Fc -Z 6 -f "/backup/jeffi_stores-$STAMP.dump"

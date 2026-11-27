@@ -69,10 +69,10 @@ do_dump() {
 # dump dir at /dump and $WORK at /work.
 pgtool() {
   if $USE_DOCKER; then
-    docker run --rm -e PGHOST=host.docker.internal -e PGPORT="$AZ_PG_PORT" -e PGUSER=app_user -e PGSSLMODE=require -e PGPASSFILE=/work/pgpass \
+    docker run --rm -e PGHOST=host.docker.internal -e PGPORT="$AZ_PG_PORT" -e PGUSER=app_user -e PGSSLMODE="$AZ_PG_SSLMODE" -e PGPASSFILE=/work/pgpass \
       -v "$WORK:/work" -v "$DUMPDIR:/dump:ro" "postgres:$SRV_MAJOR-alpine" "$@"
   else
-    PGHOST=$PG_ADDR PGPORT=$AZ_PG_PORT PGUSER=app_user PGSSLMODE=require PGPASSFILE=$WORK/pgpass "$@"
+    PGHOST=$PG_ADDR PGPORT=$AZ_PG_PORT PGUSER=app_user PGSSLMODE=$AZ_PG_SSLMODE PGPASSFILE=$WORK/pgpass "$@"
   fi
 }
 do_ensure() {

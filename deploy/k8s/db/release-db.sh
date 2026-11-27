@@ -44,7 +44,7 @@ if $FLAGSHIP; then
     say "File migrations on jeffi_stores (every <service>/database/migrations and platform-only/migrations)"
     flag=(); $DRY_RUN && flag=(--dry-run)
     if [ "$CLOUD" = azure ]; then # password from PGPASSFILE
-      RDS_HOST='' PGSSLMODE=require DATABASE_URL="postgresql://app_user@$PG_ADDR:$AZ_PG_PORT/jeffi_stores" \
+      RDS_HOST='' PGSSLMODE=$AZ_PG_SSLMODE DATABASE_URL="postgresql://app_user@$PG_ADDR:$AZ_PG_PORT/jeffi_stores" \
         bash "$REPO/deploy/run-migrations.sh" ${flag[@]+"${flag[@]}"}
     else
       RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=jeffi_stores \

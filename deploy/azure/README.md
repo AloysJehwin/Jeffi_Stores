@@ -184,7 +184,7 @@ After the cutover the scripts refuse the AWS side: `release-db.sh`, `rollout.sh`
 
 The self-hosted flagship Postgres is protected by the CronJob `flagship-postgres-backup`: every 4 hours a `pg_dump -Fc` of `jeffi_stores` (plus the roles, `pg_dumpall --globals-only`) goes to `jeffiprodpgbackup/pg-backups/flagship/YYYY/MM/DD/`. Blobs are deleted after 30 days, with 7 days of soft delete on top. The disk itself has no snapshots, so these dumps are the recovery path (at most 4 hours of data lost).
 
-Restore one:
+Restore one (the login that ran `apply.sh` has Storage Blob Data Reader on the container; nothing else but the backup identity can read it):
 ```bash
 az storage blob list --auth-mode login --account-name jeffiprodpgbackup -c pg-backups --prefix flagship/2026/ -o table
 az storage blob download --auth-mode login --account-name jeffiprodpgbackup -c pg-backups \

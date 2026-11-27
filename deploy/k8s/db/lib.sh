@@ -23,6 +23,9 @@ AZ_RG=${AZ_RG:-jeffi-prod-cin}
 AZ_KEY_VAULT=${AZ_KEY_VAULT:-jeffi-prod-kv}
 AZ_PG_HOST=${AZ_PG_HOST:-flagship-postgres.jeffi.svc.cluster.local} # the in-cluster host the apps use (kv-sync.sh)
 AZ_PG_PORT=${AZ_PG_PORT:-15433} # local end of the port-forward: apart from the RDS tunnel's PORT, which restores hold at the same time
+# Plain TCP through the port-forward: it is already inside the API server's TLS tunnel and lands on the pod's loopback
+# (postgres.yaml allows only that without TLS). A TLS close can end in a reset, and kubectl drops the forward on one.
+AZ_PG_SSLMODE=${AZ_PG_SSLMODE:-disable}
 AZ_PG_NAMESPACE=${AZ_PG_NAMESPACE:-jeffi}
 AZ_PG_SERVICE=${AZ_PG_SERVICE:-flagship-postgres}
 AZ_PG_ADMIN=${AZ_PG_ADMIN:-jeffiadmin}
@@ -185,14 +188,14 @@ tunnel() {
 # libpq env for app_user (a fresh IAM token per call; they expire after 15 minutes) and for the master user postgres.
 pg_env() {
   if $REHEARSAL; then export PGUSER=app_user PGPASSWORD=$REHEARSAL_PW; return 0; fi
-  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=$AZ_PG_PORT PGUSER=app_user PGSSLMODE=require; return 0; fi
+  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=$AZ_PG_PORT PGUSER=app_user PGSSLMODE=$AZ_PG_SSLMODE; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=app_user PGSSLMODE=require
   PGPASSWORD=$(aws rds generate-db-auth-token --hostname "$RDS_HOST" --port 5432 --username app_user)
   export PGPASSWORD
 }
 pg_master_env() {
   if $REHEARSAL; then export PGUSER=postgres PGPASSWORD=$REHEARSAL_PW; return 0; fi
-  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=$AZ_PG_PORT PGUSER=$AZ_PG_ADMIN PGSSLMODE=require; return 0; fi
+  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=$AZ_PG_PORT PGUSER=$AZ_PG_ADMIN PGSSLMODE=$AZ_PG_SSLMODE; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=postgres PGSSLMODE=require
   PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id jeffi/production --query SecretString --output text |
     python3 -I -c 'import json, sys; print(json.load(sys.stdin)["RDS_MASTER_PASSWORD"])')
@@ -216,7 +219,7 @@ schema_diff() {
     RDS_DB=$db TARGET_URL="postgresql://app_user:$REHEARSAL_PW@127.0.0.1:$PGPORT/$db" SCHEMA_DIFF_OUT=$OUT_DIR \
       bash "$REPO/deploy/schema-diff.sh" "$@"
   elif [ "$CLOUD" = azure ]; then # the password comes from PGPASSFILE
-    RDS_DB=$db TARGET_URL="postgresql://app_user@${PG_ADDR:?tunnel first}:$AZ_PG_PORT/$db?sslmode=require" SCHEMA_DIFF_OUT=$OUT_DIR \
+    RDS_DB=$db TARGET_URL="postgresql://app_user@${PG_ADDR:?tunnel first}:$AZ_PG_PORT/$db?sslmode=$AZ_PG_SSLMODE" SCHEMA_DIFF_OUT=$OUT_DIR \
       bash "$REPO/deploy/schema-diff.sh" "$@"
   else
     RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=$db \
