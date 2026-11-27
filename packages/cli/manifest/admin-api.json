@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "1781b53da0c8bb010dd664335ea3d2a38964df9edfeca5cedcc14c9983901758",
+ "manifestHash": "67344222c0ae6016d56e7c6d68526effdc74645d9cb6af428eecf5724307bd58",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -41891,6 +41891,60 @@
    "command": "site-builder create"
   },
   {
+   "id": "admin GET /api/admin/site-builder/admin-theme",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/admin-theme",
+   "gatewayPath": "/v1/admin/site-builder/admin-theme",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/admin-theme/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Whether the admin panel also takes the store's published Site Builder theme.",
+   "command": "site-builder admin-theme"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/admin-theme",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/admin-theme",
+   "gatewayPath": "/v1/admin/site-builder/admin-theme",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/admin-theme/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "enabled": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "enabled"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submit admin theme (site builder)",
+   "command": "site-builder admin-theme-create"
+  },
+  {
    "id": "admin POST /api/admin/site-builder/ai",
    "host": "admin",
    "method": "POST",
@@ -43422,7 +43476,8 @@
     }
    ],
    "query": [
-    "audience"
+    "audience",
+    "layout"
    ],
    "queryParams": [
     {
@@ -43432,6 +43487,12 @@
       "examples": [
        "business"
       ]
+     }
+    },
+    {
+     "name": "layout",
+     "schema": {
+      "type": "string"
      }
     }
    ],
