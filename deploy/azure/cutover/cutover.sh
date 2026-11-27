@@ -64,12 +64,25 @@ step_freeze() {
 step_final_dump_restore() {
   local dump=$RUN_DIR/jeffi_stores.dump
   if ! $APPLY; then
+    if [ "${DUMP_VIA:-edge}" = edge ]; then
+      echo "(dry run) would: quiesce the Azure platform pods (freeze.sh on, state $AZ_FREEZE_STATE), then edge-copy.sh: reset the Azure"
+      echo "  jeffi_stores, a postgres pod on the AWS tenant edge dumps the RDS and restores it into flagship-postgres, compare table counts."
+      echo "  (DUMP_VIA=tunnel uses the SSM tunnel instead, which stalled in the rehearsal.) The Azure pods stay at 0 until the identity step."
+      return 0
+    fi
     echo "(dry run) would: pg_dump -Fc jeffi_stores from the RDS (tunnel via the AWS core, app_user IAM token) into $dump;"
     echo "  quiesce the Azure platform pods (freeze.sh on, state $AZ_FREEZE_STATE); pg_restore as app_user (PGPASSFILE 0600 from Key Vault) into Azure jeffi_stores;"
     echo "  compare table counts. The Azure pods stay at 0 until the identity step."
     return 0
   fi
   [ -s "$AWS_FREEZE_STATE" ] || die "the AWS cluster is not frozen ($AWS_FREEZE_STATE missing): run the freeze step first"
+  if [ "${DUMP_VIA:-edge}" = edge ]; then
+    confirm_typed restore "reset the Azure jeffi_stores and copy the frozen RDS into it from a pod on the AWS tenant edge"
+    say "Quiesce the Azure platform"
+    if [ -s "$AZ_FREEZE_STATE" ]; then echo "   already quiesced ($AZ_FREEZE_STATE)"; else freeze_azure on; fi
+    RUN_DIR=$RUN_DIR AZ_KUBECONFIG=$AZ_KUBECONFIG bash "$(dirname "$SELF")/edge-copy.sh"
+    return 0
+  fi
   confirm_typed restore "dump the frozen RDS jeffi_stores and restore it into Azure Postgres (overwrites the Azure copy if RESTORE_CLEAN=1)"
   say "Dump from RDS"
   lib_run aws 'tunnel; pg_major > "$RUN_DIR/pg_major"
