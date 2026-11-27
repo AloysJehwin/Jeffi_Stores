@@ -15,6 +15,7 @@ import { WIZARD_STEPS, resumeStep, stepIndex, type WizardStepKey } from './steps
 import { fieldInput, fieldLabel, ghostBtn, noteCls, primaryBtn } from './ui'
 import { ADDON_INFO, cleanAddonIds, type AddonId, type AddonPrice } from '@/lib/billing/addons'
 import ContactFields from '../_domains/ContactFields'
+import ReviewSitePreview from './_studio/ReviewSitePreview'
 import SiteStudio, { type SiteMode, type StudioSummary } from './_studio/SiteStudio'
 import GiftCard, { FreeChip } from './_studio/GiftCard'
 import StoreStep, { type DomainPick } from './StoreStep'
@@ -1292,6 +1293,7 @@ export default function OnboardWizard({
               logoUrl={logoUrl || null}
               categories={productCats}
               onSummary={onStudioSummary}
+              onContinue={() => canNext() && goTo(step + 1)}
             />
           )}
 
@@ -1317,6 +1319,7 @@ export default function OnboardWizard({
                   })}
                 </div>
               )}
+              {siteMode !== 'self' && <ReviewSitePreview onEdit={() => goTo(stepIndex('site'))} />}
               <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] lg:items-start gap-4">
               <Card title="Your application">
               <div className="space-y-2.5">

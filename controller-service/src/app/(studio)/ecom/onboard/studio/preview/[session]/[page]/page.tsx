@@ -5,7 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { dbSiteData, runWithSiteData, sampleSiteData, type SampleCatalog, type SiteData } from '@/lib/site/data'
 import { CARD_KEY, cardOf } from '@/lib/site/card'
 import type { CompiledSection } from '@/lib/site/code/compile'
-import CodeSection from '@/components/visitor/site/code/CodeSection'
+import CodeSection, { GUARD_CSS } from '@/components/visitor/site/code/CodeSection'
 import type { StudioPlan } from '@/lib/site/studio/types'
 import { getStudioSessionById } from '@controller/lib/site-studio/sessions'
 import { themePreviewSession } from '@controller/lib/site-studio/themes'
@@ -46,7 +46,7 @@ function Sections({ doc, pageKey, data, lead = false }: { doc: PageDoc; pageKey:
         if (b.type !== 'code_section' || !compiled || b.visibility?.hidden) return null
         return (
           <div key={b.id} data-studio-block={b.id} data-studio-page={pageKey} data-studio-label={String(b.props.label ?? 'Section')} className="studio-block">
-            <CodeSection section={compiled} id={b.id} page={isPageKey(page) ? page : null} data={data} priority={lead && i === 0} always={lead && i === 0} />
+            <CodeSection section={compiled} id={b.id} page={isPageKey(page) ? page : null} data={data} priority={lead && i === 0} always={lead && i === 0} guard={false} />
           </div>
         )
       })}
@@ -82,8 +82,10 @@ export default async function StudioPreviewPage({ params, searchParams }: { para
   const source = as === 'live' ? dbSiteData() : as === 'empty' ? { ...sampleSiteData({ ...EMPTY, store: catalog.store }), sample: false } : sampleSiteData(catalog)
   // Every product list draws the session's own product card (none yet: the store's card).
   const data: SiteData = { ...source, card: cardOf(s.pages?.[CARD_KEY]) }
-  const css = `${cssVarsRule('.studio-preview.studio-preview', themeCssVars(theme))}
-.studio-preview{font-family:var(--font-body),system-ui,sans-serif;background:var(--color-surface);color:var(--color-foreground);min-height:100vh}
+  const css = `html{overflow-x:hidden}
+${GUARD_CSS}
+${cssVarsRule('.studio-preview.studio-preview', themeCssVars(theme))}
+.studio-preview{max-width:100%;overflow-x:clip;font-family:var(--font-body),system-ui,sans-serif;background:var(--color-surface);color:var(--color-foreground);min-height:100vh}
 .studio-picking .studio-block{cursor:pointer}
 .studio-picking .studio-block:hover{outline:2px dashed #c46a46;outline-offset:-2px}
 [data-studio-selected]{outline:3px solid #c46a46;outline-offset:-3px}`

@@ -126,7 +126,7 @@ export default function StudioPreview({
 
   return (
     <div ref={box} className="w-full">
-      <div className={phone ? 'mx-auto rounded-[2.4rem] border-[10px] border-[#1b1714] bg-[#1b1714] shadow-xl' : 'overflow-hidden rounded-2xl border border-border-default bg-white shadow-sm'} style={phone ? { width: Math.round(w * scale) + 20 } : undefined}>
+      <div className={phone ? 'mx-auto overflow-hidden rounded-[2.4rem] border-[10px] border-[#1b1714] bg-[#1b1714] shadow-xl' : 'overflow-hidden rounded-2xl border border-border-default bg-white shadow-sm'} style={phone ? { width: Math.round(w * scale) + 20 } : undefined}>
         {!phone && (
           <div className="flex items-center gap-1.5 border-b border-border-default bg-surface-secondary/60 px-3 py-2" aria-hidden>
             <span className="h-2.5 w-2.5 rounded-full bg-[#e3dacb]" />
@@ -134,14 +134,14 @@ export default function StudioPreview({
             <span className="h-2.5 w-2.5 rounded-full bg-[#e3dacb]" />
           </div>
         )}
-        <div className={`relative overflow-hidden bg-white ${phone ? 'rounded-[1.8rem]' : ''}`} style={{ height: visibleH }}>
+        <div className={`relative overflow-hidden bg-white [contain:paint] ${phone ? 'rounded-[1.8rem]' : ''}`} style={{ height: visibleH, ...(phone ? { width: Math.round(w * scale) } : {}) }}>
           {width > 0 && (
             <iframe
               ref={frame}
               key={src}
               src={src}
               title="Preview of your site"
-              className="absolute left-0 top-0 origin-top-left border-0 bg-white"
+              className="absolute left-0 top-0 max-w-none origin-top-left border-0 bg-white"
               style={{ width: w, height: frameH, transform: `scale(${scale})` }}
             />
           )}
