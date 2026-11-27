@@ -58,9 +58,13 @@ do_dump() {
   major=$(PGPASSFILE=$RDS_PGPASS PGSSLMODE=require psql -h 127.0.0.1 -p "$PORT" -U app_user -d jeffi_stores -Atc 'show server_version_num' | cut -c1-2)
   mkdir -p "$BK"; chmod 700 "$BK"
   echo "RDS major $major; dumping jeffi_stores into $BK"
+  # Explicit checks: timed() calls this in an `||` list, where set -e is off, so a dead pg_dump would pass silently.
   docker run --rm -e PGHOST=host.docker.internal -e PGPORT="$PORT" -e PGUSER=app_user -e PGSSLMODE=require \
     -e PGPASSFILE=/pg/pgpass -v "$RDS_PGPASS:/pg/pgpass:ro" -v "$BK:/out" "postgres:$major-alpine" \
-    pg_dump -d jeffi_stores -Fc -f /out/jeffi_stores.dump
+    pg_dump -d jeffi_stores -Fc -f /out/jeffi_stores.dump || { echo "pg_dump failed (exit $?): no restore from a partial dump" >&2; return 1; }
+  # A full read: -l reads only the table of contents, which a truncated dump still has.
+  docker run --rm -v "$BK:/out:ro" "postgres:$major-alpine" pg_restore -f /dev/null /out/jeffi_stores.dump \
+    || { echo "the dump does not read back in full: no restore" >&2; return 1; }
   DUMP=$BK/jeffi_stores.dump; echo "$major" > "$BK/pg_major"
   echo "dump: $(du -h "$DUMP" | cut -f1)"
 }

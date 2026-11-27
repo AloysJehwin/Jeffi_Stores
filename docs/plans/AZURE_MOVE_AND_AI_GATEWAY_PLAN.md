@@ -14,7 +14,17 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **Postgres: self-hosted on the core** (founder, 2026-11-27). Flexible Server B2s returned `SkuNotAvailable` in every zone, and Microsoft declined zonal access in Central India (request 2611260030001583, left open with "update when fulfilled").
   - Applied 2026-11-27: data disk `jeffi-prod-pg-data` (P6 64 GB) attached at LUN 0 and mounted at `/var/lib/jeffi-pg` by the `jeffi-pg-volume` agent; storage account `jeffiprodpgbackup` (container `pg-backups`, 30-day lifecycle, 7-day soft delete); identity `jeffi-prod-pg-backup` (client id in `azure.env`).
   - Started 2026-11-27: namespace `jeffi` (only what Postgres needs; no platform release has reached Azure yet), the `flagship-postgres` pod (PostgreSQL 16.16), `pg-init.sh --apply` (app_user, the four extensions, the six Key Vault service secrets pointed at `flagship-postgres.jeffi.svc.cluster.local`), and a manual backup run uploaded to `flagship/2026/11/27/`.
-  - Next: the Phase D restore of the flagship dump.
+- **Phase D rehearsal, 2026-11-27: passed** (safe mode on, `--skip-store`, tag `local-8f114ce0`; report `~/Documents/db-backups/rehearsal-2026-11-27.log`).
+  - **Database:** prod `jeffi_stores` dumped in **31 s** (165 MB, 376 tables with data) from a pod on the AWS tenant edge, which sits in the VPC next to RDS, and restored into `flagship-postgres` in **322 s** (`pg_restore` exit 0, no errors; 863 MB). The scripted route, `restore-dump.sh` over the SSM port-forward, stalled twice (at 57 MB and 10 MB), so Phase E needs the in-cluster copy (see `deploy/azure/rehearsal/README.md`, If the SSM tunnel stalls). Then `release-db.sh --cloud=azure` in **104 s** (diff applied, control-plane seed, no pending migrations).
+  - **Safe mode:** the scrub skipped 6 queued WhatsApp messages and revoked 4 integration credentials and 3 social accounts: 0 violations, re-checked before the platform. Vault `jeffi-reh-kv` holds only allowlisted keys (provider credentials dropped from all 7 secrets). All 64 CronJobs are suspended, and all 17 running app pods carry the switches (flagship-postgres exempt). No denied credential is in the vault or any Secret.
+  - **Platform:** apply 35 s, rollout 86 s, and the wildcard certificate issued by DNS-01 (a temporary Route 53 TXT record, approved by the founder). Smoke returned 200 for controller, storefront, admin, business, public-api, mobile, showcase and ai-gateway through 52.172.147.62.
+  - **Fixed on the way:**
+    - The scrub used `cancelled` where `messages`/`bulk_job_items` allow `skipped`, so it stopped halfway.
+    - The violation check missed half of what the scrub covers.
+    - `restore-dump.sh` treated a dead `pg_dump` as success.
+    - `apply-platform.sh` could not apply the Coroot resource on a fresh cluster.
+    - The rehearsal checks now exempt the Postgres StatefulSet.
+  - **Left running:** the platform on Azure in rehearsal safe mode, pointed at `jeffi-reh-kv`. Messaging, documents and voice are parked, and every CronJob is suspended, including the Postgres backup, until the next standby apply.
 - **Anthropic federation: one identity per environment** (founder, 2026-11-26). Every store uses it; spend is still charged per store by our own metering.
   - **Production:** workspace `jeffi-production` (`wrkspc_015htan8z4DDLDEQiUYJC6ci`) and service account `jeffi-production` (`svac_01HXWF7V5MmqFNXzAaxbofaH`).
     - Rule `jeffi-production-next` (`fdrl_015c1KmN69fVRfNYSuA5pZMF`) is on the Razer issuer.
@@ -77,7 +87,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
         - `razer-release.sh` reaches the Razer box through the AWS core, so after the cutover Release · razer is skipped. It needs a path through the Azure core: the deploy key on the Azure VM and a hostNetwork Job, or `az vm run-command`, which the deploy identity, a Reader, can't call today.
         - The Azure deploy identity reads Key Vault but cannot write it, so `jeffi-store` drift only warns. A Secrets Officer assignment scoped to that one secret would match the AWS deploy role, which may write only `jeffi/store`.
         - Nothing here has run against a live cluster; the stubbed checks and `actionlint` passed.
-- **Still to do:** the Phase D rehearsal on the self-hosted Postgres (running and initialised since 2026-11-27), the open audit items above, and the Anthropic clean-up after #646's production release.
+- **Still to do:** a reliable dump path for Phase E (the in-cluster copy from the AWS edge; the SSM tunnel stalls), the store round trip (`rehearse.sh` without `--skip-store`, needs an admin cookie), the `shelf_stock_unique` duplicate in `admin-service/database/` (index and constraint share the name), the open audit items above, and the Anthropic clean-up after #646's production release.
 
 **Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
 - **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):

@@ -22,7 +22,11 @@ fi
 kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=300s
 kubectl wait --for condition=established crd/clusterissuers.cert-manager.io --timeout=120s
 kubectl apply -f 21-issuers.yaml
-kubectl wait --for condition=established crd/coroots.coroot.com --timeout=300s 2>/dev/null || sleep 30
+# 50-observability.yaml holds both the operator (a HelmChart) and its Coroot resource, whose CRD exists only once the
+# operator runs: on a fresh cluster apply it, wait for the CRD to appear, then apply it again.
+kubectl apply -f 50-observability.yaml || true
+for _ in $(seq 1 60); do kubectl get crd coroots.coroot.com >/dev/null 2>&1 && break; sleep 5; done
+kubectl wait --for condition=established crd/coroots.coroot.com --timeout=120s
 kubectl apply -f 50-observability.yaml
 for d in jeffi-stores-controller-service jeffi-stores-storefront-service jeffi-stores-admin-service jeffi-stores-business-service jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service jeffi-stores-mobile-service jeffi-stores-showcase-service; do
   kubectl -n jeffi rollout status deploy/$d --timeout=600s
