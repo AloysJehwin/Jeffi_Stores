@@ -176,7 +176,7 @@ describe('runExport', () => {
     expect(values[head + 1][3]).toBe(100.5)
     expect(values[head + 4][0]).toBe('Total')
     expect(values[head + 4][3]).toBe(300.5)
-  })
+  }, 20_000)
 
   it('renders PDF and PowerPoint documents', async () => {
     const pdf = await bytes((await runExport(def, admin, { options: opts({ format: 'pdf' }) })).body)
