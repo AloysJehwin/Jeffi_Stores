@@ -18,7 +18,7 @@ STEPS=(preflight freeze final-dump-restore identity stores-rejoin dns cloudfront
 AZURE_IP=${AZURE_IP:-}; EDGE_IP=${EDGE_IP:-}
 export RUN_DIR ANTH_TENANT ANTH_SA ANTH_RULE_AZURE RESTORE_CLEAN=${RESTORE_CLEAN:-} RESTORE_ALLOW_ERRORS=${RESTORE_ALLOW_ERRORS:-}
 need_ips() { [ -n "$EDGE_IP" ] && [ -n "$AZURE_IP" ] || die "set EDGE_IP and AZURE_IP"; }
-route53() { EDGE_IP=$EDGE_IP AZURE_IP=$AZURE_IP OUT_DIR=$1 bash "$R53" "${@:2}"; }
+route53() { EDGE_IP=$EDGE_IP AZURE_IP=$AZURE_IP STORES_IP=${STORES_IP:-} OUT_DIR=$1 bash "$R53" "${@:2}"; }
 
 step_preflight() {
   local bad=0 sha out
@@ -169,7 +169,7 @@ step_dns() {
   say "Plan (route53-plan.sh, nothing applied)"
   route53 "$SCRATCH"
   $APPLY || { echo "(dry run) --apply would submit it with TTL 60"; return 0; }
-  confirm_typed dns "move the store wildcards to $EDGE_IP and the platform hosts to $AZURE_IP in Route 53"
+  confirm_typed dns "move the store wildcards to ${STORES_IP:-$EDGE_IP} and the platform hosts to $AZURE_IP in Route 53"
   mkdir -p "$RUN_DIR/dns-apply"
   route53 "$RUN_DIR/dns-apply" --apply
   # The first apply's batch is the real rollback; a re-run would only hold the already-changed records.
