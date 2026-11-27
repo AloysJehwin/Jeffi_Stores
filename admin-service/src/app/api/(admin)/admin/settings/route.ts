@@ -7,6 +7,8 @@ import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
 import { getSiteControls, invalidateSiteControlsCache, MESSAGING_LOCK_HINT } from '@/lib/catalog/site-controls'
 import { isGoogleTagSettingKey, validateGoogleTagSetting } from '@/lib/analytics/google-tag'
+import { NO_APP_ERROR, storeHasApp } from '@/lib/site/app-surface'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { OPS_EMAIL_KEY, parseOpsEmailInput } from '@/lib/shared/ops-email-config'
 import { STORE_SOCIAL_KEYS, STORE_SOCIAL_LABELS, STORE_SOCIAL_NETWORKS, STORE_WHATSAPP_KEY, socialUrl, whatsappDigits } from '@/lib/catalog/store-socials'
 
@@ -195,6 +197,20 @@ function normaliseAppBuildId(updates: Array<{ key: string; value: unknown }>): s
   return null
 }
 
+// A tenant can't declare its own app: the build ID is set by the platform. Without an app, app push can't be
+// switched on either. 403 NO_APP_ERROR; null when the request is fine.
+async function noAppDenial(updates: Array<{ key: string; value: unknown }>): Promise<NextResponse | null> {
+  const wantsPush = updates.some(
+    u => (u.key === 'feature_push_enabled' || u.key === 'feature_marketing_push_enabled') && String(u.value) === 'true'
+  )
+  const setsId = updates.some(u => u.key === APP_BUILD_ID_KEY)
+  if (!wantsPush && !setsId) return null
+  const isTenant = (await resolveTenantId().catch(() => null)) != null
+  if (setsId && isTenant) return NextResponse.json({ error: NO_APP_ERROR }, { status: 403 })
+  if (wantsPush && isTenant && !(await storeHasApp())) return NextResponse.json({ error: NO_APP_ERROR }, { status: 403 })
+  return null
+}
+
 // App push can't be switched on while the store has no app build ID (counting one saved in this request).
 async function lockedPushHint(updates: Array<{ key: string; value: unknown }>): Promise<string | null> {
   const want = (k: string) => updates.some(u => u.key === k && String(u.value) === 'true')
@@ -283,6 +299,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
       if (await referralNeedsLoyalty(updates))
         return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+      const denied = await noAppDenial(updates)
+      if (denied) return denied
       const appIdError = normaliseAppBuildId(updates)
       if (appIdError) return NextResponse.json({ error: appIdError }, { status: 400 })
       const batchLock = (await lockedChannelHint(updates)) ?? (await lockedPushHint(updates))
@@ -307,6 +325,8 @@ export async function PATCH(request: NextRequest) {
     if (await referralNeedsLoyalty([{ key, value }])) {
       return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
     }
+    const deniedOne = await noAppDenial([{ key, value }])
+    if (deniedOne) return deniedOne
     if (key === APP_BUILD_ID_KEY) {
       const single = [{ key, value }]
       const err = normaliseAppBuildId(single)
