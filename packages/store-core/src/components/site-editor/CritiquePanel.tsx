@@ -89,7 +89,7 @@ export default function CritiquePanel({
               {sizes.found.map(f => (
                 <li key={f.key} className="rounded-lg border border-border-default p-2.5 space-y-2">
                   <p className="flex gap-2 text-xs text-foreground">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" /> {f.what} runs past the screen on {f.screen}, so the page scrolls sideways there.
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" /> {f.what} runs past the screen on {f.screen}, so it is cut off or the page scrolls sideways there.
                   </p>
                   <button type="button" className={btn} onClick={f.show}>
                     <Crosshair className="h-3.5 w-3.5" /> Show

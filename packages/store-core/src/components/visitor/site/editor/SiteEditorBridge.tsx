@@ -104,7 +104,8 @@ export default function SiteEditorBridge() {
     /** Typing in a field (or an element being edited): keys belong to it. */
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))
     /** What runs past the screen sideways, so the page scrolls or cuts it: the outermost such element of each section
-     * that no ancestor clips or scrolls on purpose. Fixed layers never widen the page. */
+     * that no ancestor clips or scrolls on purpose. Fixed layers never widen the page. A code section's wrapper clips
+     * by default (CodeSection GUARD_CSS), not on purpose: what it cuts off is still reported. */
     const overflowing = () => {
       const vw = root.clientWidth
       const found: HTMLElement[] = []
@@ -116,6 +117,7 @@ export default function SiteEditorBridge() {
         if (cs.position === 'fixed' || cs.visibility === 'hidden') continue
         let clipped = false
         for (let a = el.parentElement; a && a !== document.body && !clipped; a = a.parentElement) {
+          if (a.hasAttribute('data-code-section')) continue
           const s = getComputedStyle(a)
           clipped = s.overflowX !== 'visible' || s.position === 'fixed'
         }

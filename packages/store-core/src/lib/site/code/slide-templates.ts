@@ -62,7 +62,7 @@ function builder(aspect: SlideAspectId) {
   return { el, link, picture, part, section }
 }
 
-const BUTTON = 'inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold md:min-h-0 md:rounded-[0.8cqw] md:px-[1.6cqw] md:py-[1cqw]'
+const BUTTON = 'inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-semibold md:rounded-[0.8cqw] md:px-[1.6cqw] md:py-[1cqw]'
 
 function poster(): CodeNode {
   const b = builder('16:9')
