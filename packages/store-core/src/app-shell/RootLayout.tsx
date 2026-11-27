@@ -6,6 +6,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/catalog/site-controls'
 import { cssVarsRule, googleFontsHref, themeCssVars } from '@jeffi/site-blocks'
 import { getPublishedTheme, getSiteDraft } from '@/lib/site/store'
+import { adminUsesSiteTheme } from '@/lib/site/admin-theme'
 import { verifyHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
 import { normalizeTheme } from '@jeffi/site-blocks'
 import { headers } from 'next/headers'
@@ -105,12 +106,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const adTenantId = (await resolveRequestTenantId()) ?? tenant?.tenantId
   const showAds = !!adClient && !(await storeIsAdFree(adTenantId))
   const cookieConsent = (hasGoogleTag || showAds) && isStorefrontHost
-  // A Site Builder theme recolours and re-fonts the store and business pages (never the staff hosts). Set on the body,
-  // twice-classed, so it wins over the base :root / .dark variables.
+  // A Site Builder theme recolours and re-fonts the store and business pages, decided by the app first (JEFFI_APP,
+  // so /admin on any host is never themed) and the host second; the admin app takes it only when the store opts in.
+  // Set on the body, twice-classed, so it wins over the base :root / .dark variables.
+  const app = process.env.JEFFI_APP
+  const storeApp = app === 'storefront' || app === 'business'
+  const themedStore = storeApp && isStorefrontHost
+  const themedBusiness = storeApp && isBusinessSubdomain
+  const themedHost = themedStore || themedBusiness
+  const adminThemed = app === 'admin' && !isFormsSubdomain && !isDocumentSubdomain && !isVaultSubdomain && !isCertPortalSubdomain && !isEcomSubdomain && (await adminUsesSiteTheme().catch(() => false))
   // In the Site Builder canvas (a preview token): the draft's theme when it has one, and its header, footer and
   // announcement bar on the layout the canvas asks for.
   const sitePreview =
-    isStorefrontHost || isBusinessSubdomain
+    themedHost
       ? await verifyHomepagePreviewToken((await headers()).get('x-site-preview'))
           .then(t => (t?.kind === 'site' ? t : null))
           .catch(() => null)
@@ -129,26 +137,28 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const siteTheme =
     previewTheme ??
-    (isStorefrontHost || isBusinessSubdomain
+    (themedHost
       ? ((isBusinessSubdomain ? await getPublishedTheme('business').catch(() => null) : null) ??
         (await getPublishedTheme('store').catch(() => null)))
-      : null)
+      : adminThemed
+        ? await getPublishedTheme('store').catch(() => null)
+        : null)
   // The header, footer and announcement bar from Site Builder (phones get their own layout).
   const siteChrome =
-    isStorefrontHost || isBusinessSubdomain
+    themedHost
       ? await chromeSurface()
           .then(s => getSiteChrome(isBusinessSubdomain ? 'business' : 'store', s, sitePreview?.draftId))
           .catch(() => null)
       : null
   // The AI-written header, footer and announcement bar (AI Site Studio) replace the built-in ones on the storefront.
-  const codeChrome = isStorefrontHost
+  const codeChrome = themedStore
     ? await chromeSurface()
         .then(s => loadCodeChrome('store', s, sitePreview))
         .catch(() => null)
     : null
   // The AI-written product card's styles, once, in <head>. A card's own copy can land in a tree the browser never
   // shows (the 404 page every route carries), which would leave every shown card without them. Loaded only on demand.
-  const siteCardStyles = isStorefrontHost
+  const siteCardStyles = themedStore
     ? await Promise.all([import('@/lib/site/card'), import('@/components/visitor/site/code/common/SiteCard')])
         .then(async ([{ siteCard }, { SiteCardStyles }]) => {
           const card = await siteCard()
@@ -157,7 +167,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         .catch(() => null)
     : null
   // Credits for the stock photos the store shows, under its footer (drawn by ConditionalLayout, never by page code).
-  const photoCredits = isStorefrontHost ? await storePhotoCredits(storeSlug ?? 'flagship').catch(() => []) : []
+  const photoCredits = themedStore ? await storePhotoCredits(storeSlug ?? 'flagship').catch(() => []) : []
   const siteThemeCss = siteTheme
     ? `${cssVarsRule('body.site-theme.site-theme', themeCssVars(siteTheme))}body.site-theme{font-family:var(--font-body),system-ui,sans-serif}`
     : null
