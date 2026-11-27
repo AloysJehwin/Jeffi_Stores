@@ -13,7 +13,8 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **Secrets:** `kv-sync.sh --apply` copied the 10 production secrets into Key Vault. The `*/local` developer secrets are skipped.
 - **Postgres: self-hosted on the core** (founder, 2026-11-27). Flexible Server B2s returned `SkuNotAvailable` in every zone, and Microsoft declined zonal access in Central India (request 2611260030001583, left open with "update when fulfilled").
   - Applied 2026-11-27: data disk `jeffi-prod-pg-data` (P6 64 GB) attached at LUN 0 and mounted at `/var/lib/jeffi-pg` by the `jeffi-pg-volume` agent; storage account `jeffiprodpgbackup` (container `pg-backups`, 30-day lifecycle, 7-day soft delete); identity `jeffi-prod-pg-backup` (client id in `azure.env`).
-  - Not yet: the `flagship-postgres` pod and `pg-init.sh --apply` (they need the Mac on the tailnet), then the Phase D restore.
+  - Started 2026-11-27: namespace `jeffi` (only what Postgres needs; no platform release has reached Azure yet), the `flagship-postgres` pod (PostgreSQL 16.16), `pg-init.sh --apply` (app_user, the four extensions, the six Key Vault service secrets pointed at `flagship-postgres.jeffi.svc.cluster.local`), and a manual backup run uploaded to `flagship/2026/11/27/`.
+  - Next: the Phase D restore of the flagship dump.
 - **Anthropic federation: one identity per environment** (founder, 2026-11-26). Every store uses it; spend is still charged per store by our own metering.
   - **Production:** workspace `jeffi-production` (`wrkspc_015htan8z4DDLDEQiUYJC6ci`) and service account `jeffi-production` (`svac_01HXWF7V5MmqFNXzAaxbofaH`).
     - Rule `jeffi-production-next` (`fdrl_015c1KmN69fVRfNYSuA5pZMF`) is on the Razer issuer.
@@ -76,7 +77,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
         - `razer-release.sh` reaches the Razer box through the AWS core, so after the cutover Release · razer is skipped. It needs a path through the Azure core: the deploy key on the Azure VM and a hostNetwork Job, or `az vm run-command`, which the deploy identity, a Reader, can't call today.
         - The Azure deploy identity reads Key Vault but cannot write it, so `jeffi-store` drift only warns. A Secrets Officer assignment scoped to that one secret would match the AWS deploy role, which may write only `jeffi/store`.
         - Nothing here has run against a live cluster; the stubbed checks and `actionlint` passed.
-- **Still to do:** start the self-hosted Postgres (`postgres.yaml`, `pg-init.sh --apply`; the disk, backup store and identity are applied), then the rehearsal, the open audit items above, and the Anthropic clean-up after #646's production release.
+- **Still to do:** the Phase D rehearsal on the self-hosted Postgres (running and initialised since 2026-11-27), the open audit items above, and the Anthropic clean-up after #646's production release.
 
 **Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
 - **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):
