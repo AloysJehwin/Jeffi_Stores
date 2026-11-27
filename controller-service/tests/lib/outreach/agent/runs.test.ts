@@ -28,7 +28,7 @@ describe('runs', () => {
     const r = await runs.createRun({ contactId: 'k1', skillVersionId: null, skillRef: 'showcase-offer/2026-11-24.1' })
     expect(r.id).toBe('r-existing')
     expect(sqls()[0]).toMatch(/^INSERT INTO outreach_agent_runs .* ON CONFLICT DO NOTHING/)
-    expect(h.query.mock.calls[0][1]).toEqual(['k1', null, 'showcase-offer/2026-11-24.1'])
+    expect(h.query.mock.calls[0][1]).toEqual(['k1', null, 'showcase-offer/2026-11-24.1', null])
   })
 
   it('createRun throws when no run can be read back', async () => {
@@ -53,7 +53,8 @@ describe('runs', () => {
     expect(s[0]).toContain('UPDATE outreach_contacts SET handoff_at')
     expect(s[0]).not.toContain('status =')
     expect(s[1]).toContain(`UPDATE outreach_agent_runs SET status = 'handed_off'`)
-    expect(s[2]).toContain(`UPDATE outreach_agent_tasks SET status = 'cancelled'`)
+    expect(s[2]).toContain(`UPDATE outreach_jobs SET status = 'handed_off'`)
+    expect(s[3]).toContain(`UPDATE outreach_agent_tasks SET status = 'cancelled'`)
     expect(events()).toEqual([{ kind: 'handoff', data: { reason: 'wants a person', channel: 'whatsapp' }, actor: 'outreach:agent' }])
   })
 

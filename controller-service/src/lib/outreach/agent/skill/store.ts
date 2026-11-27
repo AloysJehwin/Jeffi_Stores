@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { outreachPool } from '../../db'
 import { recordEvent } from '../../events'
 import type { OutreachContact } from '../../types'
-import type { AgentRunRow, ParsedSkill, ResolvedSkill, SkillFlow, SkillMeta, SkillValidation } from '../types'
+import type { AgentAudience, AgentPurpose, AgentRunRow, InputSpec, JobRow, ParsedSkill, ResolvedSkill, SkillFlow, SkillMeta, SkillValidation } from '../types'
 import { BUILTIN_SKILLS, DEFAULT_SKILL_SLUG } from './builtin'
 import { parseSkill } from './parse'
 import { validateSkill } from './validate'
@@ -26,7 +26,18 @@ export interface SkillSummary {
   updated_at: string
   list_count: number
   is_default: boolean
+  /** Task agents: draft | active | paused, who it talks to, and what starts it. */
+  status: AgentStatus
+  audience: AgentAudience
+  purpose: AgentPurpose
+  trigger_event: string
+  /** The current version's declared inputs and outcomes. */
+  inputs: Record<string, InputSpec>
+  outcomes: string[]
 }
+
+export const AGENT_STATUSES = ['draft', 'active', 'paused'] as const
+export type AgentStatus = (typeof AGENT_STATUSES)[number]
 
 export interface SkillVersionRow {
   id: string
@@ -50,7 +61,7 @@ const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : Strin
 const isoOrNull = (v: unknown): string | null => (v == null ? null : iso(v))
 
 const SUMMARY_SQL = `
-  SELECT s.id, s.slug, s.title, s.description, s.current_version_id, s.archived_at, s.updated_at,
+  SELECT s.id, s.slug, s.title, s.description, s.current_version_id, s.archived_at, s.updated_at, s.status, s.audience, s.purpose, s.trigger_event,
          v.version AS current_version, v.meta AS current_meta,
          (SELECT count(*)::int FROM outreach_lists l WHERE l.skill_id = s.id) AS list_count,
          COALESCE(ps.default_skill_id = s.id, false) AS is_default
@@ -75,6 +86,12 @@ function toSummary(r: any): SkillSummary {
     updated_at: iso(r.updated_at),
     list_count: Number(r.list_count ?? 0),
     is_default: !!r.is_default,
+    status: r.status ?? 'active',
+    audience: r.audience ?? 'lead',
+    purpose: r.purpose ?? 'transactional',
+    trigger_event: r.trigger_event ?? 'manual',
+    inputs: meta.inputs ?? {},
+    outcomes: meta.outcomes ?? [],
   }
 }
 
@@ -131,8 +148,9 @@ export async function createSkill(input: { tenantId: string | null; program: str
   let skillId: string
   try {
     const r = await pool.query(
-      `INSERT INTO outreach_skills (tenant_id, program, slug, title, description, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-      [input.tenantId, input.program, meta.name, meta.title, meta.description, input.actor.id]
+      `INSERT INTO outreach_skills (tenant_id, program, slug, title, description, status, audience, purpose, trigger_event, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      // A store agent starts as a draft so no trigger or job runs before someone activates it; Showcase skills stay active.
+      [input.tenantId, input.program, meta.name, meta.title, meta.description, meta.audience === 'shopper' ? 'draft' : 'active', meta.audience, meta.purpose, meta.trigger.event, input.actor.id]
     )
     skillId = r.rows[0].id
   } catch (e) {
@@ -163,18 +181,30 @@ export async function addSkillVersion(skillId: string, content: string, actor: A
     [skillId, content, JSON.stringify(meta), sha256(content), JSON.stringify(storable(validation)), actor.id]
   )
   const version = toVersion(v.rows[0])
-  await pool.query(`UPDATE outreach_skills SET current_version_id = $2, title = $3, description = $4, updated_at = now() WHERE id = $1`, [skillId, version.id, meta.title, meta.description])
+  await pool.query(
+    `UPDATE outreach_skills SET current_version_id = $2, title = $3, description = $4, audience = $5, purpose = $6, trigger_event = $7, updated_at = now() WHERE id = $1`,
+    [skillId, version.id, meta.title, meta.description, meta.audience, meta.purpose, meta.trigger.event]
+  )
   await recordEvent(null, 'skill_version_added', { actor: actor.label, data: { skillId, slug: cur.slug, versionId: version.id, version: version.version } })
   return { skill: (await getSummary(skillId))!, version, validation }
 }
 
-export async function updateSkill(id: string, patch: { title?: string; description?: string | null; current_version_id?: string }, actor: Actor): Promise<SkillSummary> {
+export async function updateSkill(id: string, patch: { title?: string; description?: string | null; current_version_id?: string; status?: AgentStatus }, actor: Actor): Promise<SkillSummary> {
   const cur = await getSummary(id)
   if (!cur) throw new SkillError('Skill not found', 404)
   const pool = outreachPool()
+  let versionMeta: Partial<SkillMeta> = {}
   if (patch.current_version_id) {
-    const v = await pool.query(`SELECT id, version FROM outreach_skill_versions WHERE id = $1 AND skill_id = $2`, [patch.current_version_id, id])
+    const v = await pool.query(`SELECT id, version, meta FROM outreach_skill_versions WHERE id = $1 AND skill_id = $2`, [patch.current_version_id, id])
     if (!v.rows[0]) throw new SkillError('That version does not belong to this skill', 400)
+    versionMeta = (v.rows[0].meta ?? {}) as Partial<SkillMeta>
+  }
+  if (patch.status === 'active') {
+    // an agent only goes live when its current version still passes validation
+    const row = await bySkill(id)
+    if (!row) throw new SkillError('This agent has no current version', 409)
+    const v = validateSkill(row.content)
+    if (!v.ok) throw new SkillError(`Fix the agent before activating it: ${v.issues.find(i => i.level === 'error')?.message ?? 'it does not validate'}`, 400, v)
   }
   const sets: string[] = []
   const params: unknown[] = [id]
@@ -184,9 +214,16 @@ export async function updateSkill(id: string, patch: { title?: string; descripti
   }
   if (patch.title !== undefined) set('title', patch.title)
   if (patch.description !== undefined) set('description', patch.description)
-  if (patch.current_version_id !== undefined) set('current_version_id', patch.current_version_id)
+  if (patch.current_version_id !== undefined) {
+    set('current_version_id', patch.current_version_id)
+    if (versionMeta.audience) set('audience', versionMeta.audience)
+    if (versionMeta.purpose) set('purpose', versionMeta.purpose)
+    if (versionMeta.trigger) set('trigger_event', versionMeta.trigger.event)
+  }
+  if (patch.status !== undefined) set('status', patch.status)
   if (!sets.length) return cur
   await pool.query(`UPDATE outreach_skills SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, params)
+  if (patch.status && patch.status !== cur.status) await recordEvent(null, 'skill_status_set', { actor: actor.label, data: { skillId: id, slug: cur.slug, status: patch.status } })
   if (patch.current_version_id) await recordEvent(null, 'skill_current_set', { actor: actor.label, data: { skillId: id, slug: cur.slug, versionId: patch.current_version_id } })
   return (await getSummary(id))!
 }
@@ -284,4 +321,41 @@ export async function loadRunSkill(run: Pick<AgentRunRow, 'skill_version_id' | '
     }
   }
   return builtinSkill(run.skill_ref.split(/[/@]/)[0])
+}
+
+// ---- task agents ----
+
+/** The agent's current version, parsed, with the columns a job needs. Null for an unknown id. */
+export async function getAgent(skillId: string): Promise<{ resolved: ResolvedSkill; status: AgentStatus; archived: boolean } | null> {
+  const r = await outreachPool().query(`SELECT status FROM outreach_skills WHERE id = $1`, [skillId])
+  if (!r.rows[0]) return null
+  const row = await bySkill(skillId)
+  if (!row) return null
+  // a stored version is already validated; only an unparsable file is refused
+  const skill = validateSkill(row.content).skill
+  if (!skill) return null
+  return { resolved: resolved(row, skill), status: r.rows[0].status as AgentStatus, archived: !!row.archived_at }
+}
+
+/** The skill a job runs: its pinned version, else the agent's current one. */
+export async function loadJobSkill(job: Pick<JobRow, 'skill_id' | 'skill_version_id'>): Promise<ResolvedSkill | null> {
+  if (job.skill_version_id) {
+    const row = await byVersion(job.skill_version_id)
+    const skill = row ? validateSkill(row.content).skill : null
+    if (row && skill) return resolved(row, skill)
+  }
+  return (await getAgent(job.skill_id))?.resolved ?? null
+}
+
+/** Active, unarchived agents with an event trigger (the outreach-triggers cron's list), on their current version. */
+export async function activeTriggerAgents(): Promise<{ skillId: string; versionId: string | null; meta: SkillMeta }[]> {
+  const r = await outreachPool().query(
+    `${VERSION_JOIN} WHERE s.status = 'active' AND s.archived_at IS NULL AND s.trigger_event <> 'manual' AND v.id = s.current_version_id`
+  )
+  const out: { skillId: string; versionId: string | null; meta: SkillMeta }[] = []
+  for (const row of r.rows as VersionJoin[]) {
+    const skill = validateSkill(row.content).skill
+    if (skill && skill.meta.trigger.event !== 'manual') out.push({ skillId: row.skill_id, versionId: row.id, meta: skill.meta })
+  }
+  return out
 }

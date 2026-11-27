@@ -19,7 +19,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
   const tab: OutreachTab = TABS.find(t => t.id === sp.tab)?.id ?? 'program'
   return (
     <PageBody>
-      <PageHeader title="Outreach" description="The AI caller phones businesses from imported lists, builds each a Showcase website and sends the links on WhatsApp." />
+      <PageHeader title="Outreach" description="The AI caller phones businesses from imported lists, builds each a Showcase website and sends the links on WhatsApp. Task agents work through jobs for shoppers and leads." />
       <div className="mb-5">
         <TabLinks tabs={TABS.map(t => ({ ...t, href: t.id === 'program' ? BASE : `${BASE}?tab=${t.id}` }))} value={tab} />
       </div>

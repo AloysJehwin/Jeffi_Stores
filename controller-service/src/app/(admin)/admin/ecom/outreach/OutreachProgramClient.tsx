@@ -38,7 +38,7 @@ export default function OutreachProgramClient() {
     api<View>(`${API}/program`).then(({ ok, data }) => (ok ? apply(data) : setError(data.error || 'Could not load the program')))
   }, [apply])
   useEffect(() => {
-    api<{ skills: SkillSummary[] }>(`${API}/skills?program=showcase-offer`).then(({ ok, data }) => ok && setSkills(data.skills.filter(s => !s.archived_at)))
+    api<{ skills: SkillSummary[] }>(`${API}/skills?program=showcase-offer`).then(({ ok, data }) => ok && setSkills(data.skills.filter(s => !s.archived_at && s.audience !== 'shopper')))
   }, [])
 
   async function patch(body: Record<string, unknown>, done: string) {
@@ -115,12 +115,12 @@ export default function OutreachProgramClient() {
         </div>
       </Card>
 
-      <Card title="Default skill" hint="What the agent follows for contacts whose list has no skill of its own. Applies to new runs; calls in progress keep theirs.">
+      <Card title="Default agent" hint="What the agent follows for contacts whose list has no agent of its own. Applies to new runs; calls in progress keep theirs.">
         <label className="text-xs text-foreground-muted space-y-1 block sm:w-96">
-          Default skill
-          <select aria-label="Default skill" className={inputCls} value={state.default_skill_id ?? ''} disabled={!canWrite || saving} onChange={e => patch({ default_skill_id: e.target.value || null }, 'Default skill saved')}>
+          Default agent
+          <select aria-label="Default agent" className={inputCls} value={state.default_skill_id ?? ''} disabled={!canWrite || saving} onChange={e => patch({ default_skill_id: e.target.value || null }, 'Default agent saved')}>
             <option value="">Builtin: Showcase offer (default)</option>
-            {state.default_skill_id && !skills.some(s => s.id === state.default_skill_id) && <option value={state.default_skill_id}>Archived skill</option>}
+            {state.default_skill_id && !skills.some(s => s.id === state.default_skill_id) && <option value={state.default_skill_id}>Archived agent</option>}
             {skills.map(s => (
               <option key={s.id} value={s.id}>{s.title}</option>
             ))}

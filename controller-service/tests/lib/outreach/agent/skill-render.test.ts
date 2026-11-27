@@ -157,7 +157,7 @@ describe('helpers', () => {
   })
 
   it('lists the placeholders', () => {
-    expect([...PLACEHOLDERS].sort()).toEqual(['ai_answer', 'business', 'category', 'city', 'consent_ask', 'language', 'now_ist', 'owner', 'persona', 'pitch', 'trial_days'])
+    expect([...PLACEHOLDERS].sort()).toEqual(['ai_answer', 'business', 'category', 'city', 'consent_ask', 'language', 'now_ist', 'owner', 'persona', 'pitch', 'store', 'trial_days'])
     expect(LANGUAGE_NAMES.en.english).toBe('English')
   })
 })

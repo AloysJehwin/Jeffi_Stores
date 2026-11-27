@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS public.outreach_contacts (
     list_id uuid,
     program text NOT NULL,
     phone text NOT NULL,
-    business_name text NOT NULL,
+    business_name text,
+    kind text NOT NULL DEFAULT 'lead',
+    user_id uuid,
     owner_name text,
     category text,
     city text,
@@ -126,6 +128,10 @@ CREATE TABLE IF NOT EXISTS public.outreach_skills (
     title text NOT NULL,
     description text,
     current_version_id uuid,
+    status text NOT NULL DEFAULT 'active',
+    audience text NOT NULL DEFAULT 'lead',
+    purpose text NOT NULL DEFAULT 'transactional',
+    trigger_event text NOT NULL DEFAULT 'manual',
     archived_at timestamp with time zone,
     created_by uuid,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -148,6 +154,7 @@ CREATE TABLE IF NOT EXISTS public.outreach_skill_versions (
 CREATE TABLE IF NOT EXISTS public.outreach_agent_runs (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     contact_id uuid NOT NULL,
+    job_id uuid,
     skill_version_id uuid,
     skill_ref text NOT NULL,
     status text NOT NULL DEFAULT 'active',
@@ -175,4 +182,26 @@ CREATE TABLE IF NOT EXISTS public.outreach_agent_tasks (
     created_by text,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     done_at timestamp with time zone
+);
+
+-- Task-agent jobs (docs/plans/OUTREACH_AGENTS.md): one task for one person (a review call for one order, one Showcase
+-- lead), with the inputs the agent declared, validated; source_ref dedupes per agent (one job per order).
+CREATE TABLE IF NOT EXISTS public.outreach_jobs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    skill_id uuid NOT NULL,
+    skill_version_id uuid,
+    contact_id uuid NOT NULL,
+    inputs jsonb NOT NULL DEFAULT '{}',
+    refs jsonb NOT NULL DEFAULT '{}',
+    source text NOT NULL,
+    source_ref text,
+    status text NOT NULL DEFAULT 'queued',
+    outcome text,
+    due_at timestamp with time zone NOT NULL DEFAULT now(),
+    attempts integer NOT NULL DEFAULT 0,
+    result jsonb,
+    created_by text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    ended_at timestamp with time zone
 );

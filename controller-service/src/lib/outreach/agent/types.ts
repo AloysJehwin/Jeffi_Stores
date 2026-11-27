@@ -13,6 +13,9 @@ export type SkillFlow = (typeof FLOWS)[number]
 
 export type ToolEffect = 'read' | 'write' | 'send' | 'call'
 
+export const TOOL_GROUPS = ['core', 'messaging', 'orders', 'reviews', 'checkout', 'catalog', 'support', 'showcase', 'voice'] as const
+export type ToolGroup = (typeof TOOL_GROUPS)[number]
+
 /** Hard limits live in code (guards.ts HARD_LIMITS); a skill may only lower them. */
 export interface AgentLimits {
   /** Unanswered dial attempts before a lead fails (worker + scheduleCallback before interest). */
@@ -43,6 +46,8 @@ export type AgentRunStatus = 'active' | 'handed_off' | 'completed' | 'stopped'
 export interface AgentRunRow {
   id: string
   contact_id: string
+  /** The task-agent job this run serves; absent/null for a Showcase lead run. */
+  job_id?: string | null
   skill_version_id: string | null
   /** "<slug>@v<n>", or the builtin's script version: cited in consent evidence and audit rows. */
   skill_ref: string
@@ -83,8 +88,73 @@ export type AgentTrigger =
   | { kind: 'call_ended'; callId: string; outcome: string | null; summary: string | null }
   | { kind: 'call_unanswered'; callId: string; status: string }
 
+export const JOB_SOURCES = ['csv', 'sheet', 'form', 'api', 'event', 'test'] as const
+export type JobSource = (typeof JOB_SOURCES)[number]
+
+/** queued: waiting to start (due_at, or another live job on the same phone); active: its run is live; waiting: a
+ *  follow-up or callback is scheduled; the rest are terminal. */
+export const JOB_STATUSES = ['queued', 'active', 'waiting', 'completed', 'failed', 'cancelled', 'handed_off'] as const
+export type JobStatus = (typeof JOB_STATUSES)[number]
+export const OPEN_JOB_STATUSES: readonly JobStatus[] = ['queued', 'active', 'waiting']
+
+/** Safe summaries of the job's references, resolved on the server (agent/store/refs.ts). No phone, email or address. */
+export interface OrderRef {
+  id: string
+  number: string
+  status: string
+  paymentStatus: string | null
+  paymentMethod: string | null
+  /** Rupees, formatted ("₹1,240"). */
+  total: string
+  itemCount: number
+  /** "Drill set and 2 more" */
+  itemsShort: string
+  placedAt: string
+  deliveredAt: string | null
+  hasTracking: boolean
+}
+export interface CheckoutRef {
+  /** cart:<userId> or order:<orderId> (a failed or abandoned checkout) */
+  key: string
+  kind: 'cart' | 'checkout'
+  total: string
+  itemCount: number
+  itemsShort: string
+  at: string
+}
+export interface ProductRef { id: string; name: string; price: string; inStock: boolean; slug: string | null }
+export interface CustomerRef { userId: string; firstName: string | null; orderCount: number; lastOrderAt: string | null }
+export interface ResolvedRefs {
+  order?: OrderRef
+  checkout?: CheckoutRef
+  product?: ProductRef
+  customer?: CustomerRef
+}
+
+export interface JobRow {
+  id: string
+  skill_id: string
+  skill_version_id: string | null
+  contact_id: string
+  inputs: Record<string, unknown>
+  refs: ResolvedRefs
+  source: JobSource
+  source_ref: string | null
+  status: JobStatus
+  outcome: string | null
+  due_at: string
+  attempts: number
+  result: Record<string, unknown> | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  ended_at: string | null
+}
+
 export interface ToolContext {
   channel: AgentChannel
+  /** The task-agent job this turn serves; null for a Showcase lead run that predates jobs. */
+  job: JobRow | null
   /** Fresh row, read just before the tool runs. */
   contact: OutreachContact
   /** The live call (voice only). */
@@ -121,6 +191,8 @@ export interface ToolDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
   effect: ToolEffect
   /** Always offered, whatever the skill lists (optOut, handOff, getLead, logOutcome). */
   mandatory?: boolean
+  /** Catalog area for the admin tool picker; defaults to 'showcase' for the original tools. */
+  group?: ToolGroup
   args: S
   /** JSON Schema of the args, handed to the LLM. */
   inputSchema: Record<string, unknown>
@@ -134,11 +206,64 @@ export interface LlmToolSchema {
   input_schema: Record<string, unknown>
 }
 
+// Task agents (docs/plans/OUTREACH_AGENTS.md): a skill that declares inputs and a trigger runs as jobs.
+
+/** promotional adds DND and the marketing opt-out; transactional keeps opt-out, suppression and the calling window. */
+export const PURPOSES = ['transactional', 'promotional'] as const
+export type AgentPurpose = (typeof PURPOSES)[number]
+
+/** Who the agent talks to: a business lead (Showcase, program 'showcase') or a flagship-store shopper (program 'store'). */
+export const AUDIENCES = ['lead', 'shopper'] as const
+export type AgentAudience = (typeof AUDIENCES)[number]
+export const PROGRAM_OF: Record<AgentAudience, string> = { lead: 'showcase', shopper: 'store' }
+
+export const INPUT_TYPES = [
+  'text', 'phone', 'email', 'number', 'money', 'date', 'datetime', 'url', 'enum', 'boolean', 'language',
+  'order_ref', 'checkout_ref', 'product_ref', 'customer_ref',
+] as const
+export type InputType = (typeof INPUT_TYPES)[number]
+export const REF_TYPES: readonly InputType[] = ['order_ref', 'checkout_ref', 'product_ref', 'customer_ref']
+
+/** contact: the phone the job reaches (exactly one per agent); name and language fill the contact row. */
+export const INPUT_ROLES = ['contact', 'name', 'language'] as const
+export type InputRole = (typeof INPUT_ROLES)[number]
+
+export interface InputSpec {
+  type: InputType
+  required: boolean
+  role: InputRole | null
+  description: string | null
+  /** type enum only */
+  enum: string[] | null
+}
+
+export const TRIGGER_EVENTS = ['manual', 'order.delivered', 'order.placed', 'checkout.abandoned', 'payment.failed', 'review.missing'] as const
+export type TriggerEvent = (typeof TRIGGER_EVENTS)[number]
+
+export interface TriggerSpec {
+  event: TriggerEvent
+  /** Minutes after the event before the job is due (frontmatter `delay: 2d | 6h | 30m`). */
+  delayMinutes: number
+  /** How far back the trigger looks for events (frontmatter `lookback: 7d`; default 3 days, at most 30). */
+  lookbackMinutes: number
+  /** Input whose value makes the job unique per agent (outreach_jobs.source_ref). */
+  dedupe: string | null
+  /** Optional filters the event query understands, e.g. { payment_method: cod, min_total: 500 }. */
+  when: Record<string, string | number | boolean>
+}
+
 export interface SkillMeta {
   name: string
   title: string
   description: string | null
   flow: SkillFlow
+  /** Task-agent keys; a skill without them is a Showcase lead skill (audience lead, trigger manual, no inputs). */
+  audience: AgentAudience
+  purpose: AgentPurpose
+  inputs: Record<string, InputSpec>
+  trigger: TriggerSpec
+  /** The codes setOutcome accepts (slugs). Empty: setOutcome takes any slug. */
+  outcomes: string[]
   /** The live channels the skill talks on; follow_up is implied by a "## Follow-up" section. */
   channels: ('voice' | 'whatsapp')[]
   languages: OutreachLanguage[]
@@ -213,6 +338,12 @@ export interface RenderContext {
   trigger?: AgentTrigger
   /** WhatsApp 24 h window open (free text allowed). */
   windowOpen?: boolean
+  /** Task agents: the job's inputs and resolved references, for {{inputs.x}} and {{order.x}} placeholders. */
+  audience?: AgentAudience
+  inputs?: Record<string, unknown>
+  refs?: ResolvedRefs
+  /** The flagship store's name for {{store}}; defaults to render.ts STORE_NAME. */
+  store?: string
 }
 
 /** The model behind a gateway turn. Production: aiChat through the AI gateway; tests and the E2E: a scripted brain. */

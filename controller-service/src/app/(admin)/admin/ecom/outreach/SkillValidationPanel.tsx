@@ -80,7 +80,7 @@ export function ParsedMeta({ validation }: { validation: SkillValidation }) {
 
 export function ValidationSummary({ validation, checking, error }: { validation: SkillValidation | null; checking: boolean; error?: string | null }) {
   if (error) return <p className={`text-sm ${ICON_ERR}`}>{error}</p>
-  if (!validation) return <p className="text-sm text-foreground-muted">{checking ? 'Checking…' : 'Paste or upload a skill file to check it.'}</p>
+  if (!validation) return <p className="text-sm text-foreground-muted">{checking ? 'Checking…' : 'Paste or upload an agent file to check it.'}</p>
   const errors = validation.issues.filter(i => i.level === 'error').length
   const warns = validation.issues.length - errors
   return (

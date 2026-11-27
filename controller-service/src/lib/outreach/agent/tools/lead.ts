@@ -14,12 +14,32 @@ const firstName = (n: string | null) => (n?.trim().split(/\s+/)[0] || null)
 const getLeadArgs = z.object({})
 export const getLead: ToolDef<typeof getLeadArgs> = {
   name: 'getLead',
-  description: 'Read what we know about this lead: business, owner, language, status, WhatsApp consent, attempts, what they already told us, site state. Phone is masked.',
+  description: 'Read what we know about this contact: for a lead the business, owner, status, what they told us and site state; for a shopper the name and language. Also WhatsApp consent and attempts. Phone is masked.',
   channels: ALL,
   effect: 'read',
   args: getLeadArgs,
   inputSchema: { type: 'object', properties: {} },
   async run({ contact, call, now }) {
+    if (contact.kind === 'shopper') {
+      const last = await outreachPool()
+        .query(`SELECT outcome, status FROM outreach_calls WHERE contact_id = $1 AND ended_at IS NOT NULL AND id IS DISTINCT FROM $2 ORDER BY created_at DESC LIMIT 1`, [contact.id, call?.id ?? null])
+        .then(r => r.rows[0] as { outcome: string | null; status: string } | undefined)
+        .catch(() => undefined)
+      return {
+        ok: true,
+        data: {
+          firstName: firstName(contact.owner_name),
+          language: contact.language,
+          phone: maskPhone(contact.phone),
+          consent: { whatsapp: !!contact.consent_whatsapp_at, at: contact.consent_whatsapp_at },
+          optedOut: !!contact.opted_out_at || contact.status === 'opted_out',
+          handoff: contact.handoff_at ? { at: contact.handoff_at, reason: contact.handoff_reason } : null,
+          attempts: contact.attempts,
+          whatsappWindowOpen: windowOpen(contact, now),
+          lastCall: last ? { outcome: last.outcome, status: last.status } : null,
+        },
+      }
+    }
     const [known, last, site] = await Promise.all([
       knownBrief(contact.id).catch(() => ({})),
       outreachPool()
@@ -54,7 +74,7 @@ export const getLead: ToolDef<typeof getLeadArgs> = {
 const updateLeadArgs = z.object({ owner_name: s(120).optional(), language: z.enum(LANGUAGES).optional(), category: s(120).optional(), city: s(120).optional(), note: s(500).optional() })
 export const updateLead: ToolDef<typeof updateLeadArgs> = {
   name: 'updateLead',
-  description: "Correct or add to the lead's record: the owner's name, preferred language, category, city, or a short note. Never changes status.",
+  description: "Correct or add to the contact's record: their name, preferred language, category, city, or a short note. Never changes status.",
   channels: ALL,
   effect: 'write',
   args: updateLeadArgs,

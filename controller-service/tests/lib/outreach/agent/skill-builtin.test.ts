@@ -11,9 +11,10 @@ import { LANGUAGES } from '@controller/lib/outreach/types'
 const get = (slug: string) => BUILTIN_SKILLS.find(b => b.slug === slug)!
 
 describe('builtin skills', () => {
-  it('ships the default and two templates', () => {
+  it('ships the default, two Showcase templates and the three shopper agents', () => {
     expect(DEFAULT_SKILL_SLUG).toBe('showcase-offer')
-    expect(BUILTIN_SKILLS.map(b => b.slug)).toEqual(['showcase-offer', 'showcase-two-call', 'showcase-whatsapp-only'])
+    expect(BUILTIN_SKILLS.map(b => b.slug)).toEqual(['showcase-offer', 'showcase-two-call', 'showcase-whatsapp-only', 'post-order-review', 'cod-confirmation', 'abandoned-checkout'])
+    expect(BUILTIN_SKILLS.map(b => b.audience)).toEqual(['lead', 'lead', 'lead', 'shopper', 'shopper', 'shopper'])
   })
 
   it.each(BUILTIN_SKILLS.map(b => [b.slug, b] as const))('%s validates with no errors, and its listing matches its frontmatter', (_slug, b) => {

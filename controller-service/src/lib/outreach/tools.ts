@@ -32,6 +32,7 @@ export async function runTool(callId: string, tool: string, rawArgs: unknown, no
   const r = await invokeTool({
     channel: 'voice',
     actor: 'voice',
+    job: ctx.job,
     contact: ctx.contact,
     call: ctx.call,
     run: ctx.run,

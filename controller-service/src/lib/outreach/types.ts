@@ -54,7 +54,11 @@ export interface OutreachContact {
   list_id: string | null
   program: string
   phone: string
+  /** Null for a shopper contact (kind 'shopper'): it has a name, not a business. */
   business_name: string
+  /** 'lead' (a Showcase business) when absent. */
+  kind?: 'lead' | 'shopper'
+  user_id?: string | null
   owner_name: string | null
   category: string | null
   city: string | null

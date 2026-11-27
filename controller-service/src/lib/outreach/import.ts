@@ -75,6 +75,37 @@ export function matrixToRows(matrix: unknown[][]): { rows: { row: number; values
   return { rows }
 }
 
+/** Any header row plus data rows, for importing jobs: no required columns. `values` is keyed by the normalised header (headerKey). */
+export function parseTableFile(buf: Buffer, name: string): { headers: string[]; rows: { row: number; values: Record<string, string> }[]; fatal?: string } {
+  const bad = checkImportFile(name, buf)
+  if (bad) throw new ImportError(bad.error, bad.status)
+  let wb: XLSX.WorkBook
+  try {
+    wb = XLSX.read(buf, { type: 'buffer' })
+  } catch {
+    return { headers: [], rows: [], fatal: 'Could not read the file. Is it a valid .xlsx or .csv?' }
+  }
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  if (!ws) return { headers: [], rows: [], fatal: 'The workbook has no sheets.' }
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: '', raw: false })
+  if (!matrix.length || !matrix[0].some(c => cell(c) !== '')) return { headers: [], rows: [], fatal: 'The file is empty.' }
+  const headers = matrix[0].map(headerKey)
+  const rows: { row: number; values: Record<string, string> }[] = []
+  for (let i = 1; i < matrix.length; i++) {
+    if (!matrix[i].some(c => cell(c) !== '')) continue
+    const values: Record<string, string> = {}
+    headers.forEach((h, j) => {
+      if (h) values[h] = cell(matrix[i][j])
+    })
+    rows.push({ row: i + 1, values })
+  }
+  if (rows.length > MAX_ROWS) return { headers, rows: [], fatal: `Too many rows (${rows.length}). Import at most ${MAX_ROWS} at a time.` }
+  return { headers: headers.filter(Boolean), rows }
+}
+
+/** The header key a mapping's column name matches ("Order No." and "order_no." are the same column). */
+export const columnKey = headerKey
+
 export function parseContactFile(buf: Buffer, name: string): { rows: { row: number; values: Record<string, string> }[]; fatal?: string } {
   const bad = checkImportFile(name, buf)
   if (bad) throw new ImportError(bad.error, bad.status)

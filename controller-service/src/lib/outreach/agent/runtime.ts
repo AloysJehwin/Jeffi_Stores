@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto'
 import { outreachPool } from '../db'
 import { recordEvent } from '../events'
 import { getProgramState } from '../program-state'
-import { asLanguage, greeting, LINES } from '../prompt'
+import { getProgram } from '../programs/_registry'
+import { asLanguage, greeting, LINES, shopperGreeting } from '../prompt'
 import { hadAnsweredCall, knownBrief, loadCallContext, MAX_DURATION_S, readVoiceSettings, SILENCE_S, type CallSession } from '../session'
 import { InvalidTransitionError, transition } from '../state'
 import { isSuppressed } from '../suppress'
@@ -11,14 +12,16 @@ import { VoiceServiceError, voiceServiceUrl } from '../voice-client'
 import { sendOutreachText, windowOpen } from '../whatsapp'
 import { callCounts, inCallingWindow, nextWindowTime, place } from '../worker'
 import { allowedTools, llmSchemas } from './catalog'
-import { agentCallQuota, deniesBeingAi, turnBudget } from './guards'
+import { agentCallQuota, deniesBeingAi, istDayStart, turnBudget } from './guards'
 import { invokeTool } from './invoke'
+import { cancelJob, completeJob, failJob, jobOfRun, liveJobOf, phoneBusy, setJobStatus, SHOWCASE_PROGRAM, toJob } from './jobs'
 import { effectiveLimits } from './limits'
 import { getAgentModel } from './model'
 import * as runs from './runs'
-import { personaNameFor, renderSystemPrompt, skillLanguage } from './skill/render'
-import { loadRunSkill, resolveSkillForContact } from './skill/store'
-import type { AgentLimits,AgentModelRequest, AgentRunRow, AgentTaskRow, AgentTrigger, ResolvedSkill } from './types'
+import { personaNameFor, renderSystemPrompt, skillLanguage, STORE_NAME } from './skill/render'
+import { loadJobSkill, loadRunSkill, resolveSkillForContact } from './skill/store'
+import { shopperConsent } from './store/consent'
+import type { AgentLimits, AgentModelRequest, AgentRunRow, AgentTaskRow, AgentTrigger, JobRow, RenderContext, ResolvedSkill } from './types'
 import { fallbackLine, OPT_OUT_CONFIRMATION, transcript } from './wa-lines'
 
 // The outreach agent's runtime (docs/plans/OUTREACH_AGENT_SKILLS.md §3): which skill a contact runs, the voice session
@@ -32,6 +35,8 @@ const AGENT_ACTOR = 'outreach:agent'
 const ENGAGED = new Set(['interested', 'building', 'preview_sent', 'published'])
 const UNANSWERED = new Set(['no_answer', 'busy', 'voicemail', 'error'])
 const RETRY_MS = 10 * 60_000
+const JOB_RETRY_MS = 2 * 3600_000
+const JOB_DEFER_MS = 15 * 60_000
 
 const log = (msg: string, e: unknown) => console.error(`[outreach] ${msg}`, e instanceof Error ? e.message : e)
 
@@ -44,15 +49,33 @@ async function stopped(c: Pick<OutreachContact, 'status' | 'opted_out_at' | 'pho
   return !!c.opted_out_at || c.status === 'opted_out' || c.status === 'suppressed' || (await isSuppressed(c.phone))
 }
 
-/** The contact's open run and the skill it pinned; a new run resolves and pins the skill now. */
-export async function ensureRun(contact: OutreachContact, now: Date = new Date()): Promise<{ run: AgentRunRow; skill: ResolvedSkill }> {
+/** Where a contact's program settings (window, caps, test numbers) live: shopper contacts use the Showcase program's. */
+export const settingsProgram = (contact: Pick<OutreachContact, 'program'>): string => (getProgram(contact.program) ? contact.program : SHOWCASE_PROGRAM)
+
+/** A shopper contact runs its live job's agent; the job's latest run stands in when the job just ended (a late tool call). */
+async function shopperRun(contact: OutreachContact): Promise<{ run: AgentRunRow; skill: ResolvedSkill; job: JobRow | null }> {
+  const job = await liveJobOf(contact.id)
+  if (job) {
+    const skill = await loadJobSkill(job)
+    if (!skill) throw new Error(`The agent of job ${job.id} no longer exists`)
+    const run = await runs.createRun({ contactId: contact.id, skillVersionId: skill.versionId, skillRef: skill.ref, jobId: job.id })
+    return { run, skill: run.skill_ref === skill.ref ? skill : await loadRunSkill(run), job: (await jobOfRun(run)) ?? job }
+  }
+  const last = (await outreachPool().query(`SELECT * FROM outreach_agent_runs WHERE contact_id = $1 ORDER BY started_at DESC LIMIT 1`, [contact.id])).rows[0] as AgentRunRow | undefined
+  if (!last) throw new Error(`No job for shopper contact ${contact.id}`)
+  return { run: last, skill: await loadRunSkill(last), job: await jobOfRun(last) }
+}
+
+/** The contact's open run, the skill it pinned and its job (task agents); a new run resolves and pins the skill now. */
+export async function ensureRun(contact: OutreachContact, now: Date = new Date()): Promise<{ run: AgentRunRow; skill: ResolvedSkill; job: JobRow | null }> {
   void now
   const open = await runs.getOpenRun(contact.id)
-  if (open) return { run: open, skill: await loadRunSkill(open) }
+  if (open) return { run: open, skill: await loadRunSkill(open), job: await jobOfRun(open) }
+  if (contact.kind === 'shopper') return shopperRun(contact)
   const skill = await resolveSkillForContact(contact)
   const run = await runs.createRun({ contactId: contact.id, skillVersionId: skill.versionId, skillRef: skill.ref })
   // Another process may have opened the run first with a different skill.
-  return { run, skill: run.skill_ref === skill.ref ? skill : await loadRunSkill(run) }
+  return { run, skill: run.skill_ref === skill.ref ? skill : await loadRunSkill(run), job: null }
 }
 
 // ---- voice ----
@@ -62,6 +85,7 @@ export interface VoiceAgentContext {
   contact: OutreachContact
   run: AgentRunRow
   skill: ResolvedSkill
+  job: JobRow | null
   limits: AgentLimits
   language: OutreachLanguage
 }
@@ -69,26 +93,32 @@ export interface VoiceAgentContext {
 export async function voiceAgentContext(callId: string, now: Date = new Date()): Promise<VoiceAgentContext | null> {
   const ctx = await loadCallContext(callId)
   if (!ctx) return null
-  const { run, skill } = await ensureRun(ctx.contact, now)
+  const { run, skill, job } = await ensureRun(ctx.contact, now)
   return {
     call: ctx.call,
     contact: ctx.contact,
     run,
     skill,
+    job,
     limits: effectiveLimits(skill.skill.meta.limits),
     language: skillLanguage(skill.skill, ctx.call.language ?? ctx.contact.language),
   }
 }
 
+/** The extra render context of a task-agent job (none for a Showcase lead, so its prompt stays as it was). */
+const taskContext = (skill: ResolvedSkill, job: JobRow | null): Pick<RenderContext, 'audience' | 'inputs' | 'refs'> =>
+  job ? { audience: skill.skill.meta.audience, inputs: job.inputs, refs: job.refs } : {}
+
 /** What voice-service needs to run one call: the skill's prompt, tools and persona; the greeting stays in code. */
 export async function buildVoiceSession(callId: string, now: Date = new Date()): Promise<CallSession | null> {
   const ctx = await voiceAgentContext(callId, now)
   if (!ctx) return null
-  const { call, contact, skill, language } = ctx
+  const { call, contact, skill, language, job } = ctx
+  const shopper = skill.skill.meta.audience === 'shopper' && !!job
   const [{ settings }, testNumbers, known, continuing] = await Promise.all([
     readVoiceSettings(),
-    getProgramState(contact.program).then(s => s.test_numbers ?? [], () => [] as string[]),
-    knownBrief(contact.id),
+    getProgramState(settingsProgram(contact)).then(s => s.test_numbers ?? [], () => [] as string[]),
+    shopper ? Promise.resolve({}) : knownBrief(contact.id),
     hadAnsweredCall(contact.id, call.id),
   ])
   const personaName = personaNameFor(skill.skill, language)
@@ -100,7 +130,7 @@ export async function buildVoiceSession(callId: string, now: Date = new Date()):
       channel: 'voice',
       language,
       personaName,
-      business: contact.business_name,
+      business: contact.business_name ?? '',
       owner: contact.owner_name,
       category: contact.category,
       city: contact.city,
@@ -112,8 +142,11 @@ export async function buildVoiceSession(callId: string, now: Date = new Date()):
       published: contact.status === 'published' || contact.status === 'claimed',
       known,
       scriptVersion: skill.ref,
+      ...taskContext(skill, job),
     }),
-    greeting: greeting({ language, personaName, business: contact.business_name, owner: contact.owner_name, continuing }),
+    greeting: shopper
+      ? shopperGreeting({ language, personaName, store: STORE_NAME, name: contact.owner_name?.trim().split(/\s+/)[0] ?? null, continuing })
+      : greeting({ language, personaName, business: contact.business_name, owner: contact.owner_name, continuing }),
     tools: llmSchemas(allowedTools('voice', skill.skill.meta.tools.voice)),
     maxDurationS: MAX_DURATION_S,
     silenceS: SILENCE_S,
@@ -149,7 +182,7 @@ export async function runAgentTurn(input: { contact: OutreachContact; channel: '
   const wa = channel === 'whatsapp'
   const actor = wa ? WA_ACTOR : AGENT_ACTOR
   const lang = input.language ?? asLanguage(contact.language)
-  const { run, skill } = await ensureRun(contact, now)
+  const { run, skill, job } = await ensureRun(contact, now)
 
   if (run.status === 'handed_off' || contact.handoff_at) {
     await recordEvent(contact.id, 'agent_paused', { actor, data: { runId: run.id, channel, reason: contact.handoff_reason ?? 'handed_off' } })
@@ -175,12 +208,12 @@ export async function runAgentTurn(input: { contact: OutreachContact; channel: '
 
   const meta = skill.skill.meta
   const personaName = personaNameFor(skill.skill, lang)
-  const [known, continuing] = await Promise.all([knownBrief(contact.id), hadAnsweredCall(contact.id)])
+  const [known, continuing] = await Promise.all([job ? Promise.resolve({}) : knownBrief(contact.id), hadAnsweredCall(contact.id)])
   const system = renderSystemPrompt(skill.skill, {
     channel,
     language: lang,
     personaName,
-    business: contact.business_name,
+    business: contact.business_name ?? '',
     owner: contact.owner_name,
     category: contact.category,
     city: contact.city,
@@ -194,6 +227,7 @@ export async function runAgentTurn(input: { contact: OutreachContact; channel: '
     scriptVersion: skill.ref,
     trigger,
     windowOpen: windowOpen(contact, now),
+    ...taskContext(skill, job),
   })
 
   const messages: AgentModelRequest['messages'] = await transcript(contact.id)
@@ -224,6 +258,7 @@ export async function runAgentTurn(input: { contact: OutreachContact; channel: '
         used.push(tc.name)
         const out = await invokeTool({
           channel,
+          job,
           contact: (await freshContact(contact.id)) ?? contact,
           call: null,
           run,
@@ -278,6 +313,10 @@ export async function onCallEnded(callId: string, type: string, now: Date = new 
     const call = c.rows[0] as { id: string; contact_id: string; answered_at: string | null } | undefined
     if (!call) return
     const contact = await freshContact(call.contact_id)
+    if (contact?.kind === 'shopper') {
+      const open = await runs.getOpenRun(contact.id)
+      if (open?.job_id) return await onJobCallEnded(call, type, contact, open, now)
+    }
     if (!contact || !ENGAGED.has(contact.status) || contact.handoff_at || (await stopped(contact))) return
     const run = await runs.getOpenRun(contact.id)
     if (!run || run.status !== 'active') return
@@ -294,6 +333,35 @@ export async function onCallEnded(callId: string, type: string, now: Date = new 
   } catch (e) {
     log('onCallEnded failed', e)
   }
+}
+
+/** A call of a task-agent job ended: retry an unanswered one, then the Follow-up section, then fail; an answered one the agent did not close waits for its follow-up or ends. */
+async function onJobCallEnded(call: { id: string; answered_at: string | null }, type: string, contact: OutreachContact, run: AgentRunRow, now: Date): Promise<void> {
+  const job = await jobOfRun(run)
+  if (!job || job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled' || job.status === 'handed_off') return
+  if (contact.handoff_at || (await stopped(contact))) return
+  const skill = await loadRunSkill(run)
+  const limits = effectiveLimits(skill.skill.meta.limits)
+  const followUp = (reason: 'call_ended' | 'call_unanswered') =>
+    runs.scheduleTask({ runId: run.id, contactId: contact.id, kind: 'whatsapp_turn', dueAt: now, reason, instruction: `callId=${call.id}`, createdBy: AGENT_ACTOR })
+  if (UNANSWERED.has(type) && !call.answered_at) {
+    if (job.attempts < limits.maxCallAttempts) {
+      // Back in the queue for another try; the run ends so another job could use the phone meanwhile.
+      await outreachPool().query(`UPDATE outreach_agent_runs SET status = 'stopped', updated_at = $2, ended_at = $2 WHERE id = $1 AND status = 'active'`, [run.id, now])
+      await setJobStatus(job.id, 'queued', { dueAt: new Date(now.getTime() + JOB_RETRY_MS), now })
+    } else if (skill.skill.sections.follow_up) {
+      await followUp('call_unanswered')
+      await setJobStatus(job.id, 'waiting', { now })
+    } else await failJob(job.id, 'unreachable', 'call_unanswered', now)
+    return
+  }
+  if (type !== 'ended' || !call.answered_at) return
+  // Answered and ended without setOutcome: a pending callback or follow-up keeps the job waiting, otherwise it ends here.
+  if ((await runs.pendingTaskCount(contact.id)) > 0) await setJobStatus(job.id, 'waiting', { now })
+  else if (skill.skill.sections.follow_up) {
+    await followUp('call_ended')
+    await setJobStatus(job.id, 'waiting', { now })
+  } else await completeJob(job.id, 'no_outcome', { actor: AGENT_ACTOR, now })
 }
 
 // ---- the agent's own tasks ----
@@ -314,10 +382,17 @@ async function triggerFor(task: AgentTaskRow): Promise<AgentTrigger> {
 
 export type DialAgentResult = { callId: string } | { reschedule: Date; reason: string } | { fail: string }
 
-/** Rings an engaged contact for a task: no status move, no attempt, like the language redial. */
-export async function dialAgentCall(contact: OutreachContact, task: AgentTaskRow, now: Date): Promise<DialAgentResult> {
+type DialFor = { kind: 'task'; task: Pick<AgentTaskRow, 'id'> } | { kind: 'job'; job: Pick<JobRow, 'id'> }
+
+/** Calls this contact has had today (IST), whoever placed them. */
+async function callsToday(contactId: string, now: Date): Promise<number> {
+  const r = await outreachPool().query(`SELECT count(*)::int AS n FROM outreach_calls WHERE contact_id = $1 AND created_at >= $2`, [contactId, istDayStart(now)])
+  return Number(r.rows[0]?.n ?? 0)
+}
+
+async function dialFor(contact: OutreachContact, what: DialFor, now: Date): Promise<DialAgentResult> {
   if (!voiceServiceUrl()) return { reschedule: new Date(now.getTime() + 30 * 60_000), reason: 'voice_not_configured' }
-  const state = await getProgramState(contact.program).catch(() => null)
+  const state = await getProgramState(settingsProgram(contact)).catch(() => null)
   if (!state?.enabled) return { fail: 'program_disabled' }
   if (!inCallingWindow(now, state)) return { reschedule: nextWindowTime(now, state), reason: 'outside_window' }
   if (contact.dnd_status === 'dnd') return { fail: 'dnd' }
@@ -326,7 +401,9 @@ export async function dialAgentCall(contact: OutreachContact, task: AgentTaskRow
   const testMode = provider === 'twilio_test'
   if (testMode && !(state.test_numbers ?? []).includes(contact.phone)) return { fail: 'not_test_number' }
   const { skill } = await ensureRun(contact, now)
-  const quota = await agentCallQuota(contact.id, effectiveLimits(skill.skill.meta.limits), now)
+  const limits = effectiveLimits(skill.skill.meta.limits)
+  // A job's first calls are counted by the job's attempts; only the agent's own scheduled calls use the lifetime quota.
+  const quota = what.kind === 'task' ? await agentCallQuota(contact.id, limits, now) : (await callsToday(contact.id, now)) >= limits.maxAgentCallsPerDay ? 'call_limit' : null
   if (quota) return { fail: quota }
   const { today, active } = await callCounts(contact.program, now)
   if (state.daily_cap - today <= 0) return { reschedule: new Date(now.getTime() + RETRY_MS), reason: 'daily_cap' }
@@ -339,7 +416,8 @@ export async function dialAgentCall(contact: OutreachContact, task: AgentTaskRow
   const callId = randomUUID()
   await pool.query(`INSERT INTO outreach_calls (id, contact_id, provider, language, status) VALUES ($1, $2, $3, $4, 'queued')`, [callId, contact.id, provider, language])
   await pool.query(`UPDATE outreach_contacts SET last_call_id = $2, updated_at = now() WHERE id = $1`, [contact.id, callId])
-  await recordEvent(contact.id, 'agent_call', { callId, actor: AGENT_ACTOR, data: { taskId: task.id, language } })
+  // A task call is an 'agent_call' (counted by the quota); a job's call is a 'job_call'.
+  await recordEvent(contact.id, what.kind === 'task' ? 'agent_call' : 'job_call', { callId, actor: AGENT_ACTOR, data: what.kind === 'task' ? { taskId: what.task.id, language } : { jobId: what.job.id, language } })
   try {
     await place(contact, callId, { language, actor: AGENT_ACTOR, from: testMode ? settings.twilioTest.from : settings.exotel.callerId, provider, test: testMode }, false)
   } catch (e) {
@@ -348,6 +426,9 @@ export async function dialAgentCall(contact: OutreachContact, task: AgentTaskRow
   }
   return { callId }
 }
+
+/** Rings an engaged contact for a task: no status move, no attempt, like the language redial. */
+export const dialAgentCall = (contact: OutreachContact, task: AgentTaskRow, now: Date): Promise<DialAgentResult> => dialFor(contact, { kind: 'task', task }, now)
 
 export interface DueRun {
   claimed: number
@@ -402,6 +483,181 @@ export async function runDueAgentTasks(now: Date = new Date(), limit = 10): Prom
         await runs.finishTask(task.id, 'failed', { error: e instanceof Error ? e.message : String(e) }).catch(() => {})
         sum.failed++
       }
+    }
+  }
+  return sum
+}
+
+// ---- task-agent jobs ----
+
+export interface JobsRun {
+  claimed: number
+  started: number
+  deferred: number
+  cancelled: number
+  failed: number
+}
+
+/** Dial refusals that end the job as cancelled (the person or the program said no), not failed. */
+const CANCEL_REASONS = new Set(['dnd', 'suppressed', 'program_disabled', 'not_test_number'])
+
+/**
+ * Takes a queued, due job for itself: active, unless another job (or an open run) holds the same phone. The phone's
+ * advisory lock makes two due jobs for one number start one at a time. 'busy' leaves it queued.
+ */
+async function claimJob(id: string, now: Date): Promise<JobRow | 'busy' | null> {
+  const client = await outreachPool().connect()
+  try {
+    await client.query('BEGIN')
+    const cur = await client.query(
+      `SELECT j.id, c.phone FROM outreach_jobs j JOIN outreach_contacts c ON c.id = j.contact_id WHERE j.id = $1 AND j.status = 'queued' AND j.due_at <= $2 FOR UPDATE OF j SKIP LOCKED`,
+      [id, now]
+    )
+    const row = cur.rows[0] as { id: string; phone: string } | undefined
+    if (!row) {
+      await client.query('ROLLBACK')
+      return null
+    }
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [row.phone])
+    if (await phoneBusy(row.phone, id, client)) {
+      await client.query('ROLLBACK')
+      return 'busy'
+    }
+    const up = await client.query(`UPDATE outreach_jobs SET status = 'active', updated_at = $2 WHERE id = $1 RETURNING *`, [id, now])
+    await client.query('COMMIT')
+    return toJob(up.rows[0])
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
+/** Jobs of people who opted out meanwhile are cancelled; a job nothing is working on for a day (no task, no call) fails. */
+async function sweepJobs(now: Date, sum: JobsRun): Promise<void> {
+  const pool = outreachPool()
+  const stopped = await pool.query(
+    `SELECT j.id FROM outreach_jobs j JOIN outreach_contacts c ON c.id = j.contact_id
+      WHERE j.status IN ('queued', 'active', 'waiting')
+        AND (c.opted_out_at IS NOT NULL OR c.status IN ('opted_out', 'suppressed') OR EXISTS (SELECT 1 FROM outreach_suppressions s WHERE s.phone = c.phone))
+      LIMIT 50`
+  )
+  for (const r of stopped.rows as { id: string }[]) {
+    await cancelJob(r.id, AGENT_ACTOR, 'opted_out', now)
+    sum.cancelled++
+  }
+  const stale = await pool.query(
+    `SELECT j.id FROM outreach_jobs j
+      WHERE j.status IN ('active', 'waiting') AND j.updated_at < $1
+        AND NOT EXISTS (SELECT 1 FROM outreach_agent_tasks t WHERE t.contact_id = j.contact_id AND t.status IN ('pending', 'running'))
+        AND NOT EXISTS (SELECT 1 FROM outreach_calls oc WHERE oc.contact_id = j.contact_id AND oc.ended_at IS NULL)
+      LIMIT 50`,
+    [new Date(now.getTime() - 24 * 3600_000)]
+  )
+  for (const r of stale.rows as { id: string }[]) {
+    await failJob(r.id, 'no_outcome', 'stale', now)
+    sum.failed++
+  }
+}
+
+/** Puts a claimed job back in the queue for later; its run (if one was made) ends so the phone is free. */
+async function deferJob(job: JobRow, until: Date, now: Date, sum: JobsRun): Promise<void> {
+  await outreachPool().query(`UPDATE outreach_agent_runs SET status = 'stopped', updated_at = $2, ended_at = $2 WHERE job_id = $1 AND status = 'active'`, [job.id, now])
+  await setJobStatus(job.id, 'queued', { dueAt: until, now })
+  sum.deferred++
+}
+
+/** The job's first touch: gates, then its run, then a call or a WhatsApp turn. */
+async function startJob(job: JobRow, now: Date, sum: JobsRun): Promise<void> {
+  const contact = await freshContact(job.contact_id)
+  const skill = await loadJobSkill(job)
+  if (!contact || !skill) {
+    await failJob(job.id, 'error', contact ? 'agent_missing' : 'no_contact', now)
+    sum.failed++
+    return
+  }
+  const meta = skill.skill.meta
+  const cancel = async (reason: string) => {
+    await cancelJob(job.id, AGENT_ACTOR, reason, now)
+    sum.cancelled++
+  }
+  if (await stopped(contact)) return cancel('opted_out')
+  const state = await getProgramState(settingsProgram(contact)).catch(() => null)
+  if (!state?.enabled) return deferJob(job, new Date(now.getTime() + 3600_000), now, sum)
+  if (!inCallingWindow(now, state)) return deferJob(job, nextWindowTime(now, state), now, sum)
+  const voiceFirst = meta.flow !== 'whatsapp_only' && meta.channels.includes('voice')
+  if (meta.purpose === 'promotional') {
+    if (contact.dnd_status === 'dnd') return cancel('dnd')
+    // A promotional call needs a checked-clear DND status, like the Showcase dialler; test numbers are exempt.
+    if (voiceFirst && contact.dnd_status !== 'clear' && !(state.test_numbers ?? []).includes(contact.phone)) return cancel('dnd_unchecked')
+    if (meta.audience === 'shopper' && (await shopperConsent(contact.phone)).marketingOptOut) return cancel('marketing_opt_out')
+  }
+
+  const run = await runs.createRun({ contactId: contact.id, skillVersionId: skill.versionId, skillRef: skill.ref, jobId: job.id })
+  if (run.job_id !== job.id) return deferJob(job, new Date(now.getTime() + JOB_DEFER_MS), now, sum)
+  if (contact.kind === 'shopper' && contact.status !== 'interested') {
+    await outreachPool().query(`UPDATE outreach_contacts SET status = 'interested', updated_at = now() WHERE id = $1 AND status NOT IN ('opted_out', 'suppressed')`, [contact.id])
+    await recordEvent(contact.id, 'status_change', { actor: AGENT_ACTOR, data: { from: contact.status, to: 'interested', jobId: job.id } })
+  }
+
+  if (voiceFirst) {
+    const r = await dialFor(contact, { kind: 'job', job }, now)
+    if ('callId' in r) {
+      await setJobStatus(job.id, 'active', { attempts: job.attempts + 1, now })
+      sum.started++
+    } else if ('reschedule' in r) await deferJob(job, r.reschedule, now, sum)
+    else if (CANCEL_REASONS.has(r.fail)) await cancel(r.fail)
+    else {
+      await failJob(job.id, r.fail === 'call_limit' ? 'unreachable' : 'error', r.fail, now)
+      sum.failed++
+    }
+    return
+  }
+  // WhatsApp first: only with the person's opt-in (the shopper's order-update choice, or consent recorded earlier).
+  const consent = !!contact.consent_whatsapp_at || (meta.audience === 'shopper' && (await shopperConsent(contact.phone)).whatsappOptIn)
+  if (!consent) return cancel('no_whatsapp_consent')
+  if (!skill.skill.sections.follow_up) {
+    await failJob(job.id, 'error', 'no_follow_up_section', now)
+    sum.failed++
+    return
+  }
+  await runs.scheduleTask({ runId: run.id, contactId: contact.id, kind: 'whatsapp_turn', dueAt: now, reason: 'kickoff', createdBy: AGENT_ACTOR })
+  await setJobStatus(job.id, 'active', { attempts: job.attempts + 1, now })
+  sum.started++
+}
+
+/**
+ * The cron's job half (after the dialler, before the agent's own tasks): queued jobs that are due, a few at a time.
+ * One live job per phone; outside the calling window or while the phone is busy a job stays queued.
+ */
+export async function runDueJobs(now: Date = new Date(), limit = 10): Promise<JobsRun> {
+  const sum: JobsRun = { claimed: 0, started: 0, deferred: 0, cancelled: 0, failed: 0 }
+  await sweepJobs(now, sum)
+  const due = await outreachPool().query(
+    `SELECT j.id FROM outreach_jobs j JOIN outreach_skills s ON s.id = j.skill_id
+      WHERE j.status = 'queued' AND j.due_at <= $1 AND s.archived_at IS NULL AND (s.status = 'active' OR j.source = 'test')
+      ORDER BY j.due_at LIMIT $2`,
+    [now, limit]
+  )
+  for (const { id } of due.rows as { id: string }[]) {
+    let job: JobRow | 'busy' | null = null
+    try {
+      job = await claimJob(id, now)
+      if (job === 'busy') {
+        await setJobStatus(id, 'queued', { dueAt: new Date(now.getTime() + JOB_DEFER_MS), now })
+        sum.deferred++
+      } else if (job) {
+        sum.claimed++
+        await startJob(job, now, sum)
+      }
+    } catch (e) {
+      log(`job ${id} failed to start`, e)
+      if (job && job !== 'busy') {
+        await outreachPool().query(`UPDATE outreach_agent_runs SET status = 'stopped', updated_at = $2, ended_at = $2 WHERE job_id = $1 AND status = 'active'`, [id, now]).catch(() => {})
+        await setJobStatus(id, 'queued', { dueAt: new Date(now.getTime() + RETRY_MS), now }).catch(() => {})
+      }
+      sum.deferred++
     }
   }
   return sum

@@ -10,6 +10,7 @@ vi.mock('@controller/lib/outreach/suppress', () => ({ isSuppressed: vi.fn() }))
 vi.mock('@/lib/showcase/store', () => ({ getShowcaseById: vi.fn() }))
 
 import { MANDATORY_TOOLS, TOOLS, TOOL_NAMES, allowedTools, catalogSummary, getTool, llmSchemas } from '@controller/lib/outreach/agent/catalog'
+import { TOOL_MANIFEST } from '@controller/lib/outreach/agent/tool-manifest'
 import * as prompt from '@controller/lib/outreach/prompt'
 import type { AgentChannel } from '@controller/lib/outreach/agent/types'
 
@@ -24,12 +25,25 @@ const TABLE: [string, AgentChannel[]][] = [
   ['getSiteStatus', ALL], ['startPreview', VWF], ['addDetails', VW], ['requestChange', VW], ['publishSite', VW], ['sendLink', ALL],
   ['sendWhatsAppTemplate', ALL], ['sendWhatsAppText', WF], ['readMessages', ALL], ['placeCall', WF], ['scheduleCallback', VWF],
   ['scheduleFollowUp', ALL], ['endCall', V], ['switchLanguage', V],
+  // task-agent tools: jobs (core) and the flagship store
+  ['getJob', ALL], ['setOutcome', ALL], ['getOrder', ALL], ['findOrders', ALL], ['trackShipment', ALL],
+  ['confirmCodOrder', ALL], ['sendReviewLink', ALL], ['recordRating', ALL], ['getReviewStatus', ALL], ['getAbandonedCheckout', ALL],
+  ['sendCheckoutLink', ALL], ['sendPaymentLink', ALL], ['checkDelivery', ALL], ['searchProducts', ALL], ['getProduct', ALL],
+  ['sendProductLink', ALL], ['getStoreInfo', ALL], ['createSupportTicket', ALL], ['createStaffTask', ALL], ['sendSms', ALL],
 ]
 
 describe('catalog', () => {
   it('has every tool of the contract, in order, on the right channels', () => {
     expect(TOOL_NAMES).toEqual(TABLE.map(t => t[0]))
     for (const [name, channels] of TABLE) expect([...getTool(name)!.channels], name).toEqual(channels)
+  })
+
+  it('the dependency-free manifest validation uses equals the catalog, in order', () => {
+    expect(Object.keys(TOOL_MANIFEST)).toEqual(TOOL_NAMES)
+    for (const name of TOOL_NAMES) {
+      const t = getTool(name)!
+      expect(TOOL_MANIFEST[name], name).toEqual({ channels: [...t.channels], effect: t.effect, mandatory: !!t.mandatory, group: t.group ?? 'showcase' })
+    }
   })
 
   it('optOut and handOff are the mandatory tools', () => {

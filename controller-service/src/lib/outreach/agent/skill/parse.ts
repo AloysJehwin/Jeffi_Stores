@@ -1,13 +1,17 @@
 import { LANGUAGES, type OutreachLanguage } from '../../types'
-import { TOOLS } from '../catalog'
+import { manifestTool } from '../tool-manifest'
 import { limitKey } from '../limits'
-import { CHANNELS, FLOWS, type AgentChannel, type AgentLimits, type ParsedSkill, type SkillFlow, type SkillIssue, type SkillMeta } from '../types'
+import {
+  AUDIENCES, CHANNELS, FLOWS, INPUT_ROLES, INPUT_TYPES, PURPOSES, REF_TYPES, TRIGGER_EVENTS,
+  type AgentAudience, type AgentChannel, type AgentLimits, type AgentPurpose, type InputRole, type InputSpec, type InputType, type ParsedSkill,
+  type SkillFlow, type SkillIssue, type SkillMeta, type TriggerEvent, type TriggerSpec,
+} from '../types'
 import { parseFrontmatter } from './frontmatter'
 
 const err = (code: string, message: string, line?: number): SkillIssue => ({ level: 'error', code, message, line })
 const warn = (code: string, message: string, line?: number): SkillIssue => ({ level: 'warning', code, message, line })
 
-const KNOWN_KEYS = ['name', 'title', 'description', 'flow', 'channels', 'languages', 'default_language', 'persona', 'tone', 'tools', 'limits', 'script_version', 'version']
+const KNOWN_KEYS = ['name', 'title', 'description', 'flow', 'channels', 'languages', 'default_language', 'persona', 'tone', 'tools', 'limits', 'script_version', 'version', 'audience', 'purpose', 'inputs', 'trigger', 'outcomes']
 
 /** snake_case, camelCase and kebab-case keys all mean the same key. */
 const snake = (k: string) => k.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/-/g, '_').toLowerCase()
@@ -29,6 +33,112 @@ function asList(v: unknown): string[] | null {
   if (Array.isArray(v)) return v.map(x => String(x ?? '').trim()).filter(Boolean)
   if (typeof v === 'string') return v.split(',').map(x => x.trim()).filter(Boolean)
   return null
+}
+
+
+const SLUG = /^[a-z][a-z0-9_]{0,39}$/
+const DEFAULT_LOOKBACK_MIN = 3 * 1440
+const MAX_LOOKBACK_MIN = 30 * 1440
+
+/** "2d", "6h", "30m" (or a bare 0) as minutes; null when it is none of these. */
+export function parseDurationMinutes(v: unknown): number | null {
+  if (v === 0 || v === '0') return 0
+  const m = /^(\d+)\s*([dhm])$/i.exec(String(v ?? '').trim())
+  if (!m) return null
+  return Number(m[1]) * { d: 1440, h: 60, m: 1 }[m[2].toLowerCase() as 'd' | 'h' | 'm']
+}
+
+const isMap = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+function parseInputs(raw: unknown, issues: SkillIssue[]): Record<string, InputSpec> {
+  const out: Record<string, InputSpec> = {}
+  if (raw == null) return out
+  if (!isMap(raw)) {
+    issues.push(err('bad_inputs', 'inputs must be a map of input name to its definition'))
+    return out
+  }
+  for (const [name, def] of Object.entries(raw)) {
+    if (!SLUG.test(name)) {
+      issues.push(err('bad_input_name', `inputs.${name}: use lowercase letters, digits and underscores, starting with a letter`))
+      continue
+    }
+    const d: Record<string, unknown> = isMap(def) ? def : typeof def === 'string' ? { type: def } : {}
+    if (!isMap(def) && typeof def !== 'string') {
+      issues.push(err('bad_input', `inputs.${name} must be written as { type: text } or a block with type:`))
+      continue
+    }
+    const type = asText(d.type)
+    if (!type || !(INPUT_TYPES as readonly string[]).includes(type)) {
+      issues.push(err('bad_input_type', `inputs.${name}: unknown type "${String(d.type ?? '')}"; use one of ${INPUT_TYPES.join(', ')}`))
+      continue
+    }
+    const role = d.role == null ? null : asText(d.role)
+    if (role && !(INPUT_ROLES as readonly string[]).includes(role)) {
+      issues.push(err('bad_input_role', `inputs.${name}: unknown role "${role}"; use ${INPUT_ROLES.join(', ')}`))
+      continue
+    }
+    if (d.required != null && typeof d.required !== 'boolean') issues.push(err('bad_input', `inputs.${name}.required must be true or false`))
+    let values: string[] | null = null
+    if (type === 'enum') {
+      values = asList(d.enum)
+      if (!values?.length) issues.push(err('bad_input_enum', `inputs.${name}: an enum input needs enum: [a, b]`))
+    } else if (d.enum != null) issues.push(warn('input_enum_ignored', `inputs.${name}: enum is only used with type enum`))
+    out[name] = { type: type as InputType, required: d.required === true, role: (role as InputRole | null) ?? null, description: asText(d.description), enum: values?.length ? values : null }
+  }
+  return out
+}
+
+function parseTrigger(raw: unknown, issues: SkillIssue[]): TriggerSpec {
+  const spec: TriggerSpec = { event: 'manual', delayMinutes: 0, lookbackMinutes: DEFAULT_LOOKBACK_MIN, dedupe: null, when: {} }
+  if (raw == null) return spec
+  const d: Record<string, unknown> = isMap(raw) ? raw : typeof raw === 'string' ? { event: raw } : {}
+  if (!isMap(raw) && typeof raw !== 'string') {
+    issues.push(err('bad_trigger', 'trigger must be a map such as { event: order.delivered, delay: 2d } or manual'))
+    return spec
+  }
+  const event = asText(d.event) ?? 'manual'
+  if ((TRIGGER_EVENTS as readonly string[]).includes(event)) spec.event = event as TriggerEvent
+  else issues.push(err('unknown_trigger_event', `Unknown trigger event "${event}"; use one of ${TRIGGER_EVENTS.join(', ')}`))
+  if (d.delay != null) {
+    const m = parseDurationMinutes(d.delay)
+    if (m === null) issues.push(err('bad_duration', 'trigger.delay must look like 30m, 6h or 2d'))
+    else spec.delayMinutes = m
+  }
+  if (d.lookback != null) {
+    const m = parseDurationMinutes(d.lookback)
+    if (m === null || m <= 0) issues.push(err('bad_duration', 'trigger.lookback must look like 6h or 7d'))
+    else if (m > MAX_LOOKBACK_MIN) issues.push(err('bad_duration', 'trigger.lookback is at most 30d'))
+    else spec.lookbackMinutes = m
+  }
+  if (d.dedupe != null) {
+    const k = asText(d.dedupe)
+    if (k) spec.dedupe = k
+  }
+  if (d.when != null) {
+    if (!isMap(d.when)) issues.push(err('bad_trigger', 'trigger.when must be a map such as { payment_method: cod }'))
+    else {
+      for (const [k, v] of Object.entries(d.when)) {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') spec.when[k] = v
+        else issues.push(err('bad_trigger', `trigger.when.${k} must be a text, number or true/false`))
+      }
+    }
+  }
+  return spec
+}
+
+function parseOutcomes(raw: unknown, issues: SkillIssue[]): string[] {
+  if (raw == null) return []
+  const list = asList(raw)
+  if (!list) {
+    issues.push(err('bad_outcomes', 'outcomes must be a list such as [confirmed, declined]'))
+    return []
+  }
+  const out: string[] = []
+  for (const o of list) {
+    if (!SLUG.test(o)) issues.push(err('bad_outcome', `Outcome "${o}" must be a slug: lowercase letters, digits and underscores`))
+    else if (!out.includes(o)) out.push(o)
+  }
+  return out
 }
 
 interface Split {
@@ -162,7 +272,7 @@ export function parseSkill(raw: string, opts: { builtin?: boolean } = {}): { ski
   if (data.tools != null) {
     if (Array.isArray(data.tools) || typeof data.tools === 'string') {
       const list = dedupe(asList(data.tools) ?? [])
-      for (const ch of CHANNELS) tools[ch] = list.filter(n => !TOOLS[n] || TOOLS[n].channels.includes(ch))
+      for (const ch of CHANNELS) tools[ch] = list.filter(n => !manifestTool(n) || manifestTool(n)!.channels.includes(ch))
     } else if (typeof data.tools === 'object') {
       for (const [k, v] of Object.entries(data.tools as Record<string, unknown>)) {
         const ch = snake(k)
@@ -193,11 +303,33 @@ export function parseSkill(raw: string, opts: { builtin?: boolean } = {}): { ski
     }
   }
 
+  // task-agent keys; defaults keep a Showcase skill exactly as it was
+  const inputs = parseInputs(data.inputs, issues)
+  const trigger = parseTrigger(data.trigger, issues)
+  const outcomes = parseOutcomes(data.outcomes, issues)
+  let purpose: AgentPurpose = 'transactional'
+  if (data.purpose != null) {
+    const p = asText(data.purpose)
+    if (p && (PURPOSES as readonly string[]).includes(p)) purpose = p as AgentPurpose
+    else issues.push(err('unknown_purpose', `Unknown purpose "${String(data.purpose)}"; use ${PURPOSES.join(' or ')}`))
+  }
+  let audience: AgentAudience = Object.values(inputs).some(i => REF_TYPES.includes(i.type)) || trigger.event !== 'manual' ? 'shopper' : 'lead'
+  if (data.audience != null) {
+    const a = asText(data.audience)
+    if (a && (AUDIENCES as readonly string[]).includes(a)) audience = a as AgentAudience
+    else issues.push(err('unknown_audience', `Unknown audience "${String(data.audience)}"; use ${AUDIENCES.join(' or ')}`))
+  }
+
   const meta: SkillMeta = {
     name,
     title: asText(data.title) ?? name,
     description: asText(data.description),
     flow,
+    audience,
+    purpose,
+    inputs,
+    trigger,
+    outcomes,
     channels,
     languages,
     defaultLanguage,

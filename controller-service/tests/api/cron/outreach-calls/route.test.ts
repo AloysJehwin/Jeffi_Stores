@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const h = vi.hoisted(() => ({ run: vi.fn(), agent: vi.fn() }))
+const h = vi.hoisted(() => ({ run: vi.fn(), agent: vi.fn(), jobs: vi.fn() }))
 const run = h.run
 vi.mock('@controller/lib/outreach/worker', () => ({ runOutreachWorker: h.run }))
-vi.mock('@controller/lib/outreach/agent/runtime', () => ({ runDueAgentTasks: h.agent }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ runDueAgentTasks: h.agent, runDueJobs: h.jobs }))
 
 import { GET } from '@controller/app/api/(internal)/cron/outreach-calls/route'
 
@@ -14,6 +14,7 @@ const call = (auth: string | null = 'Bearer test-cron-secret') =>
 beforeEach(() => {
   vi.clearAllMocks()
   h.agent.mockResolvedValue({ claimed: 0, ran: 0, rescheduled: 0, failed: 0, cancelled: 0 })
+  h.jobs.mockResolvedValue({ claimed: 0, started: 0, deferred: 0, cancelled: 0, failed: 0 })
   vi.stubEnv('CRON_SECRET', 'test-cron-secret')
 })
 afterEach(() => vi.unstubAllEnvs())
@@ -33,7 +34,7 @@ describe('GET /api/cron/outreach-calls', () => {
     h.agent.mockResolvedValue(agent)
     const res = await call()
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ...summary, agent })
+    expect(await res.json()).toEqual({ ...summary, jobs: { claimed: 0, started: 0, deferred: 0, cancelled: 0, failed: 0 }, agent })
   })
 
   it('500s when the dialler throws, but still runs the agent tasks', async () => {
@@ -52,6 +53,6 @@ describe('GET /api/cron/outreach-calls', () => {
     h.agent.mockRejectedValue(new Error('agent boom'))
     const res = await call()
     expect(res.status).toBe(500)
-    expect(await res.json()).toEqual({ ...summary, agent: null, error: 'agent boom' })
+    expect(await res.json()).toEqual({ ...summary, jobs: expect.anything(), agent: null, error: 'agent boom' })
   })
 })

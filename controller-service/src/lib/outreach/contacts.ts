@@ -81,13 +81,18 @@ export async function getContactDetail(id: string): Promise<ContactDetail | null
 export const ACTIVE_STATUSES: ContactStatus[] = ['interested', 'building', 'preview_sent', 'published', 'claimed']
 export const ACTIVE_WINDOW_DAYS = 30
 
-/** The contact an inbound WhatsApp from `phone` belongs to: engaged (interested..claimed) and touched in the last 30 days. */
+/**
+ * The contact an inbound WhatsApp from `phone` belongs to: engaged (interested..claimed) and touched in the last 30 days.
+ * A shopper contact only counts while its job is live (active, waiting or handed off).
+ */
 export async function findActiveByPhone(phone: string, now: Date = new Date()): Promise<OutreachContact | null> {
   const e164 = normalizePhone(phone)
   if (!e164) return null
   const since = new Date(now.getTime() - ACTIVE_WINDOW_DAYS * 86400_000)
   const r = await outreachPool().query(
-    `SELECT * FROM outreach_contacts WHERE phone = $1 AND status = ANY($2) AND updated_at >= $3 ORDER BY updated_at DESC LIMIT 1`,
+    `SELECT * FROM outreach_contacts c WHERE c.phone = $1 AND c.status = ANY($2) AND c.updated_at >= $3
+        AND (c.kind IS DISTINCT FROM 'shopper' OR EXISTS (SELECT 1 FROM outreach_jobs j WHERE j.contact_id = c.id AND j.status IN ('active', 'waiting', 'handed_off')))
+      ORDER BY c.updated_at DESC LIMIT 1`,
     [e164, ACTIVE_STATUSES, since]
   )
   return r.rows[0] ?? null

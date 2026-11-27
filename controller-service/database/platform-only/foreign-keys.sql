@@ -12,3 +12,7 @@ ALTER TABLE ONLY public.outreach_agent_runs ADD CONSTRAINT outreach_agent_runs_c
 ALTER TABLE ONLY public.outreach_agent_runs ADD CONSTRAINT outreach_agent_runs_skill_version_id_fkey FOREIGN KEY (skill_version_id) REFERENCES public.outreach_skill_versions(id) ON DELETE SET NULL;
 ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.outreach_agent_runs(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.outreach_contacts(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.outreach_jobs ADD CONSTRAINT outreach_jobs_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.outreach_skills(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.outreach_jobs ADD CONSTRAINT outreach_jobs_skill_version_id_fkey FOREIGN KEY (skill_version_id) REFERENCES public.outreach_skill_versions(id) ON DELETE SET NULL;
+ALTER TABLE ONLY public.outreach_jobs ADD CONSTRAINT outreach_jobs_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.outreach_contacts(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.outreach_agent_runs ADD CONSTRAINT outreach_agent_runs_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.outreach_jobs(id) ON DELETE SET NULL;
