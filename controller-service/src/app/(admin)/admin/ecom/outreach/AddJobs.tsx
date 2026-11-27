@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { api, Badge, btnGhost, btnPrimary, inputCls } from '@/components/admin/kit/core'
 import { Card } from '@/components/admin/kit/layout'
 import { useActionToast } from '@/components/admin/kit/toast'
@@ -326,7 +327,7 @@ function ApiPanel({ agentId, inputs }: { agentId: string; inputs: Record<string,
   )
 }
 
-export default function AddJobs({ agentId, agentStatus, inputs, canWrite, onCreated, onOpenJob }: {
+export default function AddJobs({ agentId, agentStatus, inputs, canWrite: canWriteProp, onCreated, onOpenJob }: {
   agentId: string
   agentStatus: string
   inputs: Record<string, InputSpec>
@@ -341,6 +342,8 @@ export default function AddJobs({ agentId, agentStatus, inputs, canWrite, onCrea
   const hasInputs = Object.keys(inputs).length > 0
   const live = agentStatus === 'active'
   // A draft or paused agent only takes test jobs.
+  // Gated here as well as by the parent: every job this panel creates is a write.
+  const canWrite = useCanWrite('ecom_outreach:write') && canWriteProp
   const disabled = !canWrite || !live
 
   async function post(path: string, inputsBody: Record<string, unknown>, dueAt?: string) {
