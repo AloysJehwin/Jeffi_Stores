@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { NO_APP_ERROR, storeHasApp } from '@/lib/site/app-surface'
 import { randomUUID } from 'crypto'
 import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
       ? { ...(d.config ?? {}) }
       : { ...d.config, placement: { after: PLACEMENT_DEFAULT_AFTER } }
   const surface = rowSurface({ surface: d.surface })
+  if (surface === 'app' && !(await storeHasApp())) return NextResponse.json({ error: NO_APP_ERROR }, { status: 403 })
   const draftId = homepageDraftIdFrom(request)
   if (!draftId) return noHomepageDraft()
   const section = await withHomepageDraft(draftId, admin.adminId, draft => {

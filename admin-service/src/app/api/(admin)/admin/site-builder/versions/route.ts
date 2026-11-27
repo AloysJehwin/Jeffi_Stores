@@ -5,6 +5,7 @@ import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { listPageVersions, rollbackPage } from '@/lib/site/store'
 import { afterSiteChange } from '@/lib/site/after-publish'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { noAppDenial } from '../_no-app'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,8 @@ export async function GET(request: NextRequest) {
   if (admin instanceof NextResponse) return admin
   const ref = parsePageRefKey(request.nextUrl.searchParams.get('key') ?? '')
   if (!ref) return NextResponse.json({ error: 'Unknown page' }, { status: 400 })
+  const noApp = await noAppDenial(ref.surface)
+  if (noApp) return noApp
   return NextResponse.json({ versions: await listPageVersions(ref) })
 }
 
@@ -25,6 +28,8 @@ export async function POST(request: NextRequest) {
   const parsed = Body.safeParse(await request.json().catch(() => null))
   const ref = parsed.success ? parsePageRefKey(parsed.data.key) : null
   if (!parsed.success || !ref) return NextResponse.json({ error: 'Send { key, version }' }, { status: 400 })
+  const noApp = await noAppDenial(ref.surface)
+  if (noApp) return noApp
   const version = await rollbackPage(ref, parsed.data.version, admin.adminId)
   if (version == null) return NextResponse.json({ error: 'That version is not kept any more' }, { status: 404 })
   await afterSiteChange(request)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { NO_APP_ERROR, storeHasApp } from '@/lib/site/app-surface'
 import { randomUUID } from 'crypto'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
   const d = parsed.data
 
   const surface = rowSurface({ surface: d.surface })
+  if (surface === 'app' && !(await storeHasApp())) return NextResponse.json({ error: NO_APP_ERROR }, { status: 403 })
   const audience = rowAudience({ audience: d.audience })
   const refused = homepagePlanRefusal(await getHomepagePlan(), { audience })
   if (refused) return NextResponse.json({ error: refused }, { status: 403 })

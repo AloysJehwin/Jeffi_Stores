@@ -29,13 +29,13 @@ export default function SiteBuilderSwitch({ target, live, setup = false }: { tar
   }
 
   async function makeLive() {
-    const name = target === 'site' ? 'Site Builder' : 'the Homepage builder'
+    const name = target === 'site' ? 'Site builder' : 'Block builder'
     const ok = await showConfirm({
-      title: `Make ${name} live?`,
-      message: `Customers see the pages from ${name} from now on. The other builder keeps its work, and you can switch back any time.`,
+      title: `Make ${name.toLowerCase()} live?`,
+      message: `Customers see the pages from the ${name.toLowerCase()} from now on. The other builder keeps its work, and you can switch back any time.`,
       confirmText: 'Make live',
     })
-    if (ok) await send({ enabled: target === 'site' }, `${target === 'site' ? 'Site Builder' : 'The Homepage builder'} is live`)
+    if (ok) await send({ enabled: target === 'site' }, `${name} is live`)
   }
 
   if (setup) {
@@ -50,7 +50,7 @@ export default function SiteBuilderSwitch({ target, live, setup = false }: { tar
             <p className="text-sm text-foreground-muted">
               Lay out every page for desktop, phone browsers and the app separately, edit blocks in a live preview, start from
               templates, set your own colours and fonts, and let AI build or correct pages. Setting it up copies your current
-              homepage layouts in; customers keep seeing the Homepage builder until you make Site Builder live.
+              homepage layouts in; customers keep seeing the Block builder until you make Site builder live.
             </p>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default function SiteBuilderSwitch({ target, live, setup = false }: { tar
   if (live) return null
   return (
     <button type="button" disabled={busy} onClick={makeLive} className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium rounded-lg border border-accent-500 text-accent-600 hover:bg-accent-500/10 disabled:opacity-50">
-      <Radio className="w-4 h-4" /> Make {target === 'site' ? 'Site Builder' : 'Homepage builder'} live
+      <Radio className="w-4 h-4" /> Make {target === 'site' ? 'site builder' : 'block builder'} live
     </button>
   )
 }

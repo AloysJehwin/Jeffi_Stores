@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { NO_APP_ERROR, storeHasApp } from '@/lib/site/app-surface'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
   const target = parsed.data.audience as HomepageAudience
   const source = (parsed.data.fromAudience ?? target) as HomepageAudience
   if (from === to && source === target) return NextResponse.json({ error: 'Pick two different layouts' }, { status: 400 })
+  if ((from === 'app' || to === 'app') && !(await storeHasApp())) return NextResponse.json({ error: NO_APP_ERROR }, { status: 403 })
   if (target === 'business' && page !== 'home') {
     return NextResponse.json({ error: 'The business homepage has no listing pages' }, { status: 400 })
   }

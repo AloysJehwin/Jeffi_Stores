@@ -5,6 +5,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { aiDenial } from '@/lib/auth/ai-scope'
 import { critiquePage, fixPage } from '@/lib/site/critique'
 import { getPublishedTheme } from '@/lib/site/store'
+import { noAppDenial } from '../_no-app'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -29,6 +30,8 @@ export async function POST(request: NextRequest) {
   if (denied) return NextResponse.json({ error: denied }, { status: 403 })
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Send the page to check' }, { status: 400 })
+  const noApp = await noAppDenial(parsed.data.ref.surface)
+  if (noApp) return noApp
   const ref = parsed.data.ref as never
   const doc = normalizeDoc(parsed.data.doc as unknown as PageDoc)
   const theme = normalizeTheme((parsed.data.theme as never) ?? (await getPublishedTheme(parsed.data.ref.audience as never)) ?? {})

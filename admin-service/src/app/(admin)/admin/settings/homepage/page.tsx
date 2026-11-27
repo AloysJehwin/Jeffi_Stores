@@ -33,8 +33,8 @@ import { signHomepagePreviewToken } from '@/lib/catalog/homepage-preview-token'
 import { getEditableHomepage, getHomepageDraftSummary, homepageDrafts, type DraftDiff } from '@/lib/catalog/homepage-draft'
 import { loadHeroData, loadSectionOptions } from '@/lib/catalog/homepage-editor-options'
 import { siteBuilderEnabled } from '@/lib/site/store'
+import { storeHasApp } from '@/lib/site/app-surface'
 import SiteBuilderTabs from '@/components/admin/site-builder/SiteBuilderTabs'
-import SiteBuilderSwitch from '@/components/admin/site-builder/SiteBuilderSwitch'
 import { Badge, PageHeader, TabStrip } from '@/components/admin/kit'
 import { resnapshotHomepageSession, startHomepageDraft } from './actions'
 
@@ -115,7 +115,9 @@ export default async function HomepagePage({
   const business = audience === 'business'
   const page = business ? 'home' : rowPage({ page: params.page })
   // The device whose layout is edited: every device has its own.
-  const surface: HomepageSurface = HOMEPAGE_SURFACES.includes(params.surface as HomepageSurface) ? (params.surface as HomepageSurface) : 'web'
+  const hasApp = await storeHasApp()
+  const surfaces = HOMEPAGE_SURFACES.filter(s => hasApp || s !== 'app')
+  const surface: HomepageSurface = surfaces.includes(params.surface as HomepageSurface) ? (params.surface as HomepageSurface) : 'web'
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
   const draftPending = draftSummary.hasDraft && (changed(draftSummary.sections) || changed(draftSummary.slides))
   // The manager keeps the edited device's rows.
@@ -130,7 +132,10 @@ export default async function HomepagePage({
   }
   const businessNeeds = planName(plan.businessUpgrade)
   const base = ap('/admin/settings/homepage', host)
-  const siteBuilderOn = await siteBuilderEnabled()
+  const [siteBuilderOn, siteStarted] = await Promise.all([
+    siteBuilderEnabled(),
+    queryOne<{ n: string }>(`SELECT count(*) AS n FROM site_pages`).then(r => Number(r?.n ?? 0) > 0).catch(() => false),
+  ])
   const hrefFor = (p: HomepagePage, a: HomepageAudience = audience, s: HomepageSurface = surface) => {
     const q = new URLSearchParams()
     if (a === 'business') q.set('audience', a)
@@ -151,17 +156,17 @@ export default async function HomepagePage({
       ? d.sections.added + d.sections.removed + d.sections.edited + d.slides.added + d.slides.removed + d.slides.edited
       : 0
   const pendingOnPage = (p: HomepagePage) =>
-    HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.byPage[p][s]), 0)
+    surfaces.reduce((n, s) => n + pendingOf(draftSummary.byPage[p][s]), 0)
   const pendingFor: Record<HomepageAudience, number> = {
     store: HOMEPAGE_PAGES.reduce((n, p) => n + pendingOnPage(p), 0),
-    business: HOMEPAGE_SURFACES.reduce((n, s) => n + pendingOf(draftSummary.business[s]), 0),
+    business: surfaces.reduce((n, s) => n + pendingOf(draftSummary.business[s]), 0),
   }
 
   const pill = (on: boolean) =>
     `flex items-center gap-1.5 px-3 text-xs font-medium rounded-md ${on ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`
   const deviceTabs = (
     <div role="tablist" aria-label="Device" className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit">
-      {HOMEPAGE_SURFACES.map(s => (
+      {surfaces.map(s => (
         <Link key={s} href={hrefFor(page, audience, s)} scroll={false} role="tab" aria-selected={s === surface} className={pill(s === surface)}>
           {SURFACE_TAB[s]}
         </Link>
@@ -220,13 +225,13 @@ export default async function HomepagePage({
               <Badge tone="amber">{drafts.length === 1 ? '1 open draft' : `${drafts.length} open drafts`}</Badge>
             ) : null
           }
-          actions={<SiteBuilderSwitch target="homepage" live={!siteBuilderOn} />}
         />
         <SiteBuilderTabs
           active="homepage"
           live={siteBuilderOn ? 'site' : 'homepage'}
           siteHref={ap('/admin/settings/site-builder', host)}
           homepageHref={base}
+          siteStarted={siteStarted}
         />
 
         {/* One tab line: Editor / Drafts, then the page tabs; Store / Business and Preview on the right. */}
@@ -236,7 +241,7 @@ export default async function HomepagePage({
             <>
               {!showDrafts && deviceTabs}
               {audienceTabs}
-              {previewToken && !showDrafts && page === 'home' && <HomepagePreviewButton token={previewToken} audience={audience} surface={surface} />}
+              {previewToken && !showDrafts && page === 'home' && <HomepagePreviewButton token={previewToken} audience={audience} surface={surface} hasApp={hasApp} />}
             </>
           }
         >
@@ -314,11 +319,11 @@ export default async function HomepagePage({
         <HomepageLockBanner />
         {siteBuilderOn && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-            Site Builder is live, so customers see the pages built there, not these layouts. Edit the site in{' '}
+            The site builder is live, so customers see the pages built there, not these layouts. Edit the site in{' '}
             <Link href={ap('/admin/settings/site-builder', host)} className="font-medium underline">
-              Site Builder
+              Site builder
             </Link>
-            , or make the Homepage builder live again.
+            , or make the Block builder live again.
           </div>
         )}
 
@@ -329,6 +334,7 @@ export default async function HomepagePage({
           audience={audience}
           page={page}
           surface={surface}
+          hasApp={hasApp}
           initial={sections}
           options={sectionOptions}
           planTypes={plan.types}

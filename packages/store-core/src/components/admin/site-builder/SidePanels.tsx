@@ -6,6 +6,8 @@ import { INPUT_CLASS, Select } from '@/components/admin/homepage/editors/fields'
 import { isSectionBlock, siteRegistry } from '@/lib/site/blocks'
 import { THEME_PACK_PREFIX, THEME_PALETTES, THEME_STYLES, themeIdOf, themeName, themeStyle, themeTokens, type ThemeAvailable, type ThemePalette, type ThemeStyleId } from '@/lib/site/themes/catalog'
 import { useLibraryDrag, type NewItem } from './BlockList'
+import AdminThemeToggle from './AdminThemeToggle'
+import { PanelSkeleton, WorkCard } from './SiteBuilderLoading'
 
 const CATEGORY: Record<BlockCategory, string> = {
   structure: 'Layout',
@@ -173,7 +175,8 @@ export function ThemePanel({ theme, canWrite, onChange }: { theme: ThemeTokens; 
           onChange={v => set({ [key]: v === 'auto' ? undefined : v } as Partial<ThemeStyle>)}
         />
       ))}
-      <p className="text-xs text-foreground-muted">Applies to every page for these customers once published. The admin keeps its own look.</p>
+      <p className="text-xs text-foreground-muted">Applies to the storefront and the business storefront once published.</p>
+      <AdminThemeToggle />
     </div>
   )
 }
@@ -234,6 +237,8 @@ export function TemplatePanel({
   onSave,
   onDelete,
   onApplyPack,
+  hasApp = true,
+  work = null,
 }: {
   templates: { builtIn: SiteTemplate[]; saved: SiteTemplate[]; themes?: ThemeAvailable } | null
   pageRef: Pick<PageRef, 'audience' | 'surface' | 'page'>
@@ -242,19 +247,24 @@ export function TemplatePanel({
   onSave: (name: string) => void
   onDelete: (t: SiteTemplate) => void
   onApplyPack?: (t: SiteTemplate) => void
+  /** The store has a mobile app; templates for the app layout are offered only then. */
+  hasApp?: boolean
+  /** A theme or pack is being applied: shown at the top while the controls wait. */
+  work?: { title: string; step: string } | null
 }) {
   const [name, setName] = useState('')
-  const fits = (t: SiteTemplate) => t.kind === 'page' && t.pages.some(p => p.page === pageRef.page)
-  const packs = (templates?.builtIn ?? []).filter(t => t.kind === 'site' && t.pages.some(p => p.audience === pageRef.audience))
+  const fits = (t: SiteTemplate) => t.kind === 'page' && t.pages.some(p => p.page === pageRef.page && (hasApp || p.surface !== 'app'))
+  const packs = (templates?.builtIn ?? []).filter(t => t.kind === 'site' && t.pages.some(p => p.audience === pageRef.audience && (hasApp || p.surface !== 'app')))
   const list = useMemo(
     () => [...(templates?.saved ?? []).map(t => ({ t, saved: true })), ...(templates?.builtIn ?? []).map(t => ({ t, saved: false }))].filter(x => fits(x.t)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [templates, pageRef.page]
   )
-  if (!templates) return <p className="text-sm text-foreground-muted">Loading templates…</p>
+  if (!templates) return <PanelSkeleton cards={4} label="Loading templates" />
   return (
     <div className="space-y-3">
-      {templates.themes && onApplyPack && pageRef.audience === 'store' && <ThemePacks themes={templates.themes} canWrite={canWrite} onApplyPack={onApplyPack} />}
+      {work && <WorkCard {...work} />}
+      {templates.themes && onApplyPack && pageRef.audience === 'store' && <ThemePacks themes={templates.themes} canWrite={canWrite && !work} onApplyPack={onApplyPack} />}
       {packs.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Whole-site styles</p>
@@ -271,7 +281,7 @@ export function TemplatePanel({
               <p className="text-xs text-foreground-muted">{t.description}</p>
               {t.theme?.fontDisplay && <p className="text-[11px] text-foreground-muted">Fonts: {t.theme.fontDisplay} / {t.theme.fontBody}</p>}
               {canWrite && onApplyPack && (
-                <button type="button" className="text-xs font-medium text-accent-600" onClick={() => onApplyPack(t)}>
+                <button type="button" disabled={!!work} className="text-xs font-medium text-accent-600 disabled:opacity-50" onClick={() => onApplyPack(t)}>
                   Apply to the whole site ({new Set(t.pages.map(p => p.page)).size} pages)
                 </button>
               )}
