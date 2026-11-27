@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText, FileType2, GripVertical, Loader2, Presentation, RotateCcw, Save, Trash2 } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
+import AdminSelect from '@/components/admin/AdminSelect'
 import { Dialog } from '@/components/admin/kit/dialog'
 import { useActionToast } from '@/components/admin/kit/toast'
 import {
@@ -268,18 +269,15 @@ export function ExportDialog({ open, onClose, exportKey, query = '', range, filt
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs font-medium text-foreground-muted" htmlFor="export-preset">
-              Preset
-            </label>
-            <select id="export-preset" value={presetId} onChange={e => applyPreset(e.target.value)} className="control-sm min-w-0 flex-1 rounded-lg border border-border-default bg-surface-elevated px-2 text-sm text-foreground">
-              {schema.last && <option value="last">Last used</option>}
-              <option value="defaults">Defaults</option>
-              {presets.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <span className="text-xs font-medium text-foreground-muted">Preset</span>
+            <AdminSelect
+              sm
+              ariaLabel="Preset"
+              className="min-w-0 flex-1"
+              value={presetId}
+              onChange={applyPreset}
+              options={[...(schema.last ? [{ value: 'last', label: 'Last used' }] : []), { value: 'defaults', label: 'Defaults' }, ...presets.map(p => ({ value: p.id, label: p.name }))]}
+            />
             {naming == null ? (
               <button type="button" onClick={() => setNaming('')} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary" title="Save these choices as a named preset">
                 <Save className="h-3.5 w-3.5" /> Save as…
