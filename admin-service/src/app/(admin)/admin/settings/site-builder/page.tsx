@@ -10,6 +10,7 @@ import SiteBuilderEditor from '@/components/admin/site-builder/SiteBuilderEditor
 import SiteBuilderSwitch from '@/components/admin/site-builder/SiteBuilderSwitch'
 import { storeHasApp } from '@/lib/site/app-surface'
 import SiteBuilderTabs from '@/components/admin/site-builder/SiteBuilderTabs'
+import AdminThemeToggle from '@/components/admin/site-builder/AdminThemeToggle'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -37,6 +38,18 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
         description="Every customer page, laid out per device from blocks. Changes are saved as a draft and go live when you publish."
       />
       <SiteBuilderTabs active="site" live={live ? 'site' : 'homepage'} siteHref={ap('/admin/settings/site-builder', host)} homepageHref={ap('/admin/settings/homepage', host)} siteStarted={started} />
+      {started && (
+        <div className="rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+          <AdminThemeToggle
+            label="Use the store theme in the admin panel"
+            hint={
+              live
+                ? 'On: the admin takes the colours and fonts you publish here. Off: the admin keeps its own look.'
+                : 'Takes effect while the Site builder is live. Off: the admin keeps its own look.'
+            }
+          />
+        </div>
+      )}
       {aiBuild && (
         <div className="rounded-xl border border-accent-500/40 bg-surface-elevated px-4 py-3 text-sm">
           {aiBuild.status === 'done' && (

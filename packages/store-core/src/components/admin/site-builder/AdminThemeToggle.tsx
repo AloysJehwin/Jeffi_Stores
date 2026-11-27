@@ -8,7 +8,10 @@ import { useToast } from '@/contexts/ToastContext'
 
 const ENDPOINT = '/api/admin/site-builder/admin-theme'
 
-export default function AdminThemeToggle() {
+export default function AdminThemeToggle({
+  label = 'Use this theme in the admin panel too',
+  hint = 'Off: the admin keeps its own look.',
+}: { label?: string; hint?: string }) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [on, setOn] = useState(false)
@@ -42,9 +45,9 @@ export default function AdminThemeToggle() {
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <label htmlFor="admin-theme-toggle" className="block text-sm font-medium text-foreground">
-          Use this theme in the admin panel too
+          {label}
         </label>
-        <p className="text-xs text-foreground-secondary">Off: the admin keeps its own look.</p>
+        <p className="text-xs text-foreground-secondary">{hint}</p>
       </div>
       <Toggle id="admin-theme-toggle" checked={on} onChange={change} disabled={!canWrite || !loaded || saving} />
     </div>

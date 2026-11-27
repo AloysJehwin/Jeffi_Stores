@@ -149,7 +149,8 @@ export function ThemePanel({ theme, canWrite, onChange }: { theme: ThemeTokens; 
   const set = (patch: Partial<ThemeTokens>) => onChange(normalizeTheme({ ...theme, ...patch }))
   const fonts = FONT_CHOICES.map(f => ({ value: f.name, label: `${f.name} (${f.kind})` }))
   return (
-    <div className="space-y-3">
+    // Bottom room so the floating assistant button never covers the admin-theme switch.
+    <div className="space-y-3 pb-16">
       {(['primary', 'accent', 'neutral'] as const).map(k => (
         <label key={k} className="flex items-center justify-between gap-3">
           <span className="text-sm text-foreground capitalize">{k === 'neutral' ? 'Dark tone' : k === 'primary' ? 'Brand colour' : 'Accent colour'}</span>
