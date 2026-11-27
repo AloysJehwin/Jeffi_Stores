@@ -1,5 +1,5 @@
 name: Azure release setup
-description: Azure login (federated), the tailnet (the core's API and its Postgres subnet route), psql and the Azure core's kubeconfig for a release job on Azure.
+description: Azure login (federated), the tailnet (the core's API; Postgres goes through kubectl port-forward), psql and the Azure core's kubeconfig for a release job on Azure.
 inputs:
   client-id:
     description: The jeffi-prod-github-deploy identity's client id (deploy/azure, apply.sh output githubClientId)
@@ -27,7 +27,7 @@ runs:
         client-id: ${{ inputs.client-id }}
         tenant-id: ${{ inputs.tenant-id }}
         subscription-id: ${{ inputs.subscription-id }}
-    # --accept-routes: the core advertises the Postgres subnet and Azure DNS (deploy/azure/cloud-init/core.sh).
+    # --accept-routes: the core's advertised routes (deploy/azure/cloud-init/core.sh); Postgres no longer needs one.
     - uses: tailscale/github-action@v3
       with:
         oauth-client-id: ${{ inputs.ts-oauth-client-id }}

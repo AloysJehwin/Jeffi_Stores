@@ -50,7 +50,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
   - **Kubeconfig:** `~/.kube/jeffi-azure.yaml` was fetched with `fetch-kubeconfig.sh --apply --github`, through the `az vm run-command` fallback. Tailscale SSH is a `check` rule, so a script can't use it. From the Mac over the tailnet, `kubectl get nodes` shows `core` and `tenant-edge` Ready.
   - **GitHub:** the secrets `KUBECONFIG_AZURE_B64`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` are set, and the variable `AZURE_INGRESS_IP` is 52.172.147.62. `AZURE_TARGET` stays unset until the cutover.
   - **Tailscale:** the OAuth client "GitHub Actions Jeffi Stores Azure deploy" (Auth Keys write, `tag:ci`) was created, and `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` are set, so the Azure CI jobs can join the tailnet.
-  - **Postgres:** request 2611260030001583 is still open. On 2026-11-26 the engineer said they are coordinating internally; the response deadline is 2026-11-27 04:55 UTC. Phase D's restore waits on it.
+  - **Postgres:** declined 2026-11-27; replaced by the self-hosted pod above. Request 2611260030001583 stays open for a later move to Flexible Server.
   - **Credential audit (evening):**
     - **Live probes from the core:** pods with the real service accounts assumed `jeffi-irsa-app` and `jeffi-irsa-controller` (S3, SMS, EC2 and RDS reads work) and read every Key Vault secret through both Entra identities.
     - **Key Vault:** `kv-sync.sh` dry run: all 10 production secrets equal Secrets Manager. The live IRSA inline policies equal the repo.
@@ -74,13 +74,13 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
         - `razer-release.sh` reaches the Razer box through the AWS core, so after the cutover Release · razer is skipped. It needs a path through the Azure core: the deploy key on the Azure VM and a hostNetwork Job, or `az vm run-command`, which the deploy identity, a Reader, can't call today.
         - The Azure deploy identity reads Key Vault but cannot write it, so `jeffi-store` drift only warns. A Secrets Officer assignment scoped to that one secret would match the AWS deploy role, which may write only `jeffi/store`.
         - Nothing here has run against a live cluster; the stubbed checks and `actionlint` passed.
-- **Still to do:** Postgres (then `pg-init.sh` and the rehearsal), the open audit items above, and the Anthropic clean-up after #646's production release.
+- **Still to do:** apply the self-hosted Postgres (`apply.sh --apply`, `pg-disk.sh --apply`, `postgres.yaml`, `pg-init.sh --apply`; then the rehearsal), the open audit items above, and the Anthropic clean-up after #646's production release.
 
 **Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
 - **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):
   - resource group `jeffi-prod-cin`, VNet and NSG (80/443 public; the k3s API, SSH and Postgres only over Tailscale), static IP;
   - the E4ps_v6 core with cloud-init (Tailscale subnet router, k3s server with flannel on `tailscale0`, issuer `https://oidc.jeffistores.in`);
-  - Postgres 16 B2s, private, with the four extensions allow-listed;
+  - self-hosted Postgres 16 on the core: a 64 GB data disk, a backup storage account and identity (a managed Flexible Server only with `DEPLOY_PG=true`);
   - Key Vault (RBAC) and the identities: GitHub deploy, plus cluster apps and controller through the k3s issuer.
 - **Self-hosted IRSA:**
   - issuer site `deploy/aws/oidc-issuer.yaml` (S3 behind CloudFront; validated by CloudFormation);
@@ -92,7 +92,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **AWS tenant edge** (`deploy/aws/edge`, `deploy/k8s/edge`): a Traefik DaemonSet on `jeffi.io/edge=true`, the launch and Elastic IP script, and a Route 53 plan with a saved rollback.
 - **CI:**
   - `db-azure`, `deploy-prep-azure` and `release-azure` reach Azure over Tailscale;
-  - `release-db.sh --cloud=azure` talks to Postgres over the subnet route, with the password from Key Vault in a temporary PGPASSFILE;
+  - `release-db.sh --cloud=azure` talks to Postgres through a `kubectl port-forward` (k8s API only), with the password from Key Vault in a temporary PGPASSFILE;
   - the AWS lane releases until `FLAGSHIP_CLOUD=azure`; before that, Azure renders on standby (`overlays/azure-standby`).
 
 **Founder steps.**
@@ -100,9 +100,9 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 2. Resource providers: Compute, Network, DBforPostgreSQL, KeyVault, ManagedIdentity and Storage are *NotRegistered* today. `apply.sh --apply` registers them.
 3. Quota check: once Compute is registered, `apply.sh` prints the EPSv6 quota in Central India. The core needs 4 vCPUs.
 4. Tailscale:
-   - ACL for `tag:ci` to the core and the Postgres subnet;
+   - ACL for `tag:ci` to the core's 6443;
    - auto-approve the core's routes;
-   - split DNS for `postgres.database.azure.com`.
+   - (no split DNS for `postgres.database.azure.com` any more).
 5. A new Anthropic federation rule for issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`.
 6. GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. GitHub variables: `AZURE_INGRESS_IP`; `AZURE_TARGET=true` and `FLAGSHIP_CLOUD=azure` come from the cutover's `azure-live` step.
 7. The DNS cutover window:
@@ -260,9 +260,9 @@ Runs now on the current AWS cluster and doesn't wait for the move.
 
 **k3s core VM:** E4ps_v6 (Arm, so our arm64-only images run unchanged), Ubuntu 24.04 arm64, P10 disk, static IP. It joins Tailscale.
 
-**Flagship database:** Postgres 16 Flexible Server, B2s, 32 GB.
-- Allow-list `pg_trgm`, `uuid-ossp`, `unaccent` and `vector` in `azure.extensions`.
-- TLS is required.
+**Flagship database:** Postgres 16 self-hosted on the core (`flagship-postgres` pod, `pgvector/pgvector:pg16`) on a 64 GB Premium SSD data disk; `jeffiadmin` creates `pg_trgm`, `uuid-ossp`, `unaccent` and `vector`.
+- TLS on (self-signed; clients use `sslmode=require`), reachable in-cluster only.
+- `pg_dump -Fc` every 4 hours to `jeffiprodpgbackup`, kept 30 days (+7 days soft delete).
 
 **Key Vault** `jeffi-prod-kv` (Standard, RBAC mode):
 - Copy every `jeffi/*` secret across under dash names.
@@ -314,7 +314,7 @@ Runs now on the current AWS cluster and doesn't wait for the move.
 **Releases**
 - CI reaches the cluster over Tailscale (`TS_OAUTH_*`), not SSM.
 - The `deploy/k8s/db` scripts connect over the tunnel with a password.
-- `00-backup.sh` uses Flexible Server backups plus pg_dump to S3.
+- `00-backup.sh` takes a pg_dump to S3; on Azure the CronJob's blob dumps cover the flagship.
 - A GitHub federated credential is added on Azure for the few Azure-side steps. A trimmed AWS deploy role keeps ECR push, Secrets Manager and CloudFront invalidation.
 
 ### Phase D: Rehearsal
@@ -327,7 +327,7 @@ Runs now on the current AWS cluster and doesn't wait for the move.
 ### Phase E: Cutover (one announced window, about 30–60 minutes)
 
 1. Lower DNS TTLs a day before. Freeze writes by putting the platform in maintenance mode.
-2. Final pg_dump of the flagship database, restored into Flexible Server.
+2. Final pg_dump of the flagship database, restored into the self-hosted Postgres.
 3. Move each live store's on-node Postgres from its S3 dump, taken fresh at freeze. Re-create its node on Azure.
 4. Point the Route 53 records and `CLUSTER_INGRESS_IP` at the Azure IP.
 5. Point CloudFront's origin at a stable `origin.jeffistores.in`.
@@ -345,14 +345,13 @@ Prices are Azure retail (Central India) and AWS actuals, taken 2026-11-25. Azure
 | k3s core VM | E4ps_v6: 4 vCPU, 32 GB, $88.33 | E2ps_v6: 2 vCPU, 16 GB, $44.24 |
 | OS disk, P10 128 GB premium SSD | $19.71 | $19.71 |
 | Static public IP | $3.65 | $3.65 |
-| Postgres Flexible | B2s: 2 vCore, 4 GB, $71.54 | B1ms: 1 vCore, 2 GB, $17.89 |
-| Database storage, 32 GB | $4.19 | $4.19 |
-| Database backups, 7 days (within storage size) | $0 | $0 |
+| Postgres data disk, P6 64 GB premium SSD (self-hosted on the core) | ~$10 | ~$10 |
+| Postgres backup blobs (`jeffiprodpgbackup`) | < $1 | < $1 |
 | Internet egress (first 100 GB/month free) | ~$0–5 | ~$0–5 |
-| **Infrastructure subtotal** | **≈ $188/mo (≈ ₹17,900)** | **≈ $90/mo (≈ ₹8,600)** |
+| **Infrastructure subtotal** | **≈ $123/mo (≈ ₹11,700)** | **≈ $79/mo (≈ ₹7,500)** |
 | Azure AI usage (OpenAI and Speech), estimate | $20–60 | $20–60 |
-| **Total debited from the credit** | **≈ $210–250/mo** | **≈ $110–150/mo** |
-| How long $5,000 lasts | about 20–24 months | past the Nov 2028 expiry |
+| **Total debited from the credit** | **≈ $143–183/mo** | **≈ $99–139/mo** |
+| How long $5,000 lasts | about 27–35 months | past the Nov 2028 expiry |
 
 Notes:
 - A store that buys its own server adds a node, for example D2ps_v6 at $33.73/mo plus its disk. That node is charged to the store owner's wallet at our margin.

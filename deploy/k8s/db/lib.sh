@@ -1,8 +1,8 @@
 # Shared helpers for the production DB release scripts (sourced, never run directly).
 # RDS is reached through an SSH tunnel via the k3s core node (it sits in the VPC, next to RDS), as app_user
 # with IAM tokens: app_user owns the app tables. rehearse.sh sets REHEARSAL=true and PG* at a local copy.
-# JEFFI_CLOUD=azure (or --cloud=azure): the Azure core and its Postgres Flexible Server, both reached directly over
-# Tailscale (the core advertises the Postgres subnet), with passwords from Key Vault (deploy/azure/README.md).
+# JEFFI_CLOUD=azure (or --cloud=azure): the Azure core and the self-hosted flagship Postgres pod on it, reached
+# through a kubectl port-forward over the k8s API (Tailscale), with passwords from Key Vault (deploy/azure/README.md).
 set -euo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 CLOUD=${JEFFI_CLOUD:-aws}
@@ -21,9 +21,12 @@ refuse_if_aws_retired() {
 }
 AZ_RG=${AZ_RG:-jeffi-prod-cin}
 AZ_KEY_VAULT=${AZ_KEY_VAULT:-jeffi-prod-kv}
-AZ_PG_HOST=${AZ_PG_HOST:-jeffi-prod-pg.postgres.database.azure.com}
+AZ_PG_HOST=${AZ_PG_HOST:-flagship-postgres.jeffi.svc.cluster.local} # the in-cluster host the apps use (kv-sync.sh)
+AZ_PG_PORT=${AZ_PG_PORT:-15433} # local end of the port-forward: apart from the RDS tunnel's PORT, which restores hold at the same time
+AZ_PG_NAMESPACE=${AZ_PG_NAMESPACE:-jeffi}
+AZ_PG_SERVICE=${AZ_PG_SERVICE:-flagship-postgres}
 AZ_PG_ADMIN=${AZ_PG_ADMIN:-jeffiadmin}
-# The database's master login (owner of the oldest tables): RDS's postgres, the Flexible Server's admin.
+# The database's master login (owner of the oldest tables): RDS's postgres, the self-hosted superuser on Azure.
 MASTER_ROLE=postgres; [ "$CLOUD" = azure ] && MASTER_ROLE=$AZ_PG_ADMIN
 RDS_HOST=${RDS_HOST:-jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com}
 RDS_INSTANCE=${RDS_INSTANCE:-jeffi-stores-db}
@@ -136,14 +139,6 @@ pg_up() { pg_isready -h 127.0.0.1 -p "$PORT" -t 10 -q 2>/dev/null; }
 
 # Azure: a Key Vault value, for command substitution only (never echo it).
 kv_secret() { az keyvault secret show --vault-name "$AZ_KEY_VAULT" --name "$1" --query value -o tsv; }
-# The Postgres address: its name when this machine resolves the private zone (Tailscale split DNS to Azure DNS
-# through the core), else the zone's A record (the GitHub deploy identity has Reader on the group).
-az_pg_addr() {
-  if python3 -I -c 'import socket, sys; socket.gethostbyname(sys.argv[1])' "$AZ_PG_HOST" 2>/dev/null; then echo "$AZ_PG_HOST"; return; fi
-  local zone
-  zone=$(az network private-dns zone list -g "$AZ_RG" --query "[?ends_with(name, 'private.postgres.database.azure.com')].name | [0]" -o tsv)
-  az network private-dns record-set a list -g "$AZ_RG" -z "$zone" --query '[0].aRecords[0].ipv4Address' -o tsv
-}
 # app_user's and the admin's passwords in a 0600 PGPASSFILE (libpq, psql and migra read it), removed on exit:
 # no password in argv or the environment. Children of this script reuse it.
 az_pgpass() {
@@ -154,16 +149,28 @@ az_pgpass() {
   app=$(kv_secret pg-app-password 2>/dev/null | esc || true)
   admin=$(kv_secret pg-admin-password | esc)
   [ -n "$admin" ] || { echo "pg-admin-password is not readable in $AZ_KEY_VAULT" >&2; exit 1; }
-  (umask 077; { [ -z "$app" ] || printf '*:5432:*:app_user:%s\n' "$app"; printf '*:5432:*:%s:%s\n' "$AZ_PG_ADMIN" "$admin"; } > "$d/pgpass")
+  (umask 077; { [ -z "$app" ] || printf '*:*:*:app_user:%s\n' "$app"; printf '*:*:*:%s:%s\n' "$AZ_PG_ADMIN" "$admin"; } > "$d/pgpass")
   export PGPASSFILE=$d/pgpass
 }
+# kubectl port-forward to the flagship Postgres Service (reuses one already answering on AZ_PG_PORT); the scripts
+# connect to 127.0.0.1:$AZ_PG_PORT. Needs only the k8s API (KUBECONFIG), no subnet route or private DNS.
 az_db() {
-  if [ -z "${PG_ADDR:-}" ]; then PG_ADDR=$(az_pg_addr); export PG_ADDR; fi
-  [ -n "$PG_ADDR" ] || { echo "Could not find the address of $AZ_PG_HOST" >&2; exit 1; }
+  export PG_ADDR=127.0.0.1
   az_pgpass
-  for _ in $(seq 1 15); do pg_isready -h "$PG_ADDR" -p 5432 -t 10 -q 2>/dev/null && return 0; sleep 2; done
-  echo "$AZ_PG_HOST ($PG_ADDR) does not answer: is the core advertising its Postgres subnet route, and is this machine on the tailnet accepting routes?" >&2
-  exit 1
+  if ! { listening "$AZ_PG_PORT" && pg_isready -h 127.0.0.1 -p "$AZ_PG_PORT" -t 5 -q 2>/dev/null; }; then
+    local log pf
+    log=$(mktemp "${TMPDIR:-/tmp}/pg-forward.XXXXXX"); on_exit "rm -f '$log'"
+    kubectl -n "$AZ_PG_NAMESPACE" port-forward "svc/$AZ_PG_SERVICE" "$AZ_PG_PORT:5432" >"$log" 2>&1 &
+    pf=$!; on_exit "kill $pf 2>/dev/null"
+    for _ in $(seq 1 15); do
+      pg_isready -h 127.0.0.1 -p "$AZ_PG_PORT" -t 5 -q 2>/dev/null && return 0
+      kill -0 "$pf" 2>/dev/null || break
+      sleep 2
+    done
+    echo "$AZ_PG_SERVICE does not answer through kubectl port-forward on :$AZ_PG_PORT (KUBECONFIG=$KUBECONFIG; is the pod Ready: kubectl -n $AZ_PG_NAMESPACE get pod flagship-postgres-0?):" >&2
+    sed 's/^/  /' "$log" >&2
+    exit 1
+  fi
 }
 
 tunnel() {
@@ -178,14 +185,14 @@ tunnel() {
 # libpq env for app_user (a fresh IAM token per call; they expire after 15 minutes) and for the master user postgres.
 pg_env() {
   if $REHEARSAL; then export PGUSER=app_user PGPASSWORD=$REHEARSAL_PW; return 0; fi
-  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=5432 PGUSER=app_user PGSSLMODE=require; return 0; fi
+  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=$AZ_PG_PORT PGUSER=app_user PGSSLMODE=require; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=app_user PGSSLMODE=require
   PGPASSWORD=$(aws rds generate-db-auth-token --hostname "$RDS_HOST" --port 5432 --username app_user)
   export PGPASSWORD
 }
 pg_master_env() {
   if $REHEARSAL; then export PGUSER=postgres PGPASSWORD=$REHEARSAL_PW; return 0; fi
-  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=5432 PGUSER=$AZ_PG_ADMIN PGSSLMODE=require; return 0; fi
+  if [ "$CLOUD" = azure ]; then export PGHOST=${PG_ADDR:?tunnel first} PGPORT=$AZ_PG_PORT PGUSER=$AZ_PG_ADMIN PGSSLMODE=require; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=postgres PGSSLMODE=require
   PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id jeffi/production --query SecretString --output text |
     python3 -I -c 'import json, sys; print(json.load(sys.stdin)["RDS_MASTER_PASSWORD"])')
@@ -209,7 +216,7 @@ schema_diff() {
     RDS_DB=$db TARGET_URL="postgresql://app_user:$REHEARSAL_PW@127.0.0.1:$PGPORT/$db" SCHEMA_DIFF_OUT=$OUT_DIR \
       bash "$REPO/deploy/schema-diff.sh" "$@"
   elif [ "$CLOUD" = azure ]; then # the password comes from PGPASSFILE
-    RDS_DB=$db TARGET_URL="postgresql://app_user@${PG_ADDR:?tunnel first}:5432/$db?sslmode=require" SCHEMA_DIFF_OUT=$OUT_DIR \
+    RDS_DB=$db TARGET_URL="postgresql://app_user@${PG_ADDR:?tunnel first}:$AZ_PG_PORT/$db?sslmode=require" SCHEMA_DIFF_OUT=$OUT_DIR \
       bash "$REPO/deploy/schema-diff.sh" "$@"
   else
     RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=$db \
@@ -237,7 +244,7 @@ platform_manifests() {
 
 k8s_up() { kubectl get nodes --request-timeout=10s >/dev/null 2>&1; }
 k8s_tunnel() {
-  if [ "$CLOUD" = azure ]; then # the kubeconfig's server is the core's Tailscale address
+  if [ "$CLOUD" = azure ]; then # the kubeconfig's server is the core's Tailscale address (the Postgres port-forward rides on it)
     for _ in 1 2 3; do k8s_up && return 0; sleep 3; done
     echo "The Azure cluster does not answer over Tailscale (KUBECONFIG=$KUBECONFIG)" >&2; exit 1
   fi

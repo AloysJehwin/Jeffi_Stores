@@ -11,17 +11,19 @@ The existing `jeffi-ai-cin` resource group (Speech and OpenAI) is separate, and 
 | Path | What it does |
 |---|---|
 | `main.bicep` | Subscription scope. Creates resource group `jeffi-prod-cin` (Central India), then the two modules below. |
-| `modules/foundation.bicep` | VNet `10.60.0.0/16` with two subnets: `nodes`, and `postgres` (delegated). Also creates: <ul><li>an NSG that opens 80/443 and Tailscale UDP 41641 only;</li><li>a static Standard public IP;</li><li>Postgres 16 Flexible Server `jeffi-prod-pg` (B2s, 32 GB, private access, TLS required);</li><li>the `azure.extensions` allow-list (`pg_trgm`, `uuid-ossp`, `unaccent`, `vector`) and database `jeffi_stores`;</li><li>Key Vault `jeffi-prod-kv` (Standard, RBAC, purge protection), holding `pg-admin-password`;</li><li>three user-assigned identities, listed in the next table.</li></ul> |
+| `modules/foundation.bicep` | VNet `10.60.0.0/16` with two subnets: `nodes`, and `postgres` (delegated; unused unless `DEPLOY_PG=true`). Also creates: <ul><li>an NSG that opens 80/443 and Tailscale UDP 41641 only;</li><li>a static Standard public IP;</li><li>for the self-hosted Postgres: the 64 GB Premium data disk `jeffi-prod-pg-data`, the backup storage account `jeffiprodpgbackup` (container `pg-backups`) and the backup identity `jeffi-prod-pg-backup`;</li><li>only with `DEPLOY_PG=true`: a managed Postgres 16 Flexible Server `jeffi-prod-pg` (B2s, private access) with its `azure.extensions` allow-list and database;</li><li>Key Vault `jeffi-prod-kv` (Standard, RBAC, purge protection), holding `pg-admin-password`;</li><li>three user-assigned identities, listed in the next table.</li></ul> |
 | `modules/core-vm.bicep` | The k3s core: `Standard_E4ps_v6` (Arm, Cobalt 100), Ubuntu 24.04 arm64, Trusted Launch, P10 128 GB OS disk, accelerated networking, private IP `10.60.1.4`. Its system identity is Key Vault Secrets Officer. Only deployed with `deployCore=true`. |
 | `cloud-init/core.sh` | Runs on the VM's first boot: <ol><li>installs Tailscale and joins as `jeffi-k8s-core-az`, a subnet router for the Postgres subnet and `168.63.129.16`;</li><li>installs the k3s server with `--flannel-iface tailscale0`, node IP = Tailscale IP, and `--kube-apiserver-arg service-account-issuer=https://oidc.jeffistores.in` plus the matching `service-account-jwks-uri`;</li><li>turns ServiceLB on for the core only.</li></ol>The k3s token and Tailscale key come from Key Vault `jeffi-production-k3s`. |
-| `apply.sh` | Runs a preflight (subscription, providers, Epsv6 quota, SKU restrictions), then `az deployment sub what-if`. `--apply` deploys. `--core` adds the VM. It generates the Postgres admin password, or reads it back from the vault, and writes it into a 0600 parameters file. |
+| `apply.sh` | Runs a preflight (subscription, providers, Epsv6 quota, SKU restrictions), then `az deployment sub what-if`. `--apply` deploys. `--core` adds the VM. It generates the Postgres admin password (the self-hosted pod's superuser), or reads it back from the vault, and writes it into a 0600 parameters file. |
 | `kv-sync.sh` | Copies every `jeffi/*` Secrets Manager secret to Key Vault under its dash name (`jeffi/production` becomes `jeffi-production`). It skips `jeffi/local*`, compares by sha256 and never prints a value. `--patch <secret> <KEY>` sets one JSON key from stdin. |
-| `pg-init.sh` | Creates the `app_user` login, with its password generated straight into Key Vault (`pg-app-password`). Then: `azure_pg_admin` membership, ownership of `jeffi_stores`, and the four extensions. |
+| `pg-disk.sh` | Attaches the data disk to the core VM and mounts it at `/var/lib/jeffi-pg` (the pod's hostPath). |
+| `../k8s/overlays/azure/postgres.yaml` | The `flagship-postgres` StatefulSet and Service in `jeffi`, the 4-hourly backup CronJob and a NetworkPolicy. |
+| `pg-init.sh` | Creates the k8s Secret `flagship-postgres` from Key Vault, waits for the pod, then creates the `app_user` login (password generated straight into Key Vault, `pg-app-password`), makes it owner of `jeffi_stores` and creates the four extensions as `jeffiadmin`. |
 | `irsa/publish-oidc.sh` | Reads the cluster's discovery document and JWKS, checks the issuer, and uploads both to the `jeffi-oidc-issuer` stack's bucket. Then it invalidates CloudFront. |
 | `irsa/aws-roles.sh` | Creates the IAM OIDC provider for `oidc.jeffistores.in`, plus one role per service account (next table). |
 | `../aws/oidc-issuer.yaml` | CloudFormation for the issuer site: a private S3 bucket, CloudFront with origin access control, an ACM certificate and the Route 53 alias `oidc.jeffistores.in`. |
 | `../aws/edge/` | The AWS tenant edge: <ul><li>`launch-edge.sh`: a t4g.small with an Elastic IP (`eip` subcommand) and a security group open on 80/443;</li><li>`edge-node-user-data.sh`: joins the core over Tailscale;</li><li>`route53-plan.sh`: store hosts to the edge, platform hosts to Azure, with a saved rollback batch.</li></ul> |
-| `../k8s/overlays/azure/` | The platform on Azure, which `JEFFI_CLOUD=azure` selects. It adds: <ul><li>projected tokens for STS and Entra;</li><li>`SECRETS_BACKEND=keyvault`, `DB_IAM_AUTH=false` and `DB_SSL=require`;</li><li>cert-manager and ecr-refresh through IRSA;</li><li>CoreDNS forwarding for the Postgres private zone;</li><li>the provisioning ConfigMap for store nodes and pods (next section);</li><li>the edge (`../k8s/edge/`): its Traefik, and a `public-{slug}` copy of public-api with its own Redis, which the core's Traefik skips (`patches/traefik-core.yaml`).</li></ul> After the cutover only (`FLAGSHIP_CLOUD=azure`). |
+| `../k8s/overlays/azure/` | The platform on Azure, which `JEFFI_CLOUD=azure` selects. It adds: <ul><li>projected tokens for STS and Entra;</li><li>`SECRETS_BACKEND=keyvault`, `DB_IAM_AUTH=false` and `DB_SSL=require`;</li><li>cert-manager and ecr-refresh through IRSA;</li><li>CoreDNS forwarding for Azure DNS;</li><li>the provisioning ConfigMap for store nodes and pods (next section);</li><li>the edge (`../k8s/edge/`): its Traefik, and a `public-{slug}` copy of public-api with its own Redis, which the core's Traefik skips (`patches/traefik-core.yaml`).</li></ul> After the cutover only (`FLAGSHIP_CLOUD=azure`). |
 | `../k8s/overlays/azure-standby/` | The same overlay before the cutover (`FLAGSHIP_CLOUD=aws`): the 61 app CronJobs suspended (`ecr-refresh` keeps running), messaging, documents and voice at 0, both annotated `jeffi.io/standby`. `lib.sh` and `apply-platform.sh` render it, and refuse to render Azure at all while `FLAGSHIP_CLOUD` is unset. The cutover's `azure-live` step applies the live CronJobs and Deployments in their place. |
 
 ### Identities
@@ -59,9 +61,9 @@ Before the first store moves, put the Azure `DATABASE_URL` (and `CONTROL_PLANE_D
    - The core needs 4 vCPUs.
    - Sponsorship subscriptions often start at 0–4. If it is short, request more in Portal → Quotas.
 4. **Tailscale admin.**
-   - **ACL:** allow `tag:ci` to reach the core on 6443, and `10.60.2.0/24:5432` and `168.63.129.16:53`.
+   - **ACL:** allow `tag:ci` to reach the core on 6443. Postgres needs no rule: scripts use `kubectl port-forward` over the k8s API.
    - **Auto-approve routes:** add `autoApprovers.routes` for `10.60.2.0/24` and `168.63.129.16/32` by `tag:server-prod`, or approve them by hand after step 4 of the runbook.
-   - **Split DNS:** `postgres.database.azure.com` → `168.63.129.16`.
+   - **Split DNS:** not needed for Postgres any more (it was for `postgres.database.azure.com`).
    - **Auth key:** check that `TS_AUTHKEY` in `jeffi/production/k3s` is a reusable, tagged key that has not expired.
 5. **Anthropic federation.** Done: rule `jeffi-production-azure` (`fdrl_01QsmDKrzxm6y34Ho52LNwk5`) trusts issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`. The cutover's identity step points the platform row at it.
 6. **GitHub settings.**
@@ -82,7 +84,7 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
    bash deploy/azure/apply.sh            # preflight and what-if
    bash deploy/azure/apply.sh --apply
    ```
-   Note the outputs: `ingressIp`, `postgresFqdn`, `tenantId`, `githubClientId`, `clusterAppsClientId` and `clusterControllerClientId`.
+   Note the outputs: `ingressIp`, `pgBackupClientId`, `tenantId`, `githubClientId`, `clusterAppsClientId` and `clusterControllerClientId`.
 3. **Secrets.**
    ```bash
    bash deploy/azure/kv-sync.sh
@@ -103,11 +105,17 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
    ```
    Then store the same file base64 as `KUBECONFIG_AZURE_B64`.
    Or run `bash deploy/azure/fetch-kubeconfig.sh --apply [--github]`. It never prints the file, and it falls back to `az vm run-command` when Tailscale SSH isn't allowed yet. The tailnet's SSH rule is `check`, so a non-interactive `tailscale ssh` waits for a browser re-auth; the fallback is the normal path from a script. Then run `bash deploy/azure/github-settings.sh --apply` to set the GitHub Azure secrets and `AZURE_INGRESS_IP`; add `--enable-target` only at cutover. The tailnet ACL, route and SSH additions are in [`deploy/tailscale/README.md`](../tailscale/README.md).
-6. **Database.**
+6. **Database** (self-hosted Postgres on the core; after the core VM, step 5's kubeconfig, and step 8's overlay values).
    ```bash
+   bash deploy/azure/pg-disk.sh --apply     # attach and mount the data disk on the VM
+   ```
+   Fill `PG_BACKUP_CLIENT_ID` in `deploy/k8s/overlays/azure/azure.env` from the `pgBackupClientId` output of step 2. Then apply the StatefulSet, or let the release do it:
+   ```bash
+   kubectl --kubeconfig ~/.kube/jeffi-azure.yaml apply -f deploy/k8s/overlays/azure/postgres.yaml
    bash deploy/azure/pg-init.sh             # dry run
    bash deploy/azure/pg-init.sh --apply
    ```
+   `pg-init.sh` creates the `flagship-postgres` Secret first: it must exist before the pod's first start (initdb reads it once), so if the pod is stuck on a missing Secret, run it, then `kubectl -n jeffi delete pod flagship-postgres-0`. The restore of the flagship dump is Phase D (`rehearsal/restore-dump.sh`).
    Its last step is `kv-sync.sh --azure-db --apply`. That points every service secret (`jeffi-production`, `jeffi-store`, messaging, documents, public-api, mobile) at this server as `app_user`, in `DATABASE_URL`, `CONTROL_PLANE_DATABASE_URL` and `MESSAGING_`/`DOCUMENTS_DATABASE_URL`, with the RDS IAM flags off. The Key Vault copies otherwise carry RDS IAM logins, and the store namespaces get copies of these secrets too. A later plain `kv-sync.sh --apply` keeps the overrides. The overlay also forces `DB_IAM_AUTH`, `RDS_IAM_AUTH` and `CONTROL_PLANE_IAM_AUTH` to false on the platform pods.
 7. **Self-hosted IRSA.**
    ```bash
@@ -150,13 +158,13 @@ Run from the repo root on the founder's Mac with `az` logged in (subscription "A
 
 **How CI reaches Azure** (needs the `tag:ci` rule from `deploy/tailscale/azure-acl-snippet.hujson`). `db-azure`, `deploy-prep-azure` and `release-azure` in `.github/workflows/ci.yml` use `.github/actions/azure-release-setup`. That action:
 - logs in to Azure (federated);
-- joins the tailnet as `tag:ci` with `--accept-routes`;
+- joins the tailnet as `tag:ci` (`--accept-routes` stays on, for the nodes' routes);
 - installs psql;
 - writes the kubeconfig;
 - sets `JEFFI_CLOUD=azure`.
 
 From there:
-- `release-db.sh --cloud=azure` reaches Postgres directly over the subnet route. It takes `app_user`'s password from Key Vault through a temporary `PGPASSFILE`, so no password is in argv or the environment.
+- `release-db.sh --cloud=azure` reaches Postgres through `kubectl port-forward` to `svc/flagship-postgres` (local port `AZ_PG_PORT`, 15433), so it needs only the k8s API. It takes `app_user`'s password from Key Vault through a temporary `PGPASSFILE`, so no password is in argv or the environment.
 - `rollout.sh` and `smoke.sh` render the overlay and talk to the core's Tailscale address.
 
 **Which lane releases** is set by two repository variables. The workflow passes `FLAGSHIP_CLOUD` on to the scripts, and Init's summary names the lanes.
@@ -172,6 +180,24 @@ After the cutover the scripts refuse the AWS side: `release-db.sh`, `rollout.sh`
 
 **Razer after the cutover.** `razer-release.sh` reaches the Razer box over SSM through the AWS core, which stops at the cutover, so Release · AWS · razer is skipped from then on. PaddleOCR changes need a path through the Azure core first (open item in the plan).
 
+## Backups and restore
+
+The self-hosted flagship Postgres is protected by the CronJob `flagship-postgres-backup`: every 4 hours a `pg_dump -Fc` of `jeffi_stores` (plus the roles, `pg_dumpall --globals-only`) goes to `jeffiprodpgbackup/pg-backups/flagship/YYYY/MM/DD/`. Blobs are deleted after 30 days, with 7 days of soft delete on top. The disk itself has no snapshots, so these dumps are the recovery path (at most 4 hours of data lost).
+
+Restore one:
+```bash
+az storage blob list --auth-mode login --account-name jeffiprodpgbackup -c pg-backups --prefix flagship/2026/ -o table
+az storage blob download --auth-mode login --account-name jeffiprodpgbackup -c pg-backups \
+  -n flagship/<YYYY>/<MM>/<DD>/jeffi_stores-<stamp>.dump -f ./jeffi_stores.dump
+```
+Then `pg_restore` through the port-forward, as `restore-dump.sh` does: `deploy/azure/rehearsal/restore-dump.sh --dump ./jeffi_stores.dump --target-db <db> --apply` (as `app_user`, extensions and the schema grant as `jeffiadmin`). To restore over the live database, stop the platform first and use `--reset`.
+
+Do a restore drill monthly: restore the newest dump into a scratch database and compare table counts.
+
+Operating notes:
+- The StatefulSet's `updateStrategy` is `OnDelete`: a manifest change applies only after `kubectl -n jeffi delete pod flagship-postgres-0` (brief downtime while the pod restarts on the same disk).
+- After a core VM rebuild, re-run `bash deploy/azure/pg-disk.sh --apply` before the pod can start; the data stays on the disk.
+
 ## Monthly cost (from the plan, Azure retail Central India and AWS actuals, 2026-11-25)
 
 ### Azure, paid from the $5,000 credit
@@ -181,16 +207,15 @@ After the cutover the scripts refuse the AWS side: `release-db.sh`, `rollout.sh`
 | k3s core VM | E4ps_v6: 4 vCPU, 32 GB, $88.33 | E2ps_v6: 2 vCPU, 16 GB, $44.24 |
 | OS disk, P10 128 GB premium SSD | $19.71 | $19.71 |
 | Static public IP | $3.65 | $3.65 |
-| Postgres Flexible | B2s: 2 vCore, 4 GB, $71.54 | B1ms: 1 vCore, 2 GB, $17.89 |
-| Database storage, 32 GB | $4.19 | $4.19 |
-| Database backups, 7 days | $0 | $0 |
+| Postgres data disk, P6 64 GB premium SSD (self-hosted on the core) | ~$10 | ~$10 |
+| Postgres backup blobs (`jeffiprodpgbackup`) | < $1 | < $1 |
 | Internet egress (first 100 GB free) | ~$0–5 | ~$0–5 |
-| **Infrastructure subtotal** | **≈ $188/mo (≈ ₹17,900)** | **≈ $90/mo (≈ ₹8,600)** |
+| **Infrastructure subtotal** | **≈ $123/mo (≈ ₹11,700)** | **≈ $79/mo (≈ ₹7,500)** |
 | Azure AI usage (OpenAI, Speech), estimate | $20–60 | $20–60 |
-| **Total debited from the credit** | **≈ $210–250/mo** | **≈ $110–150/mo** |
+| **Total debited from the credit** | **≈ $143–183/mo** | **≈ $99–139/mo** |
 
 - Key Vault costs a few cents a month.
-- For the Lean column, set `vmSize=Standard_E2ps_v6` and `pgSku=Standard_B1ms`.
+- For the Lean column, set `vmSize=Standard_E2ps_v6`. All of it is Microsoft first-party, paid from the sponsorship credit.
 
 ### AWS, paid by card, after the move
 

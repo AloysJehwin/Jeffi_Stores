@@ -1,6 +1,6 @@
 #!/bin/bash
 # Phase D: a fresh logical dump of the flagship database (prod RDS jeffi_stores, over the core's SSH/SSM tunnel, as
-# app_user with an IAM token) restored into the Azure Postgres Flexible Server over the tailnet.
+# app_user with an IAM token) restored into the self-hosted Azure Postgres pod through a kubectl port-forward.
 #   dump     pg_dump -Fc of jeffi_stores into ~/Documents/db-backups/rehearsal-<stamp>/ (0700; real customer data).
 #            --dump <file> reuses an existing dump (a release's 00-backup.sh one, say) and skips this step.
 #   restore  pg_restore as app_user (--no-owner --no-acl: every object becomes app_user's, as pg-init.sh set it up).
@@ -69,10 +69,10 @@ do_dump() {
 # dump dir at /dump and $WORK at /work.
 pgtool() {
   if $USE_DOCKER; then
-    docker run --rm -e PGHOST="$PG_ADDR" -e PGPORT=5432 -e PGUSER=app_user -e PGSSLMODE=require -e PGPASSFILE=/work/pgpass \
+    docker run --rm -e PGHOST=host.docker.internal -e PGPORT="$AZ_PG_PORT" -e PGUSER=app_user -e PGSSLMODE=require -e PGPASSFILE=/work/pgpass \
       -v "$WORK:/work" -v "$DUMPDIR:/dump:ro" "postgres:$SRV_MAJOR-alpine" "$@"
   else
-    PGHOST=$PG_ADDR PGPORT=5432 PGUSER=app_user PGSSLMODE=require PGPASSFILE=$WORK/pgpass "$@"
+    PGHOST=$PG_ADDR PGPORT=$AZ_PG_PORT PGUSER=app_user PGSSLMODE=require PGPASSFILE=$WORK/pgpass "$@"
   fi
 }
 do_ensure() {

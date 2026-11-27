@@ -1,5 +1,6 @@
-// Network, flagship Postgres, Key Vault and the identities that read it (the GitHub deploy job, and the cluster's
-// service accounts through the k3s OIDC issuer).
+// Network, the flagship Postgres disk and backup store, Key Vault and the identities that read it (the GitHub deploy
+// job, and the cluster's service accounts through the k3s OIDC issuer). Postgres runs as a pod on the core; the
+// Flexible Server resources stay behind deployPostgres.
 param location string
 param prefix string
 param keyVaultName string
@@ -19,9 +20,14 @@ param pgSubnetCidr string = '10.60.2.0/24'
 param pgSku string = 'Standard_B2s'
 @description('Postgres availability zone; empty lets Azure choose.')
 param pgZone string = ''
-@description('False skips the Postgres server, e.g. while region access is pending.')
-param deployPostgres bool = true
+@description('The managed Flexible Server; off, the flagship Postgres is a pod on the core (disk and backups below).')
+param deployPostgres bool = false
 param pgStorageGb int = 32
+param pgDataDiskGb int = 64
+param pgBackupStorageAccount string = 'jeffiprodpgbackup'
+param pgBackupSubjects array = [
+  'system:serviceaccount:jeffi:pg-backup'
+]
 param githubEnvironments array = [
   'production'
   'production-release'
@@ -38,6 +44,7 @@ var roles = {
   kvSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   kvSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
   reader: 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
+  storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 }
 
 resource nsg 'Microsoft.Network/networkSecurityGroups@2024-05-01' = {
@@ -245,6 +252,90 @@ resource pgDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' =
   ]
 }
 
+// The flagship Postgres data disk. Attached to the core by pg-disk.sh / core-vm.bicep; no zone, deleteOption Detach.
+resource pgDataDisk 'Microsoft.Compute/disks@2024-03-02' = {
+  name: '${prefix}-pg-data'
+  location: location
+  tags: tags
+  sku: {
+    name: 'Premium_LRS'
+  }
+  properties: {
+    creationData: {
+      createOption: 'Empty'
+    }
+    diskSizeGB: pgDataDiskGb
+  }
+}
+
+resource pgBackupSa 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: pgBackupStorageAccount
+  location: location
+  tags: tags
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+  }
+}
+
+resource pgBackupBlob 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: pgBackupSa
+  name: 'default'
+  properties: {
+    deleteRetentionPolicy: {
+      enabled: true
+      days: 7
+    }
+  }
+}
+
+resource pgBackupContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: pgBackupBlob
+  name: 'pg-backups'
+}
+
+resource pgBackupPolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+  parent: pgBackupSa
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'expire-flagship-30d'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            filters: {
+              blobTypes: [
+                'blockBlob'
+              ]
+              prefixMatch: [
+                'pg-backups/flagship/'
+              ]
+            }
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: 30
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+  dependsOn: [
+    pgBackupContainer
+  ]
+}
+
 resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: keyVaultName
   location: location
@@ -342,6 +433,28 @@ resource controllerFic 'Microsoft.ManagedIdentity/userAssignedIdentities/federat
   }
 ]
 
+resource pgBackupId 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${prefix}-pg-backup'
+  location: location
+  tags: tags
+}
+
+@batchSize(1)
+resource pgBackupFic 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = [
+  for (sub, i) in pgBackupSubjects: {
+    parent: pgBackupId
+    name: 'k3s-pg-backup-${i}'
+    dependsOn: [controllerFic]
+    properties: {
+      issuer: oidcIssuerUrl
+      subject: sub
+      audiences: [
+        'api://AzureADTokenExchange'
+      ]
+    }
+  }
+]
+
 resource githubKv 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: kv
   name: guid(kv.id, githubId.id, roles.kvSecretsUser)
@@ -383,6 +496,17 @@ resource controllerKv 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
+// The backup CronJob writes dumps under flagship/ in this container only.
+resource pgBackupBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: pgBackupContainer
+  name: guid(pgBackupContainer.id, pgBackupId.id, roles.storageBlobDataContributor)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataContributor)
+    principalId: pgBackupId.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource operatorKv 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(operatorPrincipalId)) {
   scope: kv
   name: guid(kv.id, operatorPrincipalId, roles.kvSecretsOfficer)
@@ -403,3 +527,6 @@ output keyVaultUri string = kv.properties.vaultUri
 output githubClientId string = githubId.properties.clientId
 output clusterAppsClientId string = appsId.properties.clientId
 output clusterControllerClientId string = controllerId.properties.clientId
+output pgDataDiskId string = pgDataDisk.id
+output pgBackupStorageAccount string = pgBackupSa.name
+output pgBackupClientId string = pgBackupId.properties.clientId

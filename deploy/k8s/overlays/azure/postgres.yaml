@@ -1,0 +1,213 @@
+# The flagship Postgres, self-hosted on the core: one pod on the data disk pg-disk.sh mounts at /var/lib/jeffi-pg
+# (the same pattern as a store's database, tenant-workload.ts postgresWorkload). The `flagship-postgres` Secret
+# (username, password, database) comes from Key Vault via deploy/azure/pg-init.sh, never from git. TLS only.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: jeffi-database }
+value: 1000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: The flagship database outranks every app pod, so memory pressure evicts apps first.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: pg-backup, namespace: jeffi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: flagship-postgres, namespace: jeffi, labels: { app: flagship-postgres } }
+spec:
+  type: ClusterIP
+  selector: { app: flagship-postgres }
+  ports: [{ name: pg, port: 5432, targetPort: pg }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: flagship-postgres, namespace: jeffi, labels: { app: flagship-postgres } }
+spec:
+  replicas: 1
+  serviceName: flagship-postgres
+  # OnDelete: a release never restarts the database by surprise; restart it with `kubectl delete pod flagship-postgres-0`.
+  updateStrategy: { type: OnDelete }
+  selector: { matchLabels: { app: flagship-postgres } }
+  template:
+    metadata: { labels: { app: flagship-postgres } }
+    spec:
+      priorityClassName: jeffi-database
+      nodeSelector: { jeffi.io/role: core }
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      securityContext: { runAsUser: 999, runAsGroup: 999, fsGroup: 999 }
+      initContainers:
+        # Self-signed cert made on the disk at first start; pg_hba.conf sits next to it (outside PGDATA, so initdb
+        # still sees an empty pgdata/) and is rewritten each start: SSL and scram only, trust on the container's socket.
+        - name: tls-init
+          image: pgvector/pgvector:pg16
+          command:
+            - sh
+            - -c
+            - |
+              set -e; D=/var/lib/postgresql/data
+              if [ ! -s "$D/server.crt" ] || [ ! -s "$D/server.key" ]; then
+                openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=postgres" -keyout "$D/server.key" -out "$D/server.crt"
+              fi
+              chmod 600 "$D/server.key" "$D/server.crt"
+              printf '%s\n' \
+                'local all all trust' \
+                'hostssl all all 0.0.0.0/0 scram-sha-256' \
+                'hostssl all all ::/0 scram-sha-256' \
+                'hostnossl all all 0.0.0.0/0 reject' \
+                'hostnossl all all ::/0 reject' > "$D/pg_hba.conf"
+              chmod 600 "$D/pg_hba.conf"
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 128Mi } }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          args:
+            - -c
+            - ssl=on
+            - -c
+            - ssl_cert_file=/var/lib/postgresql/data/server.crt
+            - -c
+            - ssl_key_file=/var/lib/postgresql/data/server.key
+            - -c
+            - hba_file=/var/lib/postgresql/data/pg_hba.conf
+            - -c
+            - max_connections=300
+            - -c
+            - shared_buffers=1536MB
+            - -c
+            - effective_cache_size=4GB
+            - -c
+            - work_mem=8MB
+            - -c
+            - maintenance_work_mem=256MB
+            - -c
+            - wal_compression=on
+            - -c
+            - password_encryption=scram-sha-256
+            - -c
+            - log_min_duration_statement=1000
+            - -c
+            - checkpoint_timeout=15min
+            - -c
+            - max_wal_size=2GB
+          env:
+            - { name: POSTGRES_USER, valueFrom: { secretKeyRef: { name: flagship-postgres, key: username } } }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: flagship-postgres, key: password } } }
+            - { name: POSTGRES_DB, valueFrom: { secretKeyRef: { name: flagship-postgres, key: database } } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ name: pg, containerPort: 5432 }]
+          resources:
+            requests: { cpu: 500m, memory: 3Gi }
+            limits: { memory: 6Gi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: shm, mountPath: /dev/shm }
+          readinessProbe:
+            exec: { command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1'] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec: { command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1'] }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: data
+          hostPath: { path: /var/lib/jeffi-pg/data, type: Directory }
+        - name: shm
+          emptyDir: { medium: Memory, sizeLimit: 512Mi }
+---
+# The namespace's ingress-from-edge policy admits this namespace, kube-system, observability and node IPs; the
+# stores' pods connect too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: flagship-postgres-from-stores, namespace: jeffi }
+spec:
+  podSelector: { matchLabels: { app: flagship-postgres } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { jeffi.io/tier: tenant } }
+      ports: [{ port: 5432 }]
+---
+# Not labelled part-of=jeffi-cron: the azure-standby overlay suspends those, and backups must run on standby too.
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: flagship-postgres-backup, namespace: jeffi }
+spec:
+  schedule: '0 */4 * * *'
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: pg-backup
+          nodeSelector: { jeffi.io/role: core }
+          initContainers:
+            - name: dump
+              image: pgvector/pgvector:pg16
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  STAMP=$(date -u +%Y%m%d-%H%M)
+                  echo "$STAMP" > /backup/stamp
+                  pg_dump -Fc -Z 6 -f "/backup/jeffi_stores-$STAMP.dump"
+                  pg_dumpall --globals-only --no-role-passwords -f "/backup/globals-$STAMP.sql"
+                  pg_restore --list "/backup/jeffi_stores-$STAMP.dump" > /dev/null
+                  ls -l /backup
+              env:
+                - { name: PGHOST, value: flagship-postgres }
+                - { name: PGSSLMODE, value: require }
+                - { name: PGUSER, valueFrom: { secretKeyRef: { name: flagship-postgres, key: username } } }
+                - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: flagship-postgres, key: password } } }
+                - { name: PGDATABASE, valueFrom: { secretKeyRef: { name: flagship-postgres, key: database } } }
+              resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 1Gi } }
+              volumeMounts: [{ name: backup, mountPath: /backup }]
+          containers:
+            - name: upload
+              image: mcr.microsoft.com/azure-cli:2.67.0
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  STAMP=$(cat /backup/stamp)
+                  P="flagship/$(echo "$STAMP" | cut -c1-4)/$(echo "$STAMP" | cut -c5-6)/$(echo "$STAMP" | cut -c7-8)"
+                  az login --service-principal -u "$AZURE_CLIENT_ID" -t "$AZURE_TENANT_ID" \
+                    --federated-token "$(cat "$AZURE_FEDERATED_TOKEN_FILE")" --allow-no-subscriptions -o none
+                  for f in "jeffi_stores-$STAMP.dump" "globals-$STAMP.sql"; do
+                    az storage blob upload --auth-mode login --account-name "$PG_BACKUP_STORAGE_ACCOUNT" -c pg-backups \
+                      -n "$P/$f" -f "/backup/$f" --overwrite false -o none
+                    echo "uploaded $P/$f"
+                  done
+              env:
+                - name: AZURE_TENANT_ID
+                  valueFrom: { configMapKeyRef: { name: azure-identity, key: TENANT_ID } }
+                - name: AZURE_CLIENT_ID
+                  valueFrom: { configMapKeyRef: { name: azure-identity, key: PG_BACKUP_CLIENT_ID } }
+                - name: PG_BACKUP_STORAGE_ACCOUNT
+                  valueFrom: { configMapKeyRef: { name: azure-identity, key: PG_BACKUP_STORAGE_ACCOUNT } }
+                - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
+              resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }
+              volumeMounts:
+                - { name: backup, mountPath: /backup, readOnly: true }
+                - { name: azure-identity-token, mountPath: /var/run/secrets/azure/tokens, readOnly: true }
+          volumes:
+            - name: backup
+              emptyDir: {}
+            - name: azure-identity-token
+              projected:
+                sources:
+                  - serviceAccountToken: { audience: api://AzureADTokenExchange, expirationSeconds: 3600, path: azure-identity-token }

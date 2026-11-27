@@ -72,9 +72,9 @@ Stores' own databases are on AWS and are not part of this copy, so there is no p
 
 ## Prerequisites
 
-1. Postgres `jeffi-prod-pg` created (waits on the Microsoft quota) and `deploy/azure/pg-init.sh --apply` done.
+1. The self-hosted Postgres pod `flagship-postgres-0` running on the core (`pg-disk.sh --apply`, `postgres.yaml` applied) and `deploy/azure/pg-init.sh --apply` done. The scripts reach it through `kubectl port-forward` on local port `AZ_PG_PORT` (15433, apart from the RDS tunnel's 15432).
 2. Kubeconfig at `~/.kube/jeffi-azure.yaml`; IRSA (README step 7) and the overlay values (step 8) done. `CLUSTER_INGRESS_IP` is a REPLACE_ME until the AWS edge exists: pass `--ingress-ip <ip>` for the rehearsal.
-3. `az login`, AWS credentials, Tailscale up and accepting routes. `jq` installed.
+3. `az login`, AWS credentials, Tailscale up (the Azure kubeconfig's API address; no subnet route needed). `jq` installed.
 4. For `--restore` or `restore-dump.sh`: docker running, and the core's SSH key or `session-manager-plugin`.
 5. For `rehearse.sh --apply`: `certs/ca-cert.pem` and friends in the repo root (`secrets.sh`); for the store round trip, a file with an administrator's `Cookie: ...` header line.
 

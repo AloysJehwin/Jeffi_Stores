@@ -90,7 +90,7 @@ step_final_dump_restore() {
     mj=$(cat "$RUN_DIR/pg_major"); lm=$(pg_restore --version 2>/dev/null | grep -oE "[0-9]+" | head -1 || true)
     # The local client when it is at least the dump version, else the matching image; the password file is mounted, never passed.
     if [ "${lm:-0}" -ge "$mj" ]; then run=(pg_restore); in=$RUN_DIR
-    else run=(docker run --rm -e PGPASSFILE=/run/pgpass -e PGHOST -e PGPORT -e PGUSER -e PGSSLMODE -v "$PGPASSFILE:/run/pgpass:ro" -v "$RUN_DIR:/in:ro" "postgres:$mj-alpine" pg_restore); in=/in; fi
+    else run=(docker run --rm -e PGPASSFILE=/run/pgpass -e PGHOST=host.docker.internal -e PGPORT -e PGUSER -e PGSSLMODE -v "$PGPASSFILE:/run/pgpass:ro" -v "$RUN_DIR:/in:ro" "postgres:$mj-alpine" pg_restore); in=/in; fi
     tables=$("${run[@]}" -l "$in/jeffi_stores.dump" | grep -cE "; [0-9]+ [0-9]+ TABLE public " || true)
     rc=0; (pg_env; "${run[@]}" "${flags[@]}" -d jeffi_stores "$in/jeffi_stores.dump") > "$RUN_DIR/restore.log" 2>&1 || rc=$?
     echo "   pg_restore exit $rc, $(grep -c "^pg_restore: error" "$RUN_DIR/restore.log" || true) error line(s); log $RUN_DIR/restore.log"
