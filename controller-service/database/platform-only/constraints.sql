@@ -23,3 +23,12 @@ ALTER TABLE ONLY public.outreach_messages ADD CONSTRAINT outreach_messages_pkey 
 ALTER TABLE ONLY public.outreach_messages ADD CONSTRAINT outreach_messages_direction_check CHECK ((direction = ANY (ARRAY['in'::text, 'out'::text])));
 ALTER TABLE ONLY public.outreach_suppressions ADD CONSTRAINT outreach_suppressions_pkey PRIMARY KEY (phone);
 ALTER TABLE ONLY public.outreach_events ADD CONSTRAINT outreach_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.outreach_skills ADD CONSTRAINT outreach_skills_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.outreach_skill_versions ADD CONSTRAINT outreach_skill_versions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.outreach_skill_versions ADD CONSTRAINT outreach_skill_versions_skill_version_key UNIQUE (skill_id, version);
+ALTER TABLE ONLY public.outreach_skill_versions ADD CONSTRAINT outreach_skill_versions_source_check CHECK ((source = ANY (ARRAY['upload'::text, 'builtin'::text])));
+ALTER TABLE ONLY public.outreach_agent_runs ADD CONSTRAINT outreach_agent_runs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.outreach_agent_runs ADD CONSTRAINT outreach_agent_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'handed_off'::text, 'completed'::text, 'stopped'::text])));
+ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_kind_check CHECK ((kind = ANY (ARRAY['call'::text, 'whatsapp_turn'::text])));
+ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'done'::text, 'cancelled'::text, 'failed'::text])));

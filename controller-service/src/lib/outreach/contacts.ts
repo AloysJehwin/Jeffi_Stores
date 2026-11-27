@@ -1,4 +1,6 @@
 import { outreachPool } from './db'
+import * as runs from './agent/runs'
+import type { AgentRunRow, AgentTaskRow } from './agent/types'
 import { MAX_ATTEMPTS } from './state'
 import { normalizePhone } from './phone'
 import type { ContactStatus, OutreachCall, OutreachContact, OutreachEvent, OutreachMessage } from './types'
@@ -57,18 +59,23 @@ export interface ContactDetail {
   calls: OutreachCall[]
   messages: OutreachMessage[]
   events: OutreachEvent[]
+  agent: { run: AgentRunRow | null; tasks: AgentTaskRow[] }
 }
 
 export async function getContactDetail(id: string): Promise<ContactDetail | null> {
   const contact = await getContact(id)
   if (!contact) return null
   const pool = outreachPool()
-  const [calls, messages, events] = await Promise.all([
+  const [calls, messages, events, open, tasks] = await Promise.all([
     pool.query(`SELECT * FROM outreach_calls WHERE contact_id = $1 ORDER BY created_at DESC`, [id]),
     pool.query(`SELECT * FROM outreach_messages WHERE contact_id = $1 ORDER BY created_at DESC`, [id]),
     pool.query(`SELECT * FROM outreach_events WHERE contact_id = $1 ORDER BY id DESC LIMIT 200`, [id]),
+    runs.getOpenRun(id),
+    runs.listTasks(id),
   ])
-  return { contact, calls: calls.rows, messages: messages.rows, events: events.rows }
+  // The open run, else the latest one.
+  const run = open ?? ((await pool.query(`SELECT * FROM outreach_agent_runs WHERE contact_id = $1 ORDER BY started_at DESC LIMIT 1`, [id])).rows[0] as AgentRunRow | undefined) ?? null
+  return { contact, calls: calls.rows, messages: messages.rows, events: events.rows, agent: { run, tasks } }
 }
 
 export const ACTIVE_STATUSES: ContactStatus[] = ['interested', 'building', 'preview_sent', 'published', 'claimed']

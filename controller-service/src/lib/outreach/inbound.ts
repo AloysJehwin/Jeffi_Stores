@@ -1,23 +1,23 @@
-import { aiChat, type AiChatMessage, type AiToolDef } from '@/lib/shared/ai-client'
 import { markWhatsAppRead } from '@/lib/shared/whatsapp'
 import { detectLang } from '@/lib/support/translate'
-import { languageLabel } from '@/lib/support/types'
 import { outreachPool } from './db'
 import { recordEvent } from './events'
 import { findActiveByPhone } from './contacts'
 import { InvalidTransitionError, transition } from './state'
 import { captureMode, recordInbound, sendOutreachText } from './whatsapp'
-import { mergeBrief, requestChange, type OutreachBrief } from './build'
+import { runAgentTurn } from './agent/runtime'
+import { OPT_OUT_CONFIRMATION } from './agent/wa-lines'
+import type { OutreachBrief } from './build'
 import { LANGUAGES, type OutreachContact, type OutreachLanguage } from './types'
+
+export { OPT_OUT_CONFIRMATION }
 
 // WhatsApp from an owner the outreach program is talking to (interested…claimed, last 30 days). The webhook sends
 // it here before the shopper bot and never forwards it on. STOP in any supported language opts out at once (one
-// confirmation); anything else is one Claude slot-filling turn that updates the brief or asks for a change through
-// build.ts, then replies in the owner's language inside the 24h window.
+// confirmation); anything else is an agent turn (agent/runtime.ts runAgentTurn) running the contact's skill, which
+// replies in the owner's language inside the 24h window.
 
 const ACTOR = 'outreach:whatsapp'
-const MAX_ITERATIONS = 4
-const HISTORY = 12
 
 const clean = (s: string) =>
   s.normalize('NFC').replace(/[​-‍﻿]/g, '').replace(/[’‘`]/g, "'").toLowerCase().replace(/\s+/g, ' ').trim()
@@ -54,23 +54,6 @@ export function isOptOut(text: string): boolean {
   return STOP_WORDS.includes(bare) || STOP_PHRASES.some(p => t.includes(p))
 }
 
-export const OPT_OUT_CONFIRMATION: Record<OutreachLanguage, string> = {
-  en: "Done. We won't send you any more WhatsApp messages. Sorry for the trouble.",
-  hi: 'ठीक है। अब हम आपको WhatsApp पर कोई संदेश नहीं भेजेंगे। असुविधा के लिए क्षमा करें।',
-  ta: 'சரி. இனி உங்களுக்கு WhatsApp-இல் எந்த செய்தியும் அனுப்ப மாட்டோம். சிரமத்திற்கு மன்னிக்கவும்.',
-  te: 'సరే. ఇకపై మీకు WhatsApp లో ఎలాంటి సందేశాలు పంపము. అసౌకర్యానికి క్షమించండి.',
-  kn: 'ಸರಿ. ಇನ್ನು ಮುಂದೆ ನಿಮಗೆ WhatsApp ನಲ್ಲಿ ಯಾವುದೇ ಸಂದೇಶ ಕಳುಹಿಸುವುದಿಲ್ಲ. ತೊಂದರೆಗಾಗಿ ಕ್ಷಮಿಸಿ.',
-  ml: 'ശരി. ഇനി നിങ്ങൾക്ക് WhatsApp-ൽ സന്ദേശങ്ങൾ അയക്കില്ല. ബുദ്ധിമുട്ടിന് ക്ഷമിക്കണം.',
-  mr: 'ठीक आहे. यापुढे आम्ही तुम्हाला WhatsApp वर कोणताही संदेश पाठवणार नाही. त्रासाबद्दल क्षमस्व.',
-  bn: 'ঠিক আছে। আমরা আর আপনাকে WhatsApp-এ কোনো বার্তা পাঠাব না। অসুবিধার জন্য দুঃখিত।',
-  gu: 'બરાબર. હવે અમે તમને WhatsApp પર કોઈ સંદેશ નહીં મોકલીએ. તકલીફ બદલ માફ કરશો.',
-}
-
-const FALLBACK_REPLY = {
-  en: 'Thanks, we have your message. Our team will get back to you here shortly.',
-  hi: 'धन्यवाद, आपका संदेश मिल गया है। हमारी टीम जल्द ही यहीं आपको जवाब देगी।',
-}
-
 const isLang = (v: unknown): v is OutreachLanguage => typeof v === 'string' && (LANGUAGES as readonly string[]).includes(v)
 
 /** The language to answer in: the one this message is written in when we can tell, else the contact's. */
@@ -91,7 +74,7 @@ export interface OutreachInbound {
 export type InboundResult =
   | { action: 'duplicate' }
   | { action: 'opted_out'; confirmed: boolean }
-  | { action: 'replied' | 'no_reply' | 'fallback'; reply?: string; tools: string[] }
+  | { action: 'replied' | 'no_reply' | 'fallback' | 'paused' | 'budget'; reply?: string; tools: string[] }
 
 /**
  * The webhook's hook. True when the sender is an active outreach contact: the message is handled here (even when
@@ -121,7 +104,9 @@ export async function handleOutreachInbound(contact: OutreachContact, m: Outreac
   if (m.providerMessageId && !captureMode()) void markWhatsAppRead(m.providerMessageId, 'customer')
   const lang = replyLanguage(contact, m.text)
   if (isOptOut(m.text)) return { action: 'opted_out', confirmed: await optOut(contact, lang, { via: 'keyword', text: m.text }) }
-  return runTurn(contact, lang)
+  const r = await runAgentTurn({ contact, channel: 'whatsapp', trigger: { kind: 'inbound', messageId: stored.messageId }, language: lang })
+  if (r.action === 'opted_out') return { action: 'opted_out', confirmed: r.confirmed ?? false }
+  return { action: r.action, ...(r.reply ? { reply: r.reply } : {}), tools: r.tools }
 }
 
 /** Status opted_out, the number on the suppression list, and one confirmation. False when it was already done. */
@@ -140,45 +125,6 @@ export async function optOut(contact: Pick<OutreachContact, 'id' | 'phone'>, lan
   const sent = await sendOutreachText(contact.id, OPT_OUT_CONFIRMATION[lang], { actor: ACTOR, optOutConfirmation: true })
   return sent.ok
 }
-
-const TOOLS: AiToolDef[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'update_details',
-      description: 'Save business details the owner just gave for their website. Only include what they actually said. Returns what is still missing.',
-      parameters: {
-        type: 'object',
-        properties: {
-          what_they_do: { type: 'string', description: 'What the business does or sells' },
-          audience: { type: 'string', description: 'Who their customers are' },
-          highlights: { type: 'array', items: { type: 'string' }, description: 'What makes them special' },
-          contact: {
-            type: 'object',
-            properties: { phone: { type: 'string' }, email: { type: 'string' }, whatsapp: { type: 'string' } },
-            description: 'How customers reach them',
-          },
-          hours: { type: 'string', description: 'Opening hours' },
-          address: { type: 'string', description: 'Shop or office address' },
-          style: { type: 'string', description: 'The look they want' },
-          language: { type: 'string', enum: [...LANGUAGES], description: 'Language of the website' },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'request_change',
-      description: 'Ask for a change to the website (text, photos, colours, sections). Pass their instruction in English.',
-      parameters: { type: 'object', properties: { instruction: { type: 'string' } }, required: ['instruction'] },
-    },
-  },
-  {
-    type: 'function',
-    function: { name: 'opt_out', description: 'The owner asked us to stop messaging or contacting them.', parameters: { type: 'object', properties: {} } },
-  },
-]
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 1000) : undefined)
 
@@ -203,112 +149,4 @@ export function briefFromArgs(a: Record<string, unknown>): OutreachBrief {
   set('style', str(a.style))
   if (isLang(a.language)) b.language = a.language
   return b
-}
-
-function systemPrompt(c: OutreachContact, lang: OutreachLanguage): string {
-  const stage =
-    c.status === 'claimed' ? 'The owner has claimed the site.'
-    : c.status === 'published' ? 'The site is live; the owner has not claimed it yet.'
-    : 'The site is a draft preview the owner is helping us fill in.'
-  return [
-    `You are the WhatsApp assistant of Jeffi Stores, chatting with ${c.owner_name || 'the owner'} of "${c.business_name}"${c.city ? ` in ${c.city}` : ''}.`,
-    'On a phone call they agreed to a free Showcase website that we are building for them. This chat is where they send details or ask for changes.',
-    stage,
-    `Reply in ${languageLabel(lang) || 'English'}. Keep it short: one or two sentences, warm and plain, no markdown, no links.`,
-    'When they give business details, call update_details with only what they actually said. Never invent or guess facts.',
-    'When they ask to change something on the site, call request_change. Never say a change is done unless the tool returned ok.',
-    'update_details tells you what is still missing: ask for at most one missing thing at a time, and do not ask again for something they already gave.',
-    'If they ask us to stop messaging or contacting them, call opt_out.',
-    "If they sincerely ask whether you are a person, say truthfully that you are Jeffi Stores' AI assistant. Never claim to be human.",
-    'For anything else (prices, payments, complaints), say the team will get back to them here.',
-  ].join('\n')
-}
-
-async function transcript(contactId: string): Promise<AiChatMessage[]> {
-  const r = await outreachPool().query(
-    `SELECT direction, body FROM outreach_messages WHERE contact_id = $1 AND body IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT ${HISTORY}`,
-    [contactId]
-  )
-  const out: AiChatMessage[] = []
-  for (const m of (r.rows as { direction: string; body: string }[]).reverse()) {
-    const role = m.direction === 'in' ? 'user' : 'assistant'
-    const content = String(m.body).slice(0, 2000)
-    const last = out[out.length - 1]
-    if (last && last.role === role) last.content += `\n\n${content}`
-    else out.push({ role, content })
-  }
-  while (out.length && out[0].role !== 'user') out.shift()
-  return out
-}
-
-async function runTool(contact: OutreachContact, name: string, args: Record<string, unknown>): Promise<unknown> {
-  if (name === 'update_details') {
-    const brief = briefFromArgs(args)
-    if (!Object.keys(brief).length) return { error: 'No details given' }
-    const res = await mergeBrief(contact.id, brief)
-    await recordEvent(contact.id, 'brief_updated', { actor: ACTOR, data: { via: 'whatsapp', fields: Object.keys(brief), building: res.building, missing: res.missing } })
-    return res
-  }
-  if (name === 'request_change') {
-    const instruction = str(args.instruction)
-    if (!instruction) return { error: 'No instruction given' }
-    const res = await requestChange(contact.id, instruction)
-    await recordEvent(contact.id, 'change_requested', { actor: ACTOR, data: { via: 'whatsapp', instruction, ok: res.ok, summary: res.summary } })
-    return res
-  }
-  return { error: `Unknown tool ${name}` }
-}
-
-async function runTurn(contact: OutreachContact, lang: OutreachLanguage): Promise<InboundResult> {
-  const messages: AiChatMessage[] = [{ role: 'system', content: systemPrompt(contact, lang) }, ...(await transcript(contact.id))]
-  const used: string[] = []
-  let text = ''
-  try {
-    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-      const r = await aiChat({
-        feature: 'outreach_whatsapp',
-        modelHint: 'agent',
-        cacheNamespace: 'platform',
-        temperature: 0.3,
-        maxTokens: 600,
-        noCache: true,
-        messages,
-        tools: iter < MAX_ITERATIONS - 1 ? TOOLS : undefined,
-      })
-      if (!r.toolCalls?.length) {
-        text = r.content
-        break
-      }
-      const calls = r.toolCalls.map((tc, i) => ({ ...tc, id: tc.id || `call_${iter}_${i}` }))
-      if (calls.some(tc => tc.name === 'opt_out')) {
-        return { action: 'opted_out', confirmed: await optOut(contact, lang, { via: 'assistant' }) }
-      }
-      messages.push({
-        role: 'assistant',
-        content: r.content || '',
-        tool_calls: calls.map(tc => ({ id: tc.id, function: { name: tc.name, arguments: tc.arguments } })),
-        providerState: r.providerState,
-      })
-      for (const tc of calls) {
-        used.push(tc.name)
-        let content: string
-        try {
-          content = JSON.stringify(await runTool(contact, tc.name, tc.arguments ?? {})).slice(0, 4000)
-        } catch (e) {
-          content = JSON.stringify({ error: e instanceof Error ? e.message : String(e) })
-        }
-        messages.push({ role: 'tool', tool_call_id: tc.id, content })
-      }
-    }
-  } catch (e) {
-    console.error('[outreach] assistant failed', e instanceof Error ? e.message : e)
-    await recordEvent(contact.id, 'whatsapp_assistant_failed', { actor: ACTOR, data: { error: e instanceof Error ? e.message : String(e), tools: used } })
-    const reply = lang === 'hi' ? FALLBACK_REPLY.hi : FALLBACK_REPLY.en
-    await sendOutreachText(contact.id, reply, { actor: ACTOR })
-    return { action: 'fallback', reply, tools: used }
-  }
-  const reply = text.trim()
-  if (!reply) return { action: 'no_reply', tools: used }
-  await sendOutreachText(contact.id, reply, { actor: ACTOR })
-  return { action: 'replied', reply, tools: used }
 }

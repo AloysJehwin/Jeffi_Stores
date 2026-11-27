@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "8fb750801c4ed26799d3f908ee0199cc201cd4f3a45187c4c7cd707e5fadd12d",
+ "manifestHash": "1781b53da0c8bb010dd664335ea3d2a38964df9edfeca5cedcc14c9983901758",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -50361,6 +50361,25 @@
    "command": "platform outreach-calls get"
   },
   {
+   "id": "platform GET /api/admin/ecom/outreach/catalog",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/catalog",
+   "gatewayPath": "/v1/platform/ecom/outreach/catalog",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/catalog/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET → what a skill can use: the tool catalog, the hard limits, the placeholders, the channels and flows.",
+   "command": "platform outreach catalog"
+  },
+  {
    "id": "platform GET /api/admin/ecom/outreach/contacts",
    "host": "platform",
    "method": "GET",
@@ -50433,7 +50452,9 @@
       "enum": [
        "suppress",
        "requeue",
-       "not_interested"
+       "not_interested",
+       "handoff",
+       "resume"
       ]
      },
      "note": {
@@ -50447,7 +50468,7 @@
    },
    "bodySource": "zod",
    "bodyContentType": "application/json",
-   "summary": "PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested.",
+   "summary": "PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested, and hand the lead to the team / resume the agent.",
    "command": "platform outreach-contacts update"
   },
   {
@@ -50585,6 +50606,62 @@
    "command": "platform outreach-lists create"
   },
   {
+   "id": "platform PATCH /api/admin/ecom/outreach/lists/{id}",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/lists/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/lists/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/lists/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "skill_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "skill_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "skill_id"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH { skill_id, skill_version_id? } → the campaign's skill (null clears it), optionally pinned to one version.",
+   "command": "platform outreach-lists update"
+  },
+  {
    "id": "platform POST /api/admin/ecom/outreach/lists/{id}/sync",
    "host": "platform",
    "method": "POST",
@@ -50689,13 +50766,324 @@
        "maxLength": 20
       },
       "maxItems": 10
+     },
+     "default_skill_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     }
    },
    "bodySource": "zod",
    "bodyContentType": "application/json",
-   "summary": "PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers.",
+   "summary": "PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers, the default skill.",
    "command": "platform outreach program-update"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/skills",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/skills",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/route.ts",
+   "pathParams": [],
+   "query": [
+    "archived",
+    "program"
+   ],
+   "queryParams": [
+    {
+     "name": "archived",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    },
+    {
+     "name": "program",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET ?program&archived=1 → the skills, the builtin starting points and the program's default skill id.",
+   "command": "platform outreach-skills list"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "program": {
+      "type": "string",
+      "default": "showcase-offer"
+     },
+     "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+     }
+    },
+    "required": [
+     "content"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { content } → a new skill (version 1, current). 400 carries the validation, 409 means the name is taken.",
+   "command": "platform outreach-skills create"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/skills/{id}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/skills/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get a skill (outreach)",
+   "command": "platform outreach-skills get"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/outreach/skills/{id}",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/skills/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "current_version_id": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH { title?, description?, current_version_id? } → set the title, description or which version is current.",
+   "command": "platform outreach-skills update"
+  },
+  {
+   "id": "platform DELETE /api/admin/ecom/outreach/skills/{id}",
+   "host": "platform",
+   "method": "DELETE",
+   "path": "/api/admin/ecom/outreach/skills/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "noBody": true,
+   "summary": "DELETE → archive (versions, runs and pinned lists keep working; new runs skip it).",
+   "command": "platform outreach-skills delete"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills/{id}/versions",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills/{id}/versions",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}/versions",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/versions/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+     }
+    },
+    "required": [
+     "content"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { content } → a new version of the skill, made current. 400 carries the validation.",
+   "command": "platform outreach-skills versions"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills/preview",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills/preview",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/preview",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/preview/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "content": {
+      "type": "string",
+      "maxLength": 200000
+     },
+     "versionId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "channel": {
+      "type": "string",
+      "enum": [
+       "voice",
+       "whatsapp",
+       "follow_up"
+      ]
+     },
+     "language": {
+      "type": "string",
+      "maxLength": 10
+     },
+     "contactId": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    "required": [
+     "channel"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST → the exact system prompt, greeting and tool list the agent would get, for a sample or a real contact. No AI call.",
+   "command": "platform outreach-skills preview"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills/validate",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills/validate",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/validate",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/validate/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "content": {
+      "type": "string",
+      "maxLength": 200000
+     }
+    },
+    "required": [
+     "content"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { content } → the validation (errors, warnings, tools) without saving; the admin UI calls it as you type.",
+   "command": "platform outreach-skills validate"
   },
   {
    "id": "platform GET /api/admin/ecom/outreach/suppressions",

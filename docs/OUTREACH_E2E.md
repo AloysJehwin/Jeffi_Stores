@@ -8,7 +8,8 @@ Two harnesses prove the Outreach voice program before anything goes live:
 - **B. Outreach flow** (`tests/outreach-e2e/`, Playwright): CSV import to a claimed Showcase site on a trial, through the
   real controller on `jeffi_test`, with A's simulator answering the call.
 
-Plus **C**, the live test runbook for after deploy.
+Plus **B2**, the agent's skill-driven flow on the real tables (Vitest, no servers), and **C**, the live test runbook
+for after deploy.
 
 ## A. Voice-to-voice harness
 
@@ -269,6 +270,34 @@ change, no `VOICE_SERVICE_URL`, or a `CRON_SECRET` mismatch. A piece that runs a
 
 The same `run.py serve` is how harness A runs against the real controller's session, tools and events: start it, then
 place test calls from the admin Outreach page or this spec. Voice-only runs keep the stub.
+
+## B2. Outreach agent: skill-driven flow (Vitest, DB-backed)
+
+`controller-service/integration-tests/api-db/outreach-agent-e2e.test.ts` drives one test contact through a multi-step,
+multi-channel run of the agent (docs/plans/OUTREACH_AGENT_SKILLS.md) on `jeffi_test`, with no servers:
+
+1. **Skill.** The builtin two-call playbook is uploaded under a test name (`createSkill`) and set on a list; the
+   contact's run pins that version (`skill_ref` `<slug>@v1`).
+2. **Call 1.** The worker's `dialContact` creates the call (voice-client is mocked, so nothing rings). The test then
+   does what voice-service does: `buildVoiceSession` (the skill's First-call text, its voice tools plus `handOff`,
+   the code greeting), `runTool` for recordConsent, startPreview, addDetails and scheduleCallback, and the
+   ringing/answered/ended events. The contact stays `preview_sent`; a `call` task is booked for the callback time and
+   the end of the call queues a `call_ended` follow-up turn (the skill has a Follow-up section).
+3. **WhatsApp.** `handleOutreachInbound` hands the owner's message to the agent; the scripted model calls addDetails
+   and replies; the reply is captured, the brief updated, the gateway turns recorded; a duplicate is ignored.
+4. **Scheduler.** `runDueAgentTasks` runs the follow-up turn (its text is never sent) and then dials the engaged
+   contact: an `agent_call` event, no status move, no extra attempt.
+5. **Call 2.** The session continues (`greetingAgain`, the Second-call text, the details collected so far). Publish is
+   refused until the site is designed and has a contact detail, then goes live: `site_live` and `claim` captured, the
+   claim link nowhere in the audit rows, one run for the whole conversation.
+
+The model is scripted (`setAgentModel`), the site generation (`startRun`) and `placeCall` are mocked, and WhatsApp is
+in capture mode (`OUTREACH_TEST_MODE=1`), so nothing is called, dialled or sent. `jeffi_test` needs the agent tables
+(the `controller-service/database/platform-only/` files). Run it:
+
+```bash
+API_DB=1 DATABASE_URL=postgresql://$USER@localhost:5432/jeffi_test CONTROL_PLANE_DATABASE_URL=postgresql://$USER@localhost:5432/jeffi_test npx vitest run -c vitest.db.config.ts controller-service/integration-tests/api-db/outreach-agent-e2e.test.ts
+```
 
 ## C. Live test runbook (after deploy)
 

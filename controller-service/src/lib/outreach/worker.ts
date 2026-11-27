@@ -85,7 +85,7 @@ export interface DialOptions {
   test?: boolean
 }
 
-async function place(contact: OutreachContact, callId: string, opts: DialOptions, revert: boolean): Promise<{ callId: string; providerCallId: string }> {
+export async function place(contact: OutreachContact, callId: string, opts: DialOptions, revert: boolean): Promise<{ callId: string; providerCallId: string }> {
   const pool = outreachPool()
   try {
     const r = await placeCall({ callId, to: contact.phone, from: opts.from, language: opts.language })
@@ -199,7 +199,7 @@ async function dueContacts(program: string, now: Date, limit: number, maxAttempt
   return r.rows
 }
 
-async function callCounts(program: string, now: Date): Promise<{ today: number; active: number }> {
+export async function callCounts(program: string, now: Date): Promise<{ today: number; active: number }> {
   const r = await outreachPool().query(
     `SELECT count(*) FILTER (WHERE c.created_at >= $2 AND (c.error IS NULL OR c.error NOT LIKE 'dial_failed%'))::int AS today,
             count(*) FILTER (WHERE c.ended_at IS NULL)::int AS active
@@ -327,8 +327,11 @@ export async function runOutreachWorker(now: Date = new Date()): Promise<WorkerR
       continue
     }
     const due = await dueContacts(def.key, now, Math.min(byCap, bySlots), Math.min(def.maxAttempts, MAX_ATTEMPTS), tests)
+    const { planFirstTouch } = await import('./agent/runtime')
     for (const contact of due) {
       try {
+        // The contact's skill decides: ring it, start on WhatsApp, or skip it (no consent for a WhatsApp-only skill).
+        if ((await planFirstTouch(contact, now)) !== 'call') continue
         await dialContact(contact, { language: contact.language ?? 'en', actor: 'worker', from, provider, test: testMode })
         run.placed++
       } catch (e) {

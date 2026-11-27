@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import { signServiceToken } from '@jeffi/service-auth'
 
 const buildSession = vi.hoisted(() => vi.fn())
-vi.mock('@controller/lib/outreach/session', () => ({ buildSession }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ buildVoiceSession: buildSession }))
 
 import { GET } from '@controller/app/api/(internal)/internal/outreach/calls/[callId]/session/route'
 
@@ -17,7 +17,7 @@ const get = (auth?: string, id = CALL) =>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  buildSession.mockResolvedValue({ language: 'en', persona: { name: 'Priya', voiceId: 'ishita' }, systemPrompt: 'p', greeting: 'g', tools: [], maxDurationS: 720, silenceS: 14 })
+  buildSession.mockResolvedValue({ language: 'en', persona: { name: 'Priya', voiceId: 'ishita' }, systemPrompt: 'p', greeting: 'g', tools: [], maxDurationS: 720, silenceS: 14, skillRef: 'showcase-offer/2026-11-24.1' })
 })
 
 describe('GET /api/internal/outreach/calls/[callId]/session', () => {
@@ -32,7 +32,9 @@ describe('GET /api/internal/outreach/calls/[callId]/session', () => {
     const r = await get(token('voice', CALL))
     expect(r.status).toBe(200)
     expect(r.headers.get('cache-control')).toBe('no-store')
-    expect((await r.json()).persona).toEqual({ name: 'Priya', voiceId: 'ishita' })
+    const body = await r.json()
+    expect(body.persona).toEqual({ name: 'Priya', voiceId: 'ishita' })
+    expect(body.skillRef).toBe('showcase-offer/2026-11-24.1')
     expect(buildSession).toHaveBeenCalledWith(CALL)
   })
 

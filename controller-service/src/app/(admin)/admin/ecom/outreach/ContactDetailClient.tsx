@@ -2,16 +2,23 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { api, Badge, btnGhost, when } from '@/components/admin/kit/core'
+import { api, Badge, btnGhost, inputCls, when } from '@/components/admin/kit/core'
 import { Card, Field, Fields } from '@/components/admin/kit/layout'
 import { useActionToast } from '@/components/admin/kit/toast'
+import type { AgentRunRow, AgentTaskRow } from '@controller/lib/outreach/agent/types'
 import type { OutreachCall, OutreachContact, OutreachEvent, OutreachMessage } from '@controller/lib/outreach/types'
 import CallPanelClient from './CallPanelClient'
 import { StatusChip } from './OutreachContactsClient'
-import { API, LANGUAGE_LABEL, maskPhone } from './shared'
+import type { Tone } from '@/components/admin/kit/tones'
+import { API, CHANNEL_LABEL, inr, LANGUAGE_LABEL, maskPhone } from './shared'
 
-type Detail = { contact: OutreachContact; calls: OutreachCall[]; messages: OutreachMessage[]; events: OutreachEvent[] }
-type Action = 'requeue' | 'not_interested' | 'suppress'
+type Detail = { contact: OutreachContact; calls: OutreachCall[]; messages: OutreachMessage[]; events: OutreachEvent[]; agent?: { run: AgentRunRow | null; tasks: AgentTaskRow[] } }
+type Action = 'requeue' | 'not_interested' | 'suppress' | 'handoff' | 'resume'
+
+const RUN_TONE: Record<AgentRunRow['status'], Tone> = { active: 'green', handed_off: 'amber', completed: 'muted', stopped: 'red' }
+const RUN_LABEL: Record<AgentRunRow['status'], string> = { active: 'Active', handed_off: 'Handed off', completed: 'Completed', stopped: 'Stopped' }
+const TASK_TONE: Record<AgentTaskRow['status'], Tone> = { pending: 'blue', running: 'blue', done: 'green', cancelled: 'muted', failed: 'red' }
+const truncate = (t: string | null, n = 80) => (!t ? '-' : t.length > n ? `${t.slice(0, n)}…` : t)
 
 const isUrl = (v: unknown): v is string => typeof v === 'string' && /^https?:\/\//.test(v)
 
@@ -37,6 +44,7 @@ export default function ContactDetailClient({ contactId }: { contactId: string }
   const [d, setD] = useState<Detail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<Action | null>(null)
+  const [reason, setReason] = useState('')
 
   const load = useCallback(async () => {
     const { ok, data } = await api<Detail>(`${API}/contacts/${contactId}`)
@@ -47,13 +55,17 @@ export default function ContactDetailClient({ contactId }: { contactId: string }
     load()
   }, [load])
 
-  async function act(action: Action) {
+  async function act(action: Action, note?: string) {
     setBusy(action)
-    const { ok, data } = await api<Detail>(`${API}/contacts/${contactId}`, { method: 'PATCH', json: { action } })
+    const { ok, data } = await api<Detail>(`${API}/contacts/${contactId}`, { method: 'PATCH', json: { action, ...(note ? { note } : {}) } })
     setBusy(null)
     if (!ok) return toast.error(data.error || 'Could not update the contact')
     setD(data)
-    toast.success('Updated')
+    if (action === 'handoff' || action === 'resume') {
+      setReason('')
+      if (!data.agent) load()
+    }
+    toast.success(action === 'handoff' ? 'Handed off to the team' : action === 'resume' ? 'Agent resumed' : 'Updated')
   }
 
   if (error) return <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
@@ -135,6 +147,8 @@ export default function ContactDetailClient({ contactId }: { contactId: string }
         </Card>
       </div>
 
+      {d.agent && <AgentCard contact={c} agent={d.agent} canWrite={canWrite} busy={busy} reason={reason} setReason={setReason} act={act} />}
+
       <div className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Calls</h2>
         {!calls.length && <p className="text-sm text-foreground-muted">No calls yet.</p>}
@@ -166,5 +180,97 @@ export default function ContactDetailClient({ contactId }: { contactId: string }
         )}
       </Card>
     </div>
+  )
+}
+
+function AgentCard({ contact: c, agent, canWrite, busy, reason, setReason, act }: {
+  contact: OutreachContact
+  agent: { run: AgentRunRow | null; tasks: AgentTaskRow[] }
+  canWrite: boolean
+  busy: Action | null
+  reason: string
+  setReason: (s: string) => void
+  act: (a: Action, note?: string) => void
+}) {
+  const { run, tasks } = agent
+  const handedOff = !!c.handoff_at || run?.status === 'handed_off'
+  return (
+    <Card
+      title="Agent"
+      hint="The AI agent's run for this contact: where it is, what it has scheduled and when a person took over."
+      action={run && <Badge tone={RUN_TONE[run.status]}>{RUN_LABEL[run.status]}</Badge>}
+    >
+      <div className="space-y-4">
+        {!run ? (
+          <p className="text-sm text-foreground-muted">The agent has not started on this contact yet.</p>
+        ) : (
+          <Fields cols={3}>
+            <Field label="Skill" value={<span className="font-mono text-xs break-all">{run.skill_ref}</span>} />
+            <Field label="Turns" value={`${run.turns}`} />
+            <Field label="Spend" value={<span className="tabular-nums">{inr(run.spend_paise)}</span>} />
+            <Field label="Last channel" value={run.last_channel ? CHANNEL_LABEL[run.last_channel] ?? run.last_channel : '-'} />
+            <Field label="Last turn" value={when(run.last_turn_at)} />
+            <Field label="Started" value={when(run.started_at)} />
+          </Fields>
+        )}
+
+        {handedOff && (
+          <p className="rounded-lg bg-surface-secondary p-3 text-sm">
+            Handed off to the team{c.handoff_at ? ` on ${when(c.handoff_at)}` : ''}. {c.handoff_reason ? `Reason: ${c.handoff_reason}` : 'No reason recorded.'} The agent stays quiet until you resume it.
+          </p>
+        )}
+
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-1">Scheduled tasks</h3>
+          {!tasks.length ? (
+            <p className="text-sm text-foreground-muted">No tasks.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-foreground-muted border-b border-border-default">
+                    <th className="py-1.5 pr-3">Kind</th>
+                    <th className="py-1.5 pr-3">Due</th>
+                    <th className="py-1.5 pr-3">Status</th>
+                    <th className="py-1.5 pr-3">Reason</th>
+                    <th className="py-1.5 pr-3">Instruction</th>
+                    <th className="py-1.5">Attempts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map(t => (
+                    <tr key={t.id} className="border-t border-border-default/60 align-top">
+                      <td className="py-1.5 pr-3 whitespace-nowrap">{t.kind === 'call' ? 'Call' : 'WhatsApp turn'}</td>
+                      <td className="py-1.5 pr-3 whitespace-nowrap">{when(t.due_at)}</td>
+                      <td className="py-1.5 pr-3"><Badge tone={TASK_TONE[t.status]}>{t.status}</Badge></td>
+                      <td className="py-1.5 pr-3">{t.reason || '-'}</td>
+                      <td className="py-1.5 pr-3 max-w-xs" title={t.instruction ?? undefined}>{truncate(t.instruction)}</td>
+                      <td className="py-1.5 tabular-nums">{t.attempts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {canWrite && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            {handedOff ? (
+              <button type="button" className={btnGhost} disabled={!!busy} onClick={() => act('resume')}>
+                Resume agent
+              </button>
+            ) : (
+              <>
+                <input aria-label="Hand-off reason" className={`${inputCls} sm:max-w-sm`} placeholder="Reason (optional)" value={reason} maxLength={200} onChange={e => setReason(e.target.value)} />
+                <button type="button" className={btnGhost} disabled={!!busy} onClick={() => act('handoff', reason.trim() || undefined)}>
+                  Hand off to team
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
   )
 }

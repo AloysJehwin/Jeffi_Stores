@@ -7,7 +7,7 @@ import { api, Badge, btnPrimary, inputCls, Kpi, KpiGrid } from '@/components/adm
 import { Card } from '@/components/admin/kit/layout'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { LANGUAGES, type OutreachProgramState } from '@controller/lib/outreach/types'
-import { API, BASE, isE164, LANGUAGE_LABEL, STATUS_LABEL } from './shared'
+import { API, BASE, isE164, LANGUAGE_LABEL, STATUS_LABEL, type SkillSummary } from './shared'
 
 type View = { program: { key: string; title: string }; state: OutreachProgramState; counts: Record<string, number> }
 
@@ -25,6 +25,7 @@ export default function OutreachProgramClient() {
   const [testLang, setTestLang] = useState('en')
   const [calling, setCalling] = useState(false)
   const [callId, setCallId] = useState<string | null>(null)
+  const [skills, setSkills] = useState<SkillSummary[]>([])
 
   const apply = useCallback((v: View) => {
     setView(v)
@@ -36,6 +37,9 @@ export default function OutreachProgramClient() {
   useEffect(() => {
     api<View>(`${API}/program`).then(({ ok, data }) => (ok ? apply(data) : setError(data.error || 'Could not load the program')))
   }, [apply])
+  useEffect(() => {
+    api<{ skills: SkillSummary[] }>(`${API}/skills?program=showcase-offer`).then(({ ok, data }) => ok && setSkills(data.skills.filter(s => !s.archived_at)))
+  }, [])
 
   async function patch(body: Record<string, unknown>, done: string) {
     setSaving(true)
@@ -109,6 +113,19 @@ export default function OutreachProgramClient() {
             Save settings
           </button>
         </div>
+      </Card>
+
+      <Card title="Default skill" hint="What the agent follows for contacts whose list has no skill of its own. Applies to new runs; calls in progress keep theirs.">
+        <label className="text-xs text-foreground-muted space-y-1 block sm:w-96">
+          Default skill
+          <select aria-label="Default skill" className={inputCls} value={state.default_skill_id ?? ''} disabled={!canWrite || saving} onChange={e => patch({ default_skill_id: e.target.value || null }, 'Default skill saved')}>
+            <option value="">Builtin: Showcase offer (default)</option>
+            {state.default_skill_id && !skills.some(s => s.id === state.default_skill_id) && <option value={state.default_skill_id}>Archived skill</option>}
+            {skills.map(s => (
+              <option key={s.id} value={s.id}>{s.title}</option>
+            ))}
+          </select>
+        </label>
       </Card>
 
       <Card title="Test numbers" hint="Only these numbers can receive a test call. One per line, E.164.">

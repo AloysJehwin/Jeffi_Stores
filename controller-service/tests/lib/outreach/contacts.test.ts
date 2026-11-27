@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const query = vi.fn()
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query }) }))
 
-import { dueForCalling, findActiveByPhone, listContacts } from '@controller/lib/outreach/contacts'
+import { dueForCalling, findActiveByPhone, getContactDetail, listContacts } from '@controller/lib/outreach/contacts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -59,5 +59,36 @@ describe('listContacts', () => {
     expect(sql).toContain('ILIKE $4')
     expect(sql).toContain('LIMIT 20 OFFSET 40')
     expect(params).toEqual(['showcase-offer', ['queued', 'no_answer'], 'l1', '%sri%'])
+  })
+})
+
+describe('getContactDetail', () => {
+  const answer = (rows: Record<string, unknown[]>) =>
+    query.mockImplementation(async (sql: string) => {
+      const key = Object.keys(rows).find(k => sql.includes(k))
+      return { rows: key ? rows[key] : [] }
+    })
+
+  it('carries the contact, its history and the agent run with its tasks', async () => {
+    answer({
+      'FROM outreach_contacts WHERE id': [{ id: 'k1' }],
+      "status IN ('active', 'handed_off')": [{ id: 'r1', status: 'active' }],
+      'FROM outreach_agent_tasks': [{ id: 't1', kind: 'call' }],
+    })
+    const d = await getContactDetail('k1')
+    expect(d!.contact).toEqual({ id: 'k1' })
+    expect(d!.agent).toEqual({ run: { id: 'r1', status: 'active' }, tasks: [{ id: 't1', kind: 'call' }] })
+  })
+
+  it('falls back to the latest run when none is open, and to null when there never was one', async () => {
+    answer({ 'FROM outreach_contacts WHERE id': [{ id: 'k1' }], 'contact_id = $1 ORDER BY started_at DESC LIMIT 1': [{ id: 'r0', status: 'completed' }] })
+    expect((await getContactDetail('k1'))!.agent.run).toEqual({ id: 'r0', status: 'completed' })
+    answer({ 'FROM outreach_contacts WHERE id': [{ id: 'k1' }] })
+    expect((await getContactDetail('k1'))!.agent).toEqual({ run: null, tasks: [] })
+  })
+
+  it('is null for an unknown contact', async () => {
+    answer({})
+    expect(await getContactDetail('nope')).toBeNull()
   })
 })

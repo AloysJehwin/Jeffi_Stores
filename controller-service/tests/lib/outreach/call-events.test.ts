@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   readVoiceSettings: vi.fn(),
   getProgramState: vi.fn(),
   presign: vi.fn(),
+  onCallEnded: vi.fn(),
 }))
 vi.mock('@controller/lib/outreach/db', () => ({ outreachPool: () => ({ query: h.query }) }))
 vi.mock('@controller/lib/outreach/worker', async orig => ({
@@ -16,6 +17,7 @@ vi.mock('@controller/lib/outreach/worker', async orig => ({
   redialContact: h.redialContact,
 }))
 vi.mock('@controller/lib/outreach/tools', () => ({ applyOptOut: h.applyOptOut }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ onCallEnded: h.onCallEnded }))
 vi.mock('@controller/lib/outreach/session', () => ({ readVoiceSettings: h.readVoiceSettings, loadCallContext: vi.fn() }))
 vi.mock('@controller/lib/outreach/program-state', () => ({ getProgramState: h.getProgramState, WINDOW_MIN: '09:30', WINDOW_MAX: '20:30' }))
 vi.mock('@/lib/shared/s3', () => ({ presignPlatformObjectGet: h.presign }))
@@ -170,6 +172,33 @@ describe('handleCallEvent', () => {
     redials = 0
     await handleCallEvent(CALL, { type: 'ended', data: { redialLanguage: 'ta' } }, new Date('2026-11-25T16:00:00Z'))
     expect(h.redialContact).not.toHaveBeenCalled()
+  })
+})
+
+describe('the agent follow-up after a terminal event', () => {
+  it('asks the runtime once the contact has been settled, with the event type', async () => {
+    contact.status = 'preview_sent'
+    await ev('ended', { durationS: 300 })
+    expect(h.onCallEnded).toHaveBeenCalledWith(CALL, 'ended', NOW)
+    h.onCallEnded.mockClear()
+    await ev('no_answer', { reason: 'no_answer' })
+    expect(h.onCallEnded).toHaveBeenCalledWith(CALL, 'no_answer', NOW)
+  })
+
+  it('does not follow up a duplicate terminal event, nor a ring-back in another language', async () => {
+    terminalRow = null
+    await ev('ended', { durationS: 1 })
+    expect(h.onCallEnded).not.toHaveBeenCalled()
+    terminalRow = { id: CALL, contact_id: 'k1', outcome: null, recording_key: null }
+    await ev('ended', { durationS: 30, redialLanguage: 'ta' })
+    expect(h.redialContact).toHaveBeenCalled()
+    expect(h.onCallEnded).not.toHaveBeenCalled()
+  })
+
+  it('a failing follow-up never breaks the events route', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.onCallEnded.mockRejectedValueOnce(new Error('boom'))
+    expect((await ev('ended', { durationS: 5 })).status).toBe(200)
   })
 })
 

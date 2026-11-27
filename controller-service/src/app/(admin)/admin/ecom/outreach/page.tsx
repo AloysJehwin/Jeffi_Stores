@@ -5,6 +5,7 @@ import { PageBody, PageHeader, TabLinks } from '@/components/admin/kit'
 import { BASE, TABS, type OutreachTab } from './shared'
 import OutreachProgramClient from './OutreachProgramClient'
 import OutreachListsClient from './OutreachListsClient'
+import OutreachSkillsClient from './OutreachSkillsClient'
 import OutreachContactsClient from './OutreachContactsClient'
 import OutreachSuppressionsClient from './OutreachSuppressionsClient'
 
@@ -24,6 +25,7 @@ export default async function OutreachPage({ searchParams }: { searchParams: Pro
       </div>
       {tab === 'program' && <OutreachProgramClient />}
       {tab === 'lists' && <OutreachListsClient />}
+      {tab === 'skills' && <OutreachSkillsClient />}
       {tab === 'contacts' && <OutreachContactsClient />}
       {tab === 'suppressions' && <OutreachSuppressionsClient />}
     </PageBody>

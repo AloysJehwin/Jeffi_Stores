@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { outreachGuard, firstIssue, serverError } from '@controller/lib/outreach/guard'
 import { getContactDetail } from '@controller/lib/outreach/contacts'
 import { addSuppression } from '@controller/lib/outreach/suppress'
+import { ensureRun } from '@controller/lib/outreach/agent/runtime'
+import * as runs from '@controller/lib/outreach/agent/runs'
 import { transition, InvalidTransitionError, ContactNotFoundError } from '@controller/lib/outreach/state'
 
 export const dynamic = 'force-dynamic'
@@ -24,11 +26,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 const Patch = z.object({
-  action: z.enum(['suppress', 'requeue', 'not_interested']),
+  action: z.enum(['suppress', 'requeue', 'not_interested', 'handoff', 'resume']),
   note: z.string().trim().max(500).optional(),
 })
 
-// PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested.
+// PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested, and hand the lead to the team / resume the agent.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await outreachGuard(req, 'write')
   if (admin instanceof NextResponse) return admin
@@ -48,6 +50,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'This contact opted out or is on DND and cannot be requeued' }, { status: 409 })
       }
       await transition(contact, 'queued', { actor: admin.label, data: { note: note ?? null }, set: { attempts: 0, next_attempt_at: new Date() } })
+    } else if (action === 'handoff') {
+      await ensureRun(contact)
+      await runs.handOff({ contactId: id, reason: note ?? 'Handed off by an admin', channel: 'follow_up', actor: admin.label, now: new Date() })
+    } else if (action === 'resume') {
+      if (!(await runs.resume(id, admin.label, new Date()))) return NextResponse.json({ error: 'Nothing is handed off for this contact' }, { status: 409 })
     } else {
       await transition(contact, 'not_interested', { actor: admin.label, data: { note: note ?? null } })
     }

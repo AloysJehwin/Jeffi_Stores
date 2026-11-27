@@ -4,6 +4,7 @@ import { getProgramState } from './program-state'
 import { asLanguage, isLanguage } from './prompt'
 import { readVoiceSettings } from './session'
 import { applyOptOut } from './tools'
+import { onCallEnded } from './agent/runtime'
 import { inCallingWindow, redialContact, retryOrFail } from './worker'
 import type { CallOutcome, CallStatus, OutreachCall, OutreachContact, OutreachEvent } from './types'
 
@@ -168,7 +169,15 @@ export async function handleCallEvent(callId: string, input: CallEventInput, now
       ...(redial ? { redialLanguage: redial } : {}),
     },
   })
-  await settleContact(call, type, redial, now)
+  const redialed = await settleContact(call, type, redial, now)
+  // A language ring-back continues the same conversation, so nothing follows up yet.
+  if (!redialed) {
+    try {
+      await onCallEnded(callId, type, now)
+    } catch (e) {
+      console.error('[outreach] onCallEnded failed:', (e as Error)?.message)
+    }
+  }
   return { status: 200, body: { ok: true } }
 }
 
@@ -210,22 +219,23 @@ async function tryRedial(contact: OutreachContact, call: OutreachCall, language:
 }
 
 /** The contact after a terminal event. Only the contact's latest call may move it. */
-async function settleContact(call: OutreachCall, type: CallEventType, redial: string | null, now: Date): Promise<void> {
+async function settleContact(call: OutreachCall, type: CallEventType, redial: string | null, now: Date): Promise<boolean> {
   const r = await outreachPool().query(`SELECT * FROM outreach_contacts WHERE id = $1`, [call.contact_id])
   const contact = r.rows[0] as OutreachContact | undefined
-  if (!contact) return
+  if (!contact) return false
   if (call.outcome === 'opted_out' && contact.status !== 'opted_out' && contact.status !== 'suppressed') {
     await applyOptOut(contact, call.id, now)
-    return
+    return false
   }
-  if (contact.last_call_id && contact.last_call_id !== call.id) return
-  if (redial && (await tryRedial(contact, call, redial, now))) return
+  if (contact.last_call_id && contact.last_call_id !== call.id) return false
+  if (redial && (await tryRedial(contact, call, redial, now))) return true
   if (contact.status === 'calling') {
     if (type === 'ended') await setOutcome(call.id, 'incomplete')
     await retryOrFail(contact, now, { actor: 'voice', callId: call.id, reason: type === 'ended' ? 'incomplete' : type })
-    return
+    return false
   }
   if (type === 'ended' && ENGAGED.has(contact.status)) {
     await setOutcome(call.id, contact.status === 'published' || contact.status === 'claimed' ? 'published' : 'interested')
   }
+  return false
 }

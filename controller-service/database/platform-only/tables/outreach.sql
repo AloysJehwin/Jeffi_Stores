@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.outreach_program_state (
     window_start time without time zone NOT NULL DEFAULT '09:30',
     window_end time without time zone NOT NULL DEFAULT '20:30',
     test_numbers text[] NOT NULL DEFAULT '{}',
+    default_skill_id uuid,
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_by uuid
 );
@@ -22,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.outreach_lists (
     file_key text,
     row_count integer NOT NULL DEFAULT 0,
     last_synced_at timestamp with time zone,
+    skill_id uuid,
+    skill_version_id uuid,
     created_by uuid,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now()
@@ -53,6 +56,8 @@ CREATE TABLE IF NOT EXISTS public.outreach_contacts (
     dnd_status text NOT NULL DEFAULT 'unknown',
     dnd_checked_at timestamp with time zone,
     wa_window_expires_at timestamp with time zone,
+    handoff_at timestamp with time zone,
+    handoff_reason text,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -107,4 +112,67 @@ CREATE TABLE IF NOT EXISTS public.outreach_events (
     data jsonb,
     actor text,
     created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Outreach agent (docs/plans/OUTREACH_AGENT_SKILLS.md): skills are Markdown playbooks uploaded per store (tenant_id
+-- NULL = the flagship), versioned; a run pins one skill version for a contact across calls and WhatsApp; tasks are
+-- the scheduled wake-ups (a follow-up call or a WhatsApp turn) that carry a run over days.
+
+CREATE TABLE IF NOT EXISTS public.outreach_skills (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id uuid,
+    program text NOT NULL,
+    slug text NOT NULL,
+    title text NOT NULL,
+    description text,
+    current_version_id uuid,
+    archived_at timestamp with time zone,
+    created_by uuid,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.outreach_skill_versions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    skill_id uuid NOT NULL,
+    version integer NOT NULL,
+    content text NOT NULL,
+    meta jsonb NOT NULL DEFAULT '{}',
+    sha256 text NOT NULL,
+    validation jsonb NOT NULL DEFAULT '{}',
+    source text NOT NULL DEFAULT 'upload',
+    created_by uuid,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.outreach_agent_runs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    contact_id uuid NOT NULL,
+    skill_version_id uuid,
+    skill_ref text NOT NULL,
+    status text NOT NULL DEFAULT 'active',
+    turns integer NOT NULL DEFAULT 0,
+    spend_paise integer NOT NULL DEFAULT 0,
+    last_channel text,
+    last_turn_at timestamp with time zone,
+    notes jsonb NOT NULL DEFAULT '[]',
+    started_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    ended_at timestamp with time zone
+);
+
+CREATE TABLE IF NOT EXISTS public.outreach_agent_tasks (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    run_id uuid NOT NULL,
+    contact_id uuid NOT NULL,
+    kind text NOT NULL,
+    due_at timestamp with time zone NOT NULL,
+    reason text,
+    instruction text,
+    status text NOT NULL DEFAULT 'pending',
+    attempts integer NOT NULL DEFAULT 0,
+    result jsonb,
+    created_by text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    done_at timestamp with time zone
 );

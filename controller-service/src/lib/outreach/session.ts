@@ -1,10 +1,11 @@
 import { mergeVoiceSettings, VOICE_PROVIDERS, type VoiceProviderName, type VoiceSettings } from '@/lib/providers/voice-settings'
 import { outreachPool } from './db'
-import { getProgramState } from './program-state'
-import { LINES, PERSONA_NAMES, SCRIPT_VERSION, TOOL_SCHEMAS, asLanguage, greeting, systemPrompt, type KnownBrief } from './prompt'
+import type { KnownBrief } from './prompt'
+import type { LlmToolSchema } from './agent/types'
 import type { OutreachCall, OutreachContact, OutreachLanguage } from './types'
 
-// GET /api/internal/outreach/calls/{callId}/session: what voice-service needs to run one call (plan §8).
+// The leaf helpers behind GET /api/internal/outreach/calls/{callId}/session; the session itself is built by
+// agent/runtime.ts buildVoiceSession (this file must not import the runtime).
 
 export const MAX_DURATION_S = 720
 export const SILENCE_S = 14
@@ -71,10 +72,11 @@ export async function knownBrief(contactId: string): Promise<KnownBrief> {
   return out
 }
 
-async function hadAnsweredCall(contactId: string, callId: string): Promise<boolean> {
+/** An earlier answered call with this contact (other than `exceptCallId`). */
+export async function hadAnsweredCall(contactId: string, exceptCallId: string | null = null): Promise<boolean> {
   const r = await outreachPool().query(
-    `SELECT 1 FROM outreach_calls WHERE contact_id = $1 AND id <> $2 AND answered_at IS NOT NULL LIMIT 1`,
-    [contactId, callId]
+    `SELECT 1 FROM outreach_calls WHERE contact_id = $1 AND id IS DISTINCT FROM $2 AND answered_at IS NOT NULL LIMIT 1`,
+    [contactId, exceptCallId]
   )
   return r.rows.length > 0
 }
@@ -84,54 +86,12 @@ export interface CallSession {
   persona: { name: string; voiceId: string }
   systemPrompt: string
   greeting: string
-  tools: typeof TOOL_SCHEMAS
+  tools: LlmToolSchema[]
   maxDurationS: number
   silenceS: number
   apology: string
   testNumbers: string[]
   scriptVersion: string
-}
-
-export async function buildSession(callId: string, now: Date = new Date()): Promise<CallSession | null> {
-  const ctx = await loadCallContext(callId)
-  if (!ctx) return null
-  const { call, contact } = ctx
-  const language = asLanguage(call.language ?? contact.language)
-  const [{ settings }, testNumbers, known, continuing] = await Promise.all([
-    readVoiceSettings(),
-    getProgramState(contact.program).then(s => s.test_numbers ?? [], () => [] as string[]),
-    knownBrief(contact.id),
-    hadAnsweredCall(contact.id, call.id),
-  ])
-  const personaName = PERSONA_NAMES[language]
-  const consentWhatsApp = !!contact.consent_whatsapp_at
-  const base = {
-    language,
-    personaName,
-    business: contact.business_name,
-    owner: contact.owner_name,
-    continuing,
-  }
-  return {
-    language,
-    persona: { name: personaName, voiceId: settings.sarvam.voices[language] ?? '' },
-    systemPrompt: systemPrompt({
-      ...base,
-      category: contact.category,
-      city: contact.city,
-      now,
-      consentWhatsApp,
-      previewStarted: !!contact.showcase_site_id,
-      published: contact.status === 'published' || contact.status === 'claimed',
-      known,
-    }),
-    greeting: greeting(base),
-    tools: TOOL_SCHEMAS,
-    maxDurationS: MAX_DURATION_S,
-    silenceS: SILENCE_S,
-    // voice-service's default apology promises a WhatsApp message; only make that promise with consent.
-    apology: consentWhatsApp ? LINES[language].apologyWhatsApp : LINES[language].apologyCallBack,
-    testNumbers,
-    scriptVersion: SCRIPT_VERSION,
-  }
+  /** The skill ref the run is pinned to ("<slug>@v<n>", or the builtin's script version). */
+  skillRef: string
 }

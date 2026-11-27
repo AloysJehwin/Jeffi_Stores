@@ -48,6 +48,8 @@ class ToolResult(BaseModel):
     say: str | None = None
     end: bool = False
     redialLanguage: str | None = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class ControllerError(Exception):

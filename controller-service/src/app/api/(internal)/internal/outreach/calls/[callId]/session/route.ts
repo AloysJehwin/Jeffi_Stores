@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { buildSession } from '@controller/lib/outreach/session'
+import { buildVoiceSession } from '@controller/lib/outreach/agent/runtime'
 import { UUID_RE, verifyVoiceRequest } from '@controller/lib/outreach/voice-client'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ call
   if (!verifyVoiceRequest(req, callId)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
   if (!UUID_RE.test(callId)) return NextResponse.json({ error: 'Invalid call id' }, { status: 400, headers: NO_STORE })
   try {
-    const session = await buildSession(callId)
+    const session = await buildVoiceSession(callId)
     if (!session) return NextResponse.json({ error: 'Unknown call' }, { status: 404, headers: NO_STORE })
     return NextResponse.json(session, { headers: NO_STORE })
   } catch (e) {
