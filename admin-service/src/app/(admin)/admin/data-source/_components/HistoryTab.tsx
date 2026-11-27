@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Badge, Section, when } from '@/components/admin/kit/core'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { LoadingTable } from '@/components/admin/kit/skeleton'
 import JobDetail from './JobDetail'
@@ -48,7 +49,10 @@ export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
   const error = jobs.length ? null : list.error
 
   return (
-    <Section title={`Imports (${total.toLocaleString('en-IN')})`}>
+    <Section
+      title={`Imports (${total.toLocaleString('en-IN')})`}
+      action={<ExportButton exportKey="data-source.jobs" filters={{ status: status === 'all' ? STATUS.filter(o => o.id !== 'all').map(o => o.id) : [status], source: source === 'all' ? SOURCE.filter(o => o.id !== 'all').map(o => o.id) : [source] }} />}
+    >
       <div className="flex flex-wrap gap-2 mb-3">
         <Filter options={STATUS} value={status} onChange={setStatus} label="Status" />
         <Filter options={SOURCE} value={source} onChange={setSource} label="Source" />

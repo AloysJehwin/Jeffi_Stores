@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, MessagesSquare, Search, UserRound } from 'lucide-react'
 import PresenceBadge from '@/components/chat/PresenceBadge'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { ago, previewOf } from '@/components/chat/format'
 import type { SupportChannel, SupportEvent, SupportSession } from '@/lib/support/types'
 import SupportConversation, { CHANNEL_ICON, CHANNEL_LABEL } from './SupportConversation'
@@ -164,13 +165,20 @@ export default function SupportInbox({ initialId, initialFilter, me }: { initial
     <div className="admin-split grid grid-cols-1 lg:grid-cols-[minmax(300px,360px)_1fr] gap-0 rounded-xl border border-border-default bg-surface-elevated overflow-hidden h-[calc(100dvh-15rem)] min-h-[520px]" style={INBOX_SPLIT}>
       <aside className={`min-h-0 flex-col border-r border-border-default ${selected ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-3 space-y-2 border-b border-border-default">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
-            <input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Search name, phone, email, ticket"
-              className="w-full h-9 pl-8 pr-3 rounded-lg border border-border-default bg-surface text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-400"
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
+              <input
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder="Search name, phone, email, ticket"
+                className="w-full h-9 pl-8 pr-3 rounded-lg border border-border-default bg-surface text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-400"
+              />
+            </div>
+            <ExportButton
+              exportKey="support.tickets"
+              query={`q=${encodeURIComponent(q.trim())}`}
+              filters={{ views: [filter], channels: channel ? [channel] : Object.keys(CHANNEL_LABEL) }}
             />
           </div>
           <div className="flex flex-wrap gap-1">

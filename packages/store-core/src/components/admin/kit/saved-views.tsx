@@ -6,7 +6,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Bookmark,
   BookmarkPlus,
-  Download,
   Link2,
   Loader2,
   Pencil,
@@ -23,7 +22,7 @@ import { portalRoot } from '@/lib/shared/portal-root'
 import { api } from './core'
 import { useActionToast } from './toast'
 
-// The saved-views menu, share link and CSV export on a ListFilters toolbar. Views live in the DB
+// The saved-views menu and share link on a ListFilters toolbar (Export is the shared ExportButton). Views live in the DB
 // per admin (/api/admin/saved-views); links and views carry the list's canonical query plus sort.
 
 interface ListRef {
@@ -311,71 +310,5 @@ export function ShareFilterLink({ fields, search, tab }: Omit<ListRef, 'entity'>
       <Share2 className="h-4 w-4" />
       <span className="hidden md:inline">Share</span>
     </button>
-  )
-}
-
-/** CSV of exactly the filtered rows: counts them first, warns at the cap, then downloads. */
-export function ExportRowsButton({ entity, fields, search, noun = 'rows' }: ListRef & { noun?: string }) {
-  const sp = useSearchParams()
-  const [open, setOpen] = useState(false)
-  const [count, setCount] = useState<{ q: string; count: number; capped: boolean; cap: number } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const q = canonicalQuery(sp, fields, { search })
-  const url = `/api/admin/filters/${entity}/export${q ? `?${q}` : ''}`
-
-  useEffect(() => {
-    if (!open || count?.q === q) return
-    let live = true
-    setError(null)
-    api<{ count: number; capped: boolean; cap: number }>(`${url}${q ? '&' : '?'}count=1`)
-      .then(r => {
-        if (!live) return
-        if (r.ok) setCount({ q, count: r.data.count, capped: r.data.capped, cap: r.data.cap })
-        else setError(r.data.error || 'Could not count the rows')
-      })
-      .catch(() => live && setError('Could not count the rows'))
-    return () => {
-      live = false
-    }
-  }, [open, q, url, count?.q])
-
-  const ready = count?.q === q ? count : null
-  const label = noun.toLowerCase()
-  return (
-    <Popover icon={Download} label="Export" open={open} setOpen={setOpen}>
-      <div className="space-y-2 p-2 text-sm">
-        {error ? (
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-        ) : !ready ? (
-          <p className="flex items-center gap-2 text-foreground-muted">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Counting {label}…
-          </p>
-        ) : (
-          <>
-            <p className="text-foreground">
-              {ready.count ? `${ready.count.toLocaleString('en-IN')} ${label} match these filters.` : `No ${label} match these filters.`}
-            </p>
-            {ready.capped && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Only the first {ready.cap.toLocaleString('en-IN')} are exported. Narrow the filters to get the rest.
-              </p>
-            )}
-            <button
-              type="button"
-              disabled={!ready.count}
-              onClick={() => {
-                setOpen(false)
-                window.location.href = url
-              }}
-              className="control-md w-full bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-40"
-            >
-              <Download className="h-4 w-4" />
-              Export {ready.count.toLocaleString('en-IN')} {label} (CSV)
-            </button>
-          </>
-        )}
-      </div>
-    </Popover>
   )
 }

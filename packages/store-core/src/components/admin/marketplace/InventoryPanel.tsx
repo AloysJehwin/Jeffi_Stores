@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Upload } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { Badge, Banner, Kpi, KpiGrid, Section, Table, api, btnGhost, count, inputCls, money, when, type Col } from '@/components/admin/channels/ui'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -140,6 +141,7 @@ export default function InventoryPanel({ channel }: { channel: Channel }) {
         title="Stock on the marketplace"
         action={
           <div className="flex items-center gap-1">
+            <ExportButton exportKey={`${channel}.stock`} />
             <IconButton icon={RefreshCw} label="Refresh" busy={busy === 'load'} onClick={load} />
             {canWrite && <IconButton icon={Upload} label="Push stock now" variant="accent" busy={busy === 'push'} disabled={!t.rows} onClick={push} />}
           </div>

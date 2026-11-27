@@ -241,6 +241,7 @@ export default function CustomersTable({
         rows={customers}
         cols={cols}
         rowKey={c => c.id}
+        exportKey="customers"
         total={total}
         page={page}
         pageSize={pageSize}

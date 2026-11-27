@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
@@ -12,7 +13,6 @@ import {
   Section,
   Table,
   btnGhost,
-  btnPrimary,
   count,
   money,
   type Col,
@@ -82,7 +82,7 @@ export function ReceivablesTab() {
 
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.receivables" range={{ from, to }} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <ReceivablesTabSkeleton /> : data && <Body d={data} onChanged={reload} />}
     </div>
@@ -110,28 +110,6 @@ function Body({ d, onChanged }: { d: Receivables; onChanged: () => void }) {
     } finally {
       setPaying(null)
     }
-  }
-
-  const exportCSV = () => {
-    const rows = d.overdue
-    if (!rows.length) return
-    const header = ['Invoice', 'Order', 'Customer', 'Date', 'Days', 'Amount', 'Status']
-    const body = rows.map(r => [
-      r.invoice_number ?? '',
-      r.order_number,
-      r.customer_name,
-      r.invoice_date,
-      r.days_outstanding,
-      r.total_amount,
-      r.payment_status,
-    ])
-    const csv = [header, ...body]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `receivables-${d.range.from}-to-${d.range.to}.csv`
-    a.click()
   }
 
   const customerHref = (r: { user_id: string | null; order_id: string }) =>
@@ -250,16 +228,7 @@ function Body({ d, onChanged }: { d: Receivables; onChanged: () => void }) {
         />
       </Section>
 
-      <Section
-        title="Overdue invoices"
-        action={
-          d.overdue.length > 0 ? (
-            <button type="button" className={btnPrimary} onClick={exportCSV}>
-              Export CSV
-            </button>
-          ) : undefined
-        }
-      >
+      <Section title="Overdue invoices">
         <Table rows={d.overdue} cols={overdueCols} rowKey={r => r.order_id} empty="Nothing overdue in this period." />
       </Section>
     </div>

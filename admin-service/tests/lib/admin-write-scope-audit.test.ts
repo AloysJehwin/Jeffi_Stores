@@ -48,6 +48,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // view with the team checks the list's :write scope (writeScopeOf) in the handler.
   'saved-views',
   'saved-views/[id]',
+  // The standard Export: POST counts or streams a read-only export, PUT/DELETE manage the
+  // member's own presets; all gated on the export's read scope.
+  'export/[key]',
   // Owner-only team management, gated on isPlatformOwner rather than a scope.
   'users',
   'users/[id]',
@@ -99,6 +102,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'edd-settings/preview',
   // Daily ops email preview from the posted draft settings; writes nothing.
   'site-controls/ops-email/preview',
+  // Outreach skill files: validate and render a posted draft (ecom_outreach:read, platform admin); write nothing.
+  'ecom/outreach/skills/validate',
+  'ecom/outreach/skills/preview',
   // Pre-auth: proves identity before any session exists.
   'auth/google',
   // Mints a token whose scopes are filtered to a subset of the caller's own — cannot escalate.

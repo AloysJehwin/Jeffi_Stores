@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ListFilters } from '@/components/admin/kit/list-filters'
+import { useExportRows } from '@/components/admin/export/export-rows'
 import { TASK_FIELDS, TASK_SEARCH } from '@/lib/filters/fields/tasks'
 import { TaskRowsSkeleton } from './TasksLoadingParts'
 
@@ -190,6 +191,7 @@ export default function AdminTasksClient() {
     },
   })
   const tasks = list.rows
+  useExportRows('tasks', tasks.map(r => String(r.id)))
   const loading = list.loading
   const total = list.total ?? 0
 

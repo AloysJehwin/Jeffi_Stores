@@ -177,6 +177,14 @@ CREATE INDEX idx_admin_saved_views_shared ON public.admin_saved_views USING btre
 
 
 --
+-- Name: idx_admin_export_presets_admin_key_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_admin_export_presets_admin_key_name ON public.admin_export_presets USING btree (admin_id, export_key, lower((name)::text));
+
+
+
+--
 -- Name: idx_ai_briefing_log_date; Type: INDEX; Schema: public; Owner: -
 --
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
@@ -100,7 +101,7 @@ export function PayablesTab({ initialData: _initialData }: { initialData?: unkno
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <FinancePeriodBar onRefresh={reload} busy={loading} />
+        <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.payables" range={{ from, to }} />} />
         {canWrite && (
           <button
             type="button"

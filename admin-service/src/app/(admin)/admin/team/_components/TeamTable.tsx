@@ -121,6 +121,7 @@ export default function TeamTable({
       rows={admins}
       cols={cols}
       rowKey={a => String(a.id)}
+      exportKey="team.members"
       paged
       noun="members"
       empty="No team members yet."

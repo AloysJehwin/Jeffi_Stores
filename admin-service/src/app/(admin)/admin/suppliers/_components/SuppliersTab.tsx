@@ -87,6 +87,7 @@ export default function SuppliersTab() {
         rows={suppliers}
         cols={cols}
         rowKey={s => s.id}
+        exportKey="suppliers"
         infinite={list}
         empty={search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
         mobile={rows => <SuppliersMobileList suppliers={rows} canWrite={canWriteSuppliers} onToggleActive={toggleActive} />}

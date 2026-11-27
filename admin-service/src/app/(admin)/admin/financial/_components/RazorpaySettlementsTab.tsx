@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
@@ -63,7 +64,7 @@ function Settlements() {
     <div className="space-y-5">
       <RazorpayAccountCard />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <FinancePeriodBar onRefresh={() => (overview.reload(), awaiting.reload())} busy={overview.loading} />
+        <FinancePeriodBar onRefresh={() => (overview.reload(), awaiting.reload())} busy={overview.loading} actions={<ExportButton exportKey="financial.razorpay-settlements" range={range} />} />
         <div className="flex items-center gap-3">
           {d && (
             <span className="text-xs text-foreground-muted">

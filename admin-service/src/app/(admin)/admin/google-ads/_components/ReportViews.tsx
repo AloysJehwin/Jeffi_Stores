@@ -7,6 +7,7 @@ import { Section, Table, Kpi, Badge, Empty as KitEmpty, type Col } from '@/compo
 import { money, count, decimal, pct, ratio, change, humanize } from '@/lib/google-ads/format'
 import type { OverviewData, Kpis, ProductRow } from '@/lib/google-ads/report'
 import { useAdsManage } from './ManageContext'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import AlertsPanel from './AlertsPanel'
 import { MarginBasis, MarginCell, StockBadge } from './RecommendationImpact'
 import {
@@ -192,10 +193,10 @@ export function OverviewView({ d, currency }: { d: OverviewData; currency: strin
   )
 }
 
-export function CampaignsView({ rows, currency }: { rows: any[]; currency: string }) {
+export function CampaignsView({ rows, currency, range }: { rows: any[]; currency: string; range?: { from: string; to: string } }) {
   const manage = !!useAdsManage()
   return (
-    <Section title={`Campaigns (${rows.length})`}>
+    <Section title={`Campaigns (${rows.length})`} action={<ExportButton exportKey="google-ads.campaigns" range={range} />}>
       <Table
         rows={rows}
         rowKey={r => r.campaignId}
@@ -276,7 +277,7 @@ export function AdGroupsView({ d, currency }: { d: { adGroups: any[]; ads: any[]
   )
 }
 
-export function KeywordsView({ d, currency }: { d: { keywords: any[]; searchTerms: any[] }; currency: string }) {
+export function KeywordsView({ d, currency, range }: { d: { keywords: any[]; searchTerms: any[] }; currency: string; range?: { from: string; to: string } }) {
   const [onlyMissing, setOnlyMissing] = useState(false)
   const terms = onlyMissing ? d.searchTerms.filter(t => !t.inCatalogue) : d.searchTerms
   const missingSpend = d.searchTerms.filter(t => !t.inCatalogue).reduce((s, t) => s + t.cost, 0)
@@ -286,10 +287,13 @@ export function KeywordsView({ d, currency }: { d: { keywords: any[]; searchTerm
       <Section
         title={`Search terms (${d.searchTerms.length})`}
         action={
-          <label className="text-xs flex items-center gap-2 text-foreground-muted">
-            <input type="checkbox" checked={onlyMissing} onChange={e => setOnlyMissing(e.target.checked)} />
-            Only terms we don&apos;t sell ({money(missingSpend, currency)})
-          </label>
+          <div className="flex items-center gap-3">
+            <label className="text-xs flex items-center gap-2 text-foreground-muted">
+              <input type="checkbox" checked={onlyMissing} onChange={e => setOnlyMissing(e.target.checked)} />
+              Only terms we don&apos;t sell ({money(missingSpend, currency)})
+            </label>
+            <ExportButton exportKey="google-ads.search-terms" range={range} filters={onlyMissing ? { catalogue: ['out'] } : undefined} />
+          </div>
         }
       >
         <Table
@@ -343,7 +347,7 @@ const FLAG_LABEL: Record<ProductRow['flags'][number], [string, 'red' | 'amber' |
   unmatched: ['No SKU match', 'muted'],
 }
 
-export function ProductsView({ d, currency }: { d: { items: ProductRow[]; bestsellersWithoutImpressions: any[] }; currency: string }) {
+export function ProductsView({ d, currency, range }: { d: { items: ProductRow[]; bestsellersWithoutImpressions: any[] }; currency: string; range?: { from: string; to: string } }) {
   const flagged = d.items.filter(i => i.flags.some(f => f !== 'unmatched'))
   return (
     <div className="space-y-5">
@@ -352,7 +356,7 @@ export function ProductsView({ d, currency }: { d: { items: ProductRow[]; bestse
         <Kpi label="Spend on loss-making items" value={money(d.items.filter(i => i.flags.includes('negative_margin') || i.flags.includes('unprofitable')).reduce((s, i) => s + i.cost, 0), currency)} />
         <Kpi label="Flagged items" value={count(flagged.length)} />
       </div>
-      <Section title={`Shopping items (${d.items.length})`}>
+      <Section title={`Shopping items (${d.items.length})`} action={<ExportButton exportKey="google-ads.products" range={range} />}>
         <Table
           rows={d.items}
           rowKey={r => r.itemId}

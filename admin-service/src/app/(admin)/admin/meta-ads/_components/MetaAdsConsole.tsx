@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, RefreshCw, Send, Unplug } from 'lucide-react'
@@ -233,6 +234,7 @@ export default function MetaAdsConsole() {
               tab={tab}
               d={data}
               status={status}
+              range={range}
               onChanged={() => {
                 reload()
                 loadStatus()
@@ -428,7 +430,7 @@ const kpiCols = [
   { key: 'ctr', label: 'CTR', num: true, render: (r: any) => pct(r.ctr, 2), sort: (r: any) => r.ctr ?? 0 },
 ]
 
-function Body({ tab, d, status, onChanged }: { tab: MadsTab; d: any; status: any; onChanged: () => void }) {
+function Body({ tab, d, status, range, onChanged }: { tab: MadsTab; d: any; status: any; range: { from: string; to: string }; onChanged: () => void }) {
   const canManage = useCanWrite('meta_ads_campaigns')
   const [pending, setPending] = useState<Record<string, unknown> | null>(null)
   const [imageAd, setImageAd] = useState<{ id: string; name: string; thumbnail: string | null } | null>(null)
@@ -493,7 +495,7 @@ function Body({ tab, d, status, onChanged }: { tab: MadsTab; d: any; status: any
     case 'ads': {
       const level = tab === 'campaigns' ? 'campaign' : tab === 'adsets' ? 'adset' : 'ad'
       return (
-        <Section title={TABS.find(t => t.id === tab)!.label}>
+        <Section title={TABS.find(t => t.id === tab)!.label} action={<ExportButton exportKey={`meta-ads.${tab}`} range={range} />}>
           <Table
             rows={d.rows}
             rowKey={(r: any) => r.id}

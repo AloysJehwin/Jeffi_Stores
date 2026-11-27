@@ -11,6 +11,7 @@ import { DataTable, type BulkAction, type DataCol } from '@/components/admin/kit
 import { Dialog } from '@/components/admin/kit/dialog'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { ap } from '@/lib/shared/admin-path'
 import type { QueueBucket, QueueOrderRow } from '@/lib/marketplace/console'
 import { CHANNEL_NAME, Countdown, StatusPill, useNow, type Channel } from './queue-shared'
@@ -271,11 +272,15 @@ export default function OrdersQueue({ channel }: { channel: Channel }) {
         rowActions={rowActions}
         mobileCard={mobileCard}
         noun="orders"
+        exportKey={`${channel}.orders`}
         toolbar={
-          <div className="relative w-full sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Order, packet or tracking" aria-label="Search orders" className={`${inputCls} pl-9`} />
-          </div>
+          <>
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Order, packet or tracking" aria-label="Search orders" className={`${inputCls} pl-9`} />
+            </div>
+            <ExportButton exportKey={`${channel}.orders`} query={`q=${encodeURIComponent(search)}`} filters={{ buckets: [bucket] }} />
+          </>
         }
         empty={{ title: bucket === 'new' ? `No new ${name} orders` : 'Nothing here', body: bucket === 'new' ? `Orders ${name} pushes appear here to accept.` : undefined }}
       />

@@ -152,6 +152,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
         rows={orders}
         cols={cols}
         rowKey={o => o.id}
+        exportKey="orders"
         total={total}
         page={page}
         pageSize={pageSize}

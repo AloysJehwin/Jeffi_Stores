@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw, Upload, X } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import IconButton from '@/components/ui/IconButton'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { Badge, Banner, Kpi, KpiGrid, RangePresets, Section, Table, api, btnGhost, btnPrimary, count, lastDays, money, when, type Col } from '@/components/admin/channels/ui'
 import { Dialog } from '@/components/admin/kit/dialog'
 import { useActionToast } from '@/components/admin/kit/toast'
@@ -112,6 +113,7 @@ export default function SettlementsPanel({ channel }: { channel: Channel }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <RangePresets value={range} onChange={setRange} presets={[30, 90, 180, 365]} />
         <div className="flex items-center gap-1">
+          <ExportButton exportKey={`${channel}.settlements`} range={range} />
           <IconButton icon={RefreshCw} label="Refresh" busy={loading} onClick={load} />
           {canWrite && <IconButton icon={Upload} label="Import a settlement report" variant="accent" onClick={() => fileRef.current?.click()} />}
         </div>

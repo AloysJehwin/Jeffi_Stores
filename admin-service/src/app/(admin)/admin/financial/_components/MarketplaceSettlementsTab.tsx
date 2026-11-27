@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import Link from 'next/link'
 import { Badge, Banner, Kpi, KpiGrid, Section, Table, count, money, type Col, type Tone } from '@/components/admin/channels/ui'
 import { useOverviewData } from '@/components/admin/overview/kit'
@@ -67,7 +68,7 @@ export function MarketplaceSettlementsTab() {
   const { data: d, error, loading, reload } = useOverviewData<MarketplaceSettlementsOverview>(`/api/admin/financial/marketplace-settlements?from=${range.from}&to=${range.to}`)
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.marketplace-settlements" range={range} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !d ? (
         <MarketplaceSettlementsTabSkeleton />

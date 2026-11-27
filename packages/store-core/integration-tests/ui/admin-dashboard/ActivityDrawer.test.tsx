@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
-import { ActivityDrawer, activityToCsv } from '@/components/admin/dashboard/ActivityDrawer'
+import { ActivityDrawer } from '@/components/admin/dashboard/ActivityDrawer'
 import { makeActivity, mockReducedMotion } from './fixtures'
+
+const exportProps = vi.hoisted(() => ({ last: null as any }))
+vi.mock('@/components/admin/export/ExportButton', () => ({
+  ExportButton: (p: any) => {
+    exportProps.last = p
+    return <button type="button">Export</button>
+  },
+}))
 
 const activity = makeActivity(4)
 
@@ -137,36 +145,11 @@ describe('ActivityDrawer', () => {
     expect(screen.getByRole('combobox', { name: 'Period' })).toBeInTheDocument()
   })
 
-  it('builds CSV rows from the days series', () => {
-    const csv = activityToCsv([
-      { date: '2026-01-05', shipped: 4, placed: 5, customers: 3, top: [{ name: 'Shirts', count: 2 }, { name: 'Shoes, kids', count: 1 }] },
-      { date: '2026-01-06', shipped: 0, placed: 0, customers: 0, top: [] },
-    ])
-    expect(csv.split('\n')).toEqual(['date,shipped,placed,customers,top_categories', '2026-01-05,4,5,3,"Shirts:2|Shoes, kids:1"', '2026-01-06,0,0,0,'])
-  })
-
-  it('Export CSV downloads the days as a file', async () => {
-    let blob: Blob | null = null
-    const create = vi.fn((b: Blob) => {
-      blob = b
-      return 'blob:mock'
-    })
-    const revoke = vi.fn()
-    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke })
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  it('exports through the standard Export with the drawer period and channel', async () => {
     renderDrawer()
-    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
-    expect(create).toHaveBeenCalledTimes(1)
-    expect(click).toHaveBeenCalledTimes(1)
-    expect(revoke).toHaveBeenCalledWith('blob:mock')
-    const text = await new Promise<string>(resolve => {
-      const r = new FileReader()
-      r.onload = () => resolve(String(r.result))
-      r.readAsText(blob!)
-    })
-    const lines = text.split('\n')
-    expect(lines).toHaveLength(29)
-    expect(lines[0]).toBe('date,shipped,placed,customers,top_categories')
-    expect(lines[1]).toMatch(/^2026-01-05,0,1,0,$/)
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument()
+    expect(exportProps.last.exportKey).toBe('dashboard.activity')
+    expect(exportProps.last.query).toMatch(/^weeks=\d+&filter=/)
+    expect(exportProps.last.filters.channels.length).toBeGreaterThan(0)
   })
 })

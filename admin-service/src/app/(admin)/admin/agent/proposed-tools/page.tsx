@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { PageHeader } from '@/components/admin/kit/layout'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ToolCardsSkeleton } from '../_components/AgentLoadingParts'
 
@@ -83,17 +84,20 @@ export default function ProposedToolsPage() {
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <PageHeader title="Proposed Tools" media={<Sparkles className="w-5 h-5 text-accent-500" />} />
-        <AdminSelect
-          value={statusFilter}
-          onChange={v => setStatusFilter(v as any)}
-          sm
-          options={[
-            { value: 'proposed', label: 'Proposed' },
-            { value: 'approved', label: 'Approved' },
-            { value: 'rejected', label: 'Rejected' },
-            { value: 'all', label: 'All' },
-          ]}
-        />
+        <div className="flex items-center gap-2">
+          <AdminSelect
+            value={statusFilter}
+            onChange={v => setStatusFilter(v as any)}
+            sm
+            options={[
+              { value: 'proposed', label: 'Proposed' },
+              { value: 'approved', label: 'Approved' },
+              { value: 'rejected', label: 'Rejected' },
+              { value: 'all', label: 'All' },
+            ]}
+          />
+          <ExportButton exportKey="agent.proposed-tools" filters={{ status: statusFilter === 'all' ? ['proposed', 'approved', 'rejected', 'retired'] : [statusFilter] }} />
+        </div>
       </div>
 
       <p className="text-xs text-foreground-muted mb-4">

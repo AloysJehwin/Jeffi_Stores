@@ -8,6 +8,7 @@ import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
 import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, btnPrimary, count, inputCls, money, pct, when } from '@/components/admin/channels/ui'
 import Select from '@/components/ui/Select'
 import { AmazonOrdersLoading } from './skeletons'
@@ -373,7 +374,7 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
           )}
         </div>
       </Section>
-      <Section title="Amazon orders">
+      <Section title="Amazon orders" action={<ExportButton exportKey="amazon.orders" />}>
         <Table
           rows={d.orders.rows}
           rowKey={(r: any) => r.amazon_order_id}
@@ -406,7 +407,7 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
           ]}
         />
       </Section>
-      <Section title="Stock on Amazon">
+      <Section title="Stock on Amazon" action={<ExportButton exportKey="amazon.stock" />}>
         <Table
           rows={d.stock.rows}
           rowKey={(r: any) => r.sku}

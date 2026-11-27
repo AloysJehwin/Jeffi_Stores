@@ -96,6 +96,24 @@ CREATE TABLE public.admin_saved_views (
 );
 
 
+--
+-- Name: admin_export_presets; Type: TABLE; Schema: public; Owner: -
+--
+-- An admin's export choices on a page (export_key = the export registry key): format, scope,
+-- columns, include/exclude filters, branding. name '' is the last-used set, re-applied on open.
+--
+
+CREATE TABLE public.admin_export_presets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    export_key character varying(64) NOT NULL,
+    name character varying(80) DEFAULT ''::character varying NOT NULL,
+    options jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
 
 --
 -- Name: failed_login_attempts; Type: TABLE; Schema: public; Owner: -

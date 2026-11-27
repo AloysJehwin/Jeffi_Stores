@@ -15,7 +15,8 @@ import {
 } from '@jeffi/list-filters/client'
 import AdvancedFilterPanel, { chipLabel, fieldIsActive } from '@/components/admin/AdvancedFilterPanel'
 import { DataToolbar, type FilterDef } from './data-table'
-import { ExportRowsButton, SavedViewsMenu, ShareFilterLink } from './saved-views'
+import { SavedViewsMenu, ShareFilterLink } from './saved-views'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 // One filter bar for every registered admin list: search, quick selects, a Filters toggle over the
 // full panel (a sheet on phones) and a chip per active filter, all kept in the URL.
@@ -36,7 +37,7 @@ export interface ListFiltersProps {
   /** Saved views menu and share link (on unless turned off). */
   views?: boolean
   share?: boolean
-  /** Export CSV of the filtered rows; set when the entity has export columns. */
+  /** The standard Export (right end of the toolbar); set when the entity has export columns. */
   exportable?: boolean
   /** Extra controls at the toolbar's right end. */
   children?: ReactNode
@@ -130,8 +131,8 @@ export function ListFilters({
         </button>
         {views && <SavedViewsMenu entity={entity} fields={allFields} search={searchParam} tab={tab} />}
         {share && <ShareFilterLink fields={allFields} search={searchParam} tab={tab} />}
-        {exportable && <ExportRowsButton entity={entity} fields={allFields} search={searchParam} noun={noun} />}
         {children}
+        {exportable && <ExportButton exportKey={entity} />}
       </DataToolbar>
 
       {active.length > 0 && (

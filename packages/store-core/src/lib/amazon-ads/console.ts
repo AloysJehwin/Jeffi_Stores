@@ -138,12 +138,12 @@ export async function loadProducts(r: Range) {
   const rows = await queryMany<any>(
     `WITH cat AS (
        SELECT DISTINCT ON (COALESCE(v.sku, p.sku)) COALESCE(v.sku, p.sku) AS sku, p.name, COALESCE(v.stock_status, p.stock_status) AS stock_status,
-              COALESCE(v.cost_price, p.cost_price) AS cost, COALESCE(v.price, p.base_price) AS price, COALESCE(v.price_ex_gst, p.price_ex_gst) AS price_ex_gst
+              COALESCE(v.cost_price, p.cost_price) AS unit_cost, COALESCE(v.price, p.base_price) AS price, COALESCE(v.price_ex_gst, p.price_ex_gst) AS price_ex_gst
        FROM products p LEFT JOIN product_variants v ON v.product_id = p.id WHERE COALESCE(v.sku, p.sku) IS NOT NULL
      )
-     SELECT m.sku, max(m.asin) AS asin, cat.name, cat.stock_status, cat.cost, cat.price, cat.price_ex_gst, ${SUMS}, COALESCE(SUM(m.units),0) AS units
+     SELECT m.sku, max(m.asin) AS asin, cat.name, cat.stock_status, cat.unit_cost, cat.price, cat.price_ex_gst, ${SUMS}, COALESCE(SUM(m.units),0) AS units
      FROM aads_product_metrics m LEFT JOIN cat ON cat.sku = m.sku
-     WHERE m.date BETWEEN $1 AND $2 GROUP BY m.sku, cat.name, cat.stock_status, cat.cost, cat.price, cat.price_ex_gst ORDER BY SUM(m.cost) DESC LIMIT 2000`,
+     WHERE m.date BETWEEN $1 AND $2 GROUP BY m.sku, cat.name, cat.stock_status, cat.unit_cost, cat.price, cat.price_ex_gst ORDER BY SUM(m.cost) DESC LIMIT 2000`,
     [r.from, r.to]
   )
   return {
@@ -151,7 +151,8 @@ export async function loadProducts(r: Range) {
       const k = kpis(p)
       const units = n(p.units)
       const ex = p.price && p.price_ex_gst ? n(p.price_ex_gst) / n(p.price) : 1
-      const grossProfit = p.cost == null ? null : k.sales * ex - units * n(p.cost)
+      // Unit cost from the catalogue (named apart from the ad spend `cost`, which the sums own).
+      const grossProfit = p.unit_cost == null ? null : k.sales * ex - units * n(p.unit_cost)
       return {
         sku: p.sku,
         asin: p.asin,

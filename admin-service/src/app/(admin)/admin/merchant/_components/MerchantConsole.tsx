@@ -112,13 +112,13 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
       ) : DATA_TABS.has(tab) && !data ? (
         <MerchantTabLoading tab={tab} />
       ) : (
-        <Body tab={tab} data={data} onChanged={reload} />
+        <Body tab={tab} data={data} range={range} onChanged={reload} />
       )}
     </div>
   )
 }
 
-function Body({ tab, data, onChanged }: { tab: MerchantTab; data: any; onChanged: () => void }) {
+function Body({ tab, data, range, onChanged }: { tab: MerchantTab; data: any; range: { from: string; to: string }; onChanged: () => void }) {
   switch (tab) {
     case 'overview':
       return <OverviewView d={data} />
@@ -127,7 +127,7 @@ function Body({ tab, data, onChanged }: { tab: MerchantTab; data: any; onChanged
     case 'issues':
       return <IssuesView d={data} />
     case 'performance':
-      return <PerformanceView d={data} />
+      return <PerformanceView d={data} range={range} />
     case 'competitiveness':
       return <CompetitivenessView d={data} />
     case 'insights':

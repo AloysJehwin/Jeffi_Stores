@@ -22,7 +22,7 @@ const VALUES_TIMEOUT = '4s'
 const EXPORT_TIMEOUT = '15s'
 
 /** One transaction on the entity's DB with a local statement timeout. */
-async function withTimeout<T>(db: FilterEntity['db'], timeout: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+export async function withTimeout<T>(db: FilterEntity['db'], timeout: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const run = async (c: PoolClient) => {
     await c.query(`SET LOCAL statement_timeout = '${timeout}'`)
     return fn(c)

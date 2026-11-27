@@ -111,28 +111,6 @@ export function Progress({ done, total }: { done: number; total: number }) {
   )
 }
 
-/** Problem rows (errors and warnings) as CSV, to fix in the sheet and upload again. */
-export function problemsCsv(rows: RowResult[]): string {
-  const esc = (v: unknown) => {
-    const s = String(v ?? '')
-    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const lines = [['sheet', 'row', 'sku', 'outcome', 'message']]
-  for (const r of rows) if (r.outcome === 'error' || r.outcome === 'warning') lines.push([r.sheet ?? '', String(r.row || ''), r.sku ?? '', r.outcome, r.message ?? ''])
-  return lines.map(l => l.map(esc).join(',')).join('\r\n') + '\r\n'
-}
-
-export function downloadText(name: string, text: string, type = 'text/csv;charset=utf-8') {
-  const url = URL.createObjectURL(new Blob([text], { type }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
 /** One job, re-fetched every 3s while it is queued or running; polling stops when it finishes. */
 export function useJob(id: string | null, nonce = 0): { job: ImportJob | null; error: string | null; loading: boolean } {
   const [state, setState] = useState<{ id: string; job?: ImportJob; error?: string } | null>(null)

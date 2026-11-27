@@ -4,6 +4,7 @@ import { asAdmin, asMember } from '../_support'
 
 vi.mock('next/link', () => ({ default: ({ href, children, ...r }: any) => <a href={href} {...r}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/admin/campaigns' }))
+vi.mock('@/components/admin/export/ExportButton', () => ({ ExportButton: () => <button type="button">Export</button> }))
 const showToast = vi.fn<(...a: any[]) => any>()
 vi.mock('@/contexts/ToastContext', () => ({ useToast: () => ({ showToast }), useToastOptional: () => ({ showToast }) }))
 const confirm = vi.fn<(...a: any[]) => any>()

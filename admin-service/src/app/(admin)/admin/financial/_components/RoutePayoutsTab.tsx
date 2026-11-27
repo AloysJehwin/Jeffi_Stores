@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
 import { useOverviewData } from '@/components/admin/overview/kit'
 import { RoutePayoutsTabSkeleton } from './FinanceSkeletons'
@@ -27,7 +28,7 @@ export function RoutePayoutsTab({ ownPending = false }: { ownPending?: boolean }
       {ownPending && (
         <Banner ok={false}>Your own Razorpay keys aren&apos;t saved yet, so payments still go through the platform account and are paid out below.</Banner>
       )}
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.route-payouts" range={range} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <RoutePayoutsTabSkeleton /> : data && <Body d={data} />}
     </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import Link from 'next/link'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
 import { useOverviewData } from '@/components/admin/overview/kit'
@@ -81,7 +82,7 @@ export function TransactionsTab() {
   )
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.transactions" range={range} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <TransactionsTabSkeleton /> : data && <Body d={data} />}
     </div>
@@ -184,22 +185,7 @@ function Body({ d }: { d: TxnOverview }) {
         }
       />
 
-      <Section
-        title="By method"
-        action={
-          <CsvAction
-            name="methods"
-            headers={['Method', 'Inflow', 'Outflow', 'Net', 'Txns']}
-            rows={d.by_method.map(r => [
-              labelOf(r.method),
-              r.inflow,
-              r.outflow,
-              r.inflow - r.outflow,
-              r.count,
-            ])}
-          />
-        }
-      >
+      <Section title="By method">
         <Table
           rows={d.by_method}
           cols={methodCols}
@@ -208,22 +194,7 @@ function Body({ d }: { d: TxnOverview }) {
         />
       </Section>
 
-      <Section
-        title="Top counterparties"
-        action={
-          <CsvAction
-            name="counterparties"
-            headers={['Party', 'Kind', 'Inflow', 'Outflow', 'Txns']}
-            rows={d.by_party.map(r => [
-              r.party,
-              KIND_LABEL[r.party_type] ?? r.party_type,
-              r.inflow,
-              r.outflow,
-              r.count,
-            ])}
-          />
-        }
-      >
+      <Section title="Top counterparties">
         <Table
           rows={d.by_party}
           cols={partyCols}
@@ -232,30 +203,5 @@ function Body({ d }: { d: TxnOverview }) {
         />
       </Section>
     </div>
-  )
-}
-
-function CsvAction({
-  name,
-  headers,
-  rows,
-}: {
-  name: string
-  headers: string[]
-  rows: (string | number)[][]
-}) {
-  if (!rows.length) return null
-  const download = () => {
-    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
-    const csv = [headers.join(','), ...rows.map(r => r.map(esc).join(','))].join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `transactions-${name}-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-  }
-  return (
-    <button type="button" onClick={download} className="text-xs text-accent-500 hover:underline">
-      Export CSV
-    </button>
   )
 }

@@ -10,6 +10,7 @@ import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { usePrompt } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { ap } from '@/lib/shared/admin-path'
 import type { ReturnRow } from '@/lib/marketplace/console'
 import { CHANNEL_NAME, RETURN_STATUS, StatusPill, type Channel } from './queue-shared'
@@ -96,8 +97,10 @@ export default function MarketplaceReturns({ channel }: { channel: Channel }) {
       error={error}
       rowActions={rowActions}
       noun="returns"
+      exportKey={`${channel}.returns`}
       toolbar={
-        <div className="flex h-control gap-0.5 rounded-lg border border-border-default bg-surface-elevated p-0.5">
+        <>
+          <div className="flex h-control gap-0.5 rounded-lg border border-border-default bg-surface-elevated p-0.5">
           {(['open', 'all'] as const).map(s => (
             <button
               key={s}
@@ -108,7 +111,9 @@ export default function MarketplaceReturns({ channel }: { channel: Channel }) {
               {s === 'open' ? 'Open' : 'All'}
             </button>
           ))}
-        </div>
+          </div>
+          <ExportButton exportKey={`${channel}.returns`} query={`scope=${scopeView}`} />
+        </>
       }
       mobileCard={r => (
         <MobileCard>

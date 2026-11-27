@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryOne } from '@/lib/shared/db'
+import { pageProposedTools } from '@/lib/admin-agent/proposed-tools-list'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,41 +19,7 @@ export async function GET(req: NextRequest) {
     200
   )
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
-  const offset = (page - 1) * pageSize
+  const { items, total } = await pageProposedTools(status, pageSize, page)
 
-  const countRow = await queryOne<{ total: string }>(
-    `SELECT COUNT(*)::text AS total
-       FROM admin_agent_proposed_tools
-      WHERE ($1 = 'all' OR status = $1)`,
-    [status]
-  )
-  const total = parseInt(countRow?.total || '0', 10)
-
-  const rows = await queryMany<{
-    id: string
-    name: string
-    description: string
-    kind: string
-    args_schema: any
-    sql_template: string | null
-    email_template: any
-    status: string
-    source_prompt: string
-    created_at: string
-    decided_at: string | null
-    rejection_reason: string | null
-    invocation_count: number
-    last_invoked_at: string | null
-  }>(
-    `SELECT id::text, name, description, kind, args_schema, sql_template, email_template,
-            status, source_prompt, created_at, decided_at, rejection_reason,
-            invocation_count, last_invoked_at
-       FROM admin_agent_proposed_tools
-      WHERE ($1 = 'all' OR status = $1)
-      ORDER BY created_at DESC
-      LIMIT $2 OFFSET $3`,
-    [status, pageSize, offset]
-  )
-
-  return NextResponse.json({ items: rows, total, page, pageSize })
+  return NextResponse.json({ items, total, page, pageSize })
 }

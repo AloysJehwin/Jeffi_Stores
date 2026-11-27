@@ -30,6 +30,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Self-service: the member's own saved filter views. Sharing one is offered only when the
   // server reports the list's :write scope (canShare), which the routes enforce again.
   'packages/store-core/src/components/admin/kit/saved-views.tsx',
+  // The standard Export: its only mutating calls stream an export and save the member's own presets.
+  'packages/store-core/src/components/admin/export/ExportDialog.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
   'controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx',
   // Approve or reject one licence in the KYC tab: its review route checks isPlatformAdmin.
@@ -41,6 +43,10 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/ecom/detail/AccountModeToggle.tsx',
   'controller-service/src/components/admin/ecom/detail/DeliveryModeToggle.tsx',
   'controller-service/src/components/admin/ecom/detail/UpiModeToggle.tsx',
+  // Outreach skill editor and preview (platform control plane): their only POSTs validate or render a draft on
+  // ecom_outreach:read routes that write nothing; saving goes through the parent's useCanWrite('ecom_outreach:write').
+  'controller-service/src/app/(admin)/admin/ecom/outreach/SkillEditor.tsx',
+  'controller-service/src/app/(admin)/admin/ecom/outreach/SkillPreview.tsx',
   // A store's / the flagship's SMS & WhatsApp numbers: rendered only for the platform administrator (ecom → store →
   // Numbers, isPlatformAdmin) and the flagship's administrator (Settings → Numbers); both endpoints check that role.
   'packages/store-core/src/components/admin/messaging/SenderCard.tsx',

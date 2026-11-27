@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { listCampaignSends } from '@/lib/campaigns/sends'
 import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 import { migrateLegacyCampaignDrafts } from '@/lib/campaigns/ensure-builtin-campaigns'
@@ -52,23 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   delete campaign.draft_fields_new
 
   const [recentSends, countRow, whatsappLogs, statsRow] = await Promise.all([
-    queryMany(
-      `
-      SELECT
-        ecs.id, ecs.user_id, ecs.reference_id, ecs.sent_at, ecs.opened_at, ecs.clicked_at,
-        ecs.converted_at, ecs.unsubscribed_at, ecs.bounced_at,
-        u.email AS user_email,
-        COALESCE(u.first_name || ' ' || u.last_name, u.email) AS user_name,
-        COALESCE(csc.send_count, 1)::integer AS send_count
-      FROM email_campaigns_sent ecs
-      LEFT JOIN users u ON u.id = ecs.user_id
-      LEFT JOIN campaign_send_counts csc ON csc.campaign_kind = ecs.campaign_kind AND csc.user_id = ecs.user_id
-      WHERE ecs.campaign_kind = $1
-      ORDER BY ecs.sent_at DESC
-      LIMIT $2 OFFSET $3
-    `,
-      [kind, limit, offset]
-    ),
+    listCampaignSends(kind, limit, offset),
     queryOne<{ total: string }>(`SELECT COUNT(*) AS total FROM email_campaigns_sent WHERE campaign_kind = $1`, [kind]),
     queryMany(
       `

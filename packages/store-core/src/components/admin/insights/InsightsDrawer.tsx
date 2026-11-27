@@ -2,13 +2,15 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import AdminSelect from '../AdminSelect'
+import { ExportButton } from '../export/ExportButton'
 import { useFocusTrap, useScrollLock } from '../kit/dialog'
 import { SegmentedControl } from '../kit/segmented'
 import { IsoColumns, type IsoDay } from '../dashboard/IsoColumns'
 import { acc, CARD_SHADOW, fmtLong, fmtShort, nf, usePrefersReducedMotion } from '../dashboard/viz'
-import { dayTotal, INSIGHTS_PERIODS, insightsToCsv, type InsightsQuery, type InsightsSeries } from '@/lib/insights/series'
+import { dayTotal, INSIGHTS_PERIODS, type InsightsQuery, type InsightsSeries } from '@/lib/insights/series'
+import type { FilterValues } from '@/lib/export/types'
 
 export interface InsightsCopy {
   /** What the chart counts: "Orders shipped" reads "Orders shipped per day over 26 weeks". */
@@ -54,9 +56,12 @@ export interface InsightsConfig<E = unknown> {
   /** Stat strip; default total, busiest day and streaks from `totals`. */
   stats?: (s: InsightsSeries<E>, copy: InsightsCopy) => InsightsStat[]
   sections?: InsightsSection<E>[]
-  /** CSV file name prefix (default: the title as a slug); false hides Export. */
+  /** Export file/report name (default: the title); false hides Export. */
   exportName?: string | false
-  toCsv?: (s: InsightsSeries<E>) => string
+  /** A page-specific Export (registry key) instead of the shared series export; it gets `weeks=` and `filter=` in its query. */
+  exportKey?: string
+  /** Include/exclude choices the Export should open with, from the drawer's filter value. */
+  exportFilters?: (filter: string | null) => FilterValues | undefined
 }
 
 export interface InsightsDrawerProps<E = unknown> extends InsightsConfig<E> {
@@ -74,7 +79,6 @@ const MODES = [
 ]
 
 const keyOf = (weeks: number, filter: string | null) => `${weeks}|${filter ?? ''}`
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'insights'
 
 export function defaultInsightsStats(s: InsightsSeries<unknown>, copy: InsightsCopy): InsightsStat[] {
   const t = s.totals
@@ -104,15 +108,12 @@ export function insightsIsoDays(s: Pick<InsightsSeries<unknown>, 'series' | 'day
   }))
 }
 
-function downloadCsv(text: string, name: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+/** The shared series export's query: what the drawer shows, so the file matches it. */
+export function insightsExportQuery(title: string, s: InsightsSeries<unknown>, filterLabel?: string): string {
+  const q = new URLSearchParams({ title, from: s.from, to: s.to, today: s.today, series: s.series.map(x => `${x.key}:${x.label}`).join('|') })
+  if (filterLabel) q.set('filter', filterLabel)
+  if (s.days.some(d => d.top?.length)) q.set('top', '1')
+  return q.toString()
 }
 
 function Stat({ label, value, sub, accent }: InsightsStat) {
@@ -163,7 +164,8 @@ export function InsightsDrawer<E = unknown>({
   stats = defaultInsightsStats,
   sections = [],
   exportName,
-  toCsv = insightsToCsv,
+  exportKey,
+  exportFilters,
 }: InsightsDrawerProps<E>) {
   const panel = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -276,10 +278,11 @@ export function InsightsDrawer<E = unknown>({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              {exportName !== false && (
-                <button type="button" aria-label="Export CSV" title="Export CSV" disabled={!series} onClick={() => series && downloadCsv(toCsv(series), `${exportName || slug(title)}-${series.from}_${series.to}.csv`)} className={iconBtn}>
-                  <Download className="h-4 w-4" />
-                </button>
+              {exportKey ? (
+                <ExportButton exportKey={exportKey} query={`weeks=${weeks}&filter=${encodeURIComponent(filterValue ?? '')}`} filters={exportFilters?.(filterValue)} />
+              ) : (
+                exportName !== false &&
+                series && <ExportButton exportKey="insights.series" query={insightsExportQuery(exportName || title, series, filter?.options.find(o => o.value === filterValue)?.label)} rows={series.days} />
               )}
               <button type="button" aria-label="Close" title="Close" onClick={onClose} className={iconBtn}>
                 <X className="h-4 w-4" />

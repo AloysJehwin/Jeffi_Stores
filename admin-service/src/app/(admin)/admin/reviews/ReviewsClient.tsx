@@ -15,6 +15,7 @@ import { tabHref } from '@/lib/admin/filter-url'
 import { REVIEW_ALIASES, REVIEW_FIELDS, REVIEW_LIST_PRESET, REVIEW_SEARCH } from '@/lib/filters/fields/reviews'
 import ReviewsOverview from './_components/ReviewsOverview'
 import { Sk } from '@/components/admin/kit/skeleton'
+import { useExportRows } from '@/components/admin/export/export-rows'
 
 interface Review {
   id: string
@@ -142,6 +143,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
     },
   })
   const reviews = list.rows
+  useExportRows('reviews', reviews.map(r => String(r.id)))
   const isLoading = list.loading
 
   useEffect(() => {

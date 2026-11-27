@@ -97,6 +97,14 @@ ALTER TABLE ONLY public.admin_saved_views
     ADD CONSTRAINT admin_saved_views_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
 
 
+--
+-- Name: admin_export_presets admin_export_presets_admin_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_export_presets
+    ADD CONSTRAINT admin_export_presets_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id) ON DELETE CASCADE;
+
+
 
 --
 -- Name: admins admins_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics, AnalyticsRange } from '@/lib/queries'
 import { DonutSplit, RankedBars, FunnelBar, LinkedLegend, MiniStat, ListRows, GroupLabel, StatusBadge, ORDER_STATUS, rs, rsCompact, pctStr, numStr, hoursStr, delta, formatBucket } from '@/components/admin/kit'
@@ -176,8 +177,11 @@ export default function AnalyticsDashboardClient({
 
   const prevLabel = data.range === 'today' ? 'yesterday' : 'previous period'
   const rangeBar = (
-    <div className="max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <SegmentedPills ariaLabel="Date range" options={RANGES.map(r => ({ value: r.key, label: r.label }))} value={range} onChange={changeRange} />
+    <div className="flex max-w-full items-center gap-2">
+      <div className="min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <SegmentedPills ariaLabel="Date range" options={RANGES.map(r => ({ value: r.key, label: r.label }))} value={range} onChange={changeRange} />
+      </div>
+      <ExportButton exportKey="dashboard.analytics" query={`range=${data.range}`} />
     </div>
   )
   const f = data.insights.fulfilment

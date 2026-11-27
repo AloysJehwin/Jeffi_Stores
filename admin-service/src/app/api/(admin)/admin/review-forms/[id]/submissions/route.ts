@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryCount, queryOne } from '@/lib/shared/db'
+import { queryOne } from '@/lib/shared/db'
+import { listFormSubmissions } from '@/lib/review-forms/submissions'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,25 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const limit = 50
   const offset = (page - 1) * limit
 
-  const conditions = ['rfs.form_id = $1']
-  const params2: unknown[] = [id]
-  let i = 2
-
-  if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-    conditions.push(`rfs.status = $${i++}`)
-    params2.push(status)
-  }
-
-  const where = `WHERE ${conditions.join(' AND ')}`
-
-  const [submissions, total] = await Promise.all([
-    queryMany(
-      `SELECT rfs.* FROM review_form_submissions rfs ${where} ORDER BY rfs.submitted_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-      [...params2, limit, offset]
-    ),
-    queryCount(`SELECT COUNT(*) FROM review_form_submissions rfs ${where}`, params2),
-  ])
-
+  const { submissions, total } = await listFormSubmissions(id, { status, limit, offset })
   return NextResponse.json({ submissions, total })
 }
 

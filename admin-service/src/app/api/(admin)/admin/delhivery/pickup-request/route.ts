@@ -7,20 +7,9 @@ import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
 import { walletBlocksShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
+import { EXCLUDE_STATUSES, loadPickupLists } from '@/lib/shipping/delhivery-pickups'
 
 const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
-
-const EXCLUDE_STATUSES = [
-  'shipped',
-  'delivered',
-  'granted',
-  'cancelled',
-  'returned',
-  'return_requested',
-  'return_approved',
-  'return_received',
-  'return_rejected',
-]
 
 // AWB status types that indicate the shipment has been physically picked up
 const PICKED_UP_TYPES = new Set([
@@ -129,37 +118,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ pickup_status: newStatus, rescheduledDate, updated: newStatus !== req.pickup_status })
     }
 
-    const [orders, pickupHistory] = await Promise.all([
-      queryMany(
-        `
-        SELECT o.id, o.order_number, o.awb_number, o.status, o.created_at,
-               o.customer_name, sa.city, sa.state, sa.postal_code
-        FROM orders o
-        LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
-        WHERE o.awb_number IS NOT NULL
-          AND o.payment_status = 'paid'
-          AND o.status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
-          AND o.awb_number NOT IN (
-            SELECT UNNEST(awbs) FROM delhivery_pickup_requests
-            WHERE pickup_status IN ('pending', 'picked_up')
-          )
-        ORDER BY o.created_at DESC
-        LIMIT 100
-      `,
-        [...EXCLUDE_STATUSES]
-      ),
-      queryMany(
-        `
-        SELECT id, pickup_id, pickup_date, awb_count, awbs, raw_response, pickup_status, created_at
-        FROM delhivery_pickup_requests
-        ORDER BY created_at DESC
-        LIMIT 20
-      `,
-        []
-      ),
-    ])
-
-    return NextResponse.json({ orders: orders || [], pickupHistory: pickupHistory || [] })
+    return NextResponse.json(await loadPickupLists())
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

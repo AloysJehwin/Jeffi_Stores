@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "17c493a3f26c970f1846bf7c83f645121616a46ee0079d0a7728e5b0d6e508c3",
+ "manifestHash": "8fb750801c4ed26799d3f908ee0199cc201cd4f3a45187c4c7cd707e5fadd12d",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -12108,6 +12108,410 @@
    "command": "events get"
   },
   {
+   "id": "admin GET /api/admin/export/{key}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "q"
+   ],
+   "queryParams": [
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get an export",
+   "command": "export get"
+  },
+  {
+   "id": "admin POST /api/admin/export/{key}",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "export",
+       "count"
+      ]
+     },
+     "options": {
+      "type": "object",
+      "properties": {
+       "format": {
+        "type": "string",
+        "enum": [
+         "csv",
+         "xlsx",
+         "pdf",
+         "pptx"
+        ]
+       },
+       "scope": {
+        "type": "string",
+        "enum": [
+         "filtered",
+         "page",
+         "selected",
+         "all"
+        ]
+       },
+       "columns": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "Chosen columns, in output order."
+       },
+       "filters": {
+        "type": "object",
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          {
+           "type": "boolean"
+          }
+         ]
+        }
+       },
+       "range": {
+        "type": "object",
+        "properties": {
+         "from": {
+          "type": "string"
+         },
+         "to": {
+          "type": "string"
+         }
+        }
+       },
+       "branding": {
+        "type": "object",
+        "properties": {
+         "header": {
+          "type": "boolean",
+          "description": "Master switch: the spreadsheet header block, the PDF header, the PPTX title slide."
+         },
+         "storeName": {
+          "type": "boolean"
+         },
+         "gstin": {
+          "type": "boolean"
+         },
+         "address": {
+          "type": "boolean"
+         },
+         "title": {
+          "type": "boolean"
+         },
+         "period": {
+          "type": "boolean"
+         },
+         "generatedAt": {
+          "type": "boolean"
+         },
+         "filters": {
+          "type": "boolean"
+         },
+         "logo": {
+          "type": "boolean"
+         },
+         "pageNumbers": {
+          "type": "boolean"
+         },
+         "generatedBy": {
+          "type": "boolean"
+         },
+         "summary": {
+          "type": "boolean",
+          "description": "Totals row / summary block / PPTX summary slide."
+         }
+        },
+        "required": [
+         "header",
+         "storeName",
+         "gstin",
+         "address",
+         "title",
+         "period",
+         "generatedAt",
+         "filters",
+         "logo",
+         "pageNumbers",
+         "generatedBy",
+         "summary"
+        ]
+       }
+      },
+      "required": [
+       "format",
+       "scope",
+       "columns",
+       "filters",
+       "branding"
+      ]
+     },
+     "context": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "pageIds": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "selectedIds": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "rows": {
+        "type": "array",
+        "items": {},
+        "description": "Data the page already holds, for exports of what is on screen (insights series)."
+       }
+      }
+     }
+    },
+    "required": [
+     "options"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Act on an export",
+   "command": "export post"
+  },
+  {
+   "id": "admin PUT /api/admin/export/{key}",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "options": {
+      "type": "object",
+      "properties": {
+       "format": {
+        "type": "string",
+        "enum": [
+         "csv",
+         "xlsx",
+         "pdf",
+         "pptx"
+        ]
+       },
+       "scope": {
+        "type": "string",
+        "enum": [
+         "filtered",
+         "page",
+         "selected",
+         "all"
+        ]
+       },
+       "columns": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "Chosen columns, in output order."
+       },
+       "filters": {
+        "type": "object",
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          {
+           "type": "boolean"
+          }
+         ]
+        }
+       },
+       "range": {
+        "type": "object",
+        "properties": {
+         "from": {
+          "type": "string"
+         },
+         "to": {
+          "type": "string"
+         }
+        }
+       },
+       "branding": {
+        "type": "object",
+        "properties": {
+         "header": {
+          "type": "boolean",
+          "description": "Master switch: the spreadsheet header block, the PDF header, the PPTX title slide."
+         },
+         "storeName": {
+          "type": "boolean"
+         },
+         "gstin": {
+          "type": "boolean"
+         },
+         "address": {
+          "type": "boolean"
+         },
+         "title": {
+          "type": "boolean"
+         },
+         "period": {
+          "type": "boolean"
+         },
+         "generatedAt": {
+          "type": "boolean"
+         },
+         "filters": {
+          "type": "boolean"
+         },
+         "logo": {
+          "type": "boolean"
+         },
+         "pageNumbers": {
+          "type": "boolean"
+         },
+         "generatedBy": {
+          "type": "boolean"
+         },
+         "summary": {
+          "type": "boolean",
+          "description": "Totals row / summary block / PPTX summary slide."
+         }
+        },
+        "required": [
+         "header",
+         "storeName",
+         "gstin",
+         "address",
+         "title",
+         "period",
+         "generatedAt",
+         "filters",
+         "logo",
+         "pageNumbers",
+         "generatedBy",
+         "summary"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Update an export",
+   "command": "export update"
+  },
+  {
+   "id": "admin DELETE /api/admin/export/{key}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "id"
+   ],
+   "queryParams": [
+    {
+     "name": "id",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete an export",
+   "command": "export delete"
+  },
+  {
    "id": "admin GET /api/admin/filters/{entity}/export",
    "host": "admin",
    "method": "GET",
@@ -12408,12 +12812,7 @@
     {
      "name": "status",
      "schema": {
-      "type": "string",
-      "enum": [
-       "open",
-       "closed"
-      ],
-      "default": "all"
+      "type": "string"
      }
     }
    ],
@@ -13053,7 +13452,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "List transactions (financial)",
+   "summary": "Finance → Transactions overview (see lib/finance/transactions). Returns the FinanceOverviewContract<Totals> shape.",
    "command": "financial transactions"
   },
   {
@@ -18026,6 +18425,7 @@
    "query": [
     "format",
     "from",
+    "sources",
     "to"
    ],
    "queryParams": [
@@ -18047,6 +18447,12 @@
      }
     },
     {
+     "name": "sources",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
      "name": "to",
      "required": true,
      "schema": {
@@ -18062,7 +18468,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Get gstr1 (GST)",
+   "summary": "GSTR-1 for the period; ?sources=online|cash_sale keeps only those revenue sources (all when absent). ?format=csv is the legacy flat download; the admin page exports through /api/admin/export/gst.gstr1.",
    "command": "gst gstr1"
   },
   {
@@ -18076,6 +18482,7 @@
    "query": [
     "format",
     "from",
+    "sources",
     "to"
    ],
    "queryParams": [
@@ -18097,6 +18504,12 @@
      }
     },
     {
+     "name": "sources",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
      "name": "to",
      "required": true,
      "schema": {
@@ -18112,7 +18525,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Get gstr3b (GST)",
+   "summary": "GSTR-3B for the period; ?sources= as on GSTR-1. ?format=csv is the legacy flat download.",
    "command": "gst gstr3b"
   },
   {
@@ -18162,7 +18575,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Get itc (GST)",
+   "summary": "Input tax credit from received purchase orders in the period. ?format=csv is the legacy download.",
    "command": "gst itc"
   },
   {
@@ -39200,12 +39613,7 @@
     {
      "name": "status",
      "schema": {
-      "type": "string",
-      "enum": [
-       "pending",
-       "approved",
-       "rejected"
-      ]
+      "type": "string"
      }
     }
    ],

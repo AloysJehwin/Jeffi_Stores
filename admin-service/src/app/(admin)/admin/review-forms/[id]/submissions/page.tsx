@@ -7,6 +7,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { PageBody, PageHeader } from '@/components/admin/kit'
 import { Sk } from '@/components/admin/kit/skeleton'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { SubmissionCardsLoading } from './SubmissionsLoading'
 
 interface CustomField {
@@ -107,6 +108,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
         back={{ href: ap('/admin/review-forms'), label: 'Review Forms' }}
         title={formMeta?.title ? `${formMeta.title} — Submissions` : 'Submissions'}
         description={loading && !formMeta ? <Sk className="mt-1 h-3.5 w-16" /> : `${total} total`}
+        actions={<ExportButton exportKey="review-forms.submissions" query={`form=${id}`} filters={statusFilter ? { status: [statusFilter] } : undefined} />}
       />
 
       <div className="flex h-control w-fit max-w-full gap-1 overflow-x-auto rounded-lg border border-border-default bg-surface-elevated p-0.5">

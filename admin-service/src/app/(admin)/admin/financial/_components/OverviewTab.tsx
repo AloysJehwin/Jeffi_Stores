@@ -3,6 +3,7 @@
 // Finance Overview: KPIs with vs-previous deltas, cash flow trend, aging donuts and the
 // needs-attention list. Shares `?from&to` with every other finance tab via useFinancePeriod.
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { PageInsights } from '@/components/admin/insights'
 import { FINANCE_INSIGHTS } from './financial-insights'
 import Link from 'next/link'
@@ -106,7 +107,7 @@ export function OverviewTab() {
 
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<PageInsights config={FINANCE_INSIGHTS} />} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<><PageInsights config={FINANCE_INSIGHTS} /><ExportButton exportKey="financial.overview" range={range} /></>} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <OverviewTabSkeleton /> : data && <Body d={data} />}
     </div>

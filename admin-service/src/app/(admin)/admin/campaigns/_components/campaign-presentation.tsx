@@ -2,7 +2,7 @@
 // list/detail sheet (CampaignsMobileList) so both render channels, rates and stats identically.
 import type { ReactNode } from 'react'
 import { Bell } from 'lucide-react'
-import { campaignSupportsPush } from '@/lib/campaigns/push-kinds'
+import { campaignChannels, type CampaignChannel } from '@/lib/campaigns/channels'
 import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 
 export interface CampaignRow {
@@ -35,29 +35,10 @@ export interface CampaignRow {
   push_converted?: string | number | null
 }
 
-export type CampaignChannel = 'email' | 'whatsapp' | 'push'
-
-const WA_KINDS = [
-  'abandoned_cart',
-  'abandoned_checkout',
-  'order_shipped',
-  'order_delivered',
-  'reorder_reminder',
-  'back_in_stock',
-  'back_in_stock_alert',
-]
+export type { CampaignChannel }
 
 /** `on` is Site Controls' switches (useMessagingChannels): an off channel gets no chip or filter. */
-export function getChannels(
-  kind: string,
-  params: Record<string, unknown> | null | undefined,
-  scenarioKind: string | null | undefined,
-  on: { whatsapp: boolean; push: boolean }
-): CampaignChannel[] {
-  const out: CampaignChannel[] = on.whatsapp && WA_KINDS.includes(kind) ? ['email', 'whatsapp'] : ['email']
-  if (on.push && params?.pushEnabled === true && (campaignSupportsPush(kind) || campaignSupportsPush(scenarioKind ?? ''))) out.push('push')
-  return out
-}
+export const getChannels = campaignChannels
 
 /** "Also send via SMS/WhatsApp/app push" params of a channel Site Controls has switched off. */
 export function channelParamOff(key: string, on: { sms: boolean; whatsapp: boolean; push: boolean }): boolean {

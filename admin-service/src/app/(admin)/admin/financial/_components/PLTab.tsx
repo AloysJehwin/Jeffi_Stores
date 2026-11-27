@@ -4,6 +4,7 @@
 // delta vs the previous FY, trend + donut row, and a monthly table whose rows deep-link to
 // ?month=YYYY-MM for an inline detail view (replaces the former modal).
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
@@ -61,7 +62,7 @@ export function PLTab() {
 
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} defaultPreset="fy" />
+      <FinancePeriodBar onRefresh={reload} busy={loading} defaultPreset="fy" actions={<ExportButton exportKey="financial.pl" range={range} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (
         <PLTabSkeleton />

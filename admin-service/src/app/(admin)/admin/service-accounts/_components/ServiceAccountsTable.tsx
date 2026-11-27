@@ -78,6 +78,7 @@ export default function ServiceAccountsTable({ accounts, scopeLabels, canWrite }
       rows={accounts}
       cols={cols}
       rowKey={sa => String(sa.id)}
+      exportKey="service-accounts.list"
       paged
       mobile={rows => (
         <div className="p-4">

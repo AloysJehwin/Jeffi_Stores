@@ -114,7 +114,7 @@ function baseConfig({ app, headers = [] }) {
     // /_next/image: the storefront's optimizer, which holds public/.
     ...(app === 'storefront' ? {} : { assetPrefix: `/_${app}` }),
     // Bundled, pdfjs can't find its worker ("pdf.worker.mjs" missing); @napi-rs/canvas is native.
-    serverExternalPackages: ['pdfkit', 'ioredis', 'pg', 'pdfjs-dist', '@napi-rs/canvas', 'tailwindcss'],
+    serverExternalPackages: ['pdfkit', 'ioredis', 'pg', 'pdfjs-dist', '@napi-rs/canvas', 'tailwindcss', 'pptxgenjs'],
     images: {
       remotePatterns: IMAGE_HOSTS.map(hostname => ({ protocol: 'https', hostname })),
       deviceSizes: IMAGE_OPT.deviceSizes,

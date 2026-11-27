@@ -12,6 +12,7 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import { ChannelAlerts } from '@/components/admin/channels/ChannelPanels'
 import { Badge, Banner, Empty, Kpi, KpiGrid, RangePresets, Section, Table, Tabs, api, btnGhost, btnPrimary, change, count, lastDays, money, pct, when } from '@/components/admin/channels/ui'
 import ColumnMapper from './ColumnMapper'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { IMPORT_HISTORY_COLUMNS, MarketplaceAdsTabLoading } from './skeletons'
 import { ap } from '@/lib/shared/admin-path'
@@ -93,7 +94,7 @@ export default function MarketplaceAdsConsole({ channel }: { channel: AdsChannel
       ) : !data ? (
         <MarketplaceAdsTabLoading tab={tab} />
       ) : (
-        <Body tab={tab} d={data} info={info} portalLink={portalLink} onImport={canWrite ? () => setTab('import') : undefined} />
+        <Body tab={tab} d={data} info={info} channel={channel} range={range} portalLink={portalLink} onImport={canWrite ? () => setTab('import') : undefined} />
       )}
     </div>
   )
@@ -110,7 +111,7 @@ const kpiCols = [
   { key: 'units', label: 'Units', num: true, render: (r: any) => count(r.units), sort: (r: any) => r.units },
 ]
 
-function Body({ tab, d, info, portalLink, onImport }: { tab: Tab; d: any; info: (typeof INFO)[AdsChannel]; portalLink: React.ReactNode; onImport?: () => void }) {
+function Body({ tab, d, info, channel, range, portalLink, onImport }: { tab: Tab; d: any; info: (typeof INFO)[AdsChannel]; channel: AdsChannel; range: { from: string; to: string }; portalLink: React.ReactNode; onImport?: () => void }) {
   switch (tab) {
     case 'overview': {
       if (!d.coverage)
@@ -160,7 +161,7 @@ function Body({ tab, d, info, portalLink, onImport }: { tab: Tab; d: any; info: 
     }
     case 'campaigns':
       return (
-        <Section title="Campaigns">
+        <Section title="Campaigns" action={<ExportButton exportKey={`${channel.replace('_', '-')}.campaigns`} range={range} />}>
           <Table
             rows={d.rows}
             rowKey={(r: any) => r.campaignKey || '-'}
@@ -175,7 +176,7 @@ function Body({ tab, d, info, portalLink, onImport }: { tab: Tab; d: any; info: 
       )
     case 'products':
       return (
-        <Section title="Advertised products">
+        <Section title="Advertised products" action={<ExportButton exportKey={`${channel.replace('_', '-')}.products`} range={range} />}>
           <Table
             rows={d.rows}
             rowKey={(r: any) => r.productKey}

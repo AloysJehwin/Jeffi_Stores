@@ -29,6 +29,7 @@ import SerialEntryModal, {
 import CashSaleMobileList from './_components/CashSaleMobileList'
 import { CASH_SALE_ALIASES, CASH_SALE_FIELDS, CASH_SALE_SEARCH } from '@/lib/filters/fields/cash-sale'
 import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { useExportRows } from '@/components/admin/export/export-rows'
 
 const SORT_COLS: SortCol[] = [
   { key: 'invoice_number', label: 'Receipt No' },
@@ -386,6 +387,7 @@ export default function CashSaleClient({ onViewChange }: { onViewChange?: (v: Vi
     },
   })
   const sales = list.rows
+  useExportRows('cash_sale', sales.map(r => String(r.id)))
   const sortedSales = sales
   const loading = list.loading
   const fetchSales = list.reload
