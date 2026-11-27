@@ -8,6 +8,7 @@ import { compileCodeProps, sectionTree } from '@/lib/site/code/compile'
 import { classOps, setPanelValue } from '@/lib/site/code/classes'
 import { convertBlock } from '@/lib/site/convert'
 import { litClass, placeOps } from '@/components/site-editor/free-ops'
+import { slideTemplate } from '@/lib/site/code/slide-templates'
 
 const PIC = { hero: '/images/Working.png', side: '/images/Welcome.png', phone: '/images/Tools.png' }
 
@@ -69,6 +70,14 @@ export function heroTree(): CodeNode {
   return tree
 }
 
+/** A poster slide (frame, free layers at Tablet and Desktop, words in container units), its picture the storefront's own. */
+export function slideTree(): CodeNode {
+  const tree = slideTemplate('poster')
+  if (!isTagNode(tree)) throw new Error('editor pack: the slide lost its root')
+  const kids = tree.children.map(c => (c.t === 'cmp' && c.name === 'Image' ? { ...c, props: { ...c.props, src: { k: 'lit' as const, v: PIC.side } } } : c))
+  return { ...tree, children: kids }
+}
+
 const classic = (id: string, type: string, props: Record<string, unknown>): Block => ({ id, type, v: 1, props })
 
 /** One of each convertible kind, as "Convert to editable section" leaves it. */
@@ -102,6 +111,9 @@ export async function editorHomeDoc(): Promise<PageDoc> {
   const hero = await compileCodeProps({ label: 'Hero', tree: heroTree(), source: '' }, 'home')
   if (!hero.ok) throw new Error(`editor pack: the hero does not save: ${hero.issues[0]?.message}`)
   blocks['ed-hero'] = { id: 'ed-hero', type: 'code_section', v: 1, props: hero.props }
+  const slide = await compileCodeProps({ label: 'Slide', tree: slideTree(), source: '' }, 'home')
+  if (!slide.ok) throw new Error(`editor pack: the slide does not save: ${slide.issues[0]?.message}`)
+  blocks['ed-slide'] = { id: 'ed-slide', type: 'code_section', v: 1, props: slide.props }
   for (const b of CONVERTED) {
     const r = await convertBlock(b, 'home')
     if (!r?.ok) throw new Error(`editor pack: ${b.type} does not convert${r && !r.ok ? `: ${r.issues[0]?.message}` : ''}`)

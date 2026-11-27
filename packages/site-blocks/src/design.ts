@@ -200,6 +200,9 @@ function copyWithIds(n: CodeNode, taken: Set<string>, rootId?: string): CodeNode
   return clone
 }
 
+/** A copy of a subtree for pasting: every tag under a fresh id (`taken` grows with them), derived ids following. */
+export const cloneWithIds = (n: CodeNode, taken: Set<string>): CodeNode => copyWithIds(n, taken)
+
 const isLitString = (v: CodeValue | undefined): v is { k: 'lit'; v: string } => !!v && v.k === 'lit' && typeof v.v === 'string'
 const hasLocked = (n: CodeNode) => [...walk(n)].some(l => isTagNode(l.node) && !!l.node.locked)
 const BAD_ATTR = /^on|^(ref|key|style|dangerouslySetInnerHTML|data-e|srcSet|srcset|formAction|action)$/

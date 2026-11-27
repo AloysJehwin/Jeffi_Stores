@@ -1,7 +1,7 @@
 import { isTagNode, type CodeNode } from '@jeffi/site-blocks'
 import { EDITOR_BREAKPOINTS, findNode, type Breakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { classOps } from '@/lib/site/code/classes'
-import { frameFor, freeAt, placeFree, restack, unplaceFree, type FreeLayer, type FreeRect } from '@/lib/site/code/free'
+import { frameFor, freeAt, placeFree, restack, setRotate, unplaceFree, type FreeLayer, type FreeRect } from '@/lib/site/code/free'
 import { insideData } from './nodes'
 
 // Free layers as design operations on a section's tree: placing an element (and readying its frame), moving it back
@@ -76,4 +76,31 @@ export function restackOps(tree: CodeNode, id: string, bp: Breakpoint, dir: 'fro
   if (!layer) return []
   const z = restack(layersAt(tree, bp).map(l => l.layer.z), layer.z, dir)
   return z === layer.z ? [] : placeOps(tree, id, bp, layer.rect, { z })
+}
+
+/** A free layer turned to `deg` degrees at a breakpoint (0 clears it). */
+export function rotateOps(tree: CodeNode, id: string, bp: Breakpoint, deg: number): DesignOp[] {
+  const cls = litClass(tree, id)
+  return cls === null || !layerAt(tree, id, bp) ? [] : classOps(id, cls, setRotate(cls, bp, deg))
+}
+
+/** Layers moved to new left and top (their size and stacking kept): one step for all of them. */
+export function arrangeOps(tree: CodeNode, bp: Breakpoint, moves: { id: string; left: number; top: number }[]): DesignOp[] {
+  return moves.flatMap(m => {
+    const layer = layerAt(tree, m.id, bp)
+    return layer ? placeOps(tree, m.id, bp, { ...layer.rect, left: m.left, top: m.top }, { z: layer.z }) : []
+  })
+}
+
+/** Layers moved by whole percents (the keyboard on a selection) or resized (`resize`): one step for all of them. */
+export function shiftOps(tree: CodeNode, bp: Breakpoint, ids: string[], dx: number, dy: number, resize = false): DesignOp[] {
+  return ids.flatMap(id => {
+    const layer = layerAt(tree, id, bp)
+    if (!layer) return []
+    const { left, top, width, height } = layer.rect
+    const rect: FreeRect = resize
+      ? { left, top, width: Math.max(2, width + dx), ...(height !== undefined ? { height: Math.max(2, height + dy) } : {}) }
+      : { left: left + dx, top: top + dy, width, ...(height !== undefined ? { height } : {}) }
+    return placeOps(tree, id, bp, rect, { z: layer.z })
+  })
 }

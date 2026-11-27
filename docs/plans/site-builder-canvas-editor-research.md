@@ -1,6 +1,6 @@
 # Canvas editor for the site builder: open-source research
 
-Status: research, for decision
+Status: decided and built (2026-11-27): phases A–E below, see SITE_EDITOR_PLAN.md phase 7. Open questions 1–3 taken: a slide is a code-section variant, rotation yes (per breakpoint), slides stack in reading order on phones; no banner designer, no paid licence.
 Date: 2026-11-27
 Builds on: [SITE_EDITOR_PLAN.md](SITE_EDITOR_PLAN.md) (visual editor, phases 0-6 built; phase 3 free layers designed)
 

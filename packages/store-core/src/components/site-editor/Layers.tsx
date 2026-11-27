@@ -16,12 +16,14 @@ import { insideData, nodeName, nodeWords, pathTo } from './nodes'
 export interface LayersProps {
   doc: PageDoc
   trees: Record<string, CodeNode>
-  sel: { block: string; id: string | null } | null
+  /** `more`: the rest of a multiple selection, in the same section. */
+  sel: { block: string; id: string | null; more?: string[] } | null
   canWrite: boolean
   label: (block: string) => string
   /** A section the page needs (a locked part inside, or a classic block the registry locks). */
   locked?: (block: string) => boolean
-  onSelect: (block: string, id: string | null) => void
+  /** `additive` (shift-click): adds or removes the element from the selection. */
+  onSelect: (block: string, id: string | null, additive?: boolean) => void
   onMoveSection: (block: string, to: number) => void
   /** Before the child at `index` of `parent`, counted before the node leaves its place (design.ts `move`). */
   onMoveNode: (block: string, id: string, parent: string, index: number) => void
@@ -31,6 +33,8 @@ export interface LayersProps {
    */
   freeState?: (block: string, id: string) => 'free' | 'wider' | 'flow' | null
   onToggleFree?: (block: string, id: string) => void
+  /** A free layer's rotation at the breakpoint being edited, in degrees (0 or unset: none). */
+  rotation?: (block: string, id: string) => number
 }
 
 const shown = (n: CodeNode) => n.t !== 'text' && n.t !== 'expr' && !!n.id
@@ -87,11 +91,15 @@ function NodeRow({ block, node, depth, sortable }: { block: string; node: CodeNo
   const words = nodeWords(node, 26)
   const empty = !listOf(node).some(shown) && !slotsOf(node).some(shown)
   const free = c.freeState?.(block, id) ?? null
+  const rotated = free === 'free' ? (c.rotation?.(block, id) ?? 0) : 0
+  const picked = c.sel?.block === block && (c.sel.id === id || !!c.sel.more?.includes(id))
+  // Named only when there is more to say than its text: a free layer, or a rotated one.
+  const name = free === 'free' ? `${[nodeName(node), words].filter(Boolean).join(' ')}, free layer${rotated ? `, rotated ${rotated} degrees` : ''}` : undefined
   return (
     <div ref={s.setNodeRef} style={{ transform: CSS.Translate.toString(s.transform), transition: s.transition, opacity: s.isDragging ? 0.5 : 1 }}>
-      <div className={rowCls(c.sel?.block === block && c.sel.id === id)} style={{ paddingLeft: 6 + depth * 12 }}>
+      <div className={rowCls(picked)} style={{ paddingLeft: 6 + depth * 12 }}>
         <Chevron open={open} hidden={empty} onClick={() => c.toggle(k)} />
-        <button type="button" onClick={() => c.onSelect(block, id)} className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left">
+        <button type="button" aria-label={name} onClick={e => c.onSelect(block, id, e.shiftKey)} className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-left">
           <span className="shrink-0 font-medium">{nodeName(node)}</span>
           {words && <span className="truncate text-xs text-foreground-muted">{words}</span>}
         </button>

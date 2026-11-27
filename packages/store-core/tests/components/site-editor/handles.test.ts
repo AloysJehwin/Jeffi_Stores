@@ -59,4 +59,28 @@ describe('free layer handles', () => {
     expect(onCommit.mock.calls[1][0]).toMatchObject({ left: 9, top: 12 })
     h.detach()
   })
+
+  it('labels its knobs, resizes by whole percents, and reports a rotation in 15° steps', () => {
+    const { el } = scene()
+    const onCommit = vi.fn()
+    const onRotate = vi.fn()
+    const h = createHandles(document)
+    h.attach(el, { sized: false, onCommit, onRotate })
+    const labels = [...document.querySelectorAll('[data-e-overlay][role="button"]')].map(k => k.getAttribute('aria-label'))
+    expect(labels).toContain('Resize from the right')
+    expect(labels).toContain('Resize from the top left corner')
+    h.resize(5, 0)
+    expect(onCommit).toHaveBeenLastCalledWith({ left: 10, top: 10, width: 35, height: 20 }, false)
+    // happy-dom has no layout: the layer now measures as the browser would after the inline width.
+    el.getBoundingClientRect = () => ({ left: 100, top: 50, width: 350, height: 100, right: 450, bottom: 150, x: 100, y: 50, toJSON: () => ({}) }) as DOMRect
+    h.resize(0, 3)
+    expect(onCommit).toHaveBeenLastCalledWith({ left: 10, top: 10, width: 35, height: 23 }, true)
+    const knob = document.querySelector('[aria-label^="Rotate"]')!
+    pointer('pointerdown', knob, 250, 78)
+    // A little under straight right of the layer's centre (250, 100): about 94°, snapped to 90.
+    pointer('pointermove', document, 400, 106)
+    pointer('pointerup', document, 400, 106)
+    expect(onRotate).toHaveBeenCalledWith(90)
+    h.detach()
+  })
 })

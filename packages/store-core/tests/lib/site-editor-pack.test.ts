@@ -18,9 +18,9 @@ describe('the responsive sweep’s editor page', () => {
     expect(layersAt(tree, 'base')).toHaveLength(1)
   })
 
-  it('saves every section as a compiled v2 code section, one per convertible kind after the hero', async () => {
+  it('saves every section as a compiled v2 code section, the slide, then one per convertible kind', async () => {
     const doc = await editorHomeDoc()
-    expect(doc.order).toEqual(['ed-hero', ...CONVERTED.map(b => b.id)])
+    expect(doc.order).toEqual(['ed-hero', 'ed-slide', ...CONVERTED.map(b => b.id)])
     for (const id of doc.order) {
       const b = doc.blocks[id]
       expect(b.type).toBe('code_section')
@@ -30,5 +30,6 @@ describe('the responsive sweep’s editor page', () => {
     const css = (doc.blocks['ed-hero'].props.compiled as CompiledSection).css
     expect(css).toMatch(/position:\s*absolute/)
     expect(css).toMatch(/@media \(min-width:\s*1024px\)/)
+    expect((doc.blocks['ed-slide'].props.compiled as CompiledSection).css).toMatch(/container-type:\s*inline-size/)
   })
 })

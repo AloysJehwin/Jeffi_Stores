@@ -13,7 +13,7 @@ const COLOR = `(?:surface(?:-elevated|-secondary)?|foreground(?:-secondary|-mute
 const ARB = '\\[[^\\]\\s]+\\]'
 const SPACE = `(?:\\d+(?:\\.5)?|px|${ARB})`
 const SIZE = `(?:\\d+(?:\\.5)?|px|auto|full|screen|min|max|fit|svh|dvh|lvh|\\d+\\/\\d+|xs|sm|md|lg|xl|[2-7]xl|prose|none|${ARB})`
-const LENGTH = /^\[(?:-?[\d.]+(?:px|rem|em|%|vw|vh|ch)|calc\(.+\)|clamp\(.+\))\]$/
+const LENGTH = /^\[(?:-?[\d.]+(?:px|rem|em|%|vw|vh|ch|cqw)|calc\(.+\)|clamp\(.+\))\]$/
 
 interface PropDef {
   group: PanelGroup
@@ -87,6 +87,7 @@ export const PANEL_PROPS = {
   bottom: signed('position', 'bottom', SIZE),
   left: signed('position', 'left', SIZE),
   zIndex: signed('position', 'z', `\\d+|auto|${ARB}`),
+  rotate: signed('position', 'rotate', `\\d+|${ARB}`),
 } satisfies Record<string, PropDef>
 
 export type PanelProp = keyof typeof PANEL_PROPS

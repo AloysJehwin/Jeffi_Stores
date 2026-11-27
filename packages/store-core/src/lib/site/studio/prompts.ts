@@ -3,6 +3,7 @@ import { HTML_TAGS, LIBRARY_MODULE } from '../code/allow'
 import { codeRules } from '../code/library'
 import { PRODUCT_FIELDS } from '../code/parts/common'
 import { libraryText } from './library'
+import { SLIDE_RULES, isSlideLayout } from './slide-rules'
 import type { DesignDirection, PlannedPage, PlannedSection, StudioBrief } from './types'
 import { uiStyle } from './ui-styles'
 import { utilityRules } from './utility'
@@ -120,7 +121,7 @@ ${p.sections.map((x, i) => `${i === index ? '→' : ' '} ${i + 1}. ${x.label}: $
 
 Write section ${index + 1}, "${s.label}": ${s.intent}
 Composition: ${s.layout}. Make it look different from its neighbours.
-${must}`.trim()
+${must}${isSlideLayout(s.layout) ? `\n\n${SLIDE_RULES}` : ''}`.trim()
 }
 
 export function repairText(issues: string[]): string {
@@ -140,7 +141,7 @@ ${source}
 \`\`\`
 
 Change it as the owner asks: ${instruction}
-Keep everything else, keep every library component it uses, and return the whole component in one \`\`\`tsx block.${source.includes('data-e=') ? `\n\n${EDITOR_RULES}` : ''}`
+Keep everything else, keep every library component it uses, and return the whole component in one \`\`\`tsx block.${source.includes('data-e=') ? `\n\n${EDITOR_RULES}` : ''}${isSlideLayout(source) ? `\n\n${SLIDE_RULES}` : ''}`
 }
 
 /**

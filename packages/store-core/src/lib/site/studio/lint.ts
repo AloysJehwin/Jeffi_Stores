@@ -3,6 +3,7 @@ import { CARD_PRODUCT, carouselList, type CodeNode, type CodeValue } from '../co
 import { splitClasses, taxonomyOf } from '../code/allow'
 import { checkGrid, gridTrouble, PHONE as PHONE_WIDTH } from '../code/grid'
 import { placeholderRows } from '../code/placeholders'
+import { lintSlide } from './slide-rules'
 
 // What a studio section must not hard-code. It is written against a sample catalogue but goes live on the store's own,
 // which starts empty and later has its own categories, brands and products: names, slugs, prices and contact details
@@ -202,6 +203,7 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
   // A Showcase opens with its header (`first`); the opening is the section holding the page's h1.
   if (showcase && h1 && !opts.first && !businessPicture) found.add(LINT.showcaseHero)
   if (showcase && placeholderRows(ast).size) found.add(LINT.standIn)
+  for (const m of lintSlide(ast as CodeNode)) found.add(m)
   return page === 'showcase' ? [...found].map(m => SHOWCASE_LINT[m] ?? m) : [...found]
 }
 

@@ -4,6 +4,7 @@ import { NODE_ID, type PageKey } from '@jeffi/site-blocks'
 import { carouselList, type CodeNode, type CodeValue } from '@/lib/site/code/ast'
 import { FORBIDDEN_KEYS, HTML_TAGS, MAX_DEPTH, MAX_EACH, VOID_TAGS, attrAllowed, safeHref, safeSrc, taxonomyOf } from '@/lib/site/code/allow'
 import { codeMark } from '@/lib/site/code/css'
+import { isRichText } from '@/lib/site/code/rich'
 import { evalValue, toText, truthy } from '@/lib/site/code/evaluate'
 import { allowedOnPage, codeLibrary, type RenderCtx } from '@/lib/site/code/library'
 import type { SiteData } from '@/lib/site/data/types'
@@ -331,6 +332,7 @@ function renderEl(node: Extract<CodeNode, { t: 'el' }>, env: Env, key?: Key): Re
   if (env.preview && typeof node.id === 'string' && NODE_ID.test(node.id)) {
     props['data-e'] = node.id
     if (!VOID_TAGS.has(tag) && (node.children ?? []).every(c => c.t === 'text')) props['data-e-text'] = ''
+    else if (isRichText(node)) props['data-e-rich'] = ''
   }
   if (tag === 'img') {
     if (typeof props.src !== 'string') return null

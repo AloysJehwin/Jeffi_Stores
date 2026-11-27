@@ -23,7 +23,7 @@ import { upgradeCodeProps } from './code/compile'
 
 export interface Finding {
   severity: 'error' | 'warn'
-  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page' | 'off_screen' | 'no_alt' | 'heading_order'
+  code: 'empty_data' | 'empty_block' | 'no_image' | 'too_long' | 'busy_image' | 'contrast' | 'repeat' | 'phone_dense' | 'too_many' | 'empty_page' | 'off_screen' | 'no_alt' | 'heading_order' | 'slide_overflow' | 'slide_text'
   message: string
   blockId?: string
   /** It can be fixed without asking (removed, set, shortened). */

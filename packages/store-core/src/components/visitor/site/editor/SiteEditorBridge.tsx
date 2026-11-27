@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { withBreakpoint, type DesignOp } from '@jeffi/site-blocks/design'
 import { boxIn, createHandles } from './handles'
+import type { RichSession } from './rich-text'
 
 // The visual editor's side of the Site Builder canvas (docs/plans/SITE_EDITOR_PLAN.md), successor to
 // SitePreviewBridge. Dormant until the editor (components/site-editor) sends `site-editor:mode`; then a click selects
@@ -11,19 +12,30 @@ import { boxIn, createHandles } from './handles'
 // apply at once (text, classes, a picture); the rest show on the reload after the save. Every change goes back as
 // design operations (@jeffi/site-blocks/design), which the editor records and saves; the save compiles them again.
 //
+// Rich text: a double click on a `data-e-rich` element (literal text with bold, italic, underline, strike, breaks and
+// links) or on a text-only p, li, blockquote, figcaption, dd, td or span mounts Tiptap on it (rich-text.ts, imported on
+// the first such edit). A commit with words only reports the `text` op as before; otherwise one `node` op (children
+// only, `rich: true` on the message) that the editor completes from the live tree (rich-convert.ts mergeRich).
+//
 // Free layers (phase 3): a selected element positioned `absolute` gets move and resize handles (handles.ts); a drag
 // or an arrow key reports its new box in % of its frame, and `measure` reports an element's box before it is placed.
+// A rotate knob above it reports whole degrees. Shift-click adds or removes an element: the bridge reports the click
+// (`shift`), the editor settles the selection and sends it back as a primary `id` plus `more` in the same section, which
+// are all outlined; handles stay on a lone free layer, and arrow keys on several go to the editor.
 //
-// Messages in (from the parent only): mode { on, write }, select { block, id }, apply { block, ops, seq },
-// scroll-to { y }, measure { block, id, req }, place { block, id, rect | null, frame?, frameMinHeight? },
+// Messages in (from the parent only): mode { on, write }, select { block, id, more? }, apply { block, ops, seq },
+// scroll-to { y }, measure { block, id, req }, place { block, id, rect | null, frame?, frameMinHeight? }, rotate { block, id, deg },
 // flash { block, ids } (what an AI change touched, lit up for a moment), overflow { req } (the page check's screen
 // sizes: what runs past this frame's width, answered without editing mode).
-// Messages out: ready, select { block, id, tag, cmp, text }, ops { block, ops }, applied { block, ops, seq },
-// scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' }, measured { req, rect, frame, frameHeight },
-// placed { block, id, rect, sized }, overflowed { req, width, items: { block, id, right }[] }.
+// Messages out: ready, select { block, id, tag, cmp, text, shift }, ops { block, ops, rich? }, applied { block, ops, seq },
+// scroll { y }, key { action: 'undo' | 'redo' | 'delete' | 'escape' | 'group' | 'ungroup' | 'copy' | 'cut' | 'paste' |
+// 'duplicate' | 'nudge' (dx, dy) | 'resize' (dx, dy) }, measured { req, rect, frame, frameHeight },
+// placed { block, id, rect, sized }, rotated { block, id, deg }, overflowed { req, width, items: { block, id, right }[] }.
 
 type Win = Window & { __siteEditorBridge?: boolean }
 const P = 'site-editor:'
+const RICH_TAGS = /^(p|li|blockquote|figcaption|dd|td|span)$/i
+const inOverlay = (t: EventTarget | null) => t instanceof Element && !!t.closest('[data-e-overlay]')
 
 export default function SiteEditorBridge() {
   useEffect(() => {
@@ -34,7 +46,10 @@ export default function SiteEditorBridge() {
     let write = true
     const handles = createHandles(document)
     let selected: HTMLElement | null = null
-    let editing: { el: HTMLElement; before: string } | null = null
+    // The rest of a multiple selection (the primary is `selected`).
+    let more: HTMLElement[] = []
+    // `rich`: undefined while editing plain text; null while the rich editor loads; else its session.
+    let editing: { el: HTMLElement; before: string; rich?: RichSession | null } | null = null
     const root = document.documentElement
     const send = (msg: Record<string, unknown>) => window.parent.postMessage({ ...msg, type: P + msg.type }, '*')
     const blockOf = (el: Element) => el.closest<HTMLElement>('[data-block-id]')?.dataset.blockId ?? null
@@ -55,15 +70,20 @@ export default function SiteEditorBridge() {
     /** Handles on the selection while it is a free layer. */
     const syncHandles = () => {
       const el = selected
-      if (!on || !write || !el?.dataset.e || !isFree(el)) return handles.detach()
+      if (!on || !write || more.length || !el?.dataset.e || !isFree(el)) return handles.detach()
       const block = blockOf(el)
       const id = el.dataset.e
-      handles.attach(el, { sized: false, onCommit: (rect, sized) => send({ type: 'placed', block, id, rect, sized }) })
+      handles.attach(el, {
+        sized: false,
+        onCommit: (rect, sized) => send({ type: 'placed', block, id, rect, sized }),
+        onRotate: deg => send({ type: 'rotated', block, id, deg }),
+      })
     }
-    const mark = (el: HTMLElement | null) => {
-      selected?.removeAttribute('data-e-selected')
+    const mark = (el: HTMLElement | null, rest: HTMLElement[] = []) => {
+      for (const x of [selected, ...more]) x?.removeAttribute('data-e-selected')
       selected = el
-      el?.setAttribute('data-e-selected', '')
+      more = el ? rest.filter(x => x !== el) : []
+      for (const x of [selected, ...more]) x?.setAttribute('data-e-selected', '')
       syncHandles()
     }
     /** What a layer is placed in: its offsetParent once free; before, the nearest positioned ancestor in the section,
@@ -74,12 +94,15 @@ export default function SiteEditorBridge() {
       for (let p = el.parentElement; p && top?.contains(p); p = p.parentElement) if (p === top || getComputedStyle(p).position !== 'static') return p
       return null
     }
-    const select = (el: HTMLElement | null) => {
-      mark(el)
+    const select = (el: HTMLElement | null, shift = false) => {
+      const id = el?.dataset.e ?? null
+      // Shift-click only reports the click: the editor settles the selection and sends it back.
+      if (!shift || !id) mark(el)
       if (!el) return
-      const id = el.dataset.e ?? null
-      send({ type: 'select', block: blockOf(el), id, tag: el.tagName.toLowerCase(), cmp: el.hasAttribute('data-e-cmp'), text: id && textOnly(el) ? el.textContent : null })
+      send({ type: 'select', block: blockOf(el), id, tag: el.tagName.toLowerCase(), cmp: el.hasAttribute('data-e-cmp'), text: id && textOnly(el) ? el.textContent : null, shift: shift && !!id })
     }
+    /** Typing in a field (or an element being edited): keys belong to it. */
+    const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))
     /** What runs past the screen sideways, so the page scrolls or cuts it: the outermost such element of each section
      * that no ancestor clips or scrolls on purpose. Fixed layers never widen the page. */
     const overflowing = () => {
@@ -111,8 +134,14 @@ export default function SiteEditorBridge() {
 
     const commit = (keep: boolean) => {
       if (!editing) return
-      const { el, before } = editing
+      const { el, before, rich } = editing
       editing = null
+      if (rich !== undefined) {
+        // Rich edit: still loading leaves the element as it was.
+        const done = rich?.finish(keep)
+        if (keep && done && el.dataset.e) send({ type: 'ops', block: blockOf(el), ops: done.ops, ...(done.rich ? { rich: true } : {}) })
+        return
+      }
       el.removeAttribute('contenteditable')
       if (!keep) return void (el.textContent = before)
       // Typed line breaks read as spaces, as JSX text does.
@@ -154,14 +183,37 @@ export default function SiteEditorBridge() {
       e.preventDefault()
       e.stopPropagation()
       commit(true)
-      select(el ?? block)
+      select(el ?? block, e.shiftKey && !!el)
+    }
+    // Shift-click adds to the selection, not to the page's text selection.
+    const onMouseDown = (e: MouseEvent) => {
+      if (on && e.shiftKey && !editing && nodeOf(e.target)) e.preventDefault()
+    }
+    /** Mounts the rich editor on `el`; Tiptap loads on the first call only. */
+    const startRich = (el: HTMLElement) => {
+      const wasText = textOnly(el)
+      const state: NonNullable<typeof editing> = { el, before: el.textContent ?? '', rich: null }
+      editing = state
+      import('./rich-text')
+        .then(m => {
+          if (editing === state) state.rich = m.mountRich(el, wasText)
+        })
+        .catch(() => {
+          if (editing === state) editing = null
+        })
     }
     const onDblClick = (e: MouseEvent) => {
       if (!on) return
       const el = nodeOf(e.target)
-      if (!el || !textOnly(el)) return
+      if (!el) return
+      const rich = el.closest<HTMLElement>('[data-e-rich]') ?? (textOnly(el) && RICH_TAGS.test(el.tagName) ? el : null)
+      if (!rich && !textOnly(el)) return
       e.preventDefault()
       commit(true)
+      if (rich) {
+        select(rich)
+        return startRich(rich)
+      }
       select(el)
       editing = { el, before: el.textContent ?? '' }
       el.setAttribute('contenteditable', 'plaintext-only')
@@ -176,29 +228,59 @@ export default function SiteEditorBridge() {
     const onKey = (e: KeyboardEvent) => {
       if (!on) return
       if (editing) {
+        // The rich editor's toolbar (the link field) takes its own keys.
+        if (editing.rich !== undefined && inOverlay(e.target)) return
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault()
           commit(true)
         } else if (e.key === 'Escape') commit(false)
         return
       }
+      if (typing(e.target)) return
       const mod = e.metaKey || e.ctrlKey
-      // Arrow keys nudge a free layer by 1% (5% with shift).
+      const key = e.key.toLowerCase()
+      // Arrow keys nudge a free layer by 1% (5% with shift); with alt they resize it. On several, the editor moves them.
       const step = e.shiftKey ? 5 : 1
-      const nudge = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]
-      if (nudge && handles.target) {
+      const arrow = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key]
+      if (arrow && (handles.target || more.length)) {
         e.preventDefault()
-        return handles.nudge(nudge[0], nudge[1])
+        if (more.length) return send({ type: 'key', action: e.altKey ? 'resize' : 'nudge', dx: arrow[0], dy: arrow[1] })
+        return e.altKey ? handles.resize(arrow[0], arrow[1]) : handles.nudge(arrow[0], arrow[1])
       }
+      // Copy and cut leave a text selection alone.
+      const textSelected = !!window.getSelection()?.toString()
       const action =
-        mod && e.key.toLowerCase() === 'z' ? (e.shiftKey ? 'redo' : 'undo') : mod && e.key.toLowerCase() === 'y' ? 'redo' : e.key === 'Delete' || e.key === 'Backspace' ? 'delete' : e.key === 'Escape' ? 'escape' : null
+        mod && key === 'z'
+          ? e.shiftKey
+            ? 'redo'
+            : 'undo'
+          : mod && key === 'y'
+            ? 'redo'
+            : mod && key === 'g'
+              ? e.shiftKey
+                ? 'ungroup'
+                : 'group'
+              : mod && key === 'd'
+                ? 'duplicate'
+                : mod && (key === 'c' || key === 'x') && !textSelected
+                  ? key === 'c'
+                    ? 'copy'
+                    : 'cut'
+                  : mod && key === 'v'
+                    ? 'paste'
+                    : e.key === 'Delete' || e.key === 'Backspace'
+                      ? 'delete'
+                      : e.key === 'Escape'
+                        ? 'escape'
+                        : null
       if (!action) return
       e.preventDefault()
+      if (action === 'escape') mark(null)
       send({ type: 'key', action })
     }
     // Pasted content goes in as plain text only.
     const onPaste = (e: ClipboardEvent) => {
-      if (!editing) return
+      if (!editing || editing.rich !== undefined) return
       e.preventDefault()
       const text = e.clipboardData?.getData('text/plain') ?? ''
       const range = window.getSelection()?.getRangeAt(0)
@@ -208,7 +290,11 @@ export default function SiteEditorBridge() {
       range.collapse(false)
     }
     const onBlur = (e: FocusEvent) => {
-      if (editing && e.target === editing.el) commit(true)
+      if (!editing) return
+      // Focus moving between the rich editor and its toolbar's link field keeps the edit going.
+      const to = e.relatedTarget
+      const within = to instanceof Node && (editing.el.contains(to) || inOverlay(to))
+      if ((e.target === editing.el || (editing.rich !== undefined && inOverlay(e.target))) && !(editing.rich !== undefined && within)) commit(true)
     }
     let raf = 0
     const onScroll = () => {
@@ -216,7 +302,12 @@ export default function SiteEditorBridge() {
       raf = requestAnimationFrame(() => {
         send({ type: 'scroll', y: Math.round(window.scrollY) })
         handles.refresh()
+        editing?.rich?.refresh()
       })
+    }
+    const onResize = () => {
+      handles.refresh()
+      editing?.rich?.refresh()
     }
     const onMessage = (e: MessageEvent) => {
       if (e.source !== window.parent || typeof e.data?.type !== 'string' || !e.data.type.startsWith(P)) return
@@ -231,7 +322,8 @@ export default function SiteEditorBridge() {
         }
       } else if (kind === 'select') {
         const el = typeof e.data.block === 'string' ? (e.data.id ? findAll(e.data.block, e.data.id)[0] : document.querySelector<HTMLElement>(sel(e.data.block))) : null
-        mark(el ?? null)
+        const rest = el && Array.isArray(e.data.more) ? (e.data.more as unknown[]).flatMap(id => findAll(e.data.block, id).slice(0, 1)) : []
+        mark(el ?? null, rest)
         if (el) reveal(el)
       } else if (kind === 'apply' && Array.isArray(e.data.ops)) {
         const ops = (e.data.ops as DesignOp[]).filter(op => op && typeof op === 'object' && show(e.data.block, op))
@@ -250,6 +342,10 @@ export default function SiteEditorBridge() {
         els.forEach(el => el.setAttribute('data-e-flash', ''))
         els[0]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
         setTimeout(() => els.forEach(el => el.removeAttribute('data-e-flash')), 2600)
+      } else if (kind === 'rotate' && typeof e.data.deg === 'number') {
+        // Shown at once; the class draws it after the save's reload.
+        for (const el of findAll(e.data.block, e.data.id)) el.style.transform = e.data.deg ? `rotate(${e.data.deg}deg)` : 'none'
+        handles.refresh()
       } else if (kind === 'place') {
         // Shown at once with inline styles; the classes draw it after the save's reload.
         const r = e.data.rect as { left: number; top: number; width: number; height?: number } | null
@@ -266,11 +362,12 @@ export default function SiteEditorBridge() {
 
     document.addEventListener('click', onClick, true)
     document.addEventListener('dblclick', onDblClick, true)
+    document.addEventListener('mousedown', onMouseDown, true)
     document.addEventListener('keydown', onKey, true)
     document.addEventListener('paste', onPaste, true)
     document.addEventListener('focusout', onBlur, true)
     window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', handles.refresh)
+    window.addEventListener('resize', onResize)
     window.addEventListener('message', onMessage)
     send({ type: 'ready' })
     return () => {
@@ -281,11 +378,12 @@ export default function SiteEditorBridge() {
       root.removeAttribute('data-site-editing')
       document.removeEventListener('click', onClick, true)
       document.removeEventListener('dblclick', onDblClick, true)
+      document.removeEventListener('mousedown', onMouseDown, true)
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('paste', onPaste, true)
       document.removeEventListener('focusout', onBlur, true)
       window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', handles.refresh)
+      window.removeEventListener('resize', onResize)
       window.removeEventListener('message', onMessage)
       w.__siteEditorBridge = false
     }

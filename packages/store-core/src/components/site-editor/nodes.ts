@@ -12,10 +12,16 @@ const TAGS: Record<string, string> = {
 }
 const PARTS: Record<string, string> = { Image: 'Picture', Link: 'Link', Icon: 'Icon' }
 
+/** A box the editor made by grouping (`role="group"`). */
+export const isGroup = (n: CodeNode) => n.t === 'el' && n.tag === 'div' && n.props.role?.k === 'lit' && n.props.role.v === 'group'
+
+/** An element that holds other elements: a pasted copy goes inside it rather than after it. */
+export const isFrameNode = (n: CodeNode) => n.t === 'el' && ['div', 'section', 'article', 'aside', 'header', 'footer', 'main', 'nav', 'figure'].includes(n.tag)
+
 export function nodeName(n: CodeNode): string {
   switch (n.t) {
     case 'el':
-      return TAGS[n.tag] ?? `<${n.tag}>`
+      return isGroup(n) ? 'Group' : (TAGS[n.tag] ?? `<${n.tag}>`)
     case 'cmp':
       return PARTS[n.name] ?? n.name.replace(/([a-z])([A-Z])/g, '$1 $2')
     case 'text':

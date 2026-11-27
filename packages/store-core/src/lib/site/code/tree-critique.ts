@@ -1,14 +1,15 @@
 import { isTagNode, paletteFrom, type CodeNode, type ThemeTokens } from '@jeffi/site-blocks'
 import type { DesignOp } from '@jeffi/site-blocks/design'
-import { classOps, effectiveValue, setOwn } from './classes'
+import { classOps, effectiveValue, readClasses, setOwn } from './classes'
 import { freeAt, placeFree } from './free'
+import { DESIGN_WIDTH, isSlide, pxText, pxToCqw, setCqwFont, textPx } from './slide'
 
 // The critique on code sections' trees (docs/plans/SITE_EDITOR_PLAN.md phase 4), without a browser: words too pale
 // for what is behind them, words too long for their slot, pictures with no description, headings out of order, and
-// free layers that run off a phone's screen. Pure, so the editor runs it on the page it holds and the server's
+// free layers that run off a phone's screen, and, in a slide, layers past the frame and words sized in px. Pure, so the editor runs it on the page it holds and the server's
 // critique (lib/site/critique.ts) reads the same; fixes come back as design operations, or as an AI rewrite to ask for.
 
-export type TreeFindingCode = 'contrast' | 'too_long' | 'no_alt' | 'heading_order' | 'off_screen'
+export type TreeFindingCode = 'contrast' | 'too_long' | 'no_alt' | 'heading_order' | 'off_screen' | 'slide_overflow' | 'slide_text'
 
 export interface TreeFinding {
   code: TreeFindingCode
@@ -98,6 +99,46 @@ export function offScreen(tree: CodeNode): { id: string; ops: DesignOp[] }[] {
   return out
 }
 
+const past = (r: { left: number; top: number; width: number; height?: number }) => r.left < 0 || r.top < 0 || r.left + r.width > 100.5 || (r.height !== undefined && r.top + r.height > 100.5)
+
+/** A slide's layers whose box runs past the frame at Tablet or Desktop, with a fix that brings them in. */
+export function slideOverflow(tree: CodeNode): { id: string; ops: DesignOp[] }[] {
+  const out: { id: string; ops: DesignOp[] }[] = []
+  if (!isSlide(tree)) return out
+  walk(tree, n => {
+    const cls = n === tree ? null : litOf(n, 'className')
+    if (!cls || !n.id) return
+    let next = cls
+    let bad = false
+    for (const bp of ['md', 'lg'] as const) {
+      const r = freeAt(next, bp)?.rect
+      if (!r || !past(r)) continue
+      bad = true
+      const width = Math.min(100, r.width)
+      const height = r.height === undefined ? undefined : Math.min(100, r.height)
+      next = placeFree(next, bp, { left: Math.max(0, Math.min(r.left, 100 - width)), top: Math.max(0, Math.min(r.top, 100 - (height ?? 0))), width, ...(height !== undefined ? { height } : {}) })
+    }
+    if (bad) out.push({ id: n.id, ops: classOps(n.id, cls, next) })
+  })
+  return out
+}
+
+/** A slide's words sized in px (a Tailwind size or a px/rem value) where container units keep them in scale. */
+export function slideText(tree: CodeNode): { id: string; text: string; ops: DesignOp[] }[] {
+  return pxText(tree).map(({ node, holder, text, value }) => {
+    const cls = litOf(holder, 'className') ?? ''
+    const md = textPx(value)
+    let ops: DesignOp[] = []
+    if (md !== null && holder.id) {
+      let next = setCqwFont(cls, 'md', pxToCqw(md, DESIGN_WIDTH.md))
+      const lgOwn = readClasses(next).values.lg.fontSize
+      if (lgOwn !== undefined) next = setCqwFont(next, 'lg', pxToCqw(textPx(lgOwn) ?? md * (DESIGN_WIDTH.lg / DESIGN_WIDTH.md), DESIGN_WIDTH.lg))
+      ops = classOps(holder.id, cls, next)
+    }
+    return { id: holder.id ?? node.id ?? '', text, ops }
+  })
+}
+
 /**
  * One page's code sections checked in reading order (headings run across sections). `sections`: block id, label and
  * tree, in page order.
@@ -184,6 +225,10 @@ export function critiqueTrees(sections: { block: string; label: string; tree: Co
     })
     for (const o of offScreen(tree))
       out.push({ code: 'off_screen', severity: 'warn', block, id: o.id, message: `A freely placed element in "${label}" sits partly off the screen on phones.`, ...(o.ops.length ? { fix: { ops: o.ops } } : {}) })
+    for (const o of slideOverflow(tree))
+      out.push({ code: 'slide_overflow', severity: 'warn', block, id: o.id, message: `A layer in the slide "${label}" runs past the edge of the slide on tablets or desktops.`, ...(o.ops.length ? { fix: { ops: o.ops } } : {}) })
+    for (const o of slideText(tree))
+      out.push({ code: 'slide_text', severity: 'warn', block, id: o.id, message: `"${o.text.slice(0, 40)}" in the slide "${label}" is sized in px, so it will not scale with the slide; container units (cqw) keep it in proportion.`, ...(o.ops.length ? { fix: { ops: o.ops } } : {}) })
   }
   return out
 }
