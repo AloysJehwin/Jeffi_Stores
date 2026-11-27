@@ -158,6 +158,14 @@ export const toPerson = (r: Record<string, unknown>) => ({
   email: str(r.email),
 })
 
+type SqlRow = Record<string, unknown>
+
+export const toTopEarners = (rows: SqlRow[]) =>
+  rows.map(r => ({ ...toPerson(r), earned: num(r.earned), redeemed: num(r.redeemed), points: num(r.points), tier: str(r.tier) }))
+
+export const toTopReferrers = (rows: SqlRow[]) =>
+  rows.map(r => ({ ...toPerson(r), signups: num(r.signups), rewarded: num(r.rewarded), revenue: num(r.revenue) }))
+
 export interface ProgramFacts {
   loyaltyOn: boolean
   referralsOn: boolean

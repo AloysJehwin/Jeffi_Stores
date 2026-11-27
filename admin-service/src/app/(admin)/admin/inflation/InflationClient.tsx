@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import { EmptyState, ErrorState, Pager, PageBody, SortTh, fetchJson, usePagedList, useListSort, PageHeader, LoadingTable, Sk, badgeCls, fieldInputCls, useActionToast, type SortCol } from '@/components/admin/kit'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import InflationHistoryMobileList from './_components/InflationHistoryMobileList'
 import InflationOverview from './_components/InflationOverview'
@@ -553,8 +554,9 @@ export default function InflationClient({ categories, brands }: { categories: Ca
           )}
 
           <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-            <div className="px-4 sm:px-6 py-4 border-b border-border-default">
+            <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Inflation History</h2>
+              <ExportButton exportKey="inflation.history" />
             </div>
             {logsLoading ? (
               <LoadingTable columns={[...LOG_COLS.map(c => c.label), '']} rows={4} bare />

@@ -12,7 +12,7 @@ export class ProgramStateError extends Error {}
 
 const hhmm = (t: string) => String(t).slice(0, 5)
 
-const COLS = `program, enabled, daily_cap, concurrency, to_char(window_start, 'HH24:MI') AS window_start, to_char(window_end, 'HH24:MI') AS window_end, test_numbers, updated_at, updated_by`
+const COLS = `program, enabled, daily_cap, concurrency, to_char(window_start, 'HH24:MI') AS window_start, to_char(window_end, 'HH24:MI') AS window_end, test_numbers, default_skill_id, updated_at, updated_by`
 
 /** The program's state row, created from the registry defaults on first read. */
 export async function getProgramState(program: string): Promise<OutreachProgramState> {
@@ -34,6 +34,7 @@ export interface ProgramStatePatch {
   window_start?: string
   window_end?: string
   test_numbers?: string[]
+  default_skill_id?: string | null
 }
 
 export async function updateProgramState(program: string, patch: ProgramStatePatch, actor: { id: string | null; label: string }): Promise<OutreachProgramState> {
@@ -52,6 +53,12 @@ export async function updateProgramState(program: string, patch: ProgramStatePat
       if (!tests.includes(p)) tests.push(p)
     }
   }
+  if (patch.default_skill_id) {
+    const sk = (await outreachPool().query(`SELECT program, archived_at FROM outreach_skills WHERE id = $1`, [patch.default_skill_id])).rows[0] as { program: string; archived_at: unknown } | undefined
+    if (!sk) throw new ProgramStateError('Unknown skill')
+    if (sk.archived_at) throw new ProgramStateError('That skill is archived')
+    if (sk.program !== program) throw new ProgramStateError('That skill belongs to another program')
+  }
   const sets: string[] = []
   const params: unknown[] = [program]
   const set = (col: string, v: unknown) => {
@@ -64,6 +71,7 @@ export async function updateProgramState(program: string, patch: ProgramStatePat
   if (patch.window_start !== undefined) set('window_start', start)
   if (patch.window_end !== undefined) set('window_end', end)
   if (tests) set('test_numbers', tests)
+  if (patch.default_skill_id !== undefined) set('default_skill_id', patch.default_skill_id)
   if (!sets.length) return cur
   set('updated_by', actor.id)
   const r = await outreachPool().query(

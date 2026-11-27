@@ -5,7 +5,7 @@ import QrPaymentDialog, { createQrIntent, type QrIntent, type QrResult } from '@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Check, Plus } from 'lucide-react'
 import { QUOTATION_ALIASES, QUOTATION_FIELDS, QUOTATION_SEARCH } from '@jeffi/list-filters/fields'
-import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, SortTh, fetchJson, useFilterQuery, useInfiniteList, useListSort, type SortCol, Pager, usePagedList, EMBEDDED_PAGE_SIZE } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, DraftLockBadge, DraftLockBanner, EmptyState, LockedFieldset, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, ListFilters, SortTh, fetchJson, FormSkeleton, useFilterQuery, useInfiniteList, useListSort, type SortCol, Pager, usePagedList, EMBEDDED_PAGE_SIZE } from '@/components/admin/kit'
 import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
@@ -121,14 +121,22 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // open editor directly when ?edit=<id> is in the URL (e.g. from detail page Edit button)
+  // The URL names the draft (?view=editor&edit=<id>): load it on mount and whenever it changes.
+  const urlEditId = searchParams.get('view') === 'editor' ? searchParams.get('edit') : null
+  const [loadingDraft, setLoadingDraft] = useState(!!urlEditId)
+  const loadedFromUrl = useRef<string | null>(null)
   useEffect(() => {
-    const editParam = searchParams.get('edit')
-    if (editParam && searchParams.get('view') === 'editor') {
-      openEdit(editParam)
+    if (!urlEditId) {
+      loadedFromUrl.current = null
+      setLoadingDraft(false)
+      return
     }
+    if (loadedFromUrl.current === urlEditId) return
+    loadedFromUrl.current = urlEditId
+    setLoadingDraft(true)
+    void openEdit(urlEditId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [urlEditId])
 
   function navigateView(next: View) {
     setViewState(next)
@@ -308,6 +316,14 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
     navigateView('editor')
   }
 
+  /** Row / link action: the URL carries the id; the loader effect fetches it. */
+  function editQuotation(id: string) {
+    const params = new URLSearchParams(window.location.search)
+    params.set('view', 'editor')
+    params.set('edit', id)
+    router.push(ap(`/admin/quotations?${params.toString()}`), { scroll: false })
+  }
+
   async function openEdit(id: string) {
     setSaveError('')
     try {
@@ -384,10 +400,14 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
       setConvertedOrderId(q.converted_order_id || null)
       setAutoSaveStatus('idle')
       isEditorMounted.current = false
-      navigateView('editor')
+      setViewState('editor')
     } catch (e: any) {
+      loadedFromUrl.current = null
       setError(e?.message || 'Failed to load quotation')
       showToast(e?.message || 'Failed to load quotation', 'error')
+      router.replace(ap('/admin/quotations?tab=drafts'), { scroll: false })
+    } finally {
+      setLoadingDraft(false)
     }
   }
 
@@ -509,6 +529,8 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
 
   /** No status = autosave; 'draft' = the explicit Save as Draft; 'final' = finalise. */
   async function save(newStatus?: 'draft' | 'final') {
+    // Never create or write while the saved draft is still loading.
+    if (loadingDraft || (urlEditId && editId !== urlEditId)) return
     if (newStatus === 'final') {
       if (!cName.trim()) {
         setSaveError('Consignee name is required')
@@ -635,7 +657,16 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
         return
       }
       if (!res.ok) throw new Error(apiErrorMessage(res, data, 'Save failed'))
-      if (!editId) setEditId(data.quotation.id)
+      if (!editId) {
+        setEditId(data.quotation.id)
+        loadedFromUrl.current = data.quotation.id
+        if (!newStatus) {
+          const params = new URLSearchParams(window.location.search)
+          params.set('view', 'editor')
+          params.set('edit', data.quotation.id)
+          router.replace(ap(`/admin/quotations?${params.toString()}`), { scroll: false })
+        }
+      }
       setQuoteNumber(data.quotation.quote_number)
       setAutoSaveStatus('saved')
       setTimeout(() => setAutoSaveStatus('idle'), 2000)
@@ -666,7 +697,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
   }
 
   useEffect(() => {
-    if (view !== 'editor') return
+    if (view !== 'editor' || loadingDraft) return
     if (!isEditorMounted.current) {
       isEditorMounted.current = true
       return
@@ -695,6 +726,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
     bPincode,
     bEmail,
     items,
+    loadingDraft,
   ])
 
   useEffect(() => {
@@ -960,7 +992,7 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
                             <RowActions
                               size="sm"
                               actions={[
-                                { key: 'edit', kind: 'edit', label: 'Edit', hidden: q.status !== 'draft' || q.from_rfq || !canWrite, onSelect: () => openEdit(q.id) },
+                                { key: 'edit', kind: 'edit', label: 'Edit', hidden: q.status !== 'draft' || q.from_rfq || !canWrite, onSelect: () => editQuotation(q.id) },
                                 { key: 'view', kind: 'open', label: 'View Detail', href: ap(`/admin/quotations/${q.id}/view`) },
                                 { key: 'download', kind: 'download', label: 'Download PDF', href: `/api/admin/quotations/${q.id}/pdf`, target: '_blank' },
                                 {
@@ -1516,6 +1548,8 @@ export default function QuotationsClient({ canWrite = false, section = 'list' }:
       </div>
     )
   }
+
+  if (loadingDraft) return <FormSkeleton sections={3} />
 
   return (
     <div className="space-y-5">

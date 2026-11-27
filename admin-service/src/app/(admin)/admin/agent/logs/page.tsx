@@ -5,6 +5,7 @@ import { Bot, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
 import { PageHeader } from '@/components/admin/kit/layout'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
+import { useExportRows } from '@/components/admin/export/export-rows'
 import { AGENT_LOG_FIELDS } from '@/lib/filters/fields/agent'
 import { LOG_COUNT_CAP } from '@/lib/filters/fields/audit'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -49,6 +50,7 @@ export default function AgentLogsPage() {
     },
   })
   const toolLogs = list.rows
+  useExportRows('agent.actions', toolLogs.map(r => String(r.id)))
   const loading = list.loading || list.loadingMore
 
   return (

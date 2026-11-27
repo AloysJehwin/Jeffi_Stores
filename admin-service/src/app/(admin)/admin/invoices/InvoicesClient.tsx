@@ -241,7 +241,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoSaveInFlight = useRef(false)
-  const [editLoading, setEditLoading] = useState(false)
+  const [editLoading, setEditLoading] = useState(() => searchParams.get('view') === 'edit' && !!searchParams.get('edit'))
   const [drafts, setDrafts] = useState<any[]>([])
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [finalizingId, setFinalizingId] = useState<string | null>(null)
@@ -553,6 +553,7 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
     try {
       const res = await fetch(`/api/admin/orders/${inv.id}`, { credentials: 'include' })
       const data = await res.json()
+      if (!res.ok) throw new Error('load failed')
       const order = data.order || data
       const orderItems: any[] = data.items || []
 
@@ -631,6 +632,8 @@ export default function InvoicesClient({ canWrite = false, section = 'list' }: {
       navigateView('edit', inv.id)
     } catch {
       showToast('Failed to load invoice for editing', 'error')
+      editIdRef.current = null
+      if (searchParams.get('edit')) router.replace(ap('/admin/invoices?tab=drafts'), { scroll: false })
     } finally {
       setEditLoading(false)
     }

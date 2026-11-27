@@ -46,6 +46,7 @@ A file under `platform-only/` is a platform-only table: the flagship DB only, ne
 | `admin_agent_proposed_tools` | `tables/ai.sql` | writes: admin 2 |
 | `admin_audit_log` | `tables/logs.sql` | close call (document 1, admin 1); logs.sql is mostly admin-service |
 | `admin_certificates` | `tables/users.sql` | writes: admin 3, controller 2 |
+| `admin_export_presets` | `tables/users.sql` | writes: admin 1 |
 | `admin_mfa_recovery_codes` | `tables/users.sql` | writes: admin 6 |
 | `admin_notifications` | `tables/crm.sql` | writes: admin 3, document 1 |
 | `admin_saved_views` | `tables/users.sql` | writes: admin 3 |

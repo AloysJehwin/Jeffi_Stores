@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { InsightsDrawer, insightsIsoDays, type InsightsDrawerProps } from '@/components/admin/insights/InsightsDrawer'
+
+const exportProps = vi.hoisted(() => ({ last: null as any }))
+vi.mock('@/components/admin/export/ExportButton', () => ({
+  ExportButton: (p: any) => {
+    exportProps.last = p
+    return <button type="button">Export</button>
+  },
+}))
 import { weekdaySection, weeklySection } from '@/components/admin/insights/sections'
 import { mondayGrid, summarize, type InsightsSeries } from '@/lib/insights/series'
 import { mockReducedMotion } from '../../admin-dashboard/fixtures'
@@ -51,13 +59,6 @@ function renderDrawer(props: Partial<InsightsDrawerProps<Extra>> = {}) {
   return { onClose, load, ...utils }
 }
 
-const readBlob = (b: Blob) =>
-  new Promise<string>(resolve => {
-    const r = new FileReader()
-    r.onload = () => resolve(String(r.result))
-    r.readAsText(b)
-  })
-
 const pick = (name: string, option: string) => {
   fireEvent.click(screen.getByRole('combobox', { name }))
   fireEvent.click(screen.getByRole('option', { name: option }))
@@ -81,7 +82,7 @@ describe('InsightsDrawer', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(dialog.querySelector('[data-skeleton]')).toBeInTheDocument()
     expect(within(dialog).getByText('Halo Audio · Last 2 weeks')).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Export CSV' })).toBeDisabled()
+    expect(within(dialog).queryByRole('button', { name: 'Export' })).not.toBeInTheDocument()
     await waitFor(() => expect(load).toHaveBeenCalledWith({ weeks: 2, filter: 'all' }))
     await waitFor(() => expect(within(dialog).getByRole('img', { name: /^Return requests per day over 2 weeks/ })).toBeInTheDocument())
     expect(within(dialog).getByText('Halo Audio · 5 Jan – 18 Jan')).toBeInTheDocument()
@@ -198,35 +199,25 @@ describe('InsightsDrawer', () => {
     expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('exports the series as CSV named after the title, or a custom CSV, and can hide Export', async () => {
-    let blob: Blob | null = null
-    Object.assign(URL, { createObjectURL: vi.fn((b: Blob) => ((blob = b), 'blob:x')), revokeObjectURL: vi.fn() })
-    let name = ''
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      name = this.download
-    })
+  it('exports the shown series through the standard Export, named after the title', async () => {
     const { unmount } = renderDrawer()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Export CSV' })).not.toBeDisabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
-    expect(click).toHaveBeenCalledTimes(1)
-    expect(name).toBe('return-requests-2026-01-05_2026-01-18.csv')
-    const text = await readBlob(blob as unknown as Blob)
-    expect(text.split('\n')[0]).toBe('date,requested,approved,total')
-    expect(text.split('\n')).toHaveLength(15)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument())
+    expect(exportProps.last.exportKey).toBe('insights.series')
+    const q = new URLSearchParams(exportProps.last.query)
+    expect(q.get('title')).toBe('Return requests')
+    expect(q.get('series')).toBe('requested:Requested|approved:Approved')
+    expect([q.get('from'), q.get('to'), q.get('today'), q.get('filter')]).toEqual(['2026-01-05', '2026-01-18', TODAY, 'All types'])
+    expect(exportProps.last.rows).toHaveLength(14)
     unmount()
-    renderDrawer({ exportName: 'returns', toCsv: s => `custom ${s.weeks}` })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Export CSV' })).not.toBeDisabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }))
-    expect(name).toBe('returns-2026-01-05_2026-01-18.csv')
-    expect(await readBlob(blob as unknown as Blob)).toBe('custom 2')
-    click.mockRestore()
+    renderDrawer({ exportName: 'Returns' })
+    await waitFor(() => expect(new URLSearchParams(exportProps.last.query).get('title')).toBe('Returns'))
   })
 
   it('takes custom stats and hides Export with exportName false', async () => {
     renderDrawer({ exportName: false, stats: s => [{ label: 'Approved', value: s.days.reduce((n, d) => n + d.values[1], 0), accent: true }] })
     await waitFor(() => expect(screen.getByText('Approved', { selector: '[data-stats] p' })).toBeInTheDocument())
     expect(screen.queryByText('Busiest day')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Export CSV' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument()
   })
 })
 

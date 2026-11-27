@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, InfiniteFooter, PageBody, PageHeader, badgeCls,
 import { LoadingTable } from '@/components/admin/kit/skeleton'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { ap } from '@/lib/shared/admin-path'
 import EnrichmentOverview from './EnrichmentOverview'
 import EntityEnrichmentPanel from './EntityEnrichmentPanel'
@@ -259,7 +260,8 @@ export default function CatalogEnrichmentPage() {
         <EnrichmentOverview />
       ) : (
         <>
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <ExportButton exportKey="catalog-enrichment.proposals" filters={{ status: statusFilter === 'all' ? ['proposed', 'approved', 'rejected'] : [statusFilter] }} />
             <AdminSelect
               sm
               value={statusFilter}

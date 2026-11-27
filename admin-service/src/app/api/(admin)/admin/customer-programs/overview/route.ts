@@ -17,7 +17,8 @@ import {
   loyaltySeriesSql,
   programAttention,
   toLoyaltyTotals,
-  toPerson,
+  toTopEarners,
+  toTopReferrers,
   toReferralTotals,
 } from '@/lib/overviews/customer-programs'
 
@@ -77,25 +78,14 @@ export async function GET(request: NextRequest) {
         liability,
         redeemable_members: facts.redeemableMembers,
         series: series.map(r => ({ label: str(r.label), issued: num(r.issued), redeemed: num(r.redeemed) })),
-        top_earners: earners.map(r => ({
-          ...toPerson(r),
-          earned: num(r.earned),
-          redeemed: num(r.redeemed),
-          points: num(r.points),
-          tier: str(r.tier),
-        })),
+        top_earners: toTopEarners(earners),
       },
       referrals: {
         enabled: referralSettings.enabled,
         current: referrals.current,
         previous: referrals.previous,
         all_time: referralStats,
-        top_referrers: referrers.map(r => ({
-          ...toPerson(r),
-          signups: num(r.signups),
-          rewarded: num(r.rewarded),
-          revenue: num(r.revenue),
-        })),
+        top_referrers: toTopReferrers(referrers),
       },
       attention: programAttention(facts, loyalty.current, referrals.current),
     })

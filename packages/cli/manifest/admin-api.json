@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "17c493a3f26c970f1846bf7c83f645121616a46ee0079d0a7728e5b0d6e508c3",
+ "manifestHash": "67344222c0ae6016d56e7c6d68526effdc74645d9cb6af428eecf5724307bd58",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -12108,6 +12108,410 @@
    "command": "events get"
   },
   {
+   "id": "admin GET /api/admin/export/{key}",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "q"
+   ],
+   "queryParams": [
+    {
+     "name": "q",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Get an export",
+   "command": "export get"
+  },
+  {
+   "id": "admin POST /api/admin/export/{key}",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "export",
+       "count"
+      ]
+     },
+     "options": {
+      "type": "object",
+      "properties": {
+       "format": {
+        "type": "string",
+        "enum": [
+         "csv",
+         "xlsx",
+         "pdf",
+         "pptx"
+        ]
+       },
+       "scope": {
+        "type": "string",
+        "enum": [
+         "filtered",
+         "page",
+         "selected",
+         "all"
+        ]
+       },
+       "columns": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "Chosen columns, in output order."
+       },
+       "filters": {
+        "type": "object",
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          {
+           "type": "boolean"
+          }
+         ]
+        }
+       },
+       "range": {
+        "type": "object",
+        "properties": {
+         "from": {
+          "type": "string"
+         },
+         "to": {
+          "type": "string"
+         }
+        }
+       },
+       "branding": {
+        "type": "object",
+        "properties": {
+         "header": {
+          "type": "boolean",
+          "description": "Master switch: the spreadsheet header block, the PDF header, the PPTX title slide."
+         },
+         "storeName": {
+          "type": "boolean"
+         },
+         "gstin": {
+          "type": "boolean"
+         },
+         "address": {
+          "type": "boolean"
+         },
+         "title": {
+          "type": "boolean"
+         },
+         "period": {
+          "type": "boolean"
+         },
+         "generatedAt": {
+          "type": "boolean"
+         },
+         "filters": {
+          "type": "boolean"
+         },
+         "logo": {
+          "type": "boolean"
+         },
+         "pageNumbers": {
+          "type": "boolean"
+         },
+         "generatedBy": {
+          "type": "boolean"
+         },
+         "summary": {
+          "type": "boolean",
+          "description": "Totals row / summary block / PPTX summary slide."
+         }
+        },
+        "required": [
+         "header",
+         "storeName",
+         "gstin",
+         "address",
+         "title",
+         "period",
+         "generatedAt",
+         "filters",
+         "logo",
+         "pageNumbers",
+         "generatedBy",
+         "summary"
+        ]
+       }
+      },
+      "required": [
+       "format",
+       "scope",
+       "columns",
+       "filters",
+       "branding"
+      ]
+     },
+     "context": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "pageIds": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "selectedIds": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "rows": {
+        "type": "array",
+        "items": {},
+        "description": "Data the page already holds, for exports of what is on screen (insights series)."
+       }
+      }
+     }
+    },
+    "required": [
+     "options"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Act on an export",
+   "command": "export post"
+  },
+  {
+   "id": "admin PUT /api/admin/export/{key}",
+   "host": "admin",
+   "method": "PUT",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "options": {
+      "type": "object",
+      "properties": {
+       "format": {
+        "type": "string",
+        "enum": [
+         "csv",
+         "xlsx",
+         "pdf",
+         "pptx"
+        ]
+       },
+       "scope": {
+        "type": "string",
+        "enum": [
+         "filtered",
+         "page",
+         "selected",
+         "all"
+        ]
+       },
+       "columns": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "Chosen columns, in output order."
+       },
+       "filters": {
+        "type": "object",
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          {
+           "type": "boolean"
+          }
+         ]
+        }
+       },
+       "range": {
+        "type": "object",
+        "properties": {
+         "from": {
+          "type": "string"
+         },
+         "to": {
+          "type": "string"
+         }
+        }
+       },
+       "branding": {
+        "type": "object",
+        "properties": {
+         "header": {
+          "type": "boolean",
+          "description": "Master switch: the spreadsheet header block, the PDF header, the PPTX title slide."
+         },
+         "storeName": {
+          "type": "boolean"
+         },
+         "gstin": {
+          "type": "boolean"
+         },
+         "address": {
+          "type": "boolean"
+         },
+         "title": {
+          "type": "boolean"
+         },
+         "period": {
+          "type": "boolean"
+         },
+         "generatedAt": {
+          "type": "boolean"
+         },
+         "filters": {
+          "type": "boolean"
+         },
+         "logo": {
+          "type": "boolean"
+         },
+         "pageNumbers": {
+          "type": "boolean"
+         },
+         "generatedBy": {
+          "type": "boolean"
+         },
+         "summary": {
+          "type": "boolean",
+          "description": "Totals row / summary block / PPTX summary slide."
+         }
+        },
+        "required": [
+         "header",
+         "storeName",
+         "gstin",
+         "address",
+         "title",
+         "period",
+         "generatedAt",
+         "filters",
+         "logo",
+         "pageNumbers",
+         "generatedBy",
+         "summary"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "application/json",
+   "summary": "Update an export",
+   "command": "export update"
+  },
+  {
+   "id": "admin DELETE /api/admin/export/{key}",
+   "host": "admin",
+   "method": "DELETE",
+   "path": "/api/admin/export/{key}",
+   "gatewayPath": "/v1/admin/export/{key}",
+   "file": "admin-service/src/app/api/(admin)/admin/export/[key]/route.ts",
+   "pathParams": [
+    {
+     "name": "key",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "id"
+   ],
+   "queryParams": [
+    {
+     "name": "id",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": null,
+   "scopeSource": null,
+   "scopes": [],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "noBody": true,
+   "summary": "Delete an export",
+   "command": "export delete"
+  },
+  {
    "id": "admin GET /api/admin/filters/{entity}/export",
    "host": "admin",
    "method": "GET",
@@ -12408,12 +12812,7 @@
     {
      "name": "status",
      "schema": {
-      "type": "string",
-      "enum": [
-       "open",
-       "closed"
-      ],
-      "default": "all"
+      "type": "string"
      }
     }
    ],
@@ -13053,7 +13452,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "List transactions (financial)",
+   "summary": "Finance → Transactions overview (see lib/finance/transactions). Returns the FinanceOverviewContract<Totals> shape.",
    "command": "financial transactions"
   },
   {
@@ -18026,6 +18425,7 @@
    "query": [
     "format",
     "from",
+    "sources",
     "to"
    ],
    "queryParams": [
@@ -18047,6 +18447,12 @@
      }
     },
     {
+     "name": "sources",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
      "name": "to",
      "required": true,
      "schema": {
@@ -18062,7 +18468,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Get gstr1 (GST)",
+   "summary": "GSTR-1 for the period; ?sources=online|cash_sale keeps only those revenue sources (all when absent). ?format=csv is the legacy flat download; the admin page exports through /api/admin/export/gst.gstr1.",
    "command": "gst gstr1"
   },
   {
@@ -18076,6 +18482,7 @@
    "query": [
     "format",
     "from",
+    "sources",
     "to"
    ],
    "queryParams": [
@@ -18097,6 +18504,12 @@
      }
     },
     {
+     "name": "sources",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
      "name": "to",
      "required": true,
      "schema": {
@@ -18112,7 +18525,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Get gstr3b (GST)",
+   "summary": "GSTR-3B for the period; ?sources= as on GSTR-1. ?format=csv is the legacy flat download.",
    "command": "gst gstr3b"
   },
   {
@@ -18162,7 +18575,7 @@
    "guard": "auth",
    "platform": null,
    "body": null,
-   "summary": "Get itc (GST)",
+   "summary": "Input tax credit from received purchase orders in the period. ?format=csv is the legacy download.",
    "command": "gst itc"
   },
   {
@@ -39200,12 +39613,7 @@
     {
      "name": "status",
      "schema": {
-      "type": "string",
-      "enum": [
-       "pending",
-       "approved",
-       "rejected"
-      ]
+      "type": "string"
      }
     }
    ],
@@ -41483,6 +41891,60 @@
    "command": "site-builder create"
   },
   {
+   "id": "admin GET /api/admin/site-builder/admin-theme",
+   "host": "admin",
+   "method": "GET",
+   "path": "/api/admin/site-builder/admin-theme",
+   "gatewayPath": "/v1/admin/site-builder/admin-theme",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/admin-theme/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:read",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:read"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": null,
+   "summary": "Whether the admin panel also takes the store's published Site Builder theme.",
+   "command": "site-builder admin-theme"
+  },
+  {
+   "id": "admin POST /api/admin/site-builder/admin-theme",
+   "host": "admin",
+   "method": "POST",
+   "path": "/api/admin/site-builder/admin-theme",
+   "gatewayPath": "/v1/admin/site-builder/admin-theme",
+   "file": "admin-service/src/app/api/(admin)/admin/site-builder/admin-theme/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "settings:write",
+   "scopeSource": "literal",
+   "scopes": [
+    "settings:write"
+   ],
+   "guard": "auth",
+   "platform": null,
+   "body": {
+    "type": "object",
+    "properties": {
+     "enabled": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "enabled"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "Submit admin theme (site builder)",
+   "command": "site-builder admin-theme-create"
+  },
+  {
    "id": "admin POST /api/admin/site-builder/ai",
    "host": "admin",
    "method": "POST",
@@ -43014,7 +43476,8 @@
     }
    ],
    "query": [
-    "audience"
+    "audience",
+    "layout"
    ],
    "queryParams": [
     {
@@ -43024,6 +43487,12 @@
       "examples": [
        "business"
       ]
+     }
+    },
+    {
+     "name": "layout",
+     "schema": {
+      "type": "string"
      }
     }
    ],
@@ -49953,6 +50422,25 @@
    "command": "platform outreach-calls get"
   },
   {
+   "id": "platform GET /api/admin/ecom/outreach/catalog",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/catalog",
+   "gatewayPath": "/v1/platform/ecom/outreach/catalog",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/catalog/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET → what a skill can use: the tool catalog, the hard limits, the placeholders, the channels and flows.",
+   "command": "platform outreach catalog"
+  },
+  {
    "id": "platform GET /api/admin/ecom/outreach/contacts",
    "host": "platform",
    "method": "GET",
@@ -50025,7 +50513,9 @@
       "enum": [
        "suppress",
        "requeue",
-       "not_interested"
+       "not_interested",
+       "handoff",
+       "resume"
       ]
      },
      "note": {
@@ -50039,7 +50529,7 @@
    },
    "bodySource": "zod",
    "bodyContentType": "application/json",
-   "summary": "PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested.",
+   "summary": "PATCH { action } → the manual moves only: suppress (and add to the suppression list), requeue (attempts reset), mark not interested, and hand the lead to the team / resume the agent.",
    "command": "platform outreach-contacts update"
   },
   {
@@ -50177,6 +50667,62 @@
    "command": "platform outreach-lists create"
   },
   {
+   "id": "platform PATCH /api/admin/ecom/outreach/lists/{id}",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/lists/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/lists/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/lists/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "skill_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "skill_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "skill_id"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH { skill_id, skill_version_id? } → the campaign's skill (null clears it), optionally pinned to one version.",
+   "command": "platform outreach-lists update"
+  },
+  {
    "id": "platform POST /api/admin/ecom/outreach/lists/{id}/sync",
    "host": "platform",
    "method": "POST",
@@ -50281,13 +50827,324 @@
        "maxLength": 20
       },
       "maxItems": 10
+     },
+     "default_skill_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     }
    },
    "bodySource": "zod",
    "bodyContentType": "application/json",
-   "summary": "PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers.",
+   "summary": "PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers, the default skill.",
    "command": "platform outreach program-update"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/skills",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/skills",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/route.ts",
+   "pathParams": [],
+   "query": [
+    "archived",
+    "program"
+   ],
+   "queryParams": [
+    {
+     "name": "archived",
+     "schema": {
+      "type": "string",
+      "examples": [
+       "1"
+      ]
+     }
+    },
+    {
+     "name": "program",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET ?program&archived=1 → the skills, the builtin starting points and the program's default skill id.",
+   "command": "platform outreach-skills list"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "program": {
+      "type": "string",
+      "default": "showcase-offer"
+     },
+     "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+     }
+    },
+    "required": [
+     "content"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { content } → a new skill (version 1, current). 400 carries the validation, 409 means the name is taken.",
+   "command": "platform outreach-skills create"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/skills/{id}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/skills/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "Get a skill (outreach)",
+   "command": "platform outreach-skills get"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/outreach/skills/{id}",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/skills/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "current_version_id": {
+      "type": "string",
+      "format": "uuid"
+     }
+    }
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH { title?, description?, current_version_id? } → set the title, description or which version is current.",
+   "command": "platform outreach-skills update"
+  },
+  {
+   "id": "platform DELETE /api/admin/ecom/outreach/skills/{id}",
+   "host": "platform",
+   "method": "DELETE",
+   "path": "/api/admin/ecom/outreach/skills/{id}",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "noBody": true,
+   "summary": "DELETE → archive (versions, runs and pinned lists keep working; new runs skip it).",
+   "command": "platform outreach-skills delete"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills/{id}/versions",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills/{id}/versions",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/{id}/versions",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/[id]/versions/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+     }
+    },
+    "required": [
+     "content"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { content } → a new version of the skill, made current. 400 carries the validation.",
+   "command": "platform outreach-skills versions"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills/preview",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills/preview",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/preview",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/preview/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "content": {
+      "type": "string",
+      "maxLength": 200000
+     },
+     "versionId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "channel": {
+      "type": "string",
+      "enum": [
+       "voice",
+       "whatsapp",
+       "follow_up"
+      ]
+     },
+     "language": {
+      "type": "string",
+      "maxLength": 10
+     },
+     "contactId": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    "required": [
+     "channel"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST → the exact system prompt, greeting and tool list the agent would get, for a sample or a real contact. No AI call.",
+   "command": "platform outreach-skills preview"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/skills/validate",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/skills/validate",
+   "gatewayPath": "/v1/platform/ecom/outreach/skills/validate",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/skills/validate/route.ts",
+   "pathParams": [],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "content": {
+      "type": "string",
+      "maxLength": 200000
+     }
+    },
+    "required": [
+     "content"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { content } → the validation (errors, warnings, tools) without saving; the admin UI calls it as you type.",
+   "command": "platform outreach-skills validate"
   },
   {
    "id": "platform GET /api/admin/ecom/outreach/suppressions",

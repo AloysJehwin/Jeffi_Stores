@@ -299,6 +299,7 @@ export default function ProductsTableClient({
         rows={products}
         cols={cols}
         rowKey={p => p.id}
+        exportKey="products"
         total={total}
         page={page}
         pageSize={pageSize}

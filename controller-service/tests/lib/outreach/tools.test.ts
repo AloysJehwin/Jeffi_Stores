@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => ({
   query: vi.fn(),
   transition: vi.fn(),
-  loadCallContext: vi.fn(),
+  voiceAgentContext: vi.fn(),
   startDraft: vi.fn(),
   mergeBrief: vi.fn(),
   requestChange: vi.fn(),
@@ -11,7 +11,11 @@ const h = vi.hoisted(() => ({
   send: vi.fn(),
 }))
 vi.mock('@controller/lib/outreach/db', () => ({ outreachPool: () => ({ query: h.query }) }))
-vi.mock('@controller/lib/outreach/session', () => ({ loadCallContext: h.loadCallContext, readVoiceSettings: vi.fn() }))
+vi.mock('@controller/lib/outreach/session', () => ({ readVoiceSettings: vi.fn(), knownBrief: vi.fn(async () => ({})) }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ voiceAgentContext: h.voiceAgentContext }))
+vi.mock('@controller/lib/outreach/suppress', () => ({ isSuppressed: async () => false }))
+vi.mock('@controller/lib/outreach/claim', () => ({ createClaimToken: vi.fn() }))
+vi.mock('@/lib/showcase/store', () => ({ getShowcaseById: vi.fn(async () => null) }))
 vi.mock('@controller/lib/outreach/build', () => {
   class OutreachBuildError extends Error {
     constructor(readonly code: string, message: string) {
@@ -20,24 +24,33 @@ vi.mock('@controller/lib/outreach/build', () => {
   }
   return { startDraft: h.startDraft, mergeBrief: h.mergeBrief, requestChange: h.requestChange, publish: h.publish, OutreachBuildError }
 })
-vi.mock('@controller/lib/outreach/whatsapp', () => ({ sendOutreachTemplate: h.send }))
+vi.mock('@controller/lib/outreach/whatsapp', () => ({ sendOutreachTemplate: h.send, sendOutreachText: vi.fn(), windowOpen: () => false }))
 vi.mock('@controller/lib/outreach/state', async orig => ({ ...(await orig<typeof import('@controller/lib/outreach/state')>()), transition: h.transition }))
 
 import { runTool, callbackTime } from '@controller/lib/outreach/tools'
 import { OutreachBuildError } from '@controller/lib/outreach/build'
 import { InvalidTransitionError } from '@controller/lib/outreach/state'
-import { LINES, SCRIPT_VERSION } from '@controller/lib/outreach/prompt'
+import { LINES, SCRIPT_VERSION, asLanguage } from '@controller/lib/outreach/prompt'
+import { HARD_LIMITS } from '@controller/lib/outreach/agent/limits'
 
 const CALL = '11111111-1111-4111-8111-111111111111'
 // 11:30 IST
 const NOW = new Date('2026-11-25T06:00:00Z')
 let status = 'calling'
 
+const LEGACY = ['recordConsent', 'startPreview', 'addDetails', 'requestChange', 'publishSite', 'scheduleCallback', 'markOutcome', 'optOut', 'switchLanguage']
+
 const setup = (contact: Record<string, unknown> = {}, call: Record<string, unknown> = {}) => {
   status = (contact.status as string) ?? 'calling'
-  h.loadCallContext.mockResolvedValue({
-    call: { id: CALL, contact_id: 'k1', language: 'en', ended_at: null, transcript: [{ role: 'caller', text: 'yes please' }], ...call },
-    contact: { id: 'k1', phone: '+919876543210', status, attempts: 1, consent_whatsapp_at: null, language: 'en', program: 'showcase-offer', ...contact },
+  const c = { id: CALL, contact_id: 'k1', language: 'en', ended_at: null, transcript: [{ role: 'caller', text: 'yes please' }], ...call } as Record<string, any>
+  const k = { id: 'k1', phone: '+919876543210', status, attempts: 1, consent_whatsapp_at: null, language: 'en', program: 'showcase-offer', ...contact } as Record<string, any>
+  h.voiceAgentContext.mockResolvedValue({
+    call: c,
+    contact: k,
+    run: null,
+    skill: { ref: SCRIPT_VERSION, skill: { meta: { tools: { voice: LEGACY, whatsapp: [], follow_up: [] } } } },
+    limits: HARD_LIMITS,
+    language: asLanguage(c.language ?? k.language),
   })
 }
 const run = (tool: string, args: unknown = {}) => runTool(CALL, tool, args, NOW)
@@ -62,7 +75,7 @@ beforeEach(() => {
 describe('runTool guards', () => {
   it('404s an unknown tool or call, 409s an ended call, 400s bad args', async () => {
     expect((await run('nope')).status).toBe(404)
-    h.loadCallContext.mockResolvedValueOnce(null)
+    h.voiceAgentContext.mockResolvedValueOnce(null)
     expect((await run('optOut')).status).toBe(404)
     setup({}, { ended_at: '2026-11-25T05:00:00Z' })
     expect((await run('optOut')).status).toBe(409)
@@ -71,6 +84,12 @@ describe('runTool guards', () => {
     expect(bad.status).toBe(400)
     expect(bad.body.ok).toBe(false)
     expect(events()[0]).toMatchObject({ kind: 'tool_call', data: { tool: 'startPreview', ok: false } })
+  })
+
+  it('a tool the skill does not list is refused (403) and never runs', async () => {
+    const r = await run('getLead')
+    expect(r).toEqual({ status: 403, body: { ok: false, error: 'not_allowed' } })
+    expect(events()[0]).toMatchObject({ kind: 'tool_call', data: { tool: 'getLead', channel: 'voice', ok: false, error: 'not_allowed' } })
   })
 
   it('a thrown action answers ok:false with the apology line and is audited', async () => {

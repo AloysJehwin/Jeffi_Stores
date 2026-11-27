@@ -56,6 +56,7 @@ import AiSiteBuilder from './AiSiteBuilder'
 import { BlockLibrary, TemplatePanel, ThemePanel } from './SidePanels'
 import { BlockList, DND_MEASURING, useBlockDnd, type NewItem, type Parent, type RowActions } from './BlockList'
 import VisualEditor from './VisualEditor'
+import { BlockListSkeleton, BusyOverlay, EditorSkeleton, PanelSkeleton, PreviewSkeleton } from './SiteBuilderLoading'
 
 // Site Builder: one page on one layout at a time (store or business × desktop web, phone web, app). Left, the page's
 // blocks (drag to reorder, or drag one in from the library); centre, the real store rendering the draft (click a block
@@ -102,6 +103,17 @@ const PAGES: { key: PageKey; label: string }[] = [
 
 type Panel = 'block' | 'ai' | 'add' | 'templates' | 'theme'
 
+// The picker reads as a site map: every storefront page, in these groups (a page missing here lands in "Every page").
+const GROUPS: { label: string; pages: PageKey[] }[] = [
+  { label: 'Shop', pages: ['home', 'products', 'product', 'categories', 'category', 'brands', 'brand', 'search', 'wishlist', 'compare'] },
+  { label: 'Checkout & account', pages: ['cart', 'checkout', 'login', 'signup', 'account', 'track'] },
+  { label: 'Info pages', pages: ['about', 'contact', 'support', 'returns', 'legal', 'not_found'] },
+  { label: 'Every page', pages: ['header', 'footer', 'announcement', CARD as PageKey] },
+]
+const groupOf = (page: PageKey) => GROUPS.find(g => g.pages.includes(page))?.label ?? 'Every page'
+const BY_GROUP = (list: { key: PageKey; label: string }[]) =>
+  [...GROUPS.map(g => g.label)].flatMap(label => list.filter(p => groupOf(p.key) === label).map(p => ({ value: p.key as string, label: p.label, group: label })))
+
 // The business portal's pages Site Builder lays out.
 const BUSINESS_ONLY: PageKey[] = ['catalog', 'quotes', 'orders']
 const BUSINESS_PAGES: PageKey[] = ['home', 'about', 'support', ...BUSINESS_ONLY]
@@ -114,6 +126,16 @@ const previewPathOf = (page: PageKey) => PREVIEW_PATH[page] ?? (page === CARD ? 
 // Pages that preview on a sample record (a product, category, brand, search or order from the store).
 const SAMPLED: PageKey[] = ['product', 'category', 'brand', 'search', 'track']
 type Samples = { product: string | null; category: string | null; brand: string | null; search: string | null; order: string | null }
+// Why a sampled page can't preview yet: the store has nothing to show it on.
+const NEEDS: Partial<Record<PageKey, [keyof Samples, string]>> = {
+  product: ['product', 'Add a product to preview the product page.'],
+  category: ['category', 'Add a category to preview the category page.'],
+  brand: ['brand', 'Add a brand to preview the brand page.'],
+  search: ['search', 'Add a product to preview the search results.'],
+  track: ['order', 'Place an order to preview order tracking.'],
+}
+const NO_SAMPLES: Samples = { product: null, category: null, brand: null, search: null, order: null }
+type Work = { title: string; step: string }
 type History = { past: PageDoc[]; future: PageDoc[] }
 
 /** A page the AI Site Studio built: code sections, kept exactly as they are (no Products wrapper, no core block). */
@@ -125,6 +147,18 @@ const canon = (v: unknown): unknown =>
     : v && typeof v === 'object'
       ? Object.fromEntries(Object.keys(v).filter(k => k !== 'compiled').sort().map(k => [k, canon((v as Record<string, unknown>)[k])]))
       : v
+// A document as the editor opens it. Studio pages stay as built: wrapping their sections in a Products block or adding the
+// built-in core would replace them on the store (and checkout's payment step would then refuse to save).
+function prepareDoc(doc: PageDoc, page: PageKey): PageDoc {
+  if (isCodePage(doc)) return doc
+  let next = doc
+  // A listing layout from before the slot keeps its sections between the products, inside the Products block.
+  if (isListingKey(page)) next = wrapListingDoc(next, () => crypto.randomUUID())
+  // A page with a working core (product details, the cart) always has its block; a new layout starts with it.
+  const core = coreBlockFor(page)
+  if (core && !Object.values(next.blocks).some(b => b.type === core.type)) next = insertBlock(next, { id: crypto.randomUUID(), type: core.type, v: core.v, props: {} }, 0)
+  return next
+}
 const sameDoc = (a: PageDoc, b: PageDoc) => JSON.stringify(canon({ blocks: a.blocks, order: a.order })) === JSON.stringify(canon({ blocks: b.blocks, order: b.order }))
 
 export interface SiteBuilderEditorProps {
@@ -142,9 +176,11 @@ export interface SiteBuilderEditorProps {
    * these forms are the "Classic editor", for what it can't show (the app layout) or as a fallback. Off, nothing changes.
    */
   visual?: boolean
+  /** The store has a mobile app: only then is the App layout shown or editable. */
+  hasApp?: boolean
 }
 
-export default function SiteBuilderEditor({ options, planTypes, business, initialDraftId, drafts, live = true, customPages = [], visual = false }: SiteBuilderEditorProps) {
+export default function SiteBuilderEditor({ options, planTypes, business, initialDraftId, drafts: draftsProp, live = true, customPages = [], visual = false, hasApp = true }: SiteBuilderEditorProps) {
   const canWrite = useCanWrite('settings:write')
   const canAi = useCanUseAi('settings:write')
   const [picking, setPicking] = useState(true)
@@ -167,7 +203,10 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
   const [token, setToken] = useState<string | null>(null)
   const [frameKey, setFrameKey] = useState(0)
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [busy, setBusy] = useState(false)
+  const [work, setWork] = useState<Work | null>(null)
+  const busy = !!work
+  const [drafts, setDrafts] = useState(draftsProp)
+  const [loadedFrame, setLoadedFrame] = useState('')
   const [pageRedo, setPageRedo] = useState<(PageRedo & { keys: string[]; before: Record<string, PageDoc> }) | null>(null)
   const [visualOn, setVisualOn] = useState(visual)
   /** The draft whose preview token was asked for (got or not), so the visual editor waits for it instead of the forms flashing. */
@@ -225,15 +264,32 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
           ? previewPathOf(ref.page)
           : undefined
 
+  // The sample record the sampled pages preview on loads with the draft, so those pages open at once.
   useEffect(() => {
-    if (!SAMPLED.includes(page) || samples) return
-    api<Samples>('/api/admin/site-builder?sample=1').then(r => r.ok && setSamples(r.data))
-  }, [page, samples])
+    if (!draftId || samples) return
+    api<Samples>('/api/admin/site-builder?sample=1').then(r => setSamples(r.ok ? r.data : NO_SAMPLES))
+  }, [draftId, samples])
   const previewable = !!previewPath
+  const frameId = `${frameKey}:${audience}:${surface}:${previewPath}`
+  const need = NEEDS[ref.page]
+  const previewReason = isChromePage(ref.page)
+    ? 'The header, footer and announcement bar show on every page. Edit them here; they appear on the store once you publish.'
+    : need && samples && !samples[need[0]]
+      ? `${need[1]} Changes to this page still save to the draft and go live when you publish.`
+      : ref.page === 'custom' && !ref.slug
+        ? 'Pick or create a page to preview it.'
+        : 'This page has no preview here. Changes to it still save to the draft and go live when you publish.'
+  const samplesPending = ref.page in NEEDS && !samples
 
   useEffect(() => {
-    if (!surfaceAllows(surface, page)) setPage('home')
-  }, [surface, page])
+    if (!hasApp && surface === 'app') setSurface('web')
+  }, [hasApp, surface])
+
+  useEffect(() => {
+    if (surfaceAllows(surface, page)) return
+    setPage('home')
+    showToast('The app lays out Home, All products, Category and Brand pages; the other pages are the web layouts.')
+  }, [surface, page, showToast])
 
   function createPage() {
     const s = (newPage ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
@@ -289,18 +345,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
       if (!draftDocs.current) await loadDraft(draftId)
       if (stop) return
       const stored = await storedDoc(key)
-      let next = stored ?? emptyDoc()
-      // Studio pages stay as built: wrapping their sections in a Products block or adding the built-in core would
-      // replace them on the store (and checkout's payment step would then refuse to save).
-      if (!isCodePage(next)) {
-        // A listing layout from before the slot keeps its sections between the products, inside the Products block.
-        if (isListingKey(ref.page)) next = wrapListingDoc(next, () => crypto.randomUUID())
-        // A page with a working core (product details, the cart) always has its block; a new layout starts with it.
-        const core = coreBlockFor(ref.page)
-        if (core && !Object.values(next.blocks).some(b => b.type === core.type)) {
-          next = insertBlock(next, { id: crypto.randomUUID(), type: core.type, v: core.v, props: {} }, 0)
-        }
-      }
+      const next = prepareDoc(stored ?? emptyDoc(), ref.page)
       // Desktop and phone start linked when their copies are the same (one responsive layout).
       if (siblingKey && linked[linkId] === undefined) {
         const other = docs[siblingKey] ?? (await storedDoc(siblingKey))
@@ -623,8 +668,10 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
       confirmText: 'Use template',
     })
     if (!ok) return
-    change(() => cloneDoc(p.doc, () => crypto.randomUUID()))
+    change(() => prepareDoc(cloneDoc(p.doc, () => crypto.randomUUID()), ref.page))
     setSelected(null)
+    setPanel('block')
+    showToast(`Applied "${t.name}" to this layout. Undo brings the old one back.`, 'success')
   }
 
   async function saveTemplate(name: string) {
@@ -645,18 +692,24 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
       confirmText: 'Apply style',
     })
     if (!ok) return
-    setBusy(true)
+    const count = new Set(t.pages.map(p => p.page)).size
+    setWork({ title: `Applying ${t.name}`, step: `Writing ${count} pages… this takes up to a minute` })
     const { ok: done, data } = await api<{ pages?: number; error?: string }>(`/api/admin/site-builder/drafts/${draftId}/pack`, { method: 'POST', json: { packId: t.id } })
-    setBusy(false)
-    if (!done) return showToast(data.error || 'Could not apply the style', 'error')
+    if (!done) {
+      setWork(null)
+      return showToast(data.error || 'Could not apply the style', 'error')
+    }
     // Reload every page and the theme from the draft.
+    setWork({ title: `Applying ${t.name}`, step: 'Loading the pages…' })
     const d = await loadDraft(draftId)
     setHistory({})
     setSelected(null)
     setDocs({})
+    setLinked({})
     const own = (d?.theme as Record<string, ThemeTokens> | undefined)?.[audience]
     if (own) setTheme(normalizeTheme(own))
     setFrameKey(n => n + 1)
+    setWork(null)
     showToast(`Applied ${t.name} to ${data.pages ?? 0} layouts. Review, then publish.`, 'success')
   }
 
@@ -674,6 +727,8 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     themeTimer.current = setTimeout(async () => {
       const { ok } = await api(`/api/admin/site-builder/drafts/${draftId}`, { method: 'PUT', json: { theme: { audience, tokens: t } } })
       setSaving(ok ? 'saved' : 'error')
+      if (!ok) showToast('Could not save the theme', 'error')
+      else setFrameKey(n => n + 1)
     }, 600)
   }
 
@@ -692,10 +747,12 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     window.history.replaceState(null, '', url)
   }
 
+  const refreshDrafts = () => api<{ drafts: typeof drafts }>('/api/admin/site-builder/drafts').then(r => r.ok && setDrafts(r.data.drafts))
+
   async function newDraft() {
-    setBusy(true)
+    setWork({ title: 'Starting a draft', step: 'Creating the draft…' })
     const { ok, data } = await api<{ id: string }>('/api/admin/site-builder/drafts', { method: 'POST', json: {} })
-    setBusy(false)
+    setWork(null)
     if (ok) openDraft(data.id)
     else showToast('Could not start a draft', 'error')
   }
@@ -707,17 +764,18 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
       title: 'Publish this draft?',
       message: live
         ? 'Every page and theme change in it goes live for customers now.'
-        : 'Its pages and theme are saved as Site Builder’s published version. Customers keep seeing the Homepage builder until you make Site Builder live.',
+        : 'Its pages and theme are saved as Site Builder’s published version. Customers keep seeing the Block builder until you make Site Builder live.',
       confirmText: 'Publish',
     })
     if (!ok) return
-    setBusy(true)
+    setWork({ title: 'Publishing', step: 'Publishing pages and theme…' })
     const res = await api<{ published?: { pages: string[]; conflicts: Record<string, string[]> }; error?: string }>(`/api/admin/site-builder/drafts/${draftId}`, { method: 'POST' })
-    setBusy(false)
+    setWork(null)
     if (!res.ok) return showToast(res.data.error || 'Publish failed', 'error')
     const conflicts = Object.values(res.data.published?.conflicts ?? {}).flat().length
     showToast(conflicts ? `Published. ${conflicts} block(s) were also changed by someone else; your version was kept.` : 'Published', 'success')
     openDraft(null)
+    void refreshDrafts()
   }
 
   // Back from the visual editor: its saves went straight to the draft, so the pages load again from there.
@@ -734,14 +792,18 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
     if (!draftId) return
     const ok = await showConfirm({ title: 'Delete this draft?', message: 'Its changes are lost; the live site is not affected.', confirmText: 'Delete', type: 'danger' })
     if (!ok) return
+    setWork({ title: 'Deleting the draft', step: 'Removing its changes…' })
     await api(`/api/admin/site-builder/drafts/${draftId}`, { method: 'DELETE' })
+    setWork(null)
     openDraft(null)
+    void refreshDrafts()
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────────────────────────
   if (!draftId) {
     return (
-      <div className="space-y-4">
+      <div className="relative space-y-4">
+      <BusyOverlay work={work} />
       {audience === 'store' && <AiSiteBuilder onOpen={openDraft} />}
       <div className="rounded-xl border border-border-default bg-surface-elevated p-5 space-y-4">
         <div>
@@ -787,20 +849,22 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
           <AdminSelect
             sm
             value={BUSINESS_PAGES.includes(page) ? page : 'home'}
-            options={BUSINESS_PAGES.filter(p => surfaceAllows(surface, p)).map(p => ({ value: p, label: PAGES.find(x => x.key === p)?.label ?? p }))}
+            disabled={busy}
+            options={BUSINESS_PAGES.filter(p => surfaceAllows(surface, p)).map(p => ({ value: p, label: PAGES.find(x => x.key === p)?.label ?? p, group: 'Business portal' }))}
             onChange={v => (setPage(v as PageKey), setSelected(null))}
           />
         </div>
       )}
       {audience === 'store' && (
-        <div className="w-52">
+        <div className="w-60">
           <AdminSelect
             sm
+            disabled={busy}
             value={page === 'custom' ? `custom:${slug}` : page}
             options={[
-              ...STORE_PAGES.filter(p => surfaceAllows(surface, p.key)).map(p => ({ value: p.key, label: p.label })),
-              ...(surface === 'app' ? [] : customs.map(c => ({ value: `custom:${c.slug}`, label: `Page: ${c.title ?? c.slug} (/p/${c.slug})` }))),
-              ...(surface === 'app' || !canWrite || !withNew ? [] : [{ value: '__new', label: '+ New page…' }]),
+              ...BY_GROUP(STORE_PAGES.filter(p => surfaceAllows(surface, p.key))),
+              ...(surface === 'app' ? [] : customs.map(c => ({ value: `custom:${c.slug}`, label: `${c.title ?? c.slug} (/p/${c.slug})`, group: 'Custom pages' }))),
+              ...(surface === 'app' || !canWrite || !withNew ? [] : [{ value: '__new', label: '+ New page…', group: 'Custom pages' }]),
             ]}
             onChange={v => {
               setSelected(null)
@@ -818,11 +882,11 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
   // The visual editor works on the desktop web layout of a page the canvas can show. With the flag on it is the main
   // editor; the forms below are the classic one, for the app layout and pages it can't show, or by choice.
   const canVisual = visual && previewable && !!token && surface !== 'app'
-  if (visual && visualOn && draftId && surface !== 'app' && tokenFor !== draftId)
-    return <p className="rounded-xl border border-border-default bg-surface-elevated p-5 text-sm text-foreground-muted">Opening the visual editor…</p>
+  if (visual && visualOn && draftId && surface !== 'app' && (tokenFor !== draftId || samplesPending)) return <EditorSkeleton label="Opening the visual editor…" />
   if (canVisual && visualOn && draftId && token) {
     return (
-      <div className="space-y-3">
+      <div className="relative space-y-3">
+        <BusyOverlay work={work} />
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
           {audienceTabs}
           {pagePicker(false)}
@@ -852,8 +916,8 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
         {audienceTabs}
         <div className="flex gap-0.5 rounded-lg border border-border-default p-0.5">
-          {(['web', 'web_mobile', 'app'] as const).map(s => (
-            <button key={s} type="button" className={tab(surface === s)} onClick={() => (setSurface(s), !(isLinked && s !== 'app') && setSelected(null))}>
+          {(['web', 'web_mobile', 'app'] as const).filter(s => s !== 'app' || hasApp).map(s => (
+            <button key={s} type="button" disabled={busy} className={tab(surface === s)} onClick={() => (setSurface(s), !(isLinked && s !== 'app') && setSelected(null))}>
               {SURFACE_LABEL[s]}
             </button>
           ))}
@@ -894,10 +958,10 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
           </div>
         )}
         <div className="flex gap-1">
-          <button type="button" className={iconBtn} disabled={!h?.past.length} onClick={undo} aria-label="Undo" title="Undo">
+          <button type="button" className={iconBtn} disabled={busy || !h?.past.length} onClick={undo} aria-label="Undo" title="Undo">
             <Undo2 className="w-4 h-4" />
           </button>
-          <button type="button" className={iconBtn} disabled={!h?.future.length} onClick={redo} aria-label="Redo" title="Redo">
+          <button type="button" className={iconBtn} disabled={busy || !h?.future.length} onClick={redo} aria-label="Redo" title="Redo">
             <Redo2 className="w-4 h-4" />
           </button>
         </div>
@@ -920,15 +984,16 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
                 sm
                 value=""
                 placeholder="Copy layout from…"
+                disabled={busy}
                 options={(['web', 'web_mobile', 'app'] as const)
-                  .filter(s => s !== surface && surfaceAllows(s, ref.page))
+                  .filter(s => s !== surface && surfaceAllows(s, ref.page) && (s !== 'app' || hasApp))
                   .map(s => ({ value: s, label: SURFACE_LABEL[s] }))}
                 onChange={v => v && copyFrom(v as SiteSurface)}
               />
             </div>
           )}
           {canWrite && (
-            <button type="button" onClick={discard} className="inline-flex items-center gap-1.5 px-3 h-9 text-sm rounded-lg border border-border-default text-foreground-secondary">
+            <button type="button" disabled={busy} onClick={discard} className="inline-flex items-center gap-1.5 px-3 h-9 text-sm rounded-lg border border-border-default text-foreground-secondary">
               <Trash2 className="w-4 h-4" /> Delete draft
             </button>
           )}
@@ -953,7 +1018,8 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
         onDragCancel={dnd.onDragCancel}
       >
       <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)_340px] gap-3 items-start xl:items-stretch xl:h-[calc(100dvh-8.5rem)] xl:min-h-[34rem]">
-        <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-2 min-w-0 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain [scrollbar-width:thin]">
+        <aside className="relative rounded-xl border border-border-default bg-surface-elevated p-3 space-y-2 min-w-0 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain [scrollbar-width:thin]">
+          {busy && <div className="absolute inset-0 z-30 rounded-xl bg-[color-mix(in_srgb,var(--color-surface)_70%,transparent)]" aria-hidden />}
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Blocks · {isLinked ? 'Desktop and phone' : SURFACE_LABEL[surface]}</p>
             {canWrite && (
@@ -962,7 +1028,7 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
               </button>
             )}
           </div>
-          {!doc && <p className="text-sm text-foreground-muted">Loading…</p>}
+          {!doc && <BlockListSkeleton />}
           {doc && blocks.length === 0 && <p className="text-sm text-foreground-muted">No blocks on this layout yet. Add one (or drag it in from Add), copy another layout or start from a template.</p>}
           {doc && <BlockList doc={doc} dnd={dnd} selected={selected} canWrite={canWrite} actions={actions} />}
         </aside>
@@ -992,11 +1058,14 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
               <MousePointer2 className="w-4 h-4" /> {picking ? 'Select' : 'Browse'}
             </button>
           )}
+          <BusyOverlay work={work} />
           {previewable && token ? (
-            <div style={{ height: 760, overflow: 'hidden' }} className="flex justify-center">
+            <div style={{ height: 760, overflow: 'hidden' }} className="relative flex justify-center">
+              {loadedFrame !== frameId && <PreviewSkeleton className="absolute inset-0 z-10 overflow-hidden" />}
               <iframe
-                key={`${frameKey}:${audience}:${surface}:${previewPath}`}
+                key={frameId}
                 ref={frame}
+                onLoad={() => setLoadedFrame(frameId)}
                 title="Site preview"
                 src={homepagePreviewUrl(audience, token, SURFACE_LAYOUT[surface], previewPath)}
                 style={{
@@ -1011,18 +1080,17 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
               />
             </div>
           ) : (
-            <div className="p-6 text-sm text-foreground-muted">
-              {previewable
-                ? 'Loading the preview…'
-                : isChromePage(ref.page)
-                  ? 'The header, footer and announcement bar show on every page. Edit them here; they appear on the store once you publish.'
-                  : 'Live preview covers the home pages for now. Changes to this page still save to the draft and go live when you publish.'}
-            </div>
+            (previewable || samplesPending) ? (
+              <PreviewSkeleton className="h-[760px] overflow-hidden" />
+            ) : (
+              <div className="p-6 text-sm text-foreground-muted">{previewReason}</div>
+            )
           )}
         </div>
         </div>
 
-        <aside className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-3 min-w-0 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain [scrollbar-width:thin]">
+        <aside className="relative rounded-xl border border-border-default bg-surface-elevated p-3 space-y-3 min-w-0 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain [scrollbar-width:thin]">
+          {busy && <div className="absolute inset-0 z-30 rounded-xl bg-[color-mix(in_srgb,var(--color-surface)_70%,transparent)]" aria-hidden />}
           <div className={`grid gap-1 ${canAi ? 'grid-cols-5' : 'grid-cols-4'}`}>
             {(
               [
@@ -1083,9 +1151,9 @@ export default function SiteBuilderEditor({ options, planTypes, business, initia
             />
           )}
           {panel === 'templates' && (
-            <TemplatePanel templates={templates} pageRef={ref} canWrite={canWrite} onApply={applyTemplate} onSave={saveTemplate} onDelete={deleteTemplate} onApplyPack={applyPack} />
+            <TemplatePanel templates={templates} pageRef={ref} canWrite={canWrite} onApply={applyTemplate} onSave={saveTemplate} onDelete={deleteTemplate} onApplyPack={applyPack} hasApp={hasApp} work={work} />
           )}
-          {panel === 'theme' && (theme ? <ThemePanel theme={theme} canWrite={canWrite} onChange={changeTheme} /> : <p className="text-sm text-foreground-muted">Loading…</p>)}
+          {panel === 'theme' && (theme ? <ThemePanel theme={theme} canWrite={canWrite} onChange={changeTheme} /> : <PanelSkeleton cards={4} label="Loading the theme" />)}
         </aside>
       </div>
       <DragOverlay dropAnimation={null}>

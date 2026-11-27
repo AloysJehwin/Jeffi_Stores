@@ -1,6 +1,6 @@
 #!/bin/bash
 # Phase E cutover driver (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md): platform core from AWS to Azure, stores stay on AWS.
-# Steps, in order: preflight freeze final-dump-restore identity stores-rejoin dns cloudfront smoke unfreeze.
+# Steps, in order: preflight freeze final-dump-restore identity stores-rejoin dns cloudfront smoke azure-live unfreeze.
 # Dry run by default (reads only); --apply acts, with a typed confirmation before each irreversible step.
 #   EDGE_IP=<AWS tenant edge EIP> AZURE_IP=52.172.147.62 bash deploy/azure/cutover/cutover.sh [--apply]
 #   ... --step <name>    one step        ... --from <name>   that step and everything after it       --list
@@ -14,7 +14,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/stores.sh"
-STEPS=(preflight freeze final-dump-restore identity stores-rejoin dns cloudfront smoke unfreeze)
+STEPS=(preflight freeze final-dump-restore identity stores-rejoin dns cloudfront smoke azure-live unfreeze)
 AZURE_IP=${AZURE_IP:-}; EDGE_IP=${EDGE_IP:-}
 export RUN_DIR ANTH_TENANT ANTH_SA ANTH_RULE_AZURE RESTORE_CLEAN=${RESTORE_CLEAN:-} RESTORE_ALLOW_ERRORS=${RESTORE_ALLOW_ERRORS:-}
 need_ips() { [ -n "$EDGE_IP" ] && [ -n "$AZURE_IP" ] || die "set EDGE_IP and AZURE_IP"; }
@@ -23,7 +23,7 @@ route53() { EDGE_IP=$EDGE_IP AZURE_IP=$AZURE_IP OUT_DIR=$1 bash "$R53" "${@:2}";
 step_preflight() {
   local bad=0 sha out
   ko() { echo "   FAIL $*" >&2; bad=1; }
-  need aws az kubectl psql python3 curl
+  need aws az kubectl psql python3 curl gh
   for v in EDGE_IP AZURE_IP; do
     [[ ${!v} =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] && echo "   ok $v=${!v}" || ko "$v is not set to an IPv4 address"
   done
@@ -32,6 +32,11 @@ step_preflight() {
   if [ -s "$AWS_FREEZE_STATE" ] && ! grep -q '^freeze ' "$RUN_DIR/done.txt" 2>/dev/null; then
     ko "$AWS_FREEZE_STATE exists but this window has not frozen: a stale freeze? (freeze.sh off, or remove it)"
   fi
+  if gh variable list --json name >/dev/null; then
+    out=$(for v in "${GH_VARS[@]}"; do printf '%s=%s ' "$v" "$(gh_var "$v")"; done)
+    echo "   ok GitHub variables readable: $out"
+    if grep -q 'FLAGSHIP_CLOUD=azure' <<<"$out"; then ko "FLAGSHIP_CLOUD is already azure: an azure-live step from an earlier window? (rollback.sh --step release-lanes)"; fi
+  else ko "gh cannot read the repository variables (gh auth login; the azure-live step sets them)"; fi
   [ $bad = 0 ] || return 1
   say "DNS TTLs already lowered (route53-plan.sh --lower-ttl finds nothing left to lower)"
   out=$(route53 "$SCRATCH" --lower-ttl 2>&1) || { echo "$out" >&2; ko "route53-plan.sh --lower-ttl failed"; }
@@ -193,6 +198,49 @@ step_smoke() {
   if [ -n "${SMOKE_TENANTS:-}" ]; then say "smoke.sh tenants"; JEFFI_CLOUD=azure KUBECONFIG=$AZ_KUBECONFIG bash "$BOOT/smoke.sh" "$sha" tenants; fi
 }
 
+# Azure goes live and the release lanes follow it. Until now the Azure platform was on standby (overlays/azure-standby):
+# the app CronJobs suspended, messaging, documents and voice at 0. This applies those objects from overlays/azure at
+# the cutover tag, checks messaging and documents, then sets FLAGSHIP_CLOUD=azure and AZURE_TARGET=true and deletes
+# AZURE_INGRESS_IP: from the next release the Azure lane carries the stores, and every AWS job is skipped. Late on
+# purpose: AWS stays frozen, so nothing runs twice, and a rollback before this step has no Azure-sent messages to undo.
+step_azure_live() {
+  need gh kubectl python3
+  local sha=${CUTOVER_SHA:-$(image_sha)} objs=$SCRATCH/azure-live.json v
+  say "GitHub release lanes now"
+  for v in "${GH_VARS[@]}"; do echo "   $v=$(gh_var "$v")"; done
+  say "From overlays/azure at local-$sha: the app CronJobs (resumed) and messaging, documents and voice (their release replicas)"
+  export AZURE_LIVE_TAG=local-$sha
+  KUBECONFIG=$AZ_KUBECONFIG FLAGSHIP_CLOUD=azure lib_run azure 'k8s_tunnel; platform_manifests "$AZURE_LIVE_TAG" | kubectl create --dry-run=client -f - -o json' |
+    python3 -I -c '
+import json, re, sys
+t, i, dec, items = sys.stdin.read(), 0, json.JSONDecoder(), []
+while i < len(t):
+    if t[i].isspace(): i += 1; continue
+    d, i = dec.raw_decode(t, i); items += d["items"] if isinstance(d.get("items"), list) else [d]
+keep = [o for o in items if (o["kind"] == "CronJob" and (o["metadata"].get("labels") or {}).get("app.kubernetes.io/part-of") == "jeffi-cron")
+        or (o["kind"] == "Deployment" and re.fullmatch(r"jeffi-stores-(messaging|document|voice)-service", o["metadata"]["name"]))]
+cron = [o for o in keep if o["kind"] == "CronJob"]
+if not cron or any(o["spec"].get("suspend") for o in cron): sys.exit("the live overlay rendered no app CronJobs, or suspended ones")
+print("   %d app CronJobs, not suspended" % len(cron), file=sys.stderr)
+for o in keep:
+    if o["kind"] == "Deployment": print("   deployment/%s replicas %s" % (o["metadata"]["name"], o["spec"].get("replicas", 1)), file=sys.stderr)
+json.dump({"apiVersion": "v1", "kind": "List", "items": keep}, open(sys.argv[1], "w"))' "$objs"
+  if ! $APPLY; then echo "(dry run) would apply them, then set FLAGSHIP_CLOUD=azure, AZURE_TARGET=true and delete AZURE_INGRESS_IP"; return 0; fi
+  [ -s "$AWS_FREEZE_STATE" ] || die "the AWS cluster is not frozen ($AWS_FREEZE_STATE missing): its CronJobs and workers would run beside these"
+  [ ! -s "$AZ_FREEZE_STATE" ] || die "the Azure platform is still quiesced ($AZ_FREEZE_STATE): run the identity step first"
+  gh variable list --json name >/dev/null || die "gh cannot read the repository variables (gh auth login), so they could not be saved for the rollback"
+  confirm_typed azure-live "resume the app CronJobs and the messaging, documents and voice workers on Azure, and make the Azure lane the release (GitHub variables)"
+  if [ -s "$GH_VARS_BEFORE" ]; then echo "   kept the earlier $GH_VARS_BEFORE"
+  else for v in "${GH_VARS[@]}"; do printf '%s=%s\n' "$v" "$(gh_var "$v")"; done > "$GH_VARS_BEFORE"; echo "   saved $GH_VARS_BEFORE (rollback.sh restores it)"; fi
+  KUBECONFIG=$AZ_KUBECONFIG kubectl apply -f "$objs"
+  for v in messaging-service document-service; do KUBECONFIG=$AZ_KUBECONFIG kubectl -n jeffi rollout status "deploy/jeffi-stores-$v" --timeout=600s; done
+  for v in messaging documents; do JEFFI_CLOUD=azure KUBECONFIG=$AZ_KUBECONFIG bash "$BOOT/smoke.sh" "$sha" "$v" flagship; done
+  say "GitHub variables"
+  gh_var_set FLAGSHIP_CLOUD azure
+  gh_var_set AZURE_TARGET true
+  gh_var_set AZURE_INGRESS_IP ''
+}
+
 step_unfreeze() {
   if ! $APPLY; then echo "(dry run) would resume the Azure pods if still quiesced; the AWS cluster stays frozen unless UNFREEZE_AWS=1"; return 0; fi
   confirm_typed unfreeze "end the freeze: the platform serves from Azure"
@@ -204,7 +252,9 @@ step_unfreeze() {
     echo "   The AWS cluster stays frozen on purpose: its platform would run against the stale RDS. State: $AWS_FREEZE_STATE"
   fi
   echo "   Frozen for $(( ($(date +%s) - $(cat "$RUN_DIR/frozen-at" 2>/dev/null || date +%s)) / 60 )) minute(s)."
-  echo "   Manual now: unset the GitHub variable AZURE_INGRESS_IP, set AZURE_TARGET=true, rename the Anthropic rule (README)."
+  grep -q '^azure-live ' "$RUN_DIR/done.txt" 2>/dev/null ||
+    echo "   WARNING: azure-live has not run in this window: Azure's app CronJobs and workers are on standby, and releases still take the AWS lane" >&2
+  echo "   Manual now: rename the Anthropic rule (README)."
 }
 
 main "$@"

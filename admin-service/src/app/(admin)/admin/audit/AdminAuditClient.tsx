@@ -45,6 +45,7 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'
 import { Sk } from '@/components/admin/kit/skeleton'
+import { useExportRows } from '@/components/admin/export/export-rows'
 import { LogRowsSkeleton } from './AuditLoadingParts'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import {
@@ -268,6 +269,7 @@ export default function AdminAuditClient() {
     },
   })
   const mailRows = mailList.rows
+  useExportRows(pageTab === 'mail_log' ? 'logs.email' : undefined, mailRows.map(r => String(r.id)))
   const mailLoading = mailList.loading || mailList.loadingMore
   const loadMailLog = mailList.reload
 
@@ -334,6 +336,7 @@ export default function AdminAuditClient() {
     },
   })
   const smsRows = smsList.rows
+  useExportRows(pageTab === 'sms_log' ? 'logs.sms' : undefined, smsRows.map(r => String(r.id)))
   const smsLoading = smsList.loading || smsList.loadingMore
   const loadSmsLog = smsList.reload
 
@@ -354,6 +357,7 @@ export default function AdminAuditClient() {
     },
   })
   const waRows = waList.rows
+  useExportRows(pageTab === 'whatsapp_log' ? 'logs.whatsapp' : undefined, waRows.map(r => String(r.id)))
   const waLoading = waList.loading || waList.loadingMore
   const loadWaLog = waList.reload
 
@@ -370,6 +374,7 @@ export default function AdminAuditClient() {
     },
   })
   const events = auditList.rows
+  useExportRows(pageTab === 'audit' ? 'audit' : undefined, events.map(e => String(e.id)))
   const loading = auditList.loading
 
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { PageInsights } from '@/components/admin/insights'
 import { AI_COSTS_INSIGHTS } from './ai-costs-insights'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/components/admin/channels/ui'
@@ -41,7 +42,7 @@ export function AiCostsTab() {
 
   return (
     <div className="space-y-5">
-      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={AI_COSTS_INSIGHTS} />} />
+      <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<><PageInsights config={AI_COSTS_INSIGHTS} /><ExportButton exportKey="financial.ai-costs" range={period} /></>} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <AiCostsTabSkeleton /> : data && <Body d={data} />}
     </div>

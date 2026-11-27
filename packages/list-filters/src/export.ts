@@ -13,7 +13,7 @@ export const CSV_BOM = '\uFEFF'
 export function exportQuery<K extends string>(
   entity: FilterEntity<K>,
   q: FilterQuery,
-  opts: { after?: unknown[]; limit?: number; ctx?: FilterCtx } = {}
+  opts: { after?: unknown[]; limit?: number; ctx?: FilterCtx; ids?: string[] } = {}
 ): { sql: string; params: unknown[] } | null {
   const ex = entity.export
   if (!ex?.columns.length || !ex.keyset.length) return null
@@ -21,6 +21,10 @@ export function exportQuery<K extends string>(
   const w = buildWhere(entity, q, 1, { ctx: opts.ctx })
   const params = [...w.params]
   const conds = [...w.conditions]
+  if (opts.ids) {
+    params.push(opts.ids)
+    conds.push(`(${entity.alias}.${entity.pk ?? 'id'})::text = ANY($${params.length}::text[])`)
+  }
   if (opts.after?.length === ex.keyset.length) {
     const binds = opts.after.map(v => {
       params.push(v)
@@ -41,7 +45,7 @@ export function exportQuery<K extends string>(
 function unionExportQuery<K extends string>(
   entity: FilterEntity<K>,
   q: FilterQuery,
-  opts: { after?: unknown[]; limit?: number; ctx?: FilterCtx }
+  opts: { after?: unknown[]; limit?: number; ctx?: FilterCtx; ids?: string[] }
 ): { sql: string; params: unknown[] } {
   const params: unknown[] = []
   const bind = (v: unknown) => {
@@ -54,6 +58,7 @@ function unionExportQuery<K extends string>(
     const w = buildWhere(b, q, params.length + 1, { ctx: opts.ctx })
     params.push(...w.params)
     const conds = [...w.conditions]
+    if (opts.ids) conds.push(`(${b.alias}.${b.pk ?? 'id'})::text = ANY(${bind(opts.ids)}::text[])`)
     if (opts.after?.length === ex.keyset.length)
       conds.push(`(${ex.keyset.join(', ')}) > (${opts.after.map(bind).join(', ')})`)
     const cols = [...ex.columns.map(c => `${c.sql} AS "${c.key}"`), ...ex.keyset.map((k, i) => `${k} AS ${keys[i]}`)]

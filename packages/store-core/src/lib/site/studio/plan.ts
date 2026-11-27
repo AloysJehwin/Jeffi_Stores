@@ -260,6 +260,7 @@ export const LAYOUTS = [
   'three equal columns with thin dividers',
   'an oversized word or number as the graphic',
   'an edge-to-edge marquee strip',
+  'slide: a poster composition, words and pictures placed freely in a fixed 16:9 frame',
   'a split with the picture bleeding off the edge',
   'a centered card floating over a tinted background',
 ] as const

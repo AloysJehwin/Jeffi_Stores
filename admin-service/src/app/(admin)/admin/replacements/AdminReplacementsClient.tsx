@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import { useActionToast } from '@/components/admin/kit/toast'
+import { useExportRows } from '@/components/admin/export/export-rows'
 import {
   Dialog,
   EmptyState,
@@ -394,6 +395,7 @@ export default function AdminReplacementsClient() {
     },
   })
   const replacements = list.rows
+  useExportRows('replacements', replacements.map(r => String(r.id)))
 
   return (
     <div className="space-y-4">

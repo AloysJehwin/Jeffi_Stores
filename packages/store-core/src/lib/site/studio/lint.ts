@@ -3,6 +3,7 @@ import { CARD_PRODUCT, carouselList, type CodeNode, type CodeValue } from '../co
 import { splitClasses, taxonomyOf } from '../code/allow'
 import { checkGrid, gridTrouble, PHONE as PHONE_WIDTH } from '../code/grid'
 import { placeholderRows } from '../code/placeholders'
+import { lintSlide } from './slide-rules'
 
 // What a studio section must not hard-code. It is written against a sample catalogue but goes live on the store's own,
 // which starts empty and later has its own categories, brands and products: names, slugs, prices and contact details
@@ -41,6 +42,8 @@ export const LINT = {
   anchor: 'Link only to the page\'s own sections: #top, #about, #services, #work, #reviews, #faq or #contact.',
   navMenu:
     'On phones and tablets <NavLinks> is a menu button (below lg, or the width its from= gives), and this header leaves it centred or alone on a row. It belongs at the left or right edge of the logo row: for links on a centred row of their own, pass mobile="scroll" (that row then keeps its links, scrolling on phones), or keep <NavLinks> at an edge of the logo row until the links move to their own row, with from set to that width (from="md" for a row that starts at md:).',
+  fixedWidth:
+    'A fixed width wider than a phone (about 360px) with no responsive prefix overflows the screen: size it from sm: or md: up (w-full md:w-[480px]) or give it w-full max-w-[…]. This covers w-[…px], w-[…rem], min-w-[…], basis-[…] and w-96, over 360px.',
 } as const
 
 /** The ids a Showcase section may take, and so the only in-page links its header and buttons may use. */
@@ -56,6 +59,16 @@ const LIMITS: Record<string, number> = { Reviews: 3, Offers: 3 }
 const PICTURE_LISTS = new Set(['Categories', 'Products', 'SubCategories', 'AllCategories'])
 
 /** A literal class string, or null when the value is built at render (a ternary, a template with data). */
+const WIDE_PX = 360
+/** A fixed width over a phone's with no breakpoint prefix (`w-[480px]`, `min-w-[30rem]`, `basis-[400px]`, `w-96`). */
+function wideFixed(classes: string): boolean {
+  return splitClasses(classes).some(c => {
+    const m = /^(?:w|min-w|basis)-\[(\d+(?:\.\d+)?)(px|rem)\]$/.exec(c)
+    if (m) return Number(m[1]) * (m[2] === 'rem' ? 16 : 1) > WIDE_PX
+    return /^(?:w|min-w|basis)-96$/.test(c)
+  })
+}
+
 const literalClass = (v: CodeValue | undefined): string | null => (!v ? '' : v.k === 'lit' && typeof v.v === 'string' ? v.v : null)
 
 /** A data list's grid that goes wrong for some number of items (holes, spans past its columns, slivers). */
@@ -109,6 +122,10 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
         if (showcase && node.name === 'Link') anchorHref(lit(props.href))
         const grid = gridNote(node)
         if (grid) found.add(grid)
+        for (const k of ['className', 'itemClassName']) {
+          const c = lit(props[k])
+          if (typeof c === 'string' && wideFixed(c)) found.add(LINT.fixedWidth)
+        }
         for (const key of TAXONOMY_PROPS[node.name] ?? []) if (has(lit(props[key]))) found.add(LINT.taxonomy)
         const query = lit(props.query)
         if (node.name === 'Products' && query && typeof query === 'object' && !Array.isArray(query)) {
@@ -128,6 +145,10 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
       }
       case 'el':
         if (node.tag === 'a') checkHref(lit(node.props?.href))
+        {
+          const c = lit(node.props?.className)
+          if (typeof c === 'string' && wideFixed(c)) found.add(LINT.fixedWidth)
+        }
         if (node.tag === 'a' && showcase) anchorHref(lit(node.props?.href))
         if (showcase && (node.tag === 'blockquote' || node.tag === 'q') && typed(node.children)) found.add(LINT.quotes)
         if (node.tag === 'h1') h1 = true
@@ -182,6 +203,7 @@ export function studioLint(ast: unknown, page?: PageKey | null, opts: { first?: 
   // A Showcase opens with its header (`first`); the opening is the section holding the page's h1.
   if (showcase && h1 && !opts.first && !businessPicture) found.add(LINT.showcaseHero)
   if (showcase && placeholderRows(ast).size) found.add(LINT.standIn)
+  for (const m of lintSlide(ast as CodeNode)) found.add(m)
   return page === 'showcase' ? [...found].map(m => SHOWCASE_LINT[m] ?? m) : [...found]
 }
 

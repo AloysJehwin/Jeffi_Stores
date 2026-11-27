@@ -1,4 +1,5 @@
-import { queryMany } from '@/lib/shared/db'
+import { listServiceAccounts } from '@/lib/auth/service-accounts-list'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES, assignableScopes, hasScope } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
@@ -10,15 +11,6 @@ import { EmptyState } from '@/components/admin/kit/states'
 import { badgeCls } from '@/components/admin/kit/tones'
 import ServiceAccountsTable from './ServiceAccountsTable'
 import SettingsHub from '@/components/admin/SettingsHub'
-
-async function getServiceAccounts() {
-  return queryMany(
-    `SELECT id, name, common_name, allowed_scopes, is_revoked, revoked_at,
-            p12_downloaded, created_at, last_used_at
-     FROM service_accounts
-     ORDER BY created_at DESC`
-  )
-}
 
 /** Service accounts tab of the Settings hub. */
 export default async function ServiceAccountsPanel() {
@@ -32,7 +24,7 @@ export default async function ServiceAccountsPanel() {
   if (!hasScope(role, scopes, 'service_accounts:read')) redirect(ap('/admin/settings'))
 
   const canWrite = hasScope(role, scopes, 'service_accounts:write')
-  const accounts = await getServiceAccounts()
+  const accounts = await listServiceAccounts()
 
   const scopeLabels: Record<string, string> = {}
   ADMIN_SCOPES.forEach(s => {
@@ -61,7 +53,12 @@ export default async function ServiceAccountsPanel() {
         <Card
           title="All Accounts"
           hint="M2M authentication via mTLS client certificates"
-          action={!canWrite ? <span className={badgeCls('muted')}>Read-only access</span> : undefined}
+          action={
+            <div className="flex items-center gap-2">
+              {!canWrite && <span className={badgeCls('muted')}>Read-only access</span>}
+              <ExportButton exportKey="service-accounts.list" />
+            </div>
+          }
           flush
         >
           {accounts.length === 0 ? (

@@ -177,6 +177,7 @@ export default function MessagingTable({
       rows={campaigns}
       cols={cols}
       rowKey={c => c.id}
+      exportKey="messaging"
       total={total}
       page={page}
       pageSize={pageSize}

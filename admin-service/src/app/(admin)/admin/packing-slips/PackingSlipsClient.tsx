@@ -18,6 +18,7 @@ import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { PACKING_DEFAULT_DAYS, PACKING_FIELDS, PACKING_SEARCH } from '@/lib/filters/fields/packing-slips'
 import PackingSlipsMobileList from './_components/PackingSlipsMobileList'
 import { LoadingTable } from '@/components/admin/kit/skeleton'
+import { useExportRows } from '@/components/admin/export/export-rows'
 import {
   DOC_META,
   DOC_ORDER,
@@ -93,6 +94,7 @@ export default function PackingSlipsClient({ header }: { header?: React.ReactNod
     },
   })
   const orders = list.rows
+  useExportRows('packing_slips', orders.map(r => String(r.id)))
   const windowed = !/(^|&)(from|to|search)=/.test(filters)
   const error = orders.length ? '' : list.error || ''
 

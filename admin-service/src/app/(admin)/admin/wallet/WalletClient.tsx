@@ -256,7 +256,7 @@ export default function WalletClient({
         <div className="px-5 pb-4">
           <ListFilters entity="wallet" fields={WALLET_FIELDS} search={WALLET_SEARCH} noun="Entries" exportable />
         </div>
-        <DataTable<LedgerEntry> bare sortNs="ledger" rows={list.rows} infinite={list} cols={cols} rowKey={e => e.id} empty="No matching entries." />
+        <DataTable<LedgerEntry> bare sortNs="ledger" rows={list.rows} infinite={list} cols={cols} rowKey={e => e.id} exportKey="wallet" empty="No matching entries." />
       </Card>
     </PageBody>
   )

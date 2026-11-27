@@ -1,5 +1,9 @@
 import type { Tone } from '@/components/admin/kit/tones'
 import type { ContactStatus } from '@controller/lib/outreach/types'
+import type { SkillSummary, SkillVersionRow } from '@controller/lib/outreach/agent/skill/store'
+import type { SkillValidation } from '@controller/lib/outreach/agent/types'
+
+export type { SkillSummary, SkillVersionRow, SkillValidation }
 
 export const BASE = '/admin/ecom/outreach'
 export const API = '/api/admin/ecom/outreach'
@@ -26,7 +30,15 @@ export const isE164 = (s: string) => /^\+[1-9]\d{7,14}$/.test(s.trim())
 export const TABS = [
   { id: 'program', label: 'Program' },
   { id: 'lists', label: 'Lists' },
+  { id: 'skills', label: 'Skills' },
   { id: 'contacts', label: 'Contacts' },
   { id: 'suppressions', label: 'Suppressions' },
 ] as const
 export type OutreachTab = (typeof TABS)[number]['id']
+
+export const MAX_SKILL_BYTES = 24 * 1024
+export const skillBytes = (s: string) => new TextEncoder().encode(s).length
+export const CHANNEL_LABEL: Record<string, string> = { voice: 'Voice', whatsapp: 'WhatsApp', follow_up: 'Follow-up' }
+export const FLOW_LABEL: Record<string, string> = { one_call: 'One call', two_call: 'Two calls', whatsapp_only: 'WhatsApp only' }
+export const inr = (paise: number) => `₹${(paise / 100).toFixed(2)}`
+export const versionRef = (v: Pick<SkillVersionRow, 'version'>) => `v${v.version}`

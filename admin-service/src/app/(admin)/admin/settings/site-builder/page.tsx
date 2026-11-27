@@ -8,7 +8,9 @@ import { listCustomPages, listSiteDrafts, siteBuilderEnabled, siteEditorEnabled 
 import { getOnboardingBuild } from '@/lib/site/onboarding-build'
 import SiteBuilderEditor from '@/components/admin/site-builder/SiteBuilderEditor'
 import SiteBuilderSwitch from '@/components/admin/site-builder/SiteBuilderSwitch'
+import { storeHasApp } from '@/lib/site/app-surface'
 import SiteBuilderTabs from '@/components/admin/site-builder/SiteBuilderTabs'
+import AdminThemeToggle from '@/components/admin/site-builder/AdminThemeToggle'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -16,7 +18,7 @@ export const revalidate = 0
 export default async function SiteBuilderPage({ searchParams }: { searchParams: Promise<{ draft?: string }> }) {
   const params = await searchParams
   const host = await getHost()
-  const [live, started, drafts, hero, plan, customPages, aiBuild, visual] = await Promise.all([
+  const [live, started, drafts, hero, plan, customPages, aiBuild, visual, hasApp] = await Promise.all([
     siteBuilderEnabled(),
     queryOne<{ n: string }>(`SELECT count(*) AS n FROM site_pages`).then(r => Number(r?.n ?? 0) > 0).catch(() => false),
     listSiteDrafts(),
@@ -25,6 +27,7 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
     listCustomPages(),
     getOnboardingBuild(),
     siteEditorEnabled(),
+    storeHasApp(),
   ])
   const options = started ? await loadSectionOptions(hero.categoryOptions, hero.brandOptions) : null
 
@@ -33,9 +36,20 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
       <PageHeader
         title="Site Builder"
         description="Every customer page, laid out per device from blocks. Changes are saved as a draft and go live when you publish."
-        actions={started ? <SiteBuilderSwitch target="site" live={live} /> : undefined}
       />
-      <SiteBuilderTabs active="site" live={live ? 'site' : 'homepage'} siteHref={ap('/admin/settings/site-builder', host)} homepageHref={ap('/admin/settings/homepage', host)} />
+      <SiteBuilderTabs active="site" live={live ? 'site' : 'homepage'} siteHref={ap('/admin/settings/site-builder', host)} homepageHref={ap('/admin/settings/homepage', host)} siteStarted={started} />
+      {started && (
+        <div className="rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+          <AdminThemeToggle
+            label="Use the store theme in the admin panel"
+            hint={
+              live
+                ? 'On: the admin takes the colours and fonts you publish here. Off: the admin keeps its own look.'
+                : 'Takes effect while the Site builder is live. Off: the admin keeps its own look.'
+            }
+          />
+        </div>
+      )}
       {aiBuild && (
         <div className="rounded-xl border border-accent-500/40 bg-surface-elevated px-4 py-3 text-sm">
           {aiBuild.status === 'done' && (
@@ -51,7 +65,7 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
         </div>
       )}
       {started && !live && (
-        <p className="text-sm text-foreground-muted">Customers see the Homepage builder. Publishing here saves your Site Builder pages; they reach customers when you make Site Builder live.</p>
+        <p className="text-sm text-foreground-muted">Customers see the Block builder. Publishing here saves your Site builder pages; they reach customers when you make Site builder live.</p>
       )}
       {started && options ? (
         <SiteBuilderEditor
@@ -63,6 +77,7 @@ export default async function SiteBuilderPage({ searchParams }: { searchParams: 
           customPages={customPages}
           drafts={drafts}
           visual={visual}
+          hasApp={hasApp}
         />
       ) : (
         <SiteBuilderSwitch target="site" live={false} setup />

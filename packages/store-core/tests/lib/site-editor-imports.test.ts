@@ -11,6 +11,7 @@ const APPS = ['storefront-service/src', 'showcase-service/src', 'business-servic
 const EDITOR = [
   'packages/site-blocks/src/design.ts',
   'packages/store-core/src/lib/site/code/classes.ts',
+  'packages/store-core/src/lib/site/code/arrange.ts',
   'packages/store-core/src/lib/site/code/free.ts',
   'packages/store-core/src/lib/site/code/snap.ts',
   'packages/store-core/src/lib/site/code/tree-critique.ts',

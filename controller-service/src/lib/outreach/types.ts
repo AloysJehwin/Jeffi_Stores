@@ -27,6 +27,7 @@ export interface OutreachProgramState {
   window_start: string
   window_end: string
   test_numbers: string[]
+  default_skill_id: string | null
   updated_at: string
   updated_by: string | null
 }
@@ -41,6 +42,8 @@ export interface OutreachList {
   file_key: string | null
   row_count: number
   last_synced_at: string | null
+  skill_id: string | null
+  skill_version_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -72,6 +75,8 @@ export interface OutreachContact {
   dnd_status: DndStatus
   dnd_checked_at: string | null
   wa_window_expires_at: string | null
+  handoff_at: string | null
+  handoff_reason: string | null
   created_at: string
   updated_at: string
 }

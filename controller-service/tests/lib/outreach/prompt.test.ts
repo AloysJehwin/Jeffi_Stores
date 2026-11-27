@@ -4,29 +4,13 @@ import {
   PERSONA_NAMES,
   PERSONA_RULE,
   SCRIPT_VERSION,
-  TOOL_SCHEMAS,
-  TOOL_NAMES,
   asLanguage,
   greeting,
-  isToolName,
+  istStamp,
+  knownLines,
   spokenTime,
-  systemPrompt,
 } from '@controller/lib/outreach/prompt'
 import { LANGUAGES } from '@controller/lib/outreach/types'
-
-const base = {
-  personaName: 'Priya',
-  business: 'Ravi Stores',
-  owner: null,
-  category: null,
-  city: null,
-  now: new Date('2026-11-25T06:00:00Z'),
-  continuing: false,
-  consentWhatsApp: false,
-  previewStarted: false,
-  published: false,
-  known: {},
-}
 
 describe('the showcase-offer script', () => {
   it('has a versioned script and every line in all nine languages', () => {
@@ -53,27 +37,16 @@ describe('the showcase-offer script', () => {
     }
   })
 
-  it('the system prompt keeps the persona and honesty rules', () => {
-    const p = systemPrompt({ ...base, language: 'hi' })
-    expect(p).toContain(PERSONA_RULE)
+  it('keeps the persona rule word for word (the skill renderer puts it in every voice prompt)', () => {
     expect(PERSONA_RULE).toContain("if sincerely asked it says truthfully that it is Jeffi Stores' AI assistant, and it never claims to be human")
-    expect(p).toContain('Do not volunteer that you are an AI')
-    expect(p).toContain(LINES.hi.aiAnswer)
-    expect(p).toContain('Never claim to be human')
-    expect(p).toContain('One question at a time')
-    expect(p).toContain('Never invent facts')
-    expect(p).toContain('unless the tool you called returned ok')
-    expect(p).toContain('call optOut at once')
-    expect(p).toContain('Speak only Hindi')
-    expect(p).toContain(SCRIPT_VERSION)
-    expect(p).toContain('IST')
+    expect(PERSONA_RULE).toContain('announces recording')
+    for (const l of LANGUAGES) expect(LINES[l].aiAnswer, l).toContain('Jeffi Stores')
   })
 
-  it('tool schemas cover the plan §2 tools', () => {
-    expect(TOOL_SCHEMAS.map(t => t.name)).toEqual([...TOOL_NAMES])
-    for (const t of TOOL_SCHEMAS) expect(t.input_schema.type).toBe('object')
-    expect(isToolName('optOut')).toBe(true)
-    expect(isToolName('dropTables')).toBe(false)
+  it('istStamp is a full IST date and time; knownLines lists what is known', () => {
+    expect(istStamp(new Date('2026-11-25T06:00:00Z'))).toMatch(/Wednesday.*2026.*11:30/i)
+    expect(knownLines({})).toEqual([])
+    expect(knownLines({ whatTheyDo: 'Sweets', highlights: ['a', 'b'], contact: { phone: '1', email: 'e' } })).toEqual(['- What they do: Sweets', '- Highlights: a; b', '- Contact for the site: 1, e'])
   })
 
   it('asLanguage and spokenTime', () => {

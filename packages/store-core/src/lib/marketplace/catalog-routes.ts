@@ -85,27 +85,30 @@ async function submitSupported(channel: MarketplaceChannel): Promise<boolean> {
   return !!creds && typeof getAdapter(channel, creds).submitListings === 'function'
 }
 
+/** The row the listings table shows for a sellable unit (also what the listings export holds). */
+export const toListingUnitView = (u: SellableUnit): ListingUnitView => ({
+  key: u.key,
+  level: u.level,
+  productId: u.productId,
+  name: u.name,
+  variantName: u.variantName,
+  subVariantName: u.subVariantName,
+  ourSku: u.ourSku,
+  size: u.size,
+  colour: u.colour,
+  price: u.price,
+  mrp: u.mrp,
+  quantity: u.quantity,
+  image: u.images[0] ?? null,
+  imageCount: u.images.length,
+  listing: u.listing,
+})
+
 export async function listingsGet(channel: MarketplaceChannel): Promise<NextResponse> {
   try {
     const [units, tasks, supported, saved] = await Promise.all([loadSellableUnits(channel), recentListingTasks(channel), submitSupported(channel), savedTemplateMappings(channel)])
     const payload: ListingsPayload = {
-      units: units.map(u => ({
-        key: u.key,
-        level: u.level,
-        productId: u.productId,
-        name: u.name,
-        variantName: u.variantName,
-        subVariantName: u.subVariantName,
-        ourSku: u.ourSku,
-        size: u.size,
-        colour: u.colour,
-        price: u.price,
-        mrp: u.mrp,
-        quantity: u.quantity,
-        image: u.images[0] ?? null,
-        imageCount: u.images.length,
-        listing: u.listing,
-      })),
+      units: units.map(toListingUnitView),
       tasks,
       submitSupported: supported,
       categories: Object.keys(saved).sort(),

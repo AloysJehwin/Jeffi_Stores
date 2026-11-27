@@ -28,7 +28,9 @@ vi.mock('@/components/admin/AdvancedFilterPanel', () => ({
 vi.mock('@/components/admin/kit/saved-views', () => ({
   SavedViewsMenu: () => <button>Views menu</button>,
   ShareFilterLink: () => <button>Share link</button>,
-  ExportRowsButton: () => <button>Export rows</button>,
+}))
+vi.mock('@/components/admin/export/ExportButton', () => ({
+  ExportButton: () => <button>Export rows</button>,
 }))
 
 import { ListFilters, useFilterQuery } from '@/components/admin/kit/list-filters'

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FileSpreadsheet, Images, Save, Search, Send, Upload } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import IconButton from '@/components/ui/IconButton'
 import { Badge, Banner, Section, Table, api, btnGhost, btnPrimary, inputCls, when, type Col, type Tone } from '@/components/admin/channels/ui'
 import { Dialog } from '@/components/admin/kit/dialog'
@@ -126,15 +127,18 @@ export default function ListingsMapper({ channel }: { channel: Channel }) {
       <Section
         title={`Listings (${data.units.length})`}
         action={
-          canWrite ? (
-            <div className="flex items-center gap-1">
-              <IconButton icon={Upload} label="Upload SKU report" busy={busy === 'report'} onClick={() => fileRef.current?.click()} />
-              <IconButton icon={FileSpreadsheet} label="Fill a listing template" disabled={!keys.length} onClick={() => setDialog('template')} />
-              <IconButton icon={Images} label="Build image pack" disabled={!keys.length} onClick={() => setDialog('images')} />
-              {data.submitSupported && <IconButton icon={Send} label={`Submit to ${name}`} disabled={!keys.length} onClick={() => setDialog('submit')} />}
-              <IconButton icon={Save} label="Save changes" variant="accent" disabled={!dirty.length} busy={busy === 'save'} onClick={save} />
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-1">
+            <ExportButton exportKey={`${channel}.listings`} query={`q=${encodeURIComponent(q.trim())}`} filters={{ statuses: filter === 'all' ? Object.keys(STATUS_TONE) : [filter] }} />
+            {canWrite && (
+              <>
+                <IconButton icon={Upload} label="Upload SKU report" busy={busy === 'report'} onClick={() => fileRef.current?.click()} />
+                <IconButton icon={FileSpreadsheet} label="Fill a listing template" disabled={!keys.length} onClick={() => setDialog('template')} />
+                <IconButton icon={Images} label="Build image pack" disabled={!keys.length} onClick={() => setDialog('images')} />
+                {data.submitSupported && <IconButton icon={Send} label={`Submit to ${name}`} disabled={!keys.length} onClick={() => setDialog('submit')} />}
+                <IconButton icon={Save} label="Save changes" variant="accent" disabled={!dirty.length} busy={busy === 'save'} onClick={save} />
+              </>
+            )}
+          </div>
         }
       >
         <input

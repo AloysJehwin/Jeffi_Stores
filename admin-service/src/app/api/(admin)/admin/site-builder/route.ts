@@ -6,6 +6,7 @@ import { parsePageRefKey } from '@jeffi/site-blocks'
 import { getPublishedPage, importLegacyLayouts, listSiteDrafts, setSiteBuilderEnabled, siteBuilderEnabled } from '@/lib/site/store'
 import { afterSiteChange } from '@/lib/site/after-publish'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { noAppDenial } from './_no-app'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest) {
   if (key) {
     const ref = parsePageRefKey(key)
     if (!ref) return NextResponse.json({ error: 'Unknown page' }, { status: 400 })
+    const noApp = await noAppDenial(ref.surface)
+    if (noApp) return noApp
     const page = await getPublishedPage(ref)
     return page ? NextResponse.json(page) : NextResponse.json({ error: 'That page has no published document' }, { status: 404 })
   }

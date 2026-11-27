@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import Link from 'next/link'
 import { Banner, Kpi, KpiGrid, Section, Table, money, type Col } from '@/components/admin/channels/ui'
 import { useOverviewData } from '@/components/admin/overview/kit'
@@ -57,7 +58,7 @@ export function CashflowTab({ initialData }: { initialData?: unknown }) {
 
   return (
     <div className="space-y-5">
-      <FinancePeriodBar defaultPreset="fy" onRefresh={reload} busy={loading} />
+      <FinancePeriodBar defaultPreset="fy" onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.cashflow" range={range} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !d ? <CashflowTabSkeleton /> : d ? <Body d={d} /> : null}
     </div>

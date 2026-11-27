@@ -186,6 +186,7 @@ export default function BuildStep({
   onView,
   autoStart,
   onBack,
+  onContinue,
   onAiDown,
   onWalletLow,
   aiDown = false,
@@ -194,6 +195,8 @@ export default function BuildStep({
   onView: (v: StudioView) => void
   autoStart: boolean
   onBack: () => void
+  /** The wizard's next step: offered while the build runs (it carries on on the server). */
+  onContinue?: () => void
   /** Claude became unreachable: the studio shows its notice instead of an error toast. */
   onAiDown?: () => void
   /** A paid generation (a Showcase's after its free one) the wallet can't cover: the studio shows where to top up. */
@@ -625,6 +628,17 @@ export default function BuildStep({
       {building && (
         <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-surface-secondary" aria-hidden>
           <div className="ecom-accent-bg h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(4, (pageSec ? pageSec.index / Math.max(1, pageSec.total) : built / Math.max(1, total)) * 100)}%` }} />
+        </div>
+      )}
+
+      {building && onContinue && (
+        <div className={`${noteCls} mb-4 flex flex-wrap items-center justify-between gap-3 org-sand`} role="status">
+          <span className="min-w-0 text-foreground-secondary">
+            This takes a few minutes, and it keeps building even if you leave this step. You can carry on with your registration; you’ll see your live site at the review step.
+          </span>
+          <button type="button" onClick={onContinue} className={primaryBtn}>
+            Continue registration
+          </button>
         </div>
       )}
 

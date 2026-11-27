@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, TableSkeleton, type EmptyStateProps } from './s
 import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl, type LoadPage } from './infinite'
 import { Pager, usePagedRows, EMBEDDED_PAGE_SIZE, type PagerControl } from './pager'
 import { SortArrow, useListSort, type SortType } from './list-sort'
+import { useExportRows } from '@/components/admin/export/export-rows'
 
 // List tables. A page's main list scrolls infinitely; a list inside a page (paged / pager) shows ‹ ›
 // arrows and a fixed page of rows. Client mode sorts in memory and reveals
@@ -99,6 +100,8 @@ export interface DataTableProps<T> {
   bare?: boolean
   /** Client mode: namespaces ?sort when several tables share a page. */
   sortNs?: string
+  /** Offers this table's visible and selected rows (rowKey = record id) to that key's Export dialog. */
+  exportKey?: string
 }
 
 const HIDE = { sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell', xl: 'hidden xl:table-cell' }
@@ -344,6 +347,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const keys = visible.map(rowKey)
   const allOn = keys.length > 0 && keys.every(k => selected.has(k))
   const selectedRows = loadedRows.filter(r => selected.has(rowKey(r)))
+  useExportRows(props.exportKey, keys, selectable ? [...selected] : undefined)
   const emptyProps: EmptyStateProps = typeof empty === 'string' ? { title: empty } : (empty ?? { title: 'Nothing here yet.' })
 
   const hasToolbar = !!(search || filters?.length || toolbar)

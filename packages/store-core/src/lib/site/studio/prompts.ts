@@ -3,6 +3,7 @@ import { HTML_TAGS, LIBRARY_MODULE } from '../code/allow'
 import { codeRules } from '../code/library'
 import { PRODUCT_FIELDS } from '../code/parts/common'
 import { libraryText } from './library'
+import { SLIDE_RULES, isSlideLayout } from './slide-rules'
 import type { DesignDirection, PlannedPage, PlannedSection, StudioBrief } from './types'
 import { uiStyle } from './ui-styles'
 import { utilityRules } from './utility'
@@ -51,7 +52,8 @@ const PAGE_RULES: Partial<Record<PageKey, string>> = {
 const HEADER_RULE =
   'This is only the header: the announcement bar is its own section above it, so add no promo, offer or message strip here. On phones and tablets the menu button sits in the logo row, at its left or right edge: never alone on a row, never centred. <NavLinks> draws that button below the width its links show from (from="lg" by default; from="md" shows them from 768px). Links on a centred row of their own (a centred logo over the menu, a wide search with the menu below) need mobile="scroll" on <NavLinks> (that row then keeps its links, scrolling on phones), or <NavLinks> kept at an edge of the logo row until the links move to their own row, with from set to that width.'
 
-export const RESPONSIVE = `One source serves desktop and phone: write mobile-first. Base classes are for phones (320-430px wide), then sm: md: lg: xl: for wider screens. Nothing may overflow at 320px (use flex-wrap, grid-cols-1 or 2 on phones, overflow-x-auto only for an intended scroller). Tap targets at least 44px tall; body text at least text-base on phones.`
+export const RESPONSIVE = `One source serves desktop and phone: write mobile-first. Base classes are for phones (320-430px wide), then sm: md: lg: xl: for wider screens. Nothing may overflow at 320px.
+Phone rules: never a fixed width over 320px without a breakpoint prefix: no w-[480px], min-w-[400px], basis-[420px] or w-96 on its own, only w-full or w-[…%] with max-w-[…px] on phones, and the pixel width from md: up (w-full md:w-[480px]). Grids start at grid-cols-1 (or grid-cols-2 for small cards) and gain columns from sm: or md:. Rows that may not fit use flex-wrap or flex-col sm:flex-row. Long words and URLs must wrap (break-words; min-w-0 on a flex or grid child that holds text). Pictures are w-full h-auto or fill their box with object-cover. Decorative blobs and halos are at most w-64 on phones and sit inside a relative overflow-hidden section. Horizontal scrollers (overflow-x-auto) are fine, but the scroller itself stays within the screen and only its slides are wider. Tap targets at least 44px tall; body text at least text-base on phones.`
 
 const RADIUS = { none: 'rounded-none', sm: 'rounded-md', md: 'rounded-xl', lg: 'rounded-2xl', full: 'rounded-3xl' } as const
 
@@ -119,7 +121,7 @@ ${p.sections.map((x, i) => `${i === index ? '→' : ' '} ${i + 1}. ${x.label}: $
 
 Write section ${index + 1}, "${s.label}": ${s.intent}
 Composition: ${s.layout}. Make it look different from its neighbours.
-${must}`.trim()
+${must}${isSlideLayout(s.layout) ? `\n\n${SLIDE_RULES}` : ''}`.trim()
 }
 
 export function repairText(issues: string[]): string {
@@ -139,7 +141,7 @@ ${source}
 \`\`\`
 
 Change it as the owner asks: ${instruction}
-Keep everything else, keep every library component it uses, and return the whole component in one \`\`\`tsx block.${source.includes('data-e=') ? `\n\n${EDITOR_RULES}` : ''}`
+Keep everything else, keep every library component it uses, and return the whole component in one \`\`\`tsx block.${source.includes('data-e=') ? `\n\n${EDITOR_RULES}` : ''}${isSlideLayout(source) ? `\n\n${SLIDE_RULES}` : ''}`
 }
 
 /**

@@ -363,7 +363,7 @@ export default function GoogleAdsClient({
               <GoogleAdsTabLoading tab={tab} />
             ) : data ? (
               <AdsManageProvider currency={currency} onChanged={reload}>
-                <TabBody tab={tab} data={data} currency={currency} />
+                <TabBody tab={tab} data={data} currency={currency} range={range} />
               </AdsManageProvider>
             ) : null}
             </>
@@ -374,18 +374,18 @@ export default function GoogleAdsClient({
   )
 }
 
-function TabBody({ tab, data, currency }: { tab: AdsTab; data: any; currency: string }) {
+function TabBody({ tab, data, currency, range }: { tab: AdsTab; data: any; currency: string; range: { from: string; to: string } }) {
   switch (tab) {
     case 'overview':
       return data.kpis ? <OverviewView d={data} currency={currency} /> : null
     case 'campaigns':
-      return <CampaignsView rows={data.campaigns ?? []} currency={currency} />
+      return <CampaignsView rows={data.campaigns ?? []} currency={currency} range={range} />
     case 'adgroups':
       return <AdGroupsView d={{ adGroups: data.adGroups ?? [], ads: data.ads ?? [] }} currency={currency} />
     case 'keywords':
-      return <KeywordsView d={{ keywords: data.keywords ?? [], searchTerms: data.searchTerms ?? [] }} currency={currency} />
+      return <KeywordsView d={{ keywords: data.keywords ?? [], searchTerms: data.searchTerms ?? [] }} currency={currency} range={range} />
     case 'products':
-      return <ProductsView d={{ items: data.items ?? [], bestsellersWithoutImpressions: data.bestsellersWithoutImpressions ?? [] }} currency={currency} />
+      return <ProductsView d={{ items: data.items ?? [], bestsellersWithoutImpressions: data.bestsellersWithoutImpressions ?? [] }} currency={currency} range={range} />
     case 'locations':
       return <LocationsView rows={data.locations ?? []} currency={currency} />
     case 'recommendations':

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import BrandApprovalsPanel from '@/components/admin/channels/BrandApprovalsPanel'
 import ScopedPushPanel, { type ScopedPushResult } from '@/components/admin/channels/ScopedPushPanel'
 import { useToast } from '@/contexts/ToastContext'
@@ -213,6 +214,7 @@ export default function GoogleMerchantPanel() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportButton exportKey="merchant.products" filters={statusFilter !== 'all' ? { status: [statusFilter] } : undefined} />
           <RequireWrite scope="merchant_sync:write">
             <button
               onClick={syncNow}

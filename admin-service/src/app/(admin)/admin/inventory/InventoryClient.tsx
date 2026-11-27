@@ -26,6 +26,7 @@ import {
 } from '@/lib/filters/fields/inventory'
 import InventoryOverviewTab from './_components/InventoryOverviewTab'
 import { STOCK_PAGE_SIZE, VALUATION_PAGE_SIZE, formatINR, SummaryCard, TYPE_BADGE } from '@/components/admin/purchasing/shared'
+import { useExportRows } from '@/components/admin/export/export-rows'
 
 type StockTransaction = {
   id: string
@@ -200,6 +201,7 @@ function StockTab({ view }: { view: StockView }) {
     },
   })
   const transactions = txList.rows
+  useExportRows(view === 'ledger' ? 'inventory.ledger' : undefined, transactions.map(t => String(t.id)))
 
   // Totals and filter options come with page 1; later pages only add rows.
   const valList = useInfiniteList<any>({

@@ -82,7 +82,7 @@ describe('registry', () => {
     })
     it('simple href builders', () => {
       expect(DRAFT_RESOURCES.invoice.editHref('o1')).toBe('/admin/invoices?view=edit&edit=o1')
-      expect(DRAFT_RESOURCES.quotation.editHref('q1')).toBe('/admin/quotations/q1/view')
+      expect(DRAFT_RESOURCES.quotation.editHref('q1')).toBe('/admin/quotations?view=editor&edit=q1')
       expect(DRAFT_RESOURCES.purchase_order.editHref('p1')).toBe('/admin/purchase-orders?po=p1')
       expect(DRAFT_RESOURCES.po_new.editHref('n1')).toBe('/admin/purchase-orders/new?draftId=n1')
       expect(DRAFT_RESOURCES.po_receive.editHref('r1')).toBe('/admin/purchase-orders?po=r1')

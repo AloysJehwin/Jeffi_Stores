@@ -1,6 +1,6 @@
 # Visual site editor: plan (2026-11-24)
 
-Status: **phases 0–6 built** (2026-11-24); phases 4–6 verified end to end in a local browser (see "Verified"), CI runs
+Status: **phases 0–7 built** (phase 7 on 2026-11-27); phases 4–6 verified end to end in a local browser (see "Verified"), CI runs
 pending. Decided: flow first with free layers later (1), one responsive document
 per page with Phone/Tablet/Desktop breakpoints (2), classic blocks kept until converted or redesigned (3), a
 per-tenant rollout flag with the old editors as "Classic editor" (8); fonts and colours (5, 6) run on the defaults
@@ -165,6 +165,13 @@ AI-generated pages must be editable with it.
 4. The AI end to end (`admin-service/ui-tests/site-editor/ai.spec.ts`), against a stand-in gateway
    (`tests/site-editor/ai-mock.ts`, port 8098; start the apps with `AI_GATEWAY_URL=http://localhost:8098`, as the CI job
    does): the real routes, prompts, compiler and billing run, only the model's words are fixed. Covers phase 4's flows.
+
+**Phase 7 (canvas tools, slides, rich text), 2026-11-27.** From [site-builder-canvas-editor-research.md](site-builder-canvas-editor-research.md): keep this editor, add the Canva-style tools on top, adopt only small MIT parts.
+1. Multi-select and arranging. Shift-click on the canvas or a layers row adds or removes an element of the same section (the first stays primary; `MultiPanel.tsx` replaces the inspector). Align (to the frame for one free layer, to the selection's bounds for several) and distribute (3+) are `lib/site/code/arrange.ts` maths turned into `placeOps`, one undo step each.
+2. Group and ungroup (`group-ops.ts`): adjacent siblings wrapped in a `div` (`wrap`); free layers become one free layer over their union, each re-placed in % of it, and ungroup puts them back in % of the frame. Ids stay stable. Rotate: a knob on the handles (15° steps, Shift 1°) stored as `rotate-[Ndeg]` per breakpoint (`free.ts` `rotateAt` / `setRotate`, a `rotate` panel prop).
+3. Keyboard and copy/paste: arrows nudge the selection, Alt+arrows resize, Cmd/Ctrl+G / Shift+G group and ungroup, C / X / V copy, cut and paste (`clipboard.ts`: subtrees with fresh ids via `cloneWithIds`, mirrored to sessionStorage so they cross sections and pages), D duplicate. Knobs and layer rows are labelled; actions are announced in an aria-live region.
+4. Slides (`lib/site/code/slide.ts`): a code section whose root has `md:[container-type:inline-size]` and `md:aspect-[w/h]` (16:9, 4:3, 21:9, 1:1, 3:4). Its direct children are free layers at md and lg with words in container units (`md:text-[4.2cqw]`), so it keeps one look at any width; on phones the layers stack in tree order. Five starters (`slide-templates.ts`, "Add slide…" in the section bar; the product one only where the page shows store data), `SlidePanel.tsx` (shape, "Make this a slide", back to a normal section), critique codes `slide_overflow` and `slide_text`, and for the AI `SLIDE_RULES` and `lintSlide` (`lib/site/studio/slide-rules.ts`): the planner may choose a `slide:` layout, and the section writer and editor tweaks get the rules.
+5. Rich text: double-click on a paragraph-like element mounts Tiptap (MIT, already installed) in place, loaded on the first rich edit only; bold, italic, underline, strike, line breaks and links (safe hrefs only). Plain words still report a `text` op; formatted ones a `node` op with the element's new children.
 
 **Verified (2026-11-24), locally in headless Chromium.** The storefront and admin as dev servers (webpack) behind the dev
 router on `jeffi_test` (`tests/site-editor/seed.ts` up and down; never the real-data DB), started and stopped in one

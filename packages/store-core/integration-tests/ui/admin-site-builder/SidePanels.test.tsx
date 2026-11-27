@@ -6,6 +6,9 @@ import { siteRegistry } from '@/lib/site/blocks'
 import { THEME_STYLES } from '@/lib/site/themes/catalog'
 import { combo, choose } from '../admin-homepage/editor-kit'
 
+// The admin-theme switch loads and saves its own setting; these tests cover the panel around it.
+vi.mock('@/components/admin/site-builder/AdminThemeToggle', () => ({ default: () => <div>admin-theme-toggle</div> }))
+
 // The Site Builder's side panels: the block library (add after the selected block; singletons and out-of-plan
 // types disabled), the theme panel (colours, fonts, shape) and the template panel (built-in, saved and whole-site).
 const home = { audience: 'store', surface: 'web', page: 'home' } as const
@@ -126,9 +129,9 @@ describe('TemplatePanel', () => {
     return fns
   }
 
-  it('shows a loading line until templates arrive', () => {
+  it('shows a loading skeleton until templates arrive', () => {
     setup(null)
-    expect(screen.getByText('Loading templates…')).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Loading templates' })).toBeInTheDocument()
   })
 
   it('says when no template fits the page', () => {

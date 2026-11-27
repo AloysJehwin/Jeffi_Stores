@@ -9,6 +9,7 @@ import { TIER_KEYS, TIER_NAMES, tierName } from '@/lib/loyalty/tiers'
 import { ap } from '@/lib/shared/admin-path'
 import { queryOne } from '@/lib/shared/db'
 import LoyaltySettingsForm from './LoyaltySettingsForm'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import ProgramSection, { PROGRAMS_PATH, Stat, filterButtonClass, filterInputClass } from './ProgramSection'
 
 const PAGE_SIZE = 25
@@ -189,7 +190,10 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
 
       <div className="bg-surface-elevated rounded-xl border border-border-default">
         <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Members</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Members</h3>
+            <ExportButton exportKey="loyalty.members" filters={tier ? { tiers: [tier] } : undefined} />
+          </div>
           <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="loyalty" />
             {sort && <input type="hidden" name="sort" value={sort} />}

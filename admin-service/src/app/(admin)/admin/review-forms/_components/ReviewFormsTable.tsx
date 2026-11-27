@@ -200,6 +200,7 @@ export default function ReviewFormsTable({
         rows={forms}
         cols={cols}
         rowKey={f => f.id}
+        exportKey="review_forms"
         total={total}
         page={page}
         pageSize={pageSize}

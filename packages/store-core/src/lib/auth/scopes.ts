@@ -1000,6 +1000,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/suggest')) return null
   // Generic list filters and saved views: the handlers check the registered list's own scope.
   if (pathname.startsWith('/api/admin/filters') || pathname.startsWith('/api/admin/saved-views')) return null
+  // Standard export: the handler checks the export's own scope.
+  if (pathname.startsWith('/api/admin/export/')) return null
   // Customer replies on a record: the handlers check that record's own scope.
   if (pathname.startsWith('/api/admin/replies')) return null
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'

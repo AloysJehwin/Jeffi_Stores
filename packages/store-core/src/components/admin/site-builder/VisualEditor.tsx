@@ -43,6 +43,7 @@ export default function VisualEditor({ draftId, pageRef, title, previewUrl, canW
       title,
       previewUrl,
       canWrite: writable,
+      storeData: true,
       theme,
       async load() {
         const { ok, data } = await api<{ doc: PageDoc; phone: 'same' | 'own' | 'none' }>(`/api/admin/site-builder/drafts/${draftId}/editor?key=${encodeURIComponent(key)}`)

@@ -31,6 +31,7 @@ import { badgeCls } from '@/components/admin/kit/tones'
 import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE } from '@/components/admin/purchasing/shared'
 import { FormButton, FormFooter } from '@/components/admin/kit/form'
 import { DraftLockBadge, DraftLockBanner, LockedFieldset } from '@/components/admin/kit/draft-lock'
+import { useExportRows } from '@/components/admin/export/export-rows'
 import { useDraftLock } from '@/hooks/useDraftLock'
 import { lockHeaders } from '@/lib/client/draft-lock-client'
 import { resnapshotPoReceiveSession } from './receive-actions'
@@ -378,6 +379,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     },
   })
   const pos = list.rows
+  useExportRows('purchase-orders', pos.map(p => String(p.id)))
   const loading = list.loading
   const load = list.reload
 

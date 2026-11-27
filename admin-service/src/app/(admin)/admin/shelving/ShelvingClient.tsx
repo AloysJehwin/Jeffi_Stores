@@ -12,6 +12,7 @@ import {
   AssignStockForm,
 } from '@/components/admin/ShelvingParts'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -1003,10 +1004,11 @@ function LabelsTab({
   return (
     <div className="flex-1 flex flex-col lg:flex-row lg:min-h-0 lg:overflow-hidden">
       <div className="flex flex-col w-full lg:w-72 xl:w-80 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-border-default bg-surface lg:overflow-hidden">
-        <div className="px-4 py-3 border-b border-border-default shrink-0">
+        <div className="px-4 py-3 border-b border-border-default shrink-0 flex items-center justify-between gap-3">
           <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
             Filter Locations
           </span>
+          <ExportButton exportKey="shelving.locations" filters={selectedWarehouse ? { warehouses: [selectedWarehouse] } : undefined} />
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>

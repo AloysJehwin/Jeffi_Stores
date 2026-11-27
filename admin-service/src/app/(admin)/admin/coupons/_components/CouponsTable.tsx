@@ -208,6 +208,7 @@ export default function CouponsTable({
         rows={coupons}
         cols={cols}
         rowKey={c => c.id}
+        exportKey="coupons"
         total={total}
         page={page}
         pageSize={pageSize}

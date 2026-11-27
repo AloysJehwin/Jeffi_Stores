@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, Unplug } from 'lucide-react'
@@ -198,7 +199,7 @@ export default function AmazonAdsConsole() {
           ) : DATA_TABS.has(tab) && !data ? (
             <AmazonAdsTabLoading tab={tab} />
           ) : (
-            <Body tab={tab} d={data} onChanged={reload} />
+            <Body tab={tab} d={data} range={range} onChanged={reload} />
           )}
         </>
       )}
@@ -398,7 +399,7 @@ const kpiCols = [
   { key: 'orders', label: 'Orders', num: true, render: (r: any) => count(r.orders), sort: (r: any) => r.orders },
 ]
 
-function Body({ tab, d, onChanged }: { tab: AadsTab; d: any; onChanged: () => void }) {
+function Body({ tab, d, range, onChanged }: { tab: AadsTab; d: any; range: { from: string; to: string }; onChanged: () => void }) {
   const canWrite = useCanWrite('amazon_ads')
   const [pending, setPending] = useState<Record<string, unknown> | null>(null)
   const ask = (p: Record<string, unknown>) => setPending(p)
@@ -448,7 +449,7 @@ function Body({ tab, d, onChanged }: { tab: AadsTab; d: any; onChanged: () => vo
     }
     case 'campaigns':
       return (
-        <Section title="Campaigns">
+        <Section title="Campaigns" action={<ExportButton exportKey="amazon-ads.campaigns" range={range} />}>
           <Table
             rows={d.rows}
             rowKey={(r: any) => r.campaignId}
@@ -501,7 +502,7 @@ function Body({ tab, d, onChanged }: { tab: AadsTab; d: any; onChanged: () => vo
       )
     case 'keywords':
       return (
-        <Section title="Keywords">
+        <Section title="Keywords" action={<ExportButton exportKey="amazon-ads.keywords" range={range} />}>
           <Table
             rows={d.rows}
             rowKey={(r: any) => r.keywordId}
@@ -570,7 +571,7 @@ function Body({ tab, d, onChanged }: { tab: AadsTab; d: any; onChanged: () => vo
       )
     case 'searchterms':
       return (
-        <Section title="Search terms">
+        <Section title="Search terms" action={<ExportButton exportKey="amazon-ads.search-terms" range={range} />}>
           <p className="text-xs text-foreground-muted mb-3">
             What shoppers typed. Terms with {d.harvest}+ orders that are not yet an exact keyword can be added as one;
             terms with {d.waste}+ clicks and no orders can be added as negatives.
@@ -643,7 +644,7 @@ function Body({ tab, d, onChanged }: { tab: AadsTab; d: any; onChanged: () => vo
       )
     case 'products':
       return (
-        <Section title="Advertised products">
+        <Section title="Advertised products" action={<ExportButton exportKey="amazon-ads.products" range={range} />}>
           <Table
             rows={d.rows}
             rowKey={(r: any) => r.sku}

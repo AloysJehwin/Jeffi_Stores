@@ -19,6 +19,7 @@ import CampaignsMobileList from './_components/CampaignsMobileList'
 import RowActions from '@/components/admin/RowActions'
 import { DraftLockBadge, EmptyState, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly?: boolean }) {
   const { showToast } = useToast()
@@ -267,6 +268,13 @@ export default function CampaignsListClient({ draftsOnly = false }: { draftsOnly
               </button>
             </div>
           )}
+          <ExportButton
+            exportKey="campaigns.list"
+            filters={{
+              status: statusFilter === 'all' ? ['active', 'paused'] : [statusFilter],
+              channels: channelFilter === 'all' ? ['email', 'whatsapp', 'push'] : [channelFilter],
+            }}
+          />
         </div>
       </div>
 

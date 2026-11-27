@@ -40,7 +40,7 @@ describe('SiteBuilderSwitch (scope gating + branches)', () => {
 
   it('shows the make-live button for a not-yet-live builder', () => {
     render(<SiteBuilderSwitch target="homepage" live={false} />)
-    expect(screen.getByRole('button', { name: /Make Homepage builder live/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Make block builder live/ })).toBeInTheDocument()
   })
 
   it('shows the setup card and CTA in setup mode', () => {
@@ -61,16 +61,16 @@ describe('SiteBuilderSwitch (scope gating + branches)', () => {
   it('confirms, then posts enabled=true when making Site Builder live', async () => {
     showConfirm.mockResolvedValue(true)
     render(<SiteBuilderSwitch target="site" live={false} />)
-    fireEvent.click(screen.getByRole('button', { name: /Make Site Builder live/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Make site builder live/ }))
     await waitFor(() => expect(showConfirm).toHaveBeenCalled())
     await waitFor(() => expect(api).toHaveBeenCalledWith('/api/admin/site-builder', { method: 'POST', json: { enabled: true } }))
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Site Builder is live', 'success'))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Site builder is live', 'success'))
   })
 
   it('does not post when the confirm is declined', async () => {
     showConfirm.mockResolvedValue(false)
     render(<SiteBuilderSwitch target="homepage" live={false} />)
-    fireEvent.click(screen.getByRole('button', { name: /Make Homepage builder live/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Make block builder live/ }))
     await waitFor(() => expect(showConfirm).toHaveBeenCalled())
     expect(api).not.toHaveBeenCalled()
   })

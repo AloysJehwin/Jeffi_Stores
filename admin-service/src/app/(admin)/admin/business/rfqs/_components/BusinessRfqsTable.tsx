@@ -58,6 +58,7 @@ export default function BusinessRfqsTable({ rfqs, total, page, pageSize, loadPag
       rows={rfqs}
       cols={cols}
       rowKey={r => r.id}
+      exportKey="business_rfqs"
       total={total}
       page={page}
       pageSize={pageSize}

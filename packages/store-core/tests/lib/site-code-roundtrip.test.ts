@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(async () => []), queryOne: vi.fn(async () => null), query: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children) }))
 
-import type { CodeNode, PageDoc, PageKey } from '@jeffi/site-blocks'
+import type { CodeNode, CodeValue, PageDoc, PageKey } from '@jeffi/site-blocks'
 import { SHOWCASE_TEMPLATES, STORE_TEMPLATES } from '@/lib/site/themes/templates/index'
 import { studioPageOf } from '@/lib/site/studio/showcase'
 import { GENERIC_SAMPLE } from '@/lib/site/themes/sample'
@@ -364,10 +364,29 @@ describe('code_section v2: data-e only in the preview', () => {
     env.vars.set('s', { name: 'Bound' })
     const bound: CodeNode = { t: 'el', tag: 'p', props: {}, children: [{ t: 'expr', value: { k: 'path', root: 's', path: ['name'] } }], id: 'e1' }
     expect(renderToStaticMarkup(createElement('div', null, renderNode(bound, env)))).toBe('<div><p data-e="e1">Bound</p></div>')
-    expect(preview.replace(/ data-e(-text)?="[^"]*"/g, '')).toBe(live)
+    expect(preview.replace(/ data-e(-text|-rich)?="[^"]*"/g, '')).toBe(live)
     // Through CodeSection, as pages draw it: only its preview prop turns them on.
     expect(await draw(t.check.ast, 'home')).not.toContain('data-e')
     expect(await draw(t.check.ast, 'home', true)).toContain('"data-e":"e1"')
+  })
+
+  it('marks text with inline formatting data-e-rich, text-only data-e-text, and leaves data-bound or odd ones alone', () => {
+    const t = (v: string): CodeNode => ({ t: 'text', value: v })
+    const el = (tag: string, children: CodeNode[], props: Record<string, CodeValue> = {}, id?: string): CodeNode => ({ t: 'el', tag, props, children, ...(id ? { id } : {}) })
+    const draw = (n: CodeNode) => html(n, true)
+    expect(draw(el('p', [t('Hello '), el('strong', [t('there')], {}, 'e2')], {}, 'e1'))).toContain('<p data-e="e1" data-e-rich="">')
+    expect(draw(el('p', [t('Plain')], {}, 'e1'))).toContain('data-e-text=""')
+    expect(draw(el('p', [t('Plain')], {}, 'e1'))).not.toContain('data-e-rich')
+    const lit = (v: string): CodeValue => ({ k: 'lit', v })
+    expect(draw(el('li', [el('a', [t('x')], { href: lit('/sale') }, 'e2'), el('br', [], {}, 'e3')], {}, 'e1'))).toContain('data-e-rich')
+    expect(draw(el('h2', [el('em', [t('x')], {}, 'e2')], {}, 'e1'))).toContain('data-e-rich')
+    // Not rich: data inside, a link without a safe literal href, formatting that carries props, a div, live pages.
+    expect(draw(el('p', [el('strong', [{ t: 'expr', value: { k: 'path', root: 's', path: ['name'] } }], {}, 'e2')], {}, 'e1'))).not.toContain('data-e-rich')
+    expect(draw(el('p', [el('a', [t('x')], { href: lit('javascript:alert(1)') }, 'e2')], {}, 'e1'))).not.toContain('data-e-rich')
+    expect(draw(el('p', [el('strong', [t('x')], { className: lit('font-bold') }, 'e2')], {}, 'e1'))).not.toContain('data-e-rich')
+    expect(draw(el('p', [el('mark', [t('x')], {}, 'e2')], {}, 'e1'))).not.toContain('data-e-rich')
+    expect(draw(el('div', [el('strong', [t('x')], {}, 'e2')], {}, 'e1'))).not.toContain('data-e-rich')
+    expect(html(el('p', [el('strong', [t('x')])], {}, 'e1'), false)).not.toContain('data-e')
   })
 
   it('marks parts on the canvas too: Link, Image and Icon roots, a written-out label editable in place', async () => {

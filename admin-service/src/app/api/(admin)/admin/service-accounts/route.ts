@@ -4,7 +4,8 @@ import { hasScope, ALL_SCOPE_KEYS } from '@/lib/auth/scopes'
 import { assignableScopeKeys } from '@/lib/auth/scopes-server'
 import { ensureServiceAccountAdmin } from '@/lib/auth/admin-principal'
 import { clientInfoFrom, issueServiceAccountKey } from '@/lib/auth/api-tokens'
-import { query, queryMany } from '@/lib/shared/db'
+import { query } from '@/lib/shared/db'
+import { listServiceAccounts } from '@/lib/auth/service-accounts-list'
 import { generateClientCertificate } from '@/lib/tenancy/certificates'
 import { issueTenantAdminCert } from '@/lib/tenancy/tenant-ca'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
@@ -20,13 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const rows = await queryMany(
-    `SELECT id, name, common_name, allowed_scopes, is_revoked, revoked_at,
-            p12_downloaded, created_at, last_used_at
-     FROM service_accounts
-     ORDER BY created_at DESC`
-  )
-  return NextResponse.json({ service_accounts: rows })
+  return NextResponse.json({ service_accounts: await listServiceAccounts() })
 }
 
 export async function POST(request: NextRequest) {

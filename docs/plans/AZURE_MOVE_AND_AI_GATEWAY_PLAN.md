@@ -46,7 +46,35 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
     - routes are auto-approved.
     - The pre-change policy is in ~/Documents/db-backups/tailscale-policy-before-2026-11-26.hujson.
 - **Overlay:** `azure.env` ids and `K8S_SERVER_URL` are filled. `CLUSTER_INGRESS_IP` waits for the AWS edge (step 10).
-- **Still to do:** the kubeconfig over `tailscale ssh` (the ACL gives nobody SSH to tag:server-prod yet), Postgres, IRSA (step 7) and the tenant edge.
+- **Later on 2026-11-26:**
+  - **Kubeconfig:** `~/.kube/jeffi-azure.yaml` was fetched with `fetch-kubeconfig.sh --apply --github`, through the `az vm run-command` fallback. Tailscale SSH is a `check` rule, so a script can't use it. From the Mac over the tailnet, `kubectl get nodes` shows `core` and `tenant-edge` Ready.
+  - **GitHub:** the secrets `KUBECONFIG_AZURE_B64`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` are set, and the variable `AZURE_INGRESS_IP` is 52.172.147.62. `AZURE_TARGET` stays unset until the cutover.
+  - **Tailscale:** the OAuth client "GitHub Actions Jeffi Stores Azure deploy" (Auth Keys write, `tag:ci`) was created, and `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` are set, so the Azure CI jobs can join the tailnet.
+  - **Postgres:** request 2611260030001583 is still open. On 2026-11-26 the engineer said they are coordinating internally; the response deadline is 2026-11-27 04:55 UTC. Phase D's restore waits on it.
+  - **Credential audit (evening):**
+    - **Live probes from the core:** pods with the real service accounts assumed `jeffi-irsa-app` and `jeffi-irsa-controller` (S3, SMS, EC2 and RDS reads work) and read every Key Vault secret through both Entra identities.
+    - **Key Vault:** `kv-sync.sh` dry run: all 10 production secrets equal Secrets Manager. The live IRSA inline policies equal the repo.
+    - **Fixed in the repo:**
+      - The Key Vault copies carried RDS IAM logins and no Azure URLs, for the platform and for the copies the store namespaces get. Now `kv-sync.sh --azure-db`, run by `pg-init.sh`, writes app_user's URL into every service secret's DB keys and clears the flags. The overlay also forces `RDS_IAM_AUTH` and `CONTROL_PLANE_IAM_AUTH` off.
+      - `app.json` gained the documents bucket and WhatsApp template submission.
+      - The controller gained domain purchase, and voice-service the cluster identity.
+      - The runbook sets `AZURE_TARGET` only at cutover, and builds the `ai-gateway` Secret.
+    - **Applied 2026-11-27:**
+      - `aws-roles.sh --apply` pushed the new IRSA policies; the live inline policies equal the repo.
+      - `jeffi-tenant-provisioning` v4 (= the repo file) is the default. It adds `ec2:DeleteSnapshot` on `jeffi:role=db` snapshots, which the IAM user `Jeffi_Stores` gets too. v3 is kept for rollback.
+      - Policy simulation allows the documents bucket, WhatsApp template submission, domain purchase and tagged snapshot deletion.
+    - **Open:**
+      - Every service secret still holds the static `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` of IAM user `Jeffi_Stores`. The SDKs prefer them over IRSA, so Azure pods would act as that user until the keys are removed.
+      - ~~The CI lanes are not cutover-safe yet.~~ Fixed in the repo 2026-11-27:
+        - A repository variable `FLAGSHIP_CLOUD` picks the lane, and the cutover's new `azure-live` step sets it to `azure` along with `AZURE_TARGET=true`. `rollback.sh` `release-lanes` restores both.
+        - From then on every AWS job is skipped, and the scripts refuse the AWS side. The Azure lane gains the tenant fan-out (`release-db.sh --tenants --cloud=azure`), `stores shared` / `stores <service>`, `50-seeds.sh`, `store-secret.sh --check` on Key Vault, the post-deploy smoke and CloudFront.
+        - Until the cutover, Azure renders from `overlays/azure-standby`: app CronJobs suspended, messaging, documents and voice at 0. An early `AZURE_TARGET` therefore runs nothing twice.
+        - Also fixed: the store jobs waited on `Release · controller`, a name the AWS/Azure lane rename had broken.
+      - Still open from that fix:
+        - `razer-release.sh` reaches the Razer box through the AWS core, so after the cutover Release · razer is skipped. It needs a path through the Azure core: the deploy key on the Azure VM and a hostNetwork Job, or `az vm run-command`, which the deploy identity, a Reader, can't call today.
+        - The Azure deploy identity reads Key Vault but cannot write it, so `jeffi-store` drift only warns. A Secrets Officer assignment scoped to that one secret would match the AWS deploy role, which may write only `jeffi/store`.
+        - Nothing here has run against a live cluster; the stubbed checks and `actionlint` passed.
+- **Still to do:** Postgres (then `pg-init.sh` and the rehearsal), the open audit items above, and the Anthropic clean-up after #646's production release.
 
 **Ready to apply.** Everything below is written and checked, and none of it is applied. The runbook, in order, is in [`deploy/azure/README.md`](../../deploy/azure/README.md).
 - **Landing zone** (`deploy/azure/*.bicep`, `apply.sh`):
@@ -65,7 +93,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
 - **CI:**
   - `db-azure`, `deploy-prep-azure` and `release-azure` reach Azure over Tailscale;
   - `release-db.sh --cloud=azure` talks to Postgres over the subnet route, with the password from Key Vault in a temporary PGPASSFILE;
-  - the AWS lanes are unchanged.
+  - the AWS lane releases until `FLAGSHIP_CLOUD=azure`; before that, Azure renders on standby (`overlays/azure-standby`).
 
 **Founder steps.**
 1. Add admin@ as Owner.
@@ -76,7 +104,7 @@ Status: plan, 2026-11-25. Phase B/C infrastructure written 2026-11-26, nothing c
    - auto-approve the core's routes;
    - split DNS for `postgres.database.azure.com`.
 5. A new Anthropic federation rule for issuer `https://oidc.jeffistores.in`, subject `system:serviceaccount:jeffi:ai-gateway`.
-6. GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. GitHub variables: `AZURE_INGRESS_IP`, then `AZURE_TARGET=true`.
+6. GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `KUBECONFIG_AZURE_B64`. GitHub variables: `AZURE_INGRESS_IP`; `AZURE_TARGET=true` and `FLAGSHIP_CLOUD=azure` come from the cutover's `azure-live` step.
 7. The DNS cutover window:
    - lower TTLs the day before (`route53-plan.sh --lower-ttl`);
    - on the day, store hosts move to the edge and platform hosts to Azure;

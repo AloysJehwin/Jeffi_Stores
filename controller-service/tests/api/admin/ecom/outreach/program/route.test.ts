@@ -16,6 +16,7 @@ import { ProgramStateError } from '@controller/lib/outreach/program-state'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 
+const SKILL = '11111111-1111-4111-8111-111111111111'
 const url = 'http://localhost/api/admin/ecom/outreach/program'
 const patch = (body: unknown) => new NextRequest(url, { method: 'PATCH', body: JSON.stringify(body) })
 
@@ -58,6 +59,27 @@ describe('/api/admin/ecom/outreach/program', () => {
     expect(res.status).toBe(200)
     expect(requireAdminScope).toHaveBeenCalledWith(expect.anything(), 'ecom_outreach:write')
     expect(m.update).toHaveBeenCalledWith('showcase-offer', { enabled: true, daily_cap: 20, test_numbers: ['9876543210'] }, expect.objectContaining({ id: 'a1' }))
+  })
+
+  it('GET carries the default skill id in the state', async () => {
+    m.getState.mockResolvedValueOnce({ program: 'showcase-offer', enabled: false, default_skill_id: SKILL })
+    expect((await (await GET(new NextRequest(url))).json()).state.default_skill_id).toBe(SKILL)
+  })
+
+  it('PATCH sets or clears the default skill, and 400s on a bad id', async () => {
+    expect((await PATCH(patch({ default_skill_id: 'nope' }))).status).toBe(400)
+    expect(m.update).not.toHaveBeenCalled()
+    expect((await PATCH(patch({ default_skill_id: SKILL }))).status).toBe(200)
+    expect(m.update).toHaveBeenLastCalledWith('showcase-offer', { default_skill_id: SKILL }, expect.objectContaining({ id: 'a1' }))
+    expect((await PATCH(patch({ default_skill_id: null }))).status).toBe(200)
+    expect(m.update).toHaveBeenLastCalledWith('showcase-offer', { default_skill_id: null }, expect.objectContaining({ id: 'a1' }))
+  })
+
+  it('PATCH turns an unknown, archived or foreign skill into a 400', async () => {
+    m.update.mockRejectedValueOnce(new ProgramStateError('That skill is archived'))
+    const res = await PATCH(patch({ default_skill_id: SKILL }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/archived/)
   })
 
   it('PATCH turns a compliance refusal into a 400', async () => {

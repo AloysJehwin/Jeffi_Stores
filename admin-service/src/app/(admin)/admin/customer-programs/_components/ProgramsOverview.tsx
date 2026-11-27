@@ -18,6 +18,7 @@ import { TIER_KEYS, tierName } from '@/lib/loyalty/tiers'
 import { ap } from '@/lib/shared/admin-path'
 import { ProgramsOverviewLoading } from './ProgramsLoading'
 import { SplitRow } from '@/components/admin/kit'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 interface Person {
   id: string
@@ -155,9 +156,12 @@ function Body({ data }: { data: Data }) {
       <Section
         title="Top earners this period"
         action={
-          <Link href={ap('/admin/customer-programs?tab=loyalty')} className="text-xs text-accent-500 hover:underline">
-            All members
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href={ap('/admin/customer-programs?tab=loyalty')} className="text-xs text-accent-500 hover:underline">
+              All members
+            </Link>
+            <ExportButton exportKey="loyalty.top-earners" />
+          </div>
         }
       >
         <Table
@@ -210,9 +214,12 @@ function Body({ data }: { data: Data }) {
       <Section
         title="Top referrers this period"
         action={
-          <Link href={ap('/admin/customer-programs?tab=referrals')} className="text-xs text-accent-500 hover:underline">
-            All referrals
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href={ap('/admin/customer-programs?tab=referrals')} className="text-xs text-accent-500 hover:underline">
+              All referrals
+            </Link>
+            <ExportButton exportKey="referrals.top-referrers" />
+          </div>
         }
       >
         <Table

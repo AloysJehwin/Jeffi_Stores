@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { NO_APP_ERROR, storeHasApp } from '@/lib/site/app-surface'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -399,6 +400,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid preview request' }, { status: 400 })
   }
 
+  if (parsed.data.surface === 'app' && !(await storeHasApp())) return NextResponse.json({ error: NO_APP_ERROR }, { status: 403 })
   const type = parsed.data.type as SectionType
   const resolver = RESOLVERS[type]
   if (!resolver) return NextResponse.json({ kind: 'none', items: [] })

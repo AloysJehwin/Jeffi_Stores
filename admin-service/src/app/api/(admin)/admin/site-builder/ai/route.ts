@@ -5,6 +5,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { aiDenial } from '@/lib/auth/ai-scope'
 import { getHomepagePlan } from '@/lib/catalog/homepage-plan'
 import { aiBuildPage, aiCorrectBlock, SiteAiError } from '@/lib/site/ai'
+import { noAppDenial } from '../_no-app'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Describe the change in a few words' }, { status: 400 })
   const { ref, prompt, blockId, hint } = parsed.data
+  const noApp = await noAppDenial(ref.surface)
+  if (noApp) return noApp
   const doc = normalizeDoc(parsed.data.doc as unknown as PageDoc)
   const r = ref as never
   try {

@@ -52,7 +52,7 @@ export function homepagePreviewUrl(audience: HomepageAudience, token: string, la
 
 const DEVICE_FOR: Record<HomepageSurface, DeviceId> = { web: 'desktop', web_mobile: 'phone', app: 'app' }
 
-export default function HomepagePreviewButton({ token, audience, surface = 'web' }: { token: string; audience: HomepageAudience; surface?: HomepageSurface }) {
+export default function HomepagePreviewButton({ token, audience, surface = 'web', hasApp = true }: { token: string; audience: HomepageAudience; surface?: HomepageSurface; hasApp?: boolean }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -63,14 +63,15 @@ export default function HomepagePreviewButton({ token, audience, surface = 'web'
       >
         <Eye className="w-3.5 h-3.5" /> Preview
       </button>
-      {open && <HomepagePreviewModal token={token} audience={audience} surface={surface} onClose={() => setOpen(false)} />}
+      {open && <HomepagePreviewModal token={token} audience={audience} surface={surface} hasApp={hasApp} onClose={() => setOpen(false)} />}
     </>
   )
 }
 
-function HomepagePreviewModal({ token, audience, surface, onClose }: { token: string; audience: HomepageAudience; surface: HomepageSurface; onClose: () => void }) {
+function HomepagePreviewModal({ token, audience, surface, hasApp, onClose }: { token: string; audience: HomepageAudience; surface: HomepageSurface; hasApp: boolean; onClose: () => void }) {
+  const devices = hasApp ? DEVICES : DEVICES.filter(d => d.id !== 'app')
   // Opens on the device the editor's selector highlights.
-  const [device, setDevice] = useState<Device>(() => DEVICES.find(d => d.id === DEVICE_FOR[surface]) ?? DEVICES[0])
+  const [device, setDevice] = useState<Device>(() => devices.find(d => d.id === DEVICE_FOR[surface]) ?? devices[0])
   const [landscape, setLandscape] = useState(false)
   const [fit, setFit] = useState(true)
   const [full, setFull] = useState(false)
@@ -151,7 +152,7 @@ function HomepagePreviewModal({ token, audience, surface, onClose }: { token: st
     <div role="dialog" aria-modal="true" aria-label="Homepage preview" className={`fixed z-[1000] flex flex-col bg-surface shadow-2xl ${full ? 'inset-0' : 'inset-3 sm:inset-6 rounded-2xl border border-border-default overflow-hidden'}`}>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border-default bg-surface-elevated">
         <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-default bg-surface">
-          {DEVICES.map(d => (
+          {devices.map(d => (
             <Tab key={d.id} d={d} />
           ))}
         </div>

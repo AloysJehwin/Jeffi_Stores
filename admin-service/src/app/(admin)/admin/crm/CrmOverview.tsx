@@ -18,6 +18,7 @@ import {
   type Col,
 } from '@/components/admin/channels/ui'
 import { PageHeader } from '@/components/admin/kit'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { TrendChart, type SeriesDef, type ChartPoint } from '@/components/admin/dashboard/Charts'
 import { GroupLabel } from '@/components/admin/dashboard/Primitives'
 import { ap } from '@/lib/shared/admin-path'
@@ -261,7 +262,7 @@ export default function CrmOverview({
       <PageHeader
         title="CRM"
         description={`${periodLabel(data.period)} compared with ${periodLabel(data.previous)}`}
-        actions={<PeriodPicker value={period} today={today} disabled={loading} onChange={changePeriod} />}
+        actions={<><ExportButton exportKey="crm.watchlist" /><PeriodPicker value={period} today={today} disabled={loading} onChange={changePeriod} /></>}
       />
 
       {error && <Banner ok={false}>{error}</Banner>}
@@ -348,7 +349,7 @@ export default function CrmOverview({
         </Section>
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
           <div className="xl:col-span-3 min-w-0 xl:flex xl:flex-col xl:[&>*]:flex-1">
-            <Section title="Top customers by revenue">
+            <Section title="Top customers by revenue" action={<ExportButton exportKey="crm.top-customers" range={period} />}>
               <Table
                 rows={data.topCustomers}
                 cols={cols}
@@ -359,7 +360,7 @@ export default function CrmOverview({
             </Section>
           </div>
           <div className="xl:col-span-2 min-w-0 xl:flex xl:flex-col xl:[&>*]:flex-1">
-            <Section title="Retention by first-order month">
+            <Section title="Retention by first-order month" action={<ExportButton exportKey="crm.cohorts" />}>
               <p className="text-[11px] text-foreground-muted -mt-2 mb-3">
                 Share of each cohort ordering again 1 to 6 months later.
               </p>

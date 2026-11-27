@@ -273,6 +273,7 @@ export default function AmazonMerchantPanel() {
           infinite={list}
           cols={LISTING_COLS}
           rowKey={r => r.sku}
+          exportKey="amazon.listings"
           empty={summary?.last_refreshed_at ? 'No items match.' : 'No data yet. Click "Refresh from Amazon".'}
           mobileCard={r => (
             <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1">

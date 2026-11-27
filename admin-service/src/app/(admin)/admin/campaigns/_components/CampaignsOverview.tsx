@@ -17,6 +17,7 @@ import type { CampaignRowStats, CampaignStats, CampaignTotals } from '@/lib/over
 import { ap } from '@/lib/shared/admin-path'
 import CampaignsOverviewLoading from './CampaignsOverviewLoading'
 import { SplitRow } from '@/components/admin/kit'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 interface Data {
   bucket: Bucket
@@ -149,9 +150,12 @@ export default function CampaignsOverview() {
           <Section
             title="By campaign"
             action={
-              <Link href={ap('/admin/campaigns?tab=list')} className="text-xs text-accent-500 hover:underline">
-                All campaigns
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link href={ap('/admin/campaigns?tab=list')} className="text-xs text-accent-500 hover:underline">
+                  All campaigns
+                </Link>
+                <ExportButton exportKey="campaigns.performance" range={{ from: period.from, to: period.to }} />
+              </div>
             }
           >
             <Table

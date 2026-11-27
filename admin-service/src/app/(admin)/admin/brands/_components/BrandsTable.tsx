@@ -195,6 +195,7 @@ export default function BrandsTable({
         rows={brands}
         cols={cols}
         rowKey={b => b.id}
+        exportKey="brands"
         total={total}
         page={page}
         pageSize={pageSize}

@@ -7,9 +7,10 @@ import { Card } from '@/components/admin/kit/layout'
 import { useActionToast } from '@/components/admin/kit/toast'
 import type { OutreachList } from '@controller/lib/outreach/types'
 import type { ImportSummary } from '@controller/lib/outreach/import'
-import { API } from './shared'
+import { API, versionRef, type SkillSummary, type SkillVersionRow } from './shared'
 
 type Result = { name: string; summary: ImportSummary }
+type ListRow = OutreachList & { skill_title?: string | null }
 
 function Summary({ r }: { r: Result }) {
   const s = r.summary
@@ -46,7 +47,7 @@ function Summary({ r }: { r: Result }) {
 export default function OutreachListsClient() {
   const canWrite = useCanWrite('ecom_outreach:write')
   const toast = useActionToast()
-  const [lists, setLists] = useState<OutreachList[] | null>(null)
+  const [lists, setLists] = useState<ListRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [result, setResult] = useState<Result | null>(null)
@@ -55,7 +56,7 @@ export default function OutreachListsClient() {
   const [sheet, setSheet] = useState({ name: '', sheetUrl: '', sheetTitle: '' })
 
   const load = useCallback(async () => {
-    const { ok, data } = await api<{ lists: OutreachList[] }>(`${API}/lists`)
+    const { ok, data } = await api<{ lists: ListRow[] }>(`${API}/lists`)
     if (!ok) return setError(data.error || 'Could not load the lists')
     setError(null)
     setLists(data.lists)
@@ -63,6 +64,30 @@ export default function OutreachListsClient() {
   useEffect(() => {
     load()
   }, [load])
+
+  const [skills, setSkills] = useState<SkillSummary[]>([])
+  const [versions, setVersions] = useState<Record<string, SkillVersionRow[]>>({})
+  useEffect(() => {
+    api<{ skills: SkillSummary[] }>(`${API}/skills?program=showcase-offer`).then(({ ok, data }) => ok && setSkills(data.skills.filter(s => !s.archived_at)))
+  }, [])
+  const loadVersions = useCallback(async (skillId: string) => {
+    const { ok, data } = await api<{ versions: SkillVersionRow[] }>(`${API}/skills/${skillId}`)
+    if (ok) setVersions(v => ({ ...v, [skillId]: data.versions }))
+  }, [])
+  useEffect(() => {
+    for (const l of lists ?? []) if (l.skill_id && l.skill_version_id && !versions[l.skill_id]) loadVersions(l.skill_id)
+  }, [lists, versions, loadVersions])
+
+  async function setSkill(l: ListRow, skillId: string | null, versionId: string | null) {
+    setBusy(`skill-${l.id}`)
+    const { ok, data } = await api<{ list: OutreachList }>(`${API}/lists/${l.id}`, { method: 'PATCH', json: { skill_id: skillId, skill_version_id: versionId } })
+    setBusy(null)
+    if (!ok) return toast.error(data.error || 'Could not change the skill')
+    const title = skillId ? skills.find(s => s.id === skillId)?.title ?? l.skill_title ?? null : null
+    setLists(cur => cur && cur.map(x => (x.id === l.id ? { ...x, ...data.list, skill_title: title } : x)))
+    if (skillId && !versions[skillId]) loadVersions(skillId)
+    toast.success(skillId ? (versionId ? 'Skill pinned' : 'Skill set') : 'Using the program default skill')
+  }
 
   async function upload() {
     const file = fileRef.current?.files?.[0]
@@ -155,6 +180,24 @@ export default function OutreachListsClient() {
                       {busy === l.id ? 'Syncing…' : 'Sync now'}
                     </button>
                   )}
+                </div>
+                <div className="basis-full flex flex-wrap items-center gap-2">
+                  <select aria-label={`Skill for ${l.name}`} className={`${inputCls} sm:w-64`} value={l.skill_id ?? ''} disabled={!canWrite || busy === `skill-${l.id}`} onChange={e => setSkill(l, e.target.value || null, null)}>
+                    <option value="">Program default</option>
+                    {l.skill_id && !skills.some(s => s.id === l.skill_id) && <option value={l.skill_id}>{l.skill_title || 'Archived skill'}</option>}
+                    {skills.map(s => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
+                  </select>
+                  {l.skill_id && (
+                    <select aria-label={`Pin version for ${l.name}`} className={`${inputCls} sm:w-48`} value={l.skill_version_id ?? ''} disabled={!canWrite || busy === `skill-${l.id}`} onFocus={() => !versions[l.skill_id!] && loadVersions(l.skill_id!)} onChange={e => setSkill(l, l.skill_id, e.target.value || null)}>
+                      <option value="">Follow current</option>
+                      {(versions[l.skill_id] ?? []).map(v => (
+                        <option key={v.id} value={v.id}>{`Pin ${versionRef(v)}`}</option>
+                      ))}
+                    </select>
+                  )}
+                  {l.skill_title && <span className="text-xs text-foreground-muted">{l.skill_title}</span>}
                 </div>
               </li>
             ))}

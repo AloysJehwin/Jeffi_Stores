@@ -19,7 +19,7 @@ vi.mock('@/contexts/ConfirmContext', () => ({
   usePrompt: () => () => Promise.resolve(promptResult),
 }))
 
-import { SavedViewsMenu, ShareFilterLink, ExportRowsButton, viewQueryOf } from '@/components/admin/kit/saved-views'
+import { SavedViewsMenu, ShareFilterLink, viewQueryOf } from '@/components/admin/kit/saved-views'
 
 const fields: any[] = [
   { name: 'status', label: 'Status', type: 'select', options: [{ value: 'paid', label: 'Paid' }] },
@@ -184,47 +184,5 @@ describe('ShareFilterLink', () => {
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
     expect(toast.success).not.toHaveBeenCalled()
     Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
-  })
-})
-
-describe('ExportRowsButton', () => {
-  function open() {
-    render(<ExportRowsButton entity="orders" fields={fields} noun="Orders" />)
-    fireEvent.click(screen.getByRole('button', { name: /Export/ }))
-  }
-
-  it('counts the filtered rows first and offers the CSV', async () => {
-    search = 'status=paid'
-    apiMock.mockResolvedValue({ ok: true, data: { count: 1234, capped: false, cap: 5000 } })
-    open()
-    expect(screen.getByText('Counting orders…')).toBeInTheDocument()
-    expect(await screen.findByText('1,234 orders match these filters.')).toBeInTheDocument()
-    expect(apiMock).toHaveBeenCalledWith('/api/admin/filters/orders/export?status=paid&count=1')
-    expect(screen.getByRole('button', { name: /Export 1,234 orders \(CSV\)/ })).toBeEnabled()
-  })
-
-  it('warns when capped and disables export for zero matches', async () => {
-    apiMock.mockResolvedValue({ ok: true, data: { count: 9000, capped: true, cap: 5000 } })
-    open()
-    expect(await screen.findByText(/Only the first 5,000 are exported/)).toBeInTheDocument()
-  })
-
-  it('shows no match and a disabled export for zero rows', async () => {
-    apiMock.mockResolvedValue({ ok: true, data: { count: 0, capped: false, cap: 5000 } })
-    open()
-    expect(await screen.findByText('No orders match these filters.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Export 0 orders/ })).toBeDisabled()
-  })
-
-  it('shows the count error', async () => {
-    apiMock.mockResolvedValue({ ok: false, data: { error: 'Too many' } })
-    open()
-    expect(await screen.findByText('Too many')).toBeInTheDocument()
-  })
-
-  it('falls back to a generic error when the count request throws', async () => {
-    apiMock.mockRejectedValue(new Error('net'))
-    open()
-    expect(await screen.findByText('Could not count the rows')).toBeInTheDocument()
   })
 })

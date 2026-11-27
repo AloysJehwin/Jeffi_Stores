@@ -44,4 +44,6 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 SQL
 unset PGPASSFILE; az_pgpass # re-read, now with app_user's password
 psql_app jeffi_stores -Atc "select current_user, (select string_agg(extname, ',' order by extname) from pg_extension)"
+# Every service secret in the vault now logs in as app_user here instead of RDS IAM (values never printed).
+AZ_KEY_VAULT=$AZ_KEY_VAULT AZ_PG_HOST=$AZ_PG_HOST bash "$(dirname "$0")/kv-sync.sh" --azure-db --apply
 say "Done. Next: restore the flagship dump as app_user, then: bash deploy/k8s/db/release-db.sh --cloud=azure --dry-run"

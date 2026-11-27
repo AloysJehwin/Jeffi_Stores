@@ -1,6 +1,7 @@
 'use client'
 
 import { PageInsights } from '@/components/admin/insights'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { TRAFFIC_INSIGHTS } from './traffic-insights'
 import { useCallback, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -28,6 +29,15 @@ const LABELS: Record<TrafficTab, string> = {
   search: 'Search',
   audience: 'Audience',
   realtime: 'Real-time',
+}
+
+// Tabs with a report export.
+const EXPORT_KEYS: Partial<Record<TrafficTab, string>> = {
+  acquisition: 'traffic.sources',
+  behaviour: 'traffic.pages',
+  products: 'traffic.products',
+  search: 'traffic.search',
+  audience: 'traffic.audience',
 }
 
 export default function TrafficClient() {
@@ -79,7 +89,7 @@ export default function TrafficClient() {
       {live ? (
         <p className="text-xs text-foreground-muted">Live: the last 30 minutes of visits and the last hour of orders.</p>
       ) : (
-        <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<PageInsights config={TRAFFIC_INSIGHTS} />} />
+        <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} actions={<>{EXPORT_KEYS[tab] && <ExportButton exportKey={EXPORT_KEYS[tab]!} range={{ from: period.from, to: period.to }} />}<PageInsights config={TRAFFIC_INSIGHTS} /></>} />
       )}
 
       {error ? (

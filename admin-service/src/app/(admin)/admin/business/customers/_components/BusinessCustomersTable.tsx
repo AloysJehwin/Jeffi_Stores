@@ -57,6 +57,7 @@ export default function BusinessCustomersTable({ customers, total, page, pageSiz
       rows={customers}
       cols={cols}
       rowKey={c => c.user_id}
+      exportKey="business_customers"
       total={total}
       page={page}
       pageSize={pageSize}

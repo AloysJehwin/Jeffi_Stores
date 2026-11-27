@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
-const m = vi.hoisted(() => ({ detail: vi.fn(), suppress: vi.fn(), transition: vi.fn() }))
+const m = vi.hoisted(() => ({ detail: vi.fn(), suppress: vi.fn(), transition: vi.fn(), ensureRun: vi.fn(), handOff: vi.fn(), resume: vi.fn() }))
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ isPlatformAdmin: vi.fn() }))
 vi.mock('@controller/lib/outreach/contacts', () => ({ getContactDetail: m.detail }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ ensureRun: m.ensureRun }))
+vi.mock('@controller/lib/outreach/agent/runs', () => ({ handOff: m.handOff, resume: m.resume }))
 vi.mock('@controller/lib/outreach/suppress', () => ({ addSuppression: m.suppress }))
 vi.mock('@controller/lib/outreach/state', () => ({
   transition: m.transition,
@@ -27,9 +29,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(requireAdminScope).mockResolvedValue({ adminId: 'a1', role: 'administrator', scopes: [] } as any)
   vi.mocked(isPlatformAdmin).mockReturnValue(true)
-  m.detail.mockResolvedValue({ contact, calls: [], messages: [], events: [] })
+  m.detail.mockResolvedValue({ contact, calls: [], messages: [], events: [], agent: { run: null, tasks: [] } })
   m.transition.mockResolvedValue({})
   m.suppress.mockResolvedValue({ phone: contact.phone, contactsSuppressed: 1 })
+  m.ensureRun.mockResolvedValue({ run: { id: 'r1' }, skill: {} })
+  m.handOff.mockResolvedValue(undefined)
+  m.resume.mockResolvedValue(true)
 })
 
 describe('/api/admin/ecom/outreach/contacts/[id]', () => {
@@ -51,10 +56,30 @@ describe('/api/admin/ecom/outreach/contacts/[id]', () => {
     expect((await GET(new NextRequest(url), ctx('nope'))).status).toBe(400)
   })
 
-  it('PATCH 400s on an action outside the manual three', async () => {
+  it('PATCH 400s on an action outside the manual five', async () => {
     expect((await patch({ action: 'published' })).status).toBe(400)
     expect((await patch({})).status).toBe(400)
     expect((await patch({ action: 'requeue' }, 'nope')).status).toBe(400)
+  })
+
+  it('GET carries the agent run and tasks', async () => {
+    expect(await (await GET(new NextRequest(url), ctx())).json()).toMatchObject({ agent: { run: null, tasks: [] } })
+  })
+
+  it('handoff makes sure a run exists, then hands the lead to the team with the note as the reason', async () => {
+    expect((await patch({ action: 'handoff', note: 'wants a person' })).status).toBe(200)
+    expect(m.ensureRun).toHaveBeenCalledWith(contact)
+    expect(m.handOff).toHaveBeenCalledWith({ contactId: ID, reason: 'wants a person', channel: 'follow_up', actor: expect.any(String), now: expect.any(Date) })
+    expect(m.transition).not.toHaveBeenCalled()
+    await patch({ action: 'handoff' })
+    expect(m.handOff.mock.calls[1][0].reason).toBe('Handed off by an admin')
+  })
+
+  it('resume restarts a handed-off agent; 409 when nothing is handed off', async () => {
+    expect((await patch({ action: 'resume' })).status).toBe(200)
+    expect(m.resume).toHaveBeenCalledWith(ID, expect.any(String), expect.any(Date))
+    m.resume.mockResolvedValueOnce(false)
+    expect((await patch({ action: 'resume' })).status).toBe(409)
   })
 
   it('requeue resets the attempts', async () => {

@@ -33,9 +33,10 @@ const PatchSchema = z.object({
   window_start: hhmm.optional(),
   window_end: hhmm.optional(),
   test_numbers: z.array(z.string().min(1).max(20)).max(10).optional(),
+  default_skill_id: z.string().uuid().nullable().optional(),
 })
 
-// PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers.
+// PATCH → enable/disable, daily cap, concurrency, calling window (09:30-20:30 IST at most), test numbers, the default skill.
 export async function PATCH(req: NextRequest) {
   const admin = await outreachGuard(req, 'write')
   if (admin instanceof NextResponse) return admin

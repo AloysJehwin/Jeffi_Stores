@@ -120,6 +120,17 @@ async def test_failure_is_never_success() -> None:
         assert out.run_llm is True and rec.spoken == [] and rec.ended == []
 
 
+async def test_data_and_error_reach_the_llm() -> None:
+    rec = Recorder()
+    out = await dispatcher(Backend(ToolResult(ok=True, data={"business": "Ravi Stores", "status": "interested"})), rec).dispatch("getLead", {})
+    assert out.result == {"ok": True, "data": {"business": "Ravi Stores", "status": "interested"}}
+    assert out.run_llm is True and rec.spoken == []
+    out = await dispatcher(Backend(ToolResult(ok=False, error="template_limit")), rec).dispatch("sendLink", {"kind": "preview"})
+    assert out.result == {"ok": False, "error": "template_limit"} and out.run_llm is True
+    out = await dispatcher(Backend(ToolResult(ok=True, say="Done.", data={"x": 1})), rec).dispatch("markOutcome", {})
+    assert out.result == {"ok": True, "said": "Done.", "data": {"x": 1}} and out.run_llm is False
+
+
 async def test_slow_failure_after_filler() -> None:
     rec = Recorder()
     out = await dispatcher(Backend(ControllerError("timeout"), delay_s=0.1), rec, filler_after_s=0.02).dispatch("x", {})

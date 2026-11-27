@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import Link from 'next/link'
 import { Banner, Kpi, KpiGrid, Section, Table, count, money, pct, type Col } from '@/components/admin/channels/ui'
 import { useOverviewData } from '@/components/admin/overview/kit'
@@ -74,7 +75,7 @@ export function MessagingTab() {
   )
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.messaging-spend" range={range} />} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <MessagingTabSkeleton /> : data && <Body d={data} />}
     </div>

@@ -5,6 +5,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { Badge, Kpi, Section, Table, count, money, pct, type Tone } from '@/components/admin/channels/ui'
 import { delta, ratio } from '@/lib/overview/period'
 import type { AttentionItem } from '@/components/admin/overview/kit'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { OverviewTab } from '../products/_components/catalog-overview'
 import { OffersOverviewLoading } from './OffersLoading'
 
@@ -57,7 +58,7 @@ export default function OffersOverview() {
         </>
       )}
       extra={d => (
-        <Section title="Product offers">
+        <Section title="Product offers" action={<ExportButton exportKey="offers.ranking" />}>
           <Table
             rows={d.offers}
             rowKey={r => r.id}

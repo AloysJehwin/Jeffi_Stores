@@ -23,6 +23,8 @@ export interface SiteEditorHost {
   /** The canvas: the saved draft rendered with a preview token, or null while it isn't ready. */
   previewUrl: string | null
   canWrite: boolean
+  /** The page shows the store's own data (product lists…), so starters that hold a live part may be offered. */
+  storeData?: boolean
   /** The theme, for the style panel's colours and fonts. */
   theme?: ThemeTokens | null
   /** The host's own picture picker (its uploads, its library), reporting the chosen URL. */

@@ -60,6 +60,8 @@ interface Props {
   alwaysExpanded?: boolean
   /** The device whose layout this edits; every device has its own. */
   surface?: HomepageSurface
+  /** False for a store without a mobile app: no app layout to copy from. */
+  hasApp?: boolean
 }
 
 const SURFACE_NAME: Record<HomepageSurface, string> = { web: 'Desktop web', web_mobile: 'Mobile web', app: 'App' }
@@ -110,6 +112,7 @@ export default function HomepageSectionManager({
   heroEditor,
   alwaysExpanded = false,
   surface = 'web',
+  hasApp = true,
 }: Props) {
   const { showToast, showConfirm } = useToast()
   const homepage = useHomepageLock()
@@ -182,7 +185,7 @@ export default function HomepageSectionManager({
       setCopying(false)
     }
   }
-  const otherSurfaces = HOMEPAGE_SURFACES.filter(s => s !== surface)
+  const otherSurfaces = HOMEPAGE_SURFACES.filter(s => s !== surface && (hasApp || s !== 'app'))
 
   async function patch(id: string, body: Record<string, unknown>) {
     const res = await fetch(`/api/admin/homepage-sections/${id}`, {

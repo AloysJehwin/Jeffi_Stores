@@ -8,6 +8,7 @@ import PreviewApply from '@/components/admin/channels/PreviewApply'
 import Select from '@/components/ui/Select'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, change, count, money, pct, when } from '@/components/admin/channels/ui'
 import { Sk } from '@/components/admin/kit/skeleton'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 const SERIES: SeriesDef[] = [
   { key: 'organic', label: 'Free listing clicks', color: 'rgb(16 185 129)', kind: 'bar', axis: 'count', on: true },
@@ -72,9 +73,9 @@ export function OverviewView({ d }: { d: any }) {
   )
 }
 
-export function PerformanceView({ d }: { d: any }) {
+export function PerformanceView({ d, range }: { d: any; range?: { from: string; to: string } }) {
   return (
-    <Section title="Products on Google">
+    <Section title="Products on Google" action={<ExportButton exportKey="merchant.performance" range={range} />}>
       <Table
         rows={d?.rows ?? []}
         rowKey={(r: any) => r.offerId}
@@ -137,7 +138,7 @@ function IssueDetail({ offerId }: { offerId: string }) {
 export function IssuesView({ d }: { d: any }) {
   const groups = d?.groups ?? []
   return (
-    <Section title="Product issues by type">
+    <Section title="Product issues by type" action={<ExportButton exportKey="merchant.issues" />}>
       {!groups.length ? (
         <Empty msg="No product issues in the last status refresh." />
       ) : (

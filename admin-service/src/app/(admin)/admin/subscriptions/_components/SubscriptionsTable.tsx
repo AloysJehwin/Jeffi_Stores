@@ -94,6 +94,7 @@ export default function SubscriptionsTable({
       rows={items}
       cols={cols}
       rowKey={s => s.id}
+      exportKey="subscriptions"
       total={total}
       page={page}
       pageSize={pageSize}

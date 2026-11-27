@@ -8,6 +8,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { Sk } from '@/components/admin/kit/skeleton'
 import { BankOffersLoading } from './OffersLoading'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 interface AdminOffer {
   id: string
@@ -93,11 +94,14 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
-        <p className="text-sm text-foreground">
-          Offers are created in the Razorpay dashboard, not here — Razorpay&apos;s API does not allow creating them.
-          This page controls which of your account&apos;s offers appear on product pages, how they read, and in what
-          order.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-foreground">
+            Offers are created in the Razorpay dashboard, not here — Razorpay&apos;s API does not allow creating them.
+            This page controls which of your account&apos;s offers appear on product pages, how they read, and in what
+            order.
+          </p>
+          <ExportButton exportKey="offers.bank" />
+        </div>
         {loading && !offers.length ? (
           <Sk className="mt-2 h-3 w-64" />
         ) : (

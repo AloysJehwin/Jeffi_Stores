@@ -1,9 +1,9 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { ActivityChannel, ActivityDay, DashboardActivity } from '../../../lib/dashboard/activity-types'
+import type { ActivityChannel, DashboardActivity } from '../../../lib/dashboard/activity-types'
 import { activityToInsights } from '../../../lib/dashboard/activity-insights'
-import { csvRow, type InsightsQuery } from '../../../lib/insights/series'
+import type { InsightsQuery } from '../../../lib/insights/series'
 import { InsightsDrawer, type InsightsSection } from '../insights/InsightsDrawer'
 import { WeekdayRhythm } from './WeekdayRhythm'
 import { TimeToShip } from './TimeToShip'
@@ -40,13 +40,6 @@ const SECTIONS: InsightsSection<DashboardActivity>[] = [
   { title: 'Top products shipped', render: s => <ProductShippedTable products={s.extra!.topProducts} /> },
 ]
 
-/** The `days` series as CSV text (top categories as `Name:count|Name:count`). */
-export function activityToCsv(days: ActivityDay[]): string {
-  const rows = [csvRow(['date', 'shipped', 'placed', 'customers', 'top_categories'])]
-  for (const d of days) rows.push(csvRow([d.date, d.shipped, d.placed, d.customers, d.top.map(t => `${t.name}:${t.count}`).join('|')]))
-  return rows.join('\n')
-}
-
 /** The dashboard's "Orders shipped" insights drawer: the 3D shipped-orders chart and fulfilment breakdowns. */
 export function ActivityDrawer({ activity, open, onClose, storeName, today, load }: ActivityDrawerProps) {
   const initial = useMemo(() => activityToInsights(activity, today), [activity, today])
@@ -60,7 +53,8 @@ export function ActivityDrawer({ activity, open, onClose, storeName, today, load
       copy={COPY}
       filter={{ label: 'Channel', options: CHANNELS, initial: activity.channel }}
       sections={SECTIONS}
-      toCsv={s => activityToCsv(s.extra!.days)}
+      exportKey="dashboard.activity"
+      exportFilters={f => ({ channels: f && f !== 'all' ? [f] : CHANNELS.filter(c => c.value !== 'all').map(c => c.value) })}
       load={async (q: InsightsQuery) => {
         const next = await load({ weeks: q.weeks, channel: (q.filter ?? 'all') as ActivityChannel })
         return next && activityToInsights(next, today)

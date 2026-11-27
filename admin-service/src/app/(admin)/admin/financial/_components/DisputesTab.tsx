@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useState } from 'react'
 import Link from 'next/link'
 import { RefreshCw } from 'lucide-react'
@@ -94,6 +95,7 @@ export function DisputesTab() {
   ]
 
   const t = data?.totals
+  const exportFilters = filter === 'open' ? { status: ['open', 'under_review'] } : filter === 'closed' ? { status: ['won', 'lost', 'closed'] } : undefined
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -109,17 +111,20 @@ export function DisputesTab() {
             </button>
           ))}
         </div>
-        {canWrite && (
-          <button
-            type="button"
-            onClick={sync}
-            disabled={syncing}
-            className="control-md border border-border-default bg-surface-elevated text-foreground font-medium hover:bg-surface-secondary disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing…' : 'Sync from Razorpay'}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {canWrite && (
+            <button
+              type="button"
+              onClick={sync}
+              disabled={syncing}
+              className="control-md border border-border-default bg-surface-elevated text-foreground font-medium hover:bg-surface-secondary disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing…' : 'Sync from Razorpay'}
+            </button>
+          )}
+          <ExportButton exportKey="financial.disputes" filters={exportFilters} />
+        </div>
       </div>
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? (

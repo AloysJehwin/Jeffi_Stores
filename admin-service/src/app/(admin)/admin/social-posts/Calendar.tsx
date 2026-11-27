@@ -6,6 +6,7 @@ import IconButton from '@/components/ui/IconButton'
 import { Badge, Empty, Section, api, btnGhost } from '@/components/admin/channels/ui'
 import PostGroup from './PostGroup'
 import { CalendarGridLoading } from './loading-parts'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { STATUS_TONE, groupPosts, label, type Post } from './shared'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -82,6 +83,10 @@ export default function Calendar({ reloadKey }: { reloadKey: number }) {
               </button>
             ))}
           </div>
+          <ExportButton
+            exportKey="social-posts.posts"
+            range={{ from: cells[0].toLocaleDateString('en-CA'), to: cells[cells.length - 1].toLocaleDateString('en-CA') }}
+          />
         </div>
       }
     >

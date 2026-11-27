@@ -29,6 +29,14 @@ export default function Loading() {
         </>
       }
     >
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border-default">
+        <div className="flex gap-1">
+          <span className={tab(false)}>Site builder</span>
+          <span className={tab(true)}>Block builder</span>
+        </div>
+        <Sk className="mb-1 h-9 w-48 rounded-lg" />
+      </div>
+
       {/* One tab line: Live homepage / Drafts, the page tabs, then the device and audience switches. */}
       <div className="flex items-end gap-2 border-b border-border-default">
         <div className="flex min-w-0 flex-1 gap-0.5 overflow-hidden">

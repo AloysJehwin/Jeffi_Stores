@@ -104,7 +104,12 @@ def to_outcome(res: ToolResult | None) -> ToolOutcome:
     result: dict[str, Any] = {"ok": bool(res.ok)}
     if say:
         result["said"] = say
-    if not res.ok and not say:
+    if isinstance(res.data, dict) and res.data:
+        result["data"] = res.data
+    error = (res.error or "").strip() if isinstance(res.error, str) else ""
+    if error:
+        result["error"] = error
+    elif not res.ok and not say:
         result["error"] = FAILED_RESULT["error"]
     redial = (res.redialLanguage or "").strip() or None
     ends = bool(res.end) or redial is not None

@@ -9,6 +9,7 @@ import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { useMessagingChannels } from '@/hooks/useStoreFlags'
 import { Dialog } from '@/components/admin/kit/dialog'
 import type { CampaignMetric } from '../../_components/campaign-presentation'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 export interface EligibleRecipient {
   reference_id: string
@@ -318,6 +319,9 @@ export function RecentSendsPanel({
 
   return (
     <CollapsibleCard title="Recent sends" count={sendsTotal}>
+      <div className="px-5 py-2.5 border-b border-border-default flex items-center justify-end">
+        <ExportButton exportKey="campaigns.sends" query={`kind=${encodeURIComponent(kind)}`} />
+      </div>
       {list.loading ? (
         <div className="p-4" aria-busy="true">
           <LoadingLines lines={4} />

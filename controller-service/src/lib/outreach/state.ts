@@ -7,7 +7,7 @@ export const RETRY_AFTER_HOURS = 4
 
 const BASE: Record<ContactStatus, ContactStatus[]> = {
   new: ['queued', 'dnd', 'failed'],
-  queued: ['calling', 'dnd', 'failed'],
+  queued: ['calling', 'interested', 'dnd', 'failed'],
   calling: ['no_answer', 'callback', 'not_interested', 'wrong_number', 'interested', 'failed', 'dnd', 'queued'],
   no_answer: ['calling', 'queued', 'failed', 'dnd'],
   callback: ['calling', 'queued', 'failed', 'not_interested', 'dnd'],
@@ -48,7 +48,7 @@ export class ContactNotFoundError extends Error {
 
 const SETTABLE = new Set([
   'attempts', 'next_attempt_at', 'last_call_id', 'showcase_site_id', 'claim_token_hash', 'claimed_owner_id',
-  'consent_whatsapp_at', 'consent_evidence', 'opted_out_at', 'dnd_status', 'dnd_checked_at', 'wa_window_expires_at',
+  'consent_whatsapp_at', 'consent_evidence', 'opted_out_at', 'dnd_status', 'dnd_checked_at', 'wa_window_expires_at', 'handoff_at', 'handoff_reason',
 ])
 
 export interface TransitionOpts {

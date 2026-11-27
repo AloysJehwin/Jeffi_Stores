@@ -4,6 +4,7 @@ import { PAGE_KEYS, SITE_AUDIENCES, SITE_SURFACES } from '@jeffi/site-blocks'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { builtInTemplates, deleteTemplate, saveTemplate, savedTemplates } from '@/lib/site/templates'
 import { themeAvailability } from '@/lib/site/themes/pages'
+import { noAppDenial } from '../_no-app'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
   if (admin instanceof NextResponse) return admin
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Name the template (2–120 characters) and include at least one page' }, { status: 400 })
+  const noApp = await noAppDenial(...parsed.data.pages.map(p => p.surface))
+  if (noApp) return noApp
   return NextResponse.json({ id: await saveTemplate(parsed.data as never, admin.adminId) })
 }
 

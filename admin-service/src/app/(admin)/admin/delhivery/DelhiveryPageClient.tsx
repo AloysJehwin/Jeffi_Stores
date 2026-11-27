@@ -8,6 +8,7 @@ import { SortTh, useListSort, type SortCol } from '@/components/admin/kit/list-s
 import { TONE_CLS } from '@/components/admin/kit/tones'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -658,6 +659,7 @@ export default function DelhiveryPageClient({
               <label className="text-sm text-foreground-secondary">Pickup date</label>
               <DatePicker value={pickupDate} min={todayIST()} onChange={setPickupDate} />
             </div>
+            <ExportButton exportKey="delhivery.eligible-orders" />
           </div>
         </div>
 
@@ -790,11 +792,14 @@ export default function DelhiveryPageClient({
 
       {pickupHistory.length > 0 && (
         <div className="rounded-xl border border-border-default bg-surface-elevated">
-          <div className="px-6 py-4 border-b border-border-default">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Pickup Request History</h2>
-            <p className="text-sm text-foreground-secondary mt-0.5">
-              Update each request once you confirm pickup outcome with Delhivery
-            </p>
+          <div className="px-6 py-4 border-b border-border-default flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Pickup Request History</h2>
+              <p className="text-sm text-foreground-secondary mt-0.5">
+                Update each request once you confirm pickup outcome with Delhivery
+              </p>
+            </div>
+            <ExportButton exportKey="delhivery.pickups" />
           </div>
           <div className="md:hidden px-4 py-4 space-y-3">
             <PickupHistoryMobileList

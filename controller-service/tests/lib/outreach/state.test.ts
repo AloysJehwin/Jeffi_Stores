@@ -42,6 +42,11 @@ describe('canTransition', () => {
     expect(canTransition('suppressed', 'suppressed')).toBe(false)
   })
 
+  it('lets a WhatsApp-only skill start a queued contact straight at interested', () => {
+    expect(canTransition('queued', 'interested')).toBe(true)
+    expect(canTransition('no_answer', 'interested')).toBe(false)
+  })
+
   it('allows a manual requeue from the stopped states', () => {
     for (const from of ['not_interested', 'wrong_number', 'failed'] as const) expect(canTransition(from, 'queued'), from).toBe(true)
   })
@@ -85,6 +90,11 @@ describe('transition', () => {
 
   it('reports a missing contact', async () => {
     await expect(run(null)).rejects.toBeInstanceOf(ContactNotFoundError)
+  })
+
+  it('lets a transition set the hand-off columns', async () => {
+    await run('queued', { handoff_at: new Date(), handoff_reason: 'asks for a person' })
+    expect(client.query.mock.calls.map(c => c[0] as string).some(q => q.includes('handoff_at = $3') && q.includes('handoff_reason = $4'))).toBe(true)
   })
 
   it('refuses columns outside the whitelist', async () => {

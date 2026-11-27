@@ -4,19 +4,16 @@ import { fakeDb, CONTACT, type FakeDb } from './wa-fake-db'
 
 const h = vi.hoisted(() => ({
   db: null as any,
-  aiChat: vi.fn(),
+  runAgentTurn: vi.fn(),
   markRead: vi.fn(),
-  mergeBrief: vi.fn(),
-  requestChange: vi.fn(),
 }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => h.db.pool }))
-vi.mock('@/lib/shared/ai-client', () => ({ aiChat: h.aiChat }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ runAgentTurn: h.runAgentTurn }))
 vi.mock('@/lib/shared/whatsapp', () => ({ markWhatsAppRead: h.markRead, sendWhatsAppDirect: vi.fn() }))
 vi.mock('@/lib/shared/send-by-template', () => ({ sendByTemplate: vi.fn() }))
 vi.mock('@/lib/support/translate', () => ({
   detectLang: (t: string, fallback?: string | null) => (/[ऀ-ॿ]/.test(t) ? 'hi' : /[஀-௿]/.test(t) ? 'ta' : fallback ?? 'en'),
 }))
-vi.mock('@controller/lib/outreach/build', () => ({ mergeBrief: h.mergeBrief, requestChange: h.requestChange }))
 
 import { briefFromArgs, handleOutreachInbound, isOptOut, OPT_OUT_CONFIRMATION, replyLanguage, routeOutreachWhatsApp } from '@controller/lib/outreach/inbound'
 
@@ -31,6 +28,7 @@ beforeEach(() => {
   db = fakeDb()
   h.db = db
   db.contact = { ...CONTACT }
+  h.runAgentTurn.mockResolvedValue({ action: 'no_reply', tools: [] })
   vi.stubEnv('OUTREACH_TEST_MODE', '1')
 })
 afterEach(() => vi.unstubAllEnvs())
@@ -70,7 +68,6 @@ describe('routeOutreachWhatsApp', () => {
   })
 
   it('keeps a matched contact even when handling fails, and audits the failure', async () => {
-    h.aiChat.mockRejectedValue(new Error('gateway down'))
     db.query.mockImplementationOnce(async () => ({ rows: [db.contact] })).mockImplementationOnce(async () => {
       throw new Error('insert failed')
     })
@@ -78,11 +75,11 @@ describe('routeOutreachWhatsApp', () => {
     expect(kinds()).toEqual(['whatsapp_inbound_failed'])
   })
 
-  it('stores the message, opens the 24h window and answers (captured in test mode)', async () => {
-    h.aiChat.mockResolvedValue({ content: 'Thanks Ravi! What are your opening hours?' })
+  it('stores the message, opens the 24h window and hands the turn to the agent', async () => {
+    h.runAgentTurn.mockResolvedValue({ action: 'replied', reply: 'Thanks Ravi!', tools: [] })
     expect(await routeOutreachWhatsApp(msg('Hi, I got the link'))).toBe(true)
-    expect(db.messages.map(m => m.direction)).toEqual(['in', 'out'])
-    expect(out()[0]).toMatchObject({ body: 'Thanks Ravi! What are your opening hours?', status: 'captured' })
+    expect(db.messages.map(m => m.direction)).toEqual(['in'])
+    expect(h.runAgentTurn).toHaveBeenCalledWith({ contact: db.contact, channel: 'whatsapp', trigger: { kind: 'inbound', messageId: 'm1' }, language: 'en' })
     expect(new Date(db.contact!.wa_window_expires_at).getTime()).toBeGreaterThan(Date.now() + 23 * 3600_000)
     expect(h.markRead).not.toHaveBeenCalled()
   })
@@ -97,7 +94,7 @@ describe('opt-out', () => {
     expect(db.suppressed.has(CONTACT.phone)).toBe(true)
     expect(out().map(m => m.body)).toEqual([OPT_OUT_CONFIRMATION.en])
     expect(kinds()).toEqual(['whatsapp_in', 'status_change', 'suppression_added', 'whatsapp_out'])
-    expect(h.aiChat).not.toHaveBeenCalled()
+    expect(h.runAgentTurn).not.toHaveBeenCalled()
   })
 
   it('confirms in the language they wrote in', async () => {
@@ -111,11 +108,11 @@ describe('opt-out', () => {
     expect(out()).toHaveLength(1)
   })
 
-  it('honours an opt-out the assistant recognised', async () => {
-    h.aiChat.mockResolvedValue({ content: '', toolCalls: [{ id: 't1', name: 'opt_out', arguments: {} }] })
+  it('reports an opt-out the agent handled through its optOut tool', async () => {
+    h.runAgentTurn.mockResolvedValue({ action: 'opted_out', tools: ['optOut'], confirmed: true })
     expect(await handleOutreachInbound(db.contact as any, msg('please leave me alone now'))).toEqual({ action: 'opted_out', confirmed: true })
-    expect(db.contact!.status).toBe('opted_out')
-    expect(h.mergeBrief).not.toHaveBeenCalled()
+    h.runAgentTurn.mockResolvedValue({ action: 'opted_out', tools: [] })
+    expect(await handleOutreachInbound(db.contact as any, msg('leave me alone', 'w2'))).toEqual({ action: 'opted_out', confirmed: false })
   })
 
   it('ignores a provider message it has already handled', async () => {
@@ -124,54 +121,30 @@ describe('opt-out', () => {
   })
 })
 
-describe('slot filling', () => {
-  it('merges the details into the brief and replies with what the model wrote after the tool result', async () => {
-    h.mergeBrief.mockResolvedValue({ building: true, missing: ['address'] })
-    h.aiChat
-      .mockResolvedValueOnce({ content: '', toolCalls: [{ id: 't1', name: 'update_details', arguments: { hours: '9 am to 9 pm', highlights: ['Pure ghee', ''], contact: { phone: '98765 43210', email: '' } } }], providerState: { provider: 'anthropic', content: [] } })
-      .mockResolvedValueOnce({ content: 'Got it! And where is your shop?' })
-    const r = await handleOutreachInbound(db.contact as any, msg('We are open 9 am to 9 pm, everything in pure ghee'))
-    expect(r).toEqual({ action: 'replied', reply: 'Got it! And where is your shop?', tools: ['update_details'] })
-    expect(h.mergeBrief).toHaveBeenCalledWith(CONTACT.id, { hours: '9 am to 9 pm', highlights: ['Pure ghee'], contact: { phone: '98765 43210' } })
-    const second = h.aiChat.mock.calls[1][0]
-    expect(second.messages.at(-1)).toEqual({ role: 'tool', tool_call_id: 't1', content: JSON.stringify({ building: true, missing: ['address'] }) })
-    expect(second.messages.at(-2)).toMatchObject({ role: 'assistant', providerState: { provider: 'anthropic' } })
-    expect(h.aiChat.mock.calls[0][0]).toMatchObject({ feature: 'outreach_whatsapp', cacheNamespace: 'platform' })
-    expect(h.aiChat.mock.calls[0][0].messages[0].content).toContain('Sharma Sweets')
-    expect(kinds()).toContain('brief_updated')
+describe('the agent turn', () => {
+  it('passes the reply language the message was written in', async () => {
+    await handleOutreachInbound(db.contact as any, msg('हमारी दुकान 9 बजे खुलती है'))
+    expect(h.runAgentTurn.mock.calls[0][0]).toMatchObject({ language: 'hi', channel: 'whatsapp' })
   })
 
-  it('asks build.ts for a change', async () => {
-    h.requestChange.mockResolvedValue({ ok: true, summary: 'Hero photo replaced' })
-    h.aiChat
-      .mockResolvedValueOnce({ content: '', toolCalls: [{ name: 'request_change', arguments: { instruction: 'Use a red colour theme' } }] })
-      .mockResolvedValueOnce({ content: 'Done, the site is red now.' })
-    await handleOutreachInbound(db.contact as any, msg('make it red'))
-    expect(h.requestChange).toHaveBeenCalledWith(CONTACT.id, 'Use a red colour theme')
-    expect(db.events.find(e => e.kind === 'change_requested')?.data).toMatchObject({ ok: true, instruction: 'Use a red colour theme' })
+  it('returns what the agent did: replied, paused (handed off) or budget (handed off by the cap)', async () => {
+    h.runAgentTurn.mockResolvedValueOnce({ action: 'replied', reply: 'Got it!', tools: ['addDetails'] })
+    expect(await handleOutreachInbound(db.contact as any, msg('9 to 9', 'w1'))).toEqual({ action: 'replied', reply: 'Got it!', tools: ['addDetails'] })
+    h.runAgentTurn.mockResolvedValueOnce({ action: 'paused', tools: [] })
+    expect(await handleOutreachInbound(db.contact as any, msg('hello?', 'w2'))).toEqual({ action: 'paused', tools: [] })
+    h.runAgentTurn.mockResolvedValueOnce({ action: 'budget', tools: [] })
+    expect(await handleOutreachInbound(db.contact as any, msg('again', 'w3'))).toEqual({ action: 'budget', tools: [] })
   })
 
-  it('passes a tool failure back to the model instead of failing the turn', async () => {
-    h.mergeBrief.mockRejectedValue(new Error('site not found'))
-    h.aiChat
-      .mockResolvedValueOnce({ content: '', toolCalls: [{ name: 'update_details', arguments: { address: 'MI Road' } }] })
-      .mockResolvedValueOnce({ content: 'Thanks, noted.' })
-    expect(await handleOutreachInbound(db.contact as any, msg('MI Road, Jaipur'))).toMatchObject({ action: 'replied' })
-    expect(h.aiChat.mock.calls[1][0].messages.at(-1).content).toContain('site not found')
-  })
-
-  it('sends a short fallback when the model is unreachable', async () => {
-    h.aiChat.mockRejectedValue(new Error('gateway down'))
-    db.contact!.language = 'hi'
-    const r = await handleOutreachInbound(db.contact as any, msg('hello'))
-    expect(r).toMatchObject({ action: 'fallback' })
-    expect(out()[0].body).toContain('धन्यवाद')
-    expect(kinds()).toContain('whatsapp_assistant_failed')
+  it('a failing turn is audited and the message still stays out of the shopper bot', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.runAgentTurn.mockRejectedValue(new Error('runtime down'))
+    expect(await routeOutreachWhatsApp(msg('hello'))).toBe(true)
+    expect(kinds()).toEqual(['whatsapp_in', 'whatsapp_inbound_failed'])
   })
 
   it('marks the message read outside test mode', async () => {
     vi.stubEnv('OUTREACH_TEST_MODE', '0')
-    h.aiChat.mockResolvedValue({ content: '' })
     expect(await handleOutreachInbound(db.contact as any, msg('ok'))).toEqual({ action: 'no_reply', tools: [] })
     expect(h.markRead).toHaveBeenCalledWith('wamid.1', 'customer')
   })

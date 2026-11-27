@@ -6,11 +6,13 @@ const h = vi.hoisted(() => ({
   placeCall: vi.fn(),
   getProgramState: vi.fn(),
   readVoiceSettings: vi.fn(),
+  planFirstTouch: vi.fn(),
 }))
 vi.mock('@controller/lib/outreach/db', () => ({ outreachPool: () => ({ query: h.query }) }))
 vi.mock('@controller/lib/outreach/state', async orig => ({ ...(await orig<typeof import('@controller/lib/outreach/state')>()), transition: h.transition }))
 vi.mock('@controller/lib/outreach/program-state', () => ({ getProgramState: h.getProgramState, WINDOW_MIN: '09:30', WINDOW_MAX: '20:30' }))
 vi.mock('@controller/lib/outreach/session', () => ({ readVoiceSettings: h.readVoiceSettings }))
+vi.mock('@controller/lib/outreach/agent/runtime', () => ({ planFirstTouch: h.planFirstTouch }))
 vi.mock('@controller/lib/outreach/voice-client', async orig => ({
   ...(await orig<typeof import('@controller/lib/outreach/voice-client')>()),
   placeCall: h.placeCall,
@@ -24,6 +26,7 @@ import {
   runOutreachWorker,
   sweepStaleCalls,
   dialContact,
+  callCounts,
   startTestCall,
   TestCallError,
 } from '@controller/lib/outreach/worker'
@@ -70,6 +73,7 @@ beforeEach(() => {
     return { rows: [], rowCount: 1 }
   })
   h.transition.mockResolvedValue({})
+  h.planFirstTouch.mockResolvedValue('call')
   h.placeCall.mockResolvedValue({ providerCallId: 'p1', duplicate: false })
   h.getProgramState.mockResolvedValue(state())
   h.readVoiceSettings.mockResolvedValue({ provider: 'exotel', settings: { exotel: { callerId: '+911400000000' }, twilioTest: { from: '+15550001111' } } })
@@ -202,10 +206,38 @@ describe('runOutreachWorker', () => {
     expect(h.placeCall).toHaveBeenCalledTimes(1)
   })
 
+  it("asks the contact's skill before dialling: only 'call' rings", async () => {
+    due = [contact(), contact({ id: 'k2', phone: '+919876543211' }), contact({ id: 'k3', phone: '+919876543212' })]
+    h.planFirstTouch.mockResolvedValueOnce('whatsapp').mockResolvedValueOnce('skip').mockResolvedValueOnce('call')
+    counts = { today: 0, active: 0 }
+    const r = await runOutreachWorker(NOW)
+    expect(h.planFirstTouch).toHaveBeenCalledTimes(3)
+    expect(h.planFirstTouch.mock.calls[0]).toEqual([due[0], NOW])
+    expect(h.placeCall).toHaveBeenCalledTimes(1)
+    expect(h.placeCall).toHaveBeenCalledWith(expect.objectContaining({ to: '+919876543212' }))
+    expect(r.programs[0]).toMatchObject({ placed: 1, failed: 0 })
+  })
+
+  it('a contact whose first-touch plan fails is not dialled and the run goes on', async () => {
+    due = [contact(), contact({ id: 'k2', phone: '+919876543211' })]
+    h.planFirstTouch.mockRejectedValueOnce(new Error('skill store down'))
+    const r = await runOutreachWorker(NOW)
+    expect(r.programs[0]).toMatchObject({ placed: 1, failed: 1 })
+    expect(h.placeCall).toHaveBeenCalledTimes(1)
+  })
+
   it('without VOICE_SERVICE_URL only sweeps', async () => {
     vi.stubEnv('VOICE_SERVICE_URL', '')
     expect(await runOutreachWorker(NOW)).toEqual({ swept: 0, skipped: 'not_configured', programs: [] })
     expect(h.getProgramState).not.toHaveBeenCalled()
+  })
+})
+
+describe('callCounts', () => {
+  it('counts the program calls placed today (dial failures excluded) and those still open', async () => {
+    counts = { today: 4, active: 1 }
+    expect(await callCounts('showcase-offer', NOW)).toEqual({ today: 4, active: 1 })
+    expect(sql('SELECT count(*) FILTER')[0][1]).toEqual(['showcase-offer', istMidnight(NOW)])
   })
 })
 

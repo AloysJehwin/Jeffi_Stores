@@ -142,6 +142,38 @@ ALTER TABLE ONLY public.admin_saved_views
     ADD CONSTRAINT admin_saved_views_query_check CHECK ((char_length(query) <= 4000));
 
 
+--
+-- Name: admin_export_presets admin_export_presets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_export_presets
+    ADD CONSTRAINT admin_export_presets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: admin_export_presets admin_export_presets_key_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_export_presets
+    ADD CONSTRAINT admin_export_presets_key_check CHECK (((export_key)::text ~ '^[a-z][a-z0-9_.-]*$'::text));
+
+
+--
+-- Name: admin_export_presets admin_export_presets_name_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_export_presets
+    ADD CONSTRAINT admin_export_presets_name_check CHECK ((char_length((name)::text) <= 80));
+
+
+--
+-- Name: admin_export_presets admin_export_presets_options_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_export_presets
+    ADD CONSTRAINT admin_export_presets_options_check CHECK ((pg_column_size(options) <= 16384));
+
+
 
 --
 -- Name: admins admins_pkey; Type: CONSTRAINT; Schema: public; Owner: -

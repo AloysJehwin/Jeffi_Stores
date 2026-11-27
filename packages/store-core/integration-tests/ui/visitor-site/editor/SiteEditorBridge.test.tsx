@@ -3,12 +3,15 @@ import { render, fireEvent, act } from '@testing-library/react'
 
 const h = vi.hoisted(() => ({
   handles: { attach: vi.fn(), detach: vi.fn(), refresh: vi.fn(), nudge: vi.fn(), target: null as any },
+  rich: { finish: vi.fn(), refresh: vi.fn() },
+  mountRich: vi.fn(),
 }))
 
 vi.mock('@/components/visitor/site/editor/handles', () => ({
   createHandles: () => h.handles,
   boxIn: () => ({ left: 1, top: 2, width: 3, height: 4 }),
 }))
+vi.mock('@/components/visitor/site/editor/rich-text', () => ({ mountRich: h.mountRich }))
 vi.mock('@jeffi/site-blocks/design', () => ({
   withBreakpoint: (_cur: string, _bp: unknown, value: string[]) => value.join(' '),
 }))
@@ -147,6 +150,106 @@ describe('SiteEditorBridge', () => {
     const part = document.querySelector('[data-e="cmp"]')!
     fireEvent.dblClick(part)
     expect(part).not.toHaveAttribute('contenteditable')
+  })
+
+  describe('rich text', () => {
+    const rich = () => {
+      document.querySelector('[data-block-id="b1"] > div')!.insertAdjacentHTML(
+        'beforeend',
+        `<p data-e="para" data-e-rich>Hi <strong data-e="st" data-e-text>there</strong></p><p data-e="plainp" data-e-text>Words</p><div data-e="plaind" data-e-text>Div</div>`,
+      )
+      h.mountRich.mockReset()
+      h.rich.finish.mockReset()
+      h.mountRich.mockReturnValue(h.rich)
+    }
+    const loaded = () => act(async () => void (await new Promise(r => setTimeout(r, 0))))
+
+    it('mounts the rich editor on a data-e-rich element, also from a double click on its inline child', async () => {
+      rich()
+      mount()
+      on()
+      fireEvent.dblClick(document.querySelector('[data-e="st"]')!)
+      await loaded()
+      expect(h.mountRich).toHaveBeenCalledTimes(1)
+      expect(h.mountRich.mock.calls[0][0]).toBe(document.querySelector('[data-e="para"]'))
+      expect(h.mountRich.mock.calls[0][1]).toBe(false)
+      expect(document.querySelector('[data-e="para"]')).not.toHaveAttribute('contenteditable')
+    })
+
+    it('uses it on a text-only paragraph too, but not on a div', async () => {
+      rich()
+      mount()
+      on()
+      fireEvent.dblClick(document.querySelector('[data-e="plainp"]')!)
+      await loaded()
+      expect(h.mountRich).toHaveBeenCalledWith(document.querySelector('[data-e="plainp"]'), true)
+      fireEvent.keyDown(document, { key: 'Escape' })
+      h.mountRich.mockClear()
+      fireEvent.dblClick(document.querySelector('[data-e="plaind"]')!)
+      await loaded()
+      expect(h.mountRich).not.toHaveBeenCalled()
+      expect(document.querySelector('[data-e="plaind"]')).toHaveAttribute('contenteditable')
+    })
+
+    it('commits on Enter (not Shift+Enter) and reports its operations, with rich only for a node op', async () => {
+      rich()
+      mount()
+      on()
+      h.rich.finish.mockReturnValue({ ops: [{ op: 'node', id: 'para', node: {} }], rich: true })
+      fireEvent.dblClick(document.querySelector('[data-e="para"]')!)
+      await loaded()
+      fireEvent.keyDown(document, { key: 'Enter', shiftKey: true })
+      expect(h.rich.finish).not.toHaveBeenCalled()
+      fireEvent.keyDown(document, { key: 'Enter' })
+      expect(h.rich.finish).toHaveBeenCalledWith(true)
+      expect(sent('ops')[0]).toEqual({ type: 'site-editor:ops', block: 'b1', ops: [{ op: 'node', id: 'para', node: {} }], rich: true })
+
+      h.rich.finish.mockReturnValue({ ops: [{ op: 'text', id: 'plainp', value: 'x' }], rich: false })
+      fireEvent.dblClick(document.querySelector('[data-e="plainp"]')!)
+      await loaded()
+      fireEvent.keyDown(document, { key: 'Enter' })
+      expect(sent('ops')[1]).toEqual({ type: 'site-editor:ops', block: 'b1', ops: [{ op: 'text', id: 'plainp', value: 'x' }] })
+    })
+
+    it('cancels on Escape without reporting, and sends nothing when nothing changed', async () => {
+      rich()
+      mount()
+      on()
+      fireEvent.dblClick(document.querySelector('[data-e="para"]')!)
+      await loaded()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(h.rich.finish).toHaveBeenCalledWith(false)
+      h.rich.finish.mockReturnValue(null)
+      fireEvent.dblClick(document.querySelector('[data-e="para"]')!)
+      await loaded()
+      fireEvent.keyDown(document, { key: 'Enter' })
+      expect(sent('ops')).toHaveLength(0)
+    })
+
+    it('leaves the keys to the toolbar while a field in it has focus', async () => {
+      rich()
+      mount()
+      on()
+      fireEvent.dblClick(document.querySelector('[data-e="para"]')!)
+      await loaded()
+      const bar = document.createElement('div')
+      bar.setAttribute('data-e-overlay', '')
+      bar.innerHTML = '<input />'
+      document.body.appendChild(bar)
+      fireEvent.keyDown(bar.querySelector('input')!, { key: 'Enter' })
+      expect(h.rich.finish).not.toHaveBeenCalled()
+      bar.remove()
+    })
+
+    it('a click elsewhere ends a rich edit that is still loading without mounting it', async () => {
+      rich()
+      mount()
+      on()
+      fireEvent.dblClick(document.querySelector('[data-e="para"]')!)
+      fireEvent.click(document.querySelector('[data-e="title"]')!)
+      await loaded()
+      expect(h.mountRich).not.toHaveBeenCalled()
+    })
   })
 
   it('sends undo, redo, delete and escape keys to the editor', () => {

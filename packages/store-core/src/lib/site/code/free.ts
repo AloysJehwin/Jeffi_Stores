@@ -22,6 +22,8 @@ export interface FreeLayer {
   rect: FreeRect
   /** Stacking among the frame's layers (z-index). */
   z: number
+  /** Degrees, -180..180; left out when not rotated. */
+  rotate?: number
 }
 
 /** A percentage class value: 0–100 with at most one decimal, `[12.5%]`. */
@@ -34,6 +36,17 @@ const readZ = (v: string | undefined) => {
   if (!v) return 0
   const m = /^(-?)(?:\[)?(\d+)\]?$/.exec(v)
   return m ? Number(m[2]) * (m[1] ? -1 : 1) : 0
+}
+
+/** A rotation class value (`[12deg]`, `[-12deg]`, `-[12deg]`, `12`, `-12`) in whole degrees. */
+const readDeg = (v: string | undefined): number => {
+  const m = v ? /^(-?)(?:\[(-?[\d.]+)deg\]|(\d+))$/.exec(v) : null
+  return m ? clampDeg(Number(m[2] ?? m[3]) * (m[1] ? -1 : 1)) : 0
+}
+/** Whole degrees in -180..180. */
+export const clampDeg = (n: number) => {
+  const d = Math.round(((((n + 180) % 360) + 360) % 360) - 180)
+  return d === -180 && n > 0 ? 180 : d
 }
 
 /** A z-index class value: Tailwind's steps, else an arbitrary one. */
@@ -51,7 +64,17 @@ export function freeAt(className: string, bp: Breakpoint): FreeLayer | null {
   const width = readPct(effectiveValue(className, bp, 'width')?.value)
   if (left === undefined || top === undefined || width === undefined) return null
   const height = readPct(effectiveValue(className, bp, 'height')?.value)
-  return { from: pos.from, rect: { left, top, width, ...(height !== undefined ? { height } : {}) }, z: readZ(effectiveValue(className, bp, 'zIndex')?.value) }
+  const rotate = rotateAt(className, bp)
+  return { from: pos.from, rect: { left, top, width, ...(height !== undefined ? { height } : {}) }, z: readZ(effectiveValue(className, bp, 'zIndex')?.value), ...(rotate ? { rotate } : {}) }
+}
+
+/** The rotation in effect at a breakpoint, in degrees (0: none). */
+export const rotateAt = (className: string, bp: Breakpoint) => readDeg(effectiveValue(className, bp, 'rotate')?.value)
+
+/** The classes with a rotation at a breakpoint (0 clears it); wider breakpoints that inherited the old one keep it. */
+export const setRotate = (className: string, bp: Breakpoint, deg: number) => {
+  const d = clampDeg(deg)
+  return setPanelValue(className, bp, 'rotate', d === 0 ? null : `[${d}deg]`)
 }
 
 /** Whether a breakpoint's placement is its own (not carried up from a narrower one). */
@@ -92,7 +115,7 @@ export function placeFree(className: string, bp: Breakpoint, rect: FreeRect, z?:
  */
 export function unplaceFree(className: string, bp: Breakpoint): string {
   let next = className
-  for (const prop of ['position', 'left', 'top', 'width', 'height', 'zIndex'] as PanelProp[]) {
+  for (const prop of ['position', 'left', 'top', 'width', 'height', 'zIndex', 'rotate'] as PanelProp[]) {
     const own = readClasses(next).values[bp][prop]
     // A width the author gave (w-full) stays; the placement's % one goes.
     if (own !== undefined && ((prop !== 'width' && prop !== 'height') || readPct(own) !== undefined)) next = setPanelValue(next, bp, prop, null)

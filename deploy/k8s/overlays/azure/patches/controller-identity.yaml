@@ -32,7 +32,10 @@ spec:
             - name: AZURE_CLIENT_ID
               valueFrom: { configMapKeyRef: { name: azure-identity, key: CONTROLLER_CLIENT_ID } }
             - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
+            # As patches/apps-identity.yaml: no RDS IAM login on Azure.
             - { name: DB_IAM_AUTH, value: 'false' }
+            - { name: RDS_IAM_AUTH, value: 'false' }
+            - { name: CONTROL_PLANE_IAM_AUTH, value: 'false' }
             - { name: DB_SSL, value: require }
           volumeMounts:
             - { name: aws-iam-token, mountPath: /var/run/secrets/aws, readOnly: true }

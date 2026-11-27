@@ -174,15 +174,21 @@ describe('QuotationsClient', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith(expect.stringContaining('view=editor'), { scroll: false }))
   })
 
+  it('Edit puts the quotation in the URL, so the editor loads it from there', async () => {
+    render(asAdmin(<QuotationsClient canWrite />))
+    await screen.findByRole('link', { name: 'QT-002' })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await waitFor(() => expect(push).toHaveBeenCalledWith(expect.stringContaining('edit=q2'), { scroll: false }))
+  })
+
   it('a load failure when opening a quotation for edit is toasted', async () => {
+    sp = new URLSearchParams('view=editor&edit=q2')
     fetchMock.mockImplementation(async (url: string) => {
       if (url.startsWith('/api/admin/quotations?')) return json(true, { quotations: quotes, total: 3 })
       if (url === '/api/admin/quotations/q2') return json(false, { error: 'Gone' }, 404)
       return json(true, {})
     })
     render(asAdmin(<QuotationsClient canWrite />))
-    await screen.findByRole('link', { name: 'QT-002' })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Gone'), 'error'))
   })
 

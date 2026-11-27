@@ -1,11 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download } from 'lucide-react'
 import { Badge, Banner, type Tone } from '@/components/admin/kit/core'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { Pager, usePagedRows } from '@/components/admin/kit/pager'
 import { LoadingLines } from '@/components/admin/kit/skeleton'
-import { ACTIVE, Progress, downloadText, problemsCsv, rowRef, useJob, type ImportJob, type RowResult } from './shared'
+import { ACTIVE, Progress, rowRef, useJob, type ImportJob, type RowResult } from './shared'
 
 const GROUPS: { outcome: RowResult['outcome']; label: string; tone: Tone }[] = [
   { outcome: 'error', label: 'Failed', tone: 'red' },
@@ -15,7 +15,7 @@ const GROUPS: { outcome: RowResult['outcome']; label: string; tone: Tone }[] = [
   { outcome: 'deleted', label: 'Removed', tone: 'red' },
 ]
 
-/** One import's live progress and its rows grouped by outcome, with a CSV of the problem rows. */
+/** One import's live progress and its rows grouped by outcome, with an Export of the row results (problem rows preselected). */
 export default function JobDetail({ id }: { id: string }) {
   const { job, error, loading } = useJob(id)
   if (loading)
@@ -71,14 +71,14 @@ function JobBody({ job }: { job: ImportJob }) {
             {img.failed ? ` (${img.failed} failed)` : ''}
           </span>
         )}
-        {problems > 0 && !active && (
-          <button
-            type="button"
-            onClick={() => downloadText(`import-problems-${job.id.slice(0, 8)}.csv`, problemsCsv(rows))}
-            className="ml-auto inline-flex items-center gap-1.5 text-xs text-accent-500 hover:underline"
-          >
-            <Download className="w-3.5 h-3.5" /> Download problem rows (CSV)
-          </button>
+        {rows.length > 0 && !active && (
+          <span className="ml-auto">
+            <ExportButton
+              exportKey="data-source.job-rows"
+              query={`job=${job.id}`}
+              filters={{ outcomes: problems > 0 ? ['error', 'warning'] : GROUPS.map(g => g.outcome) }}
+            />
+          </span>
         )}
       </div>
 

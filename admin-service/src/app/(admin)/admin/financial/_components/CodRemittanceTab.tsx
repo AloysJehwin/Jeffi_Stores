@@ -1,5 +1,6 @@
 'use client'
 
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import Link from 'next/link'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -86,7 +87,7 @@ export function CodRemittanceTab() {
 
   return (
     <div className="space-y-5">
-      <FinancePeriodBar onRefresh={reload} busy={loading} />
+      <FinancePeriodBar onRefresh={reload} busy={loading} actions={<ExportButton exportKey="financial.cod-remittance" range={range} filters={status === 'all' ? undefined : { status: [status] }} />} />
       <StatusPills value={status} onChange={v => { setStatus(v); setSelected(new Set()) }} />
       {error && <Banner ok={false}>{error}</Banner>}
       {loading && !data ? <CodRemittanceTabSkeleton /> : data && (

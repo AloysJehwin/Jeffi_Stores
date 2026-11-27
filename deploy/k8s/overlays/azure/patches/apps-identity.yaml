@@ -33,7 +33,10 @@ spec:
             - name: AZURE_CLIENT_ID
               valueFrom: { configMapKeyRef: { name: azure-identity, key: APPS_CLIENT_ID } }
             - { name: AZURE_FEDERATED_TOKEN_FILE, value: /var/run/secrets/azure/tokens/azure-identity-token }
+            # No RDS IAM login on Azure, whatever the secret says (kv-sync.sh --azure-db also clears it there).
             - { name: DB_IAM_AUTH, value: 'false' }
+            - { name: RDS_IAM_AUTH, value: 'false' }
+            - { name: CONTROL_PLANE_IAM_AUTH, value: 'false' }
             - { name: DB_SSL, value: require }
           volumeMounts:
             - { name: aws-iam-token, mountPath: /var/run/secrets/aws, readOnly: true }

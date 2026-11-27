@@ -7,6 +7,7 @@ import { afterSiteChange } from '@/lib/site/after-publish'
 import { saveStudioContext } from '@/lib/site/studio/context'
 import { draftStudioContext } from '@/lib/site/studio/redesign'
 import { requireAdminScope } from '@/lib/auth/jwt'
+import { noAppDenial } from '../../_no-app'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,8 @@ export async function PUT(request: NextRequest, { params }: Ctx) {
   const { id } = await params
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Send { page: { ref, doc } } or { theme: { audience, tokens } }' }, { status: 400 })
+  const noApp = await noAppDenial(parsed.data.page?.ref.surface)
+  if (noApp) return noApp
   try {
     const out: Record<string, unknown> = {}
     if (parsed.data.page) out.doc = await saveDraftPage(id, parsed.data.page.ref as never, parsed.data.page.doc, admin.adminId)

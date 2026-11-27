@@ -61,6 +61,7 @@ export default function SiteStudio({
   logoUrl,
   categories,
   onSummary,
+  onContinue,
 }: {
   mode: SiteMode
   onModeChange: (mode: SiteMode) => void
@@ -68,6 +69,8 @@ export default function SiteStudio({
   logoUrl: string | null
   categories: string[]
   onSummary: (s: StudioSummary) => void
+  /** Moves the wizard on while the build keeps running. */
+  onContinue?: () => void
 }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -442,6 +445,7 @@ export default function SiteStudio({
                   aiDown={aiDown}
                   autoStart={!aiDown && s.status !== 'building' && s.status !== 'ready' && !Object.keys(s.pages ?? {}).length && view.allowance.free !== 'used'}
                   onBack={() => go('direction')}
+                  onContinue={onContinue}
                   onAiDown={() => setAiOff(true)}
                 />
               )}

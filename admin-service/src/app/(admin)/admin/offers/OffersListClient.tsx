@@ -11,6 +11,7 @@ import { Plus } from 'lucide-react'
 import { DataTable, DraftLockBadge, StatusBadge, useListSort, type DataCol } from '@/components/admin/kit'
 import type { DraftLockChip } from '@/lib/client/draft-lock-client'
 import { OffersListLoading } from './OffersLoading'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 
 interface OfferListRow {
   id: string
@@ -132,12 +133,15 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
         loading={loading}
         search={{ placeholder: 'Search offers...', match: o => `${o.title} ${o.slug}` }}
         toolbar={
-          <RequireWrite scope="coupons:write">
-            <button type="button" onClick={addOffer} disabled={creating} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
-              <Plus className="w-4 h-4" />
-              {creating ? 'Adding…' : 'Add offer'}
-            </button>
-          </RequireWrite>
+          <>
+            <ExportButton exportKey="offers.list" />
+            <RequireWrite scope="coupons:write">
+              <button type="button" onClick={addOffer} disabled={creating} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
+                <Plus className="w-4 h-4" />
+                {creating ? 'Adding…' : 'Add offer'}
+              </button>
+            </RequireWrite>
+          </>
         }
         onRowClick={o => router.push(ap(`/admin/offers/${o.id}/view`))}
         mobileCard={offer => (

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany } from '@/lib/shared/db'
-import { round2 } from '@/lib/catalog/gst'
+import { getGstr1, parseSources, type GstInvoice } from '@/lib/gst/returns'
 
 export const dynamic = 'force-dynamic'
 
+// GSTR-1 for the period; ?sources=online|cash_sale keeps only those revenue sources (all when absent).
+// ?format=csv is the legacy flat download; the admin page exports through /api/admin/export/gst.gstr1.
 export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
@@ -25,60 +26,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'from and to date params required (YYYY-MM-DD)' }, { status: 400 })
     }
 
-    const rows = await queryMany(
-      `
-      SELECT
-        o.invoice_number,
-        o.invoice_date,
-        o.order_number,
-        o.customer_name,
-        o.buyer_gstin,
-        o.is_igst,
-        o.taxable_amount,
-        o.cgst_amount,
-        o.sgst_amount,
-        o.igst_amount,
-        o.total_amount,
-        a.state AS buyer_state,
-        o.irn,
-        o.irn_ack_no,
-        o.irn_ack_dt,
-        json_agg(json_build_object(
-          'product_name', oi.product_name,
-          -- Lines saved without HSN fall back to the product's category default.
-          'hsn_code', COALESCE(NULLIF(oi.hsn_code, ''), c.default_hsn_code, pc.default_hsn_code, '9999'),
-          'uqc', COALESCE(NULLIF(c.default_uqc, ''), NULLIF(pc.default_uqc, ''), 'NOS'),
-          'gst_rate', COALESCE(oi.gst_rate, 18),
-          'quantity', oi.quantity,
-          'taxable_amount', oi.taxable_amount,
-          'cgst_amount', oi.cgst_amount,
-          'sgst_amount', oi.sgst_amount,
-          'igst_amount', oi.igst_amount,
-          'total_price', oi.total_price
-        ) ORDER BY oi.created_at) AS items
-      FROM orders o
-      JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN products p ON p.id = oi.product_id
-      LEFT JOIN categories c ON c.id = p.category_id
-      LEFT JOIN categories pc ON pc.id = c.parent_category_id
-      LEFT JOIN addresses a ON a.id = o.shipping_address_id
-      WHERE o.invoice_date >= $1
-        AND o.invoice_date < ($2::date + interval '1 day')
-        AND o.invoice_number IS NOT NULL
-        AND o.payment_status = 'paid'
-      GROUP BY o.id, a.state
-      ORDER BY o.invoice_date ASC
-    `,
-      [from, to]
-    )
-
-    const b2b = rows.filter((r: any) => r.buyer_gstin)
-    const b2c = rows.filter((r: any) => !r.buyer_gstin)
-
-    const hsnSummary = buildHsnSummary(rows)
+    const report = await getGstr1(from, to, parseSources(searchParams.get('sources')))
 
     if (format === 'csv') {
-      const csv = buildGSTR1CSV(rows)
+      const csv = buildGSTR1CSV([...report.b2b, ...report.b2c].sort((a, b) => String(a.invoice_date).localeCompare(String(b.invoice_date))))
       return new NextResponse(csv, {
         headers: {
           'Content-Type': 'text/csv',
@@ -87,74 +38,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    return NextResponse.json({
-      period: { from, to },
-      summary: {
-        totalInvoices: rows.length,
-        b2bCount: b2b.length,
-        b2cCount: b2c.length,
-        totalTaxable: sum(rows, 'taxable_amount'),
-        totalCgst: sum(rows, 'cgst_amount'),
-        totalSgst: sum(rows, 'sgst_amount'),
-        totalIgst: sum(rows, 'igst_amount'),
-        totalTax: sum(rows, 'cgst_amount') + sum(rows, 'sgst_amount') + sum(rows, 'igst_amount'),
-        totalInvoiceValue: sum(rows, 'total_amount'),
-      },
-      b2b,
-      b2c,
-      hsnSummary,
-    })
+    return NextResponse.json(report)
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
 
-function sum(rows: any[], field: string): number {
-  return round2(rows.reduce((acc: number, r: any) => acc + parseFloat(r[field] || '0'), 0))
-}
-
-function buildHsnSummary(rows: any[]) {
-  const map: Record<
-    string,
-    { hsnCode: string; gstRate: number; uqc: string; qty: number; taxableVal: number; igst: number; cgst: number; sgst: number }
-  > = {}
-  for (const row of rows) {
-    for (const item of row.items || []) {
-      const uqc = item.uqc || 'NOS'
-      const key = `${item.hsn_code}-${item.gst_rate}-${uqc}`
-      if (!map[key]) {
-        map[key] = {
-          hsnCode: item.hsn_code || '9999',
-          gstRate: parseFloat(item.gst_rate || '18'),
-          uqc,
-          qty: 0,
-          taxableVal: 0,
-          igst: 0,
-          cgst: 0,
-          sgst: 0,
-        }
-      }
-      map[key].qty += parseFloat(item.quantity || '0')
-      map[key].taxableVal += parseFloat(item.taxable_amount || '0')
-      map[key].igst += parseFloat(item.igst_amount || '0')
-      map[key].cgst += parseFloat(item.cgst_amount || '0')
-      map[key].sgst += parseFloat(item.sgst_amount || '0')
-    }
-  }
-  return Object.values(map).map(h => ({
-    hsnCode: h.hsnCode,
-    gstRate: h.gstRate,
-    uqc: h.uqc,
-    qty: round2(h.qty),
-    taxableVal: round2(h.taxableVal),
-    igstAmt: round2(h.igst),
-    cgstAmt: round2(h.cgst),
-    sgstAmt: round2(h.sgst),
-    totalTax: round2(h.igst + h.cgst + h.sgst),
-  }))
-}
-
-function buildGSTR1CSV(rows: any[]): string {
+function buildGSTR1CSV(rows: GstInvoice[]): string {
   const headers = [
     'Invoice No',
     'Invoice Date',
@@ -183,7 +73,7 @@ function buildGSTR1CSV(rows: any[]): string {
         r.cgst_amount,
         r.sgst_amount,
         r.igst_amount,
-        (parseFloat(r.cgst_amount || 0) + parseFloat(r.sgst_amount || 0) + parseFloat(r.igst_amount || 0)).toFixed(2),
+        (parseFloat(String(r.cgst_amount || 0)) + parseFloat(String(r.sgst_amount || 0)) + parseFloat(String(r.igst_amount || 0))).toFixed(2),
         r.total_amount,
         r.irn || '',
         r.irn_ack_no || '',

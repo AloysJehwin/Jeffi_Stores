@@ -9,12 +9,20 @@ import type { SiteEditorHost } from './host'
 import Inspector from './Inspector'
 import Layers from './Layers'
 import FreePanel from './FreePanel'
+import MultiPanel from './MultiPanel'
+import SlidePanel from './SlidePanel'
+import { makeSlideOps, slideAspectOps, unslideOps } from './slide-ops'
+import { SLIDE_TEMPLATES, slideSectionProps, type SlideTemplateId } from '@/lib/site/code/slide-templates'
 import AiBox from './AiBox'
 import CritiquePanel from './CritiquePanel'
 import { critiqueTrees, type TreeFinding } from '@/lib/site/code/tree-critique'
 import { isConvertible } from '@/lib/site/convertible'
-import { canFree, layerAt, placeOps, placedWider, restackOps, unplaceOps } from './free-ops'
+import { arrangeOps, canFree, layerAt, placeOps, placedWider, restackOps, rotateOps, shiftOps, unplaceOps } from './free-ops'
 import type { FreeRect } from '@/lib/site/code/free'
+import { alignRects, distributeRects, movedRects, type AlignKind, type DistributeAxis } from '@/lib/site/code/arrange'
+import { allFree, canUngroup, groupOps, groupable, ungroupOps, type Box } from './group-ops'
+import { copyNodes, pasteOps, readClip, writeClip } from './clipboard'
+import { mergeRich } from '@/components/visitor/site/editor/rich-convert'
 import { hasLocked, insertPlace, litProp, nodeName, nodeWords, newNode, newSectionTree, parentOf, type NewKind } from './nodes'
 import StylePanel, { BREAKPOINT_NAME } from './StylePanel'
 import { addCredit, adoptSaved, canRedo, canUndo, createEditor, currentTrees, docToSave, editDoc, editSection, endGestures, liveTree, redo, undo, type EditorState, type Shown } from './state'
@@ -40,7 +48,9 @@ const BREAKPOINTS = [
 const SIZES = BREAKPOINTS.map(([b]) => b)
 type SizeHit = { bp: Breakpoint; block: string; id: string | null }
 
-type Selection = { block: string; id: string | null } | null
+/** `id` is the primary element; `more` the rest of a multiple selection, in the same section. */
+type Selection = { block: string; id: string | null; more?: string[] } | null
+const selIds = (s: Selection) => (s?.id ? [s.id, ...(s.more ?? [])] : [])
 /** The canvas's answer to `measure`: the element's box in % of its frame, the frame's node id and height in px. */
 type Measured = { rect: Required<FreeRect> | null; frame: string | null; frameHeight: number | null }
 type Status = { kind: 'idle' | 'pending' | 'saving' | 'saved' } | { kind: 'error'; message: string }
@@ -67,6 +77,8 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
   const seq = useRef({ n: 0, sent: new Map<number, number>() })
   const measures = useRef({ n: 0, wait: new Map<number, (m: Measured | null) => void>() })
   const [aiBusy, setAiBusy] = useState(false)
+  /** What a screen reader hears (a polite live region). */
+  const [announce, setAnnounce] = useState('')
   const [checking, setChecking] = useState(false)
   const [converting, setConverting] = useState(false)
   /** Counts selections, so field edits join one undo step only within one visit to a block. */
@@ -173,7 +185,14 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     return true
   }
   const treeAt = (block: string) => liveTree(latest.current.state, block)
+  const tell = (message: string) => setAnnounce(message)
+  // Errors show in the status line, itself a live region, so they aren't announced twice.
   const say = (message: string) => setStatus({ kind: 'error', message })
+  /** The selection's elements that are still in the tree (undo may have taken some). */
+  const liveIds = (at: NonNullable<Selection>) => {
+    const tree = treeAt(at.block)
+    return tree ? selIds(at).filter(id => findNode(tree, id)) : []
+  }
 
   // ── Elements and sections: add, duplicate, delete (parts the page needs stay; design.ts refuses them too) ──
   const addNode = (block: string, kind: NewKind) => {
@@ -222,6 +241,24 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       s => editDoc(s, d => insertBlock(d, { id, type: CODE_SECTION, v, props: { label: 'New section', source: '', tree, compiled: null } }, at)),
       () => select(id, tree.id ?? null)
     )
+  }
+  /** A starter slide (lib/site/code/slide-templates.ts) as a new code section after the selected one. */
+  const addSlide = (template: SlideTemplateId) => {
+    const doc = latest.current.state?.doc
+    if (!doc) return
+    const at = latest.current.sel ? doc.order.indexOf(latest.current.sel.block) + 1 || doc.order.length : doc.order.length
+    const id = crypto.randomUUID()
+    const v = Object.values(doc.blocks).find(b => b.type === CODE_SECTION)?.v ?? 1
+    const { label: name, tree } = slideSectionProps(template)
+    changePage(
+      s => editDoc(s, d => insertBlock(d, { id, type: CODE_SECTION, v, props: { label: name, source: '', tree, compiled: null } }, at)),
+      () => select(id, tree.id ?? null)
+    )
+  }
+  /** The section as a slide, its shape, or back in the flow; the reload after the save draws the new classes. */
+  const slideEdit = (block: string, ops: DesignOp[]) => {
+    if (!ops.length) return say('Nothing to change')
+    if (edit(block, ops)) requestReload()
   }
   const duplicateSection = (id: string) => {
     if (sectionLocked(id)) return say('This section holds a part a page has only once')
@@ -429,9 +466,192 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
     edit(block, ops)
     requestReload()
   }
-  const select = (block: string, id: string | null) => {
-    setSel({ block, id })
-    post({ type: 'select', block, id })
+  const select = (block: string, id: string | null, more?: string[]) => {
+    setSel({ block, id, ...(more?.length ? { more } : {}) })
+    post({ type: 'select', block, id, more })
+  }
+  /** A click on the canvas or a layers row; `additive` (shift) adds the element to the selection, or takes it out. */
+  const pick = (block: string, id: string | null, additive = false) => {
+    const cur = latest.current.sel
+    const tree = treeAt(block)
+    if (!additive || !id || !tree || !cur || cur.block !== block || !cur.id || id === tree.id) return select(block, id)
+    const ids = selIds(cur)
+    if (ids.includes(id)) {
+      const rest = ids.filter(x => x !== id)
+      return rest.length ? select(block, rest[0], rest.slice(1)) : undefined
+    }
+    // An element and one inside it can't be selected together.
+    const inside = (a: string, b: string) => !!findNode(findNode(tree, a)?.node ?? tree, b)
+    if (ids.some(x => x === tree.id || inside(x, id) || inside(id, x))) return select(block, id)
+    select(block, ids[0], [...ids.slice(1), id])
+    tell(`${ids.length + 1} elements selected`)
+  }
+
+  // ── Several elements: align, group, copy and paste, keys ──
+  const frameOfAll = async (block: string, ids: string[]) => {
+    const ms = await Promise.all(ids.map(id => measure(block, id)))
+    const fail = (msg: string) => {
+      say(msg)
+      return null
+    }
+    if (ms.some(m => !m?.rect)) return fail('Show those layers on the canvas first (they may be hidden at this screen size)')
+    if (new Set(ms.map(m => m!.frame)).size > 1) return fail('Those layers sit in different frames')
+    return ms.map(m => m!.rect!)
+  }
+  /** Layers placed in the section, drawn at their new rects at once (the reload after the save draws the classes). */
+  const showPlaced = (block: string, ids: string[]) => {
+    const tree = treeAt(block)
+    for (const id of ids) {
+      const layer = tree && layerAt(tree, id, bp)
+      if (layer) post({ type: 'place', block, id, rect: layer.rect })
+    }
+  }
+  const rotateLayer = (block: string, id: string, deg: number) => {
+    const tree = treeAt(block)
+    const ops = tree ? rotateOps(tree, id, bp, deg) : []
+    if (!ops.length || !update(s => editSection(s, block, ops))) return
+    post({ type: 'rotate', block, id, deg })
+    requestReload()
+    tell(deg ? `Rotated ${deg} degrees` : 'Rotation reset')
+  }
+  /** Free layers lined up (to the frame for one, to the selection's bounds for several) or spread evenly. */
+  const arrange = async (kind: AlignKind | null, axis?: DistributeAxis) => {
+    const at = latest.current.sel
+    const tree = at && treeAt(at.block)
+    if (!at || !tree || !hostRef.current.canWrite) return
+    const ids = liveIds(at)
+    if (!ids.length || !ids.every(id => layerAt(tree, id, bp))) return say('Align and distribute work on free layers placed on this screen size')
+    const rects = await frameOfAll(at.block, ids)
+    if (!rects) return
+    const before = ids.map((id, i) => ({ id, ...rects[i] }))
+    const after = axis ? distributeRects(before, axis) : alignRects(before, kind!)
+    const now = treeAt(at.block)
+    const ops = now ? arrangeOps(now, bp, movedRects(before, after)) : []
+    if (!ops.length || !update(s => editSection(s, at.block, ops))) return tell('Already in place')
+    showPlaced(at.block, ids)
+    requestReload()
+    tell(axis ? `Distributed ${ids.length} layers` : `Aligned ${ids.length} layer${ids.length > 1 ? 's' : ''}`)
+  }
+  const groupSelection = async () => {
+    const at = latest.current.sel
+    const tree = at && treeAt(at.block)
+    if (!at || !tree || !hostRef.current.canWrite) return
+    const g = groupable(tree, liveIds(at))
+    if ('error' in g) return say(g.error)
+    let boxes: Map<string, Box> | null = null
+    if (allFree(tree, g.ids, bp)) {
+      const rects = await frameOfAll(at.block, g.ids)
+      if (!rects) return
+      boxes = new Map(g.ids.map((id, i) => [id, rects[i]]))
+    }
+    const now = treeAt(at.block)
+    const ops = now && groupOps(now, g.ids, bp, boxes)
+    if (!ops) return
+    if (!Array.isArray(ops)) return say(ops.error)
+    const wrap = ops[0]
+    if (!edit(at.block, ops)) return
+    requestReload()
+    if (wrap.op === 'wrap' && wrap.wrapper.id) select(at.block, wrap.wrapper.id)
+    tell(`Grouped ${g.ids.length} elements`)
+  }
+  const ungroupSelection = async () => {
+    const at = latest.current.sel
+    const tree = at?.id ? treeAt(at.block) : null
+    if (!at?.id || !tree || !hostRef.current.canWrite) return
+    if (!canUngroup(tree, at.id)) return say('Select a group to ungroup it')
+    const node = findNode(tree, at.id)?.node
+    let box: Box | null = null
+    if (layerAt(tree, at.id, bp)) {
+      const m = await measure(at.block, at.id)
+      box = m?.rect ?? null
+    }
+    const now = treeAt(at.block)
+    const ops = now && ungroupOps(now, at.id, bp, box)
+    if (!ops) return
+    if (!Array.isArray(ops)) return say(ops.error)
+    const members = node && isTagNode(node) ? node.children.filter(isTagNode).map(c => c.id!) : []
+    if (!edit(at.block, ops)) return
+    requestReload()
+    if (members.length) select(at.block, members[0], members.slice(1))
+    tell('Ungrouped')
+  }
+  const copySelection = (cut: boolean) => {
+    const at = latest.current.sel
+    const tree = at && treeAt(at.block)
+    if (!at || !tree) return
+    const r = copyNodes(tree, liveIds(at))
+    if ('error' in r) return say(r.error)
+    if (!cut) {
+      writeClip(r.nodes)
+      return tell(r.nodes.length > 1 ? `Copied ${r.nodes.length} elements` : 'Copied')
+    }
+    if (!hostRef.current.canWrite) return
+    const up = parentOf(tree, r.nodes[0].id!)?.parent.id ?? tree.id ?? null
+    if (!edit(at.block, r.nodes.map(n => ({ op: 'remove' as const, id: n.id! })))) return
+    writeClip(r.nodes)
+    requestReload()
+    select(at.block, up)
+    tell('Cut')
+  }
+  const pasteSelection = () => {
+    const at = latest.current.sel
+    const state0 = latest.current.state
+    if (!state0 || !hostRef.current.canWrite) return
+    const block = at?.block ?? state0.doc.order.find(id => liveTree(state0, id))
+    const tree = block ? treeAt(block) : null
+    if (!block || !tree) return say('Select a section to paste into')
+    const clip = readClip()
+    if (!clip) return say('Nothing copied yet')
+    const ids = at && at.block === block ? liveIds(at) : []
+    // After the last of the selected, in tree order.
+    const last = treeIds(tree).filter(x => ids.includes(x)).pop() ?? null
+    const r = pasteOps(tree, clip, last)
+    if ('error' in r) return say(r.error)
+    if (!edit(block, r.ops)) return
+    requestReload()
+    select(block, r.ids[0], r.ids.slice(1))
+    tell(r.ids.length > 1 ? `Pasted ${r.ids.length} elements` : 'Pasted')
+  }
+  const duplicateSelection = () => {
+    const at = latest.current.sel
+    const tree = at && treeAt(at.block)
+    if (!at || !tree || !hostRef.current.canWrite) return
+    const ids = liveIds(at).filter(id => id !== tree.id)
+    if (ids.length === 1) return duplicateNode(at.block, ids[0])
+    const used: string[] = []
+    const ops: DesignOp[] = ids.map(id => {
+      const as = freshId([...treeIds(tree), ...used])
+      used.push(as)
+      return { op: 'duplicate', id, as }
+    })
+    if (!ops.length || !edit(at.block, ops)) return
+    requestReload()
+    select(at.block, used[0], used.slice(1))
+    tell(`Duplicated ${ids.length} elements`)
+  }
+  const deleteSelection = () => {
+    const at = latest.current.sel
+    const tree = at && treeAt(at.block)
+    if (!at || !tree || !hostRef.current.canWrite) return
+    const ids = liveIds(at).filter(id => id !== tree.id)
+    if (ids.length <= 1) return at.id ? deleteNode(at.block, at.id) : undefined
+    const up = parentOf(tree, ids[0])?.parent.id ?? tree.id ?? null
+    if (!edit(at.block, ids.map(id => ({ op: 'remove' as const, id })))) return
+    requestReload()
+    select(at.block, up)
+    tell(`Deleted ${ids.length} elements`)
+  }
+  /** The keyboard on the selection's free layers: moved by `dx`, `dy` percent, or resized. */
+  const shiftSelection = (dx: number, dy: number, resize: boolean) => {
+    const at = latest.current.sel
+    const tree = at && treeAt(at.block)
+    if (!at || !tree || !hostRef.current.canWrite) return
+    const ids = liveIds(at)
+    const ops = shiftOps(tree, bp, ids, dx, dy, resize)
+    if (!ops.length || !update(s => editSection(s, at.block, ops))) return
+    showPlaced(at.block, ids)
+    requestReload()
+    tell(resize ? 'Resized' : 'Moved')
   }
 
   // ── The canvas ─────────────────────────────────────────────────────────────────────────────────
@@ -447,10 +667,16 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
         post({ type: 'flash', ...flash.current })
         flash.current = null
       }
-    } else if (kind === 'select' && typeof m.block === 'string') setSel({ block: m.block, id: typeof m.id === 'string' ? m.id : null })
+    } else if (kind === 'select' && typeof m.block === 'string') {
+      const id = typeof m.id === 'string' ? m.id : null
+      if (m.shift) pick(m.block, id, true)
+      else setSel({ block: m.block, id })
+    }
     else if (kind === 'ops' && typeof m.block === 'string' && Array.isArray(m.ops)) {
       // Typed in place: the canvas shows it already. Refused (it changed since), the reload puts the page right.
-      if (!hostRef.current.canWrite || !update(s => editSection(s, m.block as string, m.ops as DesignOp[]))) setFrameKey(k => k + 1)
+      // Rich text comes as the new children only: the element's tag, props and marks are the live tree's.
+      const ops = m.rich === true ? mergeRich(treeAt(m.block), m.ops as DesignOp[]) : (m.ops as DesignOp[])
+      if (!hostRef.current.canWrite || !ops || !update(s => editSection(s, m.block as string, ops))) setFrameKey(k => k + 1)
     } else if (kind === 'applied' && typeof m.seq === 'number') {
       const want = seq.current.sent.get(m.seq)
       seq.current.sent.delete(m.seq)
@@ -464,12 +690,23 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
       const had = tree ? layerAt(tree, m.id, bp)?.rect.height !== undefined : false
       placeLayer(m.block, m.id, { left: r.left, top: r.top, width: r.width, ...(m.sized || had ? { height: r.height } : {}) }, true)
     }
+    else if (kind === 'rotated' && typeof m.block === 'string' && typeof m.id === 'string' && typeof m.deg === 'number' && hostRef.current.canWrite) rotateLayer(m.block, m.id, m.deg)
     else if (kind === 'key') {
       if (m.action === 'undo' || m.action === 'redo') step(m.action)
-      if (m.action === 'escape') setSel(null)
+      if (m.action === 'escape') {
+        setSel(null)
+        post({ type: 'select', block: null })
+      }
+      if (m.action === 'group') void groupSelection()
+      if (m.action === 'ungroup') void ungroupSelection()
+      if (m.action === 'copy') copySelection(false)
+      if (m.action === 'cut') copySelection(true)
+      if (m.action === 'paste') pasteSelection()
+      if (m.action === 'duplicate') duplicateSelection()
+      if ((m.action === 'nudge' || m.action === 'resize') && typeof m.dx === 'number' && typeof m.dy === 'number') shiftSelection(m.dx, m.dy, m.action === 'resize')
       const at = latest.current.sel
       if (m.action === 'delete' && at && hostRef.current.canWrite) {
-        if (at.id) deleteNode(at.block, at.id)
+        if (at.id) deleteSelection()
         // A classic block is one piece: Delete takes it whole (undoable), unless the page needs it.
         else if (!treeAt(at.block)) deleteSection(at.block)
       }
@@ -491,11 +728,25 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
         e.preventDefault()
         return handlers.current({ type: `${P}key`, action: 'delete' })
       }
+      // Arrow keys with nothing focused move the selection's free layers (alt resizes), as on the canvas.
+      const arrow = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]
+      if (!mod && arrow && t === document.body && latest.current.sel?.id) {
+        e.preventDefault()
+        const k = e.shiftKey ? 5 : 1
+        return handlers.current({ type: `${P}key`, action: e.altKey ? 'resize' : 'nudge', dx: arrow[0] * k, dy: arrow[1] * k })
+      }
       if (!mod) return
       const k = e.key.toLowerCase()
       if (k === 'z' || k === 'y') {
         e.preventDefault()
         handlers.current({ type: `${P}key`, action: k === 'y' || e.shiftKey ? 'redo' : 'undo' })
+        return
+      }
+      // Copy and cut leave a text selection alone.
+      const action = k === 'g' ? (e.shiftKey ? 'ungroup' : 'group') : k === 'd' ? 'duplicate' : k === 'v' ? 'paste' : (k === 'c' || k === 'x') && !window.getSelection()?.toString() ? (k === 'c' ? 'copy' : 'cut') : null
+      if (action && latest.current.sel?.id) {
+        e.preventDefault()
+        handlers.current({ type: `${P}key`, action })
       }
     }
     window.addEventListener('message', onMessage)
@@ -549,6 +800,9 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
 
   return (
     <div className="space-y-3" data-site-editor="">
+      <div role="status" aria-live="polite" className="sr-only">
+        {announce}
+      </div>
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-default bg-surface-elevated p-2">
         <p className="px-1 text-sm font-semibold text-foreground">{host.title}</p>
         <span className="rounded-full bg-accent-50 px-2 py-0.5 text-[11px] font-medium text-accent-600">Visual editor · beta</span>
@@ -619,7 +873,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
             canWrite={host.canWrite}
             label={label}
             locked={sectionLocked}
-            onSelect={select}
+            onSelect={pick}
             onMoveSection={(id, to) => {
               if (update(s => editDoc(s, d => moveBlock(d, id, to)))) requestReload()
             }}
@@ -632,6 +886,7 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               return !tree || !canFree(tree, id) ? null : layerAt(tree, id, bp) ? 'free' : placedWider(tree, id, bp) ? 'wider' : 'flow'
             }}
             onToggleFree={(block, id) => void toggleFree(block, id)}
+            rotation={(block, id) => (trees[block] ? (layerAt(trees[block], id, bp)?.rotate ?? 0) : 0)}
           />
         </aside>
 
@@ -709,6 +964,19 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                 <button type="button" className={smallBtn} onClick={addSection}>
                   <Plus className="h-3.5 w-3.5" /> Add section after
                 </button>
+                <select
+                  aria-label="Add a slide after this section"
+                  className={smallBtn}
+                  value=""
+                  onChange={e => e.target.value && addSlide(e.target.value as SlideTemplateId)}
+                >
+                  <option value="">Add slide…</option>
+                  {SLIDE_TEMPLATES.filter(t => host.storeData || t.id !== 'product').map(t => (
+                    <option key={t.id} value={t.id} title={t.description}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
                 <button type="button" className={smallBtn} aria-label="Duplicate section" disabled={sectionLocked(block.id)} onClick={() => duplicateSection(block.id)}>
                   <Copy className="h-3.5 w-3.5" /> Duplicate
                 </button>
@@ -725,16 +993,30 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
           )}
           {sel && tree && host.changeWithAi && host.canWrite && (
             <AiBox
-              key={`${sel.block}:${sel.id ?? ''}`}
+              key={`ai:${sel.block}:${sel.id ?? ''}`}
               target={sel.id && sel.id !== tree.id ? nodeName(findNode(tree, sel.id)?.node ?? tree) : 'this section'}
               note={host.aiNote}
               busy={aiBusy}
               onAsk={instruction => void changeWithAi(sel.block, sel.id, instruction)}
             />
           )}
-          {sel && tree && sel.id ? (
+          {sel && tree && sel.id && sel.more?.length ? (
+            <MultiPanel
+              count={selIds(sel).length}
+              canWrite={host.canWrite}
+              free={selIds(sel).every(id => layerAt(tree, id, bp))}
+              onGroup={() => void groupSelection()}
+              onDuplicate={duplicateSelection}
+              onDelete={deleteSelection}
+              onCopy={() => copySelection(false)}
+              onCut={() => copySelection(true)}
+              onPaste={readClip() ? pasteSelection : undefined}
+              onAlign={kind => void arrange(kind)}
+              onDistribute={axis => void arrange(null, axis)}
+            />
+          ) : sel && tree && sel.id ? (
             <Inspector
-              key={`${sel.block}:${sel.id}`}
+              key={`inspector:${sel.block}:${sel.id}`}
               tree={tree}
               id={sel.id}
               canWrite={host.canWrite}
@@ -745,6 +1027,10 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
               onAdd={kind => addNode(sel.block, kind)}
               onDuplicate={() => duplicateNode(sel.block, sel.id!)}
               onDelete={() => deleteNode(sel.block, sel.id!)}
+              onCopy={() => copySelection(false)}
+              onCut={() => copySelection(true)}
+              onPaste={readClip() ? pasteSelection : undefined}
+              onUngroup={canUngroup(tree, sel.id) ? () => void ungroupSelection() : undefined}
               renderImagePicker={host.renderImagePicker}
               ai={
                 host.elementAi
@@ -765,6 +1051,8 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                   onRect={rect => placeLayer(sel.block, sel.id!, rect)}
                   onRestack={dir => restackLayer(sel.block, sel.id!, dir)}
                   onFlow={() => void toggleFree(sel.block, sel.id!)}
+                  onRotate={deg => rotateLayer(sel.block, sel.id!, deg)}
+                  onAlign={kind => void arrange(kind)}
                 />
               )}
               {!layerAt(tree, sel.id, bp) && canFree(tree, sel.id) && (
@@ -780,6 +1068,16 @@ export default function SiteEditor({ host }: { host: SiteEditorHost }) {
                     </button>
                   )}
                 </div>
+              )}
+              {sel.id === tree.id && tree.t === 'el' && (
+                <SlidePanel
+                  tree={tree}
+                  bp={bp}
+                  canWrite={host.canWrite}
+                  onAspect={aspect => slideEdit(sel.block, slideAspectOps(tree, aspect))}
+                  onFlow={() => slideEdit(sel.block, unslideOps(tree))}
+                  onMake={() => slideEdit(sel.block, makeSlideOps(tree))}
+                />
               )}
               {styleable(tree, sel.id) !== null && (
                 <StylePanel key={bp} className={styleable(tree, sel.id) ?? ''} bp={bp} theme={host.theme} canWrite={host.canWrite} onChange={(prop, value) => style(sel.block, sel.id!, prop, value)} />

@@ -204,6 +204,9 @@ export default function NewMessagePage() {
   const edit = useEditSession({ resourceType: 'mailer', resourceId: draftId, lock })
   const [showRestoreBanner, setShowRestoreBanner] = useState(false)
   const draftIdRef = useRef<string | null>(null)
+  // ?draftId= names a saved draft: no autosave (which would create a blank one) until it is loaded.
+  const restoringRef = useRef(typeof window !== 'undefined' && !!new URLSearchParams(window.location.search).get('draftId'))
+  const [restoreDone, setRestoreDone] = useState(!restoringRef.current)
 
   // Site Controls' SMS/WhatsApp/app push switches: an off channel is hidden and left out of what's saved/sent.
   const { sms: smsOn, whatsapp: waOn, push: pushOn } = useMessagingChannels()
@@ -266,7 +269,7 @@ export default function NewMessagePage() {
     const fromUrl = new URLSearchParams(window.location.search).get('draftId')
     if (fromUrl) {
       localStorage.setItem(DRAFT_STORAGE_KEY, fromUrl)
-      void restoreDraftFromId(fromUrl)
+      void loadDraftFromUrl(fromUrl)
       return
     }
     if (localStorage.getItem(DRAFT_STORAGE_KEY)) setShowRestoreBanner(true)
@@ -335,11 +338,11 @@ export default function NewMessagePage() {
   )
 
   const triggerAutoSave = useCallback(() => {
-    if (lockRef.current.readOnly) return
+    if (lockRef.current.readOnly || restoringRef.current) return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     setSaveState('saving')
     autoSaveRef.current = setTimeout(async () => {
-      if (lockRef.current.readOnly) return setSaveState('idle')
+      if (lockRef.current.readOnly || restoringRef.current) return setSaveState('idle')
       try {
         const payload = {
           draft_id: draftIdRef.current,
@@ -376,7 +379,7 @@ export default function NewMessagePage() {
         setSaveState('error')
       }
     }, 1500)
-  }, [step, title, subject, payloadChannels, audienceType, buildAudienceFilter, scheduledAt])
+  }, [step, title, subject, payloadChannels, audienceType, buildAudienceFilter, scheduledAt, restoreDone])
 
   useEffect(() => {
     triggerAutoSave()
@@ -449,6 +452,15 @@ export default function NewMessagePage() {
       /* ignore */
     }
     setShowRestoreBanner(false)
+  }
+
+  async function loadDraftFromUrl(id: string) {
+    try {
+      await restoreDraftFromId(id)
+    } finally {
+      restoringRef.current = false
+      setRestoreDone(true)
+    }
   }
 
   function discardDraft() {

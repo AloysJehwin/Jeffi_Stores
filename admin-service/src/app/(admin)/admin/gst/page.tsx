@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Download, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
 import { Card, DataTable, EmptyState, Field, Fields, FormField, Kpi, KpiGrid, PageBody, PageHeader, StatusBadge, Tabs, badgeCls, useActionToast, type DataCol, type StatusMap } from '@/components/admin/kit'
 import { fmtQty } from '@/lib/shared/number-display'
+import { ExportButton } from '@/components/admin/export/ExportButton'
 import TaxCredentialsGear from './_components/TaxCredentialsGear'
 import { GstKpisSkeleton, GstTabSkeleton } from './_components/GstSkeleton'
 
@@ -84,22 +85,25 @@ const INR = (n: number) =>
 const fmtDate = (s: string) =>
   s ? new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
+// Local calendar day (toISOString would shift IST midnight back to the previous UTC day).
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 function getPresetRange(preset: string): { from: string; to: string } {
   const now = new Date()
   const y = now.getFullYear(),
     m = now.getMonth()
   if (preset === 'this_month') {
-    return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+    return { from: ymd(new Date(y, m, 1)), to: ymd(now) }
   }
   if (preset === 'last_month') {
     const last = new Date(y, m, 0)
-    return { from: new Date(y, m - 1, 1).toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) }
+    return { from: ymd(new Date(y, m - 1, 1)), to: ymd(last) }
   }
   if (preset === 'this_quarter') {
     const qStart = Math.floor(m / 3) * 3
-    return { from: new Date(y, qStart, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+    return { from: ymd(new Date(y, qStart, 1)), to: ymd(now) }
   }
-  return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+  return { from: ymd(new Date(y, m, 1)), to: ymd(now) }
 }
 
 // e-invoice statuses as stored on invoices.irn_status.
@@ -186,14 +190,14 @@ const itcCols: DataCol<ITCRow & K>[] = [
   { key: 'itc', label: 'ITC', num: true, sort: r => parseFloat(r.tax_amount) || 0, render: r => <span className="font-medium text-green-700 dark:text-green-400">{money(r.tax_amount)}</span> },
 ]
 
-function CsvButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="control-md border border-border-default text-foreground hover:bg-surface-secondary">
-      <Download className="h-4 w-4" />
-      Download CSV
-    </button>
-  )
+interface SourceRow {
+  source: string
+  label: string
+  invoices: number
+  total: number
 }
+
+const EXPORT_KEY: Record<Tab, string> = { gstr1: 'gst.gstr1', gstr3b: 'gst.gstr3b', irn: 'gst.irn', itc: 'gst.itc' }
 
 const Note = ({ children }: { children: React.ReactNode }) => (
   <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-400">{children}</div>
@@ -223,13 +227,18 @@ export default function GSTPage() {
   const [hsnSummary, setHsnSummary] = useState<HsnRow[]>([])
   const [gstr3b, setGstr3b] = useState<GSTR3BData | null>(null)
   const [itcData, setItcData] = useState<ITCData | null>(null)
+  // Revenue sources the report covers (null = all) and the period it was fetched for: the export uses both.
+  const [sources, setSources] = useState<string[] | null>(null)
+  const [bySource, setBySource] = useState<SourceRow[]>([])
+  const [applied, setApplied] = useState({ from: initial.from, to: initial.to })
 
-  const fetchAll = useCallback(async (f: string, t: string) => {
+  const fetchAll = useCallback(async (f: string, t: string, src: string[] | null) => {
     setLoading(true)
+    const qs = `from=${f}&to=${t}${src ? `&sources=${encodeURIComponent(src.join('|'))}` : ''}`
     try {
       const [r1, r3b, itc] = await Promise.all([
-        fetch(`/api/admin/gst/gstr1?from=${f}&to=${t}`, { credentials: 'include' }),
-        fetch(`/api/admin/gst/gstr3b?from=${f}&to=${t}`, { credentials: 'include' }),
+        fetch(`/api/admin/gst/gstr1?${qs}`, { credentials: 'include' }),
+        fetch(`/api/admin/gst/gstr3b?${qs}`, { credentials: 'include' }),
         fetch(`/api/admin/gst/itc?from=${f}&to=${t}`, { credentials: 'include' }),
       ])
       const [d1, d3b, ditc] = await Promise.all([r1.json(), r3b.json(), itc.json()])
@@ -239,7 +248,9 @@ export default function GSTPage() {
       setGstr1B2B(d1.b2b || [])
       setGstr1B2C(d1.b2c || [])
       setHsnSummary(d1.hsnSummary || [])
+      setBySource(d1.bySource || [])
       setGstr3b(d3b)
+      setApplied({ from: f, to: t })
       if (itc.ok) setItcData(ditc)
     } catch (e: any) {
       toast.error(e.message)
@@ -249,8 +260,17 @@ export default function GSTPage() {
   }, [toast])
 
   useEffect(() => {
-    fetchAll(from, to)
+    fetchAll(from, to, null)
   }, [])
+
+  function toggleSource(s: string) {
+    const all = bySource.map(b => b.source)
+    const cur = sources ?? all
+    const next = cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s]
+    const src = all.every(x => next.includes(x)) ? null : next
+    setSources(src)
+    fetchAll(applied.from, applied.to, src)
+  }
 
   function applyPreset(p: string) {
     setPreset(p)
@@ -262,16 +282,7 @@ export default function GSTPage() {
   }
 
   function handleFetch() {
-    fetchAll(from, to)
-  }
-
-  function downloadCSV(type: 'gstr1' | 'gstr3b' | 'itc') {
-    const a = document.createElement('a')
-    a.href = `/api/admin/gst/${type}?from=${from}&to=${to}&format=csv`
-    a.download = `${type.toUpperCase()}_${from}_to_${to}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    fetchAll(from, to, sources)
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -285,7 +296,16 @@ export default function GSTPage() {
 
   return (
     <PageBody>
-      <PageHeader title="GST Compliance" description="GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger" actions={<TaxCredentialsGear />} />
+      <PageHeader
+        title="GST Compliance"
+        description="GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger"
+        actions={
+          <>
+            <ExportButton exportKey={EXPORT_KEY[tab]} range={applied} filters={sources && tab !== 'itc' ? { sources } : undefined} />
+            <TaxCredentialsGear />
+          </>
+        }
+      />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="inline-flex h-control max-w-full items-center overflow-x-auto rounded-lg border border-border-default bg-surface-elevated p-0.5">
@@ -329,6 +349,32 @@ export default function GSTPage() {
         </button>
       </div>
 
+      {bySource.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Revenue sources">
+          <span className="mr-1 text-xs font-medium text-foreground-muted">Revenue sources</span>
+          {bySource.map(b => {
+            const on = !sources || sources.includes(b.source)
+            return (
+              <button
+                key={b.source}
+                type="button"
+                aria-pressed={on}
+                disabled={loading}
+                onClick={() => toggleSource(b.source)}
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 ${on ? 'border-accent-500 bg-accent-500/10 text-foreground' : 'border-border-default text-foreground-muted line-through'}`}
+              >
+                {b.label} · {b.invoices}
+              </button>
+            )
+          })}
+          {sources && (
+            <button type="button" disabled={loading} onClick={() => { setSources(null); fetchAll(applied.from, applied.to, null) }} className="text-xs text-accent-600 hover:underline">
+              All sources
+            </button>
+          )}
+        </div>
+      )}
+
       {loading && <GstKpisSkeleton />}
 
       {gstr1Summary && !loading && (
@@ -352,7 +398,7 @@ export default function GSTPage() {
             <EmptyState title="Select a date range and click Fetch Report." />
           ) : (
             <>
-              <Card title={`B2B Invoices (${gstr1B2B.length})`} flush action={<CsvButton onClick={() => downloadCSV('gstr1')} />}>
+              <Card title={`B2B Invoices (${gstr1B2B.length})`} flush>
                 <DataTable bare paged sortNs="b2b" rows={keyed(gstr1B2B)} cols={invoiceCols(true)} rowKey={kk} empty="No B2B invoices in this period." />
               </Card>
               <Card title={`B2C Invoices (${gstr1B2C.length})`} flush>
@@ -370,7 +416,7 @@ export default function GSTPage() {
         <div className="space-y-4">
           {gstr3b ? (
             <>
-              <Card title="GSTR-3B Summary" action={<CsvButton onClick={() => downloadCSV('gstr3b')} />}>
+              <Card title="GSTR-3B Summary">
                 <Fields>
                   <Field label="Entity" value={gstr3b.legalName} />
                   <Field label="GSTIN" value={gstr3b.gstin} mono />
@@ -439,7 +485,7 @@ export default function GSTPage() {
         <div className="space-y-4">
           {itcData ? (
             <>
-              <Card title="Input Tax Credit Ledger" action={<CsvButton onClick={() => downloadCSV('itc')} />}>
+              <Card title="Input Tax Credit Ledger">
                 <KpiGrid>
                   <Kpi label="PO Line Items" value={String(itcData.summary.lineCount)} sub="From received POs" />
                   <Kpi label="Total Taxable Purchases" value={INR(itcData.summary.totalTaxable)} />

@@ -33,6 +33,19 @@ function once(src: SiteData): SiteData {
   }
 }
 
+/**
+ * Keeps any AI-written section inside the viewport. Zero specificity (:where) so a section's own classes still win;
+ * `max-width:100%` also caps a fixed w-[…px]. Clip (not hidden) on the root: it stops decorative overflow without
+ * making a scroll container, so sticky headers and inner carousels keep working. Tracks wider than the screen on purpose (w-max, animate-, snap scrollers, translate, %-widths) are left alone.
+ */
+export const GUARD_CSS =
+  ':where([data-code-section]){max-width:100%;overflow-x:clip}' +
+  ':where([data-code-section]) :where(div,section,article,header,footer,nav,aside,main,form,ul,ol,li,figure,p,h1,h2,h3,h4,h5,h6,span,label,blockquote,dl,dt,dd):where(:not([class*="w-max"],[class*="animate-"],[class*="snap-"],[class*="translate-x"],[class*="%]"])){min-width:0;max-width:100%}' +
+  ':where([data-code-section]) :where(h1,h2,h3,h4,h5,h6,p,li,a,span,label,blockquote,dd){overflow-wrap:break-word}' +
+  ':where([data-code-section]) :where(img,video,canvas,picture,iframe,svg,input,select,textarea){max-width:100%}' +
+  '@media(max-width:639px){:where([data-code-section]) :where(h1,h2,h3,h4,h5,h6,p,blockquote){overflow-wrap:anywhere}' +
+  ':where([data-code-section]) :where(table){display:block;max-width:100%;overflow-x:auto}}'
+
 type CmpNode = Extract<CodeNode, { t: 'cmp' }>
 
 /** How many items a data component would show; on any doubt, "some", so a section is never hidden by mistake. */
@@ -145,6 +158,7 @@ export default async function CodeSection({
   always = false,
   anchors = null,
   preview = false,
+  guard = true,
 }: {
   section: CompiledSection | null | undefined
   id?: string
@@ -156,6 +170,8 @@ export default async function CodeSection({
   anchors?: Anchors | null
   /** The editor's canvas, with a preview token: elements carry `data-e` node ids. */
   preview?: boolean
+  /** False when the page already carries GUARD_CSS once (the studio preview). */
+  guard?: boolean
 }) {
   const s = section as Partial<CompiledSection> | null | undefined
   if (!s || typeof s !== 'object' || !s.ast || typeof s.ast !== 'object') return null
@@ -177,7 +193,7 @@ export default async function CodeSection({
   const env = makeEnv({ data: src, page, sectionId: id, priority, empty, taxonomy, anchors, rows, preview })
   return (
     <div data-code-section={id} id={blockId && /^[A-Za-z0-9_-]{1,64}$/.test(blockId) ? blockId : undefined}>
-      {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+      {(guard || css) && <style dangerouslySetInnerHTML={{ __html: (guard ? GUARD_CSS : '') + css }} />}
       {renderNode(s.ast, env)}
     </div>
   )

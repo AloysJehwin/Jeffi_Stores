@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Copy, ImageIcon, Languages, Loader2, Plus, Scissors, Sparkles, Trash2 } from 'lucide-react'
+import { ClipboardPaste, Copy, ImageIcon, Ungroup, Languages, Loader2, Plus, Scissors, Sparkles, Trash2 } from 'lucide-react'
 import { LANGUAGES } from '@/lib/site/studio/languages'
 import type { CodeNode } from '@jeffi/site-blocks'
 import { findNode } from '@jeffi/site-blocks/design'
@@ -23,6 +23,10 @@ export interface InspectorProps {
   onAdd: (kind: NewKind) => void
   onDuplicate: () => void
   onDelete: () => void
+  onCopy?: () => void
+  onCut?: () => void
+  onPaste?: () => void
+  onUngroup?: () => void
   renderImagePicker?: (p: { value: string; disabled: boolean; onPick: (url: string) => void }) => ReactNode
   /** Cheap AI actions on this element (values, not code), when the host has them. */
   ai?: {
@@ -36,7 +40,7 @@ export interface InspectorProps {
 const isPicture = (n: CodeNode) => (n.t === 'cmp' && n.name === 'Image') || (n.t === 'el' && n.tag === 'img')
 const isLink = (n: CodeNode) => (n.t === 'cmp' && n.name === 'Link') || (n.t === 'el' && n.tag === 'a')
 
-export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone, onAttr, onAdd, onDuplicate, onDelete, renderImagePicker, ai, children }: InspectorProps) {
+export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone, onAttr, onAdd, onDuplicate, onDelete, onCopy, onCut, onPaste, onUngroup, renderImagePicker, ai, children }: InspectorProps) {
   const node = findNode(tree, id)?.node
   if (!node) return <p className="text-sm text-foreground-muted">That element is gone. Pick another on the canvas.</p>
   const crumbs = pathTo(tree, id)
@@ -146,6 +150,26 @@ export default function Inspector({ tree, id, canWrite, onSelect, onText, onDone
             <button type="button" className={btn} disabled={root || locked} onClick={onDelete} title={locked ? 'The page needs this part' : undefined}>
               <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
+            {onUngroup && (
+              <button type="button" className={btn} onClick={onUngroup} title="Ungroup (⇧⌘G)">
+                <Ungroup className="h-3.5 w-3.5" /> Ungroup
+              </button>
+            )}
+            {onCopy && (
+              <button type="button" className={btn} disabled={root} onClick={onCopy} title="Copy (⌘C)">
+                <Copy className="h-3.5 w-3.5" /> Copy
+              </button>
+            )}
+            {onCut && (
+              <button type="button" className={btn} disabled={root || locked} onClick={onCut} title="Cut (⌘X)">
+                <Scissors className="h-3.5 w-3.5" /> Cut
+              </button>
+            )}
+            {onPaste && (
+              <button type="button" className={btn} onClick={onPaste} title="Paste (⌘V)">
+                <ClipboardPaste className="h-3.5 w-3.5" /> Paste
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-xs text-foreground-muted">
