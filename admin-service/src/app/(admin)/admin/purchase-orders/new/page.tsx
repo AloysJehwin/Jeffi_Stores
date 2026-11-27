@@ -239,12 +239,12 @@ export default function NewPOPage() {
   useEffect(() => {
     let cancelled = false
     const resumeId = searchParams.get('draftId')
-    async function hydrate(id: string) {
+    async function hydrate(id: string): Promise<boolean> {
       try {
         const res = await fetch(`/api/admin/inventory/po/draft/${id}`, { credentials: 'include' })
-        if (!res.ok) return
+        if (!res.ok) return false
         const { draft } = await res.json()
-        if (cancelled || !draft) return
+        if (cancelled || !draft) return false
         hydratedRef.current = true
         setForm({
           supplier_id: draft.supplier_id || '',
@@ -256,14 +256,22 @@ export default function NewPOPage() {
         if (Array.isArray(draft.line_items) && draft.line_items.length > 0) {
           setLineItems(draft.line_items as POLineItem[])
         }
+        return true
       } catch {
-        /* best-effort hydrate */
+        return false
       }
     }
     ;(async () => {
       if (resumeId) {
+        // Autosave stays off until the saved draft is in the form, so it can't be overwritten empty.
+        const ok = await hydrate(resumeId)
+        if (cancelled) return
+        if (!ok) {
+          showToast('Could not load that draft', 'error')
+          router.replace(ap('/admin/purchase-orders?tab=drafts'))
+          return
+        }
         setDraftId(resumeId)
-        await hydrate(resumeId)
       } else {
         try {
           const res = await fetch('/api/admin/inventory/po/draft', {

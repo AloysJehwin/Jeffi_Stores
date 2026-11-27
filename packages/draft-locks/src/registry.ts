@@ -140,7 +140,7 @@ export const DRAFT_RESOURCES: Record<DraftResourceType, DraftResourceDef> = {
     listSql: `SELECT id, updated_at FROM quotations WHERE status = 'draft'`,
     labelSql: `SELECT id, quote_number::text AS label, NULL::text AS ref FROM quotations WHERE id = ANY($1::uuid[])`,
     hintSql: `SELECT created_by AS admin_id FROM quotations WHERE id = $1`,
-    editHref: id => `/admin/quotations/${id}/view`,
+    editHref: id => `/admin/quotations?view=editor&edit=${id}`,
   },
   purchase_order: {
     label: 'Purchase order',
