@@ -9,6 +9,8 @@
 #   jeffistores.in (CloudFront alias), www, forms         unchanged
 # Stores' custom domains point at CLUSTER_INGRESS_IP (the edge) when their owners re-verify; the controller writes
 # that from the provisioning ConfigMap.
+# STORES_IP overrides where the store wildcards go: while every store is served by the platform's shared services
+# (no store nodes of its own), they live on the Azure core, so STORES_IP=$AZURE_IP.
 # Usage: EDGE_IP=<edge EIP> AZURE_IP=<core public IP> bash deploy/aws/edge/route53-plan.sh [--lower-ttl] [--apply]
 set -euo pipefail
 ZONE=${HOSTED_ZONE_ID:-Z08094881XKVZ9XSGBKG1}
@@ -21,12 +23,13 @@ OUT=${OUT_DIR:-$HOME/Documents/db-backups}; mkdir -p "$OUT"
 STAMP=$(date +%Y%m%d-%H%M)
 
 current=$(aws route53 list-resource-record-sets --hosted-zone-id "$ZONE" --output json)
-batch=$(CURRENT="$current" EDGE_IP="${EDGE_IP:-}" AZURE_IP="${AZURE_IP:-}" LOWER=$LOWER HOSTS="$PLATFORM_HOSTS" DOMAIN=$DOMAIN \
+batch=$(CURRENT="$current" EDGE_IP="${EDGE_IP:-}" AZURE_IP="${AZURE_IP:-}" STORES_IP="${STORES_IP:-}" LOWER=$LOWER HOSTS="$PLATFORM_HOSTS" DOMAIN=$DOMAIN \
   ROLLBACK="$OUT/route53-rollback-$STAMP.json" python3 -I - <<'PY'
 import json, os
 d = os.environ["DOMAIN"] + "."
 recs = {(r["Name"].replace("\\052", "*"), r["Type"]): r for r in json.loads(os.environ["CURRENT"])["ResourceRecordSets"]}
-want = {f"*.{d}": os.environ["EDGE_IP"], f"*.business.{d}": os.environ["EDGE_IP"]}
+stores = os.environ.get("STORES_IP") or os.environ["EDGE_IP"]
+want = {f"*.{d}": stores, f"*.business.{d}": stores}
 want.update({f"{h}.{d}": os.environ["AZURE_IP"] for h in os.environ["HOSTS"].split()})
 changes, rollback = [], []
 for name, ip in want.items():

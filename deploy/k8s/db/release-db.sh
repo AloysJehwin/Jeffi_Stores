@@ -11,7 +11,7 @@
 # --dry-run shows the SQL (flagship) or validates the Job (tenants) and applies nothing; --yes skips the prompts (CI).
 # Usage: bash deploy/k8s/db/release-db.sh [--flagship] [--tenants] [--schema] [--migrations] [--dry-run] [--yes] [--cloud=aws|azure]
 # --cloud=aws (default) or --cloud=azure: the cluster and flagship database (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md).
-# Azure: Postgres Flexible Server over the core's Tailscale subnet route, app_user's password from Key Vault
+# Azure: the self-hosted flagship Postgres pod through a kubectl port-forward, app_user's password from Key Vault
 # (lib.sh). --tenants there needs FLAGSHIP_CLOUD=azure: until the cutover the stores and the controller that reaches
 # their databases are in the AWS cluster. After it (FLAGSHIP_CLOUD=azure) the AWS side is refused.
 source "$(dirname "$0")/lib.sh"
@@ -44,7 +44,7 @@ if $FLAGSHIP; then
     say "File migrations on jeffi_stores (every <service>/database/migrations and platform-only/migrations)"
     flag=(); $DRY_RUN && flag=(--dry-run)
     if [ "$CLOUD" = azure ]; then # password from PGPASSFILE
-      RDS_HOST='' PGSSLMODE=require DATABASE_URL="postgresql://app_user@$PG_ADDR:5432/jeffi_stores" \
+      RDS_HOST='' PGSSLMODE=$AZ_PG_SSLMODE DATABASE_URL="postgresql://app_user@$PG_ADDR:$AZ_PG_PORT/jeffi_stores" \
         bash "$REPO/deploy/run-migrations.sh" ${flag[@]+"${flag[@]}"}
     else
       RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=jeffi_stores \

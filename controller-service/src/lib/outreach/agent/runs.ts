@@ -13,15 +13,21 @@ export async function getOpenRun(contactId: string, db: Queryable = outreachPool
 }
 
 /** A new run, or the contact's existing open one when another process won the race. */
-export async function createRun(input: { contactId: string; skillVersionId: string | null; skillRef: string }): Promise<AgentRunRow> {
+export async function createRun(input: { contactId: string; skillVersionId: string | null; skillRef: string; jobId?: string | null }): Promise<AgentRunRow> {
   const pool = outreachPool()
   await pool.query(
-    `INSERT INTO outreach_agent_runs (contact_id, skill_version_id, skill_ref) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-    [input.contactId, input.skillVersionId, input.skillRef]
+    `INSERT INTO outreach_agent_runs (contact_id, skill_version_id, skill_ref, job_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+    [input.contactId, input.skillVersionId, input.skillRef, input.jobId ?? null]
   )
   const run = await getOpenRun(input.contactId, pool)
   if (!run) throw new Error(`No open agent run for contact ${input.contactId}`)
   return run
+}
+
+/** The job's open run, or its latest one. */
+export async function getJobRun(jobId: string, db: Queryable = outreachPool()): Promise<AgentRunRow | null> {
+  const r = await db.query(`SELECT * FROM outreach_agent_runs WHERE job_id = $1 ORDER BY (${OPEN}) DESC, started_at DESC LIMIT 1`, [jobId])
+  return r.rows[0] ?? null
 }
 
 export async function recordTurn(runId: string, channel: AgentChannel, costPaise: number, now: Date): Promise<void> {
@@ -44,6 +50,10 @@ export async function handOff(input: { contactId: string; reason: string; channe
   const pool = outreachPool()
   await pool.query(`UPDATE outreach_contacts SET handoff_at = $2, handoff_reason = $3, updated_at = now() WHERE id = $1`, [input.contactId, input.now, input.reason])
   await pool.query(`UPDATE outreach_agent_runs SET status = 'handed_off', updated_at = $2 WHERE contact_id = $1 AND status = 'active'`, [input.contactId, input.now])
+  await pool.query(
+    `UPDATE outreach_jobs SET status = 'handed_off', updated_at = $2 WHERE status IN ('active', 'waiting') AND id IN (SELECT job_id FROM outreach_agent_runs WHERE contact_id = $1 AND status = 'handed_off' AND job_id IS NOT NULL)`,
+    [input.contactId, input.now]
+  )
   await cancelTasks(input.contactId, 'handoff')
   await recordEvent(input.contactId, 'handoff', { actor: input.actor, data: { reason: input.reason, channel: input.channel } })
 }
@@ -56,6 +66,10 @@ export async function resume(contactId: string, actor: string, now: Date): Promi
     [contactId]
   )
   const r = await pool.query(`UPDATE outreach_agent_runs SET status = 'active', updated_at = $2 WHERE contact_id = $1 AND status = 'handed_off' RETURNING id`, [contactId, now])
+  await pool.query(
+    `UPDATE outreach_jobs SET status = 'active', updated_at = $2 WHERE status = 'handed_off' AND id IN (SELECT job_id FROM outreach_agent_runs WHERE contact_id = $1 AND status = 'active' AND job_id IS NOT NULL)`,
+    [contactId, now]
+  )
   const did = (c.rows?.length ?? 0) > 0 || (r.rows?.length ?? 0) > 0
   if (did) await recordEvent(contactId, 'agent_resumed', { actor })
   return did

@@ -5,6 +5,7 @@ const m = vi.hoisted(() => ({ detail: vi.fn(), update: vi.fn(), archive: vi.fn()
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ isPlatformAdmin: vi.fn() }))
 vi.mock('@controller/lib/outreach/agent/skill/store', () => ({
+  AGENT_STATUSES: ['draft', 'active', 'paused'],
   getSkillDetail: m.detail,
   updateSkill: m.update,
   archiveSkill: m.archive,

@@ -1,6 +1,7 @@
 // The k3s core: E4ps_v6 (Arm, so the arm64-only images run unchanged), Ubuntu 24.04 arm64, P10 OS disk, the static
-// public IP for 80/443. cloud-init/core.sh installs Tailscale and the k3s server on first boot. customData can't
-// change after creation: a new cloud-init means a new VM.
+// public IP for 80/443, and the flagship Postgres data disk at LUN 0. cloud-init/core.sh installs Tailscale and the
+// k3s server on first boot. customData can't change after creation: a new cloud-init means a new VM, so pg-disk.sh,
+// not cloud-init, formats and mounts the data disk (re-run it after a rebuild).
 param location string
 param prefix string
 param vmSize string = 'Standard_E4ps_v6'
@@ -13,6 +14,7 @@ param publicIpAddress string
 param keyVaultName string
 param oidcIssuerUrl string
 param pgSubnetCidr string
+param pgDataDiskId string
 param privateIp string = '10.60.1.4'
 param tags object
 
@@ -83,6 +85,18 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
         }
         deleteOption: 'Detach'
       }
+      dataDisks: [
+        {
+          lun: 0
+          name: '${prefix}-pg-data'
+          createOption: 'Attach'
+          caching: 'None'
+          deleteOption: 'Detach'
+          managedDisk: {
+            id: pgDataDiskId
+          }
+        }
+      ]
     }
     osProfile: {
       computerName: 'jeffi-core'

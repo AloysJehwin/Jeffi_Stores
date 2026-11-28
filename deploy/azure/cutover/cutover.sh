@@ -18,7 +18,7 @@ STEPS=(preflight freeze final-dump-restore identity stores-rejoin dns cloudfront
 AZURE_IP=${AZURE_IP:-}; EDGE_IP=${EDGE_IP:-}
 export RUN_DIR ANTH_TENANT ANTH_SA ANTH_RULE_AZURE RESTORE_CLEAN=${RESTORE_CLEAN:-} RESTORE_ALLOW_ERRORS=${RESTORE_ALLOW_ERRORS:-}
 need_ips() { [ -n "$EDGE_IP" ] && [ -n "$AZURE_IP" ] || die "set EDGE_IP and AZURE_IP"; }
-route53() { EDGE_IP=$EDGE_IP AZURE_IP=$AZURE_IP OUT_DIR=$1 bash "$R53" "${@:2}"; }
+route53() { EDGE_IP=$EDGE_IP AZURE_IP=$AZURE_IP STORES_IP=${STORES_IP:-} OUT_DIR=$1 bash "$R53" "${@:2}"; }
 
 step_preflight() {
   local bad=0 sha out
@@ -64,12 +64,25 @@ step_freeze() {
 step_final_dump_restore() {
   local dump=$RUN_DIR/jeffi_stores.dump
   if ! $APPLY; then
+    if [ "${DUMP_VIA:-edge}" = edge ]; then
+      echo "(dry run) would: quiesce the Azure platform pods (freeze.sh on, state $AZ_FREEZE_STATE), then edge-copy.sh: reset the Azure"
+      echo "  jeffi_stores, a postgres pod on the AWS tenant edge dumps the RDS and restores it into flagship-postgres, compare table counts."
+      echo "  (DUMP_VIA=tunnel uses the SSM tunnel instead, which stalled in the rehearsal.) The Azure pods stay at 0 until the identity step."
+      return 0
+    fi
     echo "(dry run) would: pg_dump -Fc jeffi_stores from the RDS (tunnel via the AWS core, app_user IAM token) into $dump;"
     echo "  quiesce the Azure platform pods (freeze.sh on, state $AZ_FREEZE_STATE); pg_restore as app_user (PGPASSFILE 0600 from Key Vault) into Azure jeffi_stores;"
     echo "  compare table counts. The Azure pods stay at 0 until the identity step."
     return 0
   fi
   [ -s "$AWS_FREEZE_STATE" ] || die "the AWS cluster is not frozen ($AWS_FREEZE_STATE missing): run the freeze step first"
+  if [ "${DUMP_VIA:-edge}" = edge ]; then
+    confirm_typed restore "reset the Azure jeffi_stores and copy the frozen RDS into it from a pod on the AWS tenant edge"
+    say "Quiesce the Azure platform"
+    if [ -s "$AZ_FREEZE_STATE" ]; then echo "   already quiesced ($AZ_FREEZE_STATE)"; else freeze_azure on; fi
+    RUN_DIR=$RUN_DIR AZ_KUBECONFIG=$AZ_KUBECONFIG bash "$(dirname "$SELF")/edge-copy.sh"
+    return 0
+  fi
   confirm_typed restore "dump the frozen RDS jeffi_stores and restore it into Azure Postgres (overwrites the Azure copy if RESTORE_CLEAN=1)"
   say "Dump from RDS"
   lib_run aws 'tunnel; pg_major > "$RUN_DIR/pg_major"
@@ -90,7 +103,7 @@ step_final_dump_restore() {
     mj=$(cat "$RUN_DIR/pg_major"); lm=$(pg_restore --version 2>/dev/null | grep -oE "[0-9]+" | head -1 || true)
     # The local client when it is at least the dump version, else the matching image; the password file is mounted, never passed.
     if [ "${lm:-0}" -ge "$mj" ]; then run=(pg_restore); in=$RUN_DIR
-    else run=(docker run --rm -e PGPASSFILE=/run/pgpass -e PGHOST -e PGPORT -e PGUSER -e PGSSLMODE -v "$PGPASSFILE:/run/pgpass:ro" -v "$RUN_DIR:/in:ro" "postgres:$mj-alpine" pg_restore); in=/in; fi
+    else run=(docker run --rm -e PGPASSFILE=/run/pgpass -e PGHOST=host.docker.internal -e PGPORT -e PGUSER -e PGSSLMODE -v "$PGPASSFILE:/run/pgpass:ro" -v "$RUN_DIR:/in:ro" "postgres:$mj-alpine" pg_restore); in=/in; fi
     tables=$("${run[@]}" -l "$in/jeffi_stores.dump" | grep -cE "; [0-9]+ [0-9]+ TABLE public " || true)
     rc=0; (pg_env; "${run[@]}" "${flags[@]}" -d jeffi_stores "$in/jeffi_stores.dump") > "$RUN_DIR/restore.log" 2>&1 || rc=$?
     echo "   pg_restore exit $rc, $(grep -c "^pg_restore: error" "$RUN_DIR/restore.log" || true) error line(s); log $RUN_DIR/restore.log"
@@ -156,7 +169,7 @@ step_dns() {
   say "Plan (route53-plan.sh, nothing applied)"
   route53 "$SCRATCH"
   $APPLY || { echo "(dry run) --apply would submit it with TTL 60"; return 0; }
-  confirm_typed dns "move the store wildcards to $EDGE_IP and the platform hosts to $AZURE_IP in Route 53"
+  confirm_typed dns "move the store wildcards to ${STORES_IP:-$EDGE_IP} and the platform hosts to $AZURE_IP in Route 53"
   mkdir -p "$RUN_DIR/dns-apply"
   route53 "$RUN_DIR/dns-apply" --apply
   # The first apply's batch is the real rollback; a re-run would only hold the already-changed records.

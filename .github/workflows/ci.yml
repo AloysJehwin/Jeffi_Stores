@@ -871,7 +871,7 @@ jobs:
         with: { name: "db-aws-${{ matrix.db }}" }
 
   # The databases on Azure (docs/plans/AZURE_MOVE_AND_AI_GATEWAY_PLAN.md). Off until AZURE_TARGET=true. Postgres is
-  # reached over the tailnet (the core's subnet route), app_user's password read from Key Vault (deploy/k8s/db/lib.sh).
+  # reached through a kubectl port-forward over the tailnet (the k8s API), app_user's password read from Key Vault (deploy/k8s/db/lib.sh).
   # Before the cutover only the flagship; with FLAGSHIP_CLOUD=azure also tenants, the fan-out Job in the Azure cluster
   # (the stores rejoined it at the cutover).
   db-azure:

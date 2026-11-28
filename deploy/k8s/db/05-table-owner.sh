@@ -1,6 +1,6 @@
 #!/bin/bash
 # Let app_user alter the older tables (10-platform-schema.sh runs this first). They belong to the RDS master user
-# postgres (MASTER_ROLE in lib.sh: the Flexible Server's admin on Azure), and app_user (which runs the release and owns
+# postgres (MASTER_ROLE in lib.sh: the self-hosted superuser on Azure), and app_user (which runs the release and owns
 # every newer table) can't ALTER or index them. As that master: create the role jeffi_owner with it and app_user as
 # members, and hand it those objects. Idempotent; writes $OUT_DIR/table-owner-rollback.sql (run it as the master).
 # Usage: bash deploy/k8s/db/05-table-owner.sh [--dry-run] [--yes]

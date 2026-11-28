@@ -44,7 +44,7 @@ const badValidation = { ok: false, issues: [{ level: 'error', code: 'name', mess
 const listing = { skills: [skill(), skill({ id: 's2', slug: 'old', title: 'Old pitch', archived_at: '2026-11-01T00:00:00Z', is_default: false, list_count: 0 })], builtins: [{ slug: 'showcase-offer', title: 'Showcase offer', description: 'The default pitch', content: '---\nname: showcase-offer\n---\nhello' }], defaultSkillId: 's1' }
 const version = (n: number, id: string) => ({ id, skill_id: 's1', version: n, content: `body v${n}`, meta, sha256: 'abcdef0123456789', validation: { ok: true, issues: [] }, source: 'upload', created_by: null, created_at: '2026-11-26T10:00:00Z' })
 
-const typeContent = (v: string) => fireEvent.change(screen.getByLabelText('Skill content'), { target: { value: v } })
+const typeContent = (v: string) => fireEvent.change(screen.getByLabelText('Agent content'), { target: { value: v } })
 
 describe('tabs', () => {
   it('lists the Skills tab', () => {
@@ -72,8 +72,9 @@ describe('OutreachSkillsClient', () => {
       [`GET ${B}/skills`]: () => listing,
     }
     render(<OutreachSkillsClient />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New skill' }))
-    const save = () => screen.getByRole('button', { name: 'Create skill' }) as HTMLButtonElement
+    fireEvent.click(await screen.findByRole('button', { name: 'New agent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start blank' }))
+    const save = () => screen.getByRole('button', { name: 'Create agent' }) as HTMLButtonElement
 
     typeContent('bad file')
     expect(await screen.findByText(/name is required/, undefined, { timeout: 3000 })).toBeTruthy()
@@ -95,8 +96,9 @@ describe('OutreachSkillsClient', () => {
   it('fills the editor from a template', async () => {
     routes = { [`GET ${B}/skills`]: () => listing }
     render(<OutreachSkillsClient />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Use Showcase offer as a starting point' }))
-    expect((screen.getByLabelText('Skill content') as HTMLTextAreaElement).value).toContain('name: showcase-offer')
+    fireEvent.click(await screen.findByRole('button', { name: 'New agent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use Showcase offer as a starting point' }))
+    expect((screen.getByLabelText('Agent content') as HTMLTextAreaElement).value).toContain('name: showcase-offer')
   })
 
   it('makes an older version current', async () => {
@@ -124,7 +126,7 @@ describe('Lists and Program skill selects', () => {
     render(<OutreachListsClient />)
     await screen.findByText('Pune')
     await screen.findByRole('option', { name: 'Showcase offer' })
-    fireEvent.change(screen.getByLabelText('Skill for Pune'), { target: { value: 's1' } })
+    fireEvent.change(screen.getByLabelText('Agent for Pune'), { target: { value: 's1' } })
     await waitFor(() => expect(calls.some(c => c.init?.method === 'PATCH')).toBe(true))
     expect(JSON.parse(calls.find(c => c.init?.method === 'PATCH')!.init!.body as string)).toEqual({ skill_id: 's1', skill_version_id: null })
     expect(await screen.findByLabelText('Pin version for Pune')).toBeTruthy()
@@ -139,7 +141,7 @@ describe('Lists and Program skill selects', () => {
     }
     render(<OutreachProgramClient />)
     await screen.findByRole('option', { name: 'Showcase offer' })
-    fireEvent.change(screen.getByLabelText('Default skill'), { target: { value: 's1' } })
+    fireEvent.change(screen.getByLabelText('Default agent'), { target: { value: 's1' } })
     await waitFor(() => expect(calls.some(c => c.init?.method === 'PATCH')).toBe(true))
     expect(JSON.parse(calls.find(c => c.init?.method === 'PATCH')!.init!.body as string)).toEqual({ default_skill_id: 's1' })
   })

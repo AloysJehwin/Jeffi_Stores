@@ -1,6 +1,7 @@
 import type { SkillIssue } from '../types'
 
-// A minimal YAML subset for skill frontmatter: scalars, [a, b] lists, "- item" lists, one level of "sub: value" maps, # comments.
+// A minimal YAML subset for skill frontmatter: scalars, [a, b] lists, { a: b } flow maps, "- item" lists, maps nested two
+// levels below a key (the inputs: block), # comments.
 
 export interface Frontmatter {
   data: Record<string, unknown>
@@ -23,7 +24,7 @@ function stripComment(s: string): string {
       if (c === '\\' && q === '"') i++
       else if (c === q) q = null
     } else if (c === '"' || c === "'") {
-      if (i === 0 || /[\s[,:]/.test(s[i - 1])) q = c
+      if (i === 0 || /[\s[{,:]/.test(s[i - 1])) q = c
     } else if (c === '#' && (i === 0 || /\s/.test(s[i - 1]))) {
       return s.slice(0, i)
     }
@@ -50,11 +51,12 @@ function scalar(raw: string): { value: unknown } | { error: string } {
   return { value: s }
 }
 
-/** Splits the inside of [a, b, "c, d"] on top-level commas. */
+/** Splits the inside of [a, b, "c, d"] or { a: b, c: [x, y] } on top-level commas. */
 function splitList(inner: string): string[] | { error: string } {
   const parts: string[] = []
   let cur = ''
   let q: string | null = null
+  let depth = 0
   for (let i = 0; i < inner.length; i++) {
     const c = inner[i]
     if (q) {
@@ -64,7 +66,13 @@ function splitList(inner: string): string[] | { error: string } {
     } else if (c === '"' || c === "'") {
       q = c
       cur += c
-    } else if (c === ',') {
+    } else if (c === '[' || c === '{') {
+      depth++
+      cur += c
+    } else if (c === ']' || c === '}') {
+      depth--
+      cur += c
+    } else if (c === ',' && depth === 0) {
       parts.push(cur)
       cur = ''
     } else cur += c
@@ -72,6 +80,23 @@ function splitList(inner: string): string[] | { error: string } {
   if (q) return { error: 'Unterminated quote in list' }
   if (cur.trim() || parts.length) parts.push(cur)
   return parts
+}
+
+/** Index of the first top-level ":" in a flow-map entry, or -1. */
+function colonAt(part: string): number {
+  let q: string | null = null
+  let depth = 0
+  for (let i = 0; i < part.length; i++) {
+    const c = part[i]
+    if (q) {
+      if (c === '\\' && q === '"') i++
+      else if (c === q) q = null
+    } else if (c === '"' || c === "'") q = c
+    else if (c === '[' || c === '{') depth++
+    else if (c === ']' || c === '}') depth--
+    else if (c === ':' && depth === 0 && (i + 1 === part.length || /\s/.test(part[i + 1]))) return i
+  }
+  return -1
 }
 
 function value(raw: string): { value: unknown } | { error: string } {
@@ -83,9 +108,26 @@ function value(raw: string): { value: unknown } | { error: string } {
     const out: unknown[] = []
     for (const p of parts) {
       if (!p.trim()) continue
-      const v = scalar(p)
+      const v = value(p)
       if ('error' in v) return v
       out.push(v.value)
+    }
+    return { value: out }
+  }
+  if (s[0] === '{') {
+    if (s[s.length - 1] !== '}') return { error: 'Unclosed { map' }
+    const parts = splitList(s.slice(1, -1))
+    if ('error' in parts) return parts
+    const out: Record<string, unknown> = {}
+    for (const p of parts) {
+      if (!p.trim()) continue
+      const at = colonAt(p)
+      if (at < 0) return { error: `Expected "name: value" inside { }, got "${p.trim().slice(0, 40)}"` }
+      const k = scalar(p.slice(0, at))
+      if ('error' in k || typeof k.value !== 'string') return { error: `Bad key inside { }: "${p.slice(0, at).trim().slice(0, 40)}"` }
+      const v = value(p.slice(at + 1))
+      if ('error' in v) return v
+      out[k.value] = v.value
     }
     return { value: out }
   }
@@ -93,6 +135,59 @@ function value(raw: string): { value: unknown } | { error: string } {
 }
 
 const indentOf = (l: string) => l.length - l.trimStart().length
+
+interface Row {
+  text: string
+  line: number
+}
+
+const KEY = /^([A-Za-z_][\w-]*)\s*:(?:\s+(.*))?$/
+/** Maps may nest this many levels below a top-level key (inputs → name → fields). */
+const MAX_DEPTH = 2
+
+function blockValue(path: string, block: Row[], depth: number, issues: SkillIssue[]): unknown {
+  if (!block.length) return null
+  if (block[0].text.trim().startsWith('-')) {
+    const list: unknown[] = []
+    for (const b of block) {
+      const t = b.text.trim()
+      if (!/^-(\s|$)/.test(t)) {
+        issues.push(err('frontmatter_list', `${path}: every line of a "- item" list must start with "- "`, b.line))
+        continue
+      }
+      const v = scalar(t.slice(1))
+      if ('error' in v) issues.push(err('frontmatter_value', `${path}: ${v.error}`, b.line))
+      else list.push(v.value)
+    }
+    return list
+  }
+  const base = indentOf(block[0].text)
+  const map: Record<string, unknown> = {}
+  for (let i = 0; i < block.length; i++) {
+    const b = block[i]
+    const sm = indentOf(b.text) === base ? KEY.exec(b.text.trim()) : null
+    if (!sm) {
+      issues.push(err('frontmatter_syntax', `${path}: expected "name: value", got "${b.text.trim().slice(0, 60)}"`, b.line))
+      continue
+    }
+    const sub = (sm[2] ?? '').trim()
+    if (sub) {
+      const v = value(sub)
+      if ('error' in v) issues.push(err('frontmatter_value', `${path}.${sm[1]}: ${v.error}`, b.line))
+      else map[sm[1]] = v.value
+      continue
+    }
+    const child: Row[] = []
+    while (i + 1 < block.length && indentOf(block[i + 1].text) > base) child.push(block[++i])
+    if (!child.length) continue
+    if (depth >= MAX_DEPTH) {
+      issues.push(err('frontmatter_nested', `${path}.${sm[1]}: maps nest at most two levels below a key`, b.line))
+      continue
+    }
+    map[sm[1]] = blockValue(`${path}.${sm[1]}`, child, depth + 1, issues)
+  }
+  return map
+}
 
 export function parseFrontmatter(raw: string): Frontmatter {
   const text = raw.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
@@ -110,8 +205,7 @@ export function parseFrontmatter(raw: string): Frontmatter {
   }
   const issues: SkillIssue[] = []
   const data: Record<string, unknown> = {}
-  const rows = lines.slice(1, end).map((l, i) => ({ text: stripComment(l).replace(/\s+$/, ''), line: i + 2 }))
-  const KEY = /^([A-Za-z_][\w-]*)\s*:(?:\s+(.*))?$/
+  const rows: Row[] = lines.slice(1, end).map((l, i) => ({ text: stripComment(l).replace(/\s+$/, ''), line: i + 2 }))
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
@@ -134,46 +228,13 @@ export function parseFrontmatter(raw: string): Frontmatter {
       else data[key] = v.value
       continue
     }
-    // "key:" alone: a block of indented lines follows (a list or a one-level map), or the value is null.
+    // "key:" alone: a block of indented lines follows (a list or a nested map), or the value is null.
     const block: typeof rows = []
     while (i + 1 < rows.length && (!rows[i + 1].text.trim() || indentOf(rows[i + 1].text) > 0)) {
       i++
       if (rows[i].text.trim()) block.push(rows[i])
     }
-    if (!block.length) {
-      data[key] = null
-    } else if (block[0].text.trim().startsWith('-')) {
-      const list: unknown[] = []
-      for (const b of block) {
-        const t = b.text.trim()
-        if (!/^-(\s|$)/.test(t)) {
-          issues.push(err('frontmatter_list', `${key}: every line of a "- item" list must start with "- "`, b.line))
-          continue
-        }
-        const v = scalar(t.slice(1))
-        if ('error' in v) issues.push(err('frontmatter_value', `${key}: ${v.error}`, b.line))
-        else list.push(v.value)
-      }
-      data[key] = list
-    } else {
-      const map: Record<string, unknown> = {}
-      for (const b of block) {
-        const sm = KEY.exec(b.text.trim())
-        if (!sm) {
-          issues.push(err('frontmatter_syntax', `${key}: expected "name: value", got "${b.text.trim().slice(0, 60)}"`, b.line))
-          continue
-        }
-        const sub = (sm[2] ?? '').trim()
-        if (!sub) {
-          issues.push(err('frontmatter_nested', `${key}.${sm[1]}: only one level of nesting is supported`, b.line))
-          continue
-        }
-        const v = value(sub)
-        if ('error' in v) issues.push(err('frontmatter_value', `${key}.${sm[1]}: ${v.error}`, b.line))
-        else map[sm[1]] = v.value
-      }
-      data[key] = map
-    }
+    data[key] = blockValue(key, block, 1, issues)
   }
   return { data, body: lines.slice(end + 1).join('\n'), bodyLine: end + 2, issues }
 }

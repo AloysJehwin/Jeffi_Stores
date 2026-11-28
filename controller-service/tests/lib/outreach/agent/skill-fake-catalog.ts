@@ -35,6 +35,27 @@ const defs = [
   def('scheduleFollowUp', ALL),
   def('endCall', ['voice']),
   def('switchLanguage', ['voice']),
+  // Task-agent tools (docs/plans/OUTREACH_AGENTS.md §4)
+  def('getJob', ALL, 'read'),
+  def('setOutcome', ALL, 'write'),
+  def('getOrder', ALL, 'read'),
+  def('findOrders', ALL, 'read'),
+  def('trackShipment', ALL, 'read'),
+  def('confirmCodOrder', ALL, 'write'),
+  def('sendReviewLink', ALL, 'send'),
+  def('recordRating', ALL, 'write'),
+  def('getReviewStatus', ALL, 'read'),
+  def('getAbandonedCheckout', ALL, 'read'),
+  def('sendCheckoutLink', ALL, 'send'),
+  def('sendPaymentLink', ALL, 'send'),
+  def('checkDelivery', ALL, 'read'),
+  def('searchProducts', ALL, 'read'),
+  def('getProduct', ALL, 'read'),
+  def('sendProductLink', ALL, 'send'),
+  def('getStoreInfo', ALL, 'read'),
+  def('createSupportTicket', ALL, 'write'),
+  def('createStaffTask', ALL, 'write'),
+  def('sendSms', ALL, 'send'),
 ]
 
 export const TOOLS: Record<string, ReturnType<typeof def>> = Object.fromEntries(defs.map(d => [d.name, d]))

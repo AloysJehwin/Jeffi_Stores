@@ -53,7 +53,7 @@ describe('parseFrontmatter', () => {
   })
 
   it('reports syntax problems with line numbers and keeps reading', () => {
-    const r = parseFrontmatter(['---', 'name: ok', 'this is not a pair', 'list: [a, b', 'quote: "oops', '  stray: 1', 'deep:', '  a:', '    b: 1', '---'].join('\n'))
+    const r = parseFrontmatter(['---', 'name: ok', 'this is not a pair', 'list: [a, b', 'quote: "oops', '  stray: 1', 'deep:', '  a:', '    b:', '      c: 1', '---'].join('\n'))
     expect(r.data.name).toBe('ok')
     const by = Object.fromEntries(r.issues.map(i => [i.code + ':' + i.line, i.level]))
     expect(by['frontmatter_syntax:3']).toBe('error')

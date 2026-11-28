@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { api, Badge, btnGhost } from '@/components/admin/kit/core'
 import { Card } from '@/components/admin/kit/layout'
-import { API, CHANNEL_LABEL } from './shared'
+import { API, CHANNEL_LABEL, GROUP_LABEL } from './shared'
 
-type Tool = { name: string; description: string; channels: string[]; effect: string; mandatory: boolean }
+type Tool = { name: string; description: string; channels: string[]; effect: string; mandatory: boolean; group?: string }
 type Catalog = { tools: Tool[]; limits: Record<string, number>; placeholders: string[] }
 
 /** What a skill author can name: the tools, the hard limits and the {{placeholders}}. Loaded on first open. */
@@ -28,7 +28,7 @@ export default function SkillCatalog() {
   return (
     <Card
       title="Tool catalog"
-      hint="The tools a skill can list, the hard limits it can only lower, and the placeholders it can use."
+      hint="The tools an agent can list, the hard limits it can only lower, and the placeholders it can use."
       action={
         <button type="button" className={btnGhost} aria-expanded={open} onClick={toggle}>
           {open ? 'Hide' : 'Show'}
@@ -45,6 +45,7 @@ export default function SkillCatalog() {
               <thead>
                 <tr className="text-left text-xs text-foreground-muted border-b border-border-default">
                   <th className="py-1.5 pr-3">Tool</th>
+                  <th className="py-1.5 pr-3">Group</th>
                   <th className="py-1.5 pr-3">Channels</th>
                   <th className="py-1.5 pr-3">Effect</th>
                   <th className="py-1.5">What it does</th>
@@ -56,6 +57,7 @@ export default function SkillCatalog() {
                     <td className="py-1.5 pr-3 whitespace-nowrap">
                       <span className="font-mono text-xs">{t.name}</span> {t.mandatory && <Badge tone="blue">Always on</Badge>}
                     </td>
+                    <td className="py-1.5 pr-3 text-xs">{GROUP_LABEL[t.group ?? ''] ?? t.group ?? '-'}</td>
                     <td className="py-1.5 pr-3 text-xs">{t.channels.map(c => CHANNEL_LABEL[c] ?? c).join(', ')}</td>
                     <td className="py-1.5 pr-3 text-xs">{t.effect}</td>
                     <td className="py-1.5 text-xs text-foreground-muted">{t.description}</td>

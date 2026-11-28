@@ -40,9 +40,9 @@ SELECT pg_temp.scrub('push_queue deleted', $s$DELETE FROM push_queue$s$);
 SELECT pg_temp.scrub('campaigns disabled', $s$UPDATE campaigns SET enabled = false WHERE enabled$s$);
 SELECT pg_temp.scrub('email_campaigns back to draft', $s$UPDATE email_campaigns SET status = 'draft' WHERE status IN ('scheduled', 'sending', 'active', 'queued')$s$);
 SELECT pg_temp.scrub('deferred campaign sends skipped', $s$UPDATE email_campaign_logs SET status = 'skipped' WHERE status = 'deferred'$s$);
-SELECT pg_temp.scrub('queued messages cancelled', $s$UPDATE messages SET status = 'cancelled' WHERE status = 'queued'$s$);
+SELECT pg_temp.scrub('queued messages skipped', $s$UPDATE messages SET status = 'skipped' WHERE status = 'queued'$s$);
 SELECT pg_temp.scrub('bulk_jobs cancelled', $s$UPDATE bulk_jobs SET status = 'cancelled' WHERE status IN ('queued', 'running')$s$);
-SELECT pg_temp.scrub('bulk_job_items cancelled', $s$UPDATE bulk_job_items SET status = 'cancelled' WHERE status = 'pending'$s$);
+SELECT pg_temp.scrub('bulk_job_items skipped', $s$UPDATE bulk_job_items SET status = 'skipped' WHERE status = 'pending'$s$);
 SELECT pg_temp.scrub('outreach programs paused', $s$UPDATE outreach_program_state SET enabled = false, updated_at = now() WHERE enabled$s$);
 
 -- 5. Provisioning jobs and billing that would drive AWS or Razorpay from the copy.

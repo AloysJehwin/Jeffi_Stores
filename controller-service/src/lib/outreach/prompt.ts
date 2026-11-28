@@ -385,3 +385,32 @@ export const knownLines = (k: KnownBrief): string[] => {
 
 export const greeting = (p: Pick<PromptContext, 'language' | 'personaName' | 'business' | 'owner' | 'continuing'>): string =>
   p.continuing ? LINES[p.language].greetingAgain(p.personaName) : LINES[p.language].greeting(p.personaName, { business: p.business, owner: p.owner })
+
+// Task agents calling a store's customers: the greeting and the closing line stay in code too (the recording notice
+// comes first). Languages without an entry here fall back to English.
+interface ShopperLines {
+  greeting: (persona: string, store: string, name: string | null) => string
+  greetingAgain: (persona: string, store: string) => string
+  bye: string
+}
+
+const SHOPPER_LINES: Partial<Record<OutreachLanguage, ShopperLines>> & { en: ShopperLines } = {
+  en: {
+    greeting: (n, store, name) => `Hello! This is ${n} from ${store}. This call may be recorded so we get things right. ${name ? `Am I speaking with ${name}?` : 'Is this a good time to talk for a minute?'}`,
+    greetingAgain: (n, store) => `Hello again! This is ${n} from ${store}. This call may be recorded so we get things right. Is now a good time to continue?`,
+    bye: 'Thank you for your time. Goodbye!',
+  },
+  hi: {
+    greeting: (n, store, name) => `नमस्ते! मैं ${store} से ${n} बोल रही हूँ। यह कॉल रिकॉर्ड हो सकती है ताकि सब कुछ सही रहे। ${name ? `क्या मेरी बात ${name} जी से हो रही है?` : 'क्या अभी एक मिनट बात कर सकते हैं?'}`,
+    greetingAgain: (n, store) => `नमस्ते, फिर से! मैं ${store} से ${n} बोल रही हूँ। यह कॉल रिकॉर्ड हो सकती है ताकि सब कुछ सही रहे। क्या अभी आगे बात कर सकते हैं?`,
+    bye: 'आपके समय के लिए धन्यवाद। नमस्ते!',
+  },
+}
+
+const shopperLines = (language: OutreachLanguage): ShopperLines => SHOPPER_LINES[language] ?? SHOPPER_LINES.en
+
+export const shopperGreeting = (p: { language: OutreachLanguage; personaName: string; store: string; name: string | null; continuing: boolean }): string =>
+  p.continuing ? shopperLines(p.language).greetingAgain(p.personaName, p.store) : shopperLines(p.language).greeting(p.personaName, p.store, p.name)
+
+/** The line spoken when setOutcome ends a call. */
+export const shopperBye = (language: OutreachLanguage): string => shopperLines(language).bye

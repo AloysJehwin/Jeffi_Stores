@@ -5,6 +5,7 @@ import { getContactDetail } from '@controller/lib/outreach/contacts'
 import { addSuppression } from '@controller/lib/outreach/suppress'
 import { ensureRun } from '@controller/lib/outreach/agent/runtime'
 import * as runs from '@controller/lib/outreach/agent/runs'
+import { liveJobOf } from '@controller/lib/outreach/agent/jobs'
 import { transition, InvalidTransitionError, ContactNotFoundError } from '@controller/lib/outreach/state'
 
 export const dynamic = 'force-dynamic'
@@ -51,6 +52,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       await transition(contact, 'queued', { actor: admin.label, data: { note: note ?? null }, set: { attempts: 0, next_attempt_at: new Date() } })
     } else if (action === 'handoff') {
+      // A shopper is only reached through a job: with no live job there is nothing to hand off.
+      if (contact.kind === 'shopper' && !(await runs.getOpenRun(contact.id)) && !(await liveJobOf(contact.id))) {
+        return NextResponse.json({ error: 'This customer has no live job to hand off' }, { status: 409 })
+      }
       await ensureRun(contact)
       await runs.handOff({ contactId: id, reason: note ?? 'Handed off by an admin', channel: 'follow_up', actor: admin.label, now: new Date() })
     } else if (action === 'resume') {

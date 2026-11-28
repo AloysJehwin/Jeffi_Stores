@@ -80,6 +80,12 @@ describe('listSkills and getSkillDetail', () => {
         updated_at: '2026-11-27T00:00:00.000Z',
         list_count: 2,
         is_default: false,
+        status: 'active',
+        audience: 'lead',
+        purpose: 'transactional',
+        trigger_event: 'manual',
+        inputs: {},
+        outcomes: [],
       },
     ])
     const [text, params] = h.query.mock.calls[0]
@@ -130,7 +136,7 @@ describe('createSkill', () => {
     const out = await createSkill({ tenantId: null, program: 'showcase-offer', content: GOOD, actor })
     expect(out.skill.slug).toBe('demo')
     expect(out.validation.ok).toBe(true)
-    expect(calls(/INSERT INTO outreach_skills/)[0][1]).toEqual([null, 'showcase-offer', 'demo', 'Demo skill', 'A test', 'a1'])
+    expect(calls(/INSERT INTO outreach_skills/)[0][1]).toEqual([null, 'showcase-offer', 'demo', 'Demo skill', 'A test', 'active', 'lead', 'transactional', 'manual', 'a1'])
     const vp = calls(/INSERT INTO outreach_skill_versions/)[0][1] as unknown[]
     expect(vp[1]).toBe(GOOD)
     expect(vp[3]).toMatch(/^[0-9a-f]{64}$/)
@@ -178,7 +184,7 @@ describe('addSkillVersion', () => {
     expect(out.version.version).toBe(3)
     expect(calls(/INSERT INTO outreach_skill_versions/)[0][0]).toContain('COALESCE(MAX(version), 0) + 1')
     const up = calls(/UPDATE outreach_skills SET current_version_id/)[0]
-    expect(up[1]).toEqual([SKILL_ID, '33333333-3333-4333-8333-333333333333', 'Demo skill', 'A test'])
+    expect(up[1]).toEqual([SKILL_ID, '33333333-3333-4333-8333-333333333333', 'Demo skill', 'A test', 'lead', 'transactional', 'manual'])
     expect(h.recordEvent).toHaveBeenCalledWith(null, 'skill_version_added', expect.objectContaining({ data: expect.objectContaining({ version: 3 }) }))
   })
 })

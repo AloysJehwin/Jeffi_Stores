@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
-import { runDueAgentTasks } from '@controller/lib/outreach/agent/runtime'
+import { runDueAgentTasks, runDueJobs } from '@controller/lib/outreach/agent/runtime'
 import { runOutreachWorker } from '@controller/lib/outreach/worker'
 
 export const dynamic = 'force-dynamic'
@@ -8,8 +8,8 @@ export const runtime = 'nodejs'
 export const maxDuration = 120
 
 // Platform job: dials the outreach contacts that are due (window, caps, DND, suppression and attempts enforced in
-// lib/outreach/worker.ts), settles calls that never reported an end, then runs the agent's own due tasks (follow-up
-// turns and calls it scheduled). Each half is isolated: one failing does not stop the other.
+// lib/outreach/worker.ts), settles calls that never reported an end, starts the task-agent jobs that are due (one live
+// job per phone, calling window enforced), then runs the agent's own due tasks (follow-up turns and calls it scheduled). Each half is isolated: one failing does not stop the other.
 export async function GET(req: NextRequest) {
   if (!verifyCronRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const errors: string[] = []
@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
     }
   }
   const worker = await attempt(runOutreachWorker, 'Outreach run')
+  const jobs = await attempt(runDueJobs, 'Job run')
   const agent = await attempt(runDueAgentTasks, 'Agent run')
-  if (errors.length) return NextResponse.json({ ...(worker ?? {}), agent, error: errors[0] }, { status: 500 })
-  return NextResponse.json({ ...worker, agent })
+  if (errors.length) return NextResponse.json({ ...(worker ?? {}), jobs, agent, error: errors[0] }, { status: 500 })
+  return NextResponse.json({ ...worker, jobs, agent })
 }

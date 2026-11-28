@@ -1,9 +1,11 @@
-import type { AgentChannel, LlmToolSchema, ToolDef, ToolEffect } from './types'
+import type { AgentChannel, LlmToolSchema, ToolDef, ToolEffect, ToolGroup } from './types'
 import { getLead, logOutcome, markOutcome, recordConsent, updateLead } from './tools/lead'
 import { handOff, optOut, placeCall, scheduleCallback, scheduleFollowUp } from './tools/ops'
 import { sendLink, readMessages, sendWhatsAppTemplate, sendWhatsAppText } from './tools/messaging'
 import { addDetails, getSiteStatus, publishSite, requestChange, startPreview } from './tools/showcase'
 import { endCall, switchLanguage } from './tools/voice'
+import { JOB_TOOLS } from './tools/jobs'
+import { STORE_TOOLS } from './tools/store'
 
 // The tool catalog (docs/plans/OUTREACH_AGENT_SKILLS.md §1): every capability the agent can use, in catalog order.
 
@@ -30,6 +32,8 @@ const ORDERED: ToolDef<any>[] = [
   scheduleFollowUp,
   endCall,
   switchLanguage,
+  ...JOB_TOOLS,
+  ...STORE_TOOLS,
 ]
 
 export const TOOLS: Record<string, ToolDef> = Object.fromEntries(ORDERED.map(t => [t.name, t]))
@@ -45,6 +49,6 @@ export function allowedTools(channel: AgentChannel, allow: readonly string[]): T
 
 export const llmSchemas = (defs: ToolDef[]): LlmToolSchema[] => defs.map(t => ({ name: t.name, description: t.description, input_schema: t.inputSchema }))
 
-export function catalogSummary(): { name: string; description: string; channels: AgentChannel[]; effect: ToolEffect; mandatory: boolean; inputSchema: Record<string, unknown> }[] {
-  return ORDERED.map(t => ({ name: t.name, description: t.description, channels: [...t.channels], effect: t.effect, mandatory: !!t.mandatory, inputSchema: t.inputSchema }))
+export function catalogSummary(): { name: string; description: string; channels: AgentChannel[]; effect: ToolEffect; mandatory: boolean; group: ToolGroup; inputSchema: Record<string, unknown> }[] {
+  return ORDERED.map(t => ({ name: t.name, description: t.description, channels: [...t.channels], effect: t.effect, mandatory: !!t.mandatory, group: t.group ?? 'showcase', inputSchema: t.inputSchema }))
 }

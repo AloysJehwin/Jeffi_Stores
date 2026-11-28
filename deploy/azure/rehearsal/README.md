@@ -62,7 +62,8 @@ The copy runs under your `az` login and writes only the rehearsal vault. To remo
 | `campaigns` | `enabled = false` |
 | `email_campaigns` | `scheduled`/`sending`/`active`/`queued` set to `draft` |
 | `email_campaign_logs` | `deferred` set to `skipped` |
-| `messages`, `bulk_jobs`, `bulk_job_items` | `queued`/`running`/`pending` set to `cancelled` |
+| `messages`, `bulk_job_items` | `queued`/`pending` set to `skipped` (their status checks have no `cancelled`) |
+| `bulk_jobs` | `queued`/`running` set to `cancelled` |
 | `outreach_program_state` | `enabled = false` |
 | `provisioning_jobs` | `pending`/`running` set to `failed` |
 
@@ -72,9 +73,9 @@ Stores' own databases are on AWS and are not part of this copy, so there is no p
 
 ## Prerequisites
 
-1. Postgres `jeffi-prod-pg` created (waits on the Microsoft quota) and `deploy/azure/pg-init.sh --apply` done.
+1. The self-hosted Postgres pod `flagship-postgres-0` running on the core (`pg-disk.sh --apply`, `postgres.yaml` applied) and `deploy/azure/pg-init.sh --apply` done. The scripts reach it through `kubectl port-forward` on local port `AZ_PG_PORT` (15433, apart from the RDS tunnel's 15432).
 2. Kubeconfig at `~/.kube/jeffi-azure.yaml`; IRSA (README step 7) and the overlay values (step 8) done. `CLUSTER_INGRESS_IP` is a REPLACE_ME until the AWS edge exists: pass `--ingress-ip <ip>` for the rehearsal.
-3. `az login`, AWS credentials, Tailscale up and accepting routes. `jq` installed.
+3. `az login`, AWS credentials, Tailscale up (the Azure kubeconfig's API address; no subnet route needed). `jq` installed.
 4. For `--restore` or `restore-dump.sh`: docker running, and the core's SSH key or `session-manager-plugin`.
 5. For `rehearse.sh --apply`: `certs/ca-cert.pem` and friends in the repo root (`secrets.sh`); for the store round trip, a file with an administrator's `Cookie: ...` header line.
 
@@ -113,6 +114,14 @@ To look at it in a browser, put `<Azure IP> ecom.jeffistores.in admin.jeffistore
 - **restore log:** `restore-jeffi_stores.log` beside the dump. Missing-role or extension lines are expected; a table, index or constraint error is not.
 - **Smoke:** no `FAIL`. The store check hits the store host through the Azure IP; if store routes live only on the AWS edge it fails for that reason.
 - **Store round trip:** per-step time from `provisioning_jobs`, and no leftover namespace, EC2 node or EBS volume (the last command printed checks EC2).
+
+## If the SSM tunnel stalls
+
+On 2026-11-27 `restore-dump.sh`'s dump over the SSM port-forward stalled twice (the tunnel stopped answering after 57 MB and 10 MB), and a `kubectl exec` stream from the Mac dropped too. What worked: a one-off `postgres:16-alpine` pod in `jeffi` (so the flagship-postgres NetworkPolicy admits it), pinned to the AWS tenant edge (`kubernetes.io/hostname: tenant-edge`, toleration `jeffi.io/edge`), which reaches RDS inside the VPC and the Azure pod over the cluster network. Detached inside the pod (`nohup`), with a 0600 PGPASSFILE written through `kubectl exec -i` (end the command with output, e.g. `&& wc -l`, or kubectl may drop short stdin):
+- `pg_dump -Fc` from RDS as app_user with an IAM token: 31 s for 165 MB;
+- `pg_restore -f /dev/null` (a full read-back) and an empty-target check;
+- `pg_restore --no-owner --no-acl -L <list without EXTENSION entries> -j 4` into `flagship-postgres.jeffi.svc.cluster.local` as app_user, `sslmode=require`: 322 s;
+then `restore-dump.sh --apply --scrub-only` from the Mac, and delete the pod (it holds the dump and the password file).
 
 ## Caveats
 

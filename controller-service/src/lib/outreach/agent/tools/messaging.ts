@@ -5,9 +5,14 @@ import { createClaimToken } from '../../claim'
 import { outreachPool } from '../../db'
 import { LINES } from '../../prompt'
 import { sendOutreachTemplate, sendOutreachText } from '../../whatsapp'
+import { isShopperTemplate, SHOPPER_TEMPLATES } from '../store/template-slugs'
 import { deniesBeingAi, sendQuota } from '../guards'
 import type { ToolDef, ToolResult } from '../types'
 import { advance, ALL, isPublished, lastMessages, linkFor, liveUrlOf, refusal, siteOf, str } from './common'
+
+// Contacts of the flagship-store program (kind shopper) get the store's templates; leads keep the outreach ones.
+const isShopperContact = (c: { program?: string; kind?: string }) => c.program === 'store' || c.kind === 'shopper'
+const LEAD_TEMPLATES = ['details_needed', 'callback', 'trial_ending'] as const
 
 const sendLinkArgs = z.object({ kind: z.enum(['preview', 'live', 'claim']) })
 export const sendLink: ToolDef<typeof sendLinkArgs> = {
@@ -55,24 +60,31 @@ export const sendLink: ToolDef<typeof sendLinkArgs> = {
   },
 }
 
-const sendTemplateArgs = z.object({ template: z.enum(['details_needed', 'callback', 'trial_ending']), missing: z.array(z.string().trim().min(1).max(60)).max(8).optional() })
+const sendTemplateArgs = z.object({ template: z.enum([...LEAD_TEMPLATES, ...SHOPPER_TEMPLATES]), missing: z.array(z.string().trim().min(1).max(60)).max(8).optional() })
 export const sendWhatsAppTemplate: ToolDef<typeof sendTemplateArgs> = {
   name: 'sendWhatsAppTemplate',
   description:
-    'Send one of the approved WhatsApp messages: details_needed (what we still need for their site), callback (confirms the call back time we booked), trial_ending (their trial is about to end). The button link is added by the system. Needs their WhatsApp consent.',
+    'Send one of the approved WhatsApp messages. For a business lead: details_needed (what we still need for their site), callback (confirms the call back time we booked), trial_ending (their trial is about to end); the button link is added by the system. For a store customer: order/confirmed, order/shipped, order/out-for-delivery, order/delivered, order/payment-failed (about their order) or cart/abandoned (their cart); every detail is filled in by the system. Needs their WhatsApp consent.',
   channels: ALL,
   effect: 'send',
+  group: 'messaging',
   args: sendTemplateArgs,
   inputSchema: {
     type: 'object',
     properties: {
-      template: { type: 'string', enum: ['details_needed', 'callback', 'trial_ending'] },
+      template: { type: 'string', enum: [...LEAD_TEMPLATES, ...SHOPPER_TEMPLATES], description: 'lead: details_needed | callback | trial_ending; store customer: the order/* and cart/abandoned messages' },
       missing: { type: 'array', items: str('one missing detail', 60), maxItems: 8, description: 'details_needed only: what is still missing; defaults to what the site brief lacks' },
     },
     required: ['template'],
   },
   async run(ctx, a) {
     const { contact, language, limits, now, actor, call } = ctx
+    if (isShopperContact(contact)) {
+      if (!isShopperTemplate(a.template)) return refusal('unknown_template', ctx)
+      const { sendShopperTemplate } = await import('../store/templates')
+      return sendShopperTemplate(ctx, a.template)
+    }
+    if (isShopperTemplate(a.template)) return refusal('unknown_template', ctx)
     const q = await sendQuota(contact.id, 'template', limits, now)
     if (q) return refusal(q, ctx, LINES[language].failedSoft)
     let callbackAt: Date | undefined
@@ -128,5 +140,22 @@ export const readMessages: ToolDef<typeof readMessagesArgs> = {
   async run({ contact }, a): Promise<ToolResult> {
     const messages = await lastMessages(contact.id, a.limit ?? 10)
     return { ok: true, data: { messages } }
+  },
+}
+
+const sendSmsArgs = z.object({ template: z.enum(SHOPPER_TEMPLATES) })
+export const sendSms: ToolDef<typeof sendSmsArgs> = {
+  name: 'sendSms',
+  description:
+    "Send a store customer an SMS from the store's approved messages: order/confirmed, order/shipped, order/out-for-delivery, order/delivered, order/payment-failed (about their order) or cart/abandoned (their cart). Every detail and link is filled in by the system. A promotional agent also needs the customer not to have opted out of marketing and a DND-clear number.",
+  channels: ALL,
+  effect: 'send',
+  group: 'messaging',
+  args: sendSmsArgs,
+  inputSchema: { type: 'object', properties: { template: { type: 'string', enum: [...SHOPPER_TEMPLATES], description: 'which approved SMS to send' } }, required: ['template'] },
+  async run(ctx, a) {
+    if (!isShopperContact(ctx.contact)) return refusal('not_for_this_contact', ctx)
+    const { sendShopperSms } = await import('../store/templates')
+    return sendShopperSms(ctx, a.template)
   },
 }

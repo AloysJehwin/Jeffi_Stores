@@ -46,7 +46,7 @@ describe('/api/admin/ecom/outreach/skills', () => {
     expect(requireAdminScope).toHaveBeenCalledWith(expect.anything(), 'ecom_outreach:read')
     expect(j.skills).toEqual([{ id: 's1', slug: 'demo' }])
     expect(j.defaultSkillId).toBe('s1')
-    expect(j.builtins.map((b: { slug: string }) => b.slug)).toEqual(['showcase-offer', 'showcase-two-call', 'showcase-whatsapp-only'])
+    expect(j.builtins.map((b: { slug: string }) => b.slug)).toEqual(['showcase-offer', 'showcase-two-call', 'showcase-whatsapp-only', 'post-order-review', 'cod-confirmation', 'abandoned-checkout'])
     expect(j.builtins[0].content).toContain('## Voice')
     expect(m.list).toHaveBeenCalledWith({ tenantId: null, program: 'showcase-offer', includeArchived: true })
     expect((await GET(new NextRequest(url + '?program=nope'))).status).toBe(404)

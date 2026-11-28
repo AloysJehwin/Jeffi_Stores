@@ -68,7 +68,7 @@ export default function OutreachListsClient() {
   const [skills, setSkills] = useState<SkillSummary[]>([])
   const [versions, setVersions] = useState<Record<string, SkillVersionRow[]>>({})
   useEffect(() => {
-    api<{ skills: SkillSummary[] }>(`${API}/skills?program=showcase-offer`).then(({ ok, data }) => ok && setSkills(data.skills.filter(s => !s.archived_at)))
+    api<{ skills: SkillSummary[] }>(`${API}/skills?program=showcase-offer`).then(({ ok, data }) => ok && setSkills(data.skills.filter(s => !s.archived_at && s.audience !== 'shopper')))
   }, [])
   const loadVersions = useCallback(async (skillId: string) => {
     const { ok, data } = await api<{ versions: SkillVersionRow[] }>(`${API}/skills/${skillId}`)
@@ -82,11 +82,11 @@ export default function OutreachListsClient() {
     setBusy(`skill-${l.id}`)
     const { ok, data } = await api<{ list: OutreachList }>(`${API}/lists/${l.id}`, { method: 'PATCH', json: { skill_id: skillId, skill_version_id: versionId } })
     setBusy(null)
-    if (!ok) return toast.error(data.error || 'Could not change the skill')
+    if (!ok) return toast.error(data.error || 'Could not change the agent')
     const title = skillId ? skills.find(s => s.id === skillId)?.title ?? l.skill_title ?? null : null
     setLists(cur => cur && cur.map(x => (x.id === l.id ? { ...x, ...data.list, skill_title: title } : x)))
     if (skillId && !versions[skillId]) loadVersions(skillId)
-    toast.success(skillId ? (versionId ? 'Skill pinned' : 'Skill set') : 'Using the program default skill')
+    toast.success(skillId ? (versionId ? 'Agent pinned' : 'Agent set') : 'Using the program default agent')
   }
 
   async function upload() {
@@ -182,9 +182,9 @@ export default function OutreachListsClient() {
                   )}
                 </div>
                 <div className="basis-full flex flex-wrap items-center gap-2">
-                  <select aria-label={`Skill for ${l.name}`} className={`${inputCls} sm:w-64`} value={l.skill_id ?? ''} disabled={!canWrite || busy === `skill-${l.id}`} onChange={e => setSkill(l, e.target.value || null, null)}>
+                  <select aria-label={`Agent for ${l.name}`} className={`${inputCls} sm:w-64`} value={l.skill_id ?? ''} disabled={!canWrite || busy === `skill-${l.id}`} onChange={e => setSkill(l, e.target.value || null, null)}>
                     <option value="">Program default</option>
-                    {l.skill_id && !skills.some(s => s.id === l.skill_id) && <option value={l.skill_id}>{l.skill_title || 'Archived skill'}</option>}
+                    {l.skill_id && !skills.some(s => s.id === l.skill_id) && <option value={l.skill_id}>{l.skill_title || 'Archived agent'}</option>}
                     {skills.map(s => (
                       <option key={s.id} value={s.id}>{s.title}</option>
                     ))}

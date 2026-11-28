@@ -7,7 +7,7 @@
 # With asm-exec on PATH, values are resolved through it ({{resolve:secretsmanager:...}}) instead of the AWS CLI.
 #
 #   --patch <kv-secret> <KEY>   set one key of a JSON secret in the vault from stdin (read silently). Needs --apply.
-#   --azure-db                  point the service secrets (AZ_DB_SECRETS) at the Flexible Server: app_user's URL, its
+#   --azure-db                  point the service secrets (AZ_DB_SECRETS) at the self-hosted Postgres pod: app_user's URL, its
 #                               password from pg-app-password, in DATABASE_URL, CONTROL_PLANE_DATABASE_URL and any
 #                               MESSAGING_/DOCUMENTS_DATABASE_URL, and the RDS IAM flags set to false. pg-init.sh runs
 #                               it. Once pg-app-password exists the plain sync applies the same overrides, so copying
@@ -18,7 +18,7 @@
 set -euo pipefail
 KV=${AZ_KEY_VAULT:-jeffi-prod-kv}
 REGION=${AWS_REGION:-us-east-1}
-AZ_PG_HOST=${AZ_PG_HOST:-jeffi-prod-pg.postgres.database.azure.com} # as deploy/k8s/db/lib.sh
+AZ_PG_HOST=${AZ_PG_HOST:-flagship-postgres.jeffi.svc.cluster.local} # as deploy/k8s/db/lib.sh (in-cluster, so port 5432)
 AZ_DB_SECRETS="jeffi-production jeffi-store jeffi-messaging-production jeffi-documents-production jeffi-public-api-production jeffi-mobile-production"
 APPLY=false LOCAL=false ONLY='' PATCH=() AZDB=false
 while [ $# -gt 0 ]; do case $1 in
@@ -40,7 +40,7 @@ sum() { [ -s "$1" ] && shasum -a 256 "$1" | cut -d' ' -f1 || echo none; }
 kv_read() { az keyvault secret show --vault-name "$KV" --name "$1" --query value -o json 2>/dev/null | unjson "$2" 2>/dev/null || : > "$2"; }
 kv_write() { az keyvault secret set --vault-name "$KV" --name "$1" --file "$2" --encoding utf-8 --output none; }
 
-# app_user's Flexible Server URL into $tmp/dburl, once pg-app-password exists (pg-init.sh); otherwise no file.
+# app_user's in-cluster URL into $tmp/dburl, once pg-app-password exists (pg-init.sh); otherwise no file.
 kv_read pg-app-password "$tmp/pgpw"
 if [ -s "$tmp/pgpw" ]; then
   python3 -I -c 'import sys, urllib.parse

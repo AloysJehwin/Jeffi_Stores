@@ -683,6 +683,19 @@ export const CRON_JOBS: readonly CronJob[] = [
     k8sOnly: true,
   },
   {
+    // Platform job: task-agent event triggers (controller lib/outreach/agent/store/triggers.ts). k8s only, like the dialler.
+    id: 'outreach_triggers',
+    name: 'Outreach agent triggers',
+    path: '/api/cron/outreach-triggers',
+    method: 'GET',
+    intervalMs: 10 * MIN,
+    intervalLabel: 'every 10 min',
+    startDelayMs: 395 * SEC,
+    lockTtlMs: 10 * MIN - 30 * SEC,
+    tenantScope: null,
+    k8sOnly: true,
+  },
+  {
     // Platform job: nightly sum of every tenant's S3 bucket, drives the storage.s3Gb cap guard.
     id: 's3_usage',
     name: 'Tenant S3 bucket usage',

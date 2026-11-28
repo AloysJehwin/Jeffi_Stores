@@ -1,9 +1,10 @@
 #!/bin/bash
 # Deploy main.bicep at subscription scope. Without --apply: preflight (subscription, providers, Epsv6 quota, SKU
 # restrictions) and `what-if` only, nothing created. --core adds the k3s core VM (second pass, after kv-sync.sh).
-# The Postgres admin password is generated on the first pass and read back from Key Vault afterwards; it goes
-# through a 0600 parameters file, never argv or the terminal.
-# Usage: [PG_SKU=Standard_B2s] [PG_ZONE=1|2|3] [DEPLOY_PG=false] bash deploy/azure/apply.sh [--core] [--apply]
+# The Postgres admin password (the self-hosted pod's superuser) is generated on the first pass and read back from Key
+# Vault afterwards; it goes through a 0600 parameters file, never argv or the terminal.
+# The self-hosted Postgres disk and backup resources are always deployed; a managed Flexible Server is opt-in (DEPLOY_PG=true).
+# Usage: [PG_SKU=Standard_B2s] [PG_ZONE=1|2|3] [DEPLOY_PG=true] bash deploy/azure/apply.sh [--core] [--apply]
 set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)
 SUBSCRIPTION=${AZ_SUBSCRIPTION:-Azure subscription 1}
@@ -48,7 +49,7 @@ PW="$pw" SSH_KEY="$ssh_key" OPERATOR="$operator" CORE=$CORE python3 -I -c '
 import json, os
 p = {"pgAdminPassword": os.environ["PW"], "deployCore": os.environ["CORE"] == "true",
      "pgSku": os.environ.get("PG_SKU") or "Standard_B2s", "pgZone": os.environ.get("PG_ZONE", ""),
-     "deployPostgres": os.environ.get("DEPLOY_PG", "true") != "false",
+     "deployPostgres": os.environ.get("DEPLOY_PG", "false") == "true",
      "sshPublicKey": os.environ["SSH_KEY"], "operatorPrincipalId": os.environ["OPERATOR"]}
 print(json.dumps({"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0", "parameters": {k: {"value": v} for k, v in p.items()}}))' > "$tmp/params.json"

@@ -1,5 +1,6 @@
-# The flagship Postgres has only a private address: its name resolves through Azure DNS, reached from the core
-# directly and from AWS nodes over the core's Tailscale route to 168.63.129.16 (nodes run tailscale --accept-routes).
+# Only for a managed Flexible Server (deployPostgres=true in the Bicep), which is not deployed: the flagship Postgres is
+# the in-cluster flagship-postgres Service. A managed server's private name resolves through Azure DNS, reached over
+# the core's Tailscale route to 168.63.129.16 (nodes run tailscale --accept-routes).
 # k3s's CoreDNS imports every *.server key of this ConfigMap.
 apiVersion: v1
 kind: ConfigMap

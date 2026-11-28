@@ -18,3 +18,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_outreach_agent_runs_open ON public.outreac
 CREATE INDEX IF NOT EXISTS idx_outreach_agent_runs_contact ON public.outreach_agent_runs (contact_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_outreach_agent_tasks_due ON public.outreach_agent_tasks (status, due_at);
 CREATE INDEX IF NOT EXISTS idx_outreach_agent_tasks_contact ON public.outreach_agent_tasks (contact_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_outreach_jobs_dedupe ON public.outreach_jobs (skill_id, source_ref) WHERE source_ref IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_outreach_jobs_due ON public.outreach_jobs (status, due_at);
+CREATE INDEX IF NOT EXISTS idx_outreach_jobs_skill ON public.outreach_jobs (skill_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_outreach_jobs_contact ON public.outreach_jobs (contact_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_outreach_agent_runs_job ON public.outreach_agent_runs (job_id);

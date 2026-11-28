@@ -1,6 +1,6 @@
 {
  "version": 1,
- "manifestHash": "67344222c0ae6016d56e7c6d68526effdc74645d9cb6af428eecf5724307bd58",
+ "manifestHash": "0ed1930e5ed37a6b80014135a6594fe195fcb2b1b02dd76b8749a6bf2125cb20",
  "routes": [
   {
    "id": "admin POST /api/admin/access-request",
@@ -50397,6 +50397,208 @@
    "command": "platform numbers available"
   },
   {
+   "id": "platform GET /api/admin/ecom/outreach/agents/{id}/jobs",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/agents/{id}/jobs",
+   "gatewayPath": "/v1/platform/ecom/outreach/agents/{id}/jobs",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/agents/[id]/jobs/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [
+    "outcome",
+    "page",
+    "status"
+   ],
+   "queryParams": [
+    {
+     "name": "outcome",
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "name": "page",
+     "schema": {
+      "type": "number"
+     }
+    },
+    {
+     "name": "status",
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET ?status=&outcome=&page= → { rows: JobListRow[], total, page, pageSize }",
+   "command": "platform outreach-agents jobs"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/agents/{id}/jobs",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/agents/{id}/jobs",
+   "gatewayPath": "/v1/platform/ecom/outreach/agents/{id}/jobs",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/agents/[id]/jobs/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "inputs": {
+        "type": "object",
+        "additionalProperties": {}
+       },
+       "dueAt": {
+        "type": "string",
+        "format": "date-time"
+       }
+      },
+      "required": [
+       "inputs"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "rows": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "inputs": {
+           "type": "object",
+           "additionalProperties": {}
+          },
+          "dueAt": {
+           "type": "string",
+           "format": "date-time"
+          }
+         },
+         "required": [
+          "inputs"
+         ]
+        },
+        "minItems": 1,
+        "maxItems": 200
+       }
+      },
+      "required": [
+       "rows"
+      ]
+     }
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { inputs, dueAt? } (the form) or { rows: [{ inputs, dueAt? }] } (the API) → { results: { ok, created, jobId?, errors }[] }",
+   "command": "platform outreach-agents jobs-create"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/agents/{id}/jobs/import",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/agents/{id}/jobs/import",
+   "gatewayPath": "/v1/platform/ecom/outreach/agents/{id}/jobs/import",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/agents/[id]/jobs/import/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary"
+     },
+     "mapping": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ]
+   },
+   "bodySource": "inferred",
+   "bodyContentType": "multipart/form-data",
+   "summary": "POST multipart { file (csv/xlsx), mapping: JSON { <inputName>: <column header> } } → { created, duplicates, failed: { row, errors }[] }",
+   "command": "platform outreach-agents-jobs import"
+  },
+  {
+   "id": "platform POST /api/admin/ecom/outreach/agents/{id}/jobs/test",
+   "host": "platform",
+   "method": "POST",
+   "path": "/api/admin/ecom/outreach/agents/{id}/jobs/test",
+   "gatewayPath": "/v1/platform/ecom/outreach/agents/{id}/jobs/test",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/agents/[id]/jobs/test/route.ts",
+   "pathParams": [
+    {
+     "name": "id",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "inputs": {
+      "type": "object",
+      "additionalProperties": {}
+     }
+    },
+    "required": [
+     "inputs"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "POST { inputs } → a test job due now, for one of the program's test numbers only (like the test call).",
+   "command": "platform outreach-agents-jobs test"
+  },
+  {
    "id": "platform GET /api/admin/ecom/outreach/calls/{id}",
    "host": "platform",
    "method": "GET",
@@ -50566,6 +50768,72 @@
    "body": null,
    "summary": "GET ?limit&contactId → the audit trail, newest first.",
    "command": "platform outreach events"
+  },
+  {
+   "id": "platform GET /api/admin/ecom/outreach/jobs/{jobId}",
+   "host": "platform",
+   "method": "GET",
+   "path": "/api/admin/ecom/outreach/jobs/{jobId}",
+   "gatewayPath": "/v1/platform/ecom/outreach/jobs/{jobId}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/jobs/[jobId]/route.ts",
+   "pathParams": [
+    {
+     "name": "jobId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": null,
+   "summary": "GET → the job with its contact, run, calls, messages and tool calls.",
+   "command": "platform outreach-jobs get"
+  },
+  {
+   "id": "platform PATCH /api/admin/ecom/outreach/jobs/{jobId}",
+   "host": "platform",
+   "method": "PATCH",
+   "path": "/api/admin/ecom/outreach/jobs/{jobId}",
+   "gatewayPath": "/v1/platform/ecom/outreach/jobs/{jobId}",
+   "file": "controller-service/src/app/api/(admin)/admin/ecom/outreach/jobs/[jobId]/route.ts",
+   "pathParams": [
+    {
+     "name": "jobId",
+     "catchAll": false,
+     "optional": false
+    }
+   ],
+   "query": [],
+   "queryParams": [],
+   "scope": "ecom_outreach:read",
+   "scopeSource": "path",
+   "scopes": [],
+   "guard": "delegated",
+   "platform": "admin",
+   "body": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "cancel",
+       "retry"
+      ]
+     }
+    },
+    "required": [
+     "action"
+    ]
+   },
+   "bodySource": "zod",
+   "bodyContentType": "application/json",
+   "summary": "PATCH { action: 'cancel' | 'retry' } → the job. A retry needs a failed or cancelled job.",
+   "command": "platform outreach-jobs update"
   },
   {
    "id": "platform GET /api/admin/ecom/outreach/lists",
@@ -50989,12 +51257,20 @@
      "current_version_id": {
       "type": "string",
       "format": "uuid"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "draft",
+       "active",
+       "paused"
+      ]
      }
     }
    },
    "bodySource": "zod",
    "bodyContentType": "application/json",
-   "summary": "PATCH { title?, description?, current_version_id? } → set the title, description or which version is current.",
+   "summary": "PATCH { title?, description?, current_version_id?, status? } → set the title, description, which version is current, or the agent's status (draft | active | paused).",
    "command": "platform outreach-skills update"
   },
   {

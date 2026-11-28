@@ -1,6 +1,7 @@
 import { outreachPool } from './db'
 import { recordEvent } from './events'
 import { getProgramState } from './program-state'
+import { getProgram } from './programs/_registry'
 import { asLanguage, isLanguage } from './prompt'
 import { readVoiceSettings } from './session'
 import { applyOptOut } from './tools'
@@ -195,7 +196,7 @@ async function recentRedials(contactId: string, now: Date): Promise<number> {
 
 async function tryRedial(contact: OutreachContact, call: OutreachCall, language: string, now: Date): Promise<boolean> {
   if (!isLanguage(language) || contact.opted_out_at || ['opted_out', 'suppressed', 'dnd'].includes(contact.status)) return false
-  const state = await getProgramState(contact.program).catch(() => null)
+  const state = await getProgramState(getProgram(contact.program) ? contact.program : 'showcase-offer').catch(() => null)
   if (!inCallingWindow(now, state)) return false
   const sup = await outreachPool().query(`SELECT 1 FROM outreach_suppressions WHERE phone = $1`, [contact.phone])
   if (sup.rows.length) return false

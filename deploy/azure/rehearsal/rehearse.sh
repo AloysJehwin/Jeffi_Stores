@@ -121,11 +121,12 @@ verify_pods() { # every running pod in jeffi / jeffi-edge carries every switch
   out=$(kubectl get pods -A -o json | jq -r --argjson want "$(cat "$SAFE_ENV")" '
     .items[] | select(.metadata.namespace as $n | ["jeffi", "jeffi-edge"] | index($n))
     | select(.metadata.deletionTimestamp == null and .status.phase != "Succeeded" and .status.phase != "Failed")
+    | select(.metadata.labels.app != "flagship-postgres") # the database: no outbound calls (safe-mode.jq leaves it as is)
     | .metadata.name as $p | .spec.containers[] | . as $c | $want[]
     | select(. as $w | ([$c.env[]? | select(.name == $w.name and .value == $w.value)] | length) == 0)
     | "\($p)/\($c.name) lacks \(.name)=\(.value)"')
   [ -z "$out" ] || { echo "$out" | head -20 >&2; echo "safe mode: a running pod is missing a switch" >&2; return 1; }
-  echo "all $(kubectl get pods -A -o json | jq '[.items[] | select(.metadata.namespace as $n | ["jeffi","jeffi-edge"] | index($n)) | select(.status.phase=="Running")] | length') running pods carry the switches"
+  echo "all $(kubectl get pods -A -o json | jq '[.items[] | select(.metadata.namespace as $n | ["jeffi","jeffi-edge"] | index($n)) | select(.status.phase=="Running" and .metadata.labels.app != "flagship-postgres")] | length') running app pods carry the switches (flagship-postgres exempt)"
 }
 verify_cronjobs() {
   local out
@@ -158,8 +159,8 @@ fi
 say "Render preview (what the platform scripts will apply)"
 rendered=$(PATH=$SHIM_DIR:$PATH kubectl kustomize "$REPO/deploy/k8s/overlays/azure-standby")
 if $SAFE; then
-  echo "CronJobs rendered suspended: $(jq -s '[.[] | .items[]? | select(.kind=="CronJob" and .spec.suspend==true)] | length' <<<"$rendered")"
-  echo "parked at 0 replicas: $(jq -r -s '[.[] | .items[]? | select(.kind=="Deployment" and .spec.replicas==0) | .metadata.name] | join(", ")' <<<"$rendered")"
+  echo "CronJobs rendered suspended: $(jq -s '[.[] | (.items // [.])[] | select(.kind=="CronJob" and .spec.suspend==true)] | length' <<<"$rendered")"
+  echo "parked at 0 replicas: $(jq -r -s '[.[] | (.items // [.])[] | select(.kind=="Deployment" and .spec.replicas==0) | .metadata.name] | join(", ")' <<<"$rendered")"
   echo "switches on every container: $(jq -r '[.[].name] | join(" ")' "$SAFE_ENV")"
 fi
 echo "hostnames in the manifests:"; hosts_of <<<"$rendered" | sed 's/^/   /'

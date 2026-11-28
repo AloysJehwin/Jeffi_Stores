@@ -14,7 +14,7 @@ export function fakeDb(): FakeDb {
   const db = { contact: null, suppressed: new Set<string>(), messages: [], events: [] } as unknown as FakeDb
   db.query = vi.fn(async (sql: string, p: any[] = []) => {
     if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return { rows: [] }
-    if (sql.includes('FROM outreach_contacts WHERE phone')) return { rows: db.contact && db.contact.phone === p[0] ? [db.contact] : [] }
+    if (sql.includes('FROM outreach_contacts WHERE phone') || sql.includes('FROM outreach_contacts c WHERE c.phone')) return { rows: db.contact && db.contact.phone === p[0] ? [db.contact] : [] }
     if (sql.includes('FROM outreach_contacts WHERE id')) return { rows: db.contact && db.contact.id === p[0] ? [db.contact] : [] }
     if (sql.includes('UPDATE outreach_contacts SET status')) {
       Object.assign(db.contact!, { status: p[1] }, sql.includes('opted_out_at') ? { opted_out_at: p[2] } : {})

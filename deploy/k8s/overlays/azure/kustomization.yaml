@@ -3,10 +3,11 @@
 # On top of the base:
 #   - the cluster identity: projected service-account tokens for AWS STS (self-hosted IRSA, deploy/azure/irsa) and
 #     for Entra (Key Vault, SECRETS_BACKEND=keyvault), on the platform services, the controller, ecr-refresh and
-#     cert-manager; DB_IAM_AUTH off and DB_SSL=require (the Flexible Server takes a password over TLS)
+#     cert-manager; DB_IAM_AUTH off and DB_SSL=require (the flagship Postgres takes a password over TLS)
 #   - the AWS tenant edge (../../edge): its Traefik, and store-facing copies of public-api (and mobile, parked) that
 #     only it routes to (the core's Traefik skips jeffi.io/edge-only routes, patches/traefik-core.yaml)
-#   - Azure DNS for the Postgres private zone, the provisioning config pointing store nodes at the core's Tailscale
+#   - the flagship Postgres (postgres.yaml): a StatefulSet on the core's data disk, its backup CronJob to Blob Storage
+#   - the provisioning config pointing store nodes at the core's Tailscale
 #     address and store hosts at the edge, with stores reaching the platform as tenantPlatformLink() describes
 # Fill every REPLACE_ME (azure.env, patches/provisioning.yaml) from apply.sh's outputs first: lib.sh refuses to
 # render the overlay while one is left.
@@ -17,6 +18,7 @@ resources:
   - ../../edge
   - identity.yaml
   - coredns-custom.yaml
+  - postgres.yaml
 configMapGenerator:
   - name: azure-identity
     namespace: jeffi

@@ -7,6 +7,7 @@ import { useActionToast } from '@/components/admin/kit/toast'
 import { API, MAX_SKILL_BYTES, skillBytes, type SkillValidation } from './shared'
 import { ValidationSummary } from './SkillValidationPanel'
 import SkillPreview from './SkillPreview'
+import AgentPanels from './AgentPanels'
 
 const DEBOUNCE_MS = 500
 
@@ -91,6 +92,7 @@ export default function SkillEditor({
   const canSave = canWrite && !saving && !checking && !tooBig && !!validation && validation.ok
 
   return (
+    <div className="space-y-5">
     <Card
       title={title}
       hint={hint}
@@ -110,14 +112,14 @@ export default function SkillEditor({
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="space-y-2 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <input ref={fileRef} aria-label="Skill file" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" disabled={!canWrite} onChange={e => pick(e.target.files?.[0])} className="block text-sm text-foreground-muted file:mr-3 file:rounded-lg file:border file:border-border-default file:bg-surface file:px-3 file:py-2 file:text-sm file:text-foreground" />
+            <input ref={fileRef} aria-label="Agent file" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" disabled={!canWrite} onChange={e => pick(e.target.files?.[0])} className="block text-sm text-foreground-muted file:mr-3 file:rounded-lg file:border file:border-border-default file:bg-surface file:px-3 file:py-2 file:text-sm file:text-foreground" />
             <span className={`ml-auto text-xs tabular-nums ${tooBig ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
               {(bytes / 1024).toFixed(1)} / 24 KB
             </span>
           </div>
-          <textarea aria-label="Skill content" rows={24} spellCheck={false} placeholder="---&#10;name: my-skill&#10;title: My skill&#10;---" className={`${inputCls} font-mono text-xs leading-relaxed`} value={content} disabled={!canWrite} onChange={e => setContent(e.target.value)} />
+          <textarea aria-label="Agent content" rows={24} spellCheck={false} placeholder="---&#10;name: my-agent&#10;title: My agent&#10;---" className={`${inputCls} font-mono text-xs leading-relaxed`} value={content} disabled={!canWrite} onChange={e => setContent(e.target.value)} />
           {tooBig && <p className="text-xs text-red-600 dark:text-red-400">The file is over 24 KB. Shorten it to save.</p>}
-          {taken && <p className="text-xs text-amber-700 dark:text-amber-400">A skill named {name} already exists. Change the name in the file first.</p>}
+          {taken && <p className="text-xs text-amber-700 dark:text-amber-400">An agent named {name} already exists. Change the name in the file first.</p>}
           {saveError && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400">
               {saveError.error}
@@ -134,5 +136,7 @@ export default function SkillEditor({
         </div>
       )}
     </Card>
+    {validation?.skill && <AgentPanels meta={validation.skill.meta} content={content} setContent={setContent} canEdit={canWrite} />}
+    </div>
   )
 }

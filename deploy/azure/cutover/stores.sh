@@ -159,7 +159,9 @@ rejoin_node() { # <node> <target> <server> <overTailscale>
 # unless --only picks one).
 rejoin_all() { # <target> <server> <overTailscale>
   local target=$1 server=$2 ts=$3 b key nodes n
-  b=$(batches); [ -n "$b" ] || die "no store nodes to move (manifest $(nodes_json))"
+  b=$(batches)
+  # No store nodes: every store runs on the platform's shared services, which the platform steps already move.
+  [ -n "$b" ] || { echo "   no store nodes on the AWS cluster: every store is served by the platform services; nothing to move"; return 0; }
   echo "   batches: $(cut -d' ' -f1 <<<"$b" | tr '\n' ' ')"
   # Batches arrive on fd 3 so the typed confirmation reads the terminal, not the list.
   while read -r key nodes <&3; do

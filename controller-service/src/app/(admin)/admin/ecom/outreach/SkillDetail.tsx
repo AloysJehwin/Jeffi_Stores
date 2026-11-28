@@ -1,14 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { api, Badge, btnGhost, when } from '@/components/admin/kit/core'
+import { api, Badge, btnGhost, btnPrimary, when } from '@/components/admin/kit/core'
 import { Card } from '@/components/admin/kit/layout'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { SkillMeta } from '@controller/lib/outreach/agent/types'
-import { API, versionRef, type SkillSummary, type SkillValidation, type SkillVersionRow } from './shared'
+import { AGENT_STATUS_LABEL, AGENT_STATUS_TONE, API, AUDIENCE_LABEL, PURPOSE_LABEL, versionRef, type SkillSummary, type SkillValidation, type SkillVersionRow } from './shared'
 import SkillEditor from './SkillEditor'
 import SkillPreview from './SkillPreview'
+import AgentPanels from './AgentPanels'
+import AgentJobsClient from './AgentJobsClient'
 
 type Detail = { skill: SkillSummary; versions: SkillVersionRow[]; lists: { id: string; name: string; pinned_version_id: string | null }[] }
 
@@ -28,10 +30,11 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [tab, setTab] = useState<'overview' | 'jobs'>('overview')
 
   const load = useCallback(async () => {
     const { ok, data } = await api<Detail>(`${API}/skills/${id}`)
-    if (!ok) return setError(data.error || 'Could not load the skill')
+    if (!ok) return setError(data.error || 'Could not load the agent')
     setError(null)
     setD(data)
   }, [id])
@@ -60,13 +63,23 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
     return { ok: true }
   }
 
+  async function setStatus(status: 'active' | 'paused') {
+    setBusy('status')
+    const { ok, data } = await api(`${API}/skills/${id}`, { method: 'PATCH', json: { status } })
+    setBusy(null)
+    if (!ok) return toast.error(data.error || `Could not ${status === 'active' ? 'activate' : 'pause'} the agent`)
+    toast.success(status === 'active' ? 'Agent activated' : 'Agent paused')
+    await load()
+    onChanged()
+  }
+
   async function archive() {
     setBusy('archive')
     const { ok, data } = await api(`${API}/skills/${id}`, { method: 'DELETE' })
     setBusy(null)
     setConfirming(false)
     if (!ok) return toast.error(data.error || 'Could not archive')
-    toast.success('Skill archived')
+    toast.success('Agent archived')
     onChanged()
     onBack()
   }
@@ -78,6 +91,9 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
   const previewing = viewing ?? versions.find(v => v.id === skill.current_version_id) ?? versions[0] ?? null
   const languages = ((previewing?.meta as Partial<SkillMeta> | undefined)?.languages ?? []) as string[]
   const archived = !!skill.archived_at
+  const current = versions.find(v => v.id === skill.current_version_id) ?? versions[0] ?? null
+  const curMeta = (current?.meta ?? {}) as Partial<SkillMeta>
+  const hasMeta = !!curMeta.name
 
   return (
     <div className="space-y-5">
@@ -86,13 +102,31 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
         hint={<span className="font-mono">{skill.slug}</span>}
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={AGENT_STATUS_TONE[skill.status]}>{AGENT_STATUS_LABEL[skill.status] ?? skill.status}</Badge>
+            <Badge tone="blue">{AUDIENCE_LABEL[skill.audience] ?? skill.audience}</Badge>
+            {skill.purpose === 'promotional' && <Badge tone="amber">{PURPOSE_LABEL.promotional}</Badge>}
             {skill.is_default && <Badge tone="green">Default</Badge>}
             {archived && <Badge tone="amber">Archived</Badge>}
             <button type="button" className={btnGhost} onClick={onBack}>
-              Back to skills
+              Back to agents
             </button>
+            {canWrite && !archived && skill.status !== 'active' && (
+              <button type="button" className={btnPrimary} disabled={busy === 'status'} onClick={() => setStatus('active')}>
+                Activate
+              </button>
+            )}
+            {canWrite && !archived && skill.status === 'active' && (
+              <button type="button" className={btnGhost} disabled={busy === 'status'} onClick={() => setStatus('paused')}>
+                Pause
+              </button>
+            )}
+            {canWrite && !archived && !confirming && current && (
+              <button type="button" className={btnGhost} onClick={() => { setDraft(current.content); setAdding(true); setTab('overview') }}>
+                Edit
+              </button>
+            )}
             {canWrite && !archived && !confirming && (
-              <button type="button" className={btnGhost} onClick={() => setAdding(a => !a)}>
+              <button type="button" className={btnGhost} onClick={() => { setDraft(''); setAdding(a => !a); setTab('overview') }}>
                 Upload new version
               </button>
             )}
@@ -116,12 +150,33 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
         }
       >
         {skill.description && <p className="text-sm text-foreground-muted">{skill.description}</p>}
+        {skill.status === 'draft' && !archived && <p className="mt-1 text-xs text-foreground-muted">A draft takes only test jobs. Activate it to add jobs and let its trigger run.</p>}
       </Card>
 
+      <div className="flex gap-1.5" role="tablist" aria-label="Agent sections">
+        {(['overview', 'jobs'] as const).map(t => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={`rounded-full border px-3 py-1 text-xs ${tab === t ? 'border-accent-500 text-foreground font-medium' : 'border-border-default text-foreground-muted hover:text-foreground'}`}
+          >
+            {t === 'overview' ? 'Overview' : 'Jobs'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'jobs' && (
+        <AgentJobsClient agentId={id} agentStatus={skill.status} inputs={skill.inputs ?? {}} outcomes={skill.outcomes ?? []} canWrite={canWrite && !archived} />
+      )}
+
+      {tab === 'overview' && (<>
       {adding && (
         <SkillEditor
           title="New version"
-          hint="Saved as the next version and made current."
+          hint="Saved as the next version and made current. Jobs already running keep their pinned version."
           content={draft}
           setContent={setDraft}
           onSave={addVersion}
@@ -193,9 +248,11 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
         </Card>
       )}
 
-      <Card title="Lists using this skill" flush>
+      {hasMeta && !adding && <AgentPanels meta={curMeta as SkillMeta} canEdit={false} />}
+
+      <Card title="Lists using this agent" flush>
         {!lists.length ? (
-          <p className="px-5 pb-5 text-sm text-foreground-muted">No list uses it yet. Pick it on the Lists tab, or make it the program default.</p>
+          <p className="px-5 pb-5 text-sm text-foreground-muted">No list uses it yet. Lists feed the Showcase flow; task agents work through jobs.</p>
         ) : (
           <ul className="divide-y divide-border-default/60">
             {lists.map(l => {
@@ -210,6 +267,7 @@ export default function SkillDetail({ id, existingSlugs, onBack, onChanged }: { 
           </ul>
         )}
       </Card>
+      </>)}
     </div>
   )
 }

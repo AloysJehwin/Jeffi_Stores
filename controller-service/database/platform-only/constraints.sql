@@ -32,3 +32,10 @@ ALTER TABLE ONLY public.outreach_agent_runs ADD CONSTRAINT outreach_agent_runs_s
 ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_kind_check CHECK ((kind = ANY (ARRAY['call'::text, 'whatsapp_turn'::text])));
 ALTER TABLE ONLY public.outreach_agent_tasks ADD CONSTRAINT outreach_agent_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'done'::text, 'cancelled'::text, 'failed'::text])));
+ALTER TABLE ONLY public.outreach_skills ADD CONSTRAINT outreach_skills_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'paused'::text])));
+ALTER TABLE ONLY public.outreach_skills ADD CONSTRAINT outreach_skills_audience_check CHECK ((audience = ANY (ARRAY['lead'::text, 'shopper'::text])));
+ALTER TABLE ONLY public.outreach_skills ADD CONSTRAINT outreach_skills_purpose_check CHECK ((purpose = ANY (ARRAY['transactional'::text, 'promotional'::text])));
+ALTER TABLE ONLY public.outreach_contacts ADD CONSTRAINT outreach_contacts_kind_check CHECK ((kind = ANY (ARRAY['lead'::text, 'shopper'::text])));
+ALTER TABLE ONLY public.outreach_jobs ADD CONSTRAINT outreach_jobs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.outreach_jobs ADD CONSTRAINT outreach_jobs_source_check CHECK ((source = ANY (ARRAY['csv'::text, 'sheet'::text, 'form'::text, 'api'::text, 'event'::text, 'test'::text])));
+ALTER TABLE ONLY public.outreach_jobs ADD CONSTRAINT outreach_jobs_status_check CHECK ((status = ANY (ARRAY['queued'::text, 'active'::text, 'waiting'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'handed_off'::text])));
